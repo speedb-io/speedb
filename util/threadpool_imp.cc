@@ -343,7 +343,7 @@ void ThreadPoolImpl::Impl::StartBGThreads() {
     auto th_handle = p_t.native_handle();
     std::string thread_priority = Env::PriorityToString(GetThreadPriority());
     std::ostringstream thread_name_stream;
-    thread_name_stream << "rocksdb:";
+    thread_name_stream << "speedb:";
     for (char c : thread_priority) {
       thread_name_stream << static_cast<char>(tolower(c));
     }

@@ -24,7 +24,7 @@ class RepeatableThread {
                    const std::string& thread_name, SystemClock* clock,
                    uint64_t delay_us, uint64_t initial_delay_us = 0)
       : function_(function),
-        thread_name_("rocksdb:" + thread_name),
+        thread_name_("speedb:" + thread_name),
         clock_(clock),
         delay_us_(delay_us),
         initial_delay_us_(initial_delay_us),

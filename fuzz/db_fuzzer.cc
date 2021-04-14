@@ -1,5 +1,7 @@
 #include <fuzzer/FuzzedDataProvider.h>
 
+#include <cassert>
+
 #include "rocksdb/db.h"
 
 enum OperationType {
@@ -42,25 +44,30 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
 
     switch (op) {
       case kPut: {
-        std::string key = fuzzed_data.ConsumeRandomLengthString();
-        std::string val = fuzzed_data.ConsumeRandomLengthString();
+        std::string key = fuzzed_data.ConsumeRandomLengthString(
+            fuzzed_data.remaining_bytes());
+        std::string val = fuzzed_data.ConsumeRandomLengthString(
+            fuzzed_data.remaining_bytes());
         db->Put(ROCKSDB_NAMESPACE::WriteOptions(), key, val);
         break;
       }
       case kGet: {
-        std::string key = fuzzed_data.ConsumeRandomLengthString();
+        std::string key = fuzzed_data.ConsumeRandomLengthString(
+            fuzzed_data.remaining_bytes());
         std::string value;
         db->Get(ROCKSDB_NAMESPACE::ReadOptions(), key, &value);
         break;
       }
       case kDelete: {
-        std::string key = fuzzed_data.ConsumeRandomLengthString();
+        std::string key = fuzzed_data.ConsumeRandomLengthString(
+            fuzzed_data.remaining_bytes());
         db->Delete(ROCKSDB_NAMESPACE::WriteOptions(), key);
         break;
       }
       case kGetProperty: {
         std::string prop;
-        std::string property_name = fuzzed_data.ConsumeRandomLengthString();
+        std::string property_name = fuzzed_data.ConsumeRandomLengthString(
+            fuzzed_data.remaining_bytes());
         db->GetProperty(property_name, &prop);
         break;
       }
@@ -114,9 +121,12 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
                                         column_families, &handles, &db);
 
         if (s.ok()) {
-          std::string key1 = fuzzed_data.ConsumeRandomLengthString();
-          std::string val1 = fuzzed_data.ConsumeRandomLengthString();
-          std::string key2 = fuzzed_data.ConsumeRandomLengthString();
+          std::string key1 = fuzzed_data.ConsumeRandomLengthString(
+              fuzzed_data.remaining_bytes());
+          std::string val1 = fuzzed_data.ConsumeRandomLengthString(
+              fuzzed_data.remaining_bytes());
+          std::string key2 = fuzzed_data.ConsumeRandomLengthString(
+              fuzzed_data.remaining_bytes());
           s = db->Put(ROCKSDB_NAMESPACE::WriteOptions(), handles[1], key1,
                       val1);
           std::string value;
@@ -137,8 +147,10 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
         break;
       }
       case kCompactRange: {
-        std::string slice_start = fuzzed_data.ConsumeRandomLengthString();
-        std::string slice_end = fuzzed_data.ConsumeRandomLengthString();
+        std::string slice_start = fuzzed_data.ConsumeRandomLengthString(
+            fuzzed_data.remaining_bytes());
+        std::string slice_end = fuzzed_data.ConsumeRandomLengthString(
+            fuzzed_data.remaining_bytes());
 
         ROCKSDB_NAMESPACE::Slice begin(slice_start);
         ROCKSDB_NAMESPACE::Slice end(slice_end);
@@ -147,7 +159,8 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
         break;
       }
       case kSeekForPrev: {
-        std::string key = fuzzed_data.ConsumeRandomLengthString();
+        std::string key = fuzzed_data.ConsumeRandomLengthString(
+            fuzzed_data.remaining_bytes());
         auto iter = db->NewIterator(ROCKSDB_NAMESPACE::ReadOptions());
         iter->SeekForPrev(key);
         delete iter;
@@ -155,6 +168,9 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
       }
       case OP_COUNT:
         break;
+      default: {
+        assert(false);
+      }
     }
   }
 

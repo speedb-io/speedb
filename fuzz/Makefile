@@ -7,11 +7,11 @@ ROOT_DIR = $(abspath $(shell pwd)/../)
 
 include $(ROOT_DIR)/make_config.mk
 
-PROTOBUF_CFLAGS = `pkg-config --cflags protobuf`
-PROTOBUF_LDFLAGS = `pkg-config --libs protobuf`
+PROTOBUF_CFLAGS = $(shell pkg-config --cflags protobuf)
+PROTOBUF_LDFLAGS = $(shell pkg-config --libs protobuf)
 
-PROTOBUF_MUTATOR_CFLAGS = `pkg-config --cflags libprotobuf-mutator`
-PROTOBUF_MUTATOR_LDFLAGS = `pkg-config --libs libprotobuf-mutator`
+PROTOBUF_MUTATOR_CFLAGS = $(shell pkg-config --cflags libprotobuf-mutator)
+PROTOBUF_MUTATOR_LDFLAGS = $(shell pkg-config --libs libprotobuf-mutator)
 
 ROCKSDB_INCLUDE_DIR = $(ROOT_DIR)/include
 ROCKSDB_LIB_DIR = $(ROOT_DIR)

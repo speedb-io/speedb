@@ -1654,6 +1654,7 @@ InternalIterator* DBImpl::NewInternalIterator(const ReadOptions& read_options,
   assert(arena != nullptr);
   assert(range_del_agg != nullptr);
   // Need to create internal iterator from the arena.
+  // this is for the new range query
   MergeIteratorBuilder merge_iter_builder(
       &cfd->internal_comparator(), arena,
       !read_options.total_order_seek &&

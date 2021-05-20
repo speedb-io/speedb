@@ -41,7 +41,8 @@ class MergeIteratorBuilder {
   // comparator: the comparator used in merging comparator
   // arena: where the merging iterator needs to be allocated from.
   explicit MergeIteratorBuilder(const InternalKeyComparator* comparator,
-                                Arena* arena, bool prefix_seek_mode = false);
+                                Arena* arena, bool prefix_seek_mode = false,
+                                bool is_query_iter = false);
   ~MergeIteratorBuilder();
 
   // Add iter to the merging iterator.

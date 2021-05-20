@@ -162,6 +162,19 @@ class IteratorWrapperBase {
     }
   }
 
+  InternalIteratorBase<TValue>* GetIter() const { return iter_; }
+
+  IteratorTargetState ValidateRange(const Slice& target,
+                                    const Comparator* cmp) {
+    return iter_->ValidateRange(target, cmp);
+  }
+
+  void SetRange(const Slice& smallest_key, Slice& largest_key) {
+    iter_->SetRange(smallest_key, largest_key);
+  }
+
+  Slice GetSmallsetKeyRange() const { return iter_->GetSmallsetKeyRange(); }
+
  private:
   void Update() {
     valid_ = iter_->Valid();

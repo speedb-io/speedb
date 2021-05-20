@@ -39,4 +39,20 @@ class MinIteratorComparator {
   const InternalKeyComparator* comparator_;
 };
 
+// When used with std::priority_queue, this comparison functor puts the
+// iterator with the min/smallest key on top.
+class CandidateIteratorComparator {
+ public:
+  CandidateIteratorComparator(const InternalKeyComparator* comparator)
+      : comparator_(comparator) {}
+
+  bool operator()(IteratorWrapper* a, IteratorWrapper* b) const {
+    return comparator_->Compare(a->GetSmallsetKeyRange(),
+                                b->GetSmallsetKeyRange()) > 0;
+  }
+
+ private:
+  const InternalKeyComparator* comparator_;
+};
+
 }  // namespace ROCKSDB_NAMESPACE

@@ -293,7 +293,11 @@ InternalIterator* TableCache::NewIterator(
   if (!s.ok()) {
     assert(result == nullptr);
     result = NewErrorInternalIterator<Slice>(s, arena);
+  } else {
+    result->SetRange(file_meta.smallest.user_key(),
+                     file_meta.largest.user_key());
   }
+
   return result;
 }
 

@@ -30,6 +30,8 @@ namespace ROCKSDB_NAMESPACE {
 namespace {
 using MergerMaxIterHeap = BinaryHeap<IteratorWrapper*, MaxIteratorComparator>;
 using MergerMinIterHeap = BinaryHeap<IteratorWrapper*, MinIteratorComparator>;
+using MergerCandidateIterHeap =
+    BinaryHeap<IteratorWrapper*, CandidateIteratorComparator>;
 }  // namespace
 
 const size_t kNumIterReserve = 4;
@@ -38,9 +40,10 @@ class MergingIterator : public InternalIterator {
  public:
   MergingIterator(const InternalKeyComparator* comparator,
                   InternalIterator** children, int n, bool is_arena_mode,
-                  bool prefix_seek_mode)
+                  bool prefix_seek_mode, bool is_query_iter)
       : is_arena_mode_(is_arena_mode),
         prefix_seek_mode_(prefix_seek_mode),
+        is_query_iter_(is_query_iter),
         direction_(kForward),
         comparator_(comparator),
         current_(nullptr),
@@ -102,9 +105,51 @@ class MergingIterator : public InternalIterator {
     current_ = CurrentReverse();
   }
 
+  void QuerySeek(const Slice& target) {
+    // need to check on non previous iterator i didnt add
+    candidateHeap_.reset(new MergerCandidateIterHeap(comparator_));
+
+    for (auto& child : children_) {
+      {
+        IteratorTargetState valRange = child.ValidateRange(target, comparator_);
+        if (valRange == IteratorTargetState::AFTER_RANGE) {
+          continue;
+        }
+        if (valRange == IteratorTargetState::BEFORE_RANGE) {
+          // need to add candidate list. no seek
+          candidateHeap_->push(&child);
+          continue;
+        }
+
+        PERF_TIMER_GUARD(seek_child_seek_time);
+
+        child.Seek(target);
+      }
+
+      PERF_COUNTER_ADD(seek_child_seek_count, 1);
+      {
+        // Strictly, we timed slightly more than min heap operation,
+        // but these operations are very cheap.
+        PERF_TIMER_GUARD(seek_min_heap_time);
+        AddToMinHeapOrCheckStatus(&child);
+      }
+    }
+    direction_ = kForward;
+    {
+      PERF_TIMER_GUARD(seek_min_heap_time);
+      current_ = CurrentSmallestKey();
+    }
+  }
+
   void Seek(const Slice& target) override {
     ClearHeaps();
     status_ = Status::OK();
+    // check if this is a query iter.
+    // if true we need to check the iter range to be reduce look up
+    if (is_query_iter_) {
+      return QuerySeek(target);
+    }
+
     for (auto& child : children_) {
       {
         PERF_TIMER_GUARD(seek_child_seek_time);
@@ -180,7 +225,8 @@ class MergingIterator : public InternalIterator {
       considerStatus(current_->status());
       minHeap_.pop();
     }
-    current_ = CurrentForward();
+
+    current_ = is_query_iter_ ? CurrentSmallestKey() : CurrentForward();
   }
 
   bool NextAndGetResult(IterateResult* result) override {
@@ -288,6 +334,7 @@ class MergingIterator : public InternalIterator {
 
   bool is_arena_mode_;
   bool prefix_seek_mode_;
+  bool is_query_iter_;
   // Which direction is the iterator moving?
   enum Direction : uint8_t { kForward, kReverse };
   Direction direction_;
@@ -305,6 +352,12 @@ class MergingIterator : public InternalIterator {
   // Max heap is used for reverse iteration, which is way less common than
   // forward.  Lazily initialize it to save memory.
   std::unique_ptr<MergerMaxIterHeap> maxHeap_;
+  // The propose of the candidate heap is to reduce the seek in case we already
+  // have iterator that matches  the dezire key.  when we will progress and the
+  // candidate range is now in the current seek range we will add it to the
+  // current seek heap
+  std::unique_ptr<MergerCandidateIterHeap> candidateHeap_;
+
   PinnedIteratorsManager* pinned_iters_mgr_;
 
   // In forward direction, process a child that is not in the min heap.
@@ -331,6 +384,8 @@ class MergingIterator : public InternalIterator {
     assert(maxHeap_);
     return !maxHeap_->empty() ? maxHeap_->top() : nullptr;
   }
+
+  IteratorWrapper* CurrentSmallestKey();
 };
 
 void MergingIterator::AddToMinHeapOrCheckStatus(IteratorWrapper* child) {
@@ -349,6 +404,23 @@ void MergingIterator::AddToMaxHeapOrCheckStatus(IteratorWrapper* child) {
   } else {
     considerStatus(child->status());
   }
+}
+IteratorWrapper* MergingIterator::CurrentSmallestKey() {
+  assert(direction_ == kForward);
+
+  if (candidateHeap_) {
+    while (!candidateHeap_->empty() &&
+           (minHeap_.empty() ||
+            (comparator_->Compare(
+                 minHeap_.top()->key(),
+                 candidateHeap_->top()->GetSmallsetKeyRange()) > 0))) {
+      IteratorWrapper* candidateItem = candidateHeap_->top();
+      candidateHeap_->pop();
+      candidateItem->SeekToFirst();
+      AddToMinHeapOrCheckStatus(candidateItem);
+    }
+  }
+  return !minHeap_.empty() ? minHeap_.top() : nullptr;
 }
 
 void MergingIterator::SwitchToForward() {
@@ -400,6 +472,9 @@ void MergingIterator::ClearHeaps() {
   if (maxHeap_) {
     maxHeap_->clear();
   }
+  if (candidateHeap_) {
+    candidateHeap_->clear();
+  }
 }
 
 void MergingIterator::InitMaxHeap() {
@@ -418,20 +493,22 @@ InternalIterator* NewMergingIterator(const InternalKeyComparator* cmp,
     return list[0];
   } else {
     if (arena == nullptr) {
-      return new MergingIterator(cmp, list, n, false, prefix_seek_mode);
+      return new MergingIterator(cmp, list, n, false, prefix_seek_mode, false);
     } else {
       auto mem = arena->AllocateAligned(sizeof(MergingIterator));
-      return new (mem) MergingIterator(cmp, list, n, true, prefix_seek_mode);
+      return new (mem)
+          MergingIterator(cmp, list, n, true, prefix_seek_mode, false);
     }
   }
 }
 
 MergeIteratorBuilder::MergeIteratorBuilder(
-    const InternalKeyComparator* comparator, Arena* a, bool prefix_seek_mode)
+    const InternalKeyComparator* comparator, Arena* a, bool prefix_seek_mode,
+    bool is_query_iter)
     : first_iter(nullptr), use_merging_iter(false), arena(a) {
   auto mem = arena->AllocateAligned(sizeof(MergingIterator));
-  merge_iter =
-      new (mem) MergingIterator(comparator, nullptr, 0, true, prefix_seek_mode);
+  merge_iter = new (mem) MergingIterator(comparator, nullptr, 0, true,
+                                         prefix_seek_mode, is_query_iter);
 }
 
 MergeIteratorBuilder::~MergeIteratorBuilder() {

@@ -32,6 +32,8 @@ struct IterateResult {
   bool value_prepared = true;
 };
 
+enum class IteratorTargetState { UNKNOWN, BEFORE_RANGE, IN_RANGE, AFTER_RANGE };
+
 template <class TValue>
 class InternalIteratorBase : public Cleanable {
  public:
@@ -186,6 +188,36 @@ class InternalIteratorBase : public Cleanable {
   // Default implementation is no-op and its implemented by iterators.
   virtual void SetReadaheadState(ReadaheadFileInfo* /*readahead_file_info*/) {}
 
+  IteratorTargetState ValidateRange(const Slice& target,
+                                    const Comparator* cmp) {
+    if (!is_range_set_) {
+      return IteratorTargetState::UNKNOWN;
+    }
+
+    if (cmp->Compare(target, largest_key_) > 0) {
+      return IteratorTargetState::AFTER_RANGE;
+    }
+
+    if (cmp->Compare(target, smallest_key_) >= 0 &&
+        cmp->Compare(target, largest_key_) <= 0) {
+      return IteratorTargetState::IN_RANGE;
+    }
+
+    if (cmp->Compare(target, smallest_key_) < 0) {
+      return IteratorTargetState::BEFORE_RANGE;
+    }
+
+    return IteratorTargetState::UNKNOWN;
+  }
+
+  void SetRange(Slice smallest_key, Slice largest_key) {
+    smallest_key_ = smallest_key;
+    largest_key_ = largest_key;
+    is_range_set_ = true;
+  }
+
+  Slice GetSmallsetKeyRange() const { return smallest_key_; }
+
  protected:
   void SeekForPrevImpl(const Slice& target, const Comparator* cmp) {
     Seek(target);
@@ -198,6 +230,10 @@ class InternalIteratorBase : public Cleanable {
   }
 
   bool is_mutable_;
+  // for user query propose  - in future will be optimized
+  bool is_range_set_ = false;
+  Slice smallest_key_;  // slice that contain smallest key
+  Slice largest_key_;   // slice that contain largest key
 };
 
 using InternalIterator = InternalIteratorBase<Slice>;

@@ -3504,7 +3504,7 @@ TEST_F(OptionsParserTest, ParseVersion) {
   const std::vector<std::string> invalid_versions = {
       "a.b.c", "3.2.2b", "3.-12", "3. 1",  // only digits and dots are allowed
       "1.2.3.4",
-      "1.2.3"  // can only contains at most one dot.
+      "1.2.3",  // can only contains at most one dot.
       "0",     // options_file_version must be at least one
       "3..2",
       ".", ".1.2",             // must have at least one digit before each dot
@@ -3668,7 +3668,7 @@ TEST_F(OptionsParserTest, DumpAndParse) {
   DBOptions base_db_opt;
   std::vector<ColumnFamilyOptions> base_cf_opts;
   std::vector<std::string> cf_names = {"default", "cf1", "cf2", "cf3",
-                                       "c:f:4:4:4"
+                                       "c:f:4:4:4",
                                        "p\\i\\k\\a\\chu\\\\\\",
                                        "###rocksdb#1-testcf#2###"};
   const int num_cf = static_cast<int>(cf_names.size());

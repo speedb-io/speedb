@@ -15,6 +15,10 @@
 #include <cstring>
 #include "port/port.h"
 
+#ifdef ROCKSDB_ASSERT_STATUS_CHECKED
+#include "port/stack_trace.h"
+#endif
+
 namespace ROCKSDB_NAMESPACE {
 
 std::unique_ptr<const char[]> Status::CopyState(const char* s) {
@@ -43,6 +47,13 @@ static const char* msgs[static_cast<int>(Status::kMaxSubCode)] = {
     "Txn not prepared",  // kTxnNotPrepared
     "IO fenced off",     // kIOFenced
 };
+
+void Status::PrintFailure() {
+#ifdef ROCKSDB_ASSERT_STATUS_CHECKED
+  fprintf(stderr, "Failed to check Status %p\n", this);
+  port::PrintStack();
+#endif
+}
 
 Status::Status(Code _code, SubCode _subcode, const Slice& msg,
                const Slice& msg2, Severity sev)

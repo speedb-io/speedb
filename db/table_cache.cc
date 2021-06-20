@@ -227,7 +227,7 @@ Status TableCache::FindTable(
                          handle);
       if (s.ok()) {
         // Release ownership of table reader.
-        table_reader.release();
+        (void)table_reader.release();
       }
     }
     return s;

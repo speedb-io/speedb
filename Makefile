@@ -815,7 +815,7 @@ else
 	git_sha := $(shell git rev-parse HEAD 2>/dev/null)
 	git_tag  := $(shell git symbolic-ref -q --short HEAD 2> /dev/null || git describe --tags --exact-match 2>/dev/null)
 	git_mod  := $(shell git diff-index HEAD --quiet 2>/dev/null; echo $$?)
-	git_date := $(shell git log -1 --date=format:"%Y-%m-%d %T" --format="%ad" 2>/dev/null)
+	git_date := $(shell git log -1 --date=iso --format="%ad" 2>/dev/null | awk '{print $1 " " $2}' 2>/dev/null)
 endif
 gen_build_version = sed -e s/@GIT_SHA@/$(git_sha)/ -e s:@GIT_TAG@:"$(git_tag)": -e s/@GIT_MOD@/"$(git_mod)"/ -e s/@BUILD_DATE@/"$(build_date)"/ -e s/@GIT_DATE@/"$(git_date)"/ -e s/@ROCKSDB_PLUGIN_BUILTINS@/'$(ROCKSDB_PLUGIN_BUILTINS)'/ -e s/@ROCKSDB_PLUGIN_EXTERNS@/"$(ROCKSDB_PLUGIN_EXTERNS)"/ util/build_version.cc.in
 

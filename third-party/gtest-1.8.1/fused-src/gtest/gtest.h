@@ -3008,7 +3008,7 @@ class ThreadWithParam : public ThreadWithParamBase {
     }
   }
 
-  virtual void Run() {
+  virtual void Run() override {
     if (thread_can_start_ != NULL)
       thread_can_start_->WaitForNotification();
     func_(param_);
@@ -3192,7 +3192,7 @@ class ThreadWithParam : public ThreadWithParamBase {
           param_(param) {
     }
     virtual ~RunnableImpl() {}
-    virtual void Run() {
+    virtual void Run() override {
       func_(param_);
     }
 
@@ -9202,7 +9202,7 @@ class GTEST_TEST_CLASS_NAME_(test_case_name, test_name) : public parent_class {\
  public:\
   GTEST_TEST_CLASS_NAME_(test_case_name, test_name)() {}\
  private:\
-  virtual void TestBody();\
+  virtual void TestBody() override;\
   static ::testing::TestInfo* const test_info_ GTEST_ATTRIBUTE_UNUSED_;\
   GTEST_DISALLOW_COPY_AND_ASSIGN_(\
       GTEST_TEST_CLASS_NAME_(test_case_name, test_name));\
@@ -11639,7 +11639,7 @@ class RangeGenerator : public ParamGeneratorInterface<T> {
     virtual const ParamGeneratorInterface<T>* BaseGenerator() const {
       return base_;
     }
-    virtual void Advance() {
+    virtual void Advance() override {
       value_ = static_cast<T>(value_ + step_);
       index_++;
     }
@@ -11726,7 +11726,7 @@ class ValuesInIteratorRangeGenerator : public ParamGeneratorInterface<T> {
     virtual const ParamGeneratorInterface<T>* BaseGenerator() const {
       return base_;
     }
-    virtual void Advance() {
+    virtual void Advance() override {
       ++iterator_;
       value_.reset();
     }
@@ -11952,7 +11952,7 @@ class ParameterizedTestCaseInfo : public ParameterizedTestCaseInfoBase {
   // This method should not be called more then once on any single
   // instance of a ParameterizedTestCaseInfoBase derived class.
   // UnitTest has a guard to prevent from calling this method more then once.
-  virtual void RegisterTests() {
+  virtual void RegisterTests() override {
     for (typename TestInfoContainer::iterator test_it = tests_.begin();
          test_it != tests_.end(); ++test_it) {
       linked_ptr<TestInfo> test_info = *test_it;
@@ -15740,7 +15740,7 @@ class CartesianProductGenerator2
     }
     // Advance should not be called on beyond-of-range iterators
     // so no component iterators must be beyond end of range, either.
-    virtual void Advance() {
+    virtual void Advance() override {
       assert(!AtEnd());
       ++current2_;
       if (current2_ == end2_) {
@@ -15859,7 +15859,7 @@ class CartesianProductGenerator3
     }
     // Advance should not be called on beyond-of-range iterators
     // so no component iterators must be beyond end of range, either.
-    virtual void Advance() {
+    virtual void Advance() override {
       assert(!AtEnd());
       ++current3_;
       if (current3_ == end3_) {
@@ -15996,7 +15996,7 @@ class CartesianProductGenerator4
     }
     // Advance should not be called on beyond-of-range iterators
     // so no component iterators must be beyond end of range, either.
-    virtual void Advance() {
+    virtual void Advance() override {
       assert(!AtEnd());
       ++current4_;
       if (current4_ == end4_) {
@@ -16150,7 +16150,7 @@ class CartesianProductGenerator5
     }
     // Advance should not be called on beyond-of-range iterators
     // so no component iterators must be beyond end of range, either.
-    virtual void Advance() {
+    virtual void Advance() override {
       assert(!AtEnd());
       ++current5_;
       if (current5_ == end5_) {
@@ -16323,7 +16323,7 @@ class CartesianProductGenerator6
     }
     // Advance should not be called on beyond-of-range iterators
     // so no component iterators must be beyond end of range, either.
-    virtual void Advance() {
+    virtual void Advance() override {
       assert(!AtEnd());
       ++current6_;
       if (current6_ == end6_) {
@@ -16513,7 +16513,7 @@ class CartesianProductGenerator7
     }
     // Advance should not be called on beyond-of-range iterators
     // so no component iterators must be beyond end of range, either.
-    virtual void Advance() {
+    virtual void Advance() override {
       assert(!AtEnd());
       ++current7_;
       if (current7_ == end7_) {
@@ -16722,7 +16722,7 @@ class CartesianProductGenerator8
     }
     // Advance should not be called on beyond-of-range iterators
     // so no component iterators must be beyond end of range, either.
-    virtual void Advance() {
+    virtual void Advance() override {
       assert(!AtEnd());
       ++current8_;
       if (current8_ == end8_) {
@@ -16947,7 +16947,7 @@ class CartesianProductGenerator9
     }
     // Advance should not be called on beyond-of-range iterators
     // so no component iterators must be beyond end of range, either.
-    virtual void Advance() {
+    virtual void Advance() override {
       assert(!AtEnd());
       ++current9_;
       if (current9_ == end9_) {
@@ -17190,7 +17190,7 @@ class CartesianProductGenerator10
     }
     // Advance should not be called on beyond-of-range iterators
     // so no component iterators must be beyond end of range, either.
-    virtual void Advance() {
+    virtual void Advance() override {
       assert(!AtEnd());
       ++current10_;
       if (current10_ == end10_) {
@@ -18873,7 +18873,7 @@ internal::CartesianProductHolder10<Generator1, Generator2, Generator3,
       : public test_case_name { \
    public: \
     GTEST_TEST_CLASS_NAME_(test_case_name, test_name)() {} \
-    virtual void TestBody(); \
+    virtual void TestBody() override; \
    private: \
     static int AddToRegistry() { \
       ::testing::UnitTest::GetInstance()->parameterized_test_registry(). \
@@ -19157,7 +19157,7 @@ class GTEST_API_ HasNewFatalFailureHelper
  public:
   HasNewFatalFailureHelper();
   virtual ~HasNewFatalFailureHelper();
-  virtual void ReportTestPartResult(const TestPartResult& result);
+  virtual void ReportTestPartResult(const TestPartResult& result) override;
   bool has_new_fatal_failure() const { return has_new_fatal_failure_; }
  private:
   bool has_new_fatal_failure_;
@@ -19377,7 +19377,7 @@ INSTANTIATE_TYPED_TEST_CASE_P(My, FooTest, MyTypes);
    private:                                                                   \
     typedef CaseName<gtest_TypeParam_> TestFixture;                           \
     typedef gtest_TypeParam_ TypeParam;                                       \
-    virtual void TestBody();                                                  \
+    virtual void TestBody() override;                                         \
   };                                                                          \
   static bool gtest_##CaseName##_##TestName##_registered_                     \
         GTEST_ATTRIBUTE_UNUSED_ =                                             \
@@ -19439,7 +19439,7 @@ INSTANTIATE_TYPED_TEST_CASE_P(My, FooTest, MyTypes);
    private: \
     typedef CaseName<gtest_TypeParam_> TestFixture; \
     typedef gtest_TypeParam_ TypeParam; \
-    virtual void TestBody(); \
+    virtual void TestBody() override; \
   }; \
   static bool gtest_##TestName##_defined_ GTEST_ATTRIBUTE_UNUSED_ = \
       GTEST_TYPED_TEST_CASE_P_STATE_(CaseName).AddTestName(\
@@ -20867,21 +20867,21 @@ class TestEventListener {
 // above.
 class EmptyTestEventListener : public TestEventListener {
  public:
-  virtual void OnTestProgramStart(const UnitTest& /*unit_test*/) {}
+  virtual void OnTestProgramStart(const UnitTest& /*unit_test*/) override {}
   virtual void OnTestIterationStart(const UnitTest& /*unit_test*/,
-                                    int /*iteration*/) {}
-  virtual void OnEnvironmentsSetUpStart(const UnitTest& /*unit_test*/) {}
-  virtual void OnEnvironmentsSetUpEnd(const UnitTest& /*unit_test*/) {}
-  virtual void OnTestCaseStart(const TestCase& /*test_case*/) {}
-  virtual void OnTestStart(const TestInfo& /*test_info*/) {}
-  virtual void OnTestPartResult(const TestPartResult& /*test_part_result*/) {}
-  virtual void OnTestEnd(const TestInfo& /*test_info*/) {}
-  virtual void OnTestCaseEnd(const TestCase& /*test_case*/) {}
-  virtual void OnEnvironmentsTearDownStart(const UnitTest& /*unit_test*/) {}
-  virtual void OnEnvironmentsTearDownEnd(const UnitTest& /*unit_test*/) {}
+                                    int /*iteration*/) override {}
+  virtual void OnEnvironmentsSetUpStart(const UnitTest& /*unit_test*/) override {}
+  virtual void OnEnvironmentsSetUpEnd(const UnitTest& /*unit_test*/) override {}
+  virtual void OnTestCaseStart(const TestCase& /*test_case*/) override {}
+  virtual void OnTestStart(const TestInfo& /*test_info*/) override {}
+  virtual void OnTestPartResult(const TestPartResult& /*test_part_result*/) override {}
+  virtual void OnTestEnd(const TestInfo& /*test_info*/) override {}
+  virtual void OnTestCaseEnd(const TestCase& /*test_case*/) override {}
+  virtual void OnEnvironmentsTearDownStart(const UnitTest& /*unit_test*/) override {}
+  virtual void OnEnvironmentsTearDownEnd(const UnitTest& /*unit_test*/) override {}
   virtual void OnTestIterationEnd(const UnitTest& /*unit_test*/,
-                                  int /*iteration*/) {}
-  virtual void OnTestProgramEnd(const UnitTest& /*unit_test*/) {}
+                                  int /*iteration*/) override {}
+  virtual void OnTestProgramEnd(const UnitTest& /*unit_test*/) override {}
 };
 
 // TestEventListeners lets users add listeners to track events in Google Test.

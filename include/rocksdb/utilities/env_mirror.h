@@ -60,13 +60,15 @@ class EnvMirror : public EnvWrapper {
     std::unique_ptr<Directory> br;
     Status as = a_->NewDirectory(name, result);
     Status bs = b_->NewDirectory(name, &br);
-    assert(as == bs);
+    assert(as.code() == bs.code());
+    assert(as.subcode() == bs.subcode());
     return as;
   }
   Status FileExists(const std::string& f) override {
     Status as = a_->FileExists(f);
     Status bs = b_->FileExists(f);
-    assert(as == bs);
+    assert(as.code() == bs.code());
+    assert(as.subcode() == bs.subcode());
     return as;
   }
 #if defined(_MSC_VER)
@@ -79,7 +81,8 @@ class EnvMirror : public EnvWrapper {
     std::vector<std::string> ar, br;
     Status as = a_->GetChildren(dir, &ar);
     Status bs = b_->GetChildren(dir, &br);
-    assert(as == bs);
+    assert(as.code() == bs.code());
+    assert(as.subcode() == bs.subcode());
     std::sort(ar.begin(), ar.end());
     std::sort(br.begin(), br.end());
     if (!as.ok() || ar != br) {
@@ -94,32 +97,37 @@ class EnvMirror : public EnvWrapper {
   Status DeleteFile(const std::string& f) override {
     Status as = a_->DeleteFile(f);
     Status bs = b_->DeleteFile(f);
-    assert(as == bs);
+    assert(as.code() == bs.code());
+    assert(as.subcode() == bs.subcode());
     return as;
   }
   Status CreateDir(const std::string& d) override {
     Status as = a_->CreateDir(d);
     Status bs = b_->CreateDir(d);
-    assert(as == bs);
+    assert(as.code() == bs.code());
+    assert(as.subcode() == bs.subcode());
     return as;
   }
   Status CreateDirIfMissing(const std::string& d) override {
     Status as = a_->CreateDirIfMissing(d);
     Status bs = b_->CreateDirIfMissing(d);
-    assert(as == bs);
+    assert(as.code() == bs.code());
+    assert(as.subcode() == bs.subcode());
     return as;
   }
   Status DeleteDir(const std::string& d) override {
     Status as = a_->DeleteDir(d);
     Status bs = b_->DeleteDir(d);
-    assert(as == bs);
+    assert(as.code() == bs.code());
+    assert(as.subcode() == bs.subcode());
     return as;
   }
   Status GetFileSize(const std::string& f, uint64_t* s) override {
     uint64_t asize, bsize;
     Status as = a_->GetFileSize(f, &asize);
     Status bs = b_->GetFileSize(f, &bsize);
-    assert(as == bs);
+    assert(as.code() == bs.code());
+    assert(as.subcode() == bs.subcode());
     assert(!as.ok() || asize == bsize);
     *s = asize;
     return as;
@@ -130,7 +138,8 @@ class EnvMirror : public EnvWrapper {
     uint64_t amtime, bmtime;
     Status as = a_->GetFileModificationTime(fname, &amtime);
     Status bs = b_->GetFileModificationTime(fname, &bmtime);
-    assert(as == bs);
+    assert(as.code() == bs.code());
+    assert(as.subcode() == bs.subcode());
     assert(!as.ok() || amtime - bmtime < 10000 || bmtime - amtime < 10000);
     *file_mtime = amtime;
     return as;
@@ -139,14 +148,16 @@ class EnvMirror : public EnvWrapper {
   Status RenameFile(const std::string& s, const std::string& t) override {
     Status as = a_->RenameFile(s, t);
     Status bs = b_->RenameFile(s, t);
-    assert(as == bs);
+    assert(as.code() == bs.code());
+    assert(as.subcode() == bs.subcode());
     return as;
   }
 
   Status LinkFile(const std::string& s, const std::string& t) override {
     Status as = a_->LinkFile(s, t);
     Status bs = b_->LinkFile(s, t);
-    assert(as == bs);
+    assert(as.code() == bs.code());
+    assert(as.subcode() == bs.subcode());
     return as;
   }
 
@@ -160,7 +171,8 @@ class EnvMirror : public EnvWrapper {
     FileLock *al, *bl;
     Status as = a_->LockFile(f, &al);
     Status bs = b_->LockFile(f, &bl);
-    assert(as == bs);
+    assert(as.code() == bs.code());
+    assert(as.subcode() == bs.subcode());
     if (as.ok()) *l = new FileLockMirror(al, bl);
     return as;
   }
@@ -169,7 +181,8 @@ class EnvMirror : public EnvWrapper {
     FileLockMirror* ml = static_cast<FileLockMirror*>(l);
     Status as = a_->UnlockFile(ml->a_);
     Status bs = b_->UnlockFile(ml->b_);
-    assert(as == bs);
+    assert(as.code() == bs.code());
+    assert(as.subcode() == bs.subcode());
     delete ml;
     return as;
   }

@@ -23,7 +23,7 @@ class SequentialFileMirror : public SequentialFile {
   Status Read(size_t n, Slice* result, char* scratch) override {
     Slice aslice;
     Status as = a_->Read(n, &aslice, scratch);
-    if (as == Status::OK()) {
+    if (as.ok()) {
       char* bscratch = new char[n];
       Slice bslice;
 #ifndef NDEBUG
@@ -33,7 +33,8 @@ class SequentialFileMirror : public SequentialFile {
       while (left) {
         Status bs = b_->Read(left, &bslice, bscratch);
 #ifndef NDEBUG
-        assert(as == bs);
+        assert(as.code() == bs.code());
+        assert(as.subcode() == bs.subcode());
         assert(memcmp(bscratch, scratch + off, bslice.size()) == 0);
         off += bslice.size();
 #endif
@@ -43,7 +44,8 @@ class SequentialFileMirror : public SequentialFile {
       *result = aslice;
     } else {
       Status bs = b_->Read(n, result, scratch);
-      assert(as == bs);
+      assert(as.code() == bs.code());
+      assert(as.subcode() == bs.subcode());
     }
     return as;
   }
@@ -51,13 +53,15 @@ class SequentialFileMirror : public SequentialFile {
   Status Skip(uint64_t n) override {
     Status as = a_->Skip(n);
     Status bs = b_->Skip(n);
-    assert(as == bs);
+    assert(as.code() == bs.code());
+    assert(as.subcode() == bs.subcode());
     return as;
   }
   Status InvalidateCache(size_t offset, size_t length) override {
     Status as = a_->InvalidateCache(offset, length);
     Status bs = b_->InvalidateCache(offset, length);
-    assert(as == bs);
+    assert(as.code() == bs.code());
+    assert(as.subcode() == bs.subcode());
     return as;
   };
 };
@@ -71,14 +75,15 @@ class RandomAccessFileMirror : public RandomAccessFile {
   Status Read(uint64_t offset, size_t n, Slice* result,
               char* scratch) const override {
     Status as = a_->Read(offset, n, result, scratch);
-    if (as == Status::OK()) {
+    if (as.ok()) {
       char* bscratch = new char[n];
       Slice bslice;
       size_t off = 0;
       size_t left = result->size();
       while (left) {
         Status bs = b_->Read(offset + off, left, &bslice, bscratch);
-        assert(as == bs);
+        assert(as.code() == bs.code());
+        assert(as.subcode() == bs.subcode());
         assert(memcmp(bscratch, scratch + off, bslice.size()) == 0);
         off += bslice.size();
         left -= bslice.size();
@@ -86,7 +91,8 @@ class RandomAccessFileMirror : public RandomAccessFile {
       delete[] bscratch;
     } else {
       Status bs = b_->Read(offset, n, result, scratch);
-      assert(as == bs);
+      assert(as.code() == bs.code());
+      assert(as.subcode() == bs.subcode());
     }
     return as;
   }
@@ -107,7 +113,8 @@ class WritableFileMirror : public WritableFile {
   Status Append(const Slice& data) override {
     Status as = a_->Append(data);
     Status bs = b_->Append(data);
-    assert(as == bs);
+    assert(as.code() == bs.code());
+    assert(as.subcode() == bs.subcode());
     return as;
   }
   Status Append(const Slice& data,
@@ -117,7 +124,8 @@ class WritableFileMirror : public WritableFile {
   Status PositionedAppend(const Slice& data, uint64_t offset) override {
     Status as = a_->PositionedAppend(data, offset);
     Status bs = b_->PositionedAppend(data, offset);
-    assert(as == bs);
+    assert(as.code() == bs.code());
+    assert(as.subcode() == bs.subcode());
     return as;
   }
   Status PositionedAppend(
@@ -128,31 +136,36 @@ class WritableFileMirror : public WritableFile {
   Status Truncate(uint64_t size) override {
     Status as = a_->Truncate(size);
     Status bs = b_->Truncate(size);
-    assert(as == bs);
+    assert(as.code() == bs.code());
+    assert(as.subcode() == bs.subcode());
     return as;
   }
   Status Close() override {
     Status as = a_->Close();
     Status bs = b_->Close();
-    assert(as == bs);
+    assert(as.code() == bs.code());
+    assert(as.subcode() == bs.subcode());
     return as;
   }
   Status Flush() override {
     Status as = a_->Flush();
     Status bs = b_->Flush();
-    assert(as == bs);
+    assert(as.code() == bs.code());
+    assert(as.subcode() == bs.subcode());
     return as;
   }
   Status Sync() override {
     Status as = a_->Sync();
     Status bs = b_->Sync();
-    assert(as == bs);
+    assert(as.code() == bs.code());
+    assert(as.subcode() == bs.subcode());
     return as;
   }
   Status Fsync() override {
     Status as = a_->Fsync();
     Status bs = b_->Fsync();
-    assert(as == bs);
+    assert(as.code() == bs.code());
+    assert(as.subcode() == bs.subcode());
     return as;
   }
   bool IsSyncThreadSafe() const override {
@@ -185,7 +198,8 @@ class WritableFileMirror : public WritableFile {
   Status InvalidateCache(size_t offset, size_t length) override {
     Status as = a_->InvalidateCache(offset, length);
     Status bs = b_->InvalidateCache(offset, length);
-    assert(as == bs);
+    assert(as.code() == bs.code());
+    assert(as.subcode() == bs.subcode());
     return as;
   }
 
@@ -193,13 +207,15 @@ class WritableFileMirror : public WritableFile {
   Status Allocate(uint64_t offset, uint64_t length) override {
     Status as = a_->Allocate(offset, length);
     Status bs = b_->Allocate(offset, length);
-    assert(as == bs);
+    assert(as.code() == bs.code());
+    assert(as.subcode() == bs.subcode());
     return as;
   }
   Status RangeSync(uint64_t offset, uint64_t nbytes) override {
     Status as = a_->RangeSync(offset, nbytes);
     Status bs = b_->RangeSync(offset, nbytes);
-    assert(as == bs);
+    assert(as.code() == bs.code());
+    assert(as.subcode() == bs.subcode());
     return as;
   }
 };
@@ -213,7 +229,8 @@ Status EnvMirror::NewSequentialFile(const std::string& f,
   SequentialFileMirror* mf = new SequentialFileMirror(f);
   Status as = a_->NewSequentialFile(f, &mf->a_, options);
   Status bs = b_->NewSequentialFile(f, &mf->b_, options);
-  assert(as == bs);
+  assert(as.code() == bs.code());
+  assert(as.subcode() == bs.subcode());
   if (as.ok())
     r->reset(mf);
   else
@@ -230,7 +247,8 @@ Status EnvMirror::NewRandomAccessFile(const std::string& f,
   RandomAccessFileMirror* mf = new RandomAccessFileMirror(f);
   Status as = a_->NewRandomAccessFile(f, &mf->a_, options);
   Status bs = b_->NewRandomAccessFile(f, &mf->b_, options);
-  assert(as == bs);
+  assert(as.code() == bs.code());
+  assert(as.subcode() == bs.subcode());
   if (as.ok())
     r->reset(mf);
   else
@@ -245,7 +263,8 @@ Status EnvMirror::NewWritableFile(const std::string& f,
   WritableFileMirror* mf = new WritableFileMirror(f, options);
   Status as = a_->NewWritableFile(f, &mf->a_, options);
   Status bs = b_->NewWritableFile(f, &mf->b_, options);
-  assert(as == bs);
+  assert(as.code() == bs.code());
+  assert(as.subcode() == bs.subcode());
   if (as.ok())
     r->reset(mf);
   else
@@ -262,7 +281,8 @@ Status EnvMirror::ReuseWritableFile(const std::string& fname,
   WritableFileMirror* mf = new WritableFileMirror(fname, options);
   Status as = a_->ReuseWritableFile(fname, old_fname, &mf->a_, options);
   Status bs = b_->ReuseWritableFile(fname, old_fname, &mf->b_, options);
-  assert(as == bs);
+  assert(as.code() == bs.code());
+  assert(as.subcode() == bs.subcode());
   if (as.ok())
     r->reset(mf);
   else

@@ -328,7 +328,7 @@ Status DBImpl::FlushMemTableToOutputFile(
         error_handler_.SetBGError(s, BackgroundErrorReason::kFlushNoWAL);
       }
     } else {
-      assert(s == log_io_s);
+      assert(s.code() == log_io_s.code() && s.subcode() == log_io_s.subcode());
       Status new_bg_error = s;
       error_handler_.SetBGError(new_bg_error, BackgroundErrorReason::kFlush);
     }
@@ -799,7 +799,7 @@ Status DBImpl::AtomicFlushMemTablesToOutputFiles(
         error_handler_.SetBGError(s, BackgroundErrorReason::kFlushNoWAL);
       }
     } else {
-      assert(s == log_io_s);
+      assert(s.code() == log_io_s.code() && s.subcode() == log_io_s.subcode());
       Status new_bg_error = s;
       error_handler_.SetBGError(new_bg_error, BackgroundErrorReason::kFlush);
     }

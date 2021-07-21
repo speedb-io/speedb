@@ -1375,6 +1375,13 @@ Status ColumnFamilyData::ValidateOptions(
         "FIFO compaction only supported with max_open_files = -1.");
   }
 
+  if (cf_options.comparator->CanKeysWithDifferentByteContentsBeEqual() &&
+      cf_options.memtable_whole_key_filtering) {
+    return Status::InvalidArgument(
+        "A custom comparator with different byte contents being equal is "
+        "incompatible with memtable_whole_key_filtering");
+  }
+
   return s;
 }
 

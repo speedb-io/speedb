@@ -13,11 +13,12 @@
 #include <fcntl.h>
 
 #include <algorithm>
+#include <memory>
 #include <set>
 #include <thread>
 #include <unordered_set>
 #include <utility>
-
+#include <vector>
 #ifndef OS_WIN
 #include <unistd.h>
 #endif
@@ -2173,6 +2174,18 @@ TEST_F(DBTest, ComparatorCheck) {
 }
 
 TEST_F(DBTest, CustomComparator) {
+  struct NumberConverter {
+    static int ToNumber(const Slice& x) {
+      // Check that there are no extra characters.
+      EXPECT_TRUE(x.size() >= 2 && x[0] == '[' && x[x.size() - 1] == ']')
+          << EscapeString(x);
+      int val;
+      char ignored;
+      EXPECT_TRUE(sscanf(x.ToString().c_str(), "[%i]%c", &val, &ignored) == 1)
+          << EscapeString(x);
+      return val;
+    }
+  };
   class NumberComparator : public Comparator {
    public:
     const char* Name() const override { return "test.NumberComparator"; }
@@ -2188,15 +2201,92 @@ TEST_F(DBTest, CustomComparator) {
     }
 
    private:
-    static int ToNumber(const Slice& x) {
-      // Check that there are no extra characters.
-      EXPECT_TRUE(x.size() >= 2 && x[0] == '[' && x[x.size() - 1] == ']')
-          << EscapeString(x);
-      int val;
-      char ignored;
-      EXPECT_TRUE(sscanf(x.ToString().c_str(), "[%i]%c", &val, &ignored) == 1)
-          << EscapeString(x);
-      return val;
+    static int ToNumber(const Slice& x) { return NumberConverter::ToNumber(x); }
+  };
+  class CustomFilterPolicy : public FilterPolicy {
+    std::unique_ptr<const FilterPolicy> wrapped_{NewSpdbHybridFilterPolicy()};
+
+    struct CustomFilterBitsBuilder : public FilterBitsBuilder {
+      CustomFilterBitsBuilder(FilterBitsBuilder* wrapped) : wrapped_(wrapped) {}
+
+      void AddKey(const Slice& key) override {
+        const int num = NumberConverter::ToNumber(key);
+        wrapped_->AddKey(
+            Slice(reinterpret_cast<const char*>(&num), sizeof(num)));
+      }
+
+      size_t EstimateEntriesAdded() override {
+        return wrapped_->EstimateEntriesAdded();
+      }
+
+      Slice Finish(std::unique_ptr<const char[]>* buf) override {
+        return wrapped_->Finish(buf);
+      }
+
+      size_t ApproximateNumEntries(size_t bytes) override {
+        return wrapped_->ApproximateNumEntries(bytes);
+      }
+
+      int CalculateNumEntry(const uint32_t bytes) override {
+        return wrapped_->CalculateNumEntry(bytes);
+      }
+
+     private:
+      std::unique_ptr<FilterBitsBuilder> wrapped_;
+    };
+
+    struct CustomFilterBitsReader : public FilterBitsReader {
+      CustomFilterBitsReader(FilterBitsReader* wrapped) : wrapped_(wrapped) {}
+
+      using FilterBitsReader::MayMatch;
+      bool MayMatch(const Slice& entry) override {
+        const int num = NumberConverter::ToNumber(entry);
+        return wrapped_->MayMatch(
+            Slice(reinterpret_cast<const char*>(&num), sizeof(num)));
+      }
+
+     private:
+      std::unique_ptr<FilterBitsReader> wrapped_;
+    };
+
+   public:
+    const char* Name() const override { return "test.NumberFilter"; }
+
+    void CreateFilter(const Slice* keys, int n,
+                      std::string* dst) const override {
+      std::vector<int> converted;
+      for (int i = 0; i < n; ++i) {
+        converted.push_back(NumberConverter::ToNumber(keys[i]));
+      }
+      std::vector<Slice> sliced;
+      sliced.reserve(converted.size());
+      for (const auto& num : converted) {
+        sliced.push_back(
+            Slice(reinterpret_cast<const char*>(&num), sizeof(num)));
+      }
+      return wrapped_->CreateFilter(keys, n, dst);
+    }
+
+    bool KeyMayMatch(const Slice& key, const Slice& filter) const override {
+      const int num = NumberConverter::ToNumber(key);
+      return wrapped_->KeyMayMatch(
+          Slice(reinterpret_cast<const char*>(&num), sizeof(num)), filter);
+    }
+
+    FilterBitsBuilder* GetFilterBitsBuilder() const override {
+      return new CustomFilterBitsBuilder(wrapped_->GetFilterBitsBuilder());
+    }
+
+    FilterBitsBuilder* GetBuilderWithContext(
+        const FilterBuildingContext& context) const override {
+      return new CustomFilterBitsBuilder(
+          wrapped_->GetBuilderWithContext(context));
+    }
+
+    FilterBitsReader* GetFilterBitsReader(
+        const Slice& contents) const override {
+      return new CustomFilterBitsReader(
+          wrapped_->GetFilterBitsReader(contents));
     }
   };
   Options new_options;
@@ -2208,6 +2298,13 @@ TEST_F(DBTest, CustomComparator) {
     new_options.write_buffer_size = 4096;  // Compact more often
     new_options.arena_block_size = 4096;
     new_options = CurrentOptions(new_options);
+    BlockBasedTableOptions* table_options =
+        new_options.table_factory->GetOptions<BlockBasedTableOptions>();
+    if (table_options) {
+      BlockBasedTableOptions toptions = *table_options;
+      toptions.filter_policy.reset(new CustomFilterPolicy());
+      new_options.table_factory.reset(NewBlockBasedTableFactory(toptions));
+    }
     DestroyAndReopen(new_options);
     CreateAndReopenWithCF({"pikachu"}, new_options);
     ASSERT_OK(Put(1, "[10]", "ten"));

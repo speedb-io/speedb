@@ -689,6 +689,16 @@ Status BlockBasedTableFactory::ValidateOptions(
         ROCKSDB_NAMESPACE::ToString(
             static_cast<uint32_t>(table_options_.checksum)));
   }
+  if (cf_opts.comparator->CanKeysWithDifferentByteContentsBeEqual() &&
+      table_options_.filter_policy != nullptr) {
+    const std::string filter_policy_name = table_options_.filter_policy->Name();
+    if (filter_policy_name.find("rocksdb.") == 0 ||
+        filter_policy_name.find("speedb.") == 0) {
+      return Status::InvalidArgument(
+          "A custom comparator with different byte contents being equal is "
+          "incompatible with the built-in filter policies");
+    }
+  }
   return TableFactory::ValidateOptions(db_opts, cf_opts);
 }
 

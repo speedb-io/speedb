@@ -235,10 +235,12 @@ class FillBenchmarkThread : public BenchmarkThread {
                         num_ops, read_hits) {}
 
   void FillOne() {
+    enum test { VALID = 1, IGNORE = 2 };
+
     char* buf = nullptr;
     auto internal_key_size = 16;
-    auto encoded_len =
-        FLAGS_item_size + VarintLength(internal_key_size) + internal_key_size;
+    auto encoded_len = FLAGS_item_size + VarintLength(internal_key_size) +
+                       internal_key_size + 1;
     KeyHandle handle = table_->Allocate(encoded_len, &buf);
     assert(buf != nullptr);
     char* p = EncodeVarint32(buf, internal_key_size);
@@ -250,7 +252,12 @@ class FillBenchmarkThread : public BenchmarkThread {
     Slice bytes = generator_.Generate(FLAGS_item_size);
     memcpy(p, bytes.data(), FLAGS_item_size);
     p += FLAGS_item_size;
-    assert(p == buf + encoded_len);
+    assert(p == buf + encoded_len - 1);
+    buf[encoded_len] = IGNORE;
+    if (buf[encoded_len] == IGNORE) {
+      buf[encoded_len] = VALID;
+    }
+    char* tt = buf + encoded_len - 1;
     table_->Insert(handle);
     *bytes_written_ += encoded_len;
   }

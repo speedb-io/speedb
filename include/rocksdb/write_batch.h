@@ -236,7 +236,9 @@ class WriteBatch : public WriteBatchBase {
       return Status::InvalidArgument(
           "non-default column family and PutCF not implemented");
     }
+
     virtual void Put(const Slice& /*key*/, const Slice& /*value*/) {}
+    virtual Status IgnoreCF(const Slice& /*key*/) { return Status::OK(); }
 
     virtual Status DeleteCF(uint32_t column_family_id, const Slice& key) {
       if (column_family_id == 0) {
@@ -322,6 +324,8 @@ class WriteBatch : public WriteBatchBase {
     virtual bool WriteBeforePrepare() const { return false; }
   };
   Status Iterate(Handler* handler) const;
+  // Iterate over [begin, end) range of a write batch
+  Status IterateToSetIgnore(Handler* handler) const;
 
   // Retrieve the serialized version of this batch.
   const std::string& Data() const { return rep_; }

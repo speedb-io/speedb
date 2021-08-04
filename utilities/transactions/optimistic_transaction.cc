@@ -125,7 +125,6 @@ Status OptimisticTransaction::CommitWithParallelValidate() {
   if (!s.ok()) {
     return s;
   }
-
   s = db_impl->Write(write_options_, GetWriteBatch()->GetWriteBatch());
   if (s.ok()) {
     Clear();

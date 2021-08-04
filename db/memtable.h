@@ -305,6 +305,23 @@ class MemTable {
                         const Slice& delta,
                         const ProtectionInfoKVOS64* kv_prot_info);
 
+  Status UpdateIgnore(SequenceNumber seq, const Slice& key);
+
+  static bool IsKeyShouldBeIgnore(const char* key, bool rollback_issued) {
+    if (!rollback_issued) {
+      return false;
+    }
+    uint32_t key_length = 0;
+    const char* key_ptr = GetVarint32Ptr(key, key + 5, &key_length);
+    Slice value = GetLengthPrefixedSlice(key_ptr + key_length);
+    uint32_t value_size = static_cast<uint32_t>(value.size());
+    char* p =
+        EncodeVarint32(const_cast<char*>(key_ptr) + key_length, value_size);
+    p += value_size;
+    InternalMemtableEntryInfo* internal_info =
+        static_cast<InternalMemtableEntryInfo*>(static_cast<void*>(p));
+    return (internal_info->ignore.load());
+  }
   // Returns the number of successive merge entries starting from the newest
   // entry for the key up to the last non-merge entry or last entry for the
   // key in the memtable.
@@ -583,6 +600,11 @@ class MemTable {
   // keep track of memory usage in table_, arena_, and range_del_table_.
   // Gets refreshed inside `ApproximateMemoryUsage()` or `ShouldFlushNow`
   std::atomic<uint64_t> approximate_memory_usage_;
+
+  // for rollback handle
+  struct InternalMemtableEntryInfo {
+    std::atomic<bool> ignore;
+  };
 
 #ifndef ROCKSDB_LITE
   // Flush job info of the current memtable.

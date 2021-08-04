@@ -274,6 +274,10 @@ DBImpl::DBImpl(const DBOptions& options, const std::string& dbname,
   if (write_buffer_manager_) {
     wbm_stall_.reset(new WBMStallInterface());
   }
+
+  if (immutable_db_options_.use_spdb_writes) {
+    spdb_write_.reset(new SpdbWriteImpl(this));
+  }
 }
 
 Status DBImpl::Resume() {
@@ -522,6 +526,11 @@ Status DBImpl::CloseHelper() {
     bg_cv_.Wait();
   }
   mutex_.Unlock();
+
+  // Shutdown Spdb write in order to ensure no writes will be handled
+  if (spdb_write_) {
+    spdb_write_->Shutdown();
+  }
 
   // Below check is added as recovery_error_ is not checked and it causes crash
   // in DBSSTTest.DBWithMaxSpaceAllowedWithBlobFiles when space limit is
@@ -1306,6 +1315,10 @@ int DBImpl::FindMinimumEmptyLevelFitting(
 }
 
 Status DBImpl::FlushWAL(bool sync) {
+  if (spdb_write_) {
+    ROCKS_LOG_INFO(immutable_db_options_.info_log,
+                   "FlushWAL called manual_wal_flush_=%d", manual_wal_flush_);
+  }
   if (manual_wal_flush_) {
     IOStatus io_s;
     {
@@ -1340,6 +1353,9 @@ Status DBImpl::SyncWAL() {
   autovector<log::Writer*, 1> logs_to_sync;
   bool need_log_dir_sync;
   uint64_t current_log_number;
+  if (spdb_write_) {
+    ROCKS_LOG_INFO(immutable_db_options_.info_log, "SyncWAL called");
+  }
 
   {
     InstrumentedMutexLock l(&mutex_);

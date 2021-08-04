@@ -586,6 +586,8 @@ TEST_P(OptimisticTransactionTest, ColumnFamiliesTest) {
   snapshot_read_options.snapshot = txn->GetSnapshot();
 
   txn_options.set_snapshot = true;
+  write_options.txn_write = true;
+
   Transaction* txn2 = txn_db->BeginTransaction(write_options, txn_options);
   ASSERT_TRUE(txn2);
 
@@ -1040,6 +1042,7 @@ TEST_P(OptimisticTransactionTest, DeleteRangeSupportTest) {
           .IsNotSupported());
   WriteBatch wb;
   ASSERT_OK(wb.DeleteRange("a", "b"));
+
   ASSERT_NOK(txn_db->Write(WriteOptions(), &wb));
 }
 

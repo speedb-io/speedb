@@ -552,6 +552,8 @@ Status WriteCommittedTxnDB::Write(const WriteOptions& opts,
     return s;
   }
   if (txn_db_options_.skip_concurrency_control) {
+    WriteOptions write_options;
+    write_options.txn_write = true;
     return db_impl_->Write(opts, updates);
   } else {
     return WriteWithConcurrencyControl(opts, updates);

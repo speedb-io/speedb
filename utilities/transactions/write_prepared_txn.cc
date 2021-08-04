@@ -107,6 +107,8 @@ Iterator* WritePreparedTxn::GetIterator(const ReadOptions& options,
 Status WritePreparedTxn::PrepareInternal() {
   WriteOptions write_options = write_options_;
   write_options.disableWAL = false;
+  write_options.txn_write = true;
+
   const bool WRITE_AFTER_COMMIT = true;
   const bool kFirstPrepareBatch = true;
   auto s = WriteBatchInternal::MarkEndPrepare(GetWriteBatch()->GetWriteBatch(),
@@ -216,7 +218,10 @@ Status WritePreparedTxn::CommitInternal() {
   // TransactionOptions::use_only_the_last_commit_time_batch_for_recovery to
   // true. See the comments about GetCommitTimeWriteBatch() in
   // include/rocksdb/utilities/transaction.h.
-  s = db_impl_->WriteImpl(write_options_, working_batch, nullptr, nullptr,
+  WriteOptions write_options = write_options_;
+  write_options.txn_write = true;
+
+  s = db_impl_->WriteImpl(write_options, working_batch, nullptr, nullptr,
                           zero_log_number, disable_memtable, &seq_used,
                           batch_cnt, pre_release_callback);
   assert(!s.ok() || seq_used != kMaxSequenceNumber);
@@ -253,7 +258,8 @@ Status WritePreparedTxn::CommitInternal() {
   const bool DISABLE_MEMTABLE = true;
   const size_t ONE_BATCH = 1;
   const uint64_t NO_REF_LOG = 0;
-  s = db_impl_->WriteImpl(write_options_, &empty_batch, nullptr, nullptr,
+
+  s = db_impl_->WriteImpl(write_options, &empty_batch, nullptr, nullptr,
                           NO_REF_LOG, DISABLE_MEMTABLE, &seq_used, ONE_BATCH,
                           &update_commit_map_with_aux_batch);
   assert(!s.ok() || seq_used != kMaxSequenceNumber);
@@ -403,7 +409,10 @@ Status WritePreparedTxn::RollbackInternal() {
   // DB in one shot. min_uncommitted still works since it requires capturing
   // data that is written to DB but not yet committed, while
   // the rollback batch commits with PreReleaseCallback.
-  s = db_impl_->WriteImpl(write_options_, &rollback_batch, nullptr, nullptr,
+  WriteOptions write_options = write_options_;
+  write_options.txn_write = true;
+
+  s = db_impl_->WriteImpl(write_options, &rollback_batch, nullptr, nullptr,
                           NO_REF_LOG, !DISABLE_MEMTABLE, &seq_used, ONE_BATCH,
                           pre_release_callback);
   assert(!s.ok() || seq_used != kMaxSequenceNumber);
@@ -429,7 +438,7 @@ Status WritePreparedTxn::RollbackInternal() {
   // In the absence of Prepare markers, use Noop as a batch separator
   s = WriteBatchInternal::InsertNoop(&empty_batch);
   assert(s.ok());
-  s = db_impl_->WriteImpl(write_options_, &empty_batch, nullptr, nullptr,
+  s = db_impl_->WriteImpl(write_options, &empty_batch, nullptr, nullptr,
                           NO_REF_LOG, DISABLE_MEMTABLE, &seq_used, ONE_BATCH,
                           &update_commit_map_with_prepare);
   assert(!s.ok() || seq_used != kMaxSequenceNumber);

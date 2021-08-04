@@ -1067,6 +1067,15 @@ struct DBOptions {
   // Default: true
   bool allow_concurrent_memtable_write = true;
 
+  // If true, uses an optimized write path that pipelines writes better in the
+  // presence of multiple writers. Only some memtable_factory-s would really
+  // benefit from this write flow, as it requires support for fast concurrent
+  // insertion in order to be effective.
+  // This is an experimental feature.
+  //
+  // Default: false
+  bool use_spdb_writes = true;
+
   // If true, threads synchronizing with the write batch group leader will
   // wait for up to write_thread_max_yield_usec before blocking on a mutex.
   // This can substantially improve throughput for concurrent workloads,
@@ -1690,6 +1699,8 @@ struct WriteOptions {
   // Default: `Env::IO_TOTAL`
   Env::IOPriority rate_limiter_priority;
 
+  bool txn_write;
+
   WriteOptions()
       : sync(false),
         disableWAL(false),
@@ -1697,7 +1708,8 @@ struct WriteOptions {
         no_slowdown(false),
         low_pri(false),
         memtable_insert_hint_per_batch(false),
-        rate_limiter_priority(Env::IO_TOTAL) {}
+        rate_limiter_priority(Env::IO_TOTAL),
+        txn_write(false) {}
 };
 
 // Options that control flush operations

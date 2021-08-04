@@ -542,6 +542,10 @@ enum Histograms : uint32_t {
 
   // Number of prefetched bytes discarded by RocksDB.
   PREFETCHED_BYTES_DISCARDED,
+  DB_GET_MEMTABLE,
+  DB_WAL_WRITE_TIME,
+  DB_WRITE_WAIT_FOR_WAL,
+  DB_WRITE_WAIT_FOR_WAL_WITH_MUTEX,
 
   HISTOGRAM_ENUM_MAX,
 };

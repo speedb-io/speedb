@@ -1989,6 +1989,9 @@ Status DBImpl::FlushMemTable(ColumnFamilyData* cfd,
   autovector<FlushRequest> flush_reqs;
   autovector<uint64_t> memtable_ids_to_wait;
   {
+    if (spdb_write_) {
+      spdb_write_->GetFlushRWLock().WriteLock();
+    }
     WriteContext context;
     InstrumentedMutexLock guard_lock(&mutex_);
 
@@ -2053,6 +2056,9 @@ Status DBImpl::FlushMemTable(ColumnFamilyData* cfd,
         }
       }
     }
+    if (spdb_write_) {
+      spdb_write_->GetFlushRWLock().WriteUnlock();
+    }  
 
     if (s.ok() && !flush_reqs.empty()) {
       for (const auto& req : flush_reqs) {
@@ -2133,6 +2139,10 @@ Status DBImpl::AtomicFlushMemTables(
   FlushRequest flush_req;
   autovector<ColumnFamilyData*> cfds;
   {
+    if (spdb_write_) {
+      spdb_write_->GetFlushRWLock().WriteLock();
+    }
+
     WriteContext context;
     InstrumentedMutexLock guard_lock(&mutex_);
 
@@ -2166,6 +2176,9 @@ Status DBImpl::AtomicFlushMemTables(
       if (!s.ok()) {
         break;
       }
+    }    
+    if (spdb_write_) {
+      spdb_write_->GetFlushRWLock().WriteUnlock();
     }
     if (s.ok()) {
       AssignAtomicFlushSeq(cfds);

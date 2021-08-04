@@ -85,6 +85,10 @@ static std::unordered_map<std::string, OptionTypeInfo>
          {offsetof(struct MutableDBOptions, delayed_write_rate),
           OptionType::kUInt64T, OptionVerificationType::kNormal,
           OptionTypeFlags::kMutable}},
+        {"use_dynamic_delay",
+         {offsetof(struct MutableDBOptions, use_dynamic_delay),
+          OptionType::kBoolean, OptionVerificationType::kNormal,
+          OptionTypeFlags::kMutable}},
         {"max_total_wal_size",
          {offsetof(struct MutableDBOptions, max_total_wal_size),
           OptionType::kUInt64T, OptionVerificationType::kNormal,
@@ -322,6 +326,10 @@ static std::unordered_map<std::string, OptionTypeInfo>
           OptionTypeFlags::kNone}},
         {"allow_concurrent_memtable_write",
          {offsetof(struct ImmutableDBOptions, allow_concurrent_memtable_write),
+          OptionType::kBoolean, OptionVerificationType::kNormal,
+          OptionTypeFlags::kNone}},
+        {"use_spdb_writes",
+         {offsetof(struct ImmutableDBOptions, use_spdb_writes),
           OptionType::kBoolean, OptionVerificationType::kNormal,
           OptionTypeFlags::kNone}},
         {"wal_recovery_mode",
@@ -703,6 +711,7 @@ ImmutableDBOptions::ImmutableDBOptions(const DBOptions& options)
       enable_pipelined_write(options.enable_pipelined_write),
       unordered_write(options.unordered_write),
       allow_concurrent_memtable_write(options.allow_concurrent_memtable_write),
+      use_spdb_writes(options.use_spdb_writes),
       enable_write_thread_adaptive_yield(
           options.enable_write_thread_adaptive_yield),
       write_thread_max_yield_usec(options.write_thread_max_yield_usec),
@@ -855,6 +864,7 @@ void ImmutableDBOptions::Dump(Logger* log) const {
                    unordered_write);
   ROCKS_LOG_HEADER(log, "        Options.allow_concurrent_memtable_write: %d",
                    allow_concurrent_memtable_write);
+  ROCKS_LOG_HEADER(log, "        Options.use_spdb_writes: %d", use_spdb_writes);
   ROCKS_LOG_HEADER(log, "     Options.enable_write_thread_adaptive_yield: %d",
                    enable_write_thread_adaptive_yield);
   ROCKS_LOG_HEADER(log,
@@ -956,6 +966,7 @@ MutableDBOptions::MutableDBOptions()
       avoid_flush_during_shutdown(false),
       writable_file_max_buffer_size(1024 * 1024),
       delayed_write_rate(2 * 1024U * 1024U),
+      use_dynamic_delay(true),
       max_total_wal_size(0),
       delete_obsolete_files_period_micros(6ULL * 60 * 60 * 1000000),
       stats_dump_period_sec(600),
@@ -975,6 +986,7 @@ MutableDBOptions::MutableDBOptions(const DBOptions& options)
       avoid_flush_during_shutdown(options.avoid_flush_during_shutdown),
       writable_file_max_buffer_size(options.writable_file_max_buffer_size),
       delayed_write_rate(options.delayed_write_rate),
+      use_dynamic_delay(options.use_dynamic_delay),
       max_total_wal_size(options.max_total_wal_size),
       delete_obsolete_files_period_micros(
           options.delete_obsolete_files_period_micros),
@@ -1002,6 +1014,8 @@ void MutableDBOptions::Dump(Logger* log) const {
       writable_file_max_buffer_size);
   ROCKS_LOG_HEADER(log, "            Options.delayed_write_rate : %" PRIu64,
                    delayed_write_rate);
+  ROCKS_LOG_HEADER(log, "            Options.use_dynamic_delay : %d",
+                   use_dynamic_delay);
   ROCKS_LOG_HEADER(log, "            Options.max_total_wal_size: %" PRIu64,
                    max_total_wal_size);
   ROCKS_LOG_HEADER(

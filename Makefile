@@ -10,6 +10,7 @@
 SHELL := $(shell command -v bash || echo $(SHELL))
 include common.mk
 
+
 CLEAN_FILES = # deliberately empty, so we can append below.
 CFLAGS += ${EXTRA_CFLAGS}
 CXXFLAGS += ${EXTRA_CXXFLAGS}
@@ -487,7 +488,7 @@ ifeq ($(PLATFORM), OS_OPENBSD)
 endif
 
 ifndef DISABLE_WARNING_AS_ERROR
-	WARNING_FLAGS += -Werror
+	WARNING_FLAGS += 
 endif
 
 

@@ -22,6 +22,7 @@
 #include "db/column_family.h"
 #include "db/compaction/compaction_iterator.h"
 #include "db/compaction/compaction_job.h"
+#include "db/db_impl/db_spdb_impl_write.h"
 #include "db/error_handler.h"
 #include "db/event_helpers.h"
 #include "db/external_sst_file_ingestion_job.h"
@@ -42,6 +43,7 @@
 #include "db/wal_manager.h"
 #include "db/write_controller.h"
 #include "db/write_thread.h"
+#include "external_delay.h"
 #include "logging/event_logger.h"
 #include "monitoring/instrumented_mutex.h"
 #include "options/db_options.h"
@@ -1160,6 +1162,25 @@ class DBImpl : public DB {
   static void TEST_ResetDbSessionIdGen();
   static std::string GenerateDbSessionId(Env* env);
 
+ public:
+  // SPDB write
+  bool CheckIfActionNeeded();
+  Status RegisterFlushOrTrim();
+  void SetLastSequence(uint64_t seq_inc) {
+    versions_->SetLastSequence(seq_inc);
+  }
+  uint64_t FetchAddLastAllocatedSequence(uint64_t batch_count) {
+    return versions_->FetchAddLastAllocatedSequence(batch_count);
+  }
+  Status SpdbWrite(const WriteOptions& write_options, WriteBatch* my_batch,
+                   bool disable_memtable, bool txn_write);
+  IOStatus SpdbWriteToWAL(WriteBatch* merged_batch, size_t write_with_wal,
+                          const WriteBatch* to_be_cached_state);
+  IOStatus SpdbSyncWAL();
+
+  void SuspendSpdbWrites();
+  void ResumeSpdbWrites();
+
  protected:
   const std::string dbname_;
   // TODO(peterd): unify with VersionSet::db_id_
@@ -1938,6 +1959,9 @@ class DBImpl : public DB {
       ColumnFamilyData* cfd, SuperVersionContext* sv_context,
       const MutableCFOptions& mutable_cf_options);
 
+  // calculate the write rate based on the status of the current version
+  void RecalculateWriteRate();
+
   bool GetIntPropertyInternal(ColumnFamilyData* cfd,
                               const DBPropertyInfo& property_info,
                               bool is_locked, uint64_t* value);
@@ -2391,8 +2415,13 @@ class DBImpl : public DB {
 
   BlobFileCompletionCallback blob_callback_;
 
+  // Pointer tp Speedb write flow
+  std::unique_ptr<SpdbWriteImpl> spdb_write_;
+
   // Pointer to WriteBufferManager stalling interface.
   std::unique_ptr<StallInterface> wbm_stall_;
+
+  ExternalDelay external_delay_;
 };
 
 extern Options SanitizeOptions(const std::string& db, const Options& src,

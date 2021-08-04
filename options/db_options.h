@@ -68,6 +68,7 @@ struct ImmutableDBOptions {
   bool enable_pipelined_write;
   bool unordered_write;
   bool allow_concurrent_memtable_write;
+  bool use_spdb_writes;
   bool enable_write_thread_adaptive_yield;
   uint64_t write_thread_max_yield_usec;
   uint64_t write_thread_slow_yield_usec;
@@ -125,6 +126,7 @@ struct MutableDBOptions {
   bool avoid_flush_during_shutdown;
   size_t writable_file_max_buffer_size;
   uint64_t delayed_write_rate;
+  bool use_dynamic_delay;
   uint64_t max_total_wal_size;
   uint64_t delete_obsolete_files_period_micros;
   unsigned int stats_dump_period_sec;

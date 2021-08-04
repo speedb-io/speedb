@@ -1288,6 +1288,8 @@ DEFINE_uint64(delayed_write_rate, 8388608u,
               "Limited bytes allowed to DB when soft_rate_limit or "
               "level0_slowdown_writes_trigger triggers");
 
+DEFINE_bool(use_dynamic_delay, true, "use dynamic delay");
+
 DEFINE_bool(enable_pipelined_write, true,
             "Allow WAL and memtable writes to be pipelined");
 
@@ -1302,6 +1304,7 @@ DEFINE_bool(allow_concurrent_memtable_write, true,
 DEFINE_double(experimental_mempurge_threshold, 0.0,
               "Maximum useful payload ratio estimate that triggers a mempurge "
               "(memtable garbage collection).");
+DEFINE_bool(use_spdb_writes, true, "Use optimized Speedb write flow");
 
 DEFINE_bool(inplace_update_support,
             ROCKSDB_NAMESPACE::Options().inplace_update_support,
@@ -4209,10 +4212,12 @@ class Benchmark {
         FLAGS_allow_concurrent_memtable_write;
     options.experimental_mempurge_threshold =
         FLAGS_experimental_mempurge_threshold;
+    options.use_spdb_writes = FLAGS_use_spdb_writes;
     options.inplace_update_support = FLAGS_inplace_update_support;
     options.inplace_update_num_locks = FLAGS_inplace_update_num_locks;
     options.enable_write_thread_adaptive_yield =
         FLAGS_enable_write_thread_adaptive_yield;
+    options.use_dynamic_delay = FLAGS_use_dynamic_delay;
     options.enable_pipelined_write = FLAGS_enable_pipelined_write;
     options.unordered_write = FLAGS_unordered_write;
     options.write_thread_max_yield_usec = FLAGS_write_thread_max_yield_usec;

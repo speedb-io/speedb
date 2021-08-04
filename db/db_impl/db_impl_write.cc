@@ -175,6 +175,11 @@ Status DBImpl::WriteImpl(const WriteOptions& write_options,
     return Status::NotSupported(
         "pipelined_writes is not compatible with concurrent prepares");
   }
+  if (spdb_write_) {
+    return SpdbWrite(write_options, my_batch, callback, log_used, disable_memtable, seq_used);
+  }
+  assert(!seq_per_batch_ || batch_cnt != 0);
+
   if (seq_per_batch_ && immutable_db_options_.enable_pipelined_write) {
     // TODO(yiwu): update pipeline write with seq_per_batch and batch_cnt
     return Status::NotSupported(

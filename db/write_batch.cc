@@ -2270,6 +2270,7 @@ class MemTableInserter : public WriteBatch::Handler {
         // MarkFlushScheduled only returns true if we are the one that
         // should take action, so no need to dedup further
         flush_scheduler_->ScheduleWork(cfd);
+        db_->NotifyFlushNeeded();
       }
     }
     // check if memtable_list size exceeds max_write_buffer_size_to_maintain

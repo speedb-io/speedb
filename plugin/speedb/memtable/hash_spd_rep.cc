@@ -96,7 +96,7 @@ struct BucketHeader {
       const char* key = (*iter)->key_;
 
       if (comparator(check_key, key) == 0) {
-        return true;
+        return (MemTable::IsKeyShouldBeIgnore(key, false) ? false : true);
       }
     }
     return false;
@@ -325,6 +325,13 @@ bool SortVector::SeekForward(const MemTableRep::KeyComparator& comparator,
                            stl_wrappers::Compare(comparator));
     }
   }
+  /*if (IsRollback()) {
+    if (sort_item->curr_iter_ != items_.end()) {
+      while (MemTable::IsKeyShouldBeIgnore(*sort_item->curr_iter_, true) &&
+  sort_item->curr_iter_ != items_.end()) { sort_item->curr_iter_++;
+      }
+    }
+  }*/
   return (sort_item->curr_iter_ == items_.end()) ? false : true;
 }
 
@@ -343,6 +350,18 @@ bool SortVector::SeekBackward(const MemTableRep::KeyComparator& comparator,
       }
     }
   }
+  /*if (IsRollback()) {
+    if (sort_item->curr_iter_ != items_.end()) {
+      while (MemTable::IsKeyShouldBeIgnore(*sort_item->curr_iter_, true) &&
+  sort_item->curr_iter_ != items_.begin()) {
+        --sort_item->curr_iter_;
+      }
+      if (MemTable::IsKeyShouldBeIgnore(*sort_item->curr_iter_, true)) {
+        sort_item->curr_iter_ = items_.end();
+      }
+    }
+  }*/
+
   return (sort_item->curr_iter_ == items_.end()) ? false : true;
 }
 
@@ -939,6 +958,9 @@ void HashLocklessRep::Get(const LookupKey& k, void* callback_args,
 
   for (auto iter = bucket->items_.begin(); iter != bucket->items_.end();
        ++iter) {
+    if (MemTable::IsKeyShouldBeIgnore((*iter)->key_, IsRollback())) {
+      continue;
+    }
     if (!callback_func(callback_args, (*iter)->key_)) {
       break;
     }

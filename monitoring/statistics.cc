@@ -287,6 +287,10 @@ const std::vector<std::pair<Histograms, std::string>> HistogramsNameMap = {
     {POLL_WAIT_MICROS, "rocksdb.poll.wait.micros"},
     {PREFETCHED_BYTES_DISCARDED, "rocksdb.prefetched.bytes.discarded"},
 
+    {DB_GET_MEMTABLE, "rocksdb.db.get.mem.micros"},
+    {DB_WAL_WRITE_TIME, "rocksdb.db.wal.write.micros"},
+    {DB_WRITE_WAIT_FOR_WAL, "rocksdb.db.write_wait_for_wal.micros"},
+    {DB_WRITE_WAIT_FOR_WAL_WITH_MUTEX, "rocksdb.db.write_wait_mutex.micros"},
 };
 
 std::shared_ptr<Statistics> CreateDBStatistics() {

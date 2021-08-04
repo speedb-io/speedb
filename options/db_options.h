@@ -68,6 +68,7 @@ struct ImmutableDBOptions {
   bool enable_pipelined_write;
   bool unordered_write;
   bool allow_concurrent_memtable_write;
+  bool use_spdb_writes;
   bool enable_write_thread_adaptive_yield;
   uint64_t write_thread_max_yield_usec;
   uint64_t write_thread_slow_yield_usec;

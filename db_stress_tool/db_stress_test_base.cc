@@ -2413,6 +2413,7 @@ void StressTest::Open() {
         FLAGS_allow_concurrent_memtable_write;
     options_.experimental_mempurge_threshold =
         FLAGS_experimental_mempurge_threshold;
+    options_.use_spdb_writes = FLAGS_use_spdb_writes;
     options_.periodic_compaction_seconds = FLAGS_periodic_compaction_seconds;
     options_.ttl = FLAGS_compaction_ttl;
     options_.enable_pipelined_write = FLAGS_enable_pipelined_write;

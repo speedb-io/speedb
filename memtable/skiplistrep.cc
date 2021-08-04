@@ -74,6 +74,7 @@ public:
   // Returns true iff an entry that compares equal to key is in the list.
  bool Contains(const char* key) const override {
    return skip_list_.Contains(key);
+   // IsKeyShouldBeIgnore
  }
 
  size_t ApproximateMemoryUsage() override {
@@ -85,8 +86,14 @@ public:
           bool (*callback_func)(void* arg, const char* entry)) override {
    SkipListRep::Iterator iter(&skip_list_);
    Slice dummy_slice;
-   for (iter.Seek(dummy_slice, k.memtable_key().data());
-        iter.Valid() && callback_func(callback_args, iter.key()); iter.Next()) {
+   for (iter.Seek(dummy_slice, k.memtable_key().data()); iter.Valid();
+        iter.Next()) {
+     if (MemTable::IsKeyShouldBeIgnore(iter.key(), IsRollback())) {
+       continue;
+     }
+     if (!callback_func(callback_args, iter.key())) {
+       break;
+     }
    }
  }
 

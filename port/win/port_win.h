@@ -205,6 +205,12 @@ class RWMutex {
   SRWLOCK srwLock_;
 };
 
+// RWLock with write preference
+class RWMutexWr : public RWMutex {
+ public:
+  RWMutexWr() {}
+};
+
 class CondVar {
  public:
   explicit CondVar(Mutex* mu) : mu_(mu) {

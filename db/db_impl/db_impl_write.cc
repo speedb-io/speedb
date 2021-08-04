@@ -196,6 +196,11 @@ Status DBImpl::WriteImpl(const WriteOptions& write_options,
     }
   }
 
+  if (spdb_write_) {
+    return SpdbWrite(write_options, my_batch, callback, log_used,
+                     disable_memtable, seq_used);
+  }
+
   if (two_write_queues_ && disable_memtable) {
     AssignOrder assign_order =
         seq_per_batch_ ? kDoAssignOrder : kDontAssignOrder;
@@ -552,7 +557,6 @@ Status DBImpl::WriteImpl(const WriteOptions& write_options,
     MemTableInsertStatusCheck(w.status);
     write_thread_.ExitAsBatchGroupLeader(write_group, status);
   }
-
   if (status.ok()) {
     status = w.FinalStatus();
   }

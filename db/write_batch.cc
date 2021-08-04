@@ -82,6 +82,7 @@ enum ContentFlags : uint32_t {
   HAS_DELETE_RANGE = 1 << 9,
   HAS_BLOB_INDEX = 1 << 10,
   HAS_BEGIN_UNPREPARE = 1 << 11,
+  HAS_IGNORE = 1 << 12,
 };
 
 struct BatchContentClassifier : public WriteBatch::Handler {
@@ -458,6 +459,15 @@ Status WriteBatch::Iterate(Handler* handler) const {
                                      rep_.size());
 }
 
+Status WriteBatch::IterateToSetIgnore(Handler* handler) const {
+  if (rep_.size() < WriteBatchInternal::kHeader) {
+    return Status::Corruption("malformed WriteBatch (too small)");
+  }
+
+  return WriteBatchInternal::IterateToSetIgnore(
+      this, handler, WriteBatchInternal::kHeader, rep_.size());
+}
+
 Status WriteBatchInternal::Iterate(const WriteBatch* wb,
                                    WriteBatch::Handler* handler, size_t begin,
                                    size_t end) {
@@ -677,6 +687,94 @@ Status WriteBatchInternal::Iterate(const WriteBatch* wb,
   } else {
     return Status::OK();
   }
+}
+
+Status WriteBatchInternal::IterateToSetIgnore(const WriteBatch* wb,
+                                              WriteBatch::Handler* handler,
+                                              size_t begin, size_t end) {
+  if (begin > wb->rep_.size() || end > wb->rep_.size() || end < begin) {
+    return Status::Corruption("Invalid start/end bounds for Iterate");
+  }
+  assert(begin <= end);
+  Slice input(wb->rep_.data() + begin, static_cast<size_t>(end - begin));
+  Slice key, value, blob, xid;
+  Status s;
+  char tag = 0;
+  uint32_t column_family = 0;  // default
+  bool last_was_try_again = false;
+  bool handler_continue = true;
+  while (((s.ok() && !input.empty()) || UNLIKELY(s.IsTryAgain()))) {
+    handler_continue = handler->Continue();
+    if (!handler_continue) {
+      break;
+    }
+    // delete range. and other types
+
+    if (LIKELY(!s.IsTryAgain())) {
+      last_was_try_again = false;
+      tag = 0;
+      column_family = 0;  // default
+
+      s = ReadRecordFromWriteBatch(&input, &tag, &column_family, &key, &value,
+                                   &blob, &xid);
+      if (!s.ok()) {
+        return s;
+      }
+    } else {
+      assert(s.IsTryAgain());
+      assert(!last_was_try_again);  // to detect infinite loop bugs
+      if (UNLIKELY(last_was_try_again)) {
+        return Status::Corruption(
+            "two consecutive TryAgain in WriteBatch handler; this is either a "
+            "software bug or data corruption.");
+      }
+      last_was_try_again = true;
+      s = Status::OK();
+    }
+
+    switch (tag) {
+      case kTypeColumnFamilyValue:
+      case kTypeValue:
+      case kTypeColumnFamilyDeletion:
+      case kTypeDeletion:
+      case kTypeColumnFamilySingleDeletion:
+      case kTypeSingleDeletion:
+      case kTypeColumnFamilyRangeDeletion:
+      case kTypeRangeDeletion:
+      case kTypeColumnFamilyBlobIndex:
+      case kTypeBlobIndex:
+        s = handler->IgnoreCF(key);
+        break;
+      case kTypeColumnFamilyMerge:
+      case kTypeMerge:
+        // in case of merge, a merge entry type was inserted or a value type
+        // entry if count the number of successive merges reaches the
+        // moptions->max_successive_merges we set the merge entry as ignore as
+        // done above
+        s = handler->IgnoreCF(key);
+        break;
+
+      case kTypeLogData:
+      case kTypeBeginPrepareXID:
+      case kTypeBeginPersistedPrepareXID:
+      case kTypeBeginUnprepareXID:
+      case kTypeEndPrepareXID:
+      case kTypeCommitXID:
+      case kTypeCommitXIDAndTimestamp:
+      case kTypeRollbackXID:
+      case kTypeNoop:
+        // for WAL only . there is nothing to handle in rollback. note that
+        // transaction that get error on part of the process will do the roll
+        // back as part of the process
+        break;
+      default:
+        return Status::Corruption("unknown WriteBatch tag");
+    }
+  }
+  if (!s.ok()) {
+    return s;
+  }
+  return Status::OK();
 }
 
 bool WriteBatchInternal::IsLatestPersistentState(const WriteBatch* b) {
@@ -1868,6 +1966,14 @@ class MemTableInserter : public WriteBatch::Handler {
     return ret_status;
   }
 
+  Status IgnoreCF(const Slice& key) override {
+    Status ret_status;
+    MemTable* mem = cf_mems_->GetMemTable();
+    ret_status = mem->UpdateIgnore(sequence_, key);
+
+    return ret_status;
+  }
+
   Status PutCF(uint32_t column_family_id, const Slice& key,
                const Slice& value) override {
     const auto* kv_prot_info = NextProtectionInfo();
@@ -2609,6 +2715,26 @@ Status WriteBatchInternal::InsertInto(
   }
   if (concurrent_memtable_writes) {
     inserter.PostProcess();
+  }
+  return s;
+}
+
+Status WriteBatchInternal::Rollback(
+    const WriteBatch* batch, ColumnFamilyMemTables* memtables,
+    FlushScheduler* flush_scheduler,
+    TrimHistoryScheduler* trim_history_scheduler,
+    bool ignore_missing_column_families, uint64_t log_number, DB* db,
+    bool concurrent_memtable_writes, SequenceNumber* next_seq,
+    bool* has_valid_writes, bool seq_per_batch, bool batch_per_txn) {
+  MemTableInserter inserter(Sequence(batch), memtables, flush_scheduler,
+                            trim_history_scheduler,
+                            ignore_missing_column_families, log_number, db,
+                            concurrent_memtable_writes, batch->prot_info_.get(),
+                            has_valid_writes, seq_per_batch, batch_per_txn);
+
+  Status s = batch->IterateToSetIgnore(&inserter);
+  if (next_seq != nullptr) {
+    *next_seq = inserter.sequence();
   }
   return s;
 }

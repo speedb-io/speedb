@@ -22,6 +22,7 @@
 #include "db/column_family.h"
 #include "db/compaction/compaction_iterator.h"
 #include "db/compaction/compaction_job.h"
+#include "db/db_impl/db_spdb_impl_write.h"
 #include "db/error_handler.h"
 #include "db/event_helpers.h"
 #include "db/external_sst_file_ingestion_job.h"
@@ -1159,6 +1160,34 @@ class DBImpl : public DB {
 
   static void TEST_ResetDbSessionIdGen();
   static std::string GenerateDbSessionId(Env* env);
+
+ public:
+  // SPDB write
+  bool CheckIfActionNeeded();
+  Status RegisterFlushOrTrim();
+  void SetLastSequence(uint64_t seq_inc) {
+    versions_->SetLastSequence(seq_inc);
+  }
+  uint64_t FetchAddLastAllocatedSequence(uint64_t batch_count) {
+    return versions_->FetchAddLastAllocatedSequence(batch_count);
+  }
+  void UpdateLastGroupBatchSize(uint64_t last_batch_group_size) {
+    last_batch_group_size_ = last_batch_group_size;
+  }
+  InternalStats* GetDefaultStat() { return default_cf_internal_stats_; }
+  Statistics* GetStatistic() { return stats_; }
+  Status SpdbWrite(const WriteOptions& write_options, WriteBatch* batch,
+                   WriteCallback* callback, uint64_t* log_used,
+                   bool disable_memtable, uint64_t* seq_used);
+
+  IOStatus SpdbWriteToWAL(WriteBatch* merged_batch, size_t write_with_wal,
+                          const WriteBatch* to_be_cached_state);
+  Status SpdbSyncWAL();
+
+  void SuspendSpdbWrites();
+  void ResumeSpdbWrites();
+  Status SpdbDelayWrite();
+  Status RollbackBatch(WriteBatch* batch);
 
  protected:
   const std::string dbname_;
@@ -2390,6 +2419,9 @@ class DBImpl : public DB {
   bool wal_in_db_path_;
 
   BlobFileCompletionCallback blob_callback_;
+
+  // Pointer tp Speedb write flow
+  std::unique_ptr<SpdbWriteImpl> spdb_write_;
 
   // Pointer to WriteBufferManager stalling interface.
   std::unique_ptr<StallInterface> wbm_stall_;

@@ -151,8 +151,14 @@ class RWMutex {
   void WriteUnlock();
   void AssertHeld() { }
 
- private:
+ protected:
   pthread_rwlock_t mu_; // the underlying platform mutex
+};
+
+// RWLock with write preference
+class RWMutexWr : public RWMutex {
+ public:
+  RWMutexWr();
 };
 
 class CondVar {

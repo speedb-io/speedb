@@ -324,6 +324,10 @@ static std::unordered_map<std::string, OptionTypeInfo>
          {offsetof(struct ImmutableDBOptions, allow_concurrent_memtable_write),
           OptionType::kBoolean, OptionVerificationType::kNormal,
           OptionTypeFlags::kNone}},
+        {"use_spdb_writes",
+         {offsetof(struct ImmutableDBOptions, use_spdb_writes),
+          OptionType::kBoolean, OptionVerificationType::kNormal,
+          OptionTypeFlags::kNone}},
         {"wal_recovery_mode",
          OptionTypeInfo::Enum<WALRecoveryMode>(
              offsetof(struct ImmutableDBOptions, wal_recovery_mode),
@@ -703,6 +707,7 @@ ImmutableDBOptions::ImmutableDBOptions(const DBOptions& options)
       enable_pipelined_write(options.enable_pipelined_write),
       unordered_write(options.unordered_write),
       allow_concurrent_memtable_write(options.allow_concurrent_memtable_write),
+      use_spdb_writes(options.use_spdb_writes),
       enable_write_thread_adaptive_yield(
           options.enable_write_thread_adaptive_yield),
       write_thread_max_yield_usec(options.write_thread_max_yield_usec),
@@ -855,6 +860,7 @@ void ImmutableDBOptions::Dump(Logger* log) const {
                    unordered_write);
   ROCKS_LOG_HEADER(log, "        Options.allow_concurrent_memtable_write: %d",
                    allow_concurrent_memtable_write);
+  ROCKS_LOG_HEADER(log, "        Options.use_spdb_writes: %d", use_spdb_writes);
   ROCKS_LOG_HEADER(log, "     Options.enable_write_thread_adaptive_yield: %d",
                    enable_write_thread_adaptive_yield);
   ROCKS_LOG_HEADER(log,

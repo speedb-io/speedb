@@ -931,6 +931,14 @@ Status WriteBatchInternal::MarkEndPrepare(WriteBatch* b, const Slice& xid,
   return Status::OK();
 }
 
+Status WriteBatchInternal::MarkDelete(WriteBatch* b) {
+  b->rep_.push_back(static_cast<char>(kTypeCommitXID));
+  b->content_flags_.store(b->content_flags_.load(std::memory_order_relaxed) |
+                              ContentFlags::HAS_DELETE,
+                          std::memory_order_relaxed);
+  return Status::OK();
+}
+
 Status WriteBatchInternal::MarkCommit(WriteBatch* b, const Slice& xid) {
   b->rep_.push_back(static_cast<char>(kTypeCommitXID));
   PutLengthPrefixedSlice(&b->rep_, xid);

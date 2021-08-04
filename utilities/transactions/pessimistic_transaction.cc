@@ -653,6 +653,7 @@ Status WriteCommittedTxn::CommitWithoutPrepareInternal() {
   assert(wbwi);
   WriteBatch* wb = wbwi->GetWriteBatch();
   assert(wb);
+  WriteOptions write_options = write_options_;
 
   const bool needs_ts = WriteBatchInternal::HasKeyWithTimestamp(*wb);
   if (needs_ts && commit_timestamp_ == kMaxTxnTimestamp) {
@@ -683,7 +684,7 @@ Status WriteCommittedTxn::CommitWithoutPrepareInternal() {
 
   uint64_t seq_used = kMaxSequenceNumber;
   auto s =
-      db_impl_->WriteImpl(write_options_, wb,
+      db_impl_->WriteImpl(write_options, wb,
                           /*callback*/ nullptr, /*log_used*/ nullptr,
                           /*log_ref*/ 0, /*disable_memtable*/ false, &seq_used);
   assert(!s.ok() || seq_used != kMaxSequenceNumber);
@@ -695,7 +696,8 @@ Status WriteCommittedTxn::CommitWithoutPrepareInternal() {
 
 Status WriteCommittedTxn::CommitBatchInternal(WriteBatch* batch, size_t) {
   uint64_t seq_used = kMaxSequenceNumber;
-  auto s = db_impl_->WriteImpl(write_options_, batch, /*callback*/ nullptr,
+  WriteOptions write_options = write_options_;
+  auto s = db_impl_->WriteImpl(write_options, batch, /*callback*/ nullptr,
                                /*log_used*/ nullptr, /*log_ref*/ 0,
                                /*disable_memtable*/ false, &seq_used);
   assert(!s.ok() || seq_used != kMaxSequenceNumber);
@@ -757,7 +759,9 @@ Status WriteCommittedTxn::CommitInternal() {
   assert(s.ok());
 
   uint64_t seq_used = kMaxSequenceNumber;
-  s = db_impl_->WriteImpl(write_options_, working_batch, /*callback*/ nullptr,
+  WriteOptions write_options = write_options_;
+
+  s = db_impl_->WriteImpl(write_options, working_batch, /*callback*/ nullptr,
                           /*log_used*/ nullptr, /*log_ref*/ log_number_,
                           /*disable_memtable*/ false, &seq_used);
   assert(!s.ok() || seq_used != kMaxSequenceNumber);
@@ -809,7 +813,8 @@ Status WriteCommittedTxn::RollbackInternal() {
   WriteBatch rollback_marker;
   auto s = WriteBatchInternal::MarkRollback(&rollback_marker, name_);
   assert(s.ok());
-  s = db_impl_->WriteImpl(write_options_, &rollback_marker);
+  WriteOptions write_options = write_options_;
+  s = db_impl_->WriteImpl(write_options, &rollback_marker);
   return s;
 }
 

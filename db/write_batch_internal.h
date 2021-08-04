@@ -127,6 +127,8 @@ class WriteBatchInternal {
   static Status MarkCommitWithTimestamp(WriteBatch* batch, const Slice& xid,
                                         const Slice& commit_ts);
 
+  static Status MarkDelete(WriteBatch* b);
+
   static Status InsertNoop(WriteBatch* batch);
 
   // Return the number of entries in the batch.

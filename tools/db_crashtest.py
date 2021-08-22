@@ -7,6 +7,7 @@ import argparse
 import os
 import random
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -756,6 +757,10 @@ def gen_cmd(params, unknown_params):
     return cmd
 
 
+DEADLY_SIGNALS = {
+    signal.SIGABRT, signal.SIGBUS, signal.SIGFPE, signal.SIGILL, signal.SIGSEGV
+}
+
 def execute_cmd(cmd, timeout):
     child = subprocess.Popen(cmd, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
     print("Running db_stress with pid=%d: %s\n\n" % (child.pid, " ".join(cmd)))
@@ -763,7 +768,13 @@ def execute_cmd(cmd, timeout):
     try:
         outs, errs = child.communicate(timeout=timeout)
         hit_timeout = False
-        print("WARNING: db_stress ended before kill: exitcode=%d\n" % child.returncode)
+        if child.returncode < 0 and (-child.returncode in DEADLY_SIGNALS):
+            msg = "ERROR: db_stress failed before kill: exitcode=%d, signal=%s\n" % (
+                    child.returncode, signal.Signals(-child.returncode).name)
+            print(msg)
+            raise SystemExit(msg)
+        print("WARNING: db_stress ended before kill: exitcode=%d\n"
+              % child.returncode)
     except subprocess.TimeoutExpired:
         hit_timeout = True
         child.kill()

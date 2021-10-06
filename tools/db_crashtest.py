@@ -787,6 +787,8 @@ def blackbox_crash_main(args, unknown_args):
 
     # we need to clean up after ourselves -- only do this on test success
     shutil.rmtree(dbname, True)
+    for ctr in range(max(0, counter - 2), counter):
+        shutil.rmtree('{}_{}'.format(dbname, ctr))
 
 
 # This python script runs db_stress multiple times. Some runs with
@@ -970,6 +972,8 @@ def whitebox_crash_main(args, unknown_args):
                 os.mkdir(expected_values_dir)
 
             check_mode = (check_mode + 1) % total_check_mode
+            for ctr in range(max(0, counter - 2), counter):
+                shutil.rmtree('{}_{}'.format(dbname, ctr))
 
         time.sleep(1)  # time to stabilize after a kill
 

@@ -12,6 +12,7 @@ import signal
 import subprocess
 import shutil
 import argparse
+import datetime
 
 # params overwrite priority:
 #   for default:
@@ -580,23 +581,25 @@ DEADLY_SIGNALS = {
 def execute_cmd(cmd, timeout):
     child = subprocess.Popen(cmd, stderr=subprocess.PIPE,
                              stdout=subprocess.PIPE)
-    print("Running db_stress with pid=%d: %s\n\n"
-          % (child.pid, ' '.join(cmd)))
+    print("[%s] Running db_stress with pid=%d: %s\n\n"
+          % (str(datetime.datetime.now()), child.pid, ' '.join(cmd)))
 
     try:
         outs, errs = child.communicate(timeout=timeout)
         hit_timeout = False
         if child.returncode < 0 and (-child.returncode in DEADLY_SIGNALS):
-            msg = "ERROR: db_stress failed before kill: exitcode=%d, signal=%s\n" % (
-                    child.returncode, signal.Signals(-child.returncode).name)
+            msg = ("[%s] ERROR: db_stress (pid=%d) failed before kill: "
+                   "exitcode=%d, signal=%s\n") % (
+                    str(datetime.datetime.now()), child.pid, child.returncode,
+                    signal.Signals(-child.returncode).name)
             print(msg)
             raise SystemExit(msg)
-        print("WARNING: db_stress ended before kill: exitcode=%d\n"
-              % child.returncode)
+        print("[%s] WARNING: db_stress (pid=%d) ended before kill: exitcode=%d\n"
+              % (str(datetime.datetime.now()), child.pid, child.returncode))
     except subprocess.TimeoutExpired:
         hit_timeout = True
         child.kill()
-        print("KILLED %d\n" % child.pid)
+        print("[%s] KILLED %d\n" % (str(datetime.datetime.now()), child.pid))
         outs, errs = child.communicate()
 
     return hit_timeout, child.returncode, outs.decode('utf-8'), errs.decode('utf-8')

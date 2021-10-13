@@ -863,6 +863,15 @@ def whitebox_crash_main(args, unknown_args):
         time.sleep(1)  # time to stabilize after a kill
 
 
+def bool_converter(v):
+    s = v.lower().strip()
+    if s in ('false', '0', 'no'):
+        return False
+    elif s in ('true', '1', 'yes'):
+        return True
+    raise ValueError('Failed to parse `%s` as a boolean value' % v)
+
+
 def main():
     global stress_cmd
 
@@ -896,7 +905,10 @@ def main():
                       + list(txn_params.items()))
 
     for k, v in all_params.items():
-        parser.add_argument("--" + k, type=type(v() if callable(v) else v))
+        t = type(v() if callable(v) else v)
+        if t is bool:
+            t = bool_converter
+        parser.add_argument("--" + k, type=t)
     # unknown_args are passed directly to db_stress
     args, unknown_args = parser.parse_known_args()
 

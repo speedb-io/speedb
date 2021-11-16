@@ -157,6 +157,7 @@ int main() {
 
   // Set a new snapshot in the transaction
   txn->SetSnapshot();
+  db->ReleaseSnapshot(read_options.snapshot);
   read_options.snapshot = db->GetSnapshot();
 
   // Do some reads and writes to key "y"
@@ -171,6 +172,7 @@ int main() {
   assert(s.ok());
   delete txn;
   // Clear snapshot from read options since it is no longer valid
+  db->ReleaseSnapshot(read_options.snapshot);
   read_options.snapshot = nullptr;
 
   // txn is committed, read the latest values.

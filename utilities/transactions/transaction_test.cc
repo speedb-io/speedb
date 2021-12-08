@@ -17,6 +17,7 @@
 #include "rocksdb/db.h"
 #include "rocksdb/options.h"
 #include "rocksdb/perf_context.h"
+#include "rocksdb/table.h"
 #include "rocksdb/utilities/transaction.h"
 #include "rocksdb/utilities/transaction_db.h"
 #include "table/mock_table.h"
@@ -5759,6 +5760,88 @@ class ThreeBytewiseComparator : public Comparator {
   }
 };
 
+// SPDB-197 added a check to fail DB open in case a user comparator may consider
+// different byte contents equal and a built-in filter policy is enabled. Since
+// Speedb enables a filter policy by default, we create a filter policy which
+// wraps the default filter policy and passes canonical represantations of the
+// keys to it, which in the case of ThreeBytewiseComparator is simply the first
+// three bytes of the key.
+class ThreeBytesFilterPolicy : public FilterPolicy {
+  std::unique_ptr<const FilterPolicy> wrapped_{NewSpdbHybridFilterPolicy()};
+
+  struct CustomFilterBitsBuilder : public FilterBitsBuilder {
+    CustomFilterBitsBuilder(FilterBitsBuilder* wrapped) : wrapped_(wrapped) {}
+
+    void AddKey(const Slice& key) override {
+      wrapped_->AddKey(Slice(key.data(), std::min<size_t>(key.size(), 3)));
+    }
+
+    size_t EstimateEntriesAdded() override {
+      return wrapped_->EstimateEntriesAdded();
+    }
+
+    Slice Finish(std::unique_ptr<const char[]>* buf) override {
+      return wrapped_->Finish(buf);
+    }
+
+    size_t ApproximateNumEntries(size_t bytes) override {
+      return wrapped_->ApproximateNumEntries(bytes);
+    }
+
+    int CalculateNumEntry(const uint32_t bytes) override {
+      return wrapped_->CalculateNumEntry(bytes);
+    }
+
+   private:
+    std::unique_ptr<FilterBitsBuilder> wrapped_;
+  };
+
+  struct CustomFilterBitsReader : public FilterBitsReader {
+    CustomFilterBitsReader(FilterBitsReader* wrapped) : wrapped_(wrapped) {}
+
+    using FilterBitsReader::MayMatch;
+    bool MayMatch(const Slice& entry) override {
+      return wrapped_->MayMatch(
+          Slice(entry.data(), std::min<size_t>(entry.size(), 3)));
+    }
+
+   private:
+    std::unique_ptr<FilterBitsReader> wrapped_;
+  };
+
+ public:
+  const char* Name() const override { return "test.ThreeBytesFilterPolicy"; }
+
+  void CreateFilter(const Slice* keys, int n, std::string* dst) const override {
+    std::vector<Slice> shortened;
+    shortened.reserve(n);
+    for (int i = 0; i < n; ++i) {
+      shortened.push_back(
+          Slice(keys[i].data(), std::min<size_t>(keys[i].size(), 3)));
+    }
+    return wrapped_->CreateFilter(shortened.data(), n, dst);
+  }
+
+  bool KeyMayMatch(const Slice& key, const Slice& filter) const override {
+    return wrapped_->KeyMayMatch(
+        Slice(key.data(), std::min<size_t>(key.size(), 3)), filter);
+  }
+
+  FilterBitsBuilder* GetFilterBitsBuilder() const override {
+    return new CustomFilterBitsBuilder(wrapped_->GetFilterBitsBuilder());
+  }
+
+  FilterBitsBuilder* GetBuilderWithContext(
+      const FilterBuildingContext& context) const override {
+    return new CustomFilterBitsBuilder(
+        wrapped_->GetBuilderWithContext(context));
+  }
+
+  FilterBitsReader* GetFilterBitsReader(const Slice& contents) const override {
+    return new CustomFilterBitsReader(wrapped_->GetFilterBitsReader(contents));
+  }
+};
+
 #if !defined(ROCKSDB_VALGRIND_RUN) || defined(ROCKSDB_FULL_VALGRIND_RUN)
 TEST_P(TransactionTest, GetWithoutSnapshot) {
   WriteOptions write_options;
@@ -5832,7 +5915,8 @@ TEST_P(TransactionTest, DuplicateKeys) {
     ASSERT_OK(ReOpen());
     std::unique_ptr<const Comparator> comp_gc(new ThreeBytewiseComparator());
     cf_options.comparator = comp_gc.get();
-    ASSERT_OK(db->CreateColumnFamily(cf_options, cf_name, &cf_handle));
+    cf_options.table_factory->GetOptions<BlockBasedTableOptions>()
+        ->filter_policy.reset(new ThreeBytesFilterPolicy());
     WriteOptions write_options;
     WriteBatch batch;
     ASSERT_OK(batch.Put(cf_handle, Slice("key"), Slice("value")));
@@ -5862,6 +5946,8 @@ TEST_P(TransactionTest, DuplicateKeys) {
 
     delete cf_handle;
     cf_options.comparator = BytewiseComparator();
+    bbto.filter_policy.reset();
+    cf_options.table_factory.reset(NewBlockBasedTableFactory(bbto));
   }
 
   for (bool do_prepare : {true, false}) {
@@ -6047,6 +6133,8 @@ TEST_P(TransactionTest, DuplicateKeys) {
 
     std::unique_ptr<const Comparator> comp_gc(new ThreeBytewiseComparator());
     cf_options.comparator = comp_gc.get();
+    cf_options.table_factory->GetOptions<BlockBasedTableOptions>()
+        ->filter_policy.reset(new ThreeBytesFilterPolicy());
     cf_options.merge_operator = MergeOperators::CreateStringAppendOperator();
     ASSERT_OK(db->CreateColumnFamily(cf_options, cf_name, &cf_handle));
     delete cf_handle;

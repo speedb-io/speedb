@@ -444,6 +444,7 @@ int main(int argc, char** argv) {
 
   StartPhase("create_objects");
   cmp = rocksdb_comparator_create(NULL, CmpDestroy, CmpCompare, CmpName);
+  rocksdb_comparator_set_can_different_byte_contents_be_equal(cmp, 0);
   dbpath = rocksdb_dbpath_create(dbpathname, 1024 * 1024);
   env = rocksdb_create_default_env();
 

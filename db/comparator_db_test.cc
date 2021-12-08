@@ -9,6 +9,8 @@
 #include "memtable/stl_wrappers.h"
 #include "rocksdb/db.h"
 #include "rocksdb/env.h"
+#include "rocksdb/filter_policy.h"
+#include "rocksdb/table.h"
 #include "test_util/testharness.h"
 #include "test_util/testutil.h"
 #include "util/hash.h"
@@ -167,6 +169,14 @@ void DoRandomIteraratorTest(DB* db, std::vector<std::string> source_strings,
   }
 }
 
+static double ConvertToDouble(const Slice& a) {
+#ifndef CYGWIN
+  return std::stod(a.ToString());
+#else
+  return std::strtod(a.ToString().c_str(), 0 /* endptr */);
+#endif
+}
+
 class DoubleComparator : public Comparator {
  public:
   DoubleComparator() {}
@@ -174,13 +184,9 @@ class DoubleComparator : public Comparator {
   const char* Name() const override { return "DoubleComparator"; }
 
   int Compare(const Slice& a, const Slice& b) const override {
-#ifndef CYGWIN
-    double da = std::stod(a.ToString());
-    double db = std::stod(b.ToString());
-#else
-    double da = std::strtod(a.ToString().c_str(), 0 /* endptr */);
-    double db = std::strtod(a.ToString().c_str(), 0 /* endptr */);
-#endif
+    double da = ConvertToDouble(a);
+    double db = ConvertToDouble(a);
+
     if (da == db) {
       return a.compare(b);
     } else if (da > db) {
@@ -193,6 +199,96 @@ class DoubleComparator : public Comparator {
                              const Slice& /*limit*/) const override {}
 
   void FindShortSuccessor(std::string* /*key*/) const override {}
+};
+
+// SPDB-197 added a check to fail DB open in case a user comparator may consider
+// different byte contents equal and a built-in filter policy is enabled. Since
+// Speedb enables a filter policy by default, we create a filter policy which
+// wraps the default filter policy and passes canonical represantations of the
+// keys to it, which in the case of DoubleComparator is simply the binary
+// representation of the double instead of its string representation.
+class DoubleFilterPolicy : public FilterPolicy {
+  std::unique_ptr<const FilterPolicy> wrapped_{NewSpdbHybridFilterPolicy()};
+
+  struct DoubleFilterBitsBuilder : public FilterBitsBuilder {
+    DoubleFilterBitsBuilder(FilterBitsBuilder* wrapped) : wrapped_(wrapped) {}
+
+    void AddKey(const Slice& key) override {
+      double hk = ConvertToDouble(key);
+      wrapped_->AddKey(Slice(reinterpret_cast<char*>(&hk), sizeof(hk)));
+    }
+
+    size_t EstimateEntriesAdded() override {
+      return wrapped_->EstimateEntriesAdded();
+    }
+
+    Slice Finish(std::unique_ptr<const char[]>* buf) override {
+      return wrapped_->Finish(buf);
+    }
+
+    size_t ApproximateNumEntries(size_t bytes) override {
+      return wrapped_->ApproximateNumEntries(bytes);
+    }
+
+    int CalculateNumEntry(const uint32_t bytes) override {
+      return wrapped_->CalculateNumEntry(bytes);
+    }
+
+   private:
+    std::unique_ptr<FilterBitsBuilder> wrapped_;
+  };
+
+  struct DoubleFilterBitsReader : public FilterBitsReader {
+    DoubleFilterBitsReader(FilterBitsReader* wrapped) : wrapped_(wrapped) {}
+
+    using FilterBitsReader::MayMatch;
+    bool MayMatch(const Slice& entry) override {
+      double dk = ConvertToDouble(entry);
+      return wrapped_->MayMatch(
+          Slice(reinterpret_cast<char*>(&dk), sizeof(dk)));
+    }
+
+   private:
+    std::unique_ptr<FilterBitsReader> wrapped_;
+  };
+
+ public:
+  const char* Name() const override { return "DoubleFilterPolicy"; }
+
+  void CreateFilter(const Slice* keys, int n, std::string* dst) const override {
+    std::vector<double> converted;
+    converted.reserve(n);
+    for (int i = 0; i < n; ++i) {
+      converted.push_back(ConvertToDouble(keys[i]));
+    }
+
+    std::vector<Slice> sliced;
+    sliced.reserve(converted.size());
+    for (double& dk : converted) {
+      sliced.push_back(Slice(reinterpret_cast<char*>(&dk), sizeof(dk)));
+    }
+    return wrapped_->CreateFilter(sliced.data(), n, dst);
+  }
+
+  bool KeyMayMatch(const Slice& key, const Slice& filter) const override {
+    double dk = ConvertToDouble(key);
+    return wrapped_->KeyMayMatch(
+        Slice(reinterpret_cast<char*>(&dk), sizeof(dk)), filter);
+  }
+
+  FilterBitsBuilder* GetFilterBitsBuilder() const override {
+    return new DoubleFilterBitsBuilder(wrapped_->GetFilterBitsBuilder());
+  }
+
+  FilterBitsBuilder* GetBuilderWithContext(
+      const FilterBuildingContext& context) const override {
+    return new DoubleFilterBitsBuilder(
+        wrapped_->GetBuilderWithContext(context));
+  }
+
+  FilterBitsReader* GetFilterBitsReader(const Slice& contents) const override {
+    return new DoubleFilterBitsReader(wrapped_->GetFilterBitsReader(contents));
+  }
 };
 
 class HashComparator : public Comparator {
@@ -216,6 +312,95 @@ class HashComparator : public Comparator {
                              const Slice& /*limit*/) const override {}
 
   void FindShortSuccessor(std::string* /*key*/) const override {}
+};
+
+// SPDB-197 added a check to fail DB open in case a user comparator may consider
+// different byte contents equal and a built-in filter policy is enabled. Since
+// Speedb enables a filter policy by default, we create a filter policy which
+// wraps the default filter policy and passes canonical represantations of the
+// keys to it, which in the case of HashComparator is simply the binary
+// representation of the hash instead of the string representation of the key.
+class HashFilterPolicy : public FilterPolicy {
+  std::unique_ptr<const FilterPolicy> wrapped_{NewSpdbHybridFilterPolicy()};
+
+  struct HashFilterBitsBuilder : public FilterBitsBuilder {
+    HashFilterBitsBuilder(FilterBitsBuilder* wrapped) : wrapped_(wrapped) {}
+
+    void AddKey(const Slice& key) override {
+      uint32_t hk = Hash(key.data(), key.size(), 66);
+      wrapped_->AddKey(Slice(reinterpret_cast<char*>(&hk), sizeof(hk)));
+    }
+
+    size_t EstimateEntriesAdded() override {
+      return wrapped_->EstimateEntriesAdded();
+    }
+
+    Slice Finish(std::unique_ptr<const char[]>* buf) override {
+      return wrapped_->Finish(buf);
+    }
+
+    size_t ApproximateNumEntries(size_t bytes) override {
+      return wrapped_->ApproximateNumEntries(bytes);
+    }
+
+    int CalculateNumEntry(const uint32_t bytes) override {
+      return wrapped_->CalculateNumEntry(bytes);
+    }
+
+   private:
+    std::unique_ptr<FilterBitsBuilder> wrapped_;
+  };
+
+  struct HashFilterBitsReader : public FilterBitsReader {
+    HashFilterBitsReader(FilterBitsReader* wrapped) : wrapped_(wrapped) {}
+
+    using FilterBitsReader::MayMatch;
+    bool MayMatch(const Slice& entry) override {
+      uint32_t hk = Hash(entry.data(), entry.size(), 66);
+      return wrapped_->MayMatch(
+          Slice(reinterpret_cast<char*>(&hk), sizeof(hk)));
+    }
+
+   private:
+    std::unique_ptr<FilterBitsReader> wrapped_;
+  };
+
+ public:
+  const char* Name() const override { return "HashFilterPolicy"; }
+
+  void CreateFilter(const Slice* keys, int n, std::string* dst) const override {
+    std::vector<uint32_t> converted;
+    converted.reserve(n);
+    for (int i = 0; i < n; ++i) {
+      converted.push_back(Hash(keys[i].data(), keys[i].size(), 66));
+    }
+
+    std::vector<Slice> sliced;
+    sliced.reserve(converted.size());
+    for (uint32_t& hk : converted) {
+      sliced.push_back(Slice(reinterpret_cast<char*>(&hk), sizeof(hk)));
+    }
+    return wrapped_->CreateFilter(sliced.data(), n, dst);
+  }
+
+  bool KeyMayMatch(const Slice& key, const Slice& filter) const override {
+    uint32_t hk = Hash(key.data(), key.size(), 66);
+    return wrapped_->KeyMayMatch(
+        Slice(reinterpret_cast<char*>(&hk), sizeof(hk)), filter);
+  }
+
+  FilterBitsBuilder* GetFilterBitsBuilder() const override {
+    return new HashFilterBitsBuilder(wrapped_->GetFilterBitsBuilder());
+  }
+
+  FilterBitsBuilder* GetBuilderWithContext(
+      const FilterBuildingContext& context) const override {
+    return new HashFilterBitsBuilder(wrapped_->GetBuilderWithContext(context));
+  }
+
+  FilterBitsReader* GetFilterBitsReader(const Slice& contents) const override {
+    return new HashFilterBitsReader(wrapped_->GetFilterBitsReader(contents));
+  }
 };
 
 class TwoStrComparator : public Comparator {
@@ -248,6 +433,10 @@ class TwoStrComparator : public Comparator {
                              const Slice& /*limit*/) const override {}
 
   void FindShortSuccessor(std::string* /*key*/) const override {}
+
+  bool CanKeysWithDifferentByteContentsBeEqual() const override {
+    return false;
+  }
 };
 }  // namespace
 
@@ -280,14 +469,22 @@ class ComparatorDBTest
 
   DB* GetDB() { return db_; }
 
-  void SetOwnedComparator(const Comparator* cmp, bool owner = true) {
+  void SetOwnedComparator(const Comparator* cmp, bool owner = true,
+                          FilterPolicy* fp = nullptr) {
     if (owner) {
       comparator_guard.reset(cmp);
     } else {
       comparator_guard.reset();
     }
+    if (cmp->CanKeysWithDifferentByteContentsBeEqual()) {
+      ASSERT_NE(fp, nullptr);
+    }
     kTestComparator = cmp;
     last_options_.comparator = cmp;
+    BlockBasedTableOptions bbto =
+        *last_options_.table_factory->GetOptions<BlockBasedTableOptions>();
+    bbto.filter_policy.reset(fp);
+    last_options_.table_factory.reset(NewBlockBasedTableFactory(bbto));
   }
 
   // Return the current option configuration.
@@ -380,7 +577,7 @@ TEST_P(ComparatorDBTest, Uint64Comparator) {
 }
 
 TEST_P(ComparatorDBTest, DoubleComparator) {
-  SetOwnedComparator(new DoubleComparator());
+  SetOwnedComparator(new DoubleComparator(), true, new DoubleFilterPolicy());
 
   for (int rnd_seed = 301; rnd_seed < 316; rnd_seed++) {
     Options* opt = GetOptions();
@@ -405,7 +602,7 @@ TEST_P(ComparatorDBTest, DoubleComparator) {
 }
 
 TEST_P(ComparatorDBTest, HashComparator) {
-  SetOwnedComparator(new HashComparator());
+  SetOwnedComparator(new HashComparator(), true, new HashFilterPolicy());
 
   for (int rnd_seed = 301; rnd_seed < 316; rnd_seed++) {
     Options* opt = GetOptions();

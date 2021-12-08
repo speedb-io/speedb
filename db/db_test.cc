@@ -2156,6 +2156,9 @@ TEST_F(DBTest, ComparatorCheck) {
     void FindShortSuccessor(std::string* key) const override {
       BytewiseComparator()->FindShortSuccessor(key);
     }
+    bool CanKeysWithDifferentByteContentsBeEqual() const override {
+      return false;
+    }
   };
   Options new_options, options;
   NewComparator cmp;
@@ -2264,7 +2267,7 @@ TEST_F(DBTest, CustomComparator) {
         sliced.push_back(
             Slice(reinterpret_cast<const char*>(&num), sizeof(num)));
       }
-      return wrapped_->CreateFilter(keys, n, dst);
+      return wrapped_->CreateFilter(sliced.data(), n, dst);
     }
 
     bool KeyMayMatch(const Slice& key, const Slice& filter) const override {

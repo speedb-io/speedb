@@ -1244,15 +1244,18 @@ TEST_P(ColumnFamilyTest, DifferentWriteBufferSizes) {
 // #endif  // !ROCKSDB_LITE
 
 class TestComparator : public Comparator {
-  int Compare(const ROCKSDB_NAMESPACE::Slice& /*a*/,
-              const ROCKSDB_NAMESPACE::Slice& /*b*/) const override {
-    return 0;
+  int Compare(const ROCKSDB_NAMESPACE::Slice& a,
+              const ROCKSDB_NAMESPACE::Slice& b) const override {
+    return a.compare(b);
   }
   const char* Name() const override { return "Test"; }
   void FindShortestSeparator(
       std::string* /*start*/,
       const ROCKSDB_NAMESPACE::Slice& /*limit*/) const override {}
   void FindShortSuccessor(std::string* /*key*/) const override {}
+  bool CanKeysWithDifferentByteContentsBeEqual() const override {
+    return false;
+  }
 };
 
 static TestComparator third_comparator;

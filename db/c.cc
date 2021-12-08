@@ -272,6 +272,7 @@ struct rocksdb_comparator_t : public Comparator {
       const char* a, size_t alen,
       const char* b, size_t blen);
   const char* (*name_)(void*);
+  bool different_byte_contents_equal_;
 
   ~rocksdb_comparator_t() override { (*destructor_)(state_); }
 
@@ -284,6 +285,10 @@ struct rocksdb_comparator_t : public Comparator {
   // No-ops since the C binding does not support key shortening methods.
   void FindShortestSeparator(std::string*, const Slice&) const override {}
   void FindShortSuccessor(std::string* /*key*/) const override {}
+
+  bool CanKeysWithDifferentByteContentsBeEqual() const override {
+    return different_byte_contents_equal_;
+  }
 };
 
 struct rocksdb_filterpolicy_t : public FilterPolicy {
@@ -3732,7 +3737,13 @@ rocksdb_comparator_t* rocksdb_comparator_create(
   result->destructor_ = destructor;
   result->compare_ = compare;
   result->name_ = name;
+  result->different_byte_contents_equal_ = true;
   return result;
+}
+
+void rocksdb_comparator_set_can_different_byte_contents_be_equal(
+    rocksdb_comparator_t* cmp, int different_byte_contents_equal) {
+  cmp->different_byte_contents_equal_ = different_byte_contents_equal != 0;
 }
 
 void rocksdb_comparator_destroy(rocksdb_comparator_t* cmp) {

@@ -1567,6 +1567,9 @@ extern ROCKSDB_LIBRARY_API rocksdb_comparator_t* rocksdb_comparator_create(
     int (*compare)(void*, const char* a, size_t alen, const char* b,
                    size_t blen),
     const char* (*name)(void*));
+extern ROCKSDB_LIBRARY_API void
+rocksdb_comparator_set_can_different_byte_contents_be_equal(
+    rocksdb_comparator_t* cmp, int different_byte_contents_equal);
 extern ROCKSDB_LIBRARY_API void rocksdb_comparator_destroy(
     rocksdb_comparator_t*);
 

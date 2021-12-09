@@ -1,0 +1,56 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+
+        {
+            "name": "(gdb) Launch",
+            "type": "lldb",
+            "request": "launch",
+            //"program": "${workspaceFolder}/db_stress",
+            "program": "${workspaceFolder}/db_bench",
+            //"program": "${workspaceFolder}/db_iter_test",
+            //"program": "${workspaceFolder}/simu/sim",
+            //"program": "${workspaceFolder}/memtablerep_bench",
+            //"program": "/usr/bin/gdb",
+            //"args": ["/tmp/dbdir"],
+            //"args": ["--compression_type=None", "-benchmarks=seekrandom", "-value_size=1000", "-num=1000000", "-threads=50", "-db=/tmp/dbdir", "--duration=900"],
+            //"args": ["--benchmarks=seekrandomwhilewriting", "-seek_nexts=100", "--compression_type=none", "disable_wal=1", "-db=/tmp/dbdir", "-duration=900", "-num=1000000", "-value_size=1000", "-report_interval_seconds=1",  "-threads=50", "-report_file=seekrandomwhilewriting.csv"],
+            //"args": ["--benchmarks=seekrandomwhilewriting", "--seek_nexts=100", "--compression_type=none", "--db=/tmp/dbdir", "--duration=900", "--num=10000000", "--value_size=1000", "--report_interval_seconds=1",  "--threads=50", "--use_existing_db", "--report_file=seekrandomwhilewriting.csv"],
+            //"args": ["--benchmarks=fillrandom", "--num_threads=50", "--memtablerep=hashspd"],
+            "args": ["--benchmarks=fillrandom", "--threads=1", "--compression_type=none", "-db=/tmp/dbdir", "-num=100000", "-value_size=1000", "--delayed_write_rate=268435456", "-report_interval_seconds=1", "-report_file=fillrandom.csv"],
+            //"args": ["--benchmarks=fillrandom", "--compression_type=none", "-db=/tmp/dbdir", "-num=1000000", "-value_size=1000", "--delayed_write_rate=268435456", "-report_interval_seconds=1", "-report_file=fillrandom.csv"],
+            //"args": ["--acquire_snapshot_one_in=10000", "--allow_concurrent_memtable_write=1", "--avoid_flush_during_recovery=0", "--avoid_unnecessary_blocking_io=0", "--backup_max_size=104857600", "--backup_one_in=100000", 
+            //    "--batch_protection_bytes_per_key=0", "--block_size=16384", "--bloom_bits=13", "--bottommost_compression_type=disable", "--cache_index_and_filter_blocks=0",
+            //    "--cache_size=1048576", "--checkpoint_one_in=1000000", "--checksum_type=kxxHash64", "--clear_column_family_one_in=0", "--column_families=1", 
+            //    "--compact_files_one_in=1000000", "--compact_range_one_in=1000000", "--compaction_ttl=1000", "--compression_max_dict_buffer_bytes=0", "--compression_max_dict_bytes=0", "--compression_parallel_threads=1", "--compression_type=none", "--compression_zstd_max_train_bytes=0", 
+            //    "--continuous_verification_interval=0", "--db=/tmp/rocksdb_crashtest_blackboxdkyv4xgy", "--db_write_buffer_size=0", "--delpercent=4", "--delrangepercent=1", "--destroy_db_initially=0", "--enable_compaction_filter=0", "--enable_pipelined_write=1", "--expected_values_path=/tmp/rocksdb_crashtest_expectedf1jdm6pk", 
+            //    "--fail_if_options_file_error=1", "--file_checksum_impl=big", "--flush_one_in=1000000", "--format_version=5", "--get_current_wal_file_one_in=0", "--get_live_files_one_in=1000000", "--get_property_one_in=1000000", "--get_sorted_wal_files_one_in=0", "--index_block_restart_interval=8", "--index_type=2", "--iterpercent=10",
+            //    "--level_compaction_dynamic_level_bytes=False", "--long_running_snapshots=1", "--mark_for_compaction_one_file_in=10", "--max_background_compactions=1", "--max_bytes_for_level_base=67108864", "--max_key=100000000", "--max_key_len=3", "--max_manifest_file_size=1073741824", "--max_write_batch_group_size_bytes=64", 
+            //    "--max_write_buffer_number=3", "--max_write_buffer_size_to_maintain=8388608", "--memtablerep=skip_list", "--mmap_read=0", "--mock_direct_io=False", "--nooverwritepercent=1", "--open_files=-1", "--open_metadata_write_fault_one_in=0", "--ops_per_thread=100000000", "--optimize_filters_for_memory=1", 
+            //    "--paranoid_file_checks=0", "--partition_filters=0", "--partition_pinning=3","--pause_background_one_in=1000000", "--periodic_compaction_seconds=2", "--prefix_size=-1", "--prefixpercent=0", "--progress_reports=0", "--read_fault_one_in=1000", "--readpercent=50", "--recycle_log_file_num=1", "--reopen=20", 
+            //    "--set_options_one_in=0", "--snapshot_hold_ops=100000","--sst_file_manager_bytes_per_sec=0", "--sst_file_manager_bytes_per_truncate=0", "--subcompactions=2", "--sync=0", "--sync_fault_injection=False", "--target_file_size_base=16777216", "--target_file_size_multiplier=1", "--test_batches_snapshots=0", 
+            //    "--top_level_index_pinning=1", "--unpartitioned_pinning=3", "--use_clock_cache=0", "--use_direct_io_for_flush_and_compaction=0", "--use_direct_reads=0", "--use_full_merge_v1=1", "--use_merge=0", "--use_multiget=1",
+            //    "--use_ribbon_filter=1", "--user_timestamp_size=0", "--verify_checksum=1", "--verify_checksum_one_in=1000000", "--verify_db_one_in=100000", "--write_buffer_size=33554432", "--write_dbid_to_manifest=1",
+            //    "--writepercent=35"],
+            //"stopAtEntry": true,
+            "cwd": "${workspaceFolder}",
+            //"environment": [],
+            //"externalConsole": false,
+            //"MIMode": "gdb"
+            //"setupCommands": [
+            //    {
+            //        "description": "Enable pretty-printing for gdb",
+            //        "text": "-enable-pretty-printing",
+            //        "ignoreFailures": true
+            //    },
+            //    {
+            //        "description": "Skip stdio-common files",
+            //        "text": "-interpreter-exec console \"skip -gfi /usr/include/*.h\""
+            //    }                 
+            
+        }
+    ]
+}

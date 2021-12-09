@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "chrono": "cpp"
+    },
+    "C_Cpp.default.systemIncludePath": ["/Library/Developer/CommandLineTools/usr/include/"]
+}

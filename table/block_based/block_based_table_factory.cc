@@ -740,6 +740,19 @@ std::string BlockBasedTableFactory::GetPrintableOptions() const {
   snprintf(buffer, kBufferSize, "  pin_top_level_index_and_filter: %d\n",
            table_options_.pin_top_level_index_and_filter);
   ret.append(buffer);
+  ret.append("  metadata_cache_options:\n");
+  snprintf(buffer, kBufferSize, "    top_level_index_pinning: %d\n",
+           static_cast<int>(
+               table_options_.metadata_cache_options.top_level_index_pinning));
+  ret.append(buffer);
+  snprintf(buffer, kBufferSize, "    partition_pinning: %d\n",
+           static_cast<int>(
+               table_options_.metadata_cache_options.partition_pinning));
+  ret.append(buffer);
+  snprintf(buffer, kBufferSize, "    unpartitioned_pinning: %d\n",
+           static_cast<int>(
+               table_options_.metadata_cache_options.unpartitioned_pinning));
+  ret.append(buffer);
   snprintf(buffer, kBufferSize, "  index_type: %d\n",
            table_options_.index_type);
   ret.append(buffer);

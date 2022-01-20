@@ -541,6 +541,11 @@ DEFINE_int32(
         ROCKSDB_NAMESPACE::BlockBasedTableOptions().data_block_index_type),
     "Index type for data blocks (see `enum DataBlockIndexType` in table.h)");
 
+DEFINE_double(data_block_hash_table_util_ratio, 0.75,
+              "util ratio for data block hash index table. "
+              "This is only valid if use_data_block_hash_index is "
+              "set to true");
+
 DEFINE_string(db, "", "Use the db with the following name.");
 
 DEFINE_string(secondaries_base, "",

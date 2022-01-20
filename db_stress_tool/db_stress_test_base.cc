@@ -2333,6 +2333,10 @@ void StressTest::PrintEnv() const {
           FLAGS_wal_compression.c_str());
   fprintf(stdout, "Try verify sst unique id  : %d\n",
           static_cast<int>(FLAGS_verify_sst_unique_id_in_manifest));
+  fprintf(stdout, "data_block_index_type : %d\n",
+          static_cast<int>(FLAGS_data_block_index_type));
+  fprintf(stdout, "data_block_hash_table_util_ratio : %f\n",
+          static_cast<double>(FLAGS_data_block_hash_table_util_ratio));
 
   fprintf(stdout, "------------------------------------------------\n");
 }
@@ -2881,6 +2885,11 @@ void InitializeOptionsFromFlags(
   block_based_options.prepopulate_block_cache =
       static_cast<BlockBasedTableOptions::PrepopulateBlockCache>(
           FLAGS_prepopulate_block_cache);
+  block_based_options.data_block_index_type =
+      static_cast<BlockBasedTableOptions::DataBlockIndexType>(
+          FLAGS_data_block_index_type);
+  block_based_options.data_block_hash_table_util_ratio =
+      static_cast<double>(FLAGS_data_block_hash_table_util_ratio);
   options.table_factory.reset(NewBlockBasedTableFactory(block_based_options));
   options.db_write_buffer_size = FLAGS_db_write_buffer_size;
   options.write_buffer_size = FLAGS_write_buffer_size;

@@ -2975,7 +2975,9 @@ class Benchmark {
   }
 
   void DeleteDBs() {
-    db_.DeleteDBs();
+    if (db_.db != nullptr) {
+      db_.DeleteDBs();
+    }
     for (const DBWithColumnFamilies& dbwcf : multi_dbs_) {
       delete dbwcf.db;
     }
@@ -3449,7 +3451,7 @@ class Benchmark {
           }
           Options options = open_options_;
           for (size_t i = 0; i < multi_dbs_.size(); i++) {
-            delete multi_dbs_[i].db;
+            multi_dbs_[i].DeleteDBs();
             if (!open_options_.wal_dir.empty()) {
               options.wal_dir = GetPathForMultiple(open_options_.wal_dir, i);
             }

@@ -639,6 +639,21 @@ DEFINE_bool(
     pin_top_level_index_and_filter, false,
     "Pin top-level index of partitioned index/filter blocks in block cache.");
 
+DEFINE_bool(
+    top_level_index_pinning, false,
+    "Pin top-level block of partitioned index/filter blocks in block cache."
+    " Note: `cache_index_and_filter_blocks` must be true for this option to"
+    " have any effect.");
+
+DEFINE_bool(partition_pinning, false,
+            "Pin index/filter partitions in block cache.");
+
+DEFINE_bool(
+    unpartitioned_pinning, false,
+    "Pin unpartitioned index/filter blocks in block cache."
+    " Note `cache_index_and_filter_blocks` must be true for this option to have"
+    " any effect.");
+
 DEFINE_int32(block_size,
              static_cast<int32_t>(
                  ROCKSDB_NAMESPACE::BlockBasedTableOptions().block_size),
@@ -4178,6 +4193,17 @@ class Benchmark {
         block_based_options.cache_index_and_filter_blocks_with_high_priority =
             true;
       }
+
+      // Metadata Cache Options
+      block_based_options.metadata_cache_options.top_level_index_pinning =
+          FLAGS_top_level_index_pinning ? PinningTier::kAll
+                                        : PinningTier::kFallback;
+      block_based_options.metadata_cache_options.partition_pinning =
+          FLAGS_partition_pinning ? PinningTier::kAll : PinningTier::kFallback;
+      block_based_options.metadata_cache_options.unpartitioned_pinning =
+          FLAGS_unpartitioned_pinning ? PinningTier::kAll
+                                      : PinningTier::kFallback;
+
       block_based_options.block_cache = cache_;
       block_based_options.cache_usage_options.options_overrides.insert(
           {CacheEntryRole::kCompressionDictionaryBuildingBuffer,
@@ -8227,6 +8253,24 @@ class Benchmark {
 #endif  // ROCKSDB_LITE
 };
 
+void ValidateMetadataCacheOptions() {
+  if (FLAGS_top_level_index_pinning &&
+      (FLAGS_cache_index_and_filter_blocks == false)) {
+    fprintf(stderr,
+            "ERROR: --cache_index_and_filter_blocks must be set for "
+            "--top_level_index_pinning to have any affect.\n");
+    exit(1);
+  }
+
+  if (FLAGS_unpartitioned_pinning &&
+      (FLAGS_cache_index_and_filter_blocks == false)) {
+    fprintf(stderr,
+            "ERROR: --cache_index_and_filter_blocks must be set for "
+            "--unpartitioned_pinning to have any affect.\n");
+    exit(1);
+  }
+}
+
 int db_bench_tool(int argc, char** argv) {
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ConfigOptions config_options;
@@ -8379,6 +8423,8 @@ int db_bench_tool(int argc, char** argv) {
     fprintf(stderr, "prefix_size > 8 required by --seek_missing_prefix\n");
     exit(1);
   }
+
+  ValidateMetadataCacheOptions();
 
   ROCKSDB_NAMESPACE::Benchmark benchmark;
   benchmark.Run();

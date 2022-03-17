@@ -1240,6 +1240,8 @@ class DBImpl : public DB {
 
   std::atomic<bool> shutting_down_;
 
+  void SetOpenedSuccessfully();
+
   // Except in DB::Open(), WriteOptionsFile can only be called when:
   // Persist options to options file.
   // If need_mutex_lock = false, the method will lock DB mutex.

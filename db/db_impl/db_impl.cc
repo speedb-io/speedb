@@ -1028,6 +1028,8 @@ void DBImpl::FlushInfoLog() {
   LogFlush(immutable_db_options_.info_log);
 }
 
+void DBImpl::SetOpenedSuccessfully() { opened_successfully_ = true; }
+
 Status DBImpl::TablesRangeTombstoneSummary(ColumnFamilyHandle* column_family,
                                            int max_entries_to_print,
                                            std::string* out_str) {

@@ -268,6 +268,7 @@ Status DBImplReadOnly::OpenForReadOnlyWithoutCheck(
   impl->mutex_.Unlock();
   sv_context.Clean();
   if (s.ok()) {
+    impl->SetOpenedSuccessfully();
     *dbptr = impl;
     for (auto* h : *handles) {
       impl->NewThreadStatusCfInfo(

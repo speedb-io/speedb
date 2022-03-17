@@ -1871,7 +1871,7 @@ Status DBImpl::Open(const DBOptions& db_options, const std::string& dbname,
         false /*need_mutex_lock*/, false /*need_enter_write_thread*/);
 
     *dbptr = impl;
-    impl->opened_successfully_ = true;
+    impl->SetOpenedSuccessfully();
     impl->DeleteObsoleteFiles();
     TEST_SYNC_POINT("DBImpl::Open:AfterDeleteFiles");
     impl->MaybeScheduleFlushOrCompaction();

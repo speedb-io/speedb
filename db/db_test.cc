@@ -705,6 +705,34 @@ TEST_F(DBTest, DISABLED_SanitizeVeryVeryLargeValue) {
   ASSERT_TRUE(wb.Merge(sp_key, sp_value).IsInvalidArgument());
 }
 
+TEST_F(DBTest, GetFromBlockCacheWithDisabledCache) {
+  Options options = CurrentOptions();
+  BlockBasedTableOptions table_options;
+  table_options.no_block_cache = true;
+  options.table_factory.reset(NewBlockBasedTableFactory(table_options));
+
+  DestroyAndReopen(options);
+
+  const std::string key = "key";
+  const std::string value = "value";
+
+  ASSERT_OK(Put(key, value));
+  ASSERT_OK(Flush());
+
+  std::string result;
+  ASSERT_OK(db_->Get(ReadOptions(), key, &result));
+  ASSERT_EQ(result, value);
+  result.clear();
+
+  // Disallow I/O
+  ReadOptions read_options;
+  read_options.read_tier = kBlockCacheTier;
+
+  Status s = db_->Get(read_options, key, &result);
+  ASSERT_TRUE(result.empty());
+  ASSERT_TRUE(s.IsIncomplete());
+}
+
 // Disable because not all platform can run it.
 // It requires more than 9GB memory to run it, With single allocation
 // of more than 3GB.

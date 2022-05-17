@@ -1477,7 +1477,7 @@ if(WITH_TESTS)
   add_library(${TESTUTILLIB} STATIC ${TESTUTIL_SOURCE})
   target_link_libraries(${TESTUTILLIB} ${ROCKSDB_LIB} ${FOLLY_LIBS})
   if(MSVC)
-    set_target_properties(${TESTUTILLIB} PROPERTIES COMPILE_FLAGS "/Fd${CMAKE_CFG_INTDIR}/testutillib${ARTIFACT_SUFFIX}.pdb")
+    set_target_properties(${TESTUTILLIB} PROPERTIES COMPILE_FLAGS "/Fd${CMAKE_CFG_INTDIR}/${TESTUTILLIB}.pdb")
   endif()
   set_target_properties(${TESTUTILLIB}
         PROPERTIES EXCLUDE_FROM_DEFAULT_BUILD_RELEASE 1
@@ -1494,7 +1494,7 @@ if(WITH_TESTS)
         EXCLUDE_FROM_DEFAULT_BUILD_RELWITHDEBINFO 1
         OUTPUT_NAME ${exename}${ARTIFACT_SUFFIX}
       )
-      target_link_libraries(${exename}${ARTIFACT_SUFFIX} testutillib${ARTIFACT_SUFFIX} testharness gtest ${THIRDPARTY_LIBS} ${ROCKSDB_LIB})
+      target_link_libraries(${exename}${ARTIFACT_SUFFIX} ${TESTUTILLIB} testharness gtest ${THIRDPARTY_LIBS} ${ROCKSDB_LIB})
       if(NOT "${exename}" MATCHES "db_sanity_test")
         gtest_discover_tests(${exename} DISCOVERY_TIMEOUT 120)
         add_dependencies(check ${exename}${ARTIFACT_SUFFIX})

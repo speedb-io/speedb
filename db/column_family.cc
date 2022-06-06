@@ -1249,7 +1249,7 @@ SuperVersion* ColumnFamilyData::GetThreadLocalSuperVersion(DBImpl* db) {
     RecordTick(ioptions_.stats, NUMBER_SUPERVERSION_ACQUIRES);
     SuperVersion* sv_to_delete = nullptr;
 
-    if (sv && sv->Unref()) {
+    if (sv != SuperVersion::kSVObsolete && sv->Unref()) {
       RecordTick(ioptions_.stats, NUMBER_SUPERVERSION_CLEANUPS);
       db->mutex()->Lock();
       // NOTE: underlying resources held by superversion (sst files) might

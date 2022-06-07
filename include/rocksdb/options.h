@@ -1221,7 +1221,7 @@ struct DBOptions {
   // Use it if you're latency-sensitive.
   // If set to true, takes precedence over
   // ReadOptions::background_purge_on_iterator_cleanup.
-  bool avoid_unnecessary_blocking_io = false;
+  bool avoid_unnecessary_blocking_io = true;
 
   // Historically DB ID has always been stored in Identity File in DB folder.
   // If this flag is true, the DB ID is written to Manifest file in addition

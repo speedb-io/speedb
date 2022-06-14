@@ -326,6 +326,11 @@ int db_stress_tool(int argc, char** argv) {
   std::vector<std::string> weights;
   uint64_t scale_factor = FLAGS_key_window_scale_factor;
   key_gen_ctx.window = scale_factor * 100;
+  if (scale_factor == 0 || levels == 0) {
+    fprintf(stderr,
+            "max_key_len and key_window_scale_factor should be positive");
+    exit(1);
+  }
   if (!FLAGS_key_len_percent_dist.empty()) {
     weights = SplitString(FLAGS_key_len_percent_dist);
     if (weights.size() != levels) {
@@ -340,6 +345,10 @@ int db_stress_tool(int argc, char** argv) {
       uint64_t val = std::stoull(weight);
       key_gen_ctx.weights.emplace_back(val * scale_factor);
       total_weight += val;
+      if (val == 0) {
+        fprintf(stderr, "key_len_percent_dist cannot contain zero values");
+        exit(1);
+      }
     }
     if (total_weight != 100) {
       fprintf(stderr, "Sum of all weights in key_len_dist should be 100");
@@ -347,6 +356,12 @@ int db_stress_tool(int argc, char** argv) {
     }
   } else {
     uint64_t keys_per_level = key_gen_ctx.window / levels;
+    if (keys_per_level == 0) {
+      fprintf(
+          stderr,
+          "max_key_len cannot be greater than key_window_scale_factor * 100");
+      exit(1);
+    }
     for (unsigned int level = 0; level + 1 < levels; ++level) {
       key_gen_ctx.weights.emplace_back(keys_per_level);
     }

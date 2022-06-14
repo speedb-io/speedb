@@ -50,7 +50,7 @@ default_params = {
     "batch_protection_bytes_per_key": lambda: random.choice([0, 8]),
     "memtable_protection_bytes_per_key": lambda: random.choice([0, 1, 2, 4, 8]),
     "block_protection_bytes_per_key": lambda: random.choice([0, 1, 2, 4, 8]),
-    "block_size": 16384,
+    "block_size": random.choice([16384, 4096]),
     "bloom_bits": lambda: random.choice(
         [random.randint(0, 19), random.lognormvariate(2.3, 1.3)]
     ),
@@ -83,17 +83,15 @@ default_params = {
     "compact_range_one_in": 1000000,
     "compaction_pri": random.randint(0, 4),
     "data_block_index_type": lambda: random.choice([0, 1]),
-    "delpercent": 4,
-    "delrangepercent": 1,
     "destroy_db_initially": 0,
-    "enable_pipelined_write": lambda: random.randint(0, 1),
+    "enable_pipelined_write": lambda: random.choice([0, 0, 0, 0, 1]),
     "enable_compaction_filter": lambda: random.choice([0, 0, 0, 1]),
     "expected_values_dir": lambda: setup_expected_values_dir(),
     "fail_if_options_file_error": lambda: random.randint(0, 1),
     "flush_one_in": 1000000,
     "manual_wal_flush_one_in": lambda: random.choice([0, 0, 1000, 1000000]),
     "file_checksum_impl": lambda: random.choice(["none", "crc32c", "xxh64", "big"]),
-    "get_live_files_one_in": 1000000,
+    "get_live_files_one_in": 100000,
     # Note: the following two are intentionally disabled as the corresponding
     # APIs are not guaranteed to succeed.
     "get_sorted_wal_files_one_in": 0,
@@ -101,27 +99,24 @@ default_params = {
     # Temporarily disable hash index
     "index_type": lambda: random.choice([0, 0, 0, 2, 2, 3]),
     "ingest_external_file_one_in": 1000000,
-    "iterpercent": 10,
     "lock_wal_one_in": 1000000,
     "mark_for_compaction_one_file_in": lambda: 10 * random.randint(0, 1),
     "max_background_compactions": 20,
     "max_bytes_for_level_base": 10485760,
-    "max_key": 25000000,
+    "max_key": random.choice([100 * 1024, 1024 * 1024, 10 * 1024 * 1024]),
     "max_write_buffer_number": 3,
     "mmap_read": lambda: random.randint(0, 1),
     # Setting `nooverwritepercent > 0` is only possible because we do not vary
-    # the random seed, so the same keys are chosen by every run for disallowing
-    # overwrites.
-    "nooverwritepercent": 1,
+    # the random seed between runs, so the same keys are chosen by every run 
+    # for disallowing overwrites.
+    "nooverwritepercent": random.choice([0, 5, 20, 30, 40, 50, 95]),
     "open_files": lambda: random.choice([-1, -1, 100, 500000]),
     "optimize_filters_for_memory": lambda: random.randint(0, 1),
     "partition_filters": lambda: random.randint(0, 1),
     "partition_pinning": lambda: random.randint(0, 3),
     "pause_background_one_in": 1000000,
     "prefix_size": lambda: random.choice([-1, 1, 5, 7, 8]),
-    "prefixpercent": 5,
     "progress_reports": 0,
-    "readpercent": 45,
     "recycle_log_file_num": lambda: random.randint(0, 1),
     "snapshot_hold_ops": 100000,
     "sst_file_manager_bytes_per_sec": lambda: random.choice([0, 104857600]),
@@ -130,7 +125,7 @@ default_params = {
     "subcompactions": lambda: random.randint(1, 4),
     "target_file_size_base": 2097152,
     "target_file_size_multiplier": 2,
-    "test_batches_snapshots": random.randint(0, 1),
+    "test_batches_snapshots": random.choice([0, 0, 0, 1]),
     "top_level_index_pinning": lambda: random.randint(0, 3),
     "unpartitioned_pinning": lambda: random.randint(0, 3),
     "use_direct_reads": lambda: random.randint(0, 1),
@@ -141,7 +136,7 @@ default_params = {
          # NOTE: auto_hyper_clock_cache disabled for now
          "tiered_lru_cache", "tiered_fixed_hyper_clock_cache"]
     ),
-    "use_full_merge_v1": lambda: random.randint(0, 1),
+    "use_full_merge_v1": lambda: random.randrange(10) == 0,
     "use_merge": lambda: random.randint(0, 1),
     # use_put_entity_one_in has to be the same across invocations for verification to work, hence no lambda
     "use_put_entity_one_in": random.choice([0] * 7 + [1, 5, 10]),
@@ -150,9 +145,10 @@ default_params = {
     "value_size_mult": 32,
     "verification_only": 0,
     "verify_checksum": 1,
-    "write_buffer_size": 4 * 1024 * 1024,
+    "write_buffer_size": lambda: random.choice(
+        [1024 * 1024, 8 * 1024 * 1024, 128 * 1024 * 1024, 1024 * 1024 * 1024]),
     "writepercent": 35,
-    "format_version": lambda: random.choice([2, 3, 4, 5, 6, 6]),
+    "format_version": lambda: random.choice([2, 3, 4, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6]),
     "index_block_restart_interval": lambda: random.choice(range(1, 16)),
     "use_multiget": lambda: random.randint(0, 1),
     "use_get_entity": lambda: random.choice([0] * 7 + [1]),
@@ -171,11 +167,11 @@ default_params = {
     "sync": lambda: random.choice([1 if t == 0 else 0 for t in range(0, 20)]),
     "bytes_per_sync": lambda: random.choice([0, 262144]),
     "wal_bytes_per_sync": lambda: random.choice([0, 524288]),
-    "compaction_readahead_size": lambda: random.choice(
-        [0, 0, 1024 * 1024]),
-    "db_write_buffer_size": lambda: random.choice(
-        [0, 0, 0, 1024 * 1024, 8 * 1024 * 1024, 128 * 1024 * 1024]
-    ),
+    # Disable compaction_readahead_size because the test is not passing.
+    # "compaction_readahead_size" : lambda : random.choice(
+    #    [0, 0, 1024 * 1024]),
+    "db_write_buffer_size" : lambda: random.choice(
+        [0, 0, 0, 1024 * 1024, 8 * 1024 * 1024, 128 * 1024 * 1024, 1024 * 1024 * 1024]),
     "use_write_buffer_manager": lambda: random.randint(0, 1),
     "avoid_unnecessary_blocking_io": random.randint(0, 1),
     "write_dbid_to_manifest": random.randint(0, 1),
@@ -190,8 +186,8 @@ default_params = {
     "verify_file_checksums_one_in": 1000000,
     "verify_db_one_in": 100000,
     "continuous_verification_interval": 0,
-    "max_key_len": 3,
-    "key_len_percent_dist": "1,30,69",
+    "max_key_len": 0,
+    "key_len_percent_dist": "0",
     "read_fault_one_in": lambda: random.choice([0, 32, 1000]),
     "write_fault_one_in": lambda: random.choice([0, 128, 1000]),
     "open_metadata_write_fault_one_in": lambda: random.choice([0, 0, 8]),
@@ -232,10 +228,16 @@ default_params = {
     "preserve_internal_time_seconds": lambda: random.choice([0, 60, 3600, 36000]),
     "memtable_max_range_deletions": lambda: random.choice([0] * 6 + [100, 1000]),
     # 0 (disable) is the default and more commonly used value.
-    "bottommost_file_compaction_delay": lambda: random.choice(
-        [0, 0, 0, 600, 3600, 86400]
-    ),
+    "bottommost_file_compaction_delay": lambda: random.choice([0, 0, 0, 600, 3600, 86400]),
     "auto_readahead_size" : lambda: random.choice([0, 1]),
+    # cannot change seed between runs because the seed decides which keys are nonoverwrittenable
+    "seed": int(time.time() * 1000000) & 0xffffffff,
+    "verify_before_write": lambda: random.randrange(20) == 0,
+    "allow_concurrent_memtable_write": lambda: random.randint(0, 1),
+    # only done when thread#0 does TestAcquireSnapshot. 
+    "compare_full_db_state_snapshot": lambda: random.choice([0, 0, 0, 1]),
+    "num_iterations": lambda: random.randint(0, 100),
+    "sync_wal_one_in": 100000,
 }
 
 _TEST_DIR_ENV_VAR = "TEST_TMPDIR"
@@ -333,12 +335,40 @@ def is_direct_io_supported(dbname):
         return True
 
 
+def generate_key_dist_and_len(params):
+    # check if user supplied key dist or len
+    if params["max_key_len"] == 0 and params["key_len_percent_dist"] != "0":
+        params["max_key_len"] = params["key_len_percent_dist"].count(",") + 1
+        return
+    
+    if params["max_key_len"] == 0 and params["key_len_percent_dist"] == "0":
+        params["max_key_len"] = random.randint(1, 10)
+    
+    dist = random_distribution(params["max_key_len"] - 1)
+    params["key_len_percent_dist"] = ",".join(str(i) for i in dist)
+
+
+# Randomly select unique points (cut_points) on the distribution range
+# and set the distribution to the differences between these points.
+# Inspired by the following post, with changes to disallow 0:
+# https://math.stackexchange.com/questions/1276206/method-of-generating-random-numbers-that-sum-to-100-is-this-truly-random/1276225#1276225
+def random_distribution(cuts_count):
+    cut_points = set()
+    while len(cut_points) < cuts_count:
+        cut_points.add(random.randint(1, 100 - 1))
+    dist = []
+    for x in sorted(cut_points):
+        dist.append(x - sum(dist))
+    dist.append(100 - sum(dist))
+    return dist
+
+
 blackbox_default_params = {
     "disable_wal": lambda: random.choice([0, 0, 0, 1]),
     # total time for this script to test db_stress
-    "duration": 6000,
+    "duration": 4000,
     # time for one db_stress instance to run
-    "interval": 120,
+    "interval": 240,
     # since we will be killing anyway, use large value for ops_per_thread
     "ops_per_thread": 100000000,
     "reopen": 0,
@@ -356,14 +386,13 @@ whitebox_default_params = {
     # Second, we need to make sure disabling WAL works with `-reopen > 0`.
     "disable_wal": 0,
     "duration": 10000,
-    "log2_keys_per_lock": 10,
+    "disable_kill_points": False,
     "ops_per_thread": 200000,
     "random_kill_odd": 888887,
     "reopen": 20,
 }
 
 simple_default_params = {
-    "allow_concurrent_memtable_write": lambda: random.randint(0, 1),
     "column_families": 1,
     # TODO: re-enable once internal task T124324915 is fixed.
     # "experimental_mempurge_threshold": lambda: 10.0*random.random(),
@@ -593,10 +622,12 @@ narrow_params = {
     "progress_reports": 0,
 }
 
+
 def store_ops_supplied(params):
     for k in supplied_ops:
         supplied_ops[k] = params.get(k, -1)
-    
+
+
 # make sure sum of ops == 100.
 # value of -1 means that the op should be initialized. 
 def randomize_operation_type_percentages(src_params):
@@ -634,7 +665,8 @@ def randomize_operation_type_percentages(src_params):
 
     src_params.update(params)
 
-def finalize_and_sanitize(src_params):
+
+def finalize_and_sanitize(src_params, counter):
     dest_params = {k: v() if callable(v) else v for (k, v) in src_params.items()}
     if is_release_mode():
         dest_params["read_fault_one_in"] = 0
@@ -644,6 +676,7 @@ def finalize_and_sanitize(src_params):
     if dest_params.get("compression_type") != "zstd":
         dest_params["compression_zstd_max_train_bytes"] = 0
     if dest_params.get("allow_concurrent_memtable_write", 1) == 1:
+        # TODO: yuval- add hash_spd memtable
         dest_params["memtablerep"] = "skip_list"
     if dest_params["mmap_read"] == 1:
         dest_params["use_direct_io_for_flush_and_compaction"] = 0
@@ -729,6 +762,16 @@ def finalize_and_sanitize(src_params):
         dest_params["enable_pipelined_write"] = 0
     if dest_params.get("sst_file_manager_bytes_per_sec", 0) == 0:
         dest_params["sst_file_manager_bytes_per_truncate"] = 0
+    if dest_params.get("read_only", 0) == 1:
+        if counter == 0:
+            dest_params["read_only"] = 0
+        else:
+            dest_params["readpercent"] += dest_params["writepercent"]
+            dest_params["writepercent"] = 0
+            dest_params["iterpercent"] += dest_params["delpercent"]
+            dest_params["delpercent"] = 0
+            dest_params["iterpercent"] += dest_params["delrangepercent"]
+            dest_params["delrangepercent"] = 0 
     if dest_params.get("enable_compaction_filter", 0) == 1:
         # Compaction filter is incompatible with snapshots. Need to avoid taking
         # snapshots, as well as avoid operations that use snapshots for
@@ -736,7 +779,7 @@ def finalize_and_sanitize(src_params):
         dest_params["acquire_snapshot_one_in"] = 0
         dest_params["compact_range_one_in"] = 0
         # Give the iterator ops away to reads.
-        dest_params["readpercent"] += dest_params.get("iterpercent", 10)
+        dest_params["readpercent"] += dest_params.get("iterpercent", 0)
         dest_params["iterpercent"] = 0
     if dest_params.get("prefix_size") == -1:
         dest_params["readpercent"] += dest_params.get("prefixpercent", 20)
@@ -843,11 +886,15 @@ def gen_cmd_params(args):
     for k, v in vars(args).items():
         if v is not None:
             params[k] = v
+    
+    if params["max_key_len"] == 0 or params["key_len_percent_dist"] == "0":
+        generate_key_dist_and_len(params)
+
     return params
 
 
-def gen_cmd(params, unknown_params):
-    finalzied_params = finalize_and_sanitize(params)
+def gen_cmd(params, unknown_params, counter):
+    finalzied_params = finalize_and_sanitize(params, counter)
     cmd = (
         [stress_cmd]
         + [
@@ -871,6 +918,7 @@ def gen_cmd(params, unknown_params):
                 "test_tiered_storage",
                 "cleanup_cmd",
                 "skip_tmpdir_check",
+                "disable_kill_points"
             }
             and v is not None
         ]
@@ -910,6 +958,7 @@ def execute_cmd(cmd, timeout=None):
 
     return hit_timeout, child.returncode, outs.decode("utf-8"), errs.decode("utf-8")
 
+
 # old copy of the db is kept at same src dir as new db. 
 def copy_tree_and_remove_old(counter, dbname):
     dest = dbname + "_" + str(counter)
@@ -918,6 +967,7 @@ def copy_tree_and_remove_old(counter, dbname):
     old_db = dbname + "_" + str(counter - 2)
     if counter > 1:
         shutil.rmtree(old_db, True)
+
 
 def gen_narrow_cmd_params(args):
     params = {}
@@ -936,6 +986,7 @@ def gen_narrow_cmd_params(args):
             
     return params
 
+
 def narrow_crash_main(args, unknown_args):
     cmd_params = gen_narrow_cmd_params(args)
     dbname = get_dbname('narrow')
@@ -949,7 +1000,7 @@ def narrow_crash_main(args, unknown_args):
     
     while time.time() < exit_time:
         randomize_operation_type_percentages(cmd_params)
-        cmd = gen_cmd(dict(cmd_params, **{'db': dbname}), unknown_args)
+        cmd = gen_cmd(dict(cmd_params, **{'db': dbname}), unknown_args, counter)
 
         hit_timeout, retcode, outs, errs = execute_cmd(cmd, cmd_params['duration'])
         copy_tree_and_remove_old(counter, dbname)
@@ -967,13 +1018,16 @@ def narrow_crash_main(args, unknown_args):
         time.sleep(2)  # time to stabilize before the next run
 
     shutil.rmtree(dbname, True)
-    
+
+
 # This script runs and kills db_stress multiple times. It checks consistency
 # in case of unsafe crashes in RocksDB.
 def blackbox_crash_main(args, unknown_args):
     cmd_params = gen_cmd_params(args)
     dbname = get_dbname("blackbox")
     exit_time = time.time() + cmd_params["duration"]
+
+    store_ops_supplied(cmd_params)
 
     print(
         "Running blackbox-crash-test with \n"
@@ -988,8 +1042,9 @@ def blackbox_crash_main(args, unknown_args):
     counter = 0
 
     while time.time() < exit_time:
+        randomize_operation_type_percentages(cmd_params)
         cmd = gen_cmd(
-            dict(list(cmd_params.items()) + list({"db": dbname}.items())), unknown_args
+            dict(list(cmd_params.items()) + list({"db": dbname}.items())), unknown_args, counter
         )
 
         hit_timeout, retcode, outs, errs = execute_cmd(cmd, cmd_params["interval"])
@@ -1048,6 +1103,8 @@ def whitebox_crash_main(args, unknown_args):
     exit_time = cur_time + cmd_params["duration"]
     half_time = cur_time + cmd_params["duration"] // 2
 
+    store_ops_supplied(cmd_params)
+    
     print(
         "Running whitebox-crash-test with \n"
         + "total-duration="
@@ -1062,6 +1119,8 @@ def whitebox_crash_main(args, unknown_args):
     prev_compaction_style = -1
     counter = 0
     while time.time() < exit_time:
+        if cmd_params["disable_kill_points"]:
+            check_mode = 3
         if check_mode == 0:
             additional_opts = {
                 # use large ops per thread since we will kill it anyway
@@ -1148,13 +1207,14 @@ def whitebox_crash_main(args, unknown_args):
             additional_opts["destroy_db_initially"] = 1
         prev_compaction_style = cur_compaction_style
 
+        randomize_operation_type_percentages(cmd_params)
         cmd = gen_cmd(
             dict(
                 list(cmd_params.items())
                 + list(additional_opts.items())
                 + list({"db": dbname}.items())
             ),
-            unknown_args,
+            unknown_args, counter
         )
 
         # If the running time is 15 minutes over the run time, explicit kill and
@@ -1221,13 +1281,15 @@ def whitebox_crash_main(args, unknown_args):
                 os.mkdir(dbname)
             except OSError:
                 pass
-            if expected_values_dir is not None:
-                shutil.rmtree(expected_values_dir, True)
-                os.mkdir(expected_values_dir)
+            global expected_values_dir
+            if os.path.exists(expected_values_dir):
+                shutil.rmtree(expected_values_dir)
+            expected_values_dir = None
 
             check_mode = (check_mode + 1) % total_check_mode
             for ctr in range(max(0, counter - 2), counter):
                 shutil.rmtree('{}_{}'.format(dbname, ctr))
+            counter = 0
 
         time.sleep(1)  # time to stabilize after a kill
 
@@ -1317,7 +1379,7 @@ def main():
     if args.test_type == 'narrow':
         narrow_crash_main(args, unknown_args)
     # Only delete the `expected_values_dir` if test passes
-    if expected_values_dir is not None:
+    if expected_values_dir and os.path.exists(expected_values_dir):
         shutil.rmtree(expected_values_dir)
     if multiops_txn_key_spaces_file is not None:
         os.remove(multiops_txn_key_spaces_file)

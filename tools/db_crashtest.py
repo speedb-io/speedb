@@ -388,6 +388,7 @@ cf_consistency_params = {
     "enable_compaction_filter": 0,
     # `CfConsistencyStressTest::TestIngestExternalFile()` is not implemented.
     "ingest_external_file_one_in": 0,
+    "test_batches_snapshots": 0,
 }
 
 txn_params = {

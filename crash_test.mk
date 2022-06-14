@@ -25,6 +25,9 @@ CRASHTEST_PY=$(PYTHON) -u tools/db_crashtest.py --stress_cmd=$(DB_STRESS_CMD) --
 narrow_crash_test: $(DB_STRESS_CMD)
 	$(CRASHTEST_PY) narrow $(CRASH_TEST_EXT_ARGS)
 
+no_kill_crash_test: db_stress
+	$(CRASHTEST_PY) whitebox --disable_kill_points=1 --duration=4000 $(CRASH_TEST_EXT_ARGS)	
+
 crash_test: $(DB_STRESS_CMD)
 # Do not parallelize
 	$(CRASHTEST_MAKE) whitebox_crash_test

@@ -334,6 +334,7 @@ cf_consistency_params = {
     # Snapshots are used heavily in this test mode, while they are incompatible
     # with compaction filter.
     "enable_compaction_filter": 0,
+    "test_batches_snapshots": 0,
 }
 
 txn_params = {

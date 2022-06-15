@@ -1,5 +1,5 @@
 name: Check buck targets and code format
-on: [push, pull_request]
+on: [push, pull_request, workflow_call]
 jobs:
   check:
     name: Check TARGETS file and code format

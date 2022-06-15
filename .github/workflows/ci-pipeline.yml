@@ -79,4 +79,4 @@ jobs:
         
   sanity:
     needs: [build]
-    uses: speedb-io/rocksdb/.github/workflows/sanity_check.yml@main
+    uses: speedb-io/speedb/.github/workflows/sanity_check.yml@main

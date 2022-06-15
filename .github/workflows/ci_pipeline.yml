@@ -78,6 +78,6 @@ jobs:
         -DWITH_TESTS=1 -DWITH_ALL_TESTS=1 -DWITH_EXAMPLES=1
         ninja
         
-  sanity:
-    needs: [build]
-    uses: speedb-io/speedb/.github/workflows/sanity_check.yml@main
+#   sanity:
+#     needs: [build]
+#     uses: speedb-io/speedb/.github/workflows/sanity_check.yml@main

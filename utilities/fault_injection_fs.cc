@@ -81,9 +81,11 @@ IOStatus FSFileState::DropUnsyncedData() {
 }
 
 IOStatus FSFileState::DropRandomUnsyncedData(Random* rand) {
-  int range = static_cast<int>(buffer_.size());
-  size_t truncated_size = static_cast<size_t>(rand->Uniform(range));
-  buffer_.resize(truncated_size);
+  const int range = static_cast<int>(buffer_.size());
+  if (range > 0) {
+    size_t truncated_size = static_cast<size_t>(rand->Uniform(range));
+    buffer_.resize(truncated_size);
+  }
   return IOStatus::OK();
 }
 

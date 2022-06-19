@@ -55,6 +55,7 @@ jobs:
           name: db_map_fuzzer
           path: |
              ${{ github.workspace }}/fuzz/db_map_fuzzer
+          retention-days: 1
              
       - name: Upload db_fuzzer Artifact
         uses: actions/upload-artifact@v3.1.0
@@ -62,7 +63,7 @@ jobs:
           name: db_fuzzer
           path: |
              ${{ github.workspace }}/fuzz/db_fuzzer
-             
+          retention-days: 1
              
              
   db_fuzzer:
@@ -102,6 +103,7 @@ jobs:
         uses: actions/upload-artifact@v3.1.0
         with:
           path: ${{ github.workspace }}/out/db_fuzzer.log
+          retention-days: 1
 
   db_map_fuzzer:
     runs-on: ubuntu-latest
@@ -138,6 +140,7 @@ jobs:
         uses: actions/upload-artifact@v3.1.0
         with:
           path: ${{ github.workspace }}/out/db_map_fuzzer.log
+          retention-days: 1
           
   fuzzer_sum:
     runs-on: ubuntu-18.04

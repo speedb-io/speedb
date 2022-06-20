@@ -1,4 +1,4 @@
-name: CI
+name: aws-test
 
 on:
   workflow_dispatch:

@@ -15,7 +15,7 @@ jobs:
 
       - name: Pre-build
         run: |
-          apt update && apt install -y sudo python3 git clang-tools cmake make automake libtool gettext pkg-config build-essential clang-10 zlib1g-dev libbz2-dev ninja-build liblzma-dev autoconf libsnappy-dev libzstd-dev liblz4-dev binutils m4 g++-10
+          apt update && apt install -y sudo python3 git clang-tools cmake make automake libtool gettext pkg-config build-essential clang-10 zlib1g-dev libbz2-dev ninja-build liblzma-dev autoconf libsnappy-dev libzstd-dev liblz4-dev binutils m4 g++-10 unzip
           curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
           unzip awscliv2.zip
           sudo ./aws/install
@@ -103,7 +103,7 @@ jobs:
 
       - name: Pre-build
         run: |
-          apt update && apt install -y libtool sudo gettext pkg-config libsnappy-dev libzstd-dev liblz4-dev binutils m4
+          apt update && apt install -y libtool sudo gettext pkg-config libsnappy-dev libzstd-dev liblz4-dev binutils m4 unzip
           curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
           unzip awscliv2.zip
           sudo ./aws/install
@@ -163,7 +163,7 @@ jobs:
       
       - name: Pre-build
         run: |
-          apt update && apt install -y sudo libtool gettext pkg-config libsnappy-dev libzstd-dev liblz4-dev binutils m4 
+          apt update && apt install -y sudo libtool gettext pkg-config libsnappy-dev libzstd-dev liblz4-dev binutils m4 unzip
           curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
           unzip awscliv2.zip
           sudo ./aws/install
@@ -209,7 +209,7 @@ jobs:
       
       - name: pre
         run: |
-          apk update && apk install sudo
+          apk update && apk install sudo unzip
           curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
           unzip awscliv2.zip
           sudo ./aws/install

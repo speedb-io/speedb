@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Upload to Amazon S3
+    runs-on: ubuntu-latest
+    # These permissions are needed to interact with GitHub's OIDC Token endpoint.
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    - name: Configure AWS credentials from Test account
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+    - name: Copy files to the test website with the AWS CLI
+      run: |
+        mkdir -p $GITHUB_WORKSPACE/out
+        echo "hello-world" >> $GITHUB_WORKSPACE/out/db_fuzz.log
+        cat $GITHUB_WORKSPACE/out/db_fuzz.log
+        aws s3 cp $GITHUB_WORKSPACE/out/db_fuzz.log s3://spdb-github-ci/
+        
+    - name: download file from s3
+      run: |
+        mkdir -p $GITHUB_WORKSPACE/down
+        aws s3 cp s3://spdb-github-ci/ $GITHUB_WORKSPACE/down/db_fuzz.log
+        cat $GITHUB_WORKSPACE/down/db_fuzz.log

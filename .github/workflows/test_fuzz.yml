@@ -120,6 +120,7 @@ jobs:
         run: |
           if [ ! -d $GITHUB_WORKSPACE/fuzz/ ]; then
             mkdir -p $GITHUB_WORKSPACE/fuzz/
+          fi
           aws s3 cp s3://spdb-github-ci/db_fuzzer $GITHUB_WORKSPACE/fuzz/db_fuzzer
           ls -alFh $GITHUB_WORKSPACE/fuzz
 
@@ -180,6 +181,7 @@ jobs:
         run: |
           if [ ! -d $GITHUB_WORKSPACE/fuzz/ ]; then
             mkdir -p $GITHUB_WORKSPACE/fuzz/
+          fi
           aws s3 cp s3://spdb-github-ci/db_map_fuzzer $GITHUB_WORKSPACE/fuzz/db_map_fuzzer
           ls -alFh $GITHUB_WORKSPACE/fuzz
 

@@ -1,32 +1,75 @@
-## RocksDB: A Persistent Key-Value Store for Flash and RAM Storage
+# Speedb: A drop in replacement embedded solution for RocksDB
 
-[![CircleCI Status](https://circleci.com/gh/facebook/rocksdb.svg?style=svg)](https://circleci.com/gh/facebook/rocksdb)
-[![TravisCI Status](https://api.travis-ci.com/facebook/rocksdb.svg?branch=main)](https://travis-ci.com/github/facebook/rocksdb)
-[![Appveyor Build status](https://ci.appveyor.com/api/projects/status/fbgfu0so3afcno78/branch/main?svg=true)](https://ci.appveyor.com/project/Facebook/rocksdb/branch/main)
-[![PPC64le Build Status](http://140-211-168-68-openstack.osuosl.org:8080/buildStatus/icon?job=rocksdb&style=plastic)](http://140-211-168-68-openstack.osuosl.org:8080/job/rocksdb)
+## Checking out the source
 
-RocksDB is developed and maintained by Facebook Database Engineering Team.
-It is built on earlier work on [LevelDB](https://github.com/google/leveldb) by Sanjay Ghemawat (sanjay@google.com)
-and Jeff Dean (jeff@google.com)
+	git clone https://github.com/speedb-io/speedb.git
 
-This code is a library that forms the core building block for a fast
-key-value server, especially suited for storing data on flash drives.
-It has a Log-Structured-Merge-Database (LSM) design with flexible tradeoffs
-between Write-Amplification-Factor (WAF), Read-Amplification-Factor (RAF)
-and Space-Amplification-Factor (SAF). It has multi-threaded compactions,
-making it especially suitable for storing multiple terabytes of data in a
-single database.
+## Dynamically linking Speedb
+If speedb is in your default library path:
 
-Start with example usage here: https://github.com/facebook/rocksdb/tree/main/examples
+In your `CMakeLists.txt` add:
 
-See the [github wiki](https://github.com/facebook/rocksdb/wiki) for more explanation.
+	target_link_libraries(${PROJECT_NAME} speedb)
+where `PROJECT_NAME` is the name of your target application which uses speedb
 
-The public interface is in `include/`.  Callers should not include or
-rely on the details of any other header files in this package.  Those
-internal APIs may be changed without warning.
+Otherwise, you have to include the path to the folder the library is in like so:
+	
+	target_link_libraries(${PROJECT_NAME} /path/to/speedb/library/folder)
 
-Questions and discussions are welcome on the [RocksDB Developers Public](https://www.facebook.com/groups/rocksdb.dev/) Facebook group and [email list](https://groups.google.com/g/rocksdb) on Google Groups.
+## Usage
+Usage of the library in your code is the same, regardless of whether you statically linked the library or dynamically linked it, and examples can be found under the [examples](examples) directory.
+The public interface is in [include](include/rocksdb). Callers should not include or rely on the details of any other header files in this package. Those internal APIs may be changed without warning.
+
+## Build dependencies
+Please refer to the file [INSTALL.md](INSTALL.md) for a list of all the dependencies and how to install them across different platforms.
+
+## Building Speedb
+Debug:
+
+	mkdir build && cd build   
+	cmake .. -DCMAKE_BUILD_TYPE=Debug [cmake options]
+	make rocksdb
+
+By default the build type is Debug.
+
+Release:
+
+	mkdir build && cd build   
+	cmake .. -DCMAKE_BUILD_TYPE=Release [cmake options]
+	make rocksdb
+
+This will build the static library.
+If you want to build the dynammic library, use:
+
+	make rocksdb-shared
+
+If you want `make` to increase the number of cores used for building, simply use the `-j` option.
+
+If you want to build a specific target:
+
+	make [target name]
+
+For development and functional testing, go with the debug version which includes
+more assertions and debug prints.
+Otherwise, for production or performance testing, we recommend building a release version
+which is more optimized.
+
+## Running tests
+
+	cd build   
+	make rocksdb
+	./[test name] --db=/path/to/db
+
+for example, `db_blob_basic_test`:
+
+	cd build   
+	make rocksdb
+	./db_blob_basic_test --db=/tmp/example_db
+
+The test will generate a random DB at the specified path. This is also where speedb will store the LOG files.
+
+## Contributing code
+`TODO:` This section should point the reader to a dedicated file explaining how to contribute
 
 ## License
-
-RocksDB is dual-licensed under both the GPLv2 (found in the COPYING file in the root directory) and Apache 2.0 License (found in the LICENSE.Apache file in the root directory).  You may select, at your option, one of the above-listed licenses.
+Speedb is licensed under Apache 2.0

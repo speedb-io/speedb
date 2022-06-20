@@ -32,5 +32,6 @@ jobs:
     - name: download file from s3
       run: |
         mkdir -p $GITHUB_WORKSPACE/down
-        aws s3 cp s3://spdb-github-ci/ $GITHUB_WORKSPACE/down/db_fuzz.log
+        aws s3 cp s3://spdb-github-ci/db_fuzz.log $GITHUB_WORKSPACE/down/db_fuzz.log
+        ls -alFh $GITHUB_WORKSPACE/down
         cat $GITHUB_WORKSPACE/down/db_fuzz.log

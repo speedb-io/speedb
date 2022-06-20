@@ -25,7 +25,7 @@ jobs:
     - name: Copy files to the test website with the AWS CLI
       run: |
         mkdir -p $GITHUB_WORKSPACE/out
-        echo "hello-world" >> $GITHUB_WORKSPACE/out/db_fuzz.log
+        echo "hello   world" >> $GITHUB_WORKSPACE/out/db_fuzz.log
         cat $GITHUB_WORKSPACE/out/db_fuzz.log
         aws s3 cp $GITHUB_WORKSPACE/out/db_fuzz.log s3://spdb-github-ci/
         

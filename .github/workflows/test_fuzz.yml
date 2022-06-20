@@ -1,4 +1,4 @@
-name: fuzz-test
+name: aws-fuzz-test
 
 on:
   workflow_dispatch:
@@ -211,7 +211,7 @@ jobs:
       
       - name: pre
         run: |
-          apk update && apk install sudo unzip
+          apk update && apk add sudo unzip
           curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
           unzip awscliv2.zip
           sudo ./aws/install

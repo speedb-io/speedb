@@ -203,7 +203,7 @@ jobs:
   fuzzer_sum:
     runs-on: ubuntu-18.04
     container:
-      image:  alpine:3.14
+      image: ubuntu:18.04
     needs: [db_map_fuzzer, db_fuzzer]
       
     steps:
@@ -211,7 +211,7 @@ jobs:
       
       - name: pre
         run: |
-          apk update && apk add sudo unzip curl
+          apt update && apt install -y sudo unzip
           curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
           unzip awscliv2.zip
           sudo ./aws/install

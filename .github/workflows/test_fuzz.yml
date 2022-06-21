@@ -129,10 +129,10 @@ jobs:
           ls -l $GITHUB_WORKSPACE/out
           ls -alFh $GITHUB_WORKSPACE/fuzz
           sudo chown -R $USER:$USER "$GITHUB_WORKSPACE"
-          sudo chown $USER:$USER "$GITHUB_WORKSPACE/fuzz/db_fuzzer/db_fuzzer"
-          chmod 777 $GITHUB_WORKSPACE/fuzz/db_fuzzer/db_fuzzer
+          sudo chown $USER:$USER "$GITHUB_WORKSPACE/fuzz/db_fuzzer"
+          chmod 777 $GITHUB_WORKSPACE/fuzz/db_fuzzer
           whoami
-          ls -alFh $GITHUB_WORKSPACE/fuzz/db_fuzzer
+          ls -alFh $GITHUB_WORKSPACE/fuzz
           ASAN_OPTIONS=detect_odr_violation=0 $GITHUB_WORKSPACE/fuzz/db_fuzzer 2>&1 | sudo tee $GITHUB_WORKSPACE/out/db_fuzzer.log 
           ls -l $GITHUB_WORKSPACE/out/
           
@@ -190,10 +190,10 @@ jobs:
         run: |
           ls -l $GITHUB_WORKSPACE/out/
           sudo chown -R $USER:$USER "$GITHUB_WORKSPACE"
-          sudo chown $USER:$USER "$GITHUB_WORKSPACE/fuzz/db_map_fuzzer/db_map_fuzzer"
-          chmod 777 $GITHUB_WORKSPACE/fuzz/db_map_fuzzer/db_map_fuzzer
+          sudo chown $USER:$USER "$GITHUB_WORKSPACE/fuzz/db_map_fuzzer"
+          chmod 777 $GITHUB_WORKSPACE/fuzz/db_map_fuzzer
           whoami
-          ls -alFh $GITHUB_WORKSPACE/fuzz/db_map_fuzzer
+          ls -alFh $GITHUB_WORKSPACE/fuzz
           ASAN_OPTIONS=detect_odr_violation=0 $GITHUB_WORKSPACE/fuzz/db_map_fuzzer 2>&1 | tee $GITHUB_WORKSPACE/out/db_map_fuzzer.log 
       
       - name: Copy logs to s3

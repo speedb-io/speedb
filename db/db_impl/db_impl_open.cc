@@ -85,7 +85,11 @@ DBOptions SanitizeOptions(const std::string& dbname, const DBOptions& src,
       result.delayed_write_rate = result.rate_limiter->GetBytesPerSecond();
     }
     if (result.delayed_write_rate == 0) {
-      result.delayed_write_rate = 16 * 1024 * 1024;
+      if (result.use_dynamic_delay) {
+        result.delayed_write_rate = 512 * 1024 * 1024;
+      } else {
+        result.delayed_write_rate = 16 * 1024 * 1024;
+      }
     }
   }
 

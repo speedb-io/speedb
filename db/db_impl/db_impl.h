@@ -2399,7 +2399,6 @@ class DBImpl : public DB {
   std::unique_ptr<StallInterface> wbm_stall_;
 
   ExternalDelay external_delay_;
-  bool needs_flush_speedup_ = false;
 };
 
 extern Options SanitizeOptions(const std::string& db, const Options& src,

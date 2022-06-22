@@ -884,8 +884,7 @@ ColumnFamilyData::GetWriteStallConditionAndCause(
   return {WriteStallCondition::kNormal, WriteStallCause::kNone};
 }
 
-double ColumnFamilyData::CalculateWriteDelayIncrement(
-    bool* needs_flush_speedup) {
+double ColumnFamilyData::CalculateWriteDelayIncrement() {
   if (current_ == nullptr) {
     return 0;
   }
@@ -896,9 +895,6 @@ double ColumnFamilyData::CalculateWriteDelayIncrement(
                               (mutable_cf_options_.max_write_buffer_number - 1);
   const double memtable_increment =
       extra_memtables <= 0 ? 0 : pow(2, extra_memtables);
-  if (needs_flush_speedup != nullptr && memtable_increment > 0) {
-    *needs_flush_speedup = true;
-  }
   // as part of SPDB-570 - dont delay based on L0 when the user disables auto
   // compactions
   if (current_->GetMutableCFOptions().disable_auto_compactions) {

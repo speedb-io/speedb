@@ -465,7 +465,7 @@ class ColumnFamilyData {
   bool queued_for_flush() { return queued_for_flush_; }
   bool queued_for_compaction() { return queued_for_compaction_; }
 
-  double CalculateWriteDelayIncrement(bool* needs_flush_speedup = nullptr);
+  double CalculateWriteDelayIncrement();
 
   enum class WriteStallCause {
     kNone,

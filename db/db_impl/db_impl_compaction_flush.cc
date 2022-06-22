@@ -3720,15 +3720,12 @@ void DBImpl::InstallSuperVersionAndScheduleWork(
 
 void DBImpl::RecalculateWriteRate() {
   double rate_multiplier = 0;
-  bool needs_flush_speedup = false;
   auto& cfds = *versions_->GetColumnFamilySet();
   for (auto* my_cfd : cfds) {
     rate_multiplier =
-        std::max(rate_multiplier,
-                 my_cfd->CalculateWriteDelayIncrement(&needs_flush_speedup));
+        std::max(rate_multiplier, my_cfd->CalculateWriteDelayIncrement());
   }
 
-  needs_flush_speedup_ = needs_flush_speedup;
   if (rate_multiplier > 0) {
     const double delayed_write_rate =
         mutable_db_options_.delayed_write_rate / rate_multiplier;

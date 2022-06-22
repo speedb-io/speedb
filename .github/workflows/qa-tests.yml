@@ -1,0 +1,56 @@
+name: QA Tests
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+env:
+  GTEST_COLOR: 1
+  GTEST_THROW_ON_FAILURE: 0
+  SKIP_FORMAT_BUCK_CHECKS: 1
+
+jobs:
+  test:
+    runs-on: [self-hosted, ubuntu, asrunner]
+    container:
+      image: ubuntu:18.04
+      volumes:
+        - /var/tmp:/var/tmp # Needed for env_test's IoctlFriendlyTmpdir
+        - /tmp:/tmp # Needed for running tests on non-overlayfs (can't use /dev/shm because there's not enough RAM on the runner)
+    strategy:
+      matrix:
+        include:
+          - name: Unit tests
+            short_test: TMPD="$(mktemp -d /tmp/speedb.XXXX)" make -j$(nproc) check
+            long_test: TMPD="$(mktemp -d /tmp/speedb.XXXX)" make -j$(nproc) check
+          - name: black-box
+            short_test: CRASH_TEST_EXT_ARGS="--duration=500" make -j$(nproc) blackbox_asan_crash_test
+            long_test: CRASH_TEST_EXT_ARGS="--duration=10000" make -j$(nproc) blackbox_asan_crash_test
+          - name: white-box
+            short_test: CRASH_TEST_EXT_ARGS="--duration=500" make -j$(nproc) whitebox_asan_crash_test
+            long_test: CRASH_TEST_EXT_ARGS="--duration=10000" make -j$(nproc) whitebox_asan_crash_test
+    
+    steps:
+      - name: Network hotfix
+        run: echo "nameserver 8.8.8.8" > /etc/resolv.conf
+    
+      - name: Pre
+        run: |
+          apt update -y
+          apt install -y build-essential clang-format parallel libgflags-dev liblz4-dev libsnappy-dev libzstd-dev python3 python3-pip curl
+
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: ${{ matrix.name }}
+        run: |
+          case "$GITHUB_REF_NAME" in
+            release/*)
+              echo "Running long test for release, $(nproc) jobs"
+              make clean && ${{ matrix.long_test }}
+              ;;
+            *)
+              echo "Running short test, $(nproc) jobs"
+              make clean && ${{ matrix.short_test }}
+              ;;
+          esac

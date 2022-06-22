@@ -452,10 +452,13 @@ class ColumnFamilyData {
   // As argument takes a pointer to allocated SuperVersion to enable
   // the clients to allocate SuperVersion outside of mutex.
   // IMPORTANT: Only call this from DBImpl::InstallSuperVersion()
-  void InstallSuperVersion(SuperVersionContext* sv_context,
-                           const MutableCFOptions& mutable_cf_options);
-  void InstallSuperVersion(SuperVersionContext* sv_context,
-                           InstrumentedMutex* db_mutex);
+  void InstallSuperVersion(
+      SuperVersionContext* sv_context,
+      const MutableCFOptions& mutable_cf_options,
+      const MutableDBOptions& mutable_db_options = MutableDBOptions());
+  void InstallSuperVersion(
+      SuperVersionContext* sv_context, InstrumentedMutex* db_mutex,
+      const MutableDBOptions& mutable_db_options = MutableDBOptions());
 
   void ResetThreadLocalSuperVersions();
 
@@ -464,6 +467,8 @@ class ColumnFamilyData {
   void set_queued_for_compaction(bool value) { queued_for_compaction_ = value; }
   bool queued_for_flush() { return queued_for_flush_; }
   bool queued_for_compaction() { return queued_for_compaction_; }
+
+  double CalculateWriteDelayIncrement();
 
   enum class WriteStallCause {
     kNone,
@@ -478,12 +483,20 @@ class ColumnFamilyData {
       const MutableCFOptions& mutable_cf_options,
       const ImmutableCFOptions& immutable_cf_options);
 
+  static std::pair<WriteStallCondition, WriteStallCause>
+  DynamicGetWriteStallConditionAndCause(
+      int num_unflushed_memtables, int num_l0_files,
+      const MutableCFOptions& mutable_cf_options);
+
   // Recalculate some small conditions, which are changed only during
   // compaction, adding new memtable and/or
   // recalculation of compaction score. These values are used in
   // DBImpl::MakeRoomForWrite function to decide, if it need to make
   // a write stall
   WriteStallCondition RecalculateWriteStallConditions(
+      const MutableCFOptions& mutable_cf_options);
+
+  WriteStallCondition DynamicRecalculateWriteStallConditions(
       const MutableCFOptions& mutable_cf_options);
 
   void set_initialized() { initialized_.store(true); }

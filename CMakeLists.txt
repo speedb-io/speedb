@@ -644,6 +644,7 @@ set(SOURCES
         db/db_impl/db_impl_experimental.cc
         db/db_impl/db_impl_readonly.cc
         db/db_impl/db_impl_secondary.cc
+        db/db_impl/external_delay.cc
         db/db_info_dumper.cc
         db/db_iter.cc
         db/dbformat.cc

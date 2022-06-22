@@ -873,8 +873,122 @@ ColumnFamilyData::GetWriteStallConditionAndCause(
   return {WriteStallCondition::kNormal, WriteStallCause::kNone};
 }
 
+std::pair<WriteStallCondition, ColumnFamilyData::WriteStallCause>
+ColumnFamilyData::DynamicGetWriteStallConditionAndCause(
+    int num_unflushed_memtables, int num_l0_files,
+    const MutableCFOptions& mutable_cf_options) {
+  if (num_unflushed_memtables >
+      mutable_cf_options.max_write_buffer_number - 1) {
+    return {WriteStallCondition::kDelayed, WriteStallCause::kMemtableLimit};
+  } else if (!mutable_cf_options.disable_auto_compactions &&
+             num_l0_files > mutable_cf_options.level0_slowdown_writes_trigger) {
+    // the user is responsible for L0 count when disable_auto_compactions is
+    // true.
+    return {WriteStallCondition::kDelayed, WriteStallCause::kL0FileCountLimit};
+  } else {
+    return {WriteStallCondition::kNormal, WriteStallCause::kNone};
+  }
+}
+
+double ColumnFamilyData::CalculateWriteDelayIncrement() {
+  if (current_ == nullptr) {
+    return 0;
+  }
+
+  const auto* vstorage = current_->storage_info();
+
+  const int extra_memtables = imm()->NumNotFlushed() -
+                              (mutable_cf_options_.max_write_buffer_number - 1);
+  const double memtable_increment =
+      extra_memtables <= 0 ? 0 : pow(2, extra_memtables);
+  // as part of SPDB-570 - dont delay based on L0 when the user disables auto
+  // compactions
+  if (current_->GetMutableCFOptions().disable_auto_compactions) {
+    return memtable_increment;
+  }
+
+  const int extra_l0_ssts = vstorage->NumLevelFiles(0) -
+                            mutable_cf_options_.level0_slowdown_writes_trigger;
+  const double l0_increment = extra_l0_ssts < 0 ? 0 : pow(1.2, extra_l0_ssts);
+  auto ret = std::max(l0_increment, memtable_increment);
+  auto soft_limit = mutable_cf_options_.soft_pending_compaction_bytes_limit;  
+  if (soft_limit > 0) {
+    auto hard_limit = mutable_cf_options_.hard_pending_compaction_bytes_limit;
+    auto cur_value =  vstorage->estimated_compaction_needed_bytes();
+    if (cur_value > soft_limit) {
+      double delay = 0;
+      if (cur_value < hard_limit) {
+	auto extra_bytes = cur_value - soft_limit;
+	// this will gives value between 1 & 1.1^100 =~ e^10  
+	delay = pow(1.1 , (extra_bytes * 100.0 / (hard_limit - soft_limit))); 
+      } else {
+	delay = 1000;
+      }
+      if (delay > ret) ret = delay;
+    }
+  }
+  return ret;
+
+}
+
+WriteStallCondition ColumnFamilyData::DynamicRecalculateWriteStallConditions(
+    const MutableCFOptions& mutable_cf_options) {
+  auto write_stall_condition = WriteStallCondition::kNormal;
+  if (current_ != nullptr) {
+    auto* vstorage = current_->storage_info();
+    auto write_controller = column_family_set_->write_controller_;
+    auto write_stall_condition_and_cause =
+        DynamicGetWriteStallConditionAndCause(
+            imm()->NumNotFlushed(), vstorage->l0_delay_trigger_count(),
+            mutable_cf_options);
+    write_stall_condition = write_stall_condition_and_cause.first;
+
+    if (write_stall_condition != WriteStallCondition::kNormal) {
+      const auto delay_increment = CalculateWriteDelayIncrement();
+      ROCKS_LOG_WARN(
+          ioptions_.info_log,
+          "[%s] Stalling writes, L0 files %d, memtables %d, increment %f",
+          name_.c_str(), vstorage->NumLevelFiles(0), imm()->NumNotFlushed(),
+          delay_increment);
+    } else {
+      assert(write_stall_condition == WriteStallCondition::kNormal);
+      if (vstorage->l0_delay_trigger_count() >=
+          GetL0ThresholdSpeedupCompaction(
+              mutable_cf_options.level0_file_num_compaction_trigger,
+              mutable_cf_options.level0_slowdown_writes_trigger)) {
+        write_controller_token_ =
+            write_controller->GetCompactionPressureToken();
+        ROCKS_LOG_INFO(
+            ioptions_.logger,
+            "[%s] Increasing compaction threads because we have %d level-0 "
+            "files ",
+            name_.c_str(), vstorage->l0_delay_trigger_count());
+      } else if (vstorage->estimated_compaction_needed_bytes() >=
+                 mutable_cf_options.soft_pending_compaction_bytes_limit / 4) {
+        // Increase compaction threads if bytes needed for compaction exceeds
+        // 1/4 of threshold for slowing down.
+        // If soft pending compaction byte limit is not set, always speed up
+        // compaction.
+        write_controller_token_ =
+            write_controller->GetCompactionPressureToken();
+        if (mutable_cf_options.soft_pending_compaction_bytes_limit > 0) {
+          ROCKS_LOG_INFO(
+              ioptions_.logger,
+              "[%s] Increasing compaction threads because of estimated pending "
+              "compaction "
+              "bytes %" PRIu64,
+              name_.c_str(), vstorage->estimated_compaction_needed_bytes());
+        }
+      } else {
+        write_controller_token_.reset();
+      }
+    }
+  }
+  return write_stall_condition;
+}
+
 WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
-      const MutableCFOptions& mutable_cf_options) {
+    const MutableCFOptions& mutable_cf_options) {
   auto write_stall_condition = WriteStallCondition::kNormal;
   if (current_ != nullptr) {
     auto* vstorage = current_->storage_info();
@@ -1257,14 +1371,16 @@ bool ColumnFamilyData::ReturnThreadLocalSuperVersion(SuperVersion* sv) {
 }
 
 void ColumnFamilyData::InstallSuperVersion(
-    SuperVersionContext* sv_context, InstrumentedMutex* db_mutex) {
+    SuperVersionContext* sv_context, InstrumentedMutex* db_mutex,
+    const MutableDBOptions& mutable_db_options) {
   db_mutex->AssertHeld();
-  return InstallSuperVersion(sv_context, mutable_cf_options_);
+  return InstallSuperVersion(sv_context, mutable_cf_options_,
+                             mutable_db_options);
 }
 
 void ColumnFamilyData::InstallSuperVersion(
-    SuperVersionContext* sv_context,
-    const MutableCFOptions& mutable_cf_options) {
+    SuperVersionContext* sv_context, const MutableCFOptions& mutable_cf_options,
+    const MutableDBOptions& mutable_db_options) {
   SuperVersion* new_superversion = sv_context->new_superversion.release();
   new_superversion->mutable_cf_options = mutable_cf_options;
   new_superversion->Init(this, mem_, imm_.current(), current_);
@@ -1273,7 +1389,9 @@ void ColumnFamilyData::InstallSuperVersion(
   ++super_version_number_;
   super_version_->version_number = super_version_number_;
   super_version_->write_stall_condition =
-      RecalculateWriteStallConditions(mutable_cf_options);
+      mutable_db_options.use_dynamic_delay
+          ? DynamicRecalculateWriteStallConditions(mutable_cf_options)
+          : RecalculateWriteStallConditions(mutable_cf_options);
 
   if (old_superversion != nullptr) {
     // Reset SuperVersions cached in thread local storage.

@@ -9,6 +9,7 @@
 #include <cinttypes>
 
 #include "db/db_impl/db_impl.h"
+#include "db/db_impl/external_delay.h"
 #include "db/error_handler.h"
 #include "db/event_helpers.h"
 #include "logging/logging.h"
@@ -18,6 +19,7 @@
 #include "util/cast_util.h"
 
 namespace ROCKSDB_NAMESPACE {
+
 // Convenience methods
 Status DBImpl::Put(const WriteOptions& o, ColumnFamilyHandle* column_family,
                    const Slice& key, const Slice& val) {
@@ -127,6 +129,10 @@ Status DBImpl::WriteImpl(const WriteOptions& write_options,
                          bool disable_memtable, uint64_t* seq_used,
                          size_t batch_cnt,
                          PreReleaseCallback* pre_release_callback) {
+  if (mutable_db_options_.use_dynamic_delay) {
+    external_delay_.Enforce(last_batch_group_size_);
+  }
+
   assert(!seq_per_batch_ || batch_cnt != 0);
   if (my_batch == nullptr) {
     return Status::InvalidArgument("Batch is nullptr!");
@@ -1079,7 +1085,8 @@ Status DBImpl::PreprocessWrite(const WriteOptions& write_options,
   PERF_TIMER_STOP(write_scheduling_flushes_compactions_time);
   PERF_TIMER_GUARD(write_pre_and_post_process_time);
 
-  if (UNLIKELY(status.ok() && (write_controller_.IsStopped() ||
+  if (!mutable_db_options_.use_dynamic_delay &&
+      UNLIKELY(status.ok() && (write_controller_.IsStopped() ||
                                write_controller_.NeedsDelay()))) {
     PERF_TIMER_STOP(write_pre_and_post_process_time);
     PERF_TIMER_GUARD(write_delay_time);
@@ -1815,12 +1822,16 @@ Status DBImpl::TrimMemtableHistory(WriteContext* context) {
     if (trimmed) {
       context->superversion_context.NewSuperVersion();
       assert(context->superversion_context.new_superversion.get() != nullptr);
-      cfd->InstallSuperVersion(&context->superversion_context, &mutex_);
+      cfd->InstallSuperVersion(&context->superversion_context, &mutex_,
+                               mutable_db_options_);
     }
 
     if (cfd->UnrefAndTryDelete()) {
       cfd = nullptr;
     }
+  }
+  if (mutable_db_options_.use_dynamic_delay) {
+    RecalculateWriteRate();
   }
   return Status::OK();
 }

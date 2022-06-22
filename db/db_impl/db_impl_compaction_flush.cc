@@ -2281,12 +2281,21 @@ Status DBImpl::WaitUntilFlushWouldNotStallWrites(ColumnFamilyData* cfd,
       // check whether one extra immutable memtable or an extra L0 file would
       // cause write stalling mode to be entered. It could still enter stall
       // mode due to pending compaction bytes, but that's less common
-      write_stall_condition = ColumnFamilyData::GetWriteStallConditionAndCause(
-                                  cfd->imm()->NumNotFlushed() + 1,
-                                  vstorage->l0_delay_trigger_count() + 1,
-                                  vstorage->estimated_compaction_needed_bytes(),
-                                  mutable_cf_options, *cfd->ioptions())
-                                  .first;
+      if (mutable_db_options_.use_dynamic_delay) {
+        write_stall_condition =
+            ColumnFamilyData::DynamicGetWriteStallConditionAndCause(
+                cfd->imm()->NumNotFlushed() + 1,
+                vstorage->l0_delay_trigger_count() + 1, mutable_cf_options)
+                .first;
+      } else {
+        write_stall_condition =
+            ColumnFamilyData::GetWriteStallConditionAndCause(
+                cfd->imm()->NumNotFlushed() + 1,
+                vstorage->l0_delay_trigger_count() + 1,
+                vstorage->estimated_compaction_needed_bytes(),
+                mutable_cf_options, *cfd->ioptions())
+                .first;
+      }
     } while (write_stall_condition != WriteStallCondition::kNormal);
   }
   return Status::OK();
@@ -3698,13 +3707,14 @@ void DBImpl::InstallSuperVersionAndScheduleWork(
   if (UNLIKELY(sv_context->new_superversion == nullptr)) {
     sv_context->NewSuperVersion();
   }
-  cfd->InstallSuperVersion(sv_context, mutable_cf_options);
+  cfd->InstallSuperVersion(sv_context, mutable_cf_options, mutable_db_options_);
 
   // There may be a small data race here. The snapshot tricking bottommost
   // compaction may already be released here. But assuming there will always be
   // newer snapshot created and released frequently, the compaction will be
   // triggered soon anyway.
   bottommost_files_mark_threshold_ = kMaxSequenceNumber;
+
   for (auto* my_cfd : *versions_->GetColumnFamilySet()) {
     bottommost_files_mark_threshold_ = std::min(
         bottommost_files_mark_threshold_,
@@ -3713,6 +3723,9 @@ void DBImpl::InstallSuperVersionAndScheduleWork(
 
   // Whenever we install new SuperVersion, we might need to issue new flushes or
   // compactions.
+  if (mutable_db_options_.use_dynamic_delay) {
+    RecalculateWriteRate();
+  }
   SchedulePendingCompaction(cfd);
   MaybeScheduleFlushOrCompaction();
 
@@ -3720,6 +3733,27 @@ void DBImpl::InstallSuperVersionAndScheduleWork(
   max_total_in_memory_state_ = max_total_in_memory_state_ - old_memtable_size +
                                mutable_cf_options.write_buffer_size *
                                    mutable_cf_options.max_write_buffer_number;
+}
+
+void DBImpl::RecalculateWriteRate() {
+  double rate_multiplier = 0;
+  auto& cfds = *versions_->GetColumnFamilySet();
+  for (auto* my_cfd : cfds) {
+    rate_multiplier =
+        std::max(rate_multiplier, my_cfd->CalculateWriteDelayIncrement());
+  }
+
+  if (rate_multiplier > 0) {
+    const double delayed_write_rate =
+        mutable_db_options_.delayed_write_rate / rate_multiplier;
+
+    ROCKS_LOG_INFO(immutable_db_options_.info_log,
+                   "Setting up external delay with write rate %" PRIu64 " B/s",
+                   uint64_t(delayed_write_rate));
+    external_delay_.SetDelayWriteRate(delayed_write_rate);
+  } else if (external_delay_.Reset()) {
+    ROCKS_LOG_INFO(immutable_db_options_.info_log, "Resetting external delay");
+  }
 }
 
 // ShouldPurge is called by FindObsoleteFiles when doing a full scan,

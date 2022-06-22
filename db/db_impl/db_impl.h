@@ -43,6 +43,7 @@
 #include "db/wal_manager.h"
 #include "db/write_controller.h"
 #include "db/write_thread.h"
+#include "external_delay.h"
 #include "logging/event_logger.h"
 #include "monitoring/instrumented_mutex.h"
 #include "options/db_options.h"
@@ -1957,6 +1958,9 @@ class DBImpl : public DB {
       ColumnFamilyData* cfd, SuperVersionContext* sv_context,
       const MutableCFOptions& mutable_cf_options);
 
+  // calculate the write rate based on the status of the current version
+  void RecalculateWriteRate();
+
   bool GetIntPropertyInternal(ColumnFamilyData* cfd,
                               const DBPropertyInfo& property_info,
                               bool is_locked, uint64_t* value);
@@ -2415,6 +2419,8 @@ class DBImpl : public DB {
 
   // Pointer to WriteBufferManager stalling interface.
   std::unique_ptr<StallInterface> wbm_stall_;
+
+  ExternalDelay external_delay_;
 };
 
 extern Options SanitizeOptions(const std::string& db, const Options& src,

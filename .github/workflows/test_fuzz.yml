@@ -201,17 +201,16 @@ jobs:
           aws s3 cp $GITHUB_WORKSPACE/out/db_map_fuzzer.log s3://spdb-github-ci/
           
   fuzzer_sum:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     container:
       image: ubuntu:18.04
-    needs: [db_map_fuzzer, db_fuzzer]
       
     steps:
       - uses: actions/checkout@v3
       
       - name: pre
         run: |
-          apt update && apt install -y sudo unzip
+          apt update && apt install -y sudo unzip curl
           curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
           unzip awscliv2.zip
           sudo ./aws/install
@@ -226,13 +225,13 @@ jobs:
       - name: download db_fuzzer.log from s3
         run: |
           mkdir -p $GITHUB_WORKSPACE/out
-          aws s3 cp s3://spdb-github-ci/db_fuzzer.log $GITHUB_WORKSPACE/out/db_fuzzer.log
+          aws s3 cp s3://spdb-github-ci/db_fuzzer.log $GITHUB_WORKSPACE/out/db_fuzzer.log || echo "db_fuzzer.log not found"
           ls -alFh $GITHUB_WORKSPACE/out
           
       - name: download db_map_fuzzer.log from s3
         run: |
           mkdir -p $GITHUB_WORKSPACE/out
-          aws s3 cp s3://spdb-github-ci/db_map_fuzzer.log $GITHUB_WORKSPACE/out/db_map_fuzzer.log
+          aws s3 cp s3://spdb-github-ci/db_map_fuzzer.log $GITHUB_WORKSPACE/out/db_map_fuzzer.log || echo "db_map_fuzzer.log not found"
           ls -alFh $GITHUB_WORKSPACE/out
       
 #       - name: Download a Build Artifact
@@ -257,6 +256,5 @@ jobs:
       - name: clear s3 bucket
         run: |
           mkdir -p $GITHUB_WORKSPACE/down
-          aws s3 rm s3://spdb-github-ci/ --recursive --dryrun --exclude "*" --include "my-folder/*"
-
+          aws s3 rm s3://spdb-github-ci/ --recursive --include "*"
 

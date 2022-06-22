@@ -147,6 +147,32 @@ IOStatus DBImpl::SyncClosedLogs(JobContext* job_context) {
   return io_s;
 }
 
+void DBImpl::InitiateMemoryManagerFlushRequest(ColumnFamilyData* cfd) {
+  if (cfd->queued_for_flush()) return;
+  FlushOptions flush_options;
+  ROCKS_LOG_INFO(
+      immutable_db_options_.info_log,
+      "[%s] write buffer manager flush started current usage %lu out of %lu",
+      cfd->GetName().c_str(), cfd->write_buffer_mgr()->memory_usage(),
+      cfd->write_buffer_mgr()->buffer_size());
+  
+  flush_options.allow_write_stall = true;
+  flush_options.wait = false;
+  flush_options.force_flush_mutable_memtable = false;
+  Status s;
+  if (immutable_db_options_.atomic_flush) {
+    s = AtomicFlushMemTables({cfd}, flush_options,
+                             FlushReason::kWriteBufferManager);
+  } else {
+    s = FlushMemTable(cfd, flush_options, FlushReason::kWriteBufferManager);
+  }
+
+  ROCKS_LOG_INFO(immutable_db_options_.info_log,
+                 "[%s] write buffer manager intialize flush finished, status: %s\n",
+                 cfd->GetName().c_str(), s.ToString().c_str());
+}
+
+
 Status DBImpl::FlushMemTableToOutputFile(
     ColumnFamilyData* cfd, const MutableCFOptions& mutable_cf_options,
     bool* made_progress, JobContext* job_context,
@@ -1988,30 +2014,33 @@ Status DBImpl::FlushMemTable(ColumnFamilyData* cfd,
 
   autovector<FlushRequest> flush_reqs;
   autovector<uint64_t> memtable_ids_to_wait;
+  bool switch_memtable;
   {
     WriteContext context;
     InstrumentedMutexLock guard_lock(&mutex_);
-
+    switch_memtable = flush_options.force_flush_mutable_memtable || cfd->imm()->NumNotFlushed() == 0;
     WriteThread::Writer w;
     WriteThread::Writer nonmem_w;
-    if (!writes_stopped) {
-      write_thread_.EnterUnbatched(&w, &mutex_);
-      if (two_write_queues_) {
-        nonmem_write_thread_.EnterUnbatched(&nonmem_w, &mutex_);
+    if (switch_memtable) {
+      if (!writes_stopped) {
+        write_thread_.EnterUnbatched(&w, &mutex_);
+        if (two_write_queues_) {
+          nonmem_write_thread_.EnterUnbatched(&nonmem_w, &mutex_);
+        }
       }
-    }
-    WaitForPendingWrites();
+      WaitForPendingWrites();
 
-    if (flush_reason != FlushReason::kErrorRecoveryRetryFlush &&
-        (!cfd->mem()->IsEmpty() || !cached_recoverable_state_empty_.load())) {
-      // Note that, when flush reason is kErrorRecoveryRetryFlush, during the
-      // auto retry resume, we want to avoid creating new small memtables.
-      // Therefore, SwitchMemtable will not be called. Also, since ResumeImpl
-      // will iterate through all the CFs and call FlushMemtable during auto
-      // retry resume, it is possible that in some CFs,
-      // cfd->imm()->NumNotFlushed() = 0. In this case, so no flush request will
-      // be created and scheduled, status::OK() will be returned.
-      s = SwitchMemtable(cfd, &context);
+      if (flush_reason != FlushReason::kErrorRecoveryRetryFlush &&
+          (!cfd->mem()->IsEmpty() || !cached_recoverable_state_empty_.load())) {
+        // Note that, when flush reason is kErrorRecoveryRetryFlush, during the
+        // auto retry resume, we want to avoid creating new small memtables.
+        // Therefore, SwitchMemtable will not be called. Also, since ResumeImpl
+        // will iterate through all the CFs and call FlushMemtable during auto
+        // retry resume, it is possible that in some CFs,
+        // cfd->imm()->NumNotFlushed() = 0. In this case, so no flush request
+        // will be created and scheduled, status::OK() will be returned.
+        s = SwitchMemtable(cfd, &context);
+      }
     }
     const uint64_t flush_memtable_id = port::kMaxUint64;
     if (s.ok()) {
@@ -2077,7 +2106,7 @@ Status DBImpl::FlushMemTable(ColumnFamilyData* cfd,
       MaybeScheduleFlushOrCompaction();
     }
 
-    if (!writes_stopped) {
+    if (switch_memtable && !writes_stopped) {
       write_thread_.ExitUnbatched(&w);
       if (two_write_queues_) {
         nonmem_write_thread_.ExitUnbatched(&nonmem_w);

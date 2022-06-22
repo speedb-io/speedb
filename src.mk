@@ -116,6 +116,7 @@ LIB_SOURCES =                                                   \
   memory/jemalloc_nodump_allocator.cc                           \
   memory/memkind_kmem_allocator.cc                              \
   memory/memory_allocator.cc                                    \
+  memory/memory_manager.cc                                      \
   memtable/alloc_tracker.cc                                     \
   memtable/hash_linklist_rep.cc                                 \
   memtable/hash_skiplist_rep.cc                                 \
@@ -297,6 +298,7 @@ LIB_SOURCES =                                                   \
   utilities/wal_filter.cc                                       \
   utilities/write_batch_with_index/write_batch_with_index.cc    \
   utilities/write_batch_with_index/write_batch_with_index_internal.cc    \
+
 
 ifeq (,$(shell $(CXX) -fsyntax-only -maltivec -xc /dev/null 2>&1))
 LIB_SOURCES_ASM =\

@@ -805,11 +805,16 @@ Status FlushJob::WriteLevel0Table() {
   const uint64_t start_cpu_micros = clock_->CPUMicros();
   Status s;
 
+  size_t total_memory_usage = 0;
+
   std::vector<BlobFileAddition> blob_file_additions;
 
   {
     auto write_hint = cfd_->CalculateSSTWriteHint(0);
     db_mutex_->Unlock();
+    if (cfd_->MemoryManager())
+      cfd_->MemoryManager()->FlushStarted(total_memory_usage);
+    
     if (log_buffer_) {
       log_buffer_->FlushBufferToLog();
     }
@@ -824,7 +829,6 @@ Status FlushJob::WriteLevel0Table() {
     Arena arena;
     uint64_t total_num_entries = 0, total_num_deletes = 0;
     uint64_t total_data_size = 0;
-    size_t total_memory_usage = 0;
     // Used for testing:
     uint64_t mems_size = mems_.size();
     (void)mems_size;  // avoids unused variable error when
@@ -1027,6 +1031,8 @@ Status FlushJob::WriteLevel0Table() {
       InternalStats::BYTES_FLUSHED,
       stats.bytes_written + stats.bytes_written_blob);
   RecordFlushIOStats();
+  if (cfd_->MemoryManager())
+    cfd_->MemoryManager()->FlushEnded(total_memory_usage);
 
   return s;
 }

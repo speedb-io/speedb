@@ -695,6 +695,7 @@ ImmutableDBOptions::ImmutableDBOptions(const DBOptions& options)
       experimental_mempurge_threshold(options.experimental_mempurge_threshold),
       db_write_buffer_size(options.db_write_buffer_size),
       write_buffer_manager(options.write_buffer_manager),
+      spdb_memory_manager(options.spdb_memory_manager),
       access_hint_on_compaction_start(options.access_hint_on_compaction_start),
       random_access_max_buffer_size(options.random_access_max_buffer_size),
       use_adaptive_mutex(options.use_adaptive_mutex),

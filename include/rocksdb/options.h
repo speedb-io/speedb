@@ -885,6 +885,13 @@ struct DBOptions {
   // Default: null
   std::shared_ptr<WriteBufferManager> write_buffer_manager = nullptr;
 
+  // memory manager common to many databases. 
+  // this feature currently include:
+  //  1) dirty-data & flush schedhuler (aka write buffer manager)
+  // 
+  
+  std::shared_ptr<SpdbMemoryManager> spdb_memory_manager = nullptr;
+
   // Specify the file access pattern once a compaction is started.
   // It will be applied to all input files of a compaction.
   // Default: NORMAL
@@ -1711,7 +1718,10 @@ struct FlushOptions {
   // is performed by someone else (foreground call or background thread).
   // Default: false
   bool allow_write_stall;
-  FlushOptions() : wait(true), allow_write_stall(false) {}
+  // if there are immutable memtable this flag will cause a skip over the switch
+  // mem table to intrduce minimum interrupt to the flow of the writes
+  bool force_flush_mutable_memtable;
+  FlushOptions() : wait(true), allow_write_stall(false), force_flush_mutable_memtable(true) {}
 };
 
 // Create a Logger from provided DBOptions

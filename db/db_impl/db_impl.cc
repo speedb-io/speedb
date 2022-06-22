@@ -2779,6 +2779,11 @@ Status DBImpl::CreateColumnFamilyImpl(const ColumnFamilyOptions& cf_options,
       assert(cfd != nullptr);
       std::map<std::string, std::shared_ptr<FSDirectory>> dummy_created_dirs;
       s = cfd->AddDirectories(&dummy_created_dirs);
+      if (immutable_db_options_.spdb_memory_manager.get() != nullptr) {
+        cfd->SetMemoryClient(immutable_db_options_.spdb_memory_manager.get(),
+                              this);
+      }
+      
     }
     if (s.ok()) {
       single_column_family_mode_ = false;

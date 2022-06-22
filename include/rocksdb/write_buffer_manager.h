@@ -17,8 +17,10 @@
 #include <cstddef>
 #include <list>
 #include <mutex>
-
+#include <set>
+#include <thread>
 #include "rocksdb/cache.h"
+
 
 namespace ROCKSDB_NAMESPACE {
 class CacheReservationManager;
@@ -34,7 +36,9 @@ class StallInterface {
   virtual void Signal() = 0;
 };
 
-class WriteBufferManager final {
+
+// write buffer manager was expanded using spdb_memory_manager
+class WriteBufferManager  {
  public:
   // Parameters:
   // _buffer_size: _buffer_size = 0 indicates no limit. Memory won't be capped.
@@ -54,7 +58,7 @@ class WriteBufferManager final {
   WriteBufferManager(const WriteBufferManager&) = delete;
   WriteBufferManager& operator=(const WriteBufferManager&) = delete;
 
-  ~WriteBufferManager();
+  virtual ~WriteBufferManager();
 
   // Returns true if buffer_limit is passed to limit the total memory usage and
   // is greater than 0.
@@ -81,7 +85,7 @@ class WriteBufferManager final {
     return buffer_size_.load(std::memory_order_relaxed);
   }
 
-  void SetBufferSize(size_t new_size) {
+  virtual void SetBufferSize(size_t new_size) {
     buffer_size_.store(new_size, std::memory_order_relaxed);
     mutable_limit_.store(new_size * 7 / 8, std::memory_order_relaxed);
     // Check if stall is active and can be ended.
@@ -91,7 +95,7 @@ class WriteBufferManager final {
   // Below functions should be called by RocksDB internally.
 
   // Should only be called from write thread
-  bool ShouldFlush() const {
+  virtual bool ShouldFlush() const {
     if (enabled()) {
       if (mutable_memtable_memory_usage() >
           mutable_limit_.load(std::memory_order_relaxed)) {
@@ -116,7 +120,7 @@ class WriteBufferManager final {
   // pass allow_stall = true during WriteBufferManager instance creation.
   //
   // Should only be called by RocksDB internally .
-  bool ShouldStall() const {
+  virtual bool ShouldStall() const {
     if (!allow_stall_ || !enabled()) {
       return false;
     }
@@ -134,13 +138,13 @@ class WriteBufferManager final {
     return memory_usage() >= buffer_size_;
   }
 
-  void ReserveMem(size_t mem);
+  virtual void ReserveMem(size_t mem);
 
   // We are in the process of freeing `mem` bytes, so it is not considered
   // when checking the soft limit.
   void ScheduleFreeMem(size_t mem);
 
-  void FreeMem(size_t mem);
+  virtual void FreeMem(size_t mem);
 
   // Add the DB instance to the queue and block the DB.
   // Should only be called by RocksDB internally.
@@ -152,25 +156,105 @@ class WriteBufferManager final {
 
   void RemoveDBFromQueue(StallInterface* wbm_stall);
 
- private:
-  std::atomic<size_t> buffer_size_;
-  std::atomic<size_t> mutable_limit_;
-  std::atomic<size_t> memory_used_;
-  // Memory that hasn't been scheduled to free.
-  std::atomic<size_t> memory_active_;
-  std::shared_ptr<CacheReservationManager> cache_res_mgr_;
-  // Protects cache_res_mgr_
-  std::mutex cache_res_mgr_mu_;
 
-  std::list<StallInterface*> queue_;
-  // Protects the queue_ and stall_active_.
-  std::mutex mu_;
-  bool allow_stall_;
-  // Value should only be changed by BeginWriteStall() and MaybeEndWriteStall()
-  // while holding mu_, but it can be read without a lock.
-  std::atomic<bool> stall_active_;
+private:
+ std::atomic<size_t> buffer_size_;
+ std::atomic<size_t> mutable_limit_;
+ std::atomic<size_t> memory_used_;
+ // Memory that hasn't been scheduled to free.
+ std::atomic<size_t> memory_active_;
+ std::shared_ptr<CacheReservationManager> cache_res_mgr_;
+ // Protects cache_res_mgr_
+ std::mutex cache_res_mgr_mu_;
 
-  void ReserveMemWithCache(size_t mem);
-  void FreeMemWithCache(size_t mem);
+ std::list<StallInterface*> queue_;
+ // Protects the queue_ and stall_active_.
+ std::mutex mu_;
+ bool allow_stall_;
+ // Value should only be changed by BeginWriteStall() and MaybeEndWriteStall()
+ // while holding mu_, but it can be read without a lock.
+ std::atomic<bool> stall_active_;
+
+ void ReserveMemWithCache(size_t mem);
+ void FreeMemWithCache(size_t mem);
 };
-}  // namespace ROCKSDB_NAMESPACE
+
+struct SpdbMemoryManagerOptions {
+  SpdbMemoryManagerOptions(){};
+  SpdbMemoryManagerOptions(std::shared_ptr<Cache> _cache,
+                           size_t _dirty_data_size = 1ul << 30,
+                           size_t _n_parallel_flushes = 4,
+                           size_t _max_pinned_data_ratio = 90,
+                           size_t _delayed_write_rate = 1ul << 40)
+      : cache(_cache),
+        dirty_data_size(_dirty_data_size),
+        n_parallel_flushes(_n_parallel_flushes),
+        max_pinned_data_ratio(_max_pinned_data_ratio),
+        delayed_write_rate(_delayed_write_rate)
+  {}
+
+  // clean data 
+  std::shared_ptr<Cache> cache;
+  // dirty data size
+  size_t dirty_data_size = 1ul << 30;
+  size_t n_parallel_flushes = 4;
+  size_t max_pinned_data_ratio = 90;
+  size_t delayed_write_rate = 1ul << 40;
+};
+
+// spdb memory manager is responsible for memory mangement and timing of the flushes between
+// multiple CF 
+
+class SpdbMemoryManagerClient;
+class LogBuffer;
+class SpdbMemoryManager : public WriteBufferManager {
+ public:
+  SpdbMemoryManager(const SpdbMemoryManagerOptions &options);
+  ~SpdbMemoryManager();
+public:
+  void SetBufferSize(size_t new_size) override;
+
+public:
+  // return always false
+  bool ShouldFlush() const override {
+    return false;
+  }
+  bool ShouldStall() const override { return false; }
+public:
+  void ReserveMem(size_t mem) override;
+  void FreeMem(size_t mem) override;
+  
+  void RegisterClient(SpdbMemoryManagerClient *);
+  void UnRegisterClient(SpdbMemoryManagerClient *);
+  void FlushStarted(size_t flush_size);
+  void FlushEnded(size_t flush_size);  
+public:
+ std::shared_ptr<Cache> GetCache() { return cache_; }
+private:
+ void  MaybeInitiateFlushRequest(int mem_full_rate);
+ void  RecalcConditions();
+
+private:
+ std::shared_ptr<Cache> cache_;
+ std::unordered_set<SpdbMemoryManagerClient *> clients_;
+ int n_parallel_flushes_;
+ int n_running_flushes_;
+ int n_scheduled_flushes_;
+ size_t size_pendding_for_flush_;
+ size_t next_recalc_size_;
+ static const int kminFlushPrecent = 40;
+private:  
+  // flush threads support (flush must run on a seperate thread to avoid deadlock
+  // as the scheduler is called in the context of write and flush ask for quiece of writes
+  std::list< SpdbMemoryManagerClient *> clients_need_flush_;
+  std::thread *flush_thread_;
+  std::mutex mutex_;
+  std::condition_variable wakeup_cond_;
+  bool terminated_;
+private:
+  static void FlushFunction(SpdbMemoryManager *flush_scheduler);
+  void FlushLoop();
+  void WakeUpFlush();
+};
+
+};

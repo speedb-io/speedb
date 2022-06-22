@@ -324,6 +324,8 @@ DEFINE_int64(max_scan_distance, 0,
 
 DEFINE_bool(use_uint64_comparator, false, "use Uint64 user comparator");
 
+DEFINE_bool(use_spdb_memory_manager, true, "use the new memory manager");
+
 DEFINE_int64(batch_size, 1, "Batch size");
 
 static bool ValidateKeySize(const char* /*flagname*/, int32_t /*value*/) {
@@ -3858,10 +3860,18 @@ class Benchmark {
 
     options.env = FLAGS_env;
     options.max_open_files = FLAGS_open_files;
-    if (FLAGS_cost_write_buffer_to_cache || FLAGS_db_write_buffer_size != 0) {
+    if (FLAGS_use_spdb_memory_manager) {
+      SpdbMemoryManagerOptions memopt(cache_);
+      if (FLAGS_db_write_buffer_size) {
+        memopt.dirty_data_size = FLAGS_db_write_buffer_size;
+      }
+      options.spdb_memory_manager.reset(new SpdbMemoryManager(memopt));
+    } else if (FLAGS_cost_write_buffer_to_cache ||
+               FLAGS_db_write_buffer_size != 0) {
       options.write_buffer_manager.reset(
           new WriteBufferManager(FLAGS_db_write_buffer_size, cache_));
     }
+
     options.arena_block_size = FLAGS_arena_block_size;
     options.write_buffer_size = FLAGS_write_buffer_size;
     options.max_write_buffer_number = FLAGS_max_write_buffer_number;

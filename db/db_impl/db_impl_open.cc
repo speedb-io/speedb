@@ -61,6 +61,16 @@ DBOptions SanitizeOptions(const std::string& dbname, const DBOptions& src,
       result.info_log = nullptr;
     }
   }
+   
+  if (result.spdb_memory_manager) {
+    result.write_buffer_manager = result.spdb_memory_manager;
+  } else { 
+    if (!result.write_buffer_manager) {
+      result.write_buffer_manager.reset(
+          new WriteBufferManager(result.db_write_buffer_size));
+    }
+  }
+
 
   if (!result.write_buffer_manager) {
     result.write_buffer_manager.reset(
@@ -532,6 +542,10 @@ Status DBImpl::Recover(
       s = cfd->AddDirectories(&created_dirs);
       if (!s.ok()) {
         return s;
+      }
+      if (immutable_db_options_.spdb_memory_manager.get() != nullptr) {
+        cfd->SetMemoryClient(immutable_db_options_.spdb_memory_manager.get(),
+                             this);
       }
     }
   }

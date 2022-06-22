@@ -39,6 +39,7 @@
 #include "util/autovector.h"
 #include "util/cast_util.h"
 #include "util/compression.h"
+#include "memory/memory_manager.h"
 
 namespace ROCKSDB_NAMESPACE {
 
@@ -525,6 +526,8 @@ ColumnFamilyData::ColumnFamilyData(
       is_delete_range_supported_(
           cf_options.table_factory->IsDeleteRangeSupported()),
       write_buffer_manager_(write_buffer_manager),
+      spdb_memory_manager_(nullptr),
+      spdb_memory_manager_client_(nullptr),
       mem_(nullptr),
       imm_(ioptions_.min_write_buffer_number_to_merge,
            ioptions_.max_write_buffer_number_to_maintain,
@@ -614,6 +617,15 @@ ColumnFamilyData::ColumnFamilyData(
   RecalculateWriteStallConditions(mutable_cf_options_);
 }
 
+// this method should be part of the construct but in order to avoid too many
+// code changes it is defined here
+void ColumnFamilyData::SetMemoryClient(SpdbMemoryManager* mem_manager,
+                                       DBImpl* db) {
+  spdb_memory_manager_ = mem_manager;  
+  spdb_memory_manager_client_.reset(new SpdbMemoryManagerClient(mem_manager , db , this));
+}
+
+
 // DB mutex held
 ColumnFamilyData::~ColumnFamilyData() {
   assert(refs_.load(std::memory_order_relaxed) == 0);
@@ -668,6 +680,7 @@ ColumnFamilyData::~ColumnFamilyData() {
           id_, name_.c_str());
     }
   }
+  
 }
 
 bool ColumnFamilyData::UnrefAndTryDelete() {

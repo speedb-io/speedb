@@ -1160,6 +1160,9 @@ class DBImpl : public DB {
   static void TEST_ResetDbSessionIdGen();
   static std::string GenerateDbSessionId(Env* env);
 
+  // flush memtable initated  by the memory manager 
+  void InitiateMemoryManagerFlushRequest(ColumnFamilyData* cfd);
+
  protected:
   const std::string dbname_;
   // TODO(peterd): unify with VersionSet::db_id_
@@ -1618,6 +1621,7 @@ class DBImpl : public DB {
       std::unique_ptr<std::list<uint64_t>::iterator>& v);
 
   IOStatus SyncClosedLogs(JobContext* job_context);
+
 
   // Flush the in-memory write buffer to storage.  Switches to a new
   // log-file/memtable and writes a new descriptor iff successful. Then

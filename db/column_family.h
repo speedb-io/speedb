@@ -466,10 +466,11 @@ class ColumnFamilyData {
   bool queued_for_compaction() { return queued_for_compaction_; }
 
   enum class WriteStallCause {
-    kNone,
+    kNone = 0,
     kMemtableLimit,
     kL0FileCountLimit,
     kPendingCompactionBytes,
+    kNumCauses 
   };
   static std::pair<WriteStallCondition, WriteStallCause>
   GetWriteStallConditionAndCause(
@@ -520,8 +521,12 @@ class ColumnFamilyData {
 
   ThreadLocalPtr* TEST_GetLocalSV() { return local_sv_.get(); }
   WriteBufferManager* write_buffer_mgr() { return write_buffer_manager_; }
-
+  
+  // register this CF as a client 
+  void SetMemoryClient(SpdbMemoryManager* mem_manager, DBImpl* db);
+  SpdbMemoryManager* MemoryManager() {return spdb_memory_manager_;}
   static const uint32_t kDummyColumnFamilyDataId;
+  
 
  private:
   friend class ColumnFamilySet;
@@ -562,6 +567,9 @@ class ColumnFamilyData {
   std::unique_ptr<InternalStats> internal_stats_;
 
   WriteBufferManager* write_buffer_manager_;
+  SpdbMemoryManager*  spdb_memory_manager_;
+  std::unique_ptr<SpdbMemoryManagerClient>  spdb_memory_manager_client_;
+  
 
   MemTable* mem_;
   MemTableList imm_;
@@ -616,6 +624,7 @@ class ColumnFamilyData {
   std::vector<std::shared_ptr<FSDirectory>> data_dirs_;
 
   bool db_paths_registered_;
+  
 
   std::string full_history_ts_low_;
 };

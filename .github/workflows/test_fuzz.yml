@@ -50,10 +50,10 @@ jobs:
              make db_fuzzer \n
              ls -alFh $GITHUB_WORKSPACE/fuzz/ \n
              echo ASAN_OPTIONS=detect_leaks=0 ./db_fuzzer \n' > prepfuz.sh
-             md5sum db_fuzzer
-             md5sum db_map_fuzzer
            chmod +x prepfuz.sh
            bash -xv prepfuz.sh
+           md5sum $GITHUB_WORKSPACE/fuzz/db_fuzzer
+           md5sum $GITHUB_WORKSPACE/fuzz/db_map_fuzzer
            
          
       - name: Copy db_map_fuzzer to S3

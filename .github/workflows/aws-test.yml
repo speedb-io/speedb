@@ -1,0 +1,65 @@
+name: aws-test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  fuzzer_sum:
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:18.04
+      
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: pre
+        run: |
+          apt update && apt install -y sudo unzip curl
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+          unzip awscliv2.zip
+          sudo ./aws/install
+          
+      - name: Configure AWS credentials from Test account
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-west-2
+      
+      - name: download db_fuzzer.log from s3
+        run: |
+          mkdir -p $GITHUB_WORKSPACE/out
+          aws s3 cp s3://spdb-github-ci/db_fuzzer.log $GITHUB_WORKSPACE/out/db_fuzzer.log
+          ls -alFh $GITHUB_WORKSPACE/out
+          
+      - name: download db_map_fuzzer.log from s3
+        run: |
+          mkdir -p $GITHUB_WORKSPACE/out
+          aws s3 cp s3://spdb-github-ci/db_map_fuzzer.log $GITHUB_WORKSPACE/out/db_map_fuzzer.log
+          ls -alFh $GITHUB_WORKSPACE/out
+      
+#       - name: Download a Build Artifact
+#         uses: actions/download-artifact@v3.0.0
+#         with:
+#           path: |
+#             ${{ github.workspace }}/out/db_fuzzer.log
+            
+#       - name: Download a Build Artifact
+#         uses: actions/download-artifact@v3.0.0
+#         with:
+#           path: |
+#             ${{ github.workspace }}/out/db_map_fuzzer.log
+      
+      - name: fuzzersum
+        run: |
+          echo "~~~~ db_map_fuzzer LOGS ~~~~~"
+          tail -20 $GITHUB_WORKSPACE/out/db_map_fuzzer.log | grep "==AddressSanitizer. Thread limit (4194304 threads) exceeded\. Dying\." || echo "skoot"
+          echo "~~~~ db_fuzzer LOGS ~~~~~"
+          tail -20 $GITHUB_WORKSPACE/out/db_fuzzer.log | grep "==AddressSanitizer. Thread limit (4194304 threads) exceeded\. Dying\." || echo "skid"
+          
+      - name: clear s3 bucket
+        run: |
+          mkdir -p $GITHUB_WORKSPACE/down
+          aws s3 rm s3://spdb-github-ci/ --recursive --include "*"
+
+

@@ -1,5 +1,5 @@
 name: Check buck targets and code format
-on: [push, pull_request]
+on: [push, pull_request, workflow_call]
 jobs:
   check:
     name: Check TARGETS file and code format
@@ -12,7 +12,7 @@ jobs:
 
     - name: Fetch from upstream
       run: |
-        git remote add upstream https://github.com/facebook/rocksdb.git && git fetch upstream
+        git remote add upstream https://github.com/speedb-io/speedb.git && git fetch upstream
 
     - name: Where am I
       run: |

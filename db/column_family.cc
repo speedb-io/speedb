@@ -840,7 +840,22 @@ ColumnFamilyData::GetWriteStallConditionAndCause(
     int num_unflushed_memtables, int num_l0_files,
     uint64_t num_compaction_needed_bytes,
     const MutableCFOptions& mutable_cf_options,
-    const ImmutableCFOptions& immutable_cf_options) {
+    const ImmutableCFOptions& /* immutable_cf_options */) {
+  if (num_unflushed_memtables >
+      mutable_cf_options.max_write_buffer_number - 1) {
+    return {WriteStallCondition::kDelayed, WriteStallCause::kMemtableLimit};
+  } else if (!mutable_cf_options.disable_auto_compactions &&
+             num_l0_files > mutable_cf_options.level0_slowdown_writes_trigger) {
+    // the user is responsible for L0 count when disable_auto_compactions is
+    // true.
+    return {WriteStallCondition::kDelayed, WriteStallCause::kL0FileCountLimit};
+  } else {
+    return {WriteStallCondition::kNormal, WriteStallCause::kNone};
+  }
+
+  // The following RocksDB code is preserved here in order to limit conflicts
+  // in future rebases on newer RocksDB versions, but is never reached.
+
   if (num_unflushed_memtables >= mutable_cf_options.max_write_buffer_number) {
     return {WriteStallCondition::kStopped, WriteStallCause::kMemtableLimit};
   } else if (!mutable_cf_options.disable_auto_compactions &&
@@ -852,11 +867,7 @@ ColumnFamilyData::GetWriteStallConditionAndCause(
                  mutable_cf_options.hard_pending_compaction_bytes_limit) {
     return {WriteStallCondition::kStopped,
             WriteStallCause::kPendingCompactionBytes};
-  } else if (mutable_cf_options.max_write_buffer_number > 3 &&
-             num_unflushed_memtables >=
-                 mutable_cf_options.max_write_buffer_number - 1 &&
-             num_unflushed_memtables - 1 >=
-                 immutable_cf_options.min_write_buffer_number_to_merge) {
+  } else if (num_unflushed_memtables >= 2) {
     return {WriteStallCondition::kDelayed, WriteStallCause::kMemtableLimit};
   } else if (!mutable_cf_options.disable_auto_compactions &&
              mutable_cf_options.level0_slowdown_writes_trigger >= 0 &&
@@ -871,6 +882,34 @@ ColumnFamilyData::GetWriteStallConditionAndCause(
             WriteStallCause::kPendingCompactionBytes};
   }
   return {WriteStallCondition::kNormal, WriteStallCause::kNone};
+}
+
+double ColumnFamilyData::CalculateWriteDelayIncrement(
+    bool* needs_flush_speedup) {
+  if (current_ == nullptr) {
+    return 0;
+  }
+
+  const auto* vstorage = current_->storage_info();
+
+  const int extra_memtables = imm()->NumNotFlushed() -
+                              (mutable_cf_options_.max_write_buffer_number - 1);
+  const double memtable_increment =
+      extra_memtables <= 0 ? 0 : pow(2, extra_memtables);
+  if (needs_flush_speedup != nullptr && memtable_increment > 0) {
+    *needs_flush_speedup = true;
+  }
+  // as part of SPDB-570 - dont delay based on L0 when the user disables auto
+  // compactions
+  if (current_->GetMutableCFOptions().disable_auto_compactions) {
+    return memtable_increment;
+  }
+
+  const int extra_l0_ssts = vstorage->NumLevelFiles(0) -
+                            mutable_cf_options_.level0_slowdown_writes_trigger;
+  const double l0_increment = extra_l0_ssts < 0 ? 0 : pow(1.2, extra_l0_ssts);
+
+  return std::max(l0_increment, memtable_increment);
 }
 
 WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
@@ -888,6 +927,22 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
         *ioptions());
     write_stall_condition = write_stall_condition_and_cause.first;
     auto write_stall_cause = write_stall_condition_and_cause.second;
+
+    if (write_stall_condition != WriteStallCondition::kNormal) {
+      const auto delay_increment = CalculateWriteDelayIncrement();
+      ROCKS_LOG_WARN(
+          ioptions_.info_log,
+          "[%s] Stalling writes, L0 files %d, memtables %d, increment %f",
+          name_.c_str(), vstorage->NumLevelFiles(0), imm()->NumNotFlushed(),
+          delay_increment);
+      return write_stall_condition;
+    }
+
+    // NOTE: The following code paths are only taken if `write_stall_condition`
+    // is set to `WriteStallCondition::kNormal`, otherwise we exit early above.
+    // The code is preserved here even though most of it isn't reached (due to
+    // the fact that we only continue here if not write stall condition is set)
+    // in order to limit conflicts in future rebases on newer RocksDB versions.
 
     bool was_stopped = write_controller->IsStopped();
     bool needed_delay = write_controller->NeedsDelay();
@@ -929,6 +984,7 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
           SetupDelay(write_controller, compaction_needed_bytes,
                      prev_compaction_needed_bytes_, was_stopped,
                      mutable_cf_options.disable_auto_compactions);
+
       internal_stats_->AddCFStats(InternalStats::MEMTABLE_LIMIT_SLOWDOWNS, 1);
       ROCKS_LOG_WARN(
           ioptions_.logger,
@@ -1018,7 +1074,9 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
       // If the DB recovers from delay conditions, we reward with reducing
       // double the slowdown ratio. This is to balance the long term slowdown
       // increase signal.
-      if (needed_delay) {
+      // Disabled in SpeeDB because we never enter a stall condition in the
+      // write controller.
+      if (0 && needed_delay) {
         uint64_t write_rate = write_controller->delayed_write_rate();
         write_controller->set_delayed_write_rate(static_cast<uint64_t>(
             static_cast<double>(write_rate) * kDelayRecoverSlowdownRatio));

@@ -3699,6 +3699,7 @@ void DBImpl::InstallSuperVersionAndScheduleWork(
   // newer snapshot created and released frequently, the compaction will be
   // triggered soon anyway.
   bottommost_files_mark_threshold_ = kMaxSequenceNumber;
+
   for (auto* my_cfd : *versions_->GetColumnFamilySet()) {
     bottommost_files_mark_threshold_ = std::min(
         bottommost_files_mark_threshold_,
@@ -3707,6 +3708,7 @@ void DBImpl::InstallSuperVersionAndScheduleWork(
 
   // Whenever we install new SuperVersion, we might need to issue new flushes or
   // compactions.
+  RecalculateWriteRate();
   SchedulePendingCompaction(cfd);
   MaybeScheduleFlushOrCompaction();
 
@@ -3714,6 +3716,30 @@ void DBImpl::InstallSuperVersionAndScheduleWork(
   max_total_in_memory_state_ = max_total_in_memory_state_ - old_memtable_size +
                                mutable_cf_options.write_buffer_size *
                                    mutable_cf_options.max_write_buffer_number;
+}
+
+void DBImpl::RecalculateWriteRate() {
+  double rate_multiplier = 0;
+  bool needs_flush_speedup = false;
+  auto& cfds = *versions_->GetColumnFamilySet();
+  for (auto* my_cfd : cfds) {
+    rate_multiplier =
+        std::max(rate_multiplier,
+                 my_cfd->CalculateWriteDelayIncrement(&needs_flush_speedup));
+  }
+
+  needs_flush_speedup_ = needs_flush_speedup;
+  if (rate_multiplier > 0) {
+    const double delayed_write_rate =
+        mutable_db_options_.delayed_write_rate / rate_multiplier;
+
+    ROCKS_LOG_INFO(immutable_db_options_.info_log,
+                   "Setting up external delay with write rate %" PRIu64 " B/s",
+                   uint64_t(delayed_write_rate));
+    external_delay_.SetDelayWriteRate(delayed_write_rate);
+  } else if (external_delay_.Reset()) {
+    ROCKS_LOG_INFO(immutable_db_options_.info_log, "Resetting external delay");
+  }
 }
 
 // ShouldPurge is called by FindObsoleteFiles when doing a full scan,

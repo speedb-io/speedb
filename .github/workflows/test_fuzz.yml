@@ -114,13 +114,13 @@ jobs:
           
       - name: download db_fuzzer from s3
         run: |
-          md5sum --version
-          md5sum db_fuzzer
           if [ ! -d $GITHUB_WORKSPACE/fuzz/ ]; then
             mkdir -p $GITHUB_WORKSPACE/fuzz/
           fi
           aws s3 cp s3://spdb-github-ci/db_fuzzer $GITHUB_WORKSPACE/fuzz/db_fuzzer
           ls -alFh $GITHUB_WORKSPACE/fuzz
+          md5sum --version
+          md5sum db_fuzzer
 
       - name: dbfuzzer
         run: |
@@ -182,6 +182,8 @@ jobs:
           fi
           aws s3 cp s3://spdb-github-ci/db_map_fuzzer $GITHUB_WORKSPACE/fuzz/db_map_fuzzer
           ls -alFh $GITHUB_WORKSPACE/fuzz
+          md5sum --version
+          md5sum db_map_fuzzer
 
           
       - name: dbmapfuzzer

@@ -60,6 +60,6 @@ jobs:
       - name: clear s3 bucket
         run: |
           mkdir -p $GITHUB_WORKSPACE/down
-          aws s3 rm s3://spdb-github-ci/ --recursive --dryrun --exclude "*" --include "my-folder/*"
+          aws s3 rm s3://spdb-github-ci/ --recursive --include "*"
 
 

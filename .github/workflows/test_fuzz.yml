@@ -204,6 +204,7 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: ubuntu:18.04
+    needs: [db_map_fuzzer, db_fuzzer]
       
     steps:
       - uses: actions/checkout@v3

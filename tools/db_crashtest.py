@@ -112,7 +112,7 @@ default_params = {
     "subcompactions": lambda: random.randint(1, 4),
     "target_file_size_base": 2097152,
     "target_file_size_multiplier": 2,
-    "test_batches_snapshots": lambda: random.randint(0, 1),
+    "test_batches_snapshots": random.randint(0, 1),
     "top_level_index_pinning": lambda: random.randint(0, 3),
     "unpartitioned_pinning": lambda: random.randint(0, 3),
     "use_direct_reads": lambda: random.randint(0, 1),
@@ -533,6 +533,12 @@ def finalize_and_sanitize(src_params):
         dest_params["enable_pipelined_write"] = 0
     if dest_params.get("sst_file_manager_bytes_per_sec", 0) == 0:
         dest_params["sst_file_manager_bytes_per_truncate"] = 0
+    # test_batches_snapshots needs to stay const (either 1 or 0) throught
+    # successive runs. this stops the next check (enable_compaction_filter) 
+    # from switching its value.
+    if (dest_params.get("test_batches_snapshots", 0) == 1 and 
+        dest_params.get("enable_compaction_filter", 0) == 1):
+        dest_params["enable_compaction_filter"] = 0
     if dest_params.get("enable_compaction_filter", 0) == 1:
         # Compaction filter is incompatible with snapshots. Need to avoid taking
         # snapshots, as well as avoid operations that use snapshots for
@@ -543,8 +549,13 @@ def finalize_and_sanitize(src_params):
         dest_params["readpercent"] += dest_params.get("iterpercent", 10)
         dest_params["iterpercent"] = 0
         dest_params["test_batches_snapshots"] = 0
+    # this stops the ("prefix_size") == -1 check from changing the value
+    # of test_batches_snapshots between runs.
+    if (dest_params.get("prefix_size", 0) == -1 and 
+        dest_params.get("test_batches_snapshots", 0) == 1):
+        dest_params["prefix_size"] = 7
     if dest_params.get("prefix_size") == -1:
-        dest_params["readpercent"] += dest_params.get("prefixpercent", 20)
+        dest_params["readpercent"] += dest_params.get("prefixpercent", 0)
         dest_params["prefixpercent"] = 0
         dest_params["test_batches_snapshots"] = 0
     if (dest_params.get("prefix_size") == -1 and

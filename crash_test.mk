@@ -22,6 +22,9 @@ CRASHTEST_PY=$(PYTHON) -u tools/db_crashtest.py --stress_cmd=$(DB_STRESS_CMD)
 	crash_test_with_tiered_storage blackbox_crash_test_with_tiered_storage \
 	whitebox_crash_test_with_tiered_storage \
 
+narrow_crash_test: $(DB_STRESS_CMD)
+	$(CRASHTEST_PY) narrow $(CRASH_TEST_EXT_ARGS)
+
 crash_test: $(DB_STRESS_CMD)
 # Do not parallelize
 	$(CRASHTEST_MAKE) whitebox_crash_test

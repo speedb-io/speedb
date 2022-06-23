@@ -32,6 +32,16 @@ import datetime
 #       default_params < {blackbox,whitebox}_default_params < multiops_txn_params < args
 
 
+supplied_ops = {
+    "writepercent": -1,
+    "delpercent": -1,
+    "prefixpercent": -1,
+    "delrangepercent": -1,
+    "readpercent": -1,
+    "iterpercent": -1,
+    "customopspercent": -1,
+}
+
 default_params = {
     "acquire_snapshot_one_in": 10000,
     "backup_max_size": 100 * 1024 * 1024,
@@ -488,6 +498,81 @@ multiops_wp_txn_params = {
     "create_timestamped_snapshot_one_in": 0,
 }
 
+narrow_ops_per_thread = 50000
+
+narrow_params = {
+    "duration": 1800,
+    "expected_values_dir": lambda: setup_expected_values_dir(),
+    "max_key_len": 8,
+    "value_size_mult": 8,
+    "fail_if_options_file_error": True,
+    "allow_concurrent_memtable_write": True,
+    "reopen": 2,
+    "log2_keys_per_lock": 1,
+    "prefixpercent": 0,
+    "prefix_size": -1,
+    "ops_per_thread": narrow_ops_per_thread,
+    "get_live_files_one_in": narrow_ops_per_thread,
+    "acquire_snapshot_one_in": int(narrow_ops_per_thread / 4),
+    "sync_wal_one_in": int(narrow_ops_per_thread / 2),
+    "verify_db_one_in": int(narrow_ops_per_thread),
+    "use_multiget": lambda: random.choice([0, 0, 0, 1]),
+    "enable_compaction_filter": lambda: random.choice([0, 0, 0, 1]), 
+    "use_multiget": lambda: random.choice([0, 0, 0, 1]), 
+    "compare_full_db_state_snapshot": lambda: random.choice([0, 0, 0, 1]), 
+    "use_merge": lambda: random.choice([0, 0, 0, 1]), 
+    "nooverwritepercent": random.choice([0, 5, 20, 30, 40, 50, 95]), 
+    "seed": int(time.time() * 1000000) & 0xffffffff,
+
+    # below are params that are incompatible with current settings.
+    "clear_column_family_one_in": 0,
+    "get_sorted_wal_files_one_in": 0,
+    "get_current_wal_file_one_in": 0,
+    "continuous_verification_interval": 0,
+    "destroy_db_initially": 0,
+    "progress_reports": 0,
+}
+
+def store_ops_supplied(params):
+    for k in supplied_ops:
+        supplied_ops[k] = params.get(k, -1)
+    
+# make sure sum of ops == 100.
+# value of -1 means that the op should be initialized. 
+def randomize_operation_type_percentages(src_params):
+    num_to_initialize = sum(1 for v in supplied_ops.values() if v == -1)
+    
+    params = {k: (v if v != -1 else 0) for k, v in supplied_ops.items()}
+
+    ops_percent_sum = sum(params.get(k, 0) for k in supplied_ops)
+    current_max = 100 - ops_percent_sum
+    if ops_percent_sum > 100 or (num_to_initialize == 0 and ops_percent_sum != 100):
+        raise ValueError("Error - Sum of ops percents should be 100")
+    
+    if num_to_initialize != 0:        
+        for k , v in supplied_ops.items():
+            if v != -1:
+                continue
+            
+            if num_to_initialize == 1:
+                params[k] = current_max
+                break
+
+            if k == "writepercent" and current_max > 60:
+                params["writepercent"] = random.randint(20, 60)
+            elif k == "delpercent" and current_max > 35:
+                params["delpercent"] = random.randint(0, current_max - 35)
+            elif k == "prefixpercent" and current_max >= 10:
+                params["prefixpercent"] = random.randint(0, 10)
+            elif k == "delrangepercent" and current_max >= 5:
+                params["delrangepercent"] = random.randint(0, 5)
+            else:
+                params[k] = random.randint(0, current_max)
+            
+            current_max = current_max - params[k]
+            num_to_initialize -= 1
+
+    src_params.update(params)
 
 def finalize_and_sanitize(src_params):
     dest_params = {k: v() if callable(v) else v for (k, v) in src_params.items()}
@@ -719,6 +804,8 @@ def execute_cmd(cmd, timeout):
                    "exitcode=%d, signal=%s\n") % (
                     str(datetime.datetime.now()), child.pid, child.returncode,
                     signal.Signals(-child.returncode).name)
+            print(outs)
+            print(errs, file=sys.stderr)
             print(msg)
             raise SystemExit(msg)
         print("[%s] WARNING: db_stress (pid=%d) ended before kill: exitcode=%d\n"
@@ -740,6 +827,55 @@ def copy_tree_and_remove_old(counter, dbname):
     if counter > 1:
         shutil.rmtree(old_db, True)
 
+def gen_narrow_cmd_params(args):
+    params = {}
+    params.update(narrow_params)
+    # add these to avoid a key error in finalize_and_sanitize
+    params["mmap_read"] = 0
+    params["use_direct_io_for_flush_and_compaction"] = 0
+    params["partition_filters"] = 0
+    params["use_direct_reads"] = 0
+    params["user_timestamp_size"] = 0
+    params["ribbon_starting_level"] = 0
+
+    for k, v in vars(args).items():
+        if v is not None:
+            params[k] = v
+            
+    return params
+
+def narrow_crash_main(args, unknown_args):
+    cmd_params = gen_narrow_cmd_params(args)
+    dbname = get_dbname('narrow')
+    exit_time = time.time() + cmd_params['duration']
+    
+    store_ops_supplied(cmd_params)
+
+    print("Running narrow-crash-test\n")
+    
+    counter = 0
+    
+    while time.time() < exit_time:
+        randomize_operation_type_percentages(cmd_params)
+        cmd = gen_cmd(dict(cmd_params, **{'db': dbname}), unknown_args)
+
+        hit_timeout, retcode, outs, errs = execute_cmd(cmd, cmd_params['duration'])
+        copy_tree_and_remove_old(counter, dbname)
+        counter += 1
+
+        for line in errs.splitlines():
+            if line and not line.startswith('WARNING'):
+                run_had_errors = True
+                print('stderr has error message:')
+                print('***' + line + '***')
+        
+        if retcode != 0:
+            raise SystemExit('TEST FAILED. See kill option and exit code above!!!\n')
+
+        time.sleep(2)  # time to stabilize before the next run
+
+    shutil.rmtree(dbname, True)
+    
 # This script runs and kills db_stress multiple times. It checks consistency
 # in case of unsafe crashes in RocksDB.
 def blackbox_crash_main(args, unknown_args):
@@ -991,7 +1127,7 @@ def main():
         description="This script runs and kills \
         db_stress multiple times"
     )
-    parser.add_argument("test_type", choices=["blackbox", "whitebox"])
+    parser.add_argument("test_type", choices=["blackbox", "whitebox", "narrow"])
     parser.add_argument("--simple", action="store_true")
     parser.add_argument("--cf_consistency", action="store_true")
     parser.add_argument("--txn", action="store_true")
@@ -1012,6 +1148,8 @@ def main():
         + list(whitebox_simple_default_params.items())
         + list(blob_params.items())
         + list(ts_params.items())
+        + list(supplied_ops.items())
+        + list(narrow_params.items())
         + list(multiops_txn_default_params.items())
         + list(multiops_wc_txn_params.items())
         + list(multiops_wp_txn_params.items())
@@ -1045,6 +1183,8 @@ def main():
         blackbox_crash_main(args, unknown_args)
     if args.test_type == "whitebox":
         whitebox_crash_main(args, unknown_args)
+    if args.test_type == 'narrow':
+        narrow_crash_main(args, unknown_args)
     # Only delete the `expected_values_dir` if test passes
     if expected_values_dir is not None:
         shutil.rmtree(expected_values_dir)

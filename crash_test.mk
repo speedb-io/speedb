@@ -24,6 +24,9 @@ CRASHTEST_PY=$(PYTHON) -u tools/db_crashtest.py --stress_cmd=$(DB_STRESS_CMD) --
 	whitebox_crash_test_with_optimistic_txn \
 	blackbox_crash_test_with_optimistic_txn \
 
+narrow_crash_test: $(DB_STRESS_CMD)
+	$(CRASHTEST_PY) narrow $(CRASH_TEST_EXT_ARGS)
+
 crash_test: $(DB_STRESS_CMD)
 # Do not parallelize
 	$(CRASHTEST_MAKE) whitebox_crash_test

@@ -236,18 +236,20 @@ class SimpleConfigurable : public Configurable {
                     dynamic_unsafe_offsetof(so, so.b), OptionType::kBoolean,
                     OptionVerificationType::kNormal, OptionTypeFlags::kNone});
     simple_option_info.emplace(
-        "unique", OptionTypeInfo::AsCustomUniquePtr<TestCustomizable>(
-                      dynamic_unsafe_offsetof(so, so.cu),
-                      OptionVerificationType::kNormal, OptionTypeFlags::kNone));
+        "unique",
+        OptionTypeInfo::AsCustomUniquePtr<TestCustomizable>(
+            dynamic_unsafe_offsetof(so, so.cu), OptionVerificationType::kNormal,
+            OptionTypeFlags::kAllowNull));
     simple_option_info.emplace(
-        "shared", OptionTypeInfo::AsCustomSharedPtr<TestCustomizable>(
-                      dynamic_unsafe_offsetof(so, so.cs),
-                      OptionVerificationType::kNormal, OptionTypeFlags::kNone));
+        "shared",
+        OptionTypeInfo::AsCustomSharedPtr<TestCustomizable>(
+            dynamic_unsafe_offsetof(so, so.cs), OptionVerificationType::kNormal,
+            OptionTypeFlags::kAllowNull));
     simple_option_info.emplace(
         "pointer",
         OptionTypeInfo::AsCustomRawPtr<TestCustomizable>(
             dynamic_unsafe_offsetof(so, so.cp), OptionVerificationType::kNormal,
-            OptionTypeFlags::kNone));
+            OptionTypeFlags::kAllowNull));
 #endif  // ROCKSDB_LITE
     RegisterOptions(&simple_, &simple_option_info);
   }

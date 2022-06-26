@@ -136,6 +136,7 @@ struct MutableDBOptions {
   bool strict_bytes_per_sync;
   size_t compaction_readahead_size;
   int max_background_flushes;
+  bool use_spdb_query_builder;
 };
 
 #ifndef ROCKSDB_LITE

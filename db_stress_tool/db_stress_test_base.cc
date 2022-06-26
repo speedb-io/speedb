@@ -2411,6 +2411,7 @@ void StressTest::Open() {
     options_.max_subcompactions = static_cast<uint32_t>(FLAGS_subcompactions);
     options_.allow_concurrent_memtable_write =
         FLAGS_allow_concurrent_memtable_write;
+    options_.use_spdb_query_builder = FLAGS_use_spdb_query_builder;
     options_.experimental_mempurge_threshold =
         FLAGS_experimental_mempurge_threshold;
     options_.periodic_compaction_seconds = FLAGS_periodic_compaction_seconds;

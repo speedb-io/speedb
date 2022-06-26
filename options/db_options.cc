@@ -129,6 +129,10 @@ static std::unordered_map<std::string, OptionTypeInfo>
          {offsetof(struct MutableDBOptions, max_background_flushes),
           OptionType::kInt, OptionVerificationType::kNormal,
           OptionTypeFlags::kMutable}},
+        {"use_spdb_query_builder",
+         {offsetof(struct MutableDBOptions, use_spdb_query_builder),
+          OptionType::kBoolean, OptionVerificationType::kNormal,
+          OptionTypeFlags::kMutable}},
 };
 
 static std::unordered_map<std::string, OptionTypeInfo>
@@ -961,7 +965,8 @@ MutableDBOptions::MutableDBOptions()
       wal_bytes_per_sync(0),
       strict_bytes_per_sync(false),
       compaction_readahead_size(0),
-      max_background_flushes(-1) {}
+      max_background_flushes(-1),
+      use_spdb_query_builder(false) {}
 
 MutableDBOptions::MutableDBOptions(const DBOptions& options)
     : max_background_jobs(options.max_background_jobs),
@@ -981,7 +986,8 @@ MutableDBOptions::MutableDBOptions(const DBOptions& options)
       wal_bytes_per_sync(options.wal_bytes_per_sync),
       strict_bytes_per_sync(options.strict_bytes_per_sync),
       compaction_readahead_size(options.compaction_readahead_size),
-      max_background_flushes(options.max_background_flushes) {}
+      max_background_flushes(options.max_background_flushes),
+      use_spdb_query_builder(options.use_spdb_query_builder) {}
 
 void MutableDBOptions::Dump(Logger* log) const {
   ROCKS_LOG_HEADER(log, "            Options.max_background_jobs: %d",
@@ -992,40 +998,34 @@ void MutableDBOptions::Dump(Logger* log) const {
                    max_subcompactions);
   ROCKS_LOG_HEADER(log, "            Options.avoid_flush_during_shutdown: %d",
                    avoid_flush_during_shutdown);
-  ROCKS_LOG_HEADER(
-      log, "          Options.writable_file_max_buffer_size: %" ROCKSDB_PRIszt,
-      writable_file_max_buffer_size);
+  ROCKS_LOG_HEADER(log, "          Options.writable_file_max_buffer_size: %" ROCKSDB_PRIszt,
+                   writable_file_max_buffer_size);
   ROCKS_LOG_HEADER(log, "            Options.delayed_write_rate : %" PRIu64,
                    delayed_write_rate);
   ROCKS_LOG_HEADER(log, "            Options.max_total_wal_size: %" PRIu64,
                    max_total_wal_size);
-  ROCKS_LOG_HEADER(
-      log, "            Options.delete_obsolete_files_period_micros: %" PRIu64,
-      delete_obsolete_files_period_micros);
+  ROCKS_LOG_HEADER(log, "            Options.delete_obsolete_files_period_micros: %" PRIu64,
+                   delete_obsolete_files_period_micros);
   ROCKS_LOG_HEADER(log, "                  Options.stats_dump_period_sec: %u",
                    stats_dump_period_sec);
   ROCKS_LOG_HEADER(log, "                Options.stats_persist_period_sec: %d",
                    stats_persist_period_sec);
-  ROCKS_LOG_HEADER(
-      log,
-      "                Options.stats_history_buffer_size: %" ROCKSDB_PRIszt,
-      stats_history_buffer_size);
+  ROCKS_LOG_HEADER(log, "                Options.stats_history_buffer_size: %" ROCKSDB_PRIszt,
+                   stats_history_buffer_size);
   ROCKS_LOG_HEADER(log, "                         Options.max_open_files: %d",
                    max_open_files);
-  ROCKS_LOG_HEADER(log,
-                   "                         Options.bytes_per_sync: %" PRIu64,
+  ROCKS_LOG_HEADER(log, "                         Options.bytes_per_sync: %" PRIu64,
                    bytes_per_sync);
-  ROCKS_LOG_HEADER(log,
-                   "                     Options.wal_bytes_per_sync: %" PRIu64,
+  ROCKS_LOG_HEADER(log, "                     Options.wal_bytes_per_sync: %" PRIu64,
                    wal_bytes_per_sync);
-  ROCKS_LOG_HEADER(log,
-                   "                  Options.strict_bytes_per_sync: %d",
+  ROCKS_LOG_HEADER(log, "                  Options.strict_bytes_per_sync: %d",
                    strict_bytes_per_sync);
-  ROCKS_LOG_HEADER(log,
-                   "      Options.compaction_readahead_size: %" ROCKSDB_PRIszt,
+  ROCKS_LOG_HEADER(log, "      Options.compaction_readahead_size: %" ROCKSDB_PRIszt,
                    compaction_readahead_size);
   ROCKS_LOG_HEADER(log, "                 Options.max_background_flushes: %d",
-                          max_background_flushes);
+                   max_background_flushes);
+  ROCKS_LOG_HEADER(log, "                 Options.use_spdb_query_builder: %d",
+                   use_spdb_query_builder);
 }
 
 #ifndef ROCKSDB_LITE

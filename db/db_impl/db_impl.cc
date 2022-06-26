@@ -51,7 +51,7 @@
 #include "db/table_properties_collector.h"
 #include "db/transaction_log_impl.h"
 #include "db/version_set.h"
-#include "db/write_batch_internal.h"
+#include "db/write_batch_internal.
 #include "db/write_callback.h"
 #include "env/unique_id_gen.h"
 #include "file/file_util.h"
@@ -1657,7 +1657,8 @@ InternalIterator* DBImpl::NewInternalIterator(const ReadOptions& read_options,
   MergeIteratorBuilder merge_iter_builder(
       &cfd->internal_comparator(), arena,
       !read_options.total_order_seek &&
-          super_version->mutable_cf_options.prefix_extractor != nullptr);
+          super_version->mutable_cf_options.prefix_extractor != nullptr, 
+          mutable_db_options_.use_spdb_query_builder);
   // Collect iterator for mutable mem
   merge_iter_builder.AddIterator(
       super_version->mem->NewIterator(read_options, arena));

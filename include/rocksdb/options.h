@@ -1119,6 +1119,13 @@ struct DBOptions {
   // Default: false
   bool skip_checking_sst_file_sizes_on_db_open = false;
 
+  // If true, uses an optimized range query builder. 
+  // During builder we insert in a level only SST that in the query range
+  // This is an experimental feature.
+  //
+  // Default: false
+  bool use_spdb_query_builder = false;
+
   // Recovery mode to control the consistency while replaying WAL
   // Default: kPointInTimeRecovery
   WALRecoveryMode wal_recovery_mode = WALRecoveryMode::kPointInTimeRecovery;

@@ -56,7 +56,7 @@ jobs:
            bash -xv prepfuz.sh
            mkdir -p $GITHUB_WORKSPACE/out/
            ASAN_OPTIONS=detect_odr_violation=0 $GITHUB_WORKSPACE/fuzz/${{ matrix.name }} 2>&1 | sudo tee $GITHUB_WORKSPACE/out/${{ matrix.name }}.log
-           tail -20 $GITHUB_WORKSPACE/out/${{ matrix.name }} | grep "==AddressSanitizer. Thread limit (4194304 threads) exceeded\. Dying\." || echo "${{ matrix.name }} failed!"
+           tail -20 $GITHUB_WORKSPACE/out/${{ matrix.name }}.log | grep "==AddressSanitizer. Thread limit (4194304 threads) exceeded\. Dying\." || echo "${{ matrix.name }} failed!"
            
       - name: Copy ${{ matrix.name }} logs to S3
         run: |

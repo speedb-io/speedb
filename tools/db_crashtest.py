@@ -184,6 +184,7 @@ default_params = {
     "data_block_index_type": random.randint(0, 1),
     "data_block_hash_table_util_ratio": random.randint(0, 100) / 100.0,
     "customopspercent": 0,
+    "use_spdb_query_builder": lambda: random.choice([0, 1]),
 }
 
 _TEST_DIR_ENV_VAR = 'TEST_TMPDIR'

@@ -2,6 +2,7 @@ name: new_fuzz
 
 on:
   workflow_dispatch:
+  workflow_call:
 
 jobs:
   fuzz:
@@ -55,12 +56,12 @@ jobs:
            chmod +x prepfuz.sh
            bash -xv prepfuz.sh
            mkdir -p $GITHUB_WORKSPACE/out/
-           ASAN_OPTIONS=detect_odr_violation=0 $GITHUB_WORKSPACE/fuzz/${{ matrix.name }} 2>&1 | sudo tee $GITHUB_WORKSPACE/out/${{ matrix.name }}.log
-           tail -20 $GITHUB_WORKSPACE/out/${{ matrix.name }}.log | grep "==AddressSanitizer. Thread limit (4194304 threads) exceeded\. Dying\." || echo "${{ matrix.name }} failed!"
+           ASAN_OPTIONS=detect_odr_violation=0 $GITHUB_WORKSPACE/fuzz/${{ matrix.name }} 2>&1 | sudo tee $GITHUB_WORKSPACE/out/${{ matrix.name }}.log-$GITHUB_SHA
+           tail -20 $GITHUB_WORKSPACE/out/${{ matrix.name }}.log-$GITHUB_SHA | grep "==AddressSanitizer. Thread limit (4194304 threads) exceeded\. Dying\." || echo "${{ matrix.name }} failed!"
            
       - name: Copy ${{ matrix.name }} logs to S3
         run: |
-          aws s3 cp $GITHUB_WORKSPACE/out/${{ matrix.name }}.log s3://spdb-github-ci/
+          aws s3 cp $GITHUB_WORKSPACE/out/${{ matrix.name }}.log-$GITHUB_SHA s3://spdb-github-ci/
     
   fuzzer_sum:
     runs-on: ubuntu-latest

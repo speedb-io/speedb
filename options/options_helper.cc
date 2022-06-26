@@ -133,6 +133,7 @@ DBOptions BuildDBOptions(const ImmutableDBOptions& immutable_db_options,
   options.listeners = immutable_db_options.listeners;
   options.enable_thread_tracking = immutable_db_options.enable_thread_tracking;
   options.delayed_write_rate = mutable_db_options.delayed_write_rate;
+  options.use_dynamic_delay = mutable_db_options.use_dynamic_delay;
   options.enable_pipelined_write = immutable_db_options.enable_pipelined_write;
   options.unordered_write = immutable_db_options.unordered_write;
   options.allow_concurrent_memtable_write =

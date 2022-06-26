@@ -1016,6 +1016,12 @@ struct DBOptions {
   // Dynamically changeable through SetDBOptions() API.
   uint64_t delayed_write_rate = 0;
 
+  // use speedbs external dynamic delay
+  // Default: true
+  //
+  // Dynamically changeable through SetDBOptions() API.
+  bool use_dynamic_delay = true;
+
   // By default, a single write thread queue is maintained. The thread gets
   // to the head of the queue becomes write batch group leader and responsible
   // for writing to WAL and memtable for the batch group.

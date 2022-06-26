@@ -2275,12 +2275,21 @@ Status DBImpl::WaitUntilFlushWouldNotStallWrites(ColumnFamilyData* cfd,
       // check whether one extra immutable memtable or an extra L0 file would
       // cause write stalling mode to be entered. It could still enter stall
       // mode due to pending compaction bytes, but that's less common
-      write_stall_condition = ColumnFamilyData::GetWriteStallConditionAndCause(
-                                  cfd->imm()->NumNotFlushed() + 1,
-                                  vstorage->l0_delay_trigger_count() + 1,
-                                  vstorage->estimated_compaction_needed_bytes(),
-                                  mutable_cf_options, *cfd->ioptions())
-                                  .first;
+      if (mutable_db_options_.use_dynamic_delay) {
+        write_stall_condition =
+            ColumnFamilyData::DynamicGetWriteStallConditionAndCause(
+                cfd->imm()->NumNotFlushed() + 1,
+                vstorage->l0_delay_trigger_count() + 1, mutable_cf_options)
+                .first;
+      } else {
+        write_stall_condition =
+            ColumnFamilyData::GetWriteStallConditionAndCause(
+                cfd->imm()->NumNotFlushed() + 1,
+                vstorage->l0_delay_trigger_count() + 1,
+                vstorage->estimated_compaction_needed_bytes(),
+                mutable_cf_options, *cfd->ioptions())
+                .first;
+      }
     } while (write_stall_condition != WriteStallCondition::kNormal);
   }
   return Status::OK();
@@ -3692,7 +3701,7 @@ void DBImpl::InstallSuperVersionAndScheduleWork(
   if (UNLIKELY(sv_context->new_superversion == nullptr)) {
     sv_context->NewSuperVersion();
   }
-  cfd->InstallSuperVersion(sv_context, mutable_cf_options);
+  cfd->InstallSuperVersion(sv_context, mutable_cf_options, mutable_db_options_);
 
   // There may be a small data race here. The snapshot tricking bottommost
   // compaction may already be released here. But assuming there will always be
@@ -3708,7 +3717,9 @@ void DBImpl::InstallSuperVersionAndScheduleWork(
 
   // Whenever we install new SuperVersion, we might need to issue new flushes or
   // compactions.
-  RecalculateWriteRate();
+  if (mutable_db_options_.use_dynamic_delay) {
+    RecalculateWriteRate();
+  }
   SchedulePendingCompaction(cfd);
   MaybeScheduleFlushOrCompaction();
 

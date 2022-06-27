@@ -219,6 +219,7 @@ default_params = {
     "compare_full_db_state_snapshot": lambda: random.choice([0, 0, 0, 1]),
     "num_iterations": lambda: random.randint(0, 100),
     "sync_wal_one_in": 100000,
+    "customopspercent": 0,
 }
 
 _TEST_DIR_ENV_VAR = "TEST_TMPDIR"

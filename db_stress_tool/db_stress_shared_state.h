@@ -414,7 +414,7 @@ struct ThreadState {
     // The value of the Get
     std::string value;
     // optional state of all keys in the db
-    std::vector<bool>* key_vec;
+    std::unique_ptr<std::vector<bool>> key_vec;
 
     std::string timestamp;
   };

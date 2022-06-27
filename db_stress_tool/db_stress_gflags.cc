@@ -99,7 +99,7 @@ DEFINE_int32(lock_wal_one_in, 1000000,
 DEFINE_bool(test_cf_consistency, false,
             "If set, runs the stress test dedicated to verifying writes to "
             "multiple column families are consistent. Setting this implies "
-            "`atomic_flush=true` is set true if `disable_wal=false`.\n");
+            "`atomic_flush=true` is set true if `disable_wal=true`.\n");
 
 DEFINE_bool(test_multi_ops_txns, false,
             "If set, runs stress test dedicated to verifying multi-ops "

@@ -26,7 +26,7 @@ jobs:
         df -h
         apk add git bash python3 py3-pip clang clang-extra-tools shellcheck gcc g++ cmake ninja ccache \
         openjdk10 gflags-dev snappy-dev lz4-dev bzip2-dev zstd-dev zlib-dev linux-headers openssh-client tar
-        python3 -m pip install lint-diffs flake8
+        python3 -m pip install lint-diffs flake8 util-linux
     - name: Checkout
       uses: actions/checkout@v2 
       
@@ -50,6 +50,7 @@ jobs:
       
     - name: ${{ matrix.name }}
       run: |
+        lscpu
         df -h
         ls /etc/apk/world
         git config --global --add safe.directory $GITHUB_WORKSPACE

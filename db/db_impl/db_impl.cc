@@ -1540,9 +1540,9 @@ void DBImpl::SchedulePurge() {
   mutex_.AssertHeld();
   assert(opened_successfully_);
 
-  // Purge operations are put into High priority queue
+  // Purge operations are put into the low priority queue
   bg_purge_scheduled_++;
-  env_->Schedule(&DBImpl::BGWorkPurge, this, Env::Priority::HIGH, nullptr);
+  env_->Schedule(&DBImpl::BGWorkPurge, this, Env::Priority::LOW, nullptr);
 }
 
 void DBImpl::BackgroundCallPurge() {

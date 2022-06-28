@@ -542,7 +542,9 @@ ColumnFamilyData::ColumnFamilyData(
       prev_compaction_needed_bytes_(0),
       allow_2pc_(db_options.allow_2pc),
       last_memtable_id_(0),
-      db_paths_registered_(false) {
+      db_paths_registered_(false),
+      terminate_switch_memtable_(false),
+      switch_mem_(nullptr) {
   if (id_ != kDummyColumnFamilyDataId) {
     // TODO(cc): RegisterDbPaths can be expensive, considering moving it
     // outside of this constructor which might be called with db mutex held.
@@ -612,11 +614,44 @@ ColumnFamilyData::ColumnFamilyData(
   }
 
   RecalculateWriteStallConditions(mutable_cf_options_);
+  switch_memtable_thread_ =
+      std::thread(&ColumnFamilyData::PrepareSwitchMemTable, this);
+}
+
+void ColumnFamilyData::PrepareSwitchMemTable() {
+  for (;;) {
+    {
+      std::unique_lock<std::mutex> lck(switch_memtable_thread_mutex_);
+      while (switch_mem_.load(std::memory_order_acquire) != nullptr) {
+        if (terminate_switch_memtable_) {
+          return;
+        }
+
+        switch_memtable_thread_cv_.wait(lck);
+      }
+    }
+
+    // Construct new memtable with an empty initial sequence
+    switch_mem_.store(ConstructNewMemtable(mutable_cf_options_, 0, true),
+                      std::memory_order_release);
+  }
 }
 
 // DB mutex held
 ColumnFamilyData::~ColumnFamilyData() {
   assert(refs_.load(std::memory_order_relaxed) == 0);
+  {
+    std::unique_lock<std::mutex> lck(switch_memtable_thread_mutex_);
+    terminate_switch_memtable_ = true;
+  }
+  switch_memtable_thread_cv_.notify_one();
+  switch_memtable_thread_.join();
+
+  const MemTable* memtable = switch_mem_.exchange(nullptr);
+  if (memtable != nullptr) {
+    delete memtable;
+  }
+
   // remove from linked list
   auto prev = prev_;
   auto next = next_;
@@ -1059,10 +1094,30 @@ uint64_t ColumnFamilyData::GetLiveSstFilesSize() const {
   return current_->GetSstFilesSize();
 }
 
+MemTable* ColumnFamilyData::GetSwitchMemtable(SequenceNumber sn) {
+  MemTable* switch_mem = nullptr;
+
+  {
+    std::unique_lock<std::mutex> lck(switch_memtable_thread_mutex_);
+    switch_mem = switch_mem_.exchange(nullptr, std::memory_order_release);
+  }
+  switch_memtable_thread_cv_.notify_one();
+
+  if (switch_mem == nullptr) {
+    // No point in suspending, just construct the memtable here
+    switch_mem = ConstructNewMemtable(mutable_cf_options_, sn, false);
+  } else {
+    switch_mem->Activate(sn);
+  }
+
+  return switch_mem;
+}
+
 MemTable* ColumnFamilyData::ConstructNewMemtable(
-    const MutableCFOptions& mutable_cf_options, SequenceNumber earliest_seq) {
+    const MutableCFOptions& mutable_cf_options, SequenceNumber earliest_seq,
+    bool pending) {
   return new MemTable(internal_comparator_, ioptions_, mutable_cf_options,
-                      write_buffer_manager_, earliest_seq, id_);
+                      write_buffer_manager_, earliest_seq, id_, pending);
 }
 
 void ColumnFamilyData::CreateNewMemtable(

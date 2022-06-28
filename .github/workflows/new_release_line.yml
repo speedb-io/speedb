@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       new_branch_major:
-        description: 'New branch Major'
+        description: 'Next release Major version (leave empty for auto-increment)'
       new_branch_minor:
-        description: 'New branch Minor'
+        description: 'Next release Minor version (leave empty for auto-increment)'
 
 
 jobs:

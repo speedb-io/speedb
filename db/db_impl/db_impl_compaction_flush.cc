@@ -2661,7 +2661,7 @@ void DBImpl::BGWorkBottomCompaction(void* arg) {
 }
 
 void DBImpl::BGWorkPurge(void* db) {
-  IOSTATS_SET_THREAD_POOL_ID(Env::Priority::HIGH);
+  IOSTATS_SET_THREAD_POOL_ID(Env::Priority::LOW);
   TEST_SYNC_POINT("DBImpl::BGWorkPurge:start");
   reinterpret_cast<DBImpl*>(db)->BackgroundCallPurge();
   TEST_SYNC_POINT("DBImpl::BGWorkPurge:end");

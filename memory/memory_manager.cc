@@ -235,6 +235,16 @@ SpdbMemoryManager *NewSpdbMemoryManager(
   return new SpdbMemoryManager(options);
 }
 
+void OptimizeForSpdbMemoryManager(Options &options) {
+  // make sure the mem manager is the sole responsible for flushes
+  if (options.write_buffer_size == 0)
+    options.write_buffer_size = options.db_write_buffer_size;
+  options.max_write_buffer_number =
+      (options.db_write_buffer_size / options.write_buffer_size + 1) * 2;
+  options.min_write_buffer_number_to_merge =
+      options.max_write_buffer_number / 2;
+}
+
 DelayEnforcer::DelayEnforcer(std::shared_ptr<SystemClock> clock,
                              size_t delayed_write_rate,
                              size_t max_delay_time_micros)

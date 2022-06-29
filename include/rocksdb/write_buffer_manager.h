@@ -283,4 +283,7 @@ class SpdbMemoryManager : public WriteBufferManager {
   void FlushLoop();
   void WakeUpFlush();
 };
+
+struct Options;
+void OptimizeForSpdbMemoryManager(Options &options);
 };

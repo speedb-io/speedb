@@ -3860,17 +3860,6 @@ class Benchmark {
 
     options.env = FLAGS_env;
     options.max_open_files = FLAGS_open_files;
-    if (FLAGS_use_spdb_memory_manager) {
-      SpdbMemoryManagerOptions memopt(cache_, options.env->GetSystemClock());
-      if (FLAGS_db_write_buffer_size) {
-        memopt.dirty_data_size = FLAGS_db_write_buffer_size;
-      }
-      options.spdb_memory_manager.reset(new SpdbMemoryManager(memopt));
-    } else if (FLAGS_cost_write_buffer_to_cache ||
-               FLAGS_db_write_buffer_size != 0) {
-      options.write_buffer_manager.reset(
-          new WriteBufferManager(FLAGS_db_write_buffer_size, cache_));
-    }
 
     options.arena_block_size = FLAGS_arena_block_size;
     options.write_buffer_size = FLAGS_write_buffer_size;
@@ -3885,6 +3874,32 @@ class Benchmark {
     options.max_background_compactions = FLAGS_max_background_compactions;
     options.max_subcompactions = static_cast<uint32_t>(FLAGS_subcompactions);
     options.max_background_flushes = FLAGS_max_background_flushes;
+    if (FLAGS_use_spdb_memory_manager) {
+      SpdbMemoryManagerOptions memopt(cache_, options.env->GetSystemClock());
+
+      if (FLAGS_db_write_buffer_size) {
+        memopt.dirty_data_size = FLAGS_db_write_buffer_size;
+      }
+      if (options.max_background_flushes) {
+        memopt.n_parallel_flushes = options.max_background_flushes;
+      } else {
+        options.max_background_flushes = memopt.n_parallel_flushes;
+      }
+
+      if (options.max_background_jobs != 0 &&
+          options.max_background_jobs < options.max_background_flushes) {
+        options.max_background_jobs = options.max_background_flushes * 2;
+      }
+
+      options.db_write_buffer_size = memopt.dirty_data_size;
+      options.spdb_memory_manager.reset(new SpdbMemoryManager(memopt));
+      OptimizeForSpdbMemoryManager(options);
+    } else if (FLAGS_cost_write_buffer_to_cache ||
+               FLAGS_db_write_buffer_size != 0) {
+      options.write_buffer_manager.reset(
+          new WriteBufferManager(FLAGS_db_write_buffer_size, cache_));
+    }
+
     options.compaction_style = FLAGS_compaction_style_e;
     options.compaction_pri = FLAGS_compaction_pri_e;
     options.allow_mmap_reads = FLAGS_mmap_read;

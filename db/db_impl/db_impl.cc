@@ -184,6 +184,7 @@ DBImpl::DBImpl(const DBOptions& options, const std::string& dbname,
       total_log_size_(0),
       is_snapshot_supported_(true),
       write_buffer_manager_(immutable_db_options_.write_buffer_manager.get()),
+      spdb_memory_manager_(immutable_db_options_.spdb_memory_manager.get()),
       write_thread_(immutable_db_options_),
       nonmem_write_thread_(immutable_db_options_),
       write_controller_(mutable_db_options_.delayed_write_rate),
@@ -2781,9 +2782,8 @@ Status DBImpl::CreateColumnFamilyImpl(const ColumnFamilyOptions& cf_options,
       s = cfd->AddDirectories(&dummy_created_dirs);
       if (immutable_db_options_.spdb_memory_manager.get() != nullptr) {
         cfd->SetMemoryClient(immutable_db_options_.spdb_memory_manager.get(),
-                              this);
+                             this);
       }
-      
     }
     if (s.ok()) {
       single_column_family_mode_ = false;

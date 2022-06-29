@@ -61,16 +61,15 @@ DBOptions SanitizeOptions(const std::string& dbname, const DBOptions& src,
       result.info_log = nullptr;
     }
   }
-   
+
   if (result.spdb_memory_manager) {
     result.write_buffer_manager = result.spdb_memory_manager;
-  } else { 
+  } else {
     if (!result.write_buffer_manager) {
       result.write_buffer_manager.reset(
           new WriteBufferManager(result.db_write_buffer_size));
     }
   }
-
 
   if (!result.write_buffer_manager) {
     result.write_buffer_manager.reset(

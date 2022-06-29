@@ -814,7 +814,7 @@ Status FlushJob::WriteLevel0Table() {
     db_mutex_->Unlock();
     if (cfd_->MemoryManager())
       cfd_->MemoryManager()->FlushStarted(total_memory_usage);
-    
+
     if (log_buffer_) {
       log_buffer_->FlushBufferToLog();
     }

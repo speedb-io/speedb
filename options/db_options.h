@@ -60,7 +60,7 @@ struct ImmutableDBOptions {
   double experimental_mempurge_threshold;
   size_t db_write_buffer_size;
   std::shared_ptr<WriteBufferManager> write_buffer_manager;
-  std::shared_ptr<SpdbMemoryManager>  spdb_memory_manager; 
+  std::shared_ptr<SpdbMemoryManager> spdb_memory_manager;
   DBOptions::AccessHint access_hint_on_compaction_start;
   size_t random_access_max_buffer_size;
   bool use_adaptive_mutex;

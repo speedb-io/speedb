@@ -155,7 +155,7 @@ void DBImpl::InitiateMemoryManagerFlushRequest(ColumnFamilyData* cfd) {
       "[%s] write buffer manager flush started current usage %lu out of %lu",
       cfd->GetName().c_str(), cfd->write_buffer_mgr()->memory_usage(),
       cfd->write_buffer_mgr()->buffer_size());
-  
+
   flush_options.allow_write_stall = true;
   flush_options.wait = false;
   flush_options.force_flush_mutable_memtable = false;
@@ -167,11 +167,11 @@ void DBImpl::InitiateMemoryManagerFlushRequest(ColumnFamilyData* cfd) {
     s = FlushMemTable(cfd, flush_options, FlushReason::kWriteBufferManager);
   }
 
-  ROCKS_LOG_INFO(immutable_db_options_.info_log,
-                 "[%s] write buffer manager intialize flush finished, status: %s\n",
-                 cfd->GetName().c_str(), s.ToString().c_str());
+  ROCKS_LOG_INFO(
+      immutable_db_options_.info_log,
+      "[%s] write buffer manager intialize flush finished, status: %s\n",
+      cfd->GetName().c_str(), s.ToString().c_str());
 }
-
 
 Status DBImpl::FlushMemTableToOutputFile(
     ColumnFamilyData* cfd, const MutableCFOptions& mutable_cf_options,
@@ -2018,7 +2018,8 @@ Status DBImpl::FlushMemTable(ColumnFamilyData* cfd,
   {
     WriteContext context;
     InstrumentedMutexLock guard_lock(&mutex_);
-    switch_memtable = flush_options.force_flush_mutable_memtable || cfd->imm()->NumNotFlushed() == 0;
+    switch_memtable = flush_options.force_flush_mutable_memtable ||
+                      cfd->imm()->NumNotFlushed() == 0;
     WriteThread::Writer w;
     WriteThread::Writer nonmem_w;
     if (switch_memtable) {

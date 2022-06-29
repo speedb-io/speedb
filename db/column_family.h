@@ -470,8 +470,14 @@ class ColumnFamilyData {
     kMemtableLimit,
     kL0FileCountLimit,
     kPendingCompactionBytes,
-    kNumCauses 
+    kNumCauses
   };
+  static size_t GetSpdbDelayFactor(
+      int num_unflushed_memtables, int num_l0_files,
+      uint64_t num_compaction_needed_bytes,
+      const MutableCFOptions& mutable_cf_options,
+      const ImmutableCFOptions& immutable_cf_options);
+
   static std::pair<WriteStallCondition, WriteStallCause>
   GetWriteStallConditionAndCause(
       int num_unflushed_memtables, int num_l0_files,
@@ -484,6 +490,7 @@ class ColumnFamilyData {
   // recalculation of compaction score. These values are used in
   // DBImpl::MakeRoomForWrite function to decide, if it need to make
   // a write stall
+
   WriteStallCondition RecalculateWriteStallConditions(
       const MutableCFOptions& mutable_cf_options);
 
@@ -521,12 +528,11 @@ class ColumnFamilyData {
 
   ThreadLocalPtr* TEST_GetLocalSV() { return local_sv_.get(); }
   WriteBufferManager* write_buffer_mgr() { return write_buffer_manager_; }
-  
-  // register this CF as a client 
+
+  // register this CF as a client
   void SetMemoryClient(SpdbMemoryManager* mem_manager, DBImpl* db);
-  SpdbMemoryManager* MemoryManager() {return spdb_memory_manager_;}
+  SpdbMemoryManager* MemoryManager() { return spdb_memory_manager_; }
   static const uint32_t kDummyColumnFamilyDataId;
-  
 
  private:
   friend class ColumnFamilySet;
@@ -567,9 +573,8 @@ class ColumnFamilyData {
   std::unique_ptr<InternalStats> internal_stats_;
 
   WriteBufferManager* write_buffer_manager_;
-  SpdbMemoryManager*  spdb_memory_manager_;
-  std::unique_ptr<SpdbMemoryManagerClient>  spdb_memory_manager_client_;
-  
+  SpdbMemoryManager* spdb_memory_manager_;
+  std::unique_ptr<SpdbMemoryManagerClient> spdb_memory_manager_client_;
 
   MemTable* mem_;
   MemTableList imm_;
@@ -624,7 +629,6 @@ class ColumnFamilyData {
   std::vector<std::shared_ptr<FSDirectory>> data_dirs_;
 
   bool db_paths_registered_;
-  
 
   std::string full_history_ts_low_;
 };

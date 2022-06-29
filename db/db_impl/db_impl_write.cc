@@ -127,6 +127,9 @@ Status DBImpl::WriteImpl(const WriteOptions& write_options,
                          bool disable_memtable, uint64_t* seq_used,
                          size_t batch_cnt,
                          PreReleaseCallback* pre_release_callback) {
+  if (spdb_memory_manager_ != nullptr) {
+    spdb_memory_manager_->EnforceDelay(last_batch_group_size_);
+  }
   assert(!seq_per_batch_ || batch_cnt != 0);
   if (my_batch == nullptr) {
     return Status::InvalidArgument("Batch is nullptr!");

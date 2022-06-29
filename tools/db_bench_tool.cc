@@ -3861,7 +3861,7 @@ class Benchmark {
     options.env = FLAGS_env;
     options.max_open_files = FLAGS_open_files;
     if (FLAGS_use_spdb_memory_manager) {
-      SpdbMemoryManagerOptions memopt(cache_);
+      SpdbMemoryManagerOptions memopt(cache_, options.env->GetSystemClock());
       if (FLAGS_db_write_buffer_size) {
         memopt.dirty_data_size = FLAGS_db_write_buffer_size;
       }

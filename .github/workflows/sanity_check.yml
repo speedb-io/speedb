@@ -19,6 +19,7 @@ jobs:
     - name: Fetch from upstream
       run: |
         git remote add upstream https://github.com/speedb-io/speedb.git && git fetch upstream
+        git config --global --add safe.directory $GITHUB_WORKSPACE
 
     - name: Where am I
       run: |

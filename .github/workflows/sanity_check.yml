@@ -29,6 +29,8 @@ jobs:
 
     - name: Setup Python
       uses: actions/setup-python@v1
+      with:
+        python-version: '3.9'
 
     - name: Install Dependencies
       run: python -m pip install --upgrade pip

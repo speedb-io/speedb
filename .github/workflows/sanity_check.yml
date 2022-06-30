@@ -14,7 +14,7 @@ jobs:
 
     - name: Fetch from upstream
       run: |
-        apt update && apt install git
+        apt update && apt install -y git
         git remote add upstream https://github.com/speedb-io/speedb.git && git fetch upstream
 
     - name: Where am I

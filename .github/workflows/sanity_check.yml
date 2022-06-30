@@ -3,7 +3,7 @@ on: [push, pull_request, workflow_call]
 jobs:
   check:
     name: Check TARGETS file and code format
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, myrunner]
     steps:
     - name: Checkout feature branch
       uses: actions/checkout@v2

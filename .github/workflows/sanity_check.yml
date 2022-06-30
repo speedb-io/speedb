@@ -9,7 +9,7 @@ jobs:
     steps:
     
     - name: pre
-      run: apt update && apt install -y sudo git
+      run: apt update && apt install -y sudo git make
     
     - name: Checkout feature branch
       uses: actions/checkout@v2

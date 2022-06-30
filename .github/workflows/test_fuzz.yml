@@ -6,7 +6,7 @@ on:
 
 jobs:
   fuzz:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, myrunner]
     container:
       image: ubuntu:18.04
     strategy:

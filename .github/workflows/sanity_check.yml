@@ -5,11 +5,11 @@ jobs:
     name: Check TARGETS file and code format
     runs-on: [self-hosted, linux, x64, myrunner]
     container:
-      image: ubuntu:18.04
+      image: ubuntu:20.04
     steps:
     
     - name: pre
-      run: apt update && apt install -y git
+      run: apt update && apt install -y sudo git
     
     - name: Checkout feature branch
       uses: actions/checkout@v2

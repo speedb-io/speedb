@@ -28,7 +28,7 @@ jobs:
         echo git branch && git branch
 
     - name: Setup Python
-      uses: actions/setup-python@v1
+      uses: actions/setup-python@v4
       with:
         python-version: '3.x'
         architecture: 'x64'

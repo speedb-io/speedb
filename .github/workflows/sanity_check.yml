@@ -4,6 +4,8 @@ jobs:
   check:
     name: Check TARGETS file and code format
     runs-on: [self-hosted, linux, x64, myrunner]
+    container:
+      image: ubuntu:18.04
     steps:
     - name: Checkout feature branch
       uses: actions/checkout@v2

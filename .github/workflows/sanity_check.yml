@@ -5,7 +5,7 @@ jobs:
     name: Check TARGETS file and code format
     runs-on: [self-hosted, linux, x64, myrunner]
     container:
-      image: ubuntu:20.04
+      image: ubuntu:latest
     steps:
     
     - name: pre

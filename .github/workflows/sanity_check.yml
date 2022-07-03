@@ -3,8 +3,14 @@ on: [push, pull_request, workflow_call]
 jobs:
   check:
     name: Check TARGETS file and code format
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, myrunner]
+    container:
+      image: ubuntu:latest
     steps:
+    
+    - name: pre
+      run: apt update && apt install -y sudo git make
+    
     - name: Checkout feature branch
       uses: actions/checkout@v2
       with:
@@ -13,6 +19,7 @@ jobs:
     - name: Fetch from upstream
       run: |
         git remote add upstream https://github.com/speedb-io/speedb.git && git fetch upstream
+        git config --global --add safe.directory $GITHUB_WORKSPACE
 
     - name: Where am I
       run: |
@@ -21,7 +28,10 @@ jobs:
         echo git branch && git branch
 
     - name: Setup Python
-      uses: actions/setup-python@v1
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+        architecture: 'x64'
 
     - name: Install Dependencies
       run: python -m pip install --upgrade pip

@@ -919,7 +919,7 @@ WriteStallCondition ColumnFamilyData::DynamicRecalculateWriteStallConditions(
   auto write_stall_condition = WriteStallCondition::kNormal;
   if (current_ != nullptr) {
     auto* vstorage = current_->storage_info();
-
+    auto write_controller = column_family_set_->write_controller_;
     auto write_stall_condition_and_cause =
         DynamicGetWriteStallConditionAndCause(
             imm()->NumNotFlushed(), vstorage->l0_delay_trigger_count(),
@@ -933,6 +933,38 @@ WriteStallCondition ColumnFamilyData::DynamicRecalculateWriteStallConditions(
           "[%s] Stalling writes, L0 files %d, memtables %d, increment %f",
           name_.c_str(), vstorage->NumLevelFiles(0), imm()->NumNotFlushed(),
           delay_increment);
+    } else {
+      assert(write_stall_condition == WriteStallCondition::kNormal);
+      if (vstorage->l0_delay_trigger_count() >=
+          GetL0ThresholdSpeedupCompaction(
+              mutable_cf_options.level0_file_num_compaction_trigger,
+              mutable_cf_options.level0_slowdown_writes_trigger)) {
+        write_controller_token_ =
+            write_controller->GetCompactionPressureToken();
+        ROCKS_LOG_INFO(
+            ioptions_.logger,
+            "[%s] Increasing compaction threads because we have %d level-0 "
+            "files ",
+            name_.c_str(), vstorage->l0_delay_trigger_count());
+      } else if (vstorage->estimated_compaction_needed_bytes() >=
+                 mutable_cf_options.soft_pending_compaction_bytes_limit / 4) {
+        // Increase compaction threads if bytes needed for compaction exceeds
+        // 1/4 of threshold for slowing down.
+        // If soft pending compaction byte limit is not set, always speed up
+        // compaction.
+        write_controller_token_ =
+            write_controller->GetCompactionPressureToken();
+        if (mutable_cf_options.soft_pending_compaction_bytes_limit > 0) {
+          ROCKS_LOG_INFO(
+              ioptions_.logger,
+              "[%s] Increasing compaction threads because of estimated pending "
+              "compaction "
+              "bytes %" PRIu64,
+              name_.c_str(), vstorage->estimated_compaction_needed_bytes());
+        }
+      } else {
+        write_controller_token_.reset();
+      }
     }
   }
   return write_stall_condition;

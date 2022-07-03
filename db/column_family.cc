@@ -876,9 +876,11 @@ size_t ColumnFamilyData::GetSpdbDelayFactor(
       int extra_files = num_unflushed_memtables - start_slow + 1;
       int max_extra_files =
           mutable_cf_options.max_write_buffer_number - start_slow + 1;
-      delay_factor = std::max<size_t>(
-          SpdbMemoryManager::MaxDelayFactor * extra_files / max_extra_files,
-          delay_factor);
+      // the score is based on square of the disance
+      delay_factor = std::max<size_t>(SpdbMemoryManager::MaxDelayFactor *
+                                          extra_files * extra_files /
+                                          (max_extra_files * max_extra_files),
+                                      delay_factor);
     }
   }
   if (!mutable_cf_options.disable_auto_compactions) {
@@ -887,27 +889,29 @@ size_t ColumnFamilyData::GetSpdbDelayFactor(
       int extra_files = num_l0_files - start_slow + 1;
       int max_extra_files =
           mutable_cf_options.level0_stop_writes_trigger - start_slow + 1;
+      // the score is based on square of the disance
+      delay_factor = std::max<size_t>(SpdbMemoryManager::MaxDelayFactor *
+                                          extra_files * extra_files /
+                                          (max_extra_files * max_extra_files),
+                                      delay_factor);
+      
+    }
 
+    if ( 0 && mutable_cf_options.soft_pending_compaction_bytes_limit > 0 &&
+        num_compaction_needed_bytes >=
+            mutable_cf_options.soft_pending_compaction_bytes_limit) {
+      size_t extra_data =
+          num_compaction_needed_bytes -
+          mutable_cf_options.soft_pending_compaction_bytes_limit;
+      auto hard_limit =
+          mutable_cf_options.hard_pending_compaction_bytes_limit > 0
+              ? mutable_cf_options.hard_pending_compaction_bytes_limit
+              : mutable_cf_options.soft_pending_compaction_bytes_limit * 2;
+      size_t max_extra_data =
+          hard_limit - mutable_cf_options.soft_pending_compaction_bytes_limit;
       delay_factor = std::max<size_t>(
-          SpdbMemoryManager::MaxDelayFactor * extra_files / max_extra_files,
+          SpdbMemoryManager::MaxDelayFactor * extra_data / max_extra_data,
           delay_factor);
-      if (!mutable_cf_options.disable_auto_compactions &&
-          mutable_cf_options.soft_pending_compaction_bytes_limit > 0 &&
-          num_compaction_needed_bytes >=
-              mutable_cf_options.soft_pending_compaction_bytes_limit) {
-        size_t extra_data =
-            num_compaction_needed_bytes -
-            mutable_cf_options.soft_pending_compaction_bytes_limit;
-        auto hard_limit =
-            mutable_cf_options.hard_pending_compaction_bytes_limit > 0
-                ? mutable_cf_options.hard_pending_compaction_bytes_limit
-                : mutable_cf_options.soft_pending_compaction_bytes_limit * 2;
-        size_t max_extra_data =
-            hard_limit - mutable_cf_options.soft_pending_compaction_bytes_limit;
-        delay_factor = std::max<size_t>(
-            SpdbMemoryManager::MaxDelayFactor * extra_data / max_extra_data,
-            delay_factor);
-      }
     }
   }
   return delay_factor;
@@ -965,7 +969,7 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
           vstorage->estimated_compaction_needed_bytes(), mutable_cf_options,
           *ioptions());
       auto prev_factor = spdb_memory_manager_client_->GetDelay();
-      if (delay_factor != prev_factor) {
+      if ( 0 && delay_factor != prev_factor) {
         if (delay_factor == 0) {
           ROCKS_LOG_INFO(ioptions_.logger,
                          "[%s] client no longer needs delay %d %d %lu",
@@ -994,9 +998,9 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
                          name_.c_str(), spdb_memory_manager_->GetDelayedRate());
         }
       }
-      return WriteStallCondition();
     }
-    // else  use the rocksdb flow
+    
+    //  use the rocksdb flow because it is triggering compaction 
     auto write_stall_condition_and_cause = GetWriteStallConditionAndCause(
         imm()->NumNotFlushed(), vstorage->l0_delay_trigger_count(),
         vstorage->estimated_compaction_needed_bytes(), mutable_cf_options,
@@ -1152,6 +1156,7 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
   }
   return write_stall_condition;
 }
+    
 
 const FileOptions* ColumnFamilyData::soptions() const {
   return &(column_family_set_->file_options_);

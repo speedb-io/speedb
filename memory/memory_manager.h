@@ -50,7 +50,7 @@ class DelayEnforcer {
   void SetDelayFactor(size_t factor);
   size_t GetDelayFactor() const { return delay_factor_; }
   size_t GetDelayedRate() const {
-    return rate_multiplier_ < 0 ? delayed_write_rate_ / rate_multiplier_ : 0;
+    return rate_multiplier_ > 0 ? delayed_write_rate_ / rate_multiplier_ : 0;
   }
 
  private:

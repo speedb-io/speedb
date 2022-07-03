@@ -1161,7 +1161,7 @@ class DBImpl : public DB {
   static std::string GenerateDbSessionId(Env* env);
 
   // flush memtable initated  by the memory manager
-  void InitiateMemoryManagerFlushRequest(ColumnFamilyData* cfd);
+  bool InitiateMemoryManagerFlushRequest(ColumnFamilyData* cfd);
 
  protected:
   const std::string dbname_;

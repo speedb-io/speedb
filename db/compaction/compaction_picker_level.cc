@@ -328,13 +328,40 @@ Compaction* LevelCompactionBuilder::PickCompaction() {
 
   // Form a compaction object containing the files we picked.
   Compaction* c = GetCompaction();
-
   TEST_SYNC_POINT_CALLBACK("LevelCompactionPicker::PickCompaction:Return", c);
 
   return c;
 }
 
 Compaction* LevelCompactionBuilder::GetCompaction() {
+  // are we on a pressure if so speedup the compaction by allowing more sub compactions
+  int num_l0_files = vstorage_->l0_delay_trigger_count();
+  size_t estimated_compaction_needed_bytes = vstorage_->estimated_compaction_needed_bytes();
+  size_t n_subcompactions = 1;
+  size_t max_subcompctions = mutable_db_options_.max_subcompactions;
+  if (start_level_ <= 1 && num_l0_files >= mutable_cf_options_.level0_slowdown_writes_trigger) {
+    n_subcompactions =
+        max_subcompctions *
+        (num_l0_files - mutable_cf_options_.level0_slowdown_writes_trigger) /
+        (mutable_cf_options_.level0_stop_writes_trigger -
+         mutable_cf_options_.level0_slowdown_writes_trigger) + 1;
+  }
+
+  if (start_level_ > 0 &&
+      mutable_cf_options_.soft_pending_compaction_bytes_limit > 0 &&
+      mutable_cf_options_.hard_pending_compaction_bytes_limit > 0 &&
+      estimated_compaction_needed_bytes >
+          mutable_cf_options_.soft_pending_compaction_bytes_limit) {
+    auto tmp =
+        max_subcompctions *
+        (estimated_compaction_needed_bytes -
+         mutable_cf_options_.soft_pending_compaction_bytes_limit) /
+        (mutable_cf_options_.hard_pending_compaction_bytes_limit -
+         mutable_cf_options_.soft_pending_compaction_bytes_limit);
+    n_subcompactions = std::max<size_t>(n_subcompactions, tmp);
+  }
+  n_subcompactions = std::min<size_t> (max_subcompctions, n_subcompactions);
+
   auto c = new Compaction(
       vstorage_, ioptions_, mutable_cf_options_, mutable_db_options_,
       std::move(compaction_inputs_), output_level_,
@@ -347,7 +374,7 @@ Compaction* LevelCompactionBuilder::GetCompaction() {
                          vstorage_->base_level()),
       GetCompressionOptions(mutable_cf_options_, vstorage_, output_level_),
       Temperature::kUnknown,
-      /* max_subcompactions */ 0, std::move(grandparents_), is_manual_,
+      n_subcompactions, std::move(grandparents_), is_manual_,
       /* trim_ts */ "", start_level_score_, false /* deletion_compaction */,
       compaction_reason_);
 
@@ -492,6 +519,7 @@ bool LevelCompactionBuilder::PickFileToCompact() {
 }
 
 bool LevelCompactionBuilder::PickIntraL0Compaction() {
+  return false;
   start_level_inputs_.clear();
   const std::vector<FileMetaData*>& level_files =
       vstorage_->LevelFiles(0 /* level */);

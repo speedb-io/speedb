@@ -1067,6 +1067,7 @@ Status DBImpl::PreprocessWrite(const WriteOptions& write_options,
   }
 
   if (UNLIKELY(status.ok() && !flush_scheduler_.Empty())) {
+    
     WaitForPendingWrites();
     status = ScheduleFlushes(write_context);
   }
@@ -1074,8 +1075,9 @@ Status DBImpl::PreprocessWrite(const WriteOptions& write_options,
   PERF_TIMER_STOP(write_scheduling_flushes_compactions_time);
   PERF_TIMER_GUARD(write_pre_and_post_process_time);
 
-  if (UNLIKELY(status.ok() && (write_controller_.IsStopped() ||
-                               write_controller_.NeedsDelay()))) {
+  if (UNLIKELY(
+          status.ok() && spdb_memory_manager_ == nullptr &&
+          (write_controller_.IsStopped() || write_controller_.NeedsDelay()))) {
     PERF_TIMER_STOP(write_pre_and_post_process_time);
     PERF_TIMER_GUARD(write_delay_time);
     // We don't know size of curent batch so that we always use the size
@@ -1698,7 +1700,7 @@ Status DBImpl::DelayWrite(uint64_t num_bytes,
   // writes, we can ignore any background errors and allow the write to
   // proceed
   Status s;
-  if (write_controller_.IsStopped()) {
+  if (write_controller_.IsStopped()  ) {
     // If writes are still stopped, it means we bailed due to a background
     // error
     s = Status::Incomplete(error_handler_.GetBGError().ToString());

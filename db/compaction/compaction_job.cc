@@ -577,6 +577,10 @@ struct RangeWithSize {
       : range(a, b), size(s) {}
 };
 
+// TBD this take a huge time for compaction that has many files
+// the value of this exact calculation is unclear (to say the least)
+// we should take the gen subcompaction boundaries from speedb (break based on target)
+ 
 void CompactionJob::GenSubcompactionBoundaries() {
   auto* c = compact_->compaction;
   auto* cfd = c->column_family_data();
@@ -584,6 +588,27 @@ void CompactionJob::GenSubcompactionBoundaries() {
   std::vector<Slice> bounds;
   int start_lvl = c->start_level();
   int out_lvl = c->output_level();
+  // TBD add option to control this spdb changes
+  do {
+    const LevelFilesBrief* flevel = c->input_levels(c->num_input_levels() -1);
+    if (flevel->num_files == 0) {
+      break;
+    }
+    auto num_files = flevel->num_files;
+    uint64_t subcompactions =
+      std::min<uint64_t>(c->max_subcompactions(), num_files);
+    double files_per_subcompaction = 1.0 * num_files / subcompactions;
+    double r = 0;
+    for (size_t i = 0; i < num_files; i++, r += files_per_subcompaction) {     
+      if ((size_t) r > boundaries_.size()) {	
+        boundaries_.emplace_back(ExtractUserKey(flevel->files[i].largest_key));
+        sizes_.emplace_back(0);
+      }
+    }
+    sizes_.emplace_back(0);
+    return;
+  } while (0);
+  
 
   // Add the starting and/or ending key of certain input files as a potential
   // boundary

@@ -19,6 +19,7 @@
 #include <mutex>
 #include <set>
 #include <thread>
+#include <atomic>
 
 #include "rocksdb/cache.h"
 #include "rocksdb/env.h"
@@ -251,7 +252,7 @@ class SpdbMemoryManager : public WriteBufferManager {
   std::shared_ptr<Cache> GetCache() { return cache_; }
 
  private:
-  void MaybeInitiateFlushRequest(int mem_full_rate);
+  bool InitiateFlushRequest();
   void RecalcConditions();
 
  private:
@@ -259,7 +260,7 @@ class SpdbMemoryManager : public WriteBufferManager {
   std::unordered_set<SpdbMemoryManagerClient *> clients_;
   int n_parallel_flushes_;
   int n_running_flushes_;
-  int n_scheduled_flushes_;
+  std::atomic<int> n_scheduled_flushes_;
   size_t size_pendding_for_flush_;
   size_t next_recalc_size_;
   static const int kminFlushPrecent = 40;

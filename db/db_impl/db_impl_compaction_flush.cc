@@ -147,14 +147,21 @@ IOStatus DBImpl::SyncClosedLogs(JobContext* job_context) {
   return io_s;
 }
 
-void DBImpl::InitiateMemoryManagerFlushRequest(ColumnFamilyData* cfd) {
-  if (cfd->queued_for_flush()) return;
+bool DBImpl::InitiateMemoryManagerFlushRequest(ColumnFamilyData* cfd) {
+  if (cfd->queued_for_flush()) return false;
   FlushOptions flush_options;
   ROCKS_LOG_INFO(
       immutable_db_options_.info_log,
       "[%s] write buffer manager flush started current usage %lu out of %lu",
       cfd->GetName().c_str(), cfd->write_buffer_mgr()->memory_usage(),
       cfd->write_buffer_mgr()->buffer_size());
+  if (cfd->write_buffer_mgr()->memory_usage() >  cfd->write_buffer_mgr()->buffer_size()) {
+    ROCKS_LOG_WARN(immutable_db_options_.info_log,
+                   "[%s] write buffer manager flush started too late memory "
+                   "quata exceeded delayed_write_rate is %lu",
+                   cfd->GetName().c_str(),
+                   spdb_memory_manager_->GetDelayedRate());
+  }
 
   flush_options.allow_write_stall = true;
   flush_options.wait = false;
@@ -171,6 +178,7 @@ void DBImpl::InitiateMemoryManagerFlushRequest(ColumnFamilyData* cfd) {
       immutable_db_options_.info_log,
       "[%s] write buffer manager intialize flush finished, status: %s\n",
       cfd->GetName().c_str(), s.ToString().c_str());
+  return true;
 }
 
 Status DBImpl::FlushMemTableToOutputFile(
@@ -2018,7 +2026,7 @@ Status DBImpl::FlushMemTable(ColumnFamilyData* cfd,
   {
     WriteContext context;
     InstrumentedMutexLock guard_lock(&mutex_);
-    switch_memtable = flush_options.force_flush_mutable_memtable ||
+    switch_memtable = true || flush_options.force_flush_mutable_memtable ||
                       cfd->imm()->NumNotFlushed() == 0;
     WriteThread::Writer w;
     WriteThread::Writer nonmem_w;

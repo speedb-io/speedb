@@ -11,12 +11,12 @@
 
 #include "db/db_impl/db_impl.h"
 #include "db/write_batch_internal.h"
+#include "logging/logging.h"
 #include "monitoring/instrumented_mutex.h"
 #include "rocksdb/statistics.h"
 #include "rocksdb/status.h"
 #include "rocksdb/system_clock.h"
 #include "util/mutexlock.h"
-#include "logging/logging.h"
 
 namespace ROCKSDB_NAMESPACE {
 

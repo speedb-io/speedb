@@ -1160,6 +1160,7 @@ class DBImpl : public DB {
 
   static void TEST_ResetDbSessionIdGen();
   static std::string GenerateDbSessionId(Env* env);
+
  public:
   // SPDB write
   bool NeedQuiesce();

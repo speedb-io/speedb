@@ -40,7 +40,7 @@ jobs:
         run: |
           df -H
           
-          apt-get update -y && apt-get install -y sudo clang-format parallel moreutils g++ libgflags-dev software-properties-common golang-go gccgo binutils liblz4-dev libsnappy1v5 mlocate sysstat nvme-cli python3 python3-pip nodejs npm liblz4-dev libsnappy-dev libzstd-dev gdb dstat unzip apt-transport-https ca-certificates curl gnupg lsb-release || echo ""
+          apt-get update -y && apt-get install -y sudo default-jre default-jdk clang-format parallel moreutils g++ libgflags-dev software-properties-common golang-go gccgo binutils liblz4-dev libsnappy1v5 mlocate sysstat nvme-cli python3 python3-pip nodejs npm liblz4-dev libsnappy-dev libzstd-dev gdb dstat unzip apt-transport-https ca-certificates curl gnupg lsb-release || echo ""
           sudo mv /usr/bin/parallel /usr/bin/gnu_parallel
           sudo rm -rf /etc/parallel/config || echo ""
       - name: ${{ matrix.name }}

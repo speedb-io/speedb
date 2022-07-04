@@ -20,7 +20,7 @@ jobs:
   test:
     runs-on: [self-hosted, linux, x64, myrunner]
     container:
-      image: ubuntu:18:04
+      image: ubuntu:18.04
     strategy:
       matrix:
         include:

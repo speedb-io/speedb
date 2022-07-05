@@ -43,4 +43,6 @@ jobs:
           sudo mv /usr/bin/parallel /usr/bin/gnu_parallel
           sudo rm -rf /etc/parallel/config || echo ""
       - name: ${{ matrix.name }}
-        run:  ${{ matrix.command }}
+        run: |
+          ${{ matrix.command }}
+          df -H

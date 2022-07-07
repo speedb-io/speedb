@@ -1931,6 +1931,7 @@ TEST_F(DBPropertiesTest, GetMapPropertyDbStats) {
 
   Options opts = CurrentOptions();
   opts.env = &env;
+  opts.avoid_unnecessary_blocking_io = false;
   Reopen(opts);
 
   {

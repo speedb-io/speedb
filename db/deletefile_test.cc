@@ -195,6 +195,7 @@ TEST_F(DeleteFileTest, PurgeObsoleteFilesTest) {
   SetOptions(&options);
   Destroy(options);
   options.create_if_missing = true;
+  options.avoid_unnecessary_blocking_io = false;
   Reopen(options);
 
   CreateTwoLevels();
@@ -318,6 +319,7 @@ TEST_F(DeleteFileTest, BackgroundPurgeCFDropTest) {
   SetOptions(&options);
   Destroy(options);
   options.create_if_missing = true;
+  options.avoid_unnecessary_blocking_io = false;
   Reopen(options);
 
   auto do_test = [&](bool bg_purge) {

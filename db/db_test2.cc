@@ -3567,6 +3567,8 @@ TEST_F(DBTest2, CompactionOnBottomPriorityWithListener) {
   options.level0_file_num_compaction_trigger = kNumFilesTrigger;
   // Trigger compaction if size amplification exceeds 110%
   options.compaction_options_universal.max_size_amplification_percent = 110;
+  // To prevent from purges being moved to the background
+  options.avoid_unnecessary_blocking_io = false;
 
   CancelCompactionListener* listener = new CancelCompactionListener();
   options.listeners.emplace_back(listener);

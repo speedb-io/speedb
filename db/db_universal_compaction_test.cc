@@ -1844,6 +1844,7 @@ TEST_P(DBTestUniversalManualCompactionOutputPathId,
   options.num_levels = num_levels_;
   options.target_file_size_base = 1 << 30;  // Big size
   options.level0_file_num_compaction_trigger = 10;
+  options.avoid_unnecessary_blocking_io = false;
   Destroy(options);
   DestroyAndReopen(options);
   CreateAndReopenWithCF({"pikachu"}, options);

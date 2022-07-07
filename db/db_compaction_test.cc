@@ -772,6 +772,7 @@ TEST_F(DBCompactionTest, BGCompactionsAllowed) {
   options.max_background_compactions = 3;
   options.memtable_factory.reset(
       test::NewSpecialSkipListFactory(kNumKeysPerFile));
+  options.avoid_unnecessary_blocking_io = false;
 
   // Block all threads in thread pool.
   const size_t kTotalTasks = 4;
@@ -2936,6 +2937,7 @@ TEST_P(DBCompactionTestWithParam, DeleteMovedFileAfterCompaction) {
     OnFileDeletionListener* listener = new OnFileDeletionListener();
     options.listeners.emplace_back(listener);
     options.max_subcompactions = max_subcompactions_;
+    options.avoid_unnecessary_blocking_io = false;
     DestroyAndReopen(options);
 
     Random rnd(301);

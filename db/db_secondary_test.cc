@@ -685,6 +685,7 @@ TEST_F(DBSecondaryTest, OpenWithSubsetOfColumnFamilies) {
 TEST_F(DBSecondaryTest, SwitchToNewManifestDuringOpen) {
   Options options;
   options.env = env_;
+  options.avoid_unnecessary_blocking_io = false;
   Reopen(options);
   Close();
 

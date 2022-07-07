@@ -3021,6 +3021,7 @@ TEST_P(ColumnFamilyTest, IteratorCloseWALFile1) {
   SpecialEnv env(Env::Default());
   db_options_.env = &env;
   db_options_.max_background_flushes = 1;
+  db_options_.avoid_unnecessary_blocking_io = false;
   column_family_options_.memtable_factory.reset(
       test::NewSpecialSkipListFactory(2));
   Open();

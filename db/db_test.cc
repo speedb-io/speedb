@@ -5736,7 +5736,7 @@ TEST_F(DBTest, CloseSpeedup) {
   options.num_levels = 4;
   options.max_bytes_for_level_base = 400 * 1024;
   options.max_write_buffer_number = 16;
-
+  options.avoid_unnecessary_blocking_io = false;
   // Block background threads
   env_->SetBackgroundThreads(1, Env::LOW);
   env_->SetBackgroundThreads(1, Env::HIGH);

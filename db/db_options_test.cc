@@ -757,6 +757,7 @@ static void assert_candidate_files_empty(DBImpl* dbfull, const bool empty) {
 
 TEST_F(DBOptionsTest, DeleteObsoleteFilesPeriodChange) {
   Options options;
+  options.avoid_unnecessary_blocking_io = false;
   options.env = env_;
   SetTimeElapseOnlySleepOnReopen(&options);
   options.create_if_missing = true;

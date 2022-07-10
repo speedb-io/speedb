@@ -5754,6 +5754,10 @@ class Benchmark {
         thread->shared->read_rate_limiter->Request(1024, Env::IO_HIGH,
                                                    nullptr /* stats */,
                                                    RateLimiter::OpType::kRead);
+        // Set time at which last op finished to Now() to hide latency and
+        // sleep from rate limiter. Also, do the check once per batch, not
+        // once per write.
+        thread->stats.ResetLastOpTime();
       }
     }
 
@@ -5801,6 +5805,10 @@ class Benchmark {
           read % 256 == 255) {
         thread->shared->read_rate_limiter->Request(
             256, Env::IO_HIGH, nullptr /* stats */, RateLimiter::OpType::kRead);
+        // Set time at which last op finished to Now() to hide latency and
+        // sleep from rate limiter. Also, do the check once per batch, not
+        // once per write.
+        thread->stats.ResetLastOpTime();
       }
 
       thread->stats.FinishedOps(db_with_cfh, db_with_cfh->db, 1, kRead);
@@ -5837,6 +5845,10 @@ class Benchmark {
         thread->shared->read_rate_limiter->Request(1024, Env::IO_HIGH,
                                                    nullptr /* stats */,
                                                    RateLimiter::OpType::kRead);
+        // Set time at which last op finished to Now() to hide latency and
+        // sleep from rate limiter. Also, do the check once per batch, not
+        // once per write.
+        thread->stats.ResetLastOpTime();
       }
     }
     delete iter;
@@ -5892,6 +5904,10 @@ class Benchmark {
       if (thread->shared->read_rate_limiter.get() != nullptr) {
         thread->shared->read_rate_limiter->Request(
             100, Env::IO_HIGH, nullptr /* stats */, RateLimiter::OpType::kRead);
+        // Set time at which last op finished to Now() to hide latency and
+        // sleep from rate limiter. Also, do the check once per batch, not
+        // once per write.
+        thread->stats.ResetLastOpTime();
       }
 
       thread->stats.FinishedOps(nullptr, db, 100, kRead);
@@ -6030,6 +6046,10 @@ class Benchmark {
           read % 256 == 255) {
         thread->shared->read_rate_limiter->Request(
             256, Env::IO_HIGH, nullptr /* stats */, RateLimiter::OpType::kRead);
+        // Set time at which last op finished to Now() to hide latency and
+        // sleep from rate limiter. Also, do the check once per batch, not
+        // once per write.
+        thread->stats.ResetLastOpTime();
       }
 
       thread->stats.FinishedOps(db_with_cfh, db_with_cfh->db, 1, kRead);
@@ -6131,6 +6151,10 @@ class Benchmark {
         thread->shared->read_rate_limiter->Request(
             256 * entries_per_batch_, Env::IO_HIGH, nullptr /* stats */,
             RateLimiter::OpType::kRead);
+        // Set time at which last op finished to Now() to hide latency and
+        // sleep from rate limiter. Also, do the check once per batch, not
+        // once per write.
+        thread->stats.ResetLastOpTime();
       }
       thread->stats.FinishedOps(nullptr, db, entries_per_batch_, kRead);
     }
@@ -6534,6 +6558,10 @@ class Benchmark {
         if (thread->shared->read_rate_limiter && (gets + seek) % 100 == 0) {
           thread->shared->read_rate_limiter->Request(100, Env::IO_HIGH,
                                                      nullptr /*stats*/);
+          // Set time at which last op finished to Now() to hide latency and
+          // sleep from rate limiter. Also, do the check once per batch, not
+          // once per write.
+          thread->stats.ResetLastOpTime();
         }
         thread->stats.FinishedOps(db_with_cfh, db_with_cfh->db, 1, kRead);
       } else if (query_type == 1) {
@@ -6559,6 +6587,10 @@ class Benchmark {
         if (thread->shared->write_rate_limiter && puts % 100 == 0) {
           thread->shared->write_rate_limiter->Request(100, Env::IO_HIGH,
                                                       nullptr /*stats*/);
+          // Set time at which last op finished to Now() to hide latency and
+          // sleep from rate limiter. Also, do the check once per batch, not
+          // once per write.
+          thread->stats.ResetLastOpTime();
         }
         thread->stats.FinishedOps(db_with_cfh, db_with_cfh->db, 1, kWrite);
       } else if (query_type == 2) {
@@ -6738,6 +6770,10 @@ class Benchmark {
           read % 256 == 255) {
         thread->shared->read_rate_limiter->Request(
             256, Env::IO_HIGH, nullptr /* stats */, RateLimiter::OpType::kRead);
+        // Set time at which last op finished to Now() to hide latency and
+        // sleep from rate limiter. Also, do the check once per batch, not
+        // once per write.
+        thread->stats.ResetLastOpTime();
       }
 
       thread->stats.FinishedOps(&db_, db_.db, 1, kSeek);
@@ -6930,6 +6966,10 @@ class Benchmark {
         write_rate_limiter->Request(key.size() + val.size(), Env::IO_HIGH,
                                     nullptr /* stats */,
                                     RateLimiter::OpType::kWrite);
+        // Set time at which last op finished to Now() to hide latency and
+        // sleep from rate limiter. Also, do the check once per batch, not
+        // once per write.
+        thread->stats.ResetLastOpTime();
       }
 
       if (writes_per_range_tombstone_ > 0 &&
@@ -7486,6 +7526,10 @@ class Benchmark {
         thread->shared->write_rate_limiter->Request(
             key.size() + value.size(), Env::IO_HIGH, nullptr /*stats*/,
             RateLimiter::OpType::kWrite);
+        // Set time at which last op finished to Now() to hide latency and
+        // sleep from rate limiter. Also, do the check once per batch, not
+        // once per write.
+        thread->stats.ResetLastOpTime();
       }
 
       Slice val = gen.Generate();
@@ -8154,6 +8198,10 @@ class Benchmark {
       if (thread->shared->read_rate_limiter.get() != nullptr) {
         thread->shared->read_rate_limiter->Request(
             1, Env::IO_HIGH, nullptr /* stats */, RateLimiter::OpType::kRead);
+        // Set time at which last op finished to Now() to hide latency and
+        // sleep from rate limiter. Also, do the check once per batch, not
+        // once per write.
+        thread->stats.ResetLastOpTime();
       }
     }
     delete iter;
@@ -8222,6 +8270,10 @@ class Benchmark {
         write_rate_limiter->Request(key.size() + val.size(), Env::IO_HIGH,
                                     nullptr /* stats */,
                                     RateLimiter::OpType::kWrite);
+        // Set time at which last op finished to Now() to hide latency and
+        // sleep from rate limiter. Also, do the check once per batch, not
+        // once per write.
+        thread->stats.ResetLastOpTime();
       }
     }
   }

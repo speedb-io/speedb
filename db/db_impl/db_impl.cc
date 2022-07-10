@@ -239,7 +239,7 @@ DBImpl::DBImpl(const DBOptions& options, const std::string& dbname,
       blob_callback_(immutable_db_options_.sst_file_manager.get(), &mutex_,
                      &error_handler_, &event_logger_,
                      immutable_db_options_.listeners, dbname_),
-      spdb_write_(this) {
+      spdb_wal_(this) {
   // !batch_per_trx_ implies seq_per_batch_ because it is only unset for
   // WriteUnprepared, which should use seq_per_batch_.
   assert(batch_per_txn_ || seq_per_batch_);
@@ -525,7 +525,7 @@ Status DBImpl::CloseHelper() {
   mutex_.Unlock();
 
   // Shutdown WAL in order to ensure no writes will be handled
-  spdb_write_.Shutdown();
+  spdb_wal_.Shutdown();
 
   // Below check is added as recovery_error_ is not checked and it causes crash
   // in DBSSTTest.DBWithMaxSpaceAllowedWithBlobFiles when space limit is

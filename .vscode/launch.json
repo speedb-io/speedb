@@ -25,11 +25,11 @@
         "--threads=10",
         "--compression_type=none",
         "-db=/tmp/dbdir",
-        "-num=100000",
+        "-num=1000000",
         "-value_size=1000",
         "--delayed_write_rate=268435456",
         "-report_interval_seconds=1",
-        "use_spdb_writes=1",
+        "-use_spdb_writes=1",
         "-report_file=fillrandom.csv"
       ],
       //"args": ["--benchmarks=fillrandom", "--compression_type=none", "-db=/tmp/dbdir", "-num=1000000", "-value_size=1000", "--delayed_write_rate=268435456", "-report_interval_seconds=1", "-report_file=fillrandom.csv"],

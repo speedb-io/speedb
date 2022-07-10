@@ -26,73 +26,100 @@ class SystemClock;
 class Statistics;
 class WriteBatch;
 
-class SpdbWriteImpl {
+class WalSpdb {
  public:
-  SpdbWriteImpl(DBImpl* db);
+  WalSpdb(DBImpl* db);
 
-  ~SpdbWriteImpl();
-  void SpdbQuiesceWriteThread();
-  void* Add(WriteBatch* batch, bool disable_wal, bool disable_memtable,
-            bool* first_batch);
+  ~WalSpdb();
 
   void Shutdown();
 
-  void WaitForWalWriteComplete(void* list);
+  void* Add(WriteBatch* batch, bool disable_wal, bool read_lock_for_memtable);
 
-  void SwitchAndWriteBatchGroup();
+  void MemtableAddComplete(const void* batch_list);
 
-  void WriteBatchComplete(void* list, bool first_batch, bool disable_wal,
-                          bool disable_memtable);
+  // Called from WAL writer thread (through DBImpl::SpdbWriteToWAL)
+  uint64_t WalWriteComplete();
 
-  void Lock();
-  void Unlock();
+  void Quiesce();
 
-  port::RWMutex& GetQuiesceRWLock() { return quiesce_rwlock_; }
+  Status WaitForWalWrite(WriteBatch* batch);
 
  private:
+  uint64_t GetLastWalWriteSeq() {
+    return last_wal_write_seq_.load(std::memory_order_acquire);
+  }
+
+  // Called from WAL writer thread
+  bool SwitchBatchGroup();
+
+  void WalWriteThread();
+
+  // Called from WAL writer thread
+  bool WaitForPendingWork(size_t written_buffers);
+
   struct WritesBatchList {
     std::list<WriteBatch*> wal_writes_;
+    uint64_t min_seq_ = 0;
     uint64_t max_seq_ = 0;
-    port::RWMutex buffer_write_rw_lock_;
-    port::RWMutex memtable_ref_rwlock_;
+    port::RWMutex memtable_complete_rwlock_;
+
     void Clear() {
       wal_writes_.clear();
+      min_seq_ = 0;
       max_seq_ = 0;
     }
 
-    void Add(WriteBatch* batch, bool disable_wal, bool disable_memtable,
-             bool* first_batch);
+    void Add(WriteBatch* batch, bool disable_wal, bool read_lock_for_memtable);
+
+    void MemtableAddComplete();
+
+    bool IsEmpty() const {
+      // We check specifically for max_seq_ and not for an empty wal_writes_,
+      // as a batch list can consist of memtable only writes
+      return max_seq_ == 0;
+    }
+
+    uint64_t GetMinSeq() const { return min_seq_; }
+
     uint64_t GetMaxSeq() const { return max_seq_; }
 
-    void WriteBatchComplete(bool first_batch, bool disable_wal = false,
-                            bool disable_memtable = false);
+    void WaitForMemtableWriters();
   };
 
   WritesBatchList& GetWrittenList() {
     return wb_lists_[active_buffer_index_ ^ 1];
   }
 
-  WritesBatchList& SwitchBatchGroup();
-
   WritesBatchList& GetActiveList() { return wb_lists_[active_buffer_index_]; }
+
   static constexpr size_t kWalWritesContainers = 2;
+
+  DBImpl* db_;
 
   std::atomic<uint64_t> last_wal_write_seq_{0};
 
   std::array<WritesBatchList, kWalWritesContainers> wb_lists_;
   size_t active_buffer_index_ = 0;
 
-  DBImpl* db_;
-  std::thread quiesce_thread_;
-  std::atomic<bool> quiesce_thread_terminate_;
-  std::mutex quiesce_thread_mutex_;
-  std::condition_variable quiesce_thread_cv_;
-  std::atomic<bool> quiesce_needed_;  // this means we need to do some actions
-  port::Mutex add_buffer_mutex_;
+  bool terminate_ = false;
 
-  port::RWMutex quiesce_rwlock_;
-  port::RWMutex wal_buffers_rwlock_;
-  port::RWMutex wal_write_rwlock_;
+  port::Mutex mutex_;
+  std::atomic<size_t> pending_buffers_{0};
+
+  std::mutex wal_thread_mutex_;
+  std::atomic<size_t> threads_busy_waiting_{0};
+  std::condition_variable wal_thread_cv_;
+
+  // This means we need to do some actions
+  std::atomic<bool> quiesce_cfds_{false};
+  std::mutex quiesce_mutex_;
+  std::condition_variable quiesce_cv_;
+
+  std::mutex notify_wal_write_mutex_;
+  std::condition_variable notify_wal_write_cv_;
+
+  std::thread wal_thread_;
   WriteBatch tmp_batch_;
 };
 

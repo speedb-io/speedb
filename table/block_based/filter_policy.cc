@@ -13,12 +13,10 @@
 #include <atomic>
 #include <climits>
 #include <cstring>
-#include <deque>
 #include <limits>
 #include <memory>
 
 #include "cache/cache_entry_roles.h"
-#include "cache/cache_reservation_manager.h"
 #include "logging/logging.h"
 #include "port/lang.h"
 #include "rocksdb/convenience.h"
@@ -55,83 +53,67 @@ Slice FinishAlwaysFalse(std::unique_ptr<const char[]>* /*buf*/) {
   return Slice(nullptr, 0);
 }
 
-Slice FinishAlwaysTrue(std::unique_ptr<const char[]>* /*buf*/) {
-  return Slice("\0\0\0\0\0\0", 6);
-}
+}  // namespace
+
+// Number of hash entries to accumulate before charging their memory usage to
+// the cache when cache reservation is available
+const std::size_t XXPH3FilterBitsBuilder::kUint64tHashEntryCacheResBucketSize =
+    CacheReservationManagerImpl<
+        CacheEntryRole::kFilterConstruction>::GetDummyEntrySize() /
+    sizeof(uint64_t);
 
 // Base class for filter builders using the XXH3 preview hash,
 // also known as Hash64 or GetSliceHash64.
-class XXPH3FilterBitsBuilder : public BuiltinFilterBitsBuilder {
- public:
-  explicit XXPH3FilterBitsBuilder(
-      std::atomic<int64_t>* aggregate_rounding_balance,
-      std::shared_ptr<CacheReservationManager> cache_res_mgr,
-      bool detect_filter_construct_corruption)
-      : aggregate_rounding_balance_(aggregate_rounding_balance),
-        cache_res_mgr_(cache_res_mgr),
-        detect_filter_construct_corruption_(
-            detect_filter_construct_corruption) {}
+XXPH3FilterBitsBuilder::XXPH3FilterBitsBuilder(
+    std::atomic<int64_t>* aggregate_rounding_balance,
+    std::shared_ptr<CacheReservationManager> cache_res_mgr,
+    bool detect_filter_construct_corruption)
+    : aggregate_rounding_balance_(aggregate_rounding_balance),
+      cache_res_mgr_(cache_res_mgr),
+      detect_filter_construct_corruption_(detect_filter_construct_corruption) {}
 
-  ~XXPH3FilterBitsBuilder() override {}
-
-  virtual void AddKey(const Slice& key) override {
-    uint64_t hash = GetSliceHash64(key);
-    // Especially with prefixes, it is common to have repetition,
-    // though only adjacent repetition, which we want to immediately
-    // recognize and collapse for estimating true filter space
-    // requirements.
-    if (hash_entries_info_.entries.empty() ||
-        hash != hash_entries_info_.entries.back()) {
-      if (detect_filter_construct_corruption_) {
-        hash_entries_info_.xor_checksum ^= hash;
-      }
-      hash_entries_info_.entries.push_back(hash);
-      if (cache_res_mgr_ &&
-          // Traditional rounding to whole bucket size
-          ((hash_entries_info_.entries.size() %
-            kUint64tHashEntryCacheResBucketSize) ==
-           kUint64tHashEntryCacheResBucketSize / 2)) {
-        hash_entries_info_.cache_res_bucket_handles.emplace_back(nullptr);
-        Status s = cache_res_mgr_->MakeCacheReservation(
-            kUint64tHashEntryCacheResBucketSize * sizeof(hash),
-            &hash_entries_info_.cache_res_bucket_handles.back());
-        s.PermitUncheckedError();
-      }
+void XXPH3FilterBitsBuilder::AddKey(const Slice& key) {
+  uint64_t hash = GetSliceHash64(key);
+  // Especially with prefixes, it is common to have repetition,
+  // though only adjacent repetition, which we want to immediately
+  // recognize and collapse for estimating true filter space
+  // requirements.
+  if (hash_entries_info_.entries.empty() ||
+      hash != hash_entries_info_.entries.back()) {
+    if (detect_filter_construct_corruption_) {
+      hash_entries_info_.xor_checksum ^= hash;
+    }
+    hash_entries_info_.entries.push_back(hash);
+    if (cache_res_mgr_ &&
+        // Traditional rounding to whole bucket size
+        ((hash_entries_info_.entries.size() %
+          kUint64tHashEntryCacheResBucketSize) ==
+         kUint64tHashEntryCacheResBucketSize / 2)) {
+      hash_entries_info_.cache_res_bucket_handles.emplace_back(nullptr);
+      Status s = cache_res_mgr_->MakeCacheReservation(
+          kUint64tHashEntryCacheResBucketSize * sizeof(hash),
+          &hash_entries_info_.cache_res_bucket_handles.back());
+      s.PermitUncheckedError();
     }
   }
+}
 
-  virtual size_t EstimateEntriesAdded() override {
-    return hash_entries_info_.entries.size();
-  }
-
-  virtual Status MaybePostVerify(const Slice& filter_content) override;
-
- protected:
-  static constexpr uint32_t kMetadataLen = 5;
-
-  // Number of hash entries to accumulate before charging their memory usage to
-  // the cache when cache charging is available
-  static const std::size_t kUint64tHashEntryCacheResBucketSize =
-      CacheReservationManagerImpl<
-          CacheEntryRole::kFilterConstruction>::GetDummyEntrySize() /
-      sizeof(uint64_t);
+size_t XXPH3FilterBitsBuilder::EstimateEntriesAdded() {
+  return hash_entries_info_.entries.size();
+}
 
   // For delegating between XXPH3FilterBitsBuilders
-  void SwapEntriesWith(XXPH3FilterBitsBuilder* other) {
-    assert(other != nullptr);
-    hash_entries_info_.Swap(&(other->hash_entries_info_));
-  }
-
-  void ResetEntries() { hash_entries_info_.Reset(); }
-
-  virtual size_t RoundDownUsableSpace(size_t available_size) = 0;
+void XXPH3FilterBitsBuilder::SwapEntriesWith(XXPH3FilterBitsBuilder* other) {
+  assert(other != nullptr);
+  hash_entries_info_.Swap(&(other->hash_entries_info_));
+}
 
   // To choose size using malloc_usable_size, we have to actually allocate.
-  size_t AllocateMaybeRounding(size_t target_len_with_metadata,
-                               size_t num_entries,
-                               std::unique_ptr<char[]>* buf) {
-    // Return value set to a default; overwritten in some cases
-    size_t rv = target_len_with_metadata;
+size_t XXPH3FilterBitsBuilder::AllocateMaybeRounding(
+    size_t target_len_with_metadata, size_t num_entries,
+    std::unique_ptr<char[]>* buf) {
+  // Return value set to a default; overwritten in some cases
+  size_t rv = target_len_with_metadata;
 #ifdef ROCKSDB_MALLOC_USABLE_SIZE
     if (aggregate_rounding_balance_ != nullptr) {
       // Do optimize_filters_for_memory, using malloc_usable_size.
@@ -222,7 +204,7 @@ class XXPH3FilterBitsBuilder : public BuiltinFilterBitsBuilder {
     buf->reset(new char[rv]());
 #endif  // ROCKSDB_MALLOC_USABLE_SIZE
     return rv;
-  }
+}
 
   // TODO: Ideally we want to verify the hash entry
   // as it is added to the filter and eliminate this function
@@ -231,73 +213,25 @@ class XXPH3FilterBitsBuilder : public BuiltinFilterBitsBuilder {
   // Possible solution:
   // pass a custom iterator that tracks the xor checksum as
   // it iterates to ResetAndFindSeedToSolve
-  Status MaybeVerifyHashEntriesChecksum() {
-    if (!detect_filter_construct_corruption_) {
-      return Status::OK();
-    }
-
-    uint64_t actual_hash_entries_xor_checksum = 0;
-    for (uint64_t h : hash_entries_info_.entries) {
-      actual_hash_entries_xor_checksum ^= h;
-    }
-
-    if (actual_hash_entries_xor_checksum == hash_entries_info_.xor_checksum) {
-      return Status::OK();
-    } else {
-      // Since these hash entries are corrupted and they will not be used
-      // anymore, we can reset them and release memory.
-      ResetEntries();
-      return Status::Corruption("Filter's hash entries checksum mismatched");
-    }
+Status XXPH3FilterBitsBuilder::MaybeVerifyHashEntriesChecksum() {
+  if (!detect_filter_construct_corruption_) {
+    return Status::OK();
   }
 
-  // See BloomFilterPolicy::aggregate_rounding_balance_. If nullptr,
-  // always "round up" like historic behavior.
-  std::atomic<int64_t>* aggregate_rounding_balance_;
+  uint64_t actual_hash_entries_xor_checksum = 0;
+  for (uint64_t h : hash_entries_info_.entries) {
+    actual_hash_entries_xor_checksum ^= h;
+  }
 
-  // For reserving memory used in (new) Bloom and Ribbon Filter construction
-  std::shared_ptr<CacheReservationManager> cache_res_mgr_;
-
-  // For managing cache charge for final filter in (new) Bloom and Ribbon
-  // Filter construction
-  std::deque<std::unique_ptr<CacheReservationManager::CacheReservationHandle>>
-      final_filter_cache_res_handles_;
-
-  bool detect_filter_construct_corruption_;
-
-  struct HashEntriesInfo {
-    // A deque avoids unnecessary copying of already-saved values
-    // and has near-minimal peak memory use.
-    std::deque<uint64_t> entries;
-
-    // If cache_res_mgr_ != nullptr,
-    // it manages cache charge for buckets of hash entries in (new) Bloom
-    // or Ribbon Filter construction.
-    // Otherwise, it is empty.
-    std::deque<std::unique_ptr<CacheReservationManager::CacheReservationHandle>>
-        cache_res_bucket_handles;
-
-    // If detect_filter_construct_corruption_ == true,
-    // it records the xor checksum of hash entries.
-    // Otherwise, it is 0.
-    uint64_t xor_checksum = 0;
-
-    void Swap(HashEntriesInfo* other) {
-      assert(other != nullptr);
-      std::swap(entries, other->entries);
-      std::swap(cache_res_bucket_handles, other->cache_res_bucket_handles);
-      std::swap(xor_checksum, other->xor_checksum);
-    }
-
-    void Reset() {
-      entries.clear();
-      cache_res_bucket_handles.clear();
-      xor_checksum = 0;
-    }
-  };
-
-  HashEntriesInfo hash_entries_info_;
-};
+  if (actual_hash_entries_xor_checksum == hash_entries_info_.xor_checksum) {
+    return Status::OK();
+  } else {
+    // Since these hash entries are corrupted and they will not be used
+    // anymore, we can reset them and release memory.
+    ResetEntries();
+    return Status::Corruption("Filter's hash entries checksum mismatched");
+  }
+}
 
 // #################### FastLocalBloom implementation ################## //
 // ############## also known as format_version=5 Bloom filter ########## //
@@ -1261,21 +1195,10 @@ class LegacyBloomBitsReader : public BuiltinFilterBitsReader {
   const uint32_t log2_cache_line_size_;
 };
 
-class AlwaysTrueFilter : public BuiltinFilterBitsReader {
- public:
-  bool MayMatch(const Slice&) override { return true; }
-  using FilterBitsReader::MayMatch;  // inherit overload
-  bool HashMayMatch(const uint64_t) override { return true; }
-  using BuiltinFilterBitsReader::HashMayMatch;  // inherit overload
-};
-
-class AlwaysFalseFilter : public BuiltinFilterBitsReader {
- public:
-  bool MayMatch(const Slice&) override { return false; }
-  using FilterBitsReader::MayMatch;  // inherit overload
-  bool HashMayMatch(const uint64_t) override { return false; }
-  using BuiltinFilterBitsReader::HashMayMatch;  // inherit overload
-};
+FilterBitsReader* XXPH3FilterBitsBuilder::GetBitsReader(
+    const Slice& filter_content) {
+  return BuiltinFilterPolicy::GetBuiltinFilterBitsReader(filter_content);
+}
 
 Status XXPH3FilterBitsBuilder::MaybePostVerify(const Slice& filter_content) {
   Status s = Status::OK();
@@ -1284,8 +1207,7 @@ Status XXPH3FilterBitsBuilder::MaybePostVerify(const Slice& filter_content) {
     return s;
   }
 
-  std::unique_ptr<BuiltinFilterBitsReader> bits_reader(
-      BuiltinFilterPolicy::GetBuiltinFilterBitsReader(filter_content));
+  std::unique_ptr<FilterBitsReader> bits_reader(GetBitsReader(filter_content));
 
   for (uint64_t h : hash_entries_info_.entries) {
     // The current approach will not detect corruption from XXPH3Filter to
@@ -1302,7 +1224,6 @@ Status XXPH3FilterBitsBuilder::MaybePostVerify(const Slice& filter_content) {
   ResetEntries();
   return s;
 }
-}  // namespace
 
 const char* BuiltinFilterPolicy::kClassName() {
   return "rocksdb.internal.BuiltinFilter";
@@ -1377,7 +1298,7 @@ const char* ReadOnlyBuiltinFilterPolicy::kClassName() {
 }
 
 std::string BloomLikeFilterPolicy::GetId() const {
-  return Name() + GetBitsPerKeySuffix();
+  return Name() + GetBitsPerKeySuffix(millibits_per_key_);
 }
 
 BloomFilterPolicy::BloomFilterPolicy(double bits_per_key)
@@ -1480,9 +1401,9 @@ BloomLikeFilterPolicy::GetStandard128RibbonBuilderWithContext(
       context.info_log);
 }
 
-std::string BloomLikeFilterPolicy::GetBitsPerKeySuffix() const {
-  std::string rv = ":" + std::to_string(millibits_per_key_ / 1000);
-  int frac = millibits_per_key_ % 1000;
+std::string BloomLikeFilterPolicy::GetBitsPerKeySuffix(int millibits_per_key) {
+  std::string rv = ":" + std::to_string(millibits_per_key / 1000);
+  int frac = millibits_per_key % 1000;
   if (frac > 0) {
     rv.push_back('.');
     rv.push_back(static_cast<char>('0' + (frac / 100)));
@@ -1835,9 +1756,7 @@ static ObjectLibrary::PatternEntry FilterPatternEntryWithBits(
 
 template <typename T>
 T* NewBuiltinFilterPolicyWithBits(const std::string& uri) {
-  const std::vector<std::string> vals = StringSplit(uri, ':');
-  double bits_per_key = ParseDouble(vals[1]);
-  return new T(bits_per_key);
+  return new T(FilterPolicy::ExtractBitsPerKeyFromUri(uri));
 }
 static int RegisterBuiltinFilterPolicies(ObjectLibrary& library,
                                          const std::string& /*arg*/) {
@@ -1936,6 +1855,11 @@ static int RegisterBuiltinFilterPolicies(ObjectLibrary& library,
 }
 }  // namespace
 
+double FilterPolicy::ExtractBitsPerKeyFromUri(const std::string& uri) {
+  const std::vector<std::string> vals = StringSplit(uri, ':');
+  return ParseDouble(vals[1]);
+}
+
 Status FilterPolicy::CreateFromString(
     const ConfigOptions& options, const std::string& value,
     std::shared_ptr<const FilterPolicy>* policy) {
@@ -1979,6 +1903,16 @@ const std::vector<std::string>& BloomLikeFilterPolicy::GetAllFixedImpls() {
       test::Standard128RibbonFilterPolicy::kClassName(),
   };
   return impls;
+}
+
+int BloomLikeFilterPolicy::GetAllFixedImplIndex(const std::string& name) {
+  const auto& all_names = GetAllFixedImpls();
+  for (size_t idx = 0; idx < all_names.size(); idx++) {
+    if (name == all_names[idx]) {
+      return static_cast<int>(idx);
+    }
+  }
+  return -1;
 }
 
 }  // namespace ROCKSDB_NAMESPACE

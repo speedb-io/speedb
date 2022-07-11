@@ -12,9 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-speedb_SOURCES = 					\
-		   speedb_registry.cc			\
-		   memtable/hash_spd_rep.cc	        \
+speedb_SOURCES = 																			\
+		   speedb_registry.cc															\
+		   memtable/hash_spd_rep.cc	        							\
+ 			 paired_filter/speedb_paired_bloom.cc						\
+ 			 paired_filter/speedb_paired_bloom_internal.cc	\
 
 
 speedb_FUNC = register_SpeedbPlugins
+
+speedb_HEADERS = 																  								\
+										paired_filter/speedb_paired_bloom.h						\
+
+speedb_TESTS = 																										\
+     speedb_customizable_test.cc																	\
+		 paired_filter/speedb_db_bloom_filter_test.cc									\

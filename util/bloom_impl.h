@@ -11,6 +11,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <array>
 #include <cmath>
 
 #include "port/port.h"  // for PREFETCH
@@ -24,6 +25,18 @@
 namespace ROCKSDB_NAMESPACE {
 
 class BloomMath {
+ public:
+  // Powers of 32-bit golden ratio, mod 2**32.
+  static constexpr size_t kNumGoldenRatioPowers = 30U;
+  static constexpr std::array<uint32_t, kNumGoldenRatioPowers>
+      GoldenRatioPowers{
+          0x00000001, 0x9e3779b9, 0xe35e67b1, 0x734297e9, 0x35fbe861,
+          0xdeb7c719, 0x0448b211, 0x3459b749, 0xab25f4c1, 0x52941879,
+          0x9c95e071, 0xf5ab9aa9, 0x2d6ba521, 0x8bededd9, 0x9bfb72d1,
+          0x3ae1c209, 0x7fca7981, 0xc576c739, 0xd23ee931, 0x0335ad69,
+          0xc04ff1e1, 0x98702499, 0x7535c391, 0x9f70dcc9, 0x0e198e41,
+          0xf2ab85f9, 0xe6c581f1, 0xc7ecd029, 0x6f54cea1, 0x4c8a6b59};
+
  public:
   // False positive rate of a standard Bloom filter, for given ratio of
   // filter memory bits to added keys, and number of probes per operation.
@@ -228,6 +241,105 @@ class FastLocalBloomImpl {
     return HashMayMatchPrepared(h2, num_probes, data + bytes_to_cache_line);
   }
 
+#ifdef HAVE_AVX2
+  // Receives an intrinsic (__m256i) hash_vector comprised of num_probes (1-8)
+  // 32-bits bit positions (0-511) to test within a 512 bits bloom block
+  //
+  // Returns a pair:
+  // first: Whether testing is complete
+  // second: If testing is complete, the answer, otherwise N/A
+  //
+  // IMPORTANT: THIS CODE ASSUMES A BLOCK (CACHE-LINE) SIZE OF 64 BYTES !!!!
+  //
+  static inline std::pair<bool, bool> CheckBitsPositionsInBloomBlock(
+      int num_probes, __m256i &hash_vector, const char *const block_address_) {
+    // Now the top 9 bits of each of the eight 32-bit values in
+    // hash_vector are bit addresses for probes within the cache line.
+    // While the platform-independent code uses byte addressing (6 bits
+    // to pick a byte + 3 bits to pick a bit within a byte), here we work
+    // with 32-bit words (4 bits to pick a word + 5 bits to pick a bit
+    // within a word) because that works well with AVX2 and is equivalent
+    // under little-endian.
+
+    // Shift each right by 28 bits to get 4-bit word addresses.
+    const __m256i word_addresses = _mm256_srli_epi32(hash_vector, 28);
+
+    // Gather 32-bit values spread over 512 bits by 4-bit address. In
+    // essence, we are dereferencing eight pointers within the cache
+    // line.
+    //
+    // Option 1: AVX2 gather (seems to be a little slow - understandable)
+    // const __m256i value_vector =
+    //     _mm256_i32gather_epi32(static_cast<const int
+    //     *>(data_at_cache_line),
+    //                            word_addresses,
+    //                            /*bytes / i32*/ 4);
+    // END Option 1
+    // Potentially unaligned as we're not *always* cache-aligned -> loadu
+    const __m256i *mm_data = reinterpret_cast<const __m256i *>(block_address_);
+    // lower = block[0:255], higher = block[256:511]
+    __m256i lower = _mm256_loadu_si256(mm_data);
+    __m256i upper = _mm256_loadu_si256(mm_data + 1);
+
+    // Option 2: AVX512VL permute hack
+    // Only negligibly faster than Option 3, so not yet worth supporting
+    // const __m256i value_vector =
+    //    _mm256_permutex2var_epi32(lower, word_addresses, upper);
+    // END Option 2
+    // Option 3: AVX2 permute+blend hack
+    // Use lowest three bits to order probing values, as if all from same
+    // 256 bit piece.
+
+    // UDI: The last 3 bits of each integer of b are used as addresses into
+    // the 8 integers of a.
+    lower = _mm256_permutevar8x32_epi32(lower, word_addresses);
+    upper = _mm256_permutevar8x32_epi32(upper, word_addresses);
+    // Just top 1 bit of address, to select between lower and upper.
+    // UDI: Shifts packed 32-bit integers in a right by IMM8 while shifting in
+    // sign bits.
+    const __m256i upper_lower_selector = _mm256_srai_epi32(hash_vector, 31);
+    // Finally: the next 8 probed 32-bit values, in probing sequence order.
+    const __m256i value_vector =
+        _mm256_blendv_epi8(lower, upper, upper_lower_selector);
+    // END Option 3
+
+    // We might not need to probe all 8, so build a mask for selecting only
+    // what we need. (The k_selector(s) could be pre-computed but that
+    // doesn't seem to make a noticeable performance difference.)
+    const __m256i zero_to_seven = _mm256_setr_epi32(0, 1, 2, 3, 4, 5, 6, 7);
+    // Subtract num_probes from each of those constants
+    __m256i k_selector =
+        _mm256_sub_epi32(zero_to_seven, _mm256_set1_epi32(num_probes));
+    // Negative after subtract -> use/select
+    // Keep only high bit (logical shift right each by 31).
+    k_selector = _mm256_srli_epi32(k_selector, 31);
+
+    // Strip off the 4 bit word address (shift LEFT)
+    // Strips the 4 MSB bits
+    __m256i bit_addresses = _mm256_slli_epi32(hash_vector, 4);
+
+    // And keep only 5-bit (32 - 27) bit-within-32-bit-word addresses.
+    // Shifts RIGHT 27 => 5 lower bit pos bits remain
+    bit_addresses = _mm256_srli_epi32(bit_addresses, 27);
+    // Build a bit mask
+    // Performs a logical shift of 32 (doublewords) in the individual data
+    // elements in k_selector to the left by the bit_addresses value
+    const __m256i bit_mask = _mm256_sllv_epi32(k_selector, bit_addresses);
+
+    // Like ((~value_vector) & bit_mask) == 0)
+    bool match = _mm256_testc_si256(value_vector, bit_mask) != 0;
+
+    // This check first so that it's easy for branch predictor to optimize
+    // num_probes <= 8 case, making it free of unpredictable branches.
+    if (num_probes <= 8) {
+      return {true, match};
+    } else if (!match) {
+      return {true, false};
+    }
+    return {false, false};
+  }
+#endif  // HAVE_AVX2
+
   static inline bool HashMayMatchPrepared(uint32_t h2, int num_probes,
                                           const char *data_at_cache_line) {
     uint32_t h = h2;
@@ -242,9 +354,11 @@ class FastLocalBloomImpl {
     // in doubt, don't add unnecessary code.
 
     // Powers of 32-bit golden ratio, mod 2**32.
-    const __m256i multipliers =
-        _mm256_setr_epi32(0x00000001, 0x9e3779b9, 0xe35e67b1, 0x734297e9,
-                          0x35fbe861, 0xdeb7c719, 0x448b211, 0x3459b749);
+    const __m256i multipliers = _mm256_setr_epi32(
+        BloomMath::GoldenRatioPowers[0], BloomMath::GoldenRatioPowers[1],
+        BloomMath::GoldenRatioPowers[2], BloomMath::GoldenRatioPowers[3],
+        BloomMath::GoldenRatioPowers[4], BloomMath::GoldenRatioPowers[5],
+        BloomMath::GoldenRatioPowers[6], BloomMath::GoldenRatioPowers[7]);
 
     for (;;) {
       // Eight copies of hash
@@ -254,77 +368,10 @@ class FastLocalBloomImpl {
       // associativity of multiplication.
       hash_vector = _mm256_mullo_epi32(hash_vector, multipliers);
 
-      // Now the top 9 bits of each of the eight 32-bit values in
-      // hash_vector are bit addresses for probes within the cache line.
-      // While the platform-independent code uses byte addressing (6 bits
-      // to pick a byte + 3 bits to pick a bit within a byte), here we work
-      // with 32-bit words (4 bits to pick a word + 5 bits to pick a bit
-      // within a word) because that works well with AVX2 and is equivalent
-      // under little-endian.
-
-      // Shift each right by 28 bits to get 4-bit word addresses.
-      const __m256i word_addresses = _mm256_srli_epi32(hash_vector, 28);
-
-      // Gather 32-bit values spread over 512 bits by 4-bit address. In
-      // essence, we are dereferencing eight pointers within the cache
-      // line.
-      //
-      // Option 1: AVX2 gather (seems to be a little slow - understandable)
-      // const __m256i value_vector =
-      //     _mm256_i32gather_epi32(static_cast<const int
-      //     *>(data_at_cache_line),
-      //                            word_addresses,
-      //                            /*bytes / i32*/ 4);
-      // END Option 1
-      // Potentially unaligned as we're not *always* cache-aligned -> loadu
-      const __m256i *mm_data =
-          reinterpret_cast<const __m256i *>(data_at_cache_line);
-      __m256i lower = _mm256_loadu_si256(mm_data);
-      __m256i upper = _mm256_loadu_si256(mm_data + 1);
-      // Option 2: AVX512VL permute hack
-      // Only negligibly faster than Option 3, so not yet worth supporting
-      // const __m256i value_vector =
-      //    _mm256_permutex2var_epi32(lower, word_addresses, upper);
-      // END Option 2
-      // Option 3: AVX2 permute+blend hack
-      // Use lowest three bits to order probing values, as if all from same
-      // 256 bit piece.
-      lower = _mm256_permutevar8x32_epi32(lower, word_addresses);
-      upper = _mm256_permutevar8x32_epi32(upper, word_addresses);
-      // Just top 1 bit of address, to select between lower and upper.
-      const __m256i upper_lower_selector = _mm256_srai_epi32(hash_vector, 31);
-      // Finally: the next 8 probed 32-bit values, in probing sequence order.
-      const __m256i value_vector =
-          _mm256_blendv_epi8(lower, upper, upper_lower_selector);
-      // END Option 3
-
-      // We might not need to probe all 8, so build a mask for selecting only
-      // what we need. (The k_selector(s) could be pre-computed but that
-      // doesn't seem to make a noticeable performance difference.)
-      const __m256i zero_to_seven = _mm256_setr_epi32(0, 1, 2, 3, 4, 5, 6, 7);
-      // Subtract rem_probes from each of those constants
-      __m256i k_selector =
-          _mm256_sub_epi32(zero_to_seven, _mm256_set1_epi32(rem_probes));
-      // Negative after subtract -> use/select
-      // Keep only high bit (logical shift right each by 31).
-      k_selector = _mm256_srli_epi32(k_selector, 31);
-
-      // Strip off the 4 bit word address (shift left)
-      __m256i bit_addresses = _mm256_slli_epi32(hash_vector, 4);
-      // And keep only 5-bit (32 - 27) bit-within-32-bit-word addresses.
-      bit_addresses = _mm256_srli_epi32(bit_addresses, 27);
-      // Build a bit mask
-      const __m256i bit_mask = _mm256_sllv_epi32(k_selector, bit_addresses);
-
-      // Like ((~value_vector) & bit_mask) == 0)
-      bool match = _mm256_testc_si256(value_vector, bit_mask) != 0;
-
-      // This check first so that it's easy for branch predictor to optimize
-      // num_probes <= 8 case, making it free of unpredictable branches.
-      if (rem_probes <= 8) {
-        return match;
-      } else if (!match) {
-        return false;
+      auto [is_done, answer] = CheckBitsPositionsInBloomBlock(
+          rem_probes, hash_vector, data_at_cache_line);
+      if (is_done) {
+        return answer;
       }
       // otherwise
       // Need another iteration. 0xab25f4c1 == golden ratio to the 8th power

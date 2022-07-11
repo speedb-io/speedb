@@ -9,10 +9,12 @@
 #pragma once
 
 #include <atomic>
+#include <deque>
 #include <memory>
 #include <string>
 #include <vector>
 
+#include "cache/cache_reservation_manager.h"
 #include "rocksdb/filter_policy.h"
 #include "rocksdb/table.h"
 
@@ -95,6 +97,8 @@ class FilterBitsReader {
       may_match[i] = MayMatch(*keys[i]);
     }
   }
+
+  virtual bool HashMayMatch(const uint64_t /* h */) = 0;
 };
 
 // Exposes any extra information needed for testing built-in
@@ -115,12 +119,102 @@ class BuiltinFilterBitsBuilder : public FilterBitsBuilder {
   virtual double EstimatedFpRate(size_t num_entries, size_t bytes) = 0;
 };
 
+class XXPH3FilterBitsBuilder : public BuiltinFilterBitsBuilder {
+ public:
+  explicit XXPH3FilterBitsBuilder(
+      std::atomic<int64_t>* aggregate_rounding_balance,
+      std::shared_ptr<CacheReservationManager> cache_res_mgr,
+      bool detect_filter_construct_corruption);
+
+  ~XXPH3FilterBitsBuilder() override {}
+
+  virtual void AddKey(const Slice& key) override;
+  virtual size_t EstimateEntriesAdded() override;
+  virtual Status MaybePostVerify(const Slice& filter_content) override;
+
+ protected:
+  static constexpr uint32_t kMetadataLen = 5;
+
+  // Number of hash entries to accumulate before charging their memory usage to
+  // the cache when cache reservation is available
+  static const std::size_t kUint64tHashEntryCacheResBucketSize;
+
+  // For delegating between XXPH3FilterBitsBuilders
+  void SwapEntriesWith(XXPH3FilterBitsBuilder* other);
+  void ResetEntries() { hash_entries_info_.Reset(); }
+
+  virtual size_t RoundDownUsableSpace(size_t available_size) = 0;
+
+  // To choose size using malloc_usable_size, we have to actually allocate.
+  size_t AllocateMaybeRounding(size_t target_len_with_metadata,
+                               size_t num_entries,
+                               std::unique_ptr<char[]>* buf);
+
+  // TODO: Ideally we want to verify the hash entry
+  // as it is added to the filter and eliminate this function
+  // for speeding up and leaving fewer spaces for undetected memory/CPU
+  // corruption. For Ribbon Filter, it's bit harder.
+  // Possible solution:
+  // pass a custom iterator that tracks the xor checksum as
+  // it iterates to ResetAndFindSeedToSolve
+  Status MaybeVerifyHashEntriesChecksum();
+
+  virtual FilterBitsReader* GetBitsReader(const Slice& filter_content);
+
+  // See BloomFilterPolicy::aggregate_rounding_balance_. If nullptr,
+  // always "round up" like historic behavior.
+  std::atomic<int64_t>* aggregate_rounding_balance_;
+
+  // For reserving memory used in (new) Bloom and Ribbon Filter construction
+  std::shared_ptr<CacheReservationManager> cache_res_mgr_;
+
+  // For managing cache reservation for final filter in (new) Bloom and Ribbon
+  // Filter construction
+  std::deque<std::unique_ptr<CacheReservationManager::CacheReservationHandle>>
+      final_filter_cache_res_handles_;
+
+  bool detect_filter_construct_corruption_;
+
+  struct HashEntriesInfo {
+    // A deque avoids unnecessary copying of already-saved values
+    // and has near-minimal peak memory use.
+    std::deque<uint64_t> entries;
+
+    // If cache_res_mgr_ != nullptr,
+    // it manages cache reservation for buckets of hash entries in (new) Bloom
+    // or Ribbon Filter construction.
+    // Otherwise, it is empty.
+    std::deque<std::unique_ptr<CacheReservationManager::CacheReservationHandle>>
+        cache_res_bucket_handles;
+
+    // If detect_filter_construct_corruption_ == true,
+    // it records the xor checksum of hash entries.
+    // Otherwise, it is 0.
+    uint64_t xor_checksum = 0;
+
+    void Swap(HashEntriesInfo* other) {
+      assert(other != nullptr);
+      std::swap(entries, other->entries);
+      std::swap(cache_res_bucket_handles, other->cache_res_bucket_handles);
+      std::swap(xor_checksum, other->xor_checksum);
+    }
+
+    void Reset() {
+      entries.clear();
+      cache_res_bucket_handles.clear();
+      xor_checksum = 0;
+    }
+  };
+
+  HashEntriesInfo hash_entries_info_;
+};
+
 // Base class for RocksDB built-in filter reader with
 // extra useful functionalities for inernal.
 class BuiltinFilterBitsReader : public FilterBitsReader {
  public:
   // Check if the hash of the entry match the bits in filter
-  virtual bool HashMayMatch(const uint64_t /* h */) { return true; }
+  bool HashMayMatch(const uint64_t /* h */) override { return true; }
 };
 
 // Base class for RocksDB built-in filter policies. This provides the
@@ -195,6 +289,8 @@ class BloomLikeFilterPolicy : public BuiltinFilterPolicy {
 
   std::string GetId() const override;
 
+  static std::string GetBitsPerKeySuffix(int millibits_per_key);
+
   // Essentially for testing only: configured millibits/key
   int GetMillibitsPerKey() const { return millibits_per_key_; }
   // Essentially for testing only: legacy whole bits/key
@@ -217,8 +313,6 @@ class BloomLikeFilterPolicy : public BuiltinFilterPolicy {
       const FilterBuildingContext& context) const;
   FilterBitsBuilder* GetStandard128RibbonBuilderWithContext(
       const FilterBuildingContext& context) const;
-
-  std::string GetBitsPerKeySuffix() const;
 
  private:
   // Bits per key settings are for configuring Bloom filters.
@@ -323,6 +417,26 @@ class DeprecatedBlockBasedBloomFilterPolicy : public BloomLikeFilterPolicy {
                            std::string* dst);
   static bool KeyMayMatch(const Slice& key, const Slice& bloom_filter);
 };
+
+class AlwaysTrueFilter : public BuiltinFilterBitsReader {
+ public:
+  bool MayMatch(const Slice&) override { return true; }
+  using FilterBitsReader::MayMatch;  // inherit overload
+  bool HashMayMatch(const uint64_t) override { return true; }
+  using BuiltinFilterBitsReader::HashMayMatch;  // inherit overload
+};
+
+class AlwaysFalseFilter : public BuiltinFilterBitsReader {
+ public:
+  bool MayMatch(const Slice&) override { return false; }
+  using FilterBitsReader::MayMatch;  // inherit overload
+  bool HashMayMatch(const uint64_t) override { return false; }
+  using BuiltinFilterBitsReader::HashMayMatch;  // inherit overload
+};
+
+inline Slice FinishAlwaysTrue(std::unique_ptr<const char[]>* /*buf*/) {
+  return Slice("\0\0\0\0\0\0", 6);
+}
 
 // For testing only, but always constructable with internal names
 namespace test {

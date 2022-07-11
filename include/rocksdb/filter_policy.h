@@ -103,6 +103,11 @@ class FilterPolicy : public Customizable {
   // family (rare), implementations may return Name().
   virtual const char* CompatibilityName() const = 0;
 
+  // Utility helper to parse the URI passed to the CreateFromString()
+  // And extract the value of the bits-per-key passed via that URI
+  // See CreateFromString() below for more details
+  static double ExtractBitsPerKeyFromUri(const std::string& uri);
+
   // Creates a new FilterPolicy based on the input value string and returns the
   // result The value might be an ID, and ID with properties, or an old-style
   // policy string.

@@ -67,6 +67,10 @@ class TestFilterBitsReader : public FilterBitsReader {
   using FilterBitsReader::MayMatch;
   bool MayMatch(const Slice& entry) override {
     uint32_t h = Hash(entry.data(), entry.size(), 1);
+    return HashMayMatch(h);
+  }
+
+  bool HashMayMatch(const uint64_t h) override {
     for (size_t i = 0; i + 4 <= len_; i += 4) {
       if (h == DecodeFixed32(data_ + i)) {
         return true;

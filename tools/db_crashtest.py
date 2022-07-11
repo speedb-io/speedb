@@ -184,6 +184,7 @@ default_params = {
     "data_block_index_type": random.randint(0, 1),
     "data_block_hash_table_util_ratio": random.randint(0, 100) / 100.0,
     "customopspercent": 0,
+    "filter_uri": lambda: random.choice(["speedb.PairedBloomFilter", ""]),
 }
 
 _TEST_DIR_ENV_VAR = 'TEST_TMPDIR'
@@ -636,6 +637,10 @@ def finalize_and_sanitize(src_params, counter):
         dest_params["memtable_prefix_bloom_size_ratio"] = 0
     if dest_params.get("two_write_queues") == 1:
         dest_params["enable_pipelined_write"] = 0
+    # make sure bloom_bits is not 0 when filter_uri is used since it fails in CreateFilterPolicy.
+    if dest_params.get("filter_uri") != "":
+        dest_params["bloom_bits"] = random.choice([random.randint(1,19),
+                                         random.lognormvariate(2.3, 1.3)])
     return dest_params
 
 

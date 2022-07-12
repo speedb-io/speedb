@@ -3,8 +3,8 @@ on: [push, pull_request, workflow_call, workflow_dispatch]
 jobs:
   check:
     name: Check TARGETS file and code format
-    runs-on: ubuntu:20.04
-    #runs-on: [self-hosted, linux, x64, myrunner]
+    #runs-on: ubuntu:20.04
+    runs-on: [self-hosted, linux, x64, myrunner]
     container:
       image: ubuntu:latest
     steps:

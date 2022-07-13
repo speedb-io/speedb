@@ -9,7 +9,7 @@ jobs:
     steps:
     
     - name: pre
-      run: apt update && apt install -y sudo git make
+      run: apt update && apt install -y sudo git make clang build-essential clang-format
     
     - name: Checkout feature branch
       uses: actions/checkout@v2
@@ -20,13 +20,11 @@ jobs:
       run: |
         git remote add upstream https://github.com/speedb-io/speedb.git && git fetch upstream
         git config --global --add safe.directory $GITHUB_WORKSPACE
-
     - name: Where am I
       run: |
         echo git status && git status
         echo "git remote -v" && git remote -v
         echo git branch && git branch
-
     - name: Setup Python
       uses: actions/setup-python@v4
       with:

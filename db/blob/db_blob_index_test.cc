@@ -506,7 +506,8 @@ TEST_F(DBBlobIndexTest, IntegratedBlobIterate) {
 
   auto check_iterator = [&](Iterator* iterator, Status expected_status,
                             const Slice& expected_value) {
-    ASSERT_EQ(expected_status, iterator->status());
+    ASSERT_EQ(expected_status.code(), iterator->status().code());
+    ASSERT_EQ(expected_status.subcode(), iterator->status().subcode());
     if (expected_status.ok()) {
       ASSERT_TRUE(iterator->Valid());
       ASSERT_EQ(expected_value, iterator->value());

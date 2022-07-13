@@ -646,7 +646,11 @@ TEST_F(ImportColumnFamilyTest, ImportColumnFamilyNegativeTest) {
     Status s = db_->CreateColumnFamilyWithImport(ColumnFamilyOptions(), "koko",
                                                  ImportColumnFamilyOptions(),
                                                  metadata, &import_cfh_);
-    ASSERT_TRUE(std::strstr(s.getState(), "Column family already exists"));
+
+    ASSERT_TRUE(s.IsInvalidArgument());
+    ASSERT_NE(s.getState(), nullptr);
+    EXPECT_NE(strstr(s.getState(), "Column family already exists"), nullptr)
+        << s.getState();
     ASSERT_EQ(import_cfh_, nullptr);
   }
 
@@ -657,7 +661,11 @@ TEST_F(ImportColumnFamilyTest, ImportColumnFamilyNegativeTest) {
     Status s = db_->CreateColumnFamilyWithImport(ColumnFamilyOptions(), "yoyo",
                                                  ImportColumnFamilyOptions(),
                                                  metadata, &import_cfh_);
-    ASSERT_TRUE(std::strstr(s.getState(), "The list of files is empty"));
+
+    ASSERT_TRUE(s.IsInvalidArgument());
+    ASSERT_NE(s.getState(), nullptr);
+    EXPECT_NE(strstr(s.getState(), "The list of files is empty"), nullptr)
+        << s.getState();
     ASSERT_EQ(import_cfh_, nullptr);
   }
 
@@ -710,7 +718,10 @@ TEST_F(ImportColumnFamilyTest, ImportColumnFamilyNegativeTest) {
     Status s = db_->CreateColumnFamilyWithImport(ColumnFamilyOptions(), "coco",
                                                  ImportColumnFamilyOptions(),
                                                  metadata, &import_cfh_);
-    ASSERT_TRUE(std::strstr(s.getState(), "Comparator name mismatch"));
+    ASSERT_TRUE(s.IsInvalidArgument());
+    ASSERT_NE(s.getState(), nullptr);
+    EXPECT_NE(strstr(s.getState(), "Comparator name mismatch"), nullptr)
+        << s.getState();
     ASSERT_EQ(import_cfh_, nullptr);
   }
 
@@ -735,7 +746,10 @@ TEST_F(ImportColumnFamilyTest, ImportColumnFamilyNegativeTest) {
     Status s = db_->CreateColumnFamilyWithImport(ColumnFamilyOptions(), "yoyo",
                                                  ImportColumnFamilyOptions(),
                                                  metadata, &import_cfh_);
-    ASSERT_TRUE(std::strstr(s.getState(), "No such file or directory"));
+    ASSERT_TRUE(s.IsIOError());
+    ASSERT_NE(s.getState(), nullptr);
+    EXPECT_NE(strstr(s.getState(), "No such file or directory"), nullptr)
+        << s.getState();
     ASSERT_EQ(import_cfh_, nullptr);
 
     // Test successful import after a failure with the same CF name. Ensures

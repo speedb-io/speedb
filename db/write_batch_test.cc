@@ -422,7 +422,7 @@ TEST_F(WriteBatchTest, PrepareCommit) {
   batch.SetSavePoint();
   ASSERT_OK(WriteBatchInternal::MarkEndPrepare(&batch, Slice("xid1")));
   Status s = batch.RollbackToSavePoint();
-  ASSERT_EQ(s, Status::NotFound());
+  ASSERT_TRUE(s.IsNotFound());
   ASSERT_OK(WriteBatchInternal::MarkCommit(&batch, Slice("xid1")));
   ASSERT_OK(WriteBatchInternal::MarkRollback(&batch, Slice("xid1")));
   ASSERT_EQ(2u, batch.Count());

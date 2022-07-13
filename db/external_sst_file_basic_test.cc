@@ -683,7 +683,7 @@ TEST_F(ExternalSSTFileBasicTest, NoCopy) {
 
   s = DeprecatedAddFile({file1}, true /* move file */);
   ASSERT_OK(s) << s.ToString();
-  ASSERT_EQ(Status::NotFound(), env_->FileExists(file1));
+  ASSERT_TRUE(env_->FileExists(file1).IsNotFound());
 
   s = DeprecatedAddFile({file2}, false /* copy file */);
   ASSERT_OK(s) << s.ToString();

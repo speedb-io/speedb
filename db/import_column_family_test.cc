@@ -508,22 +508,30 @@ TEST_F(ImportColumnFamilyTest, ImportColumnFamilyNegativeTest) {
   {
     // Create column family with existing cf name.
     ExportImportFilesMetaData metadata;
+    metadata.db_comparator_name = options.comparator->Name();
 
-    ASSERT_EQ(db_->CreateColumnFamilyWithImport(ColumnFamilyOptions(), "koko",
-                                                ImportColumnFamilyOptions(),
-                                                metadata, &import_cfh_),
-              Status::InvalidArgument("Column family already exists"));
+    Status s = db_->CreateColumnFamilyWithImport(ColumnFamilyOptions(), "koko",
+                                                 ImportColumnFamilyOptions(),
+                                                 metadata, &import_cfh_);
+    ASSERT_TRUE(s.IsInvalidArgument());
+    ASSERT_NE(s.getState(), nullptr);
+    EXPECT_NE(strstr(s.getState(), "Column family already exists"), nullptr)
+        << s.getState();
     ASSERT_EQ(import_cfh_, nullptr);
   }
 
   {
     // Import with no files specified.
     ExportImportFilesMetaData metadata;
+    metadata.db_comparator_name = options.comparator->Name();
 
-    ASSERT_EQ(db_->CreateColumnFamilyWithImport(ColumnFamilyOptions(), "yoyo",
-                                                ImportColumnFamilyOptions(),
-                                                metadata, &import_cfh_),
-              Status::InvalidArgument("The list of files is empty"));
+    Status s = db_->CreateColumnFamilyWithImport(ColumnFamilyOptions(), "yoyo",
+                                                 ImportColumnFamilyOptions(),
+                                                 metadata, &import_cfh_);
+    ASSERT_TRUE(s.IsInvalidArgument());
+    ASSERT_NE(s.getState(), nullptr);
+    EXPECT_NE(strstr(s.getState(), "The list of files is empty"), nullptr)
+        << s.getState();
     ASSERT_EQ(import_cfh_, nullptr);
   }
 
@@ -550,10 +558,13 @@ TEST_F(ImportColumnFamilyTest, ImportColumnFamilyNegativeTest) {
         LiveFileMetaDataInit(file2_sst_name, sst_files_dir_, 1, 10, 19));
     metadata.db_comparator_name = options.comparator->Name();
 
-    ASSERT_EQ(db_->CreateColumnFamilyWithImport(ColumnFamilyOptions(), "yoyo",
-                                                ImportColumnFamilyOptions(),
-                                                metadata, &import_cfh_),
-              Status::InvalidArgument("Files have overlapping ranges"));
+    Status s = db_->CreateColumnFamilyWithImport(ColumnFamilyOptions(), "yoyo",
+                                                 ImportColumnFamilyOptions(),
+                                                 metadata, &import_cfh_);
+    ASSERT_TRUE(s.IsInvalidArgument());
+    ASSERT_NE(s.getState(), nullptr);
+    EXPECT_NE(strstr(s.getState(), "Files have overlapping ranges"), nullptr)
+        << s.getState();
     ASSERT_EQ(import_cfh_, nullptr);
   }
 
@@ -574,10 +585,13 @@ TEST_F(ImportColumnFamilyTest, ImportColumnFamilyNegativeTest) {
         LiveFileMetaDataInit(file1_sst_name, sst_files_dir_, 1, 10, 19));
     metadata.db_comparator_name = mismatch_options.comparator->Name();
 
-    ASSERT_EQ(db_->CreateColumnFamilyWithImport(ColumnFamilyOptions(), "coco",
-                                                ImportColumnFamilyOptions(),
-                                                metadata, &import_cfh_),
-              Status::InvalidArgument("Comparator name mismatch"));
+    Status s = db_->CreateColumnFamilyWithImport(ColumnFamilyOptions(), "coco",
+                                                 ImportColumnFamilyOptions(),
+                                                 metadata, &import_cfh_);
+    ASSERT_TRUE(s.IsInvalidArgument());
+    ASSERT_NE(s.getState(), nullptr);
+    EXPECT_NE(strstr(s.getState(), "Comparator name mismatch"), nullptr)
+        << s.getState();
     ASSERT_EQ(import_cfh_, nullptr);
   }
 
@@ -599,10 +613,13 @@ TEST_F(ImportColumnFamilyTest, ImportColumnFamilyNegativeTest) {
         LiveFileMetaDataInit(file3_sst_name, sst_files_dir_, 1, 10, 19));
     metadata.db_comparator_name = options.comparator->Name();
 
-    ASSERT_EQ(db_->CreateColumnFamilyWithImport(ColumnFamilyOptions(), "yoyo",
-                                                ImportColumnFamilyOptions(),
-                                                metadata, &import_cfh_),
-              Status::IOError("No such file or directory"));
+    Status s = db_->CreateColumnFamilyWithImport(ColumnFamilyOptions(), "yoyo",
+                                                 ImportColumnFamilyOptions(),
+                                                 metadata, &import_cfh_);
+    ASSERT_TRUE(s.IsIOError());
+    ASSERT_NE(s.getState(), nullptr);
+    EXPECT_NE(strstr(s.getState(), "No such file or directory"), nullptr)
+        << s.getState();
     ASSERT_EQ(import_cfh_, nullptr);
 
     // Test successful import after a failure with the same CF name. Ensures

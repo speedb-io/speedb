@@ -2193,7 +2193,8 @@ void ASSERT_SAME(ReadOptions roptions, TransactionDB* db, Status exp_s,
   Status s;
   PinnableSlice v;
   s = db->Get(roptions, db->DefaultColumnFamily(), key, &v);
-  ASSERT_EQ(exp_s, s);
+  ASSERT_EQ(exp_s.code(), s.code());
+  ASSERT_EQ(exp_s.subcode(), s.subcode());
   ASSERT_TRUE(s.ok() || s.IsNotFound());
   if (s.ok()) {
     ASSERT_TRUE(exp_v == v);
@@ -2206,7 +2207,8 @@ void ASSERT_SAME(ReadOptions roptions, TransactionDB* db, Status exp_s,
   ASSERT_EQ(1, values.size());
   ASSERT_EQ(1, s_vec.size());
   s = s_vec[0];
-  ASSERT_EQ(exp_s, s);
+  ASSERT_EQ(exp_s.code(), s.code());
+  ASSERT_EQ(exp_s.subcode(), s.subcode());
   ASSERT_TRUE(s.ok() || s.IsNotFound());
   if (s.ok()) {
     ASSERT_TRUE(exp_v == values[0]);

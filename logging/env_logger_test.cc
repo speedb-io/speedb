@@ -56,11 +56,11 @@ const std::string EnvLoggerTest::kLogFile = test::PerThreadDBPath("log_file");
 
 TEST_F(EnvLoggerTest, EmptyLogFile) {
   auto logger = CreateLogger();
-  ASSERT_EQ(logger->Close(), Status::OK());
+  ASSERT_OK(logger->Close());
 
   // Check the size of the log file.
   uint64_t file_size;
-  ASSERT_EQ(env_->GetFileSize(kLogFile, &file_size), Status::OK());
+  ASSERT_OK(env_->GetFileSize(kLogFile, &file_size));
   ASSERT_EQ(file_size, 0);
   DeleteLogFile();
 }
@@ -74,7 +74,7 @@ TEST_F(EnvLoggerTest, LogMultipleLines) {
 
   // Flush the logs.
   logger->Flush();
-  ASSERT_EQ(logger->Close(), Status::OK());
+  ASSERT_OK(logger->Close());
 
   // Validate whether the log file has 'kNumIter' number of lines.
   ASSERT_EQ(test::GetLinesCount(kLogFile, kSampleMessage), kNumIter);
@@ -89,7 +89,7 @@ TEST_F(EnvLoggerTest, Overwrite) {
     const int kNumIter = 10;
     WriteLogs(logger, kSampleMessage, kNumIter);
 
-    ASSERT_EQ(logger->Close(), Status::OK());
+    ASSERT_OK(logger->Close());
 
     // Validate whether the log file has 'kNumIter' number of lines.
     ASSERT_EQ(test::GetLinesCount(kLogFile, kSampleMessage), kNumIter);
@@ -101,10 +101,10 @@ TEST_F(EnvLoggerTest, Overwrite) {
 
     // File should be empty.
     uint64_t file_size;
-    ASSERT_EQ(env_->GetFileSize(kLogFile, &file_size), Status::OK());
+    ASSERT_OK(env_->GetFileSize(kLogFile, &file_size));
     ASSERT_EQ(file_size, 0);
     ASSERT_EQ(logger->GetLogFileSize(), 0);
-    ASSERT_EQ(logger->Close(), Status::OK());
+    ASSERT_OK(logger->Close());
   }
   DeleteLogFile();
 }
@@ -116,7 +116,7 @@ TEST_F(EnvLoggerTest, Close) {
   const int kNumIter = 10;
   WriteLogs(logger, kSampleMessage, kNumIter);
 
-  ASSERT_EQ(logger->Close(), Status::OK());
+  ASSERT_OK(logger->Close());
 
   // Validate whether the log file has 'kNumIter' number of lines.
   ASSERT_EQ(test::GetLinesCount(kLogFile, kSampleMessage), kNumIter);
@@ -145,7 +145,7 @@ TEST_F(EnvLoggerTest, ConcurrentLogging) {
     th.join();
   }
 
-  ASSERT_EQ(logger->Close(), Status::OK());
+  ASSERT_OK(logger->Close());
 
   // Verfiy the log file.
   ASSERT_EQ(test::GetLinesCount(kLogFile, kSampleMessage),

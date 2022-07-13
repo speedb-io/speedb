@@ -37,7 +37,7 @@ class DBWALTestBase : public DBTestBase {
     int alloc_status = fallocate(fd, 0, 0, 1);
     int err_number = errno;
     close(fd);
-    assert(env_->DeleteFile(fname_test_fallocate) == Status::OK());
+    assert(env_->DeleteFile(fname_test_fallocate).ok());
     if (err_number == ENOSYS || err_number == EOPNOTSUPP) {
       fprintf(stderr, "Skipped preallocated space check: %s\n",
               errnoStr(err_number).c_str());

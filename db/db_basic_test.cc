@@ -1125,7 +1125,7 @@ TEST_F(DBBasicTest, DBClose) {
 
   s = db->Close();
   ASSERT_EQ(env->GetCloseCount(), 1);
-  ASSERT_EQ(s, Status::IOError());
+  ASSERT_TRUE(s.IsIOError());
 
   delete db;
   ASSERT_EQ(env->GetCloseCount(), 1);
@@ -1145,7 +1145,7 @@ TEST_F(DBBasicTest, DBClose) {
   ASSERT_TRUE(db != nullptr);
 
   s = db->Close();
-  ASSERT_EQ(s, Status::OK());
+  ASSERT_OK(s);
   delete db;
   ASSERT_EQ(env->GetCloseCount(), 2);
   options.info_log.reset();
@@ -1168,15 +1168,15 @@ TEST_F(DBBasicTest, DBCloseFlushError) {
   ASSERT_OK(Put("key3", "value3"));
   fault_injection_env->SetFilesystemActive(false);
   Status s = dbfull()->Close();
-  ASSERT_NE(s, Status::OK());
+  ASSERT_NOK(s);
   // retry should return the same error
   s = dbfull()->Close();
-  ASSERT_NE(s, Status::OK());
+  ASSERT_NOK(s);
   fault_injection_env->SetFilesystemActive(true);
   // retry close() is no-op even the system is back. Could be improved if
   // Close() is retry-able: #9029
   s = dbfull()->Close();
-  ASSERT_NE(s, Status::OK());
+  ASSERT_NOK(s);
   Destroy(options);
 }
 
@@ -2247,7 +2247,7 @@ TEST_F(DBBasicTest, MultiGetIOBufferOverrun) {
     // Make the value compressible. A purely random string doesn't compress
     // and the resultant data block will not be compressed
     std::string value(rnd.RandomString(128) + zero_str);
-    assert(Put(Key(i), value) == Status::OK());
+    ASSERT_OK(Put(Key(i), value));
   }
   ASSERT_OK(Flush());
 
@@ -2789,8 +2789,11 @@ class DBBasicTestMultiGet : public DBTestBase {
         // Make the value compressible. A purely random string doesn't compress
         // and the resultant data block will not be compressed
         values_.emplace_back(rnd.RandomString(128) + zero_str);
-        assert(((num_cfs == 1) ? Put(Key(i), values_[i])
-                               : Put(cf, Key(i), values_[i])) == Status::OK());
+        if (num_cfs == 1) {
+          assert(Put(Key(i), values_[i]).ok());
+        } else {
+          assert(Put(cf, Key(i), values_[i]).ok());
+        }
       }
       if (num_cfs == 1) {
         EXPECT_OK(Flush());
@@ -2802,9 +2805,11 @@ class DBBasicTestMultiGet : public DBTestBase {
         // block cannot gain space by compression
         uncompressable_values_.emplace_back(rnd.RandomString(256) + '\0');
         std::string tmp_key = "a" + Key(i);
-        assert(((num_cfs == 1) ? Put(tmp_key, uncompressable_values_[i])
-                               : Put(cf, tmp_key, uncompressable_values_[i])) ==
-               Status::OK());
+        if (num_cfs == 1) {
+          assert(Put(tmp_key, uncompressable_values_[i]).ok());
+        } else {
+          assert(Put(cf, tmp_key, uncompressable_values_[i]).ok());
+        }
       }
       if (num_cfs == 1) {
         EXPECT_OK(Flush());
@@ -3229,8 +3234,8 @@ TEST_P(DBBasicTestWithParallelIO, MultiGetWithChecksumMismatch) {
                      keys.data(), values.data(), statuses.data(), true);
   ASSERT_TRUE(CheckValue(0, values[0].ToString()));
   // ASSERT_TRUE(CheckValue(50, values[1].ToString()));
-  ASSERT_EQ(statuses[0], Status::OK());
-  ASSERT_EQ(statuses[1], Status::Corruption());
+  ASSERT_OK(statuses[0]);
+  ASSERT_TRUE(statuses[1].IsCorruption());
 
   SyncPoint::GetInstance()->DisableProcessing();
 }
@@ -3275,8 +3280,8 @@ TEST_P(DBBasicTestWithParallelIO, MultiGetWithMissingFile) {
 
   dbfull()->MultiGet(ro, dbfull()->DefaultColumnFamily(), keys.size(),
                      keys.data(), values.data(), statuses.data(), true);
-  ASSERT_EQ(statuses[0], Status::IOError());
-  ASSERT_EQ(statuses[1], Status::IOError());
+  ASSERT_TRUE(statuses[0].IsIOError());
+  ASSERT_TRUE(statuses[1].IsIOError());
 
   SyncPoint::GetInstance()->DisableProcessing();
 }
@@ -3484,9 +3489,7 @@ class DBBasicTestMultiGetDeadline : public DBBasicTestMultiGet {
       if (i < num_ok) {
         EXPECT_OK(statuses[i]);
       } else {
-        if (statuses[i] != Status::TimedOut()) {
-          EXPECT_EQ(statuses[i], Status::TimedOut());
-        }
+        EXPECT_TRUE(statuses[i].IsTimedOut());
       }
     }
   }
@@ -3811,7 +3814,7 @@ TEST_P(DBBasicTestDeadline, PointLookupDeadline) {
       std::string value;
       Status s = dbfull()->Get(ro, "k50", &value);
       if (fs->TimedOut()) {
-        ASSERT_EQ(s, Status::TimedOut());
+        ASSERT_TRUE(s.IsTimedOut());
       } else {
         timedout = false;
         ASSERT_OK(s);
@@ -3898,7 +3901,7 @@ TEST_P(DBBasicTestDeadline, IteratorDeadline) {
       }
       if (fs->TimedOut()) {
         ASSERT_FALSE(iter->Valid());
-        ASSERT_EQ(iter->status(), Status::TimedOut());
+        ASSERT_TRUE(iter->status().IsTimedOut());
       } else {
         timedout = false;
         ASSERT_OK(iter->status());

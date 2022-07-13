@@ -965,8 +965,7 @@ std::string DBTestBase::AllEntriesFor(const Slice& user_key, int cf) {
     bool first = true;
     while (iter->Valid()) {
       ParsedInternalKey ikey(Slice(), 0, kTypeValue);
-      if (ParseInternalKey(iter->key(), &ikey, true /* log_err_key */) !=
-          Status::OK()) {
+      if (!ParseInternalKey(iter->key(), &ikey, true /* log_err_key */).ok()) {
         result += "CORRUPTED";
       } else {
         if (!last_options_.comparator->Equal(ikey.user_key, user_key)) {
@@ -1515,7 +1514,9 @@ void DBTestBase::VerifyDBFromMap(std::map<std::string, std::string> true_data,
       ASSERT_EQ(Get(kv.first), kv.second);
     } else {
       std::string value;
-      ASSERT_EQ(s, db_->Get(ReadOptions(), kv.first, &value));
+      Status ref_s = db_->Get(ReadOptions(), kv.first, &value);
+      ASSERT_EQ(s.code(), ref_s.code());
+      ASSERT_EQ(s.subcode(), ref_s.subcode());
     }
     total_reads++;
   }
@@ -1536,7 +1537,8 @@ void DBTestBase::VerifyDBFromMap(std::map<std::string, std::string> true_data,
       if (!current_status.ok()) {
         s = current_status;
       }
-      ASSERT_EQ(iter->status(), s);
+      ASSERT_EQ(iter->status().code(), s.code());
+      ASSERT_EQ(iter->status().subcode(), s.subcode());
       if (current_status.ok()) {
         ASSERT_EQ(iter->value().ToString(), data_iter->second);
       }
@@ -1559,7 +1561,8 @@ void DBTestBase::VerifyDBFromMap(std::map<std::string, std::string> true_data,
       if (!current_status.ok()) {
         s = current_status;
       }
-      ASSERT_EQ(iter->status(), s);
+      ASSERT_EQ(iter->status().code(), s.code());
+      ASSERT_EQ(iter->status().subcode(), s.subcode());
       if (current_status.ok()) {
         ASSERT_EQ(iter->value().ToString(), data_rev->second);
       }

@@ -156,7 +156,7 @@ TEST_P(EnvBasicTestWithParam, Basics) {
   std::vector<std::string> children;
 
   // Check that the directory is empty.
-  ASSERT_EQ(Status::NotFound(), env_->FileExists(test_dir_ + "/non_existent"));
+  ASSERT_TRUE(env_->FileExists(test_dir_ + "/non_existent").IsNotFound());
   ASSERT_TRUE(!env_->GetFileSize(test_dir_ + "/non_existent", &file_size).ok());
   ASSERT_OK(env_->GetChildren(test_dir_, &children));
   ASSERT_EQ(0U, children.size());
@@ -194,7 +194,7 @@ TEST_P(EnvBasicTestWithParam, Basics) {
   ASSERT_TRUE(
       !env_->RenameFile(test_dir_ + "/non_existent", test_dir_ + "/g").ok());
   ASSERT_OK(env_->RenameFile(test_dir_ + "/f1", test_dir_ + "/g"));
-  ASSERT_EQ(Status::NotFound(), env_->FileExists(test_dir_ + "/f1"));
+  ASSERT_TRUE(env_->FileExists(test_dir_ + "/f1").IsNotFound());
   ASSERT_OK(env_->FileExists(test_dir_ + "/g"));
   ASSERT_OK(env_->GetFileSize(test_dir_ + "/g", &file_size));
   ASSERT_EQ(3U, file_size);
@@ -218,7 +218,7 @@ TEST_P(EnvBasicTestWithParam, Basics) {
   // Check that deleting works.
   ASSERT_NOK(env_->DeleteFile(test_dir_ + "/non_existent"));
   ASSERT_OK(env_->DeleteFile(test_dir_ + "/g"));
-  ASSERT_EQ(Status::NotFound(), env_->FileExists(test_dir_ + "/g"));
+  ASSERT_TRUE(env_->FileExists(test_dir_ + "/g").IsNotFound());
   ASSERT_OK(env_->GetChildren(test_dir_, &children));
   ASSERT_EQ(0U, children.size());
   Status s = env_->GetChildren(test_dir_ + "/non_existent", &children);
@@ -324,7 +324,7 @@ TEST_P(EnvMoreTestWithParam, MakeDir) {
   ASSERT_TRUE(!env_->CreateDir(test_dir_ + "/j").ok());
   ASSERT_OK(env_->CreateDirIfMissing(test_dir_ + "/j"));
   ASSERT_OK(env_->DeleteDir(test_dir_ + "/j"));
-  ASSERT_EQ(Status::NotFound(), env_->FileExists(test_dir_ + "/j"));
+  ASSERT_TRUE(env_->FileExists(test_dir_ + "/j").IsNotFound());
 }
 
 TEST_P(EnvMoreTestWithParam, GetChildren) {

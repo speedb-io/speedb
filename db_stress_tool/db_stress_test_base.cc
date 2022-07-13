@@ -410,7 +410,8 @@ Status StressTest::AssertSame(DB* db, ColumnFamilyHandle* cf,
   if (!s.ok() && !s.IsNotFound()) {
     return s;
   }
-  if (snap_state.status != s) {
+  if (snap_state.status.code() != s.code() ||
+      snap_state.status.subcode() != s.subcode()) {
     return Status::Corruption(
         "The snapshot gave inconsistent results for key " +
         std::to_string(Hash(snap_state.key.c_str(), snap_state.key.size(), 0)) +

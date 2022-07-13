@@ -1302,7 +1302,7 @@ TEST_F(DBErrorHandlingFSTest, WALWriteError) {
     WriteOptions wopts;
     wopts.sync = true;
     s = dbfull()->Write(wopts, &batch);
-    ASSERT_EQ(s, s.NoSpace());
+    ASSERT_TRUE(s.IsNoSpace());
   }
   SyncPoint::GetInstance()->DisableProcessing();
   // `ClearAllCallBacks()` is needed in addition to `DisableProcessing()` to
@@ -2466,7 +2466,7 @@ TEST_F(DBErrorHandlingFSTest, FLushWritRetryableErrorAbortRecovery) {
   s = Flush();
   ASSERT_EQ(s.severity(), ROCKSDB_NAMESPACE::Status::Severity::kSoftError);
   ASSERT_EQ(listener->WaitForRecovery(5000000), true);
-  ASSERT_EQ(listener->new_bg_error(), Status::Aborted());
+  ASSERT_TRUE(listener->new_bg_error().IsAborted());
   SyncPoint::GetInstance()->DisableProcessing();
   fault_fs_->SetFilesystemActive(true);
 

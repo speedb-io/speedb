@@ -940,7 +940,7 @@ TEST_P(TransactionTest, CommitTimeBatchFailTest) {
 
   // fails due to non-empty commit-time batch
   s = txn1->Commit();
-  ASSERT_EQ(s, Status::InvalidArgument());
+  ASSERT_TRUE(s.IsInvalidArgument());
 
   delete txn1;
 }
@@ -1057,7 +1057,7 @@ TEST_P(TransactionTest, SimpleTwoPhaseTransactionTest) {
 
     // we already committed
     s = txn->Commit();
-    ASSERT_EQ(s, Status::InvalidArgument());
+    ASSERT_TRUE(s.IsInvalidArgument());
 
     // no longer is prepared results
     db->GetAllPreparedTransactions(&prepared_trans);
@@ -1130,15 +1130,15 @@ TEST_P(TransactionTest, TwoPhaseNameTest) {
 
   // cant prepare txn without name
   s = txn1->Prepare();
-  ASSERT_EQ(s, Status::InvalidArgument());
+  ASSERT_TRUE(s.IsInvalidArgument());
 
   // name too short
   s = txn1->SetName("");
-  ASSERT_EQ(s, Status::InvalidArgument());
+  ASSERT_TRUE(s.IsInvalidArgument());
 
   // name too long
   s = txn1->SetName(std::string(513, 'x'));
-  ASSERT_EQ(s, Status::InvalidArgument());
+  ASSERT_TRUE(s.IsInvalidArgument());
 
   // valid set name
   s = txn1->SetName("name1");
@@ -1146,11 +1146,11 @@ TEST_P(TransactionTest, TwoPhaseNameTest) {
 
   // cant have duplicate name
   s = txn2->SetName("name1");
-  ASSERT_EQ(s, Status::InvalidArgument());
+  ASSERT_TRUE(s.IsInvalidArgument());
 
   // shouldn't be able to prepare
   s = txn2->Prepare();
-  ASSERT_EQ(s, Status::InvalidArgument());
+  ASSERT_TRUE(s.IsInvalidArgument());
 
   // valid name set
   s = txn2->SetName("name2");
@@ -1158,7 +1158,7 @@ TEST_P(TransactionTest, TwoPhaseNameTest) {
 
   // cant reset name
   s = txn2->SetName("name3");
-  ASSERT_EQ(s, Status::InvalidArgument());
+  ASSERT_TRUE(s.IsInvalidArgument());
 
   ASSERT_EQ(txn1->GetName(), "name1");
   ASSERT_EQ(txn2->GetName(), "name2");
@@ -1168,7 +1168,7 @@ TEST_P(TransactionTest, TwoPhaseNameTest) {
 
   // can't rename after prepare
   s = txn1->SetName("name4");
-  ASSERT_EQ(s, Status::InvalidArgument());
+  ASSERT_TRUE(s.IsInvalidArgument());
 
   ASSERT_OK(txn1->Rollback());
   ASSERT_OK(txn2->Rollback());
@@ -1271,7 +1271,7 @@ TEST_P(TransactionStressTest, TwoPhaseExpirationTest) {
   ASSERT_OK(s);
 
   s = txn2->Prepare();
-  ASSERT_EQ(s, Status::Expired());
+  ASSERT_TRUE(s.IsExpired());
 
   delete txn1;
   delete txn2;
@@ -1337,11 +1337,11 @@ TEST_P(TransactionTest, TwoPhaseRollbackTest) {
 
   // make commit
   s = txn->Commit();
-  ASSERT_EQ(s, Status::InvalidArgument());
+  ASSERT_TRUE(s.IsInvalidArgument());
 
   // try rollback again
   s = txn->Rollback();
-  ASSERT_EQ(s, Status::InvalidArgument());
+  ASSERT_TRUE(s.IsInvalidArgument());
 
   delete txn;
 }
@@ -1436,7 +1436,7 @@ TEST_P(TransactionTest, PersistentTwoPhaseTransactionTest) {
 
   // we already committed
   s = txn->Commit();
-  ASSERT_EQ(s, Status::InvalidArgument());
+  ASSERT_TRUE(s.IsInvalidArgument());
 
   // no longer is prepared results
   prepared_trans.clear();
@@ -1617,7 +1617,7 @@ TEST_P(TransactionStressTest, TwoPhaseLongPrepareTest) {
 
   // verify data txn data
   s = db->Get(read_options, "foo", &value);
-  ASSERT_EQ(s, Status::OK());
+  ASSERT_OK(s);
   ASSERT_EQ(value, "bar");
 
   // verify non txn data
@@ -1625,7 +1625,7 @@ TEST_P(TransactionStressTest, TwoPhaseLongPrepareTest) {
     std::string key(i, 'k');
     std::string val(1000, 'v');
     s = db->Get(read_options, key, &value);
-    ASSERT_EQ(s, Status::OK());
+    ASSERT_OK(s);
     ASSERT_EQ(value, val);
   }
 
@@ -1674,7 +1674,7 @@ TEST_P(TransactionTest, TwoPhaseSequenceTest) {
 
   // value is now available
   s = db->Get(read_options, "foo4", &value);
-  ASSERT_EQ(s, Status::OK());
+  ASSERT_OK(s);
   ASSERT_EQ(value, "bar4");
 }
 #endif  // !defined(ROCKSDB_VALGRIND_RUN) || defined(ROCKSDB_FULL_VALGRIND_RUN)
@@ -1717,7 +1717,7 @@ TEST_P(TransactionTest, TwoPhaseDoubleRecoveryTest) {
   ASSERT_OK(s);
 
   s = db->Get(read_options, "foo", &value);
-  ASSERT_EQ(s, Status::OK());
+  ASSERT_OK(s);
   ASSERT_EQ(value, "bar");
 
   delete txn;
@@ -1744,11 +1744,11 @@ TEST_P(TransactionTest, TwoPhaseDoubleRecoveryTest) {
 
   // value is now available
   s = db->Get(read_options, "foo", &value);
-  ASSERT_EQ(s, Status::OK());
+  ASSERT_OK(s);
   ASSERT_EQ(value, "bar");
 
   s = db->Get(read_options, "foo2", &value);
-  ASSERT_EQ(s, Status::OK());
+  ASSERT_OK(s);
   ASSERT_EQ(value, "bar2");
 }
 

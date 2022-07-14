@@ -1,57 +1,64 @@
 # Ways to Contribute
-There are several ways to contribure to Speedb, other than contributing code changes.
+
+There are several ways to contribure to Speedb, other than contributing code changes:
+
 * Add or update document.
 * Report issue with detailed information, if possible attache a test.
 * Investigate and fix an issue.
 * Review and test a PR. 
 * Submit new feature request or implementation. We welcome any feature suggestions, for new feature implementation, please create an issue with the design proposal first. It can help to get more engagement and discussion before reviewing your implementation;
-* Help ongoing features development, here is list of [new features](https://github.com/speedb-io/speedb/issues) that's actively developing, help us to complete the feature development.
 
 
 # Basic Development Workflow
 
 As most open-source projects in github, Speedb contributors work on their fork, and send pull requests to Speedb’s repo. After a reviewer approves the pull request, a Speedb team member will merge it.
 
+# How to Build
+
+Refer to the [INSTALL](INSTALL.md) document for information about how to build Speedb.
 
 # How to Run Unit Tests
 
 ## Build Systems
 
-Speedb uses gtest. The makefile used for _GNU make_ has some supports to help developers run all unit tests in parallel, which will be introduced below. If you use cmake, you can run the tests with `ctest`.
+The makefile used for _GNU make_ has some supports to help developers run all unit tests in parallel, which will be introduced below. If you use CMake, you can run the tests with `ctest`.
 
-## Run Unit Tests In Parallel
+## Running the Unit Tests in Parallel
 
 In order to run unit tests in parallel, first install _GNU parallel_ on your host, and run
 ```
-make all check [-j] 
+make check
 ```
-You can specify number of parallel tests to run using environment variable `J=1`, for example:
+This will build Speedb and run the tests. You can provide the `-j` flag to `make` in order to make a better utilization of CPU and speed up the build.
+
+You can specify number of parallel tests to run using environment variable `J`, for example:
 ```
-make J=64 all check [-j]
+make J=64 check -j64
 ```
+
+If `J` isn't provided, the default is to run one job per core.
 
 If you switch between release and debug build, normal or lite build, or compiler or compiler options, call `make clean` first. So here is a safe routine to run all tests:
 
 ```
-make clean
-make J=64 all check [-j]
+make clean && make check -j64
 ```
 
-## Debug Single Unit Test Failures
+## Debugging Single Unit Test Failures
 
-RocksDB uses _gtest_. You can run specific unit test by running the test binary that contains it. If you use GNU make, the test binary will be just under your checkpoint. For example, test `DBBasicTest.OpenWhenOpen` is in binary `db_basic_test`, so just run
+Speedb uses _GTest_. You can run specific unit test by running the test binary that contains it. If you use GNU make, the test binary will be in the root directory of the repository (if you use CMake, the test binary will be in your build directory). For example, test `DBBasicTest.OpenWhenOpen` is in binary `db_basic_test`, so simply running
 ```
 ./db_basic_test
 ```
 will run all tests in the binary.
 
-gtest provides some useful command line parameters, and you can see them by calling `--help`:
+GTest provides some useful command line parameters, and you can see them by calling `--help`:
 ```
 ./db_basic_test --help
 ```
- Here are some frequently used ones:
+Here are some frequently used ones:
 
-Run subset of tests using `--gtest_filter`. If you only want to run `DBBasicTest.OpenWhenOpen`, call
+Running a subset of tests is possible using `--gtest_filter`. For example, if you only want to run `DBBasicTest.OpenWhenOpen`, call
 ```
 ./db_basic_test --gtest_filter=“*DBBasicTest.OpenWhenOpen*”
 ```
@@ -70,67 +77,76 @@ Sometimes we need to run Java tests too. Run
 ```
 make jclean rocksdbjava jtest
 ```
-You can put `-j` but sometimes it causes problem. Try to remove `-j` if you see problems.
+Running with `-j` prvided can sometimes cause problems, so try to remove `-j` if you see any errors.
 
-## Some other build flavors
+## Additional Build Flavors
 
-For more complicated code changes, we ask contributors to run more build flavors before sending the code review. The makefile for _GNU make_ has better pre-defined support for it, although it can be manually done in _CMake_ too.
+For more complicated code changes, we ask contributors to run more build flavors before sending the code for review.
 
-To build with _AddressSanitizer (ASAN)_, set environment variable `COMPILE_WITH_ASAN`:
+To build with _AddressSanitizer (ASAN)_, set environment variable `WITH_ASAN`:
 ```
-COMPILE_WITH_ASAN=1 make all check -j
+COMPILE_WITH_ASAN=1 make check -j64
 ```
 To build with _ThreadSanitizer (TSAN)_, set environment variable `COMPILE_WITH_TSAN`:
 ```
-COMPILE_WITH_TSAN=1 make all check -j
+COMPILE_WITH_TSAN=1 make check -j64
 ```
 To run all `valgrind tests`:
 ```
-make valgrind_test -j
+make valgrind_test -j64
 ```
-To run _UndefinedBehaviorSanitizer (UBSAN), set environment variable `COMPILE_WITH_UBSAN`:
+To run _UndefinedBehaviorSanitizer (UBSAN)_, set environment variable `COMPILE_WITH_UBSAN`:
 ```
-COMPILE_WITH_UBSAN=1 make all check -j
+COMPILE_WITH_UBSAN=1 make check -j
 ```
-To run `llvm`'s analyzer, run
+To run LLVM's analyzer, run
 ```
 make analyze
 ```
+
 # Code Style
 
-Speedb follows _Google C++ Style_: https://google.github.io/styleguide/cppguide.html  Note: a common pattern in existing Speedb code is using non-nullable `Type*` for output parameters, in [the old Google C++ Style](https://stackoverflow.com/questions/26441220/googles-style-guide-about-input-output-parameters-as-pointers), but this guideline [has changed](https://github.com/google/styleguide/commit/7a7a2f510efe7d7fc#diff-bcadcf8be931ffdd5d6a65c60c266039cf1f96b7f35bfb772662db811214c5a0R1713). [The new guideline](https://google.github.io/styleguide/cppguide.html#Inputs_and_Outputs) prefers (non-const) references for output parameters.
+Speedb follows the [Google C++ Style](https://google.github.io/styleguide/cppguide.html).
 
 For formatting, we limit each line to 80 characters. Most formatting can be done automatically by running
 ```
 build_tools/format-diff.sh
 ```
-or simply `make format` if you use _GNU make_. If you lack of dependencies to run it, the script will print out instructions for you to install them. 
+or simply `make format` if you use _GNU make_. If you lack any of the dependencies to run it, the script will print out instructions for you to install them.
 
 # Requirements Before Sending a Pull Request
+
+## Ensure the Code is Formatted Correctly
+As a minimum, run `make format` or `build_tools/format-diff.sh`, as described above.
+
 ## HISTORY.md
 Consider updating HISTORY.md to mention your change, especially if it's a bug fix, public API change or an awesome new feature.
 
 ## Pull Request Summary
-We recommend a "Test Plan:" section is included in the pull request summary, which introduces what testing is done to validate the quality and performance of the change.
+Describe what your change is doing, especially if there isn't a relevant issue open, reference relevant issues and discussion, and how you tested your changes (we recommend adding a "Test Plan:" section to the pull request summary, which specifies what testing was done to validate the quality and performance of the change).
 
 ## Add Unit Tests
-Almost all code changes need to go with changes in unit tests for validation. For new features, new unit tests or tests scenarios need to be added even if it has been validated manually. This is to make sure future contributors can rerun the tests to validate their changes don't cause problem with the feature.
+Almost all code changes need to go with changes in unit tests for validation. For new features, new unit tests or tests scenarios need to be added even if it has been validated manually. This is to make sure future contributors can rerun the tests to ensure that their changes don't cause problem with the feature.
 
-## Simple Changes
+## Run the Tests Locally
+
+### For Simple Changes
 Pull requests for simple changes can be sent after running all unit tests with any build flavor and see all tests pass. If any public interface is changed, or Java code involved, Java tests also need to be run.
 
-## Complex Changes
-If the change is complicated enough, ASAN, TSAN and valgrind need to be run on your local environment before sending the pull request. If you run ASAN with higher version of llvm with covers almost all the functionality of valgrind, valgrind tests can be skipped.
-It may be hard for developers who use Windows. Just try to use the best equivalence tools available in your environment.
+### For Complex Changes
+If the change is complicated enough, ASAN, TSAN and valgrind need to be run on your local environment before sending the pull request. If you run ASAN with a recent enough version of LLVM which covers almost all the functionality of valgrind, valgrind tests can be skipped.
+Running the valgrind tests may be difficult for developers who use Windows. Just try to use the best equivalent tools available in your environment.
 
-## Changes with Higher Risk or Some Unknowns
-For changes with higher risks, other than running all tests with multiple flavors, a crash test cycle (see [[Stress Test]]) needs to be executed and see no failure. If crash test doesn't cover the new feature, consider to add it there.
-To run all crash test, run
+### Changes with Higher Risk or Some Unknowns
+For changes with higher risks, other than running all of the tests with multiple flavors, a crash test cycle (see [[Stress Test]]) needs to be executed without failure. If crash test doesn't cover the new feature, add it there.
+
+To run all crash tests, run
 ```
-make crash_test -j
-make crash_test_with_atomic_flush -j
+make crash_test -j64
+make crash_test_with_atomic_flush -j64
 ```
-If you can't use _GNU make_, you can manually build db_stress binary, and run script:
+
+If you are unable to use _GNU make_, you can manually build the `db_stress` binary, and run the following commands manually:
 ```
   python -u tools/db_crashtest.py whitebox
   python -u tools/db_crashtest.py blackbox
@@ -140,5 +156,5 @@ If you can't use _GNU make_, you can manually build db_stress binary, and run sc
   python -u tools/db_crashtest.py --cf_consistency whitebox 
 ```
 
-## Performance Improvement Changes
-For changes that might impact performance, we suggest normal benchmarks are run to make sure there is no regression. Depending the actual performance, you may choose to run against a database backed by disks, or memory-backed file systems. Explain in the pull request summary why the performance environment is chosen, if it is not obvious. If the change is to improve performance, bring at least one benchmark test case that favors the improvement and show the improvements.
+### Performance Improvement Changes
+For changes that might impact performance, we suggest normal benchmarks are run to make sure there is no regression. Depending the actual performance, you may choose to run against a database backed by disks, or memory-backed file systems. Explain in the pull request summary why the specific performance environment was chosen. If the change is to improve performance, bring at least one benchmark test case that favors the improvement and share the results.

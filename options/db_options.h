@@ -117,8 +117,6 @@ struct MutableDBOptions {
   MutableDBOptions();
   explicit MutableDBOptions(const DBOptions& options);
 
-  MutableDBOptions& operator=(const MutableDBOptions&) = default;
-
   void Dump(Logger* log) const;
 
   int max_background_jobs;

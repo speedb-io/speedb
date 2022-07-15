@@ -2405,8 +2405,7 @@ class DBImpl : public DB {
   BlobFileCompletionCallback blob_callback_;
 
   // Speedb write flow parameters
-  WalSpdb spdb_wal_;
-  port::RWMutex spdb_write_batch_rwlock_;        // protect quiesce
+  SpdbWriteImpl spdb_write_;
 
   // Pointer to WriteBufferManager stalling interface.
   std::unique_ptr<StallInterface> wbm_stall_;

@@ -24,8 +24,11 @@ constexpr size_t kMaxSpinThreadCount = 256;
 constexpr size_t kMaxSpinCount = 100000;
 constexpr uint64_t kMaxSpinTimeMicros = 1000;
 
-void WalSpdb::WritesBatchList::Add(WriteBatch* batch, bool disable_wal,
-                                   bool read_lock_for_memtable) {
+bool SpdbWriteImpl::WritesBatchList::Add(WriteBatch* batch, bool disable_wal,
+                                         bool read_lock_for_memtable) {
+  bool notify_work = empty_; 
+  empty_ = false;
+
   if (read_lock_for_memtable) {
     memtable_complete_rwlock_.ReadLock();
   }
@@ -37,50 +40,47 @@ void WalSpdb::WritesBatchList::Add(WriteBatch* batch, bool disable_wal,
   // Need to set the sequence even if we don't write to WAL because the WAL
   // thread is the one responsible for publishing the last sequence
   const uint64_t sequence = WriteBatchInternal::Sequence(batch);
-  if (min_seq_ == 0) {
-    min_seq_ = sequence;
-  }
   max_seq_ = sequence + WriteBatchInternal::Count(batch) - 1;
+  return notify_work;
 }
 
-void WalSpdb::WritesBatchList::MemtableAddComplete() {
+void SpdbWriteImpl::WritesBatchList::MemtableAddComplete() {
   // Batch was added to the memtable, we can release the read lock that is
   // preventing the WAL thread from publishing the last sequence
   memtable_complete_rwlock_.ReadUnlock();
 }
 
-void WalSpdb::WritesBatchList::WaitForMemtableWriters() {
+void SpdbWriteImpl::WritesBatchList::WaitForMemtableWriters() {
   // Successfully acquiring the write lock here means that all of the memtable
   // writers holding the read lock have completed writing into the memtable
   // and released the lock
   WriteLock rl(&memtable_complete_rwlock_);
 }
 
-WalSpdb::WalSpdb(DBImpl* db)
-    : db_(db), wal_thread_(&WalSpdb::WalWriteThread, this) {
+SpdbWriteImpl::SpdbWriteImpl(DBImpl* db)
+    : db_(db), spdb_write_thread_(&SpdbWriteImpl::SpdbWriteThread, this) {
 #if defined(_GNU_SOURCE) && defined(__GLIBC_PREREQ)
 #if __GLIBC_PREREQ(2, 12)
-  auto thread_handle = wal_thread_.native_handle();
-  pthread_setname_np(thread_handle, "speedb:wal");
+  auto thread_handle = spdb_write_thread_.native_handle();
+  pthread_setname_np(thread_handle, "speedb:write_thread");
 #endif
 #endif
 }
 
-WalSpdb::~WalSpdb() {
+SpdbWriteImpl::~SpdbWriteImpl() {
   Shutdown();
-  wal_thread_.join();
+  spdb_write_thread_.join();
 }
 
-void WalSpdb::Shutdown() {
+void SpdbWriteImpl::Shutdown() {
   {
-    std::unique_lock<std::mutex> lck(wal_thread_mutex_);
+    std::unique_lock<std::mutex> lck(spdb_write_thread_mutex_);
     terminate_ = true;
   }
-  wal_thread_cv_.notify_one();
+  spdb_write_thread_cv_.notify_one();
 }
 
-void* WalSpdb::Add(WriteBatch* batch, bool disable_wal,
-                   bool read_lock_for_memtable) {
+void* SpdbWriteImpl::Add(WriteBatch* batch, bool disable_wal,bool read_lock_for_memtable) {
   // TODO: handle seq_per_batch_ with callbacks?
   const size_t seq_inc = batch->Count();
 
@@ -93,26 +93,24 @@ void* WalSpdb::Add(WriteBatch* batch, bool disable_wal,
     WriteBatchInternal::SetSequence(batch, start_sequence);
 
     WritesBatchList& pending_list = GetActiveList();
-    if (read_lock_for_memtable) {
-      returned_list = &pending_list;
-    }
-
-    pending_list.Add(batch, disable_wal, read_lock_for_memtable);
+    returned_list = &pending_list;
+   
+    bool notify_work = pending_list.Add(batch, disable_wal, read_lock_for_memtable);
     // No need to trigger work if this isn't the first batch
-    if (pending_list.GetMinSeq() < start_sequence) {
+    if (!notify_work) {
       return returned_list;
     }
   }
 
   {
-    std::unique_lock<std::mutex> lck(wal_thread_mutex_);
+    std::unique_lock<std::mutex> lck(spdb_write_thread_mutex_);
     pending_buffers_.fetch_add(1, std::memory_order_release);
   }
-  wal_thread_cv_.notify_one();
+  spdb_write_thread_cv_.notify_one();
   return returned_list;
 }
 
-void WalSpdb::MemtableAddComplete(const void* batch_list) {
+void SpdbWriteImpl::MemtableAddComplete(const void* batch_list) {
   for (WritesBatchList& list : wb_lists_) {
     if (&list == batch_list) {
       list.MemtableAddComplete();
@@ -124,7 +122,7 @@ void WalSpdb::MemtableAddComplete(const void* batch_list) {
   assert(false);
 }
 
-uint64_t WalSpdb::WalWriteComplete() {
+uint64_t SpdbWriteImpl::WalWriteComplete() {
   // no need to take the mutex. this is called when we want to write to wal
   WritesBatchList& written_list = GetWrittenList();
   const SequenceNumber written_seq = written_list.GetMaxSeq();
@@ -141,7 +139,7 @@ uint64_t WalSpdb::WalWriteComplete() {
   return written_seq;
 }
 
-bool WalSpdb::SwitchBatchGroup() {
+bool SpdbWriteImpl::SwitchBatchGroup() {
   MutexLock l(&mutex_);
 
   if (GetActiveList().IsEmpty()) {
@@ -153,7 +151,7 @@ bool WalSpdb::SwitchBatchGroup() {
   return true;
 }
 
-void WalSpdb::WalWriteThread() {
+void SpdbWriteImpl::SpdbWriteThread() {
   size_t written_buffers = 0;
 
   for (;;) {
@@ -225,7 +223,7 @@ void WalSpdb::WalWriteThread() {
       ++written_buffers;
     }
 
-    if (quiesce_cfds_.load()) {
+    if (flush_cfds_.load()) {
       // i must make sure that the cfds are quiesced before swap
       // must before switch mem table make sure the wal seq was published
       db_->HandleQuiesce();
@@ -238,7 +236,7 @@ void WalSpdb::WalWriteThread() {
   }
 }
 
-bool WalSpdb::WaitForPendingWork(size_t written_buffers) {
+bool SpdbWriteImpl::WaitForPendingWork(size_t written_buffers) {
   SystemClock* clock = db_->GetSystemClock();
 
   // Note: on termination we will spin for min(kMaxSpinTimeMicros,
@@ -260,7 +258,7 @@ bool WalSpdb::WaitForPendingWork(size_t written_buffers) {
   }
 
   // Fall back on waiting on the conditional variable
-  std::unique_lock<std::mutex> lck(wal_thread_mutex_);
+  std::unique_lock<std::mutex> lck(spdb_write_thread_mutex_);
   for (;;) {
     if (terminate_) {
       return false;
@@ -270,13 +268,13 @@ bool WalSpdb::WaitForPendingWork(size_t written_buffers) {
     if (pending_buffers != written_buffers || quiesce_cfds_.load()) {
       break;
     }
-    wal_thread_cv_.wait(lck);
+    spdb_write_thread_cv_.wait(lck);
   }
 
   return true;
 }
 
-Status WalSpdb::WaitForWalWrite(WriteBatch* batch) {
+Status SpdbWriteImpl::WaitForWalWrite(WriteBatch* batch) {
   const uint64_t last_sequence = WriteBatchInternal::Sequence(batch) +
                                  WriteBatchInternal::Count(batch) - 1;
 
@@ -320,12 +318,12 @@ Status WalSpdb::WaitForWalWrite(WriteBatch* batch) {
   return Status::OK();
 }
 
-void WalSpdb::Quiesce() {
+void SpdbWriteImpl::Quiesce() {
   {
-    std::unique_lock<std::mutex> lck(wal_thread_mutex_);
+    std::unique_lock<std::mutex> lck(spdb_write_thread_mutex_);
     quiesce_cfds_.store(true);
   }
-  wal_thread_cv_.notify_one();
+  spdb_write_thread_cv_.notify_one();
 
   std::unique_lock<std::mutex> lck(quiesce_mutex_);
   while (quiesce_cfds_.load()) {
@@ -397,6 +395,7 @@ Status DBImpl::SpdbWrite(const WriteOptions& write_options,
 
   last_batch_group_size_ = WriteBatchInternal::ByteSize(my_batch);
 
+  spdb_wal_.GetWriteRWLock()
   spdb_write_batch_rwlock_.ReadLock();
   bool write_lock_taken = false;
 

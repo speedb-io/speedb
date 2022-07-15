@@ -26,11 +26,11 @@ class SystemClock;
 class Statistics;
 class WriteBatch;
 
-class WalSpdb {
+class SpdbWriteImpl {
  public:
-  WalSpdb(DBImpl* db);
+  SpdbWriteImpl(DBImpl* db);
 
-  ~WalSpdb();
+  ~SpdbWriteImpl();
 
   void Shutdown();
 
@@ -41,9 +41,10 @@ class WalSpdb {
   // Called from WAL writer thread (through DBImpl::SpdbWriteToWAL)
   uint64_t WalWriteComplete();
 
-  void Quiesce();
+  void RegisterFlush();
 
   Status WaitForWalWrite(WriteBatch* batch);
+  port::RWMutex& GetWriteRWLock() { return spdb_write_external_rwlock_; }
 
  private:
   uint64_t GetLastWalWriteSeq() {
@@ -60,28 +61,22 @@ class WalSpdb {
 
   struct WritesBatchList {
     std::list<WriteBatch*> wal_writes_;
-    uint64_t min_seq_ = 0;
+    bool empty_ = true;
     uint64_t max_seq_ = 0;
     port::RWMutex memtable_complete_rwlock_;
 
     void Clear() {
       wal_writes_.clear();
-      min_seq_ = 0;
+      empty_ = true;
       max_seq_ = 0;
     }
 
-    void Add(WriteBatch* batch, bool disable_wal, bool read_lock_for_memtable);
+    bool Add(WriteBatch* batch, bool disable_wal, bool read_lock_for_memtable);
 
     void MemtableAddComplete();
 
-    bool IsEmpty() const {
-      // We check specifically for max_seq_ and not for an empty wal_writes_,
-      // as a batch list can consist of memtable only writes
-      return max_seq_ == 0;
-    }
-
-    uint64_t GetMinSeq() const { return min_seq_; }
-
+    bool IsEmpty()  const { return empty_; }
+ 
     uint64_t GetMaxSeq() const { return max_seq_; }
 
     void WaitForMemtableWriters();
@@ -107,19 +102,24 @@ class WalSpdb {
   port::Mutex mutex_;
   std::atomic<size_t> pending_buffers_{0};
 
-  std::mutex wal_thread_mutex_;
+  std::mutex spdb_write_thread_mutex_;
   std::atomic<size_t> threads_busy_waiting_{0};
-  std::condition_variable wal_thread_cv_;
+  std::condition_variable spdb_write_thread_cv_;
 
   // This means we need to do some actions
-  std::atomic<bool> quiesce_cfds_{false};
-  std::mutex quiesce_mutex_;
-  std::condition_variable quiesce_cv_;
+  std::atomic<bool> flush_cfds_{false};
+  std::mutex flush_mutex_;
+  std::condition_variable flush_cv_;
 
   std::mutex notify_wal_write_mutex_;
   std::condition_variable notify_wal_write_cv_;
 
-  std::thread wal_thread_;
+  // acquire write make sure there is no on the fly writes
+  port::RWMutex spdb_write_external_rwlock_; 
+  // acquire write make sure new batch will wait until register flush                 
+  port::RWMutex spdb_write_register_flush_rwlock_;     
+
+  std::thread spdb_write_thread_;
   WriteBatch tmp_batch_;
 };
 

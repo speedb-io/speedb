@@ -16,7 +16,7 @@ jobs:
   
   Build:
     needs: [Sanity]
-    if: ${{ github.event.review.state == 'approved' || github.event.name == workflow_dispatch || startsWith(github.ref, 'refs/heads/release') }}
+    if: ${{ github.event.review.state == 'approved' || github.event.name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/release') }}
     runs-on: [self-hosted, ubuntu, asrunner]
     strategy:
       matrix:

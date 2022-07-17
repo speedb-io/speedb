@@ -1124,7 +1124,7 @@ struct DBOptions {
   // This is an experimental feature.
   //
   // Default: false
-  bool use_spdb_query_builder = false;
+  bool use_spdb_query_builder = true;
 
   // Recovery mode to control the consistency while replaying WAL
   // Default: kPointInTimeRecovery

@@ -343,7 +343,7 @@ DEFINE_uint64(compaction_ttl, 1000,
 DEFINE_bool(allow_concurrent_memtable_write, false,
             "Allow multi-writers to update mem tables in parallel.");
 
-DEFINE_bool(use_spdb_query_builder, false,
+DEFINE_bool(use_spdb_query_builder, true,
             "Use optimized Speedb range query builder");
 
 DEFINE_double(experimental_mempurge_threshold, 0.0,

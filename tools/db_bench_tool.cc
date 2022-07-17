@@ -1299,7 +1299,7 @@ DEFINE_bool(
 DEFINE_bool(allow_concurrent_memtable_write, true,
             "Allow multi-writers to update mem tables in parallel.");
 
-DEFINE_bool(use_spdb_query_builder, false,
+DEFINE_bool(use_spdb_query_builder, true,
             "Use optimized Speedb query range builder");
 
 DEFINE_double(experimental_mempurge_threshold, 0.0,

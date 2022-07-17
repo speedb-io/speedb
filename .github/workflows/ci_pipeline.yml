@@ -90,12 +90,12 @@ jobs:
   Performance:
     if: ${{ github.event.review.state == 'approved' || github.event.issue.workflow_dispatch || startsWith(github.ref, 'refs/heads/release') }}
     needs: [Build]
-    uses: speedb-io/devops-sandbox/.github/workflows/perf-test.yml@main
+    uses: speedb-io/speedb/.github/workflows/perf-test.yml@devops-dev
   
   Unit_Black_White_box:
     if: ${{ github.event.review.state == 'approved' || github.event.issue.workflow_dispatch || startsWith(github.ref, 'refs/heads/release') }}
     needs: [Build]
-    uses: speedb-io/devops-sandbox/.github/workflows/full-tests.yml@main
+    uses: speedb-io/speedb/.github/workflows/qa-tests.yml@devops-dev
   
   Fuzz:
     if: ${{ github.event.review.state == 'approved' || github.event.issue.workflow_dispatch || startsWith(github.ref, 'refs/heads/release') }}

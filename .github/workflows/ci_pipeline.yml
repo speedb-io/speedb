@@ -39,8 +39,9 @@ jobs:
         apk add git bash python3 py3-pip clang clang-extra-tools shellcheck gcc g++ cmake ninja ccache \
         openjdk10 gflags-dev snappy-dev lz4-dev bzip2-dev zstd-dev zlib-dev linux-headers openssh-client tar
         python3 -m pip install lint-diffs flake8
+        
     - name: Checkout
-      uses: actions/checkout@v2 
+      uses: actions/checkout@v3 
       
       
     - name: Prepare ccache timestamp

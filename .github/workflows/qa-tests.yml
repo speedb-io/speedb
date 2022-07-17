@@ -1,7 +1,8 @@
-name: Tests
+name: QA Tests
 
 on:
   workflow_dispatch:
+  workflow_call:
 
 env:
   GTEST_THROW_ON_FAILURE: 0
@@ -25,11 +26,14 @@ jobs:
       matrix:
         include:
           - name: unit-test
-            command: make clean && make -j2 check && echo $? || echo $?
-          - mame: black-box
-            command: make clean && CRASH_TEST_EXT_ARGS=" --duration=500" make -j2 blackbox_asan_crash_test && echo $? || echo $?
-          - mame: white-box
-            command: make clean && CRASH_TEST_EXT_ARGS="--duration=500" make -j2 whitebox_asan_crash_test && echo $? || echo $?
+            short_test: TMPD=\home\ubuntu make -j2 check
+            long_test: TMPD=\home\ubuntu make -j2 check
+          - name: black-box
+            short_test: CRASH_TEST_EXT_ARGS="--duration=500" make -j2 blackbox_asan_crash_test
+            long_test: CRASH_TEST_EXT_ARGS="--duration=10000" make -j2 blackbox_asan_crash_test
+          - name: white-box
+            short_test: CRASH_TEST_EXT_ARGS="--duration=500" make -j2 whitebox_asan_crash_test
+            long_test: CRASH_TEST_EXT_ARGS="--duration=10000" make -j2 whitebox_asan_crash_test
     
     steps:
     
@@ -42,7 +46,15 @@ jobs:
           apt-get update -y && apt-get install -y sudo default-jre default-jdk clang-format parallel moreutils g++ libgflags-dev software-properties-common golang-go gccgo binutils liblz4-dev libsnappy1v5 mlocate sysstat nvme-cli python3 python3-pip nodejs npm liblz4-dev libsnappy-dev libzstd-dev gdb dstat unzip apt-transport-https ca-certificates curl gnupg lsb-release || echo ""
           sudo mv /usr/bin/parallel /usr/bin/gnu_parallel
           sudo rm -rf /etc/parallel/config || echo ""
+          
       - name: ${{ matrix.name }}
         run: |
-          ${{ matrix.command }}
+          echo $GITHUB_REF_NAME
+          if echo $GITHUB_REF_NAME | grep -Eq 'release/'; then
+            echo long
+            make clean && ${{ matrix.long_test }} && echo $? || echo $?
+          else
+            echo short
+            make clean && ${{ matrix.short_test }} && echo $? || echo $?
+          fi
           df -H

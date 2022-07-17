@@ -37,12 +37,12 @@ jobs:
         rm -rf /usr/share/dotnet || echo ""
         df -h
         apk add git
-        git config --global --unset http.proxy
-        git config --global --unset https.proxy
-        apt add bash python3 py3-pip clang clang-extra-tools shellcheck gcc g++ cmake ninja ccache \
+        #git config --global --unset http.proxy
+        #git config --global --unset https.proxy
+        apk add bash python3 py3-pip clang clang-extra-tools shellcheck gcc g++ cmake ninja ccache \
         openjdk10 gflags-dev snappy-dev lz4-dev bzip2-dev zstd-dev zlib-dev linux-headers openssh-client tar
         python3 -m pip install lint-diffs flake8
-        #sleep 3600
+        sleep 3600
         
         
     - name: Checkout

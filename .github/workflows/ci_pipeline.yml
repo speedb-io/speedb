@@ -33,14 +33,14 @@ jobs:
     steps:
     - name: Pre-build
       run: |
-        git config --global --unset http.proxy
-        git config --global --unset https.proxy
         env
         rm -rf /usr/share/dotnet || echo ""
         df -h
         apk add git bash python3 py3-pip clang clang-extra-tools shellcheck gcc g++ cmake ninja ccache \
         openjdk10 gflags-dev snappy-dev lz4-dev bzip2-dev zstd-dev zlib-dev linux-headers openssh-client tar
         python3 -m pip install lint-diffs flake8
+        git config --global --unset http.proxy
+        git config --global --unset https.proxy
         
     - name: Checkout
       uses: actions/checkout@v3 

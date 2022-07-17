@@ -33,6 +33,8 @@ jobs:
     steps:
     - name: Pre-build
       run: |
+        git config --global --unset http.proxy
+        git config --global --unset https.proxy
         env
         rm -rf /usr/share/dotnet || echo ""
         df -h

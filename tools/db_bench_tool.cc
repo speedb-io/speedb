@@ -1302,7 +1302,7 @@ DEFINE_bool(allow_concurrent_memtable_write, true,
 DEFINE_double(experimental_mempurge_threshold, 0.0,
               "Maximum useful payload ratio estimate that triggers a mempurge "
               "(memtable garbage collection).");
-DEFINE_bool(use_spdb_writes, false, "Use optimized Speedb write flow");
+DEFINE_bool(use_spdb_writes, true, "Use optimized Speedb write flow");
 
 DEFINE_bool(inplace_update_support,
             ROCKSDB_NAMESPACE::Options().inplace_update_support,

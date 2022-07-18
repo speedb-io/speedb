@@ -2407,7 +2407,7 @@ class DBImpl : public DB {
 
   BlobFileCompletionCallback blob_callback_;
 
-  // Pointer tp Speedb write flow 
+  // Pointer tp Speedb write flow
   std::unique_ptr<SpdbWriteImpl> spdb_write_;
 
   // Pointer to WriteBufferManager stalling interface.

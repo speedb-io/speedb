@@ -47,7 +47,6 @@ class SpdbWriteImpl {
 
   void WriteBatchComplete(void* list, bool leader_batch);
 
-
   port::RWMutex& GetFlushRWLock() { return flush_rwlock_; }
 
  private:
@@ -90,7 +89,7 @@ class SpdbWriteImpl {
 
   port::RWMutex flush_rwlock_;
   port::RWMutex wal_buffers_rwlock_;
-  port::Mutex   wal_write_mutex_;
+  port::Mutex wal_write_mutex_;
   WriteBatch tmp_batch_;
 };
 

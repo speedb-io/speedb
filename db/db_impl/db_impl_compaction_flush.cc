@@ -2058,7 +2058,7 @@ Status DBImpl::FlushMemTable(ColumnFamilyData* cfd,
     }
     if (spdb_write_) {
       spdb_write_->GetFlushRWLock().WriteUnlock();
-    }  
+    }
 
     if (s.ok() && !flush_reqs.empty()) {
       for (const auto& req : flush_reqs) {
@@ -2176,7 +2176,7 @@ Status DBImpl::AtomicFlushMemTables(
       if (!s.ok()) {
         break;
       }
-    }    
+    }
     if (spdb_write_) {
       spdb_write_->GetFlushRWLock().WriteUnlock();
     }

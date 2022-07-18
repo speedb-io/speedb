@@ -277,7 +277,7 @@ DBImpl::DBImpl(const DBOptions& options, const std::string& dbname,
 
   if (immutable_db_options_.use_spdb_writes) {
     spdb_write_.reset(new SpdbWriteImpl(this));
-  }  
+  }
 }
 
 Status DBImpl::Resume() {
@@ -528,7 +528,7 @@ Status DBImpl::CloseHelper() {
   mutex_.Unlock();
 
   // Shutdown Spdb write in order to ensure no writes will be handled
-  if (spdb_write_) {  
+  if (spdb_write_) {
     spdb_write_->Shutdown();
   }
 

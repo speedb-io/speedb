@@ -41,6 +41,9 @@ constexpr uint32_t kBlockSizeInBytes = 64U;
 static_assert((kBlockSizeInBytes > 0) &&
               ((kBlockSizeInBytes & (kBlockSizeInBytes - 1)) == 0));
 constexpr uint32_t kBlockSizeInBits = kBlockSizeInBytes * 8U;
+static const uint32_t kBlockSizeNumBits =
+    std::ceil(std::log2(kBlockSizeInBits));
+static const uint32_t kNumBlockSizeBitsShiftBits = 32 - kBlockSizeNumBits;
 
 // Number of bits to represent kBlockSizeInBytes
 static const uint32_t kNumBitsForBlockSize = std::log2(kBlockSizeInBytes);
@@ -58,15 +61,8 @@ constexpr uint32_t kMaxSupportedSizeNoMetadata = 0xffffffc0U;
 constexpr size_t kMaxNumProbes = 30U;
 static_assert(kMaxNumProbes % 2 == 0U);
 
-static const uint8_t InBatchIdxMask = (uint8_t{1U} << kInBatchIdxNumBits) - 1;
-static const uint8_t FirstByteBitsMask = ~InBatchIdxMask;
-
-constexpr std::array<uint32_t, kMaxNumProbes> HashSetsSeeds{
-    0x00000001, 0x9e3779b9, 0xe35e67b1, 0x734297e9, 0x35fbe861, 0xdeb7c719,
-    0x0448b211, 0x3459b749, 0xab25f4c1, 0x52941879, 0x9c95e071, 0xf5ab9aa9,
-    0x2d6ba521, 0x8bededd9, 0x9bfb72d1, 0x3ae1c209, 0x7fca7981, 0xc576c739,
-    0xd23ee931, 0x0335ad69, 0xc04ff1e1, 0x98702499, 0x7535c391, 0x9f70dcc9,
-    0x0e198e41, 0xf2ab85f9, 0xe6c581f1, 0xc7ecd029, 0x6f54cea1, 0x4c8a6b59};
+static const uint8_t kInBatchIdxMask = (uint8_t{1U} << kInBatchIdxNumBits) - 1;
+static const uint8_t kFirstByteBitsMask = ~kInBatchIdxMask;
 
 // ==================================================================================================
 //
@@ -164,29 +160,31 @@ inline BuildBlock::BuildBlock(char* data, uint32_t global_block_idx,
 }
 
 inline uint8_t BuildBlock::GetInBatchBlockIdxOfPair() const {
-  return static_cast<uint8_t>(*block_address_) & InBatchIdxMask;
+  return static_cast<uint8_t>(*block_address_) & kInBatchIdxMask;
 }
 
 inline void BuildBlock::SetInBatchBlockIdxOfPair(
     InBatchBlockIdx pair_batch_block_idx) {
-  assert(((*block_address_ & InBatchIdxMask) == 0U) ||
-         ((*block_address_ & InBatchIdxMask) == pair_batch_block_idx));
+  assert(((*block_address_ & kInBatchIdxMask) == 0U) ||
+         ((*block_address_ & kInBatchIdxMask) == pair_batch_block_idx));
 
   *block_address_ =
-      (pair_batch_block_idx | (*block_address_ & FirstByteBitsMask));
+      (pair_batch_block_idx | (*block_address_ & kFirstByteBitsMask));
 }
 
 inline int GetBitPosInBlockForHash(uint32_t hash) {
   return kInBatchIdxNumBits +
-         (static_cast<uint32_t>(KNumBitsInBlockBloom * (hash >> 9)) >> 23);
+         (static_cast<uint32_t>(KNumBitsInBlockBloom *
+                                (hash >> kBlockSizeNumBits)) >>
+          (kNumBlockSizeBitsShiftBits));
 }
 
 inline void BuildBlock::SetBlockBloomBits(uint32_t hash, uint32_t set_idx,
                                           size_t hash_set_size) {
   assert(set_idx <= 1U);
   if (set_idx == 1) {
-    assert(hash_set_size < HashSetsSeeds.size());
-    hash *= HashSetsSeeds[hash_set_size];
+    assert(hash_set_size < BloomMath::GoldenRatioPowers.size());
+    hash *= BloomMath::GoldenRatioPowers[hash_set_size];
   }
 
   for (auto i = 0U; i < hash_set_size; ++i) {
@@ -225,7 +223,7 @@ inline ReadBlock::ReadBlock(const char* data, uint32_t global_block_idx,
 }
 
 inline uint8_t ReadBlock::GetInBatchBlockIdxOfPair() const {
-  return static_cast<uint8_t>(*block_address_) & InBatchIdxMask;
+  return static_cast<uint8_t>(*block_address_) & kInBatchIdxMask;
 }
 
 bool ReadBlock::AreAllBlockBloomBitsSet(uint32_t hash, uint32_t set_idx,
@@ -233,7 +231,7 @@ bool ReadBlock::AreAllBlockBloomBitsSet(uint32_t hash, uint32_t set_idx,
 #ifdef HAVE_AVX2
   // The AVX2 code currently supports only cache-line / block sizes of 64 bytes
   // (512 bits)
-  if (kNumBitsForBlockSize == 9) {
+  if (kBlockSizeInBits == 512) {
     return AreAllBlockBloomBitsSetAvx2(hash, set_idx, hash_set_size);
   } else {
     return AreAllBlockBloomBitsSetNonAvx2(hash, set_idx, hash_set_size);
@@ -255,13 +253,15 @@ bool ReadBlock::AreAllBlockBloomBitsSetAvx2(uint32_t hash, uint32_t set_idx,
   // See bloom_impl.h for more details
 
   // Powers of 32-bit golden ratio, mod 2**32.
-  const __m256i multipliers =
-      _mm256_setr_epi32(0x00000001, 0x9e3779b9, 0xe35e67b1, 0x734297e9,
-                        0x35fbe861, 0xdeb7c719, 0x448b211, 0x3459b749);
+  const __m256i multipliers = _mm256_setr_epi32(
+      BloomMath::GoldenRatioPowers[0], BloomMath::GoldenRatioPowers[1],
+      BloomMath::GoldenRatioPowers[2], BloomMath::GoldenRatioPowers[3],
+      BloomMath::GoldenRatioPowers[4], BloomMath::GoldenRatioPowers[5],
+      BloomMath::GoldenRatioPowers[6], BloomMath::GoldenRatioPowers[7]);
 
   if (set_idx == 1) {
-    assert(hash_set_size < HashSetsSeeds.size());
-    hash *= HashSetsSeeds[hash_set_size];
+    assert(hash_set_size < BloomMath::GoldenRatioPowers.size());
+    hash *= BloomMath::GoldenRatioPowers[hash_set_size];
   }
 
   for (;;) {
@@ -275,20 +275,24 @@ bool ReadBlock::AreAllBlockBloomBitsSetAvx2(uint32_t hash, uint32_t set_idx,
     // AVX2 code to calculate the equivalent of GetBitPosInBlockForHash() for up
     // to 8 hashes
 
-    // Shift left the hashes by 9
-    hash_vector = _mm256_srli_epi32(hash_vector, 9);
+    // Shift right the hashes by kBlockSizeNumBits
+    hash_vector = _mm256_srli_epi32(hash_vector, kBlockSizeNumBits);
 
     // Multiplying by 505 => The result (lower 32 bits will be in the range
     // 0-504 (in the 9 MSB bits).
-    __m256i fast_range_vec = _mm256_set1_epi32(505);
+    __m256i fast_range_vec = _mm256_set1_epi32(KNumBitsInBlockBloom);
     hash_vector = _mm256_mullo_epi32(hash_vector, fast_range_vec);
+
+    hash_vector = _mm256_srli_epi32(hash_vector, kNumBlockSizeBitsShiftBits);
 
     // Add 7 to get the final bit position in the range 7 - 511 (In the 9 MSB
     // bits)
-    __m256i num_idx_bits_vec = _mm256_set1_epi32(7);
+    __m256i num_idx_bits_vec = _mm256_set1_epi32(kInBatchIdxNumBits);
     hash_vector = _mm256_add_epi32(hash_vector, num_idx_bits_vec);
 
-    auto [is_done, answer] = FastLocalBloomImpl::TestBitsInBloomBlock(
+    hash_vector = _mm256_slli_epi32(hash_vector, kNumBlockSizeBitsShiftBits);
+
+    auto [is_done, answer] = FastLocalBloomImpl::CheckBitsPositionsInBloomBlock(
         rem_probes, hash_vector, block_address_);
     if (is_done) {
       return answer;
@@ -306,8 +310,8 @@ bool ReadBlock::AreAllBlockBloomBitsSetAvx2(uint32_t hash, uint32_t set_idx,
 bool ReadBlock::AreAllBlockBloomBitsSetNonAvx2(uint32_t hash, uint32_t set_idx,
                                                size_t hash_set_size) const {
   if (set_idx == 1) {
-    assert(hash_set_size < HashSetsSeeds.size());
-    hash *= HashSetsSeeds[hash_set_size];
+    assert(hash_set_size < BloomMath::GoldenRatioPowers.size());
+    hash *= BloomMath::GoldenRatioPowers[hash_set_size];
   }
 
   for (auto i = 0U; i < hash_set_size; ++i) {
@@ -328,15 +332,15 @@ namespace speedb_filter {
 
 void FilterMetadata::WriteMetadata(char* metadata, [[maybe_unused]] size_t len,
                                    const Fields& fields) {
-  assert(len == MetadataLen);
+  assert(len == kMetadataLen);
 
   // Init the metadata to all Zeros
-  std::memset(metadata, 0x0, MetadataLen);
+  std::memset(metadata, 0x0, kMetadataLen);
 
-  metadata[0] = static_cast<char>(speedb_filter::FilterType::PairedBlockBloom);
+  metadata[0] = static_cast<char>(speedb_filter::FilterType::kPairedBlockBloom);
 
-  assert(fields.num_probes_ <= 30U);
-  metadata[1] = static_cast<char>(fields.num_probes_);
+  assert(fields.num_probes <= 30U);
+  metadata[1] = static_cast<char>(fields.num_probes);
   // rest of metadata stays zero
 }
 
@@ -348,26 +352,26 @@ auto FilterMetadata::ReadMetadata(const char* metadata) -> Fields {
   size_t num_probes = (block_and_probes & 0x1F);
   if (num_probes < 1 || num_probes > 30) {
     // Reserved / future safe
-    return {num_probes, FilterType::FutureUnknown};
+    return {num_probes, FilterType::kFutureUnknown};
   }
 
   uint16_t rest = DecodeFixed16(metadata + 2);
   if (rest != 0) {
     // Reserved, possibly for hash seed
     // Future safe
-    return {num_probes, FilterType::FutureUnknown};
+    return {num_probes, FilterType::kFutureUnknown};
   }
 
   if (speedb_filter::FilterType(filter_type) ==
-      speedb_filter::FilterType::PairedBlockBloom) {  // FastLocalBloom
+      speedb_filter::FilterType::kPairedBlockBloom) {  // FastLocalBloom
     // TODO: Avoid the use of magic numbers
     auto log2_block_bytes = ((block_and_probes >> 5) & 7);
     if (log2_block_bytes == 0U) {  // Only block size supported for now
-      return {num_probes, FilterType::PairedBlockBloom};
+      return {num_probes, FilterType::kPairedBlockBloom};
     }
   }
 
-  return {num_probes, FilterType::FutureUnknown};
+  return {num_probes, FilterType::kFutureUnknown};
 }
 
 }  // namespace speedb_filter
@@ -376,10 +380,11 @@ auto FilterMetadata::ReadMetadata(const char* metadata) -> Fields {
 SpdbPairedBloomBitsBuilder::SpdbPairedBloomBitsBuilder(
     const int millibits_per_key,
     std::atomic<int64_t>* aggregate_rounding_balance,
-    std::shared_ptr<CacheReservationManager> cache_res_mgr,
+    const std::shared_ptr<CacheReservationManager>& cache_res_mgr,
     bool detect_filter_construct_corruption,
-    FilterBitsReaderCreateFunc reader_create_func)
-    : XXPH3FilterBitsBuilder(aggregate_rounding_balance, cache_res_mgr,
+    const FilterBitsReaderCreateFunc& reader_create_func)
+    : XXPH3FilterBitsBuilder(aggregate_rounding_balance,
+                             std::move(cache_res_mgr),
                              detect_filter_construct_corruption),
       millibits_per_key_(millibits_per_key),
       reader_create_func_(reader_create_func) {
@@ -418,7 +423,7 @@ Slice SpdbPairedBloomBitsBuilder::Finish(std::unique_ptr<const char[]>* buf,
   len_with_metadata =
       AllocateMaybeRounding(len_with_metadata, num_entries, &mutable_buf);
   assert(mutable_buf);
-  assert(len_with_metadata >= speedb_filter::FilterMetadata::MetadataLen);
+  assert(len_with_metadata >= speedb_filter::FilterMetadata::kMetadataLen);
   // Max size supported by implementation
   assert(len_with_metadata <= kMaxSupportLenWithMetadata);
 
@@ -430,7 +435,7 @@ Slice SpdbPairedBloomBitsBuilder::Finish(std::unique_ptr<const char[]>* buf,
   }
 
   uint32_t len_no_metadata = static_cast<uint32_t>(
-      len_with_metadata - speedb_filter::FilterMetadata::MetadataLen);
+      len_with_metadata - speedb_filter::FilterMetadata::kMetadataLen);
   InitVars(len_no_metadata);
 
   if (len_no_metadata > 0) {
@@ -455,10 +460,10 @@ Slice SpdbPairedBloomBitsBuilder::Finish(std::unique_ptr<const char[]>* buf,
   }
 
   speedb_filter::FilterMetadata::Fields metadata_fields{
-      num_probes_, speedb_filter::FilterType::PairedBlockBloom};
+      num_probes_, speedb_filter::FilterType::kPairedBlockBloom};
   speedb_filter::FilterMetadata::WriteMetadata(
-      &mutable_buf[len_no_metadata], speedb_filter::FilterMetadata::MetadataLen,
-      metadata_fields);
+      &mutable_buf[len_no_metadata],
+      speedb_filter::FilterMetadata::kMetadataLen, metadata_fields);
 
   auto TEST_arg_pair __attribute__((__unused__)) =
       std::make_pair(&mutable_buf, len_with_metadata);
@@ -478,9 +483,9 @@ Slice SpdbPairedBloomBitsBuilder::Finish(std::unique_ptr<const char[]>* buf,
 size_t SpdbPairedBloomBitsBuilder::ApproximateNumEntries(
     size_t len_with_metadata) {
   size_t len_no_meta =
-      len_with_metadata >= speedb_filter::FilterMetadata::MetadataLen
+      len_with_metadata >= speedb_filter::FilterMetadata::kMetadataLen
           ? RoundDownUsableSpace(len_with_metadata) -
-                speedb_filter::FilterMetadata::MetadataLen
+                speedb_filter::FilterMetadata::kMetadataLen
           : 0;
   return static_cast<size_t>(kNumMillibitsInByte * len_no_meta /
                              millibits_per_key_);
@@ -493,7 +498,7 @@ size_t SpdbPairedBloomBitsBuilder::CalculateSpace(size_t num_entries) {
   len_without_metadata =
       std::max<size_t>(len_without_metadata, kBatchSizeInBytes);
   return RoundDownUsableSpace(len_without_metadata +
-                              speedb_filter::FilterMetadata::MetadataLen);
+                              speedb_filter::FilterMetadata::kMetadataLen);
 }
 
 size_t SpdbPairedBloomBitsBuilder::GetNumProbes() {
@@ -509,7 +514,7 @@ double SpdbPairedBloomBitsBuilder::EstimatedFpRate(
 }
 
 size_t SpdbPairedBloomBitsBuilder::RoundDownUsableSpace(size_t available_size) {
-  size_t rv = available_size - speedb_filter::FilterMetadata::MetadataLen;
+  size_t rv = available_size - speedb_filter::FilterMetadata::kMetadataLen;
 
   if (rv >= kMaxSupportedSizeNoMetadata) {
     // Max supported for this data structure implementation
@@ -519,7 +524,7 @@ size_t SpdbPairedBloomBitsBuilder::RoundDownUsableSpace(size_t available_size) {
   // round down to multiple of a Batch
   rv = (rv / kBatchSizeInBytes) * kBatchSizeInBytes;
 
-  return rv + speedb_filter::FilterMetadata::MetadataLen;
+  return rv + speedb_filter::FilterMetadata::kMetadataLen;
 }
 
 FilterBitsReader* SpdbPairedBloomBitsBuilder::GetBitsReader(

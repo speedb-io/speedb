@@ -11,6 +11,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <array>
 #include <cmath>
 
 #include "port/port.h"  // for PREFETCH
@@ -24,6 +25,18 @@
 namespace ROCKSDB_NAMESPACE {
 
 class BloomMath {
+ public:
+  // Powers of 32-bit golden ratio, mod 2**32.
+  static constexpr size_t kNumGoldenRatioPowers = 30U;
+  static constexpr std::array<uint32_t, kNumGoldenRatioPowers>
+      GoldenRatioPowers{
+          0x00000001, 0x9e3779b9, 0xe35e67b1, 0x734297e9, 0x35fbe861,
+          0xdeb7c719, 0x0448b211, 0x3459b749, 0xab25f4c1, 0x52941879,
+          0x9c95e071, 0xf5ab9aa9, 0x2d6ba521, 0x8bededd9, 0x9bfb72d1,
+          0x3ae1c209, 0x7fca7981, 0xc576c739, 0xd23ee931, 0x0335ad69,
+          0xc04ff1e1, 0x98702499, 0x7535c391, 0x9f70dcc9, 0x0e198e41,
+          0xf2ab85f9, 0xe6c581f1, 0xc7ecd029, 0x6f54cea1, 0x4c8a6b59};
+
  public:
   // False positive rate of a standard Bloom filter, for given ratio of
   // filter memory bits to added keys, and number of probes per operation.
@@ -238,7 +251,7 @@ class FastLocalBloomImpl {
   //
   // IMPORTANT: THIS CODE ASSUMES A BLOCK (CACHE-LINE) SIZE OF 64 BYTES !!!!
   //
-  static inline std::pair<bool, bool> TestBitsInBloomBlock(
+  static inline std::pair<bool, bool> CheckBitsPositionsInBloomBlock(
       int num_probes, __m256i &hash_vector, const char *const block_address_) {
     // Now the top 9 bits of each of the eight 32-bit values in
     // hash_vector are bit addresses for probes within the cache line.
@@ -341,9 +354,11 @@ class FastLocalBloomImpl {
     // in doubt, don't add unnecessary code.
 
     // Powers of 32-bit golden ratio, mod 2**32.
-    const __m256i multipliers =
-        _mm256_setr_epi32(0x00000001, 0x9e3779b9, 0xe35e67b1, 0x734297e9,
-                          0x35fbe861, 0xdeb7c719, 0x448b211, 0x3459b749);
+    const __m256i multipliers = _mm256_setr_epi32(
+        BloomMath::GoldenRatioPowers[0], BloomMath::GoldenRatioPowers[1],
+        BloomMath::GoldenRatioPowers[2], BloomMath::GoldenRatioPowers[3],
+        BloomMath::GoldenRatioPowers[4], BloomMath::GoldenRatioPowers[5],
+        BloomMath::GoldenRatioPowers[6], BloomMath::GoldenRatioPowers[7]);
 
     for (;;) {
       // Eight copies of hash
@@ -353,8 +368,8 @@ class FastLocalBloomImpl {
       // associativity of multiplication.
       hash_vector = _mm256_mullo_epi32(hash_vector, multipliers);
 
-      auto [is_done, answer] =
-          TestBitsInBloomBlock(rem_probes, hash_vector, data_at_cache_line);
+      auto [is_done, answer] = CheckBitsPositionsInBloomBlock(
+          rem_probes, hash_vector, data_at_cache_line);
       if (is_done) {
         return answer;
       }

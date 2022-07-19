@@ -16,54 +16,13 @@
 #include "test_util/testharness.h"
 #include "test_util/testutil.h"
 
-#ifndef GFLAGS
-bool FLAGS_enable_print = false;
-#else
+#ifdef GFLAGS
 #include "util/gflags_compat.h"
 using GFLAGS_NAMESPACE::ParseCommandLineFlags;
 DEFINE_bool(enable_print, false, "Print options generated to console.");
 #endif  // GFLAGS
 
 namespace ROCKSDB_NAMESPACE {
-
-class SpdbTestCustomizable : public Customizable {
- public:
-  SpdbTestCustomizable(const std::string& name) : name_(name) {}
-  // Method to allow CheckedCast to work for this class
-  static const char* kClassName() { return "SpdbTestCustomizable"; }
-
-  const char* Name() const override { return name_.c_str(); }
-  static const char* Type() { return "test.custom"; }
-  bool IsInstanceOf(const std::string& name) const override {
-    if (name == kClassName()) {
-      return true;
-    } else {
-      return Customizable::IsInstanceOf(name);
-    }
-  }
-
- protected:
-  const std::string name_;
-};
-
-namespace {
-
-#ifndef ROCKSDB_LITE
-static int RegisterLocalObjects(ObjectLibrary& library,
-                                const std::string& /*arg*/) {
-  size_t num_types;
-  library.AddFactory<const FilterPolicy>(
-      SpdbPairedBloomFilterPolicy::kClassName(),
-      [](const std::string& /*uri*/, std::unique_ptr<const FilterPolicy>* guard,
-         std::string* /* errmsg */) {
-        guard->reset(new SpdbPairedBloomFilterPolicy(23.2));
-        return guard->get();
-      });
-
-  return static_cast<int>(library.GetFactoryCount(&num_types));
-}
-#endif  // !ROCKSDB_LITE
-}  // namespace
 
 class LoadCustomizableTest : public testing::Test {
  public:
@@ -72,16 +31,8 @@ class LoadCustomizableTest : public testing::Test {
     config_options_.invoke_prepare_options = false;
   }
   bool RegisterTests(const std::string& arg) {
-#ifndef ROCKSDB_LITE
-    config_options_.registry->AddLibrary("custom-tests",
-                                         test::RegisterTestObjects, arg);
-    config_options_.registry->AddLibrary("local-tests", RegisterLocalObjects,
-                                         arg);
-    return true;
-#else
     (void)arg;
     return false;
-#endif  // !ROCKSDB_LITE
   }
 
  protected:

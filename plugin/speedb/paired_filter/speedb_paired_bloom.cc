@@ -62,7 +62,7 @@ FilterBitsBuilder* SpdbPairedBloomFilterPolicy::GetBuilderWithContext(
 FilterBitsReader* SpdbPairedBloomFilterPolicy::GetFilterBitsReader(
     const Slice& contents) const {
   uint32_t len_with_meta = static_cast<uint32_t>(contents.size());
-  const auto trailer_len = speedb_filter::FilterMetadata::MetadataLen;
+  const auto trailer_len = speedb_filter::FilterMetadata::kMetadataLen;
   if (len_with_meta <= trailer_len) {
     // filter is empty or broken. Treat like zero keys added.
     return new AlwaysFalseFilter();
@@ -73,13 +73,13 @@ FilterBitsReader* SpdbPairedBloomFilterPolicy::GetFilterBitsReader(
 
   auto trailer_data =
       speedb_filter::FilterMetadata::ReadMetadata(metadata_start);
-  switch (trailer_data.filter_type_) {
-    case speedb_filter::FilterType::PairedBlockBloom:
+  switch (trailer_data.filter_type) {
+    case speedb_filter::FilterType::kPairedBlockBloom:
       return new SpdbPairedBloomBitsReader(contents.data(),
-                                           trailer_data.num_probes_, len);
+                                           trailer_data.num_probes, len);
       break;
 
-    case speedb_filter::FilterType::FutureUnknown:
+    case speedb_filter::FilterType::kFutureUnknown:
       return new AlwaysTrueFilter();
       break;
 

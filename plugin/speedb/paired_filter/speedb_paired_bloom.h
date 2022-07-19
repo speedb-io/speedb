@@ -9,6 +9,23 @@ namespace ROCKSDB_NAMESPACE {
 class ObjectLibrary;
 struct FilterBuildingContext;
 
+// In the default cache-local bloom filter in RocksDB
+// (FastLocalBloomFilterPolicy) the trade-off between memory and false positive
+// rate is significantly worse than the theoretical standard bloom filter,
+// however it is significantly faster in terms of CPU. This trade-off
+// deteriorates performance/memory footprint especially in use cases in which
+// large accuracy of the filter is needed (typically from ~20 bits-per-key).
+//
+// For really high bits-per-key there could be orders of magnitude difference in
+// the false positive rate. Ribbon filter is generally better than bloom filter
+// in the trade-off (takes ~30% less memory to obtain the same false positive
+// rate. However, its construction and use is slower by a factor of ~4 than
+// bloom filter, so in use cases that require fast testing and construction
+// ribbon filter cannot be used.
+//
+// This filter is fast and low on CPU consumption on the one hand, but with a
+// better memory footprint- FPR trade-off on the other hand.
+//
 class SpdbPairedBloomFilterPolicy : public FilterPolicy {
  public:
   // Max supported BPK. Filters using higher BPK-s will use the max

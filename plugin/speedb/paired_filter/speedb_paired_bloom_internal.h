@@ -14,21 +14,21 @@ inline constexpr size_t kPairedBloomBatchSizeInBlocks = 128U;
 inline constexpr int kMinMillibitsPerKey = 1000.0;
 
 // Types of proprietary Speedb's filters
-enum class FilterType {
-  PairedBlockBloom = 1,
-  FutureUnknown = 0xFF,  // User to indicate an unrecognized filter type from a
-                         // future version
+enum class FilterType : uint8_t {
+  kPairedBlockBloom = 1,
+  kFutureUnknown = 0xFF,  // User to indicate an unrecognized filter type from a
+                          // future version
 };
 
-// Speedb's Proprietary Bloom filters data:
-//             0 +-----------------------------------+
+// Bloom Filter's data provided by Speedb:
+//             0 |-----------------------------------|
 //               | Raw Paired Bloom filter data      |
 //               | ...                               |
-//           len +-----------------------------------+
+//           len |-----------------------------------|
 //               | bytes Spdb Filter Types           |
-//               |   0: SpdbPairedBloom              |
+//               |   1: SpdbPairedBloom              |
 //               |   other: reserved                 |
-//         len+1 +-----------------------------------+
+//         len+1 |-----------------------------------|
 //               | byte for block_and_probes         |
 //               |   0 in top 3 bits -> 6 -> 64-byte |
 //               |   reserved:                       |
@@ -37,19 +37,19 @@ enum class FilterType {
 //               |   ...                             |
 //               |   num_probes in bottom 5 bits,    |
 //               |     except 0 and 31 reserved      |
-//         len+2 +-----------------------------------+
+//         len+2 |-----------------------------------|
 //               | two bytes reserved                |
 //               |   possibly for hash seed          |
-// len_with_meta +-----------------------------------+
+// len_with_meta |-----------------------------------|
 class FilterMetadata {
  public:
   // Metadata trailer size for Speedb's filters. (This is separate from
   // block-based table block trailer). Starting at len in the diagram above
-  static constexpr uint32_t MetadataLen = 4U;
+  static constexpr uint32_t kMetadataLen = 4U;
 
   struct Fields {
-    size_t num_probes_;
-    FilterType filter_type_;
+    size_t num_probes;
+    FilterType filter_type;
   };
 
  public:
@@ -73,9 +73,9 @@ class SpdbPairedBloomBitsBuilder : public XXPH3FilterBitsBuilder {
   explicit SpdbPairedBloomBitsBuilder(
       const int millibits_per_key,
       std::atomic<int64_t>* aggregate_rounding_balance,
-      std::shared_ptr<CacheReservationManager> cache_res_mgr,
+      const std::shared_ptr<CacheReservationManager>& cache_res_mgr,
       bool detect_filter_construct_corruption,
-      FilterBitsReaderCreateFunc reader_create_func);
+      const FilterBitsReaderCreateFunc& reader_create_func);
 
   ~SpdbPairedBloomBitsBuilder() override {}
 

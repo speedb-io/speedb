@@ -11,11 +11,11 @@ on:
 permissions: write-all
 
 jobs:
-  Sanity:
-    uses: speedb-io/speedb/.github/workflows/sanity_check.yml@devops-dev
+  #Sanity:
+    #uses: speedb-io/speedb/.github/workflows/sanity_check.yml@main
   
   Build:
-    needs: [Sanity]
+    #needs: [Sanity]
     if: ${{ github.event.review.state == 'approved' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/release') }}
     runs-on: [self-hosted, ubuntu, asrunner]
     strategy:
@@ -94,12 +94,12 @@ jobs:
   #Performance:
     #if: ${{ github.event.review.state == 'approved' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/release') }}
     #needs: [Build]
-    #uses: speedb-io/speedb/.github/workflows/perf-test.yml@devops-dev
+    #uses: speedb-io/speedb/.github/workflows/perf-test.yml@main
   
   QA-Tests:
     if: ${{ github.event.review.state == 'approved' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/release') }}
     needs: [Build]
-    uses: speedb-io/speedb/.github/workflows/qa-tests.yml@devops-dev
+    uses: speedb-io/speedb/.github/workflows/qa-tests.yml@main
   
   Fuzz:
     if: ${{ github.event.review.state == 'approved' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/release') }}

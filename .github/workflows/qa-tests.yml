@@ -1,0 +1,62 @@
+name: QA Tests
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+env:
+  GTEST_THROW_ON_FAILURE: 0
+  GTEST_OUTPUT: \"xml:/tmp/test-results/\"
+  SKIP_FORMAT_BUCK_CHECKS: 1
+  GTEST_COLOR: 1
+  CTEST_OUTPUT_ON_FAILURE: 1
+  CTEST_TEST_TIMEOUT: 300
+  ZLIB_DOWNLOAD_BASE: "https://rocksdb-deps.s3.us-west-2.amazonaws.com/pkgs/zlib"
+  BZIP2_DOWNLOAD_BASE: "https://rocksdb-deps.s3.us-west-2.amazonaws.com/pkgs/bzip2"
+  SNAPPY_DOWNLOAD_BASE: "https://rocksdb-deps.s3.us-west-2.amazonaws.com/pkgs/snappy"
+  LZ4_DOWNLOAD_BASE: "https://rocksdb-deps.s3.us-west-2.amazonaws.com/pkgs/lz4"
+  ZSTD_DOWNLOAD_BASE: "https://rocksdb-deps.s3.us-west-2.amazonaws.com/pkgs/zstd"
+
+jobs:
+  test:
+    runs-on: [self-hosted, ubuntu, asrunner]
+    container:
+      image: ubuntu:18.04
+    strategy:
+      matrix:
+        include:
+          - name: unit-test
+            short_test: TMPD=\home\ubuntu make -j2 check
+            long_test: TMPD=\home\ubuntu make -j2 check
+          - name: black-box
+            short_test: CRASH_TEST_EXT_ARGS="--duration=500" make -j2 blackbox_asan_crash_test
+            long_test: CRASH_TEST_EXT_ARGS="--duration=10000" make -j2 blackbox_asan_crash_test
+          - name: white-box
+            short_test: CRASH_TEST_EXT_ARGS="--duration=500" make -j2 whitebox_asan_crash_test
+            long_test: CRASH_TEST_EXT_ARGS="--duration=10000" make -j2 whitebox_asan_crash_test
+    
+    steps:
+      - name: Network hotfix
+        run: echo "nameserver 8.8.8.8" > /etc/resolv.conf
+    
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Pre
+        run: |
+          df -H
+          apt-get update -y && apt-get install -y sudo default-jre default-jdk clang-format parallel moreutils g++ libgflags-dev software-properties-common golang-go gccgo binutils liblz4-dev libsnappy1v5 mlocate sysstat nvme-cli python3 python3-pip nodejs npm liblz4-dev libsnappy-dev libzstd-dev gdb dstat unzip apt-transport-https ca-certificates curl gnupg lsb-release || echo ""
+          sudo mv /usr/bin/parallel /usr/bin/gnu_parallel
+          sudo rm -rf /etc/parallel/config || echo ""
+          
+      - name: ${{ matrix.name }}
+        run: |
+          echo $GITHUB_REF_NAME
+          if echo $GITHUB_REF_NAME | grep -Eq 'release/'; then
+            echo long
+            make clean && ${{ matrix.long_test }} && echo $? || echo $?
+          else
+            echo short
+            make clean && ${{ matrix.short_test }} && echo $? || echo $?
+          fi
+          df -H

@@ -3,13 +3,14 @@ on: [push, pull_request, workflow_call, workflow_dispatch]
 jobs:
   check:
     name: Check TARGETS file and code format
-    runs-on: [self-hosted, linux, x64, myrunner]
+    #runs-on: ubuntu:20.04
+    runs-on: [self-hosted, ubuntu, asrunner]
     container:
       image: ubuntu:latest
     steps:
     
     - name: pre
-      run: apt update && apt install -y sudo git make clang build-essential clang-format
+      run: apt update && apt install -y sudo git make
     
     - name: Checkout feature branch
       uses: actions/checkout@v2

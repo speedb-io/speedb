@@ -2681,8 +2681,10 @@ void GetCommand::DoCommand() {
   std::string value;
   Status st = db_->Get(ReadOptions(), GetCfHandle(), key_, &value);
   if (st.ok()) {
-    fprintf(stdout, "%s\n",
-              (is_value_hex_ ? StringToHex(value) : value).c_str());
+    if (is_value_hex_) {
+      value = StringToHex(value);
+    }
+    fprintf(stdout, "%*s\n", int(value.size()), value.c_str());
   } else {
     std::stringstream oss;
     oss << "Get failed: " << st.ToString();

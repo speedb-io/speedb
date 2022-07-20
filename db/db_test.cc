@@ -706,6 +706,34 @@ TEST_F(DBTest, DISABLED_SanitizeVeryVeryLargeValue) {
   ASSERT_TRUE(wb.Merge(sp_key, sp_value).IsInvalidArgument());
 }
 
+TEST_F(DBTest, GetFromBlockCacheWithDisabledCache) {
+  Options options = CurrentOptions();
+  BlockBasedTableOptions table_options;
+  table_options.no_block_cache = true;
+  options.table_factory.reset(NewBlockBasedTableFactory(table_options));
+
+  DestroyAndReopen(options);
+
+  const std::string key = "key";
+  const std::string value = "value";
+
+  ASSERT_OK(Put(key, value));
+  ASSERT_OK(Flush());
+
+  std::string result;
+  ASSERT_OK(db_->Get(ReadOptions(), key, &result));
+  ASSERT_EQ(result, value);
+  result.clear();
+
+  // Disallow I/O
+  ReadOptions read_options;
+  read_options.read_tier = kBlockCacheTier;
+
+  Status s = db_->Get(read_options, key, &result);
+  ASSERT_TRUE(result.empty());
+  ASSERT_TRUE(s.IsIncomplete());
+}
+
 // Disable because not all platform can run it.
 // It requires more than 9GB memory to run it, With single allocation
 // of more than 3GB.
@@ -6744,7 +6772,7 @@ TEST_F(DBTest, PinnableSliceAndRowCache) {
 
   {
     PinnableSlice pin_slice;
-    ASSERT_EQ(Get("foo", &pin_slice), Status::OK());
+    ASSERT_OK(Get("foo", &pin_slice));
     ASSERT_EQ(pin_slice.ToString(), "bar");
     // Entry is already in cache, lookup will remove the element from lru
     ASSERT_EQ(
@@ -6957,7 +6985,7 @@ TEST_F(DBTest, CreationTimeOfOldestFile) {
   uint64_t creation_time;
   Status s1 = dbfull()->GetCreationTimeOfOldestFile(&creation_time);
   ASSERT_EQ(0, creation_time);
-  ASSERT_EQ(s1, Status::OK());
+  ASSERT_OK(s1);
 
   // Testing with non-zero file creation time.
   set_file_creation_time_to_zero = false;
@@ -6982,14 +7010,14 @@ TEST_F(DBTest, CreationTimeOfOldestFile) {
   uint64_t ctime;
   Status s2 = dbfull()->GetCreationTimeOfOldestFile(&ctime);
   ASSERT_EQ(uint_time_1, ctime);
-  ASSERT_EQ(s2, Status::OK());
+  ASSERT_OK(s2);
 
   // Testing with max_open_files != -1
   options = CurrentOptions();
   options.max_open_files = 10;
   DestroyAndReopen(options);
   Status s3 = dbfull()->GetCreationTimeOfOldestFile(&ctime);
-  ASSERT_EQ(s3, Status::NotSupported());
+  ASSERT_TRUE(s3.IsNotSupported());
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->DisableProcessing();
 }

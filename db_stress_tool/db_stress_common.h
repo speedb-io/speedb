@@ -238,6 +238,8 @@ DECLARE_int32(verify_db_one_in);
 DECLARE_int32(continuous_verification_interval);
 DECLARE_int32(get_property_one_in);
 DECLARE_string(file_checksum_impl);
+DECLARE_int32(data_block_index_type);
+DECLARE_double(data_block_hash_table_util_ratio);
 
 #ifndef ROCKSDB_LITE
 // Options for StackableDB-based BlobDB

@@ -9,11 +9,9 @@
 
 #include "rocksdb/customizable.h"
 
-#include <cassert>
 #include <cctype>
 #include <cinttypes>
 #include <cstring>
-#include <memory>
 #include <unordered_map>
 
 #include "db/db_test_util.h"
@@ -210,49 +208,32 @@ struct SimpleOptions {
   TestCustomizable* cp = nullptr;
 };
 
-static std::unordered_map<std::string, OptionTypeInfo> simple_option_info;
-
-template <class T, class F>
-static int dynamic_unsafe_offsetof(const T& instance, const F& field) {
-  const char* instance_addr =
-      reinterpret_cast<const char*>(std::addressof(instance));
-  const char* field_addr = reinterpret_cast<const char*>(std::addressof(field));
-  assert(field_addr >= instance_addr);
-  const size_t offset = field_addr - instance_addr;
-  assert(offset < sizeof(instance));
-  return offset;
-}
+static std::unordered_map<std::string, OptionTypeInfo> simple_option_info = {
+#ifndef ROCKSDB_LITE
+    {"bool",
+     {offsetof(struct SimpleOptions, b), OptionType::kBoolean,
+      OptionVerificationType::kNormal, OptionTypeFlags::kNone}},
+    {"unique",
+     OptionTypeInfo::AsCustomUniquePtr<TestCustomizable>(
+         offsetof(struct SimpleOptions, cu), OptionVerificationType::kNormal,
+         OptionTypeFlags::kAllowNull)},
+    {"shared",
+     OptionTypeInfo::AsCustomSharedPtr<TestCustomizable>(
+         offsetof(struct SimpleOptions, cs), OptionVerificationType::kNormal,
+         OptionTypeFlags::kAllowNull)},
+    {"pointer",
+     OptionTypeInfo::AsCustomRawPtr<TestCustomizable>(
+         offsetof(struct SimpleOptions, cp), OptionVerificationType::kNormal,
+         OptionTypeFlags::kAllowNull)},
+#endif  // ROCKSDB_LITE
+};
 
 class SimpleConfigurable : public Configurable {
  private:
   SimpleOptions simple_;
 
  public:
-  SimpleConfigurable() {
-#ifndef ROCKSDB_LITE
-    SimpleOptions so;
-    simple_option_info.emplace(
-        "bool", OptionTypeInfo{
-                    dynamic_unsafe_offsetof(so, so.b), OptionType::kBoolean,
-                    OptionVerificationType::kNormal, OptionTypeFlags::kNone});
-    simple_option_info.emplace(
-        "unique",
-        OptionTypeInfo::AsCustomUniquePtr<TestCustomizable>(
-            dynamic_unsafe_offsetof(so, so.cu), OptionVerificationType::kNormal,
-            OptionTypeFlags::kAllowNull));
-    simple_option_info.emplace(
-        "shared",
-        OptionTypeInfo::AsCustomSharedPtr<TestCustomizable>(
-            dynamic_unsafe_offsetof(so, so.cs), OptionVerificationType::kNormal,
-            OptionTypeFlags::kAllowNull));
-    simple_option_info.emplace(
-        "pointer",
-        OptionTypeInfo::AsCustomRawPtr<TestCustomizable>(
-            dynamic_unsafe_offsetof(so, so.cp), OptionVerificationType::kNormal,
-            OptionTypeFlags::kAllowNull));
-#endif  // ROCKSDB_LITE
-    RegisterOptions(&simple_, &simple_option_info);
-  }
+  SimpleConfigurable() { RegisterOptions(&simple_, &simple_option_info); }
 
   explicit SimpleConfigurable(
       const std::unordered_map<std::string, OptionTypeInfo>* map) {

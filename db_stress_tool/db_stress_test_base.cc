@@ -393,6 +393,44 @@ bool StressTest::VerifySecondaries() {
   return true;
 }
 
+static std::vector<bool> GetKeyBitVec(DB* db, const ReadOptions& ropt_base) {
+  ReadOptions ropt = ropt_base;
+  // When `prefix_extractor` is set, seeking to beginning and scanning
+  // across prefixes are only supported with `total_order_seek` set.
+  ropt.total_order_seek = true;
+  std::unique_ptr<Iterator> iterator(db->NewIterator(ropt));
+
+  std::vector<bool> key_bitvec;
+  if (FLAGS_test_batches_snapshots) {
+    // In batched snapshot mode each key/value is inserted 10 times, where
+    // the key and the values are prefixed with a single ASCII digit in the
+    // range 0-9.
+    key_bitvec.resize(FLAGS_max_key * 10);
+  } else {
+    key_bitvec.resize(FLAGS_max_key);
+  }
+
+  for (iterator->SeekToFirst(); iterator->Valid(); iterator->Next()) {
+    uint64_t key_offset = 0;
+    Slice key_str = iterator->key();
+    // In batched snapshot mode each key operation is actually 10 operations in
+    // a single batch, as each operation creates 10 keys from each key by
+    // prefixing it with an ASCII digit in the range 0-9.
+    if (FLAGS_test_batches_snapshots) {
+      const char batch_id = key_str[0];
+      assert(batch_id >= '0' && batch_id <= '9');
+      key_offset = (batch_id - '0') * FLAGS_max_key;
+      key_str.remove_prefix(1);
+    }
+
+    uint64_t key_val;
+    if (GetIntVal(key_str.ToString(), &key_val)) {
+      key_bitvec.at(key_offset + key_val) = true;
+    }
+  }
+  return key_bitvec;
+}
+
 Status StressTest::AssertSame(DB* db, ColumnFamilyHandle* cf,
                               ThreadState::SnapshotState& snap_state) {
   Status s;
@@ -415,7 +453,8 @@ Status StressTest::AssertSame(DB* db, ColumnFamilyHandle* cf,
   if (!s.ok() && !s.IsNotFound()) {
     return s;
   }
-  if (snap_state.status != s) {
+  if (snap_state.status.code() != s.code() ||
+      snap_state.status.subcode() != s.subcode()) {
     return Status::Corruption(
         "The snapshot gave inconsistent results for key " +
         ToString(Hash(snap_state.key.c_str(), snap_state.key.size(), 0)) +
@@ -430,20 +469,9 @@ Status StressTest::AssertSame(DB* db, ColumnFamilyHandle* cf,
     }
   }
   if (snap_state.key_vec != nullptr) {
-    // When `prefix_extractor` is set, seeking to beginning and scanning
-    // across prefixes are only supported with `total_order_seek` set.
-    ropt.total_order_seek = true;
-    std::unique_ptr<Iterator> iterator(db->NewIterator(ropt));
-    std::unique_ptr<std::vector<bool>> tmp_bitvec(
-        new std::vector<bool>(FLAGS_max_key));
-    for (iterator->SeekToFirst(); iterator->Valid(); iterator->Next()) {
-      uint64_t key_val;
-      if (GetIntVal(iterator->key().ToString(), &key_val)) {
-        (*tmp_bitvec.get())[key_val] = true;
-      }
-    }
+    std::vector<bool> tmp_bitvec = GetKeyBitVec(db, ropt);
     if (!std::equal(snap_state.key_vec->begin(), snap_state.key_vec->end(),
-                    tmp_bitvec.get()->begin())) {
+                    tmp_bitvec.begin())) {
       return Status::Corruption("Found inconsistent keys at this snapshot");
     }
   }
@@ -703,7 +731,6 @@ void StressTest::OperateDb(ThreadState* thread) {
       MutexLock l(thread->shared->GetMutex());
       while (!thread->snapshot_queue.empty()) {
         db_->ReleaseSnapshot(thread->snapshot_queue.front().second.snapshot);
-        delete thread->snapshot_queue.front().second.key_vec;
         thread->snapshot_queue.pop();
       }
       thread->shared->IncVotedReopen();
@@ -973,7 +1000,6 @@ void StressTest::OperateDb(ThreadState* thread) {
   }
   while (!thread->snapshot_queue.empty()) {
     db_->ReleaseSnapshot(thread->snapshot_queue.front().second.snapshot);
-    delete thread->snapshot_queue.front().second.key_vec;
     thread->snapshot_queue.pop();
   }
 
@@ -2004,27 +2030,18 @@ void StressTest::TestAcquireSnapshot(ThreadState* thread,
   std::vector<bool>* key_vec = nullptr;
 
   if (FLAGS_compare_full_db_state_snapshot && (thread->tid == 0)) {
-    key_vec = new std::vector<bool>(FLAGS_max_key);
-    // When `prefix_extractor` is set, seeking to beginning and scanning
-    // across prefixes are only supported with `total_order_seek` set.
-    ropt.total_order_seek = true;
-    std::unique_ptr<Iterator> iterator(db_->NewIterator(ropt));
-    for (iterator->SeekToFirst(); iterator->Valid(); iterator->Next()) {
-      uint64_t key_val;
-      if (GetIntVal(iterator->key().ToString(), &key_val)) {
-        (*key_vec)[key_val] = true;
-      }
-    }
+    key_vec = new std::vector<bool>(GetKeyBitVec(db_, ropt));
   }
 
-  ThreadState::SnapshotState snap_state = {snapshot,
-                                           rand_column_family,
-                                           column_family->GetName(),
-                                           keystr,
-                                           status_at,
-                                           value_at,
-                                           key_vec,
-                                           ts_str};
+  ThreadState::SnapshotState snap_state = {
+      snapshot,
+      rand_column_family,
+      column_family->GetName(),
+      keystr,
+      status_at,
+      value_at,
+      std::unique_ptr<std::vector<bool>>(key_vec),
+      ts_str};
   uint64_t hold_for = FLAGS_snapshot_hold_ops;
   if (FLAGS_long_running_snapshots) {
     // Hold 10% of snapshots for 10x more
@@ -2039,20 +2056,19 @@ void StressTest::TestAcquireSnapshot(ThreadState* thread,
     }
   }
   uint64_t release_at = std::min(FLAGS_ops_per_thread - 1, i + hold_for);
-  thread->snapshot_queue.emplace(release_at, snap_state);
+  thread->snapshot_queue.emplace(release_at, std::move(snap_state));
 }
 
 Status StressTest::MaybeReleaseSnapshots(ThreadState* thread, uint64_t i) {
   while (!thread->snapshot_queue.empty() &&
          i >= thread->snapshot_queue.front().first) {
-    auto snap_state = thread->snapshot_queue.front().second;
+    auto& snap_state = thread->snapshot_queue.front().second;
     assert(snap_state.snapshot);
     // Note: this is unsafe as the cf might be dropped concurrently. But
     // it is ok since unclean cf drop is cunnrently not supported by write
     // prepared transactions.
     Status s = AssertSame(db_, column_families_[snap_state.cf_at], snap_state);
     db_->ReleaseSnapshot(snap_state.snapshot);
-    delete snap_state.key_vec;
     thread->snapshot_queue.pop();
     if (!s.ok()) {
       return s;
@@ -2298,6 +2314,10 @@ void StressTest::PrintEnv() const {
           static_cast<int>(FLAGS_user_timestamp_size));
   fprintf(stdout, "WAL compression           : %s\n",
           FLAGS_wal_compression.c_str());
+  fprintf(stdout, "data_block_index_type : %d\n",
+          static_cast<int>(FLAGS_data_block_index_type));
+  fprintf(stdout, "data_block_hash_table_util_ratio : %f\n",
+          static_cast<double>(FLAGS_data_block_hash_table_util_ratio));
 
   fprintf(stdout, "------------------------------------------------\n");
 }
@@ -2338,6 +2358,11 @@ void StressTest::Open() {
     block_based_options.prepopulate_block_cache =
         static_cast<BlockBasedTableOptions::PrepopulateBlockCache>(
             FLAGS_prepopulate_block_cache);
+    block_based_options.data_block_index_type =
+        static_cast<BlockBasedTableOptions::DataBlockIndexType>(
+            FLAGS_data_block_index_type);
+    block_based_options.data_block_hash_table_util_ratio =
+        static_cast<double>(FLAGS_data_block_hash_table_util_ratio);
     options_.table_factory.reset(
         NewBlockBasedTableFactory(block_based_options));
     options_.db_write_buffer_size = FLAGS_db_write_buffer_size;

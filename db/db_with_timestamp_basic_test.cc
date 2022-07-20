@@ -520,30 +520,30 @@ TEST_F(DBBasicTestWithTimestamp, UpdateFullHistoryTsLowWithPublicAPI) {
   std::string ts_low_str_back = Timestamp(8, 0);
   auto s = db_->IncreaseFullHistoryTsLow(db_->DefaultColumnFamily(),
                                          ts_low_str_back);
-  ASSERT_EQ(s, Status::InvalidArgument());
+  ASSERT_TRUE(s.IsInvalidArgument());
   // test IncreaseFullHistoryTsLow with a timestamp whose length is longger
   // than the cf's timestamp size
   std::string ts_low_str_long(Timestamp(0, 0).size() + 1, 'a');
   s = db_->IncreaseFullHistoryTsLow(db_->DefaultColumnFamily(),
                                     ts_low_str_long);
-  ASSERT_EQ(s, Status::InvalidArgument());
+  ASSERT_TRUE(s.IsInvalidArgument());
   // test IncreaseFullHistoryTsLow with a timestamp which is null
   std::string ts_low_str_null = "";
   s = db_->IncreaseFullHistoryTsLow(db_->DefaultColumnFamily(),
                                     ts_low_str_null);
-  ASSERT_EQ(s, Status::InvalidArgument());
+  ASSERT_TRUE(s.IsInvalidArgument());
   // test IncreaseFullHistoryTsLow for a column family that does not enable
   // timestamp
   options.comparator = BytewiseComparator();
   DestroyAndReopen(options);
   ts_low_str = Timestamp(10, 0);
   s = db_->IncreaseFullHistoryTsLow(db_->DefaultColumnFamily(), ts_low_str);
-  ASSERT_EQ(s, Status::InvalidArgument());
+  ASSERT_TRUE(s.IsInvalidArgument());
   // test GetFullHistoryTsLow for a column family that does not enable
   // timestamp
   std::string current_ts_low;
   s = db_->GetFullHistoryTsLow(db_->DefaultColumnFamily(), &current_ts_low);
-  ASSERT_EQ(s, Status::InvalidArgument());
+  ASSERT_TRUE(s.IsInvalidArgument());
   Close();
 }
 
@@ -719,7 +719,8 @@ TEST_F(DBBasicTestWithTimestamp, TrimHistoryTest) {
     ropts.timestamp = &ts;
     std::string value;
     Status s = db->Get(ropts, key, &value);
-    ASSERT_TRUE(s == status);
+    ASSERT_EQ(s.code(), status.code());
+    ASSERT_EQ(s.subcode(), status.subcode());
     if (s.ok()) {
       ASSERT_EQ(checkValue, value);
     }

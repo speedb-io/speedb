@@ -118,7 +118,7 @@ Status CacheReservationManagerImpl<R>::IncreaseCacheReservation(
     return_status = cache_->Insert(GetNextCacheKey(), nullptr, kSizeDummyEntry,
                                    GetNoopDeleterForRole<R>(), &handle);
 
-    if (return_status != Status::OK()) {
+    if (!return_status.ok()) {
       return return_status;
     }
 

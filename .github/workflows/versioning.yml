@@ -1,7 +1,7 @@
 name: versioning
 
 on:
-  push:
+  #push:
   workflow_dispatch:
   workflow_call:
 

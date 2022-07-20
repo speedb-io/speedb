@@ -104,7 +104,7 @@ jobs:
   Fuzz:
     if: ${{ github.event.review.state == 'approved' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/release') }}
     needs: [Build]
-    runs-on: [self-hosted, linux, x64, myrunner]
+    runs-on: [self-hosted, ubuntu, asrunner]
     container:
       image: ubuntu:18.04
     strategy:
@@ -163,7 +163,7 @@ jobs:
           aws s3 cp $GITHUB_WORKSPACE/out/${{ matrix.name }}.log s3://spdb-github-ci/
     
   fuzzer_sum:
-    runs-on: [self-hosted, linux, x64, myrunner]
+    runs-on: [self-hosted, ubuntu, asrunner]
     container:
       image: ubuntu:18.04
     needs: [ Fuzz ]

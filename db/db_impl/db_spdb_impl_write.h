@@ -54,7 +54,7 @@ class SpdbWriteImpl {
   // Called from WAL writer thread
   bool SwitchBatchGroup();
 
-  void WalWriteThread();
+  void SpdbWriteThread();
 
   // Called from WAL writer thread
   bool WaitForPendingWork(size_t written_buffers);

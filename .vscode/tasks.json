@@ -1,58 +1,69 @@
 {
-  // See https://go.microsoft.com/fwlink/?LinkId=733558
-  // for the documentation about the tasks.json format
-  "version": "2.0.0",
-  "tasks": [
-    {
-      "label": "c_test Release",
-      "type": "shell",
-      "command": "dock-speedb.sh DEBUG_LEVEL=0 make -j 16 c_test",
-      "group": {
-        "kind": "build",
-        "isDefault": false
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "db_bench Debug",
-      "type": "shell",
-      "command": "DEBUG_LEVEL=2 make -j 16 db_bench",
-      "group": {
-        "kind": "build",
-        "isDefault": false
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "memtablerep_bench Debug",
-      "type": "shell",
-      "command": "DEBUG_LEVEL=2 make -j 16 memtablerep_bench",
-      "group": {
-        "kind": "build",
-        "isDefault": false
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "db_stress Debug",
-      "type": "shell",
-      "command": "DEBUG_LEVEL=1 make -j 16 db_stress",
-      "group": {
-        "kind": "build",
-        "isDefault": false
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "db_iter_test Debug",
-      "type": "shell",
-      "command": "DEBUG_LEVEL=1 make -j 16 db_iter_test",
-      "group": {
-        "kind": "build",
-        "isDefault": false
-      },
-      "problemMatcher": []
-    },
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "c_test Release",
+            "type": "shell",
+            "command": "dock-speedb.sh DEBUG_LEVEL=0 make -j 16 c_test",
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "db_bench Debug",
+            "type": "shell",
+            "command": "DEBUG_LEVEL=2 make -j 16 db_bench",
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "problemMatcher": []
+        }, 
+        {
+            "label": "memtablerep_bench Debug",
+            "type": "shell",
+            "command": "DEBUG_LEVEL=2 make -j 16 memtablerep_bench",
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "problemMatcher": []
+        }, 
+        {
+            "label": "db_stress Debug",
+            "type": "shell",
+            "command": "DEBUG_LEVEL=1 make -j 16 db_stress",
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "problemMatcher": []
+        },   
+        {
+            "label": "db_iter_test Debug",
+            "type": "shell",
+            "command": "DEBUG_LEVEL=1 make -j 16 db_iter_test",
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "problemMatcher": []
+        },   
+        
+        {
+            "label": "check Debug",
+            "type": "shell",
+            "command": "DEBUG_LEVEL=1 make -j 16 check",
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "problemMatcher": []
+        },               
 
     {
       "label": "simu Debug",

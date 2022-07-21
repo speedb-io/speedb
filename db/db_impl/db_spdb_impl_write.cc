@@ -98,9 +98,9 @@ void SpdbWriteImpl::SpdbFlushWriteThread() {
 
 SpdbWriteImpl::SpdbWriteImpl(DBImpl* db)
     : db_(db),
-      flush_thread_(&SpdbWriteImpl::SpdbFlushWriteThread, this),
       flush_thread_terminate_(false),
-      action_needed_(false) {
+      action_needed_(false),
+      flush_thread_(&SpdbWriteImpl::SpdbFlushWriteThread, this) {
 #if defined(_GNU_SOURCE) && defined(__GLIBC_PREREQ)
 #if __GLIBC_PREREQ(2, 12)
   auto thread_handle = flush_thread_.native_handle();

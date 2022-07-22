@@ -1584,6 +1584,7 @@ void DBImpl::BackgroundCallPurge() {
 
     mutex_.Unlock();
     DeleteObsoleteFileImpl(job_id, fname, dir_to_sync, type, number);
+    immutable_db_options_.clock->SleepForMicroseconds(100);
     mutex_.Lock();
   }
 

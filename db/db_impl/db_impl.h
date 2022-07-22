@@ -1162,7 +1162,7 @@ class DBImpl : public DB {
   static std::string GenerateDbSessionId(Env* env);
 
  public:
-  // SPDB write
+ // SPDB write
   bool NeedQuiesce();
   Status HandleQuiesce();
 
@@ -1170,9 +1170,12 @@ class DBImpl : public DB {
     return versions_->FetchAddLastAllocatedSequence(seq_inc);
   }
 
-  Status SpdbWrite(const WriteOptions& write_options, WriteBatch* my_batch, bool disable_memtable);
-  IOStatus SpdbWriteToWAL(WriteBatch* merged_batch, size_t write_with_wal, const WriteBatch* to_be_cached_state);
+  Status SpdbWrite(const WriteOptions& write_options, WriteBatch* my_batch,
+                   bool disable_memtable);
+  IOStatus SpdbWriteToWAL(WriteBatch* merged_batch, size_t write_with_wal,
+                          const WriteBatch* to_be_cached_state);
 
+ protected:
  protected:
   const std::string dbname_;
   // TODO(peterd): unify with VersionSet::db_id_
@@ -2405,7 +2408,9 @@ class DBImpl : public DB {
   BlobFileCompletionCallback blob_callback_;
 
   // Speedb write flow parameters
-  SpdbWriteImpl spdb_write_;
+  WalSpdb spdb_wal_;
+  port::RWMutex spdb_write_batch_rwlock_;  // protect quiesce
+
 
   // Pointer to WriteBufferManager stalling interface.
   std::unique_ptr<StallInterface> wbm_stall_;

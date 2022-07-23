@@ -1176,6 +1176,10 @@ class DBImpl : public DB {
   IOStatus SpdbWriteToWAL(WriteBatch* merged_batch, size_t write_with_wal,
                           const WriteBatch* to_be_cached_state);
 
+  void SuspendSpdbWrites();
+  void ResumeSpdbWrites();
+
+
  protected:
   const std::string dbname_;
   // TODO(peterd): unify with VersionSet::db_id_

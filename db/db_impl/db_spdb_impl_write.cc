@@ -24,8 +24,6 @@
 
 namespace ROCKSDB_NAMESPACE {
 
-static constexpr auto kFlushCheckTimeout = std::chrono::seconds(5);
-
 // add_buffer_mutex_ is held
 void SpdbWriteImpl::WritesBatchList::Add(WriteBatch* batch, bool disable_wal,
                                          bool* leader_batch) {
@@ -49,9 +47,11 @@ void SpdbWriteImpl::WritesBatchList::WriteBatchComplete(bool leader_batch,
   // Batch was added to the memtable, we can release the memtable_ref.
   write_ref_rwlock_.ReadUnlock();
   if (leader_batch) {
-    // make sure all batches wrote to memtable (if needed) to be able progress
-    // the version
-    WriteLock wl(&write_ref_rwlock_);
+    {
+      // make sure all batches wrote to memtable (if needed) to be able progress
+      // the version
+      WriteLock wl(&write_ref_rwlock_);
+    }
     db->SetLastSequence(max_seq_);
     // wal write has been completed wal waiters will be released
     buffer_write_rw_lock_.WriteUnlock();
@@ -80,19 +80,15 @@ void SpdbWriteImpl::SpdbFlushWriteThread() {
   for (;;) {
     {
       std::unique_lock<std::mutex> lck(flush_thread_mutex_);
-      flush_thread_cv_.wait_for(lck, kFlushCheckTimeout, [this] {
-        return (action_needed_.load() || flush_thread_terminate_.load());
-      });
+      flush_thread_cv_.wait(lck);
+      if (flush_thread_terminate_.load()) {
+        break;
+      }
     }
-    if (flush_thread_terminate_.load()) {
-      break;
-    }
-    if (db_->CheckIfActionNeeded()) {
-      // make sure no on the fly writes
-      WriteLock wl(&flush_rwlock_);
-      db_->RegisterFlushOrTrim();
-      action_needed_.store(false);
-    }
+    // make sure no on the fly writes
+    WriteLock wl(&flush_rwlock_);
+    db_->RegisterFlushOrTrim();
+    action_needed_.store(false);
   }
 }
 
@@ -306,7 +302,7 @@ Status DBImpl::SpdbWrite(const WriteOptions& write_options, WriteBatch* batch,
   }
 
   last_batch_group_size_ = WriteBatchInternal::ByteSize(batch);
-  ReadLock wrl(&spdb_write_->GetFlushRWLock());
+  ReadLock rl(&spdb_write_->GetFlushRWLock());
 
   if (write_options.disableWAL) {
     has_unpersisted_data_.store(true, std::memory_order_relaxed);
@@ -339,8 +335,26 @@ Status DBImpl::SpdbWrite(const WriteOptions& write_options, WriteBatch* batch,
 
   // handle !status.ok()
   spdb_write_->WriteBatchComplete(list, leader_batch);
+
   return status;
 }
+
+void DBImpl::SuspendSpdbWrites() {
+  if (spdb_write_) {
+    spdb_write_->GetFlushRWLock().WriteLock();
+  }
+}
+void DBImpl::ResumeSpdbWrites() {
+  if (spdb_write_) {
+    // must release the db mutex lock before unlock spdb flush lock 
+    // to prevent deadlock!!! the db mutex will be acquired after the unlock
+    mutex_.Unlock();
+    spdb_write_->GetFlushRWLock().WriteUnlock();
+    // Lock again the db mutex as it was before we enterd this function
+    mutex_.Lock();
+  } 
+}
+
 
 IOStatus DBImpl::SpdbWriteToWAL(WriteBatch* merged_batch, size_t write_with_wal,
                                 const WriteBatch* to_be_cached_state) {

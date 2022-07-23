@@ -85,9 +85,9 @@ class SpdbWriteImpl {
   std::atomic<bool> action_needed_;
   std::mutex flush_thread_mutex_;
   std::condition_variable flush_thread_cv_;
-  std::thread flush_thread_;
   port::Mutex add_buffer_mutex_;
   port::RWMutex flush_rwlock_;
+  std::thread flush_thread_;
   port::RWMutex wal_buffers_rwlock_;
   port::Mutex wal_write_mutex_;
   WriteBatch tmp_batch_;

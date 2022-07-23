@@ -306,7 +306,7 @@ Status DBImpl::SpdbWrite(const WriteOptions& write_options, WriteBatch* batch,
   }
 
   last_batch_group_size_ = WriteBatchInternal::ByteSize(batch);
-  spdb_write_->GetFlushRWLock().ReadLock();
+  spdb_write_->GetFlushRWLock()->ReadLock();
 
   if (write_options.disableWAL) {
     has_unpersisted_data_.store(true, std::memory_order_relaxed);
@@ -339,14 +339,14 @@ Status DBImpl::SpdbWrite(const WriteOptions& write_options, WriteBatch* batch,
 
   // handle !status.ok()
   spdb_write_->WriteBatchComplete(list, leader_batch);
-  spdb_write_->GetFlushRWLock().ReadUnlock();
+  spdb_write_->GetFlushRWLock()->ReadUnlock();
 
   return status;
 }
 
 void DBImpl::SuspendSpdbWrites() {
   if (spdb_write_) {
-    spdb_write_->GetFlushRWLock().WriteLock();
+    spdb_write_->GetFlushRWLock()->WriteLock();
   }
 }
 void DBImpl::ResumeSpdbWrites() {
@@ -354,7 +354,7 @@ void DBImpl::ResumeSpdbWrites() {
     // must release the db mutex lock before unlock spdb flush lock 
     // to prevent deadlock!!! the db mutex will be acquired after the unlock
     mutex_.Unlock();
-    spdb_write_->GetFlushRWLock().WriteUnlock();
+    spdb_write_->GetFlushRWLock()->WriteUnlock();
     // Lock again the db mutex as it was before we enterd this function
     mutex_.Lock();
   } 

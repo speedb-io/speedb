@@ -207,6 +207,22 @@ void* SpdbWriteImpl::AddMerge(WriteBatch* batch, bool disable_wal,
 // release the add merge lock
 void SpdbWriteImpl::CompleteMerge() { add_buffer_mutex_.Unlock(); }
 
+void SpdbWriteImpl::Lock(bool is_read) {
+  if (is_read) {
+    flush_rwlock_.ReadLock();    
+  } else {
+    flush_rwlock_.WriteLock();    
+  }
+}
+
+void SpdbWriteImpl::Unlock(bool is_read) {
+  if (is_read) {
+    flush_rwlock_.ReadUnlock();    
+  } else {
+    flush_rwlock_.WriteUnlock();    
+  }
+}
+
 SpdbWriteImpl::WritesBatchList& SpdbWriteImpl::SwitchBatchGroup() {
   MutexLock l(&add_buffer_mutex_);
   WritesBatchList& batch_group = wb_lists_[active_buffer_index_];
@@ -302,7 +318,7 @@ Status DBImpl::SpdbWrite(const WriteOptions& write_options, WriteBatch* batch,
   }
 
   last_batch_group_size_ = WriteBatchInternal::ByteSize(batch);
-  ReadLock rl(&spdb_write_.get()->GetFlushRWLock());
+  spdb_write_->Lock(true);
 
   if (write_options.disableWAL) {
     has_unpersisted_data_.store(true, std::memory_order_relaxed);
@@ -335,13 +351,14 @@ Status DBImpl::SpdbWrite(const WriteOptions& write_options, WriteBatch* batch,
 
   // handle !status.ok()
   spdb_write_->WriteBatchComplete(list, leader_batch);
+  spdb_write_->Unlock(true);
 
   return status;
 }
 
 void DBImpl::SuspendSpdbWrites() {
   if (spdb_write_) {
-    spdb_write_.get()->GetFlushRWLock().WriteLock();
+    spdb_write_->Lock(false);
   }
 }
 void DBImpl::ResumeSpdbWrites() {
@@ -349,7 +366,7 @@ void DBImpl::ResumeSpdbWrites() {
     // must release the db mutex lock before unlock spdb flush lock 
     // to prevent deadlock!!! the db mutex will be acquired after the unlock
     mutex_.Unlock();
-    spdb_write_.get()->GetFlushRWLock().WriteUnlock();
+    spdb_write_->Unlock(false);
     // Lock again the db mutex as it was before we enterd this function
     mutex_.Lock();
   } 

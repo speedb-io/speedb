@@ -83,11 +83,9 @@ class SpdbWriteImpl {
   std::atomic<bool> flush_thread_terminate_;
   // this means we need to do some actions
   std::atomic<bool> action_needed_;
-  std::thread flush_thread_;
   std::mutex flush_thread_mutex_;
   std::condition_variable flush_thread_cv_;
   port::Mutex add_buffer_mutex_;
-
   port::RWMutex flush_rwlock_;
   std::thread flush_thread_;
   port::RWMutex wal_buffers_rwlock_;

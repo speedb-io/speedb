@@ -49,9 +49,11 @@ void SpdbWriteImpl::WritesBatchList::WriteBatchComplete(bool leader_batch,
   // Batch was added to the memtable, we can release the memtable_ref.
   write_ref_rwlock_.ReadUnlock();
   if (leader_batch) {
-    // make sure all batches wrote to memtable (if needed) to be able progress
-    // the version
-    WriteLock wl(&write_ref_rwlock_);
+    {
+      // make sure all batches wrote to memtable (if needed) to be able progress
+      // the version
+      WriteLock wl(&write_ref_rwlock_);
+    }
     db->SetLastSequence(max_seq_);
     // wal write has been completed wal waiters will be released
     buffer_write_rw_lock_.WriteUnlock();

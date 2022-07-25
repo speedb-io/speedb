@@ -24,8 +24,8 @@ public class NativeLibraryLoaderTest {
   public void tempFolder() throws IOException {
     NativeLibraryLoader.getInstance().loadLibraryFromJarToTemp(
         temporaryFolder.getRoot().getAbsolutePath());
-    final Path path = Paths.get(temporaryFolder.getRoot().getAbsolutePath(),
-        Environment.getJniLibraryFileName("rocksdb"));
+    final Path path = Paths.get(
+        temporaryFolder.getRoot().getAbsolutePath(), Environment.getJniLibraryFileName("speedb"));
     assertThat(Files.exists(path)).isTrue();
     assertThat(Files.isReadable(path)).isTrue();
   }

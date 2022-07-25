@@ -10,7 +10,7 @@
 SHELL := $(shell command -v bash || echo $(SHELL))
 include common.mk
 
-PROJECT_NAME := rocksdb
+PROJECT_NAME := speedb
 
 CLEAN_FILES = # deliberately empty, so we can append below.
 CFLAGS += ${EXTRA_CFLAGS}
@@ -28,14 +28,14 @@ parallel_log_extract = awk \
   }'
 
 # DEBUG_LEVEL can have three values:
-# * DEBUG_LEVEL=2; this is the ultimate debug mode. It will compile rocksdb
+# * DEBUG_LEVEL=2; this is the ultimate debug mode. It will compile Speedb
 # without any optimizations. To compile with level 2, issue `make dbg`
 # * DEBUG_LEVEL=1; debug level 1 enables all assertions and debug code, but
-# compiles rocksdb with -O2 optimizations. this is the default debug level.
-# `make all` or `make <binary_target>` compile RocksDB with debug level 1.
-# We use this debug level when developing RocksDB.
+# compiles Speedb with -O2 optimizations. this is the default debug level.
+# `make all` or `make <binary_target>` compile Speedb with debug level 1.
+# We use this debug level when developing Speedb.
 # * DEBUG_LEVEL=0; this is the debug level we use for release. If you're
-# running rocksdb in production you most definitely want to compile RocksDB
+# running Speedb in production you most definitely want to compile Speedb
 # with debug level 0. To compile with level 0, run `make shared_lib`,
 # `make install-shared`, `make static_lib`, `make install-static` or
 # `make install`
@@ -218,7 +218,7 @@ endif
 
 # `USE_LTO=1` enables link-time optimizations. Among other things, this enables
 # more devirtualization opportunities and inlining across translation units.
-# This can save significant overhead introduced by RocksDB's pluggable
+# This can save significant overhead introduced by Speedb's pluggable
 # interfaces/internal abstractions, like in the iterator hierarchy. It works
 # better when combined with profile-guided optimizations (not currently
 # supported natively in Makefile).
@@ -769,10 +769,10 @@ ifeq ($(ROCKSDBTESTS_PLATFORM_DEPENDENT), only)
         ROCKSDBTESTS_SUBSET := $(filter $(TESTS_PLATFORM_DEPENDENT), $(ROCKSDBTESTS_SUBSET))
 else ifeq ($(ROCKSDBTESTS_PLATFORM_DEPENDENT), exclude)
         ROCKSDBTESTS_SUBSET := $(filter-out $(TESTS_PLATFORM_DEPENDENT), $(ROCKSDBTESTS_SUBSET))
-endif
 
+endif
 # bench_tool_analyer main is in bench_tool_analyzer_tool, or this would be simpler...
-TOOLS = $(patsubst %.cc, %, $(notdir $(patsubst %_tool.cc, %.cc, $(TOOLS_MAIN_SOURCES))))
+TOOLS = $(patsubst rocksdb_%, $(PROJECT_NAME)_%,$(patsubst %.cc, %, $(notdir $(patsubst %_tool.cc, %.cc, $(TOOLS_MAIN_SOURCES)))))
 
 TEST_LIBS = \
 	lib$(PROJECT_NAME)_env_basic_test.a
@@ -782,6 +782,14 @@ BENCHMARKS = $(patsubst %.cc, %, $(notdir $(BENCH_MAIN_SOURCES)))
 
 MICROBENCHS = $(patsubst %.cc, %, $(notdir $(MICROBENCH_SOURCES)))
 
+# if user didn't config LIBNAME, set the default
+ifeq ($(LIBNAME),)
+  LIBNAME=librocksdb
+# we should only run Speedb in production with DEBUG_LEVEL 0
+ifneq ($(DEBUG_LEVEL),0)
+  LIBDEBUG=_debug
+endif
+endif
 STATIC_LIBRARY = ${LIBNAME}$(LIBDEBUG).a
 STATIC_TEST_LIBRARY =  ${LIBNAME}_test$(LIBDEBUG).a
 STATIC_TOOLS_LIBRARY = ${LIBNAME}_tools$(LIBDEBUG).a
@@ -1758,10 +1766,10 @@ deletefile_test: $(OBJ_DIR)/db/deletefile_test.o $(TEST_LIBRARY) $(LIBRARY)
 obsolete_files_test: $(OBJ_DIR)/db/obsolete_files_test.o $(TEST_LIBRARY) $(LIBRARY)
 	$(AM_LINK)
 
-rocksdb_dump: $(OBJ_DIR)/tools/dump/rocksdb_dump.o $(LIBRARY)
+$(PROJECT_NAME)_dump: $(OBJ_DIR)/tools/dump/rocksdb_dump.o $(LIBRARY)
 	$(AM_LINK)
 
-rocksdb_undump: $(OBJ_DIR)/tools/dump/rocksdb_undump.o $(LIBRARY)
+$(PROJECT_NAME)_undump: $(OBJ_DIR)/tools/dump/rocksdb_undump.o $(LIBRARY)
 	$(AM_LINK)
 
 cuckoo_table_builder_test: $(OBJ_DIR)/table/cuckoo/cuckoo_table_builder_test.o $(TEST_LIBRARY) $(LIBRARY)

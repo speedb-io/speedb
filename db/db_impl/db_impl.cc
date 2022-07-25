@@ -5425,7 +5425,7 @@ void DBImpl::EraseThreadStatusDbInfo() const {}
 //
 // A global method that can dump out the build version
 void DumpRocksDBBuildVersion(Logger* log) {
-  ROCKS_LOG_HEADER(log, "SpeeDB version: %s (%s)\n",
+  ROCKS_LOG_HEADER(log, "Speedb version: %s (%s)\n",
                    GetSpeedbVersionAsString().c_str(),
                    GetRocksVersionAsString().c_str());
   const auto& props = GetRocksBuildProperties();

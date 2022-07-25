@@ -2457,7 +2457,7 @@ uint32_t StressTest::GetRangeHash(ThreadState* thread, const Snapshot* snapshot,
 }
 
 void StressTest::PrintEnv() const {
-  fprintf(stdout, "RocksDB version           : %d.%d\n", kMajorVersion,
+  fprintf(stdout, "Speedb version           : %d.%d\n", kMajorVersion,
           kMinorVersion);
   fprintf(stdout, "Format version            : %d\n", FLAGS_format_version);
   fprintf(stdout, "TransactionDB             : %s\n",
@@ -2981,13 +2981,6 @@ void StressTest::Open(SharedState* shared, bool reopen) {
     DBWithTTL* db_with_ttl;
     s = DBWithTTL::Open(options_, FLAGS_db, &db_with_ttl, FLAGS_ttl);
     db_ = db_with_ttl;
-  }
-
-  if (FLAGS_preserve_unverified_changes) {
-    // Up until now, no live file should have become obsolete due to these
-    // options. After `DisableFileDeletions()` we can reenable auto compactions
-    // since, even if live files become obsolete, they won't be deleted.
-    assert(options_.avoid_flush_during_recovery);
     assert(options_.disable_auto_compactions);
     if (s.ok()) {
       s = db_->DisableFileDeletions();

@@ -164,8 +164,7 @@ class PosixFileSystem : public FileSystem {
 
     if (options.use_direct_reads && !options.use_mmap_reads) {
 #ifdef ROCKSDB_LITE
-      return IOStatus::IOError(fname,
-                               "Direct I/O not supported in RocksDB lite");
+      return IOStatus::IOError(fname, "Direct I/O not supported in LITE mode");
 #endif  // !ROCKSDB_LITE
 #if !defined(OS_MACOSX) && !defined(OS_OPENBSD) && !defined(OS_SOLARIS)
       flags |= O_DIRECT;
@@ -219,8 +218,7 @@ class PosixFileSystem : public FileSystem {
 
     if (options.use_direct_reads && !options.use_mmap_reads) {
 #ifdef ROCKSDB_LITE
-      return IOStatus::IOError(fname,
-                               "Direct I/O not supported in RocksDB lite");
+      return IOStatus::IOError(fname, "Direct I/O not supported in LITE mode");
 #endif  // !ROCKSDB_LITE
 #if !defined(OS_MACOSX) && !defined(OS_OPENBSD) && !defined(OS_SOLARIS)
       flags |= O_DIRECT;
@@ -296,8 +294,7 @@ class PosixFileSystem : public FileSystem {
       // offset.
       // More info here: https://linux.die.net/man/2/pwrite
 #ifdef ROCKSDB_LITE
-      return IOStatus::IOError(fname,
-                               "Direct I/O not supported in RocksDB lite");
+      return IOStatus::IOError(fname, "Direct I/O not supported in LITE mode");
 #endif  // ROCKSDB_LITE
       flags |= O_WRONLY;
 #if !defined(OS_MACOSX) && !defined(OS_OPENBSD) && !defined(OS_SOLARIS)
@@ -388,8 +385,7 @@ class PosixFileSystem : public FileSystem {
     // Direct IO mode with O_DIRECT flag or F_NOCAHCE (MAC OSX)
     if (options.use_direct_writes && !options.use_mmap_writes) {
 #ifdef ROCKSDB_LITE
-      return IOStatus::IOError(fname,
-                               "Direct I/O not supported in RocksDB lite");
+      return IOStatus::IOError(fname, "Direct I/O not supported in LITE mode");
 #endif  // !ROCKSDB_LITE
       flags |= O_WRONLY;
 #if !defined(OS_MACOSX) && !defined(OS_OPENBSD) && !defined(OS_SOLARIS)

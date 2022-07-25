@@ -772,7 +772,7 @@ int main(int argc, char** argv) {
 #include <cstdio>
 
 int main(int /*argc*/, char** /*argv*/) {
-  printf("Skipped in RocksDBLite as utilities are not supported.\n");
+  printf("Skipped in LITE mode as utilities are not supported.\n");
   return 0;
 }
 #endif  // !ROCKSDB_LITE

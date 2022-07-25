@@ -39,9 +39,9 @@ tmp_origin=_tmp_origin
 set -e
 git remote remove $tmp_origin 2>/dev/null || true
 if [ "$USE_SSH" ]; then
-  git remote add $tmp_origin "git@github.com:facebook/rocksdb.git"
+  git remote add $tmp_origin "git@github.com:speedb-io/speedb.git"
 else
-  git remote add $tmp_origin "https://github.com/facebook/rocksdb.git"
+  git remote add $tmp_origin "https://github.com/speedb-io/speedb.git"
 fi
 git fetch $tmp_origin
 
@@ -60,7 +60,7 @@ trap cleanup EXIT # Always clean up, even on failure or Ctrl+C
 
 scriptpath=`dirname ${BASH_SOURCE[0]}`
 
-test_dir=${TEST_TMPDIR:-"/tmp"}"/rocksdb_format_compatible_$USER"
+test_dir=${TEST_TMPDIR:-"/tmp"}"/speedb_format_compatible_$USER"
 rm -rf ${test_dir:?}
 
 # For saving current version of scripts as we checkout different versions to test

@@ -29,7 +29,7 @@
 namespace ROCKSDB_NAMESPACE {
 
 static const std::string option_file_header =
-    "# This is a RocksDB option file.\n"
+    "# This is a Speedb option file.\n"
     "#\n"
     "# For detailed file format spec, please refer to the example file\n"
     "# in examples/rocksdb_option_file_example.ini\n"
@@ -497,11 +497,11 @@ Status RocksDBOptionsParser::EndSection(
 Status RocksDBOptionsParser::ValidityCheck() {
   if (!has_db_options_) {
     return Status::Corruption(
-        "A RocksDB Option file must have a single DBOptions section");
+        "An Options file must have a single DBOptions section");
   }
   if (!has_default_cf_options_) {
     return Status::Corruption(
-        "A RocksDB Option file must have a single CFOptions:default section");
+        "An Options file must have a single CFOptions:default section");
   }
 
   return Status::OK();

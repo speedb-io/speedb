@@ -18,6 +18,7 @@ if(WITH_TOOLS)
     dump/rocksdb_undump.cc)
   foreach(src ${TOOLS})
     get_filename_component(exename ${src} NAME_WE)
+    string(REPLACE rocksdb speedb exename ${exename})
     add_executable(${exename}${ARTIFACT_SUFFIX}
       ${src})
     target_link_libraries(${exename}${ARTIFACT_SUFFIX} ${ROCKSDB_LIB} ${THIRDPARTY_LIBS})

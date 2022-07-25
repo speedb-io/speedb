@@ -50,5 +50,5 @@ endif()
 
 find_dependency(Threads)
 
-include("${CMAKE_CURRENT_LIST_DIR}/RocksDBTargets.cmake")
-check_required_components(RocksDB)
+include("${CMAKE_CURRENT_LIST_DIR}/SpeedbTargets.cmake")
+check_required_components(Speedb)

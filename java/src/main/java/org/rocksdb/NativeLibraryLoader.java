@@ -16,7 +16,7 @@ public class NativeLibraryLoader {
   private static final NativeLibraryLoader instance = new NativeLibraryLoader();
   private static boolean initialized = false;
 
-  private static final String ROCKSDB_LIBRARY_NAME = "rocksdb";
+  private static final String ROCKSDB_LIBRARY_NAME = "speedb";
 
   private static final String sharedLibraryName =
       Environment.getSharedLibraryName(ROCKSDB_LIBRARY_NAME);
@@ -27,7 +27,7 @@ public class NativeLibraryLoader {
       Environment.getJniLibraryFileName(ROCKSDB_LIBRARY_NAME);
   private static final /* @Nullable */ String fallbackJniLibraryFileName =
       Environment.getFallbackJniLibraryFileName(ROCKSDB_LIBRARY_NAME);
-  private static final String tempFilePrefix = "librocksdbjni";
+  private static final String tempFilePrefix = "libspeedbjni";  
   private static final String tempFileSuffix = Environment.getJniLibraryExtension();
 
   /**

@@ -66,5 +66,5 @@ cd /tmp &&\
 cd /rocksdb
 make jclean clean
 PORTABLE=1 make -j8 rocksdbjavastatic
-cp /rocksdb/java/target/librocksdbjni-* /rocksdb-build
-cp /rocksdb/java/target/rocksdbjni-* /rocksdb-build
+cp /rocksdb/java/target/libspeedbjni-* /rocksdb-build
+cp /rocksdb/java/target/speedbjni-* /rocksdb-build

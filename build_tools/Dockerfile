@@ -19,11 +19,11 @@ java -version\n\
 cd speedb\n\
 rm -rf build && mkdir build && cd build\n\
 cmake .. -DCMAKE_BUILD_TYPE=Release -DPORTABLE=1 -DWITH_GFLAGS=0 -DWITH_SNAPPY=1 -DWITH_LZ4=1 -DWITH_ZLIB=1 -DWITH_ZSTD=1\n\
-make -j$(nproc) rocksdb rocksdb-shared\n\
-cp librocksdb.{a,so} /out\n\
+make -j$(nproc) speedb speedb-shared\n\
+cp libspeedb.{a,so} /out\n\
 cd .. && rm -rf build\n\
 make clean && LIB_MODE=static DEBUG_LEVEL=0 PORTABLE=1 JAVA_HOME=/usr/lib/jvm/java-openjdk make -j$(nproc) rocksdbjavastatic\n\
-cp java/target/rocksdbjni-*.jar /out" > /usr/bin/build-speedb.sh
+cp java/target/speedbjni-*.jar /out" > /usr/bin/build-speedb.sh
 
 RUN chmod +x /usr/bin/build-speedb.sh
 ENTRYPOINT ["/usr/bin/build-speedb.sh"]

@@ -9,7 +9,7 @@ export JAVA_HOME=$(echo /usr/lib/jvm/java-7-openjdk*)
 cd /rocksdb
 make jclean clean
 make -j 4 rocksdbjavastatic
-cp /rocksdb/java/target/librocksdbjni-* /rocksdb-build
-cp /rocksdb/java/target/rocksdbjni-* /rocksdb-build
+cp /rocksdb/java/target/libspeedbjni-* /rocksdb-build
+cp /rocksdb/java/target/speedbjni-* /rocksdb-build
 sudo shutdown -h now
 

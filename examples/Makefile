@@ -1,6 +1,6 @@
 include ../make_config.mk
 
-PROJECT_NAME?=rocksdb
+PROJECT_NAME?=speedb
 LIBNAME?=lib$(PROJECT_NAME)
 
 ifndef DISABLE_JEMALLOC

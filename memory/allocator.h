@@ -32,12 +32,15 @@ class Allocator {
 
 class AllocTracker {
  public:
-  explicit AllocTracker(WriteBufferManager* write_buffer_manager);
+  explicit AllocTracker(WriteBufferManager* write_buffer_manager, bool pending = false);
   // No copying allowed
   AllocTracker(const AllocTracker&) = delete;
   void operator=(const AllocTracker&) = delete;
 
   ~AllocTracker();
+
+  // Will be called ONLY on a pending memtable
+  void Activate(size_t bytes);
   void Allocate(size_t bytes);
   // Call when we're finished allocating memory so we can free it from
   // the write buffer's limit.
@@ -46,12 +49,14 @@ class AllocTracker {
   void FreeMem();
 
   bool is_freed() const { return write_buffer_manager_ == nullptr || freed_; }
-
+ private:
+  bool AllocValid(); 
  private:
   WriteBufferManager* write_buffer_manager_;
   std::atomic<size_t> bytes_allocated_;
   bool done_allocating_;
   bool freed_;
+  bool pending_;
 };
 
 }  // namespace ROCKSDB_NAMESPACE

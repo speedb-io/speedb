@@ -66,6 +66,12 @@ Arena::Arena(size_t block_size, AllocTracker* tracker, size_t huge_page_size)
   }
 }
 
+void Arena::Activate() {
+  if (tracker_ != nullptr) {
+    tracker_->Activate(kInlineSize);
+  }  
+}
+
 Arena::~Arena() {
   if (tracker_ != nullptr) {
     assert(tracker_->is_freed());

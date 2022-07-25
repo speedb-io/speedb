@@ -1,4 +1,4 @@
-PROJECT_NAME?=rocksdb
+PROJECT_NAME?=speedb
 
 NATIVE_JAVA_CLASSES = \
 	org.rocksdb.AbstractCompactionFilter\

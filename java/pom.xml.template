@@ -3,15 +3,15 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>org.rocksdb</groupId>
-    <artifactId>rocksdbjni</artifactId>
+    <artifactId>speedbjni</artifactId>
     <version>${LIB_JAVA_VERSION}</version>  <!-- this will be replaced by the Makefile's rocksdbjavageneratepom target -->
 
-    <name>RocksDB JNI</name>
-    <description>RocksDB fat jar that contains .so files for linux32 and linux64 (glibc and musl-libc), jnilib files
+    <name>Speedb JNI</name>
+    <description>Speedb fat jar that contains .so files for linux32 and linux64 (glibc and musl-libc), jnilib files
         for Mac OSX, and a .dll for Windows x64.
     </description>
-    <url>https://rocksdb.org</url>
-    <inceptionYear>2012</inceptionYear>
+    <url>https://speedb.io</url>
+    <inceptionYear>2022</inceptionYear>
 
     <licenses>
         <license>
@@ -27,36 +27,26 @@
     </licenses>
 
     <scm>
-        <connection>scm:git:https://github.com/facebook/rocksdb.git</connection>
-        <developerConnection>scm:git:https://github.com/facebook/rocksdb.git</developerConnection>
-        <url>scm:git:https://github.com/facebook/rocksdb.git</url>
+        <connection>scm:git:https://github.com/speedb-io/speedb.git</connection>
+        <developerConnection>scm:git:https://github.com/speedb-io/speedb.git</developerConnection>
+        <url>scm:git:https://github.com/speedb-io/speedb.git</url>
     </scm>
 
     <organization>
-        <name>Facebook</name>
-        <url>https://www.facebook.com</url>
+        <name>Speedb</name>
+        <url>https://www.speedb.io</url>
     </organization>
 
     <developers>
         <developer>
-            <name>Facebook</name>
-            <email>help@facebook.com</email>
+            <name>Speedb</name>
+            <email>hello@speedb.io</email>
             <timezone>America/New_York</timezone>
             <roles>
                 <role>architect</role>
             </roles>
         </developer>
     </developers>
-
-    <mailingLists>
-        <mailingList>
-            <name>rocksdb - Google Groups</name>
-            <subscribe>rocksdb-subscribe@googlegroups.com</subscribe>
-            <unsubscribe>rocksdb-unsubscribe@googlegroups.com</unsubscribe>
-            <post>rocksdb@googlegroups.com</post>
-            <archive>https://groups.google.com/forum/#!forum/rocksdb</archive>
-        </mailingList>
-    </mailingLists>
 
     <properties>
         <project.build.source>1.7</project.build.source>

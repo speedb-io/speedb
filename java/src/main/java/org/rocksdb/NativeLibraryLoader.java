@@ -16,14 +16,14 @@ public class NativeLibraryLoader {
   private static final NativeLibraryLoader instance = new NativeLibraryLoader();
   private static boolean initialized = false;
 
-  private static final String sharedLibraryName = Environment.getSharedLibraryName("rocksdb");
-  private static final String jniLibraryName = Environment.getJniLibraryName("rocksdb");
+  private static final String sharedLibraryName = Environment.getSharedLibraryName("speedb");
+  private static final String jniLibraryName = Environment.getJniLibraryName("speedb");
   private static final /* @Nullable */ String fallbackJniLibraryName =
-      Environment.getFallbackJniLibraryName("rocksdb");
-  private static final String jniLibraryFileName = Environment.getJniLibraryFileName("rocksdb");
+      Environment.getFallbackJniLibraryName("speedb");
+  private static final String jniLibraryFileName = Environment.getJniLibraryFileName("speedb");
   private static final /* @Nullable */ String fallbackJniLibraryFileName =
-      Environment.getFallbackJniLibraryFileName("rocksdb");
-  private static final String tempFilePrefix = "librocksdbjni";
+      Environment.getFallbackJniLibraryFileName("speedb");
+  private static final String tempFilePrefix = "libspeedbjni";
   private static final String tempFileSuffix = Environment.getJniLibraryExtension();
 
   /**

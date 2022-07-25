@@ -34,5 +34,5 @@ export PATH=$JAVA_HOME:/usr/local/bin:$PATH
 cd /rocksdb
 scl enable devtoolset-2 'make clean-not-downloaded'
 scl enable devtoolset-2 'PORTABLE=1 make -j8 rocksdbjavastatic'
-cp /rocksdb/java/target/librocksdbjni-* /rocksdb-build
-cp /rocksdb/java/target/rocksdbjni-* /rocksdb-build
+cp /rocksdb/java/target/libspeedbjni-* /rocksdb-build
+cp /rocksdb/java/target/speedbjni-* /rocksdb-build

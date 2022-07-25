@@ -5,7 +5,9 @@
 //
 #ifndef ROCKSDB_LITE
 #include "rocksdb/ldb_tool.h"
+
 #include "rocksdb/utilities/ldb_cmd.h"
+#include "speedb/version.h"
 #include "tools/ldb_cmd_impl.h"
 
 namespace ROCKSDB_NAMESPACE {
@@ -134,8 +136,7 @@ int LDBCommandRunner::RunCommand(
       PrintHelp(ldb_options, argv[0], /*to_stderr*/ true);
       return 1;
     } else if (std::string(argv[1]) == "--version") {
-      printf("ldb from RocksDB %d.%d.%d\n", ROCKSDB_MAJOR, ROCKSDB_MINOR,
-             ROCKSDB_PATCH);
+      printf("%s\n", GetRocksBuildInfoAsString("ldb").c_str());
       return 0;
     } else if (std::string(argv[1]) == "--help") {
       PrintHelp(ldb_options, argv[0], /*to_stderr*/ false);

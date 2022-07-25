@@ -56,11 +56,10 @@ DEFINE_double(
 
 DEFINE_string(
     options_file, "",
-    "The path to a RocksDB options file.  If specified, then db_stress will "
-    "run with the RocksDB options in the default column family of the "
-    "specified options file. Note that, when an options file is provided, "
-    "db_stress will ignore the flag values for all options that may be passed "
-    "via options file.");
+    "The path to an options file.  If specified, then db_stress will run with "
+    "the options in the default column family of the specified options file. "
+    "Note that, when an options file is provided, db_stress will ignore the "
+    "flag values for all options that may be passed via options file.");
 
 DEFINE_int64(
     active_width, 0,
@@ -227,7 +226,7 @@ DEFINE_int32(
 
 DEFINE_bool(disable_auto_compactions,
             ROCKSDB_NAMESPACE::Options().disable_auto_compactions,
-            "If true, RocksDB internally will not trigger compactions.");
+            "If true, compactions will not be triggered internally.");
 
 DEFINE_int32(max_background_compactions,
              ROCKSDB_NAMESPACE::Options().max_background_compactions,

@@ -3115,7 +3115,7 @@ Status DBImpl::NewIterators(
   if (read_options.tailing) {
 #ifdef ROCKSDB_LITE
     return Status::InvalidArgument(
-        "Tailing iterator not supported in RocksDB lite");
+        "Tailing iterator not supported in LITE mode");
 #else
     for (auto cfh : column_families) {
       auto cfd = static_cast_with_check<ColumnFamilyHandleImpl>(cfh)->cfd();
@@ -4443,7 +4443,7 @@ void DBImpl::EraseThreadStatusDbInfo() const {}
 //
 // A global method that can dump out the build version
 void DumpRocksDBBuildVersion(Logger* log) {
-  ROCKS_LOG_HEADER(log, "SpeeDB version: %s (%s)\n",
+  ROCKS_LOG_HEADER(log, "Speedb version: %s (%s)\n",
                    GetSpeedbVersionAsString().c_str(),
                    GetRocksVersionAsString().c_str());
   const auto& props = GetRocksBuildProperties();

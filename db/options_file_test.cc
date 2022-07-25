@@ -113,7 +113,7 @@ int main(int argc, char** argv) {
 #include <cstdio>
 
 int main(int /*argc*/, char** /*argv*/) {
-  printf("Skipped as Options file is not supported in RocksDBLite.\n");
+  printf("Skipped as Options file is not supported in LITE mode.\n");
   return 0;
 }
 #endif  // !ROCKSDB_LITE

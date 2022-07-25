@@ -812,9 +812,7 @@ class NonBatchedOpsStressTest : public StressTest {
       const std::vector<int64_t>& /* rand_keys */,
       std::unique_ptr<MutexLock>& /* lock */) override {
     assert(false);
-    fprintf(stderr,
-            "RocksDB lite does not support "
-            "TestIngestExternalFile\n");
+    fprintf(stderr, "TestIngestExternalFile is not supported in LITE mode\n");
     std::terminate();
   }
 #else

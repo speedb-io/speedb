@@ -924,7 +924,7 @@ DEFINE_bool(optimize_filters_for_hits,
             "level of the LSM to reduce metadata that should fit in RAM. ");
 
 DEFINE_bool(paranoid_checks, ROCKSDB_NAMESPACE::Options().paranoid_checks,
-            "RocksDB will aggressively check consistency of the data.");
+            "Aggressively checks for consistency of the data.");
 
 DEFINE_bool(force_consistency_checks,
             ROCKSDB_NAMESPACE::Options().force_consistency_checks,
@@ -980,12 +980,12 @@ DEFINE_uint64(transaction_lock_timeout, 100,
               " milliseconds before failing a transaction waiting on a lock");
 DEFINE_string(
     options_file, "",
-    "The path to a RocksDB options file.  If specified, then db_bench will "
-    "run with the RocksDB options in the default column family of the "
-    "specified options file. "
+    "The path to an options file.  If specified, then db_bench will "
+    "run with the options in the default column family of the specified "
+    "options file. "
     "Note that with this setting, db_bench will ONLY accept the following "
-    "RocksDB options related command-line arguments, all other arguments "
-    "that are related to RocksDB options will be ignored:\n"
+    "database options related command-line arguments, all other arguments "
+    "that are related to database options will be ignored:\n"
     "\t--use_existing_db\n"
     "\t--use_existing_keys\n"
     "\t--statistics\n"
@@ -1133,7 +1133,7 @@ DEFINE_int32(prepopulate_blob_cache, 0,
 
 // Secondary DB instance Options
 DEFINE_bool(use_secondary_db, false,
-            "Open a RocksDB secondary instance. A primary instance can be "
+            "Open a secondary database instance. A primary instance can be "
             "running in another db_bench process.");
 
 DEFINE_string(secondary_path, "",
@@ -1194,7 +1194,7 @@ DEFINE_bool(rate_limit_auto_wal_flush, false,
             "false) after the user write operation.");
 
 DEFINE_bool(async_io, false,
-            "When set true, RocksDB does asynchronous reads for internal auto "
+            "When set true, asynchronous reads are used for internal auto "
             "readahead prefetching.");
 
 DEFINE_bool(optimize_multiget_for_io, true,
@@ -1480,10 +1480,9 @@ DEFINE_double(sine_d, 1,
 DEFINE_bool(rate_limit_bg_reads, false,
             "Use options.rate_limiter on compaction reads");
 
-DEFINE_uint64(
-    benchmark_write_rate_limit, 0,
-    "If non-zero, db_bench will rate-limit the writes going into RocksDB. This "
-    "is the global rate in bytes/second.");
+DEFINE_uint64(benchmark_write_rate_limit, 0,
+              "If non-zero, db_bench will rate-limit the writes going into the "
+              "database. This is the global rate in bytes/second.");
 
 // the parameters of mix_graph
 DEFINE_double(keyrange_dist_a, 0.0,
@@ -1548,7 +1547,7 @@ DEFINE_int64(mix_accesses, -1,
 
 DEFINE_uint64(
     benchmark_read_rate_limit, 0,
-    "If non-zero, db_bench will rate-limit the reads from RocksDB. This "
+    "If non-zero, db_bench will rate-limit the reads from the database. This "
     "is the global rate in ops/second.");
 
 DEFINE_uint64(max_compaction_bytes,
@@ -4121,7 +4120,7 @@ class Benchmark {
   // options file.
   bool InitializeOptionsFromFile(Options* opts) {
 #ifndef ROCKSDB_LITE
-    printf("Initializing RocksDB Options from the specified file\n");
+    printf("Initializing database Options from the specified file\n");
     DBOptions db_opts;
     std::vector<ColumnFamilyDescriptor> cf_descs;
     if (FLAGS_options_file != "") {
@@ -4143,7 +4142,7 @@ class Benchmark {
   }
 
   void InitializeOptionsFromFlags(Options* opts) {
-    printf("Initializing RocksDB Options from command-line flags\n");
+    printf("Initializing database Options from command-line flags\n");
     Options& options = *opts;
     ConfigOptions config_options(options);
     config_options.ignore_unsupported_options = false;

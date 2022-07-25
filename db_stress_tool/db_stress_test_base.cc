@@ -1431,9 +1431,7 @@ Status StressTest::TestBackupRestore(
     const std::vector<int>& /* rand_column_families */,
     const std::vector<int64_t>& /* rand_keys */) {
   assert(false);
-  fprintf(stderr,
-          "RocksDB lite does not support "
-          "TestBackupRestore\n");
+  fprintf(stderr, "TestBackupRestore is not supported in LITE mode\n");
   std::terminate();
 }
 
@@ -1442,18 +1440,14 @@ Status StressTest::TestCheckpoint(
     const std::vector<int>& /* rand_column_families */,
     const std::vector<int64_t>& /* rand_keys */) {
   assert(false);
-  fprintf(stderr,
-          "RocksDB lite does not support "
-          "TestCheckpoint\n");
+  fprintf(stderr, "TestCheckpoint is not supported in LITE mode\n");
   std::terminate();
 }
 
 void StressTest::TestCompactFiles(ThreadState* /* thread */,
                                   ColumnFamilyHandle* /* column_family */) {
   assert(false);
-  fprintf(stderr,
-          "RocksDB lite does not support "
-          "CompactFiles\n");
+  fprintf(stderr, "CompactFiles is not supported in LITE mode\n");
   std::terminate();
 }
 #else   // ROCKSDB_LITE
@@ -2245,7 +2239,7 @@ uint32_t StressTest::GetRangeHash(ThreadState* thread, const Snapshot* snapshot,
 }
 
 void StressTest::PrintEnv() const {
-  fprintf(stdout, "RocksDB version           : %d.%d\n", kMajorVersion,
+  fprintf(stdout, "Speedb version           : %d.%d\n", kMajorVersion,
           kMinorVersion);
   fprintf(stdout, "Format version            : %d\n", FLAGS_format_version);
   fprintf(stdout, "TransactionDB             : %s\n",
@@ -2740,7 +2734,7 @@ void StressTest::Open(SharedState* shared) {
       assert(s.ok());
       assert(cmp_cfhs_.size() == static_cast<size_t>(FLAGS_column_families));
 #else
-      fprintf(stderr, "Secondary is not supported in RocksDBLite\n");
+      fprintf(stderr, "Secondary is not supported in LITE mode\n");
       exit(1);
 #endif  // !ROCKSDB_LITE
     }
@@ -2750,7 +2744,7 @@ void StressTest::Open(SharedState* shared) {
     s = DBWithTTL::Open(options_, FLAGS_db, &db_with_ttl, FLAGS_ttl);
     db_ = db_with_ttl;
 #else
-    fprintf(stderr, "TTL is not supported in RocksDBLite\n");
+    fprintf(stderr, "TTL is not supported in LITE mode\n");
     exit(1);
 #endif
   }

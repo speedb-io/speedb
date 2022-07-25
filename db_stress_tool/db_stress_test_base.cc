@@ -24,6 +24,7 @@
 #include "rocksdb/sst_file_manager.h"
 #include "rocksdb/types.h"
 #include "rocksdb/utilities/object_registry.h"
+#include "speedb/version.h"
 #include "rocksdb/utilities/write_batch_with_index.h"
 #include "test_util/testutil.h"
 #include "util/cast_util.h"
@@ -2457,8 +2458,8 @@ uint32_t StressTest::GetRangeHash(ThreadState* thread, const Snapshot* snapshot,
 }
 
 void StressTest::PrintEnv() const {
-  fprintf(stdout, "Speedb version           : %d.%d\n", kMajorVersion,
-          kMinorVersion);
+  fprintf(stdout, "Speedb version           : %s\n",
+          GetSpeedbVersionAsString(false).c_str());
   fprintf(stdout, "Format version            : %d\n", FLAGS_format_version);
   fprintf(stdout, "TransactionDB             : %s\n",
           FLAGS_use_txn ? "true" : "false");

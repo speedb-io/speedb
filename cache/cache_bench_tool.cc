@@ -25,6 +25,7 @@
 #include "rocksdb/secondary_cache.h"
 #include "rocksdb/system_clock.h"
 #include "rocksdb/table_properties.h"
+#include "speedb/version.h"
 #include "table/block_based/block_based_table_reader.h"
 #include "table/block_based/cachable_entry.h"
 #include "util/coding.h"
@@ -761,9 +762,11 @@ class CacheBench {
     printf("WARNING: Assertions are enabled; benchmarks unnecessarily slow\n");
 #endif
     printf("----------------------------\n");
-    printf("RocksDB version     : %d.%d\n", kMajorVersion, kMinorVersion);
+    printf("Speedb version      : %s\n",
+           GetSpeedbVersionAsString(false).c_str());
     printf("Cache impl name     : %s\n", cache_->Name());
     printf("DMutex impl name    : %s\n", DMutex::kName());
+
     printf("Number of threads   : %u\n", FLAGS_threads);
     printf("Ops per thread      : %" PRIu64 "\n", FLAGS_ops_per_thread);
     printf("Cache size          : %s\n",

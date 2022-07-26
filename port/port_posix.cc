@@ -155,7 +155,10 @@ void CondVar::SignalAll() {
 }
 
 RWMutex::RWMutex() {
-  PthreadCall("init mutex", pthread_rwlock_init(&mu_, nullptr));
+  pthread_rwlockattr_t rwattr;
+  PthreadCall("attr init", pthread_rwlockattr_init (&rwattr));
+  PthreadCall("attr mutex", pthread_rwlockattr_setkind_np(&rwattr, PTHREAD_RWLOCK_PREFER_WRITER_NONRECURSIVE_NP));
+  PthreadCall("init mutex", pthread_rwlock_init(&mu_, &rwattr));
 }
 
 RWMutex::~RWMutex() { PthreadCall("destroy mutex", pthread_rwlock_destroy(&mu_)); }

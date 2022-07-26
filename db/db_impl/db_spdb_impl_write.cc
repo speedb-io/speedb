@@ -86,9 +86,10 @@ void SpdbWriteImpl::SpdbFlushWriteThread() {
       }
     }
     // make sure no on the fly writes
-    WriteLock wl(&flush_rwlock_);
+    flush_rwlock_.WriteLock();
     db_->RegisterFlushOrTrim();
     action_needed_.store(false);
+    flush_rwlock_.WriteUnlock();
   }
 }
 

@@ -75,7 +75,12 @@ MemTable::MemTable(const InternalKeyComparator& cmp,
       moptions_(ioptions, mutable_cf_options),
       refs_(0),
       kArenaBlockSize(OptimizeBlockSize(moptions_.arena_block_size)),
-      mem_tracker_(write_buffer_manager, pending),
+      mem_tracker_(write_buffer_manager, 
+                  (write_buffer_manager != nullptr &&
+                  (write_buffer_manager->enabled() ||
+                  write_buffer_manager->cost_to_cache()))
+                 ? pending
+                 : false),
       arena_(moptions_.arena_block_size,
              (write_buffer_manager != nullptr &&
               (write_buffer_manager->enabled() ||

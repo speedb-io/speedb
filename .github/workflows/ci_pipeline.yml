@@ -16,7 +16,7 @@ jobs:
   
   Build:
     #needs: [Sanity]
-    if: ${{ github.event_name == 'pull_request' || startsWith(github.ref, 'refs/heads/release') }} #if: ${{ github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/release') }}
+    if: ${{ github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/release') }}
     runs-on: [self-hosted, ubuntu, asrunner]
     strategy:
       matrix:
@@ -91,8 +91,11 @@ jobs:
         -DWITH_TESTS=1 -DWITH_ALL_TESTS=1 -DWITH_EXAMPLES=1
         ninja
         
-  #Performance:
-    #if: ${{ github.event.review.state == 'approved' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/release') }}
+  Performance:
+    if: |
+      !failure() && !cancelled() && 
+      (needs.Build.result == 'success' || needs.Build.result == 'skipped') &&
+      (github.event.review.state == 'approved' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/release'))
     #needs: [Build]
     #uses: speedb-io/speedb/.github/workflows/perf-test.yml@main
   
@@ -100,7 +103,7 @@ jobs:
     if: |
       !failure() && !cancelled() && 
       (needs.Build.result == 'success' || needs.Build.result == 'skipped') &&
-      ${{ github.event.review.state == 'approved' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/release') }}
+      (github.event.review.state == 'approved' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/release'))
     needs: [Build]
     uses: speedb-io/speedb/.github/workflows/qa-tests.yml@main
   

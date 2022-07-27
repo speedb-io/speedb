@@ -16,6 +16,8 @@ jobs:
           echo Run auto perf test
           echo  ${{ github.sender.login }} || echo ""
           ssh -i ~/remo.k remo@9.148.1.183 /home/remo/tremotnic.sh main HG_auto_T1 ${{ github.actor }}
+          sleep 30
           ssh -i ~/remo.k remo@9.148.1.183 /home/remo/tremotnic.sh main HG_auto_T1 ${{ github.actor }} run_db_bench_large_obj
+          sleep 30
           ssh -i ~/remo.k remo@9.148.1.183 /home/remo/tremotnic.sh main HG_auto_T1 ${{ github.actor }} run_db_bench_small_obj
           #ssh -i ~/remo.k remo@9.148.1.183 /home/remo/tremotnic.sh main HG_auto_T1 ${{ github.event.pusher.name }} run_db_bench_huge_memtable

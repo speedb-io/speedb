@@ -108,7 +108,7 @@ jobs:
     if: |
       !failure() && !cancelled() && 
       (needs.Build.result == 'success' || needs.Build.result == 'skipped') &&
-      ${{ github.event.review.state == 'approved' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/release') }}
+      (github.event.review.state == 'approved' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/release'))
     needs: [Build]
     runs-on: [self-hosted, ubuntu, asrunner]
     container:

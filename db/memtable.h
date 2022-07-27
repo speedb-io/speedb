@@ -107,8 +107,7 @@ class MemTable {
                     const ImmutableOptions& ioptions,
                     const MutableCFOptions& mutable_cf_options,
                     WriteBufferManager* write_buffer_manager,
-                    SequenceNumber earliest_seq, uint32_t column_family_id,
-                    bool pending = false);
+                    SequenceNumber earliest_seq, uint32_t column_family_id);
   // No copying allowed
   MemTable(const MemTable&) = delete;
   MemTable& operator=(const MemTable&) = delete;
@@ -403,14 +402,6 @@ class MemTable {
   SequenceNumber GetCreationSeq() const { return creation_seq_; }
 
   void SetCreationSeq(SequenceNumber sn) { creation_seq_ = sn; }
-
-  // Sets the initial sequence number for lazy initialization of the memtable
-  // NOTE: should only be called once before any other operation on the memtable
-  void SetInitialSeq(SequenceNumber sn);
-  // Sets the initial sequence number for lazy initialization of the memtable 
-  // and activate mem_tracker_ if needed
-  // NOTE: should only be called once before any other operation on the memtable
-  void Activate(SequenceNumber sn);
 
   // Returns the next active logfile number when this memtable is about to
   // be flushed to storage

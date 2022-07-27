@@ -2315,20 +2315,8 @@ void StressTest::PrintEnv() const {
   fprintf(stdout, "Use MultiGet              : %s\n",
           FLAGS_use_multiget ? "true" : "false");
 
-  const char* memtablerep = "";
-  switch (FLAGS_rep_factory) {
-    case kSkipList:
-      memtablerep = "skip_list";
-      break;
-    case kHashSkipList:
-      memtablerep = "prefix_hash";
-      break;
-    case kVectorRep:
-      memtablerep = "vector";
-      break;
-  }
-
-  fprintf(stdout, "Memtablerep               : %s\n", memtablerep);
+  fprintf(stdout, "Memtablerep               : %s\n",
+          FLAGS_memtablerep.c_str());
 
 #ifndef NDEBUG
   KillPoint* kp = KillPoint::GetInstance();
@@ -2409,12 +2397,30 @@ void StressTest::Open(SharedState* shared) {
   }
   InitializeOptionsGeneral(cache_, compressed_cache_, filter_policy_, options_);
 
-  if (FLAGS_prefix_size == 0 && FLAGS_rep_factory == kHashSkipList) {
+  if (strcasecmp(FLAGS_memtablerep.c_str(), "prefix_hash") == 0) {
+    // Needed to use a different default (10K vs 1M)
+    FLAGS_memtablerep = "prefix_hash:10000";
+  }
+  std::unique_ptr<MemTableRepFactory> factory;
+  ConfigOptions config_options;
+  config_options.ignore_unknown_options = false;
+  config_options.ignore_unsupported_options = false;
+  Status status = MemTableRepFactory::CreateFromString(
+      config_options, FLAGS_memtablerep, &factory);
+  if (!status.ok() || !factory) {
+    fprintf(stderr, "MemTableFactory creation failed: %s\n",
+            status.ToString().c_str());
+    exit(1);
+  }
+  options_.memtable_factory = std::move(factory);
+  if (FLAGS_prefix_size == 0 &&
+      options_.memtable_factory->IsInstanceOf("prefix_hash")) {
     fprintf(stderr,
             "prefeix_size cannot be zero if memtablerep == prefix_hash\n");
     exit(1);
   }
-  if (FLAGS_prefix_size != 0 && FLAGS_rep_factory != kHashSkipList) {
+  if (FLAGS_prefix_size != 0 &&
+      !options_.memtable_factory->IsInstanceOf("prefix_hash")) {
     fprintf(stderr,
             "WARNING: prefix_size is non-zero but "
             "memtablerep != prefix_hash\n");
@@ -3152,24 +3158,6 @@ void InitializeOptionsFromFlags(
   options.preclude_last_level_data_seconds =
       FLAGS_preclude_last_level_data_seconds;
 
-  switch (FLAGS_rep_factory) {
-    case kSkipList:
-      // no need to do anything
-      break;
-#ifndef ROCKSDB_LITE
-    case kHashSkipList:
-      options.memtable_factory.reset(NewHashSkipListRepFactory(10000));
-      break;
-    case kVectorRep:
-      options.memtable_factory.reset(new VectorRepFactory());
-      break;
-#else
-    default:
-      fprintf(stderr,
-              "RocksdbLite only supports skip list mem table. Skip "
-              "--rep_factory\n");
-#endif  // ROCKSDB_LITE
-  }
 
   if (FLAGS_use_full_merge_v1) {
     options.merge_operator = MergeOperators::CreateDeprecatedPutOperator();

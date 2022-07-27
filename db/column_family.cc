@@ -1107,7 +1107,7 @@ MemTable* ColumnFamilyData::GetSwitchMemtable(SequenceNumber sn) {
     // No point in suspending, just construct the memtable here
     switch_mem = ConstructNewMemtable(mutable_cf_options_, sn, false);
   } else {
-    switch_mem->Activate(sn);
+    switch_mem->Activate(sn, mutable_cf_options_);
   }
 
   return switch_mem;

@@ -11,7 +11,6 @@
 // on whether or not GIT is available and the platform settings
 static const std::string speedb_build_git_sha  = "speedb_build_git_sha:@GIT_SHA@";
 static const std::string speedb_build_git_tag = "speedb_build_git_tag:@GIT_TAG@";
-static const std::string speedb_build_spdb_key = "speedb_build_spdb_key:@SPDB_KEY@";
 #define HAS_GIT_CHANGES @GIT_MOD@
 #if HAS_GIT_CHANGES == 0
 // If HAS_GIT_CHANGES is 0, the GIT date is used.
@@ -51,7 +50,6 @@ static std::unordered_map<std::string, std::string>* LoadPropertiesSet() {
   AddProperty(properties, speedb_build_git_sha);
   AddProperty(properties, speedb_build_git_tag);
   AddProperty(properties, speedb_build_date);
-  AddProperty(properties, speedb_build_spdb_key);
   return properties;
 }
 

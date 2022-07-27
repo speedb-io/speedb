@@ -120,8 +120,6 @@ int db_stress_tool(int argc, char** argv) {
   }
 #endif
 
-  FLAGS_rep_factory = StringToRepFactory(FLAGS_memtablerep.c_str());
-
   // The number of background threads should be at least as much the
   // max number of concurrent compactions.
   db_stress_env->SetBackgroundThreads(FLAGS_max_background_compactions,

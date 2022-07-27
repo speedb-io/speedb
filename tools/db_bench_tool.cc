@@ -1628,9 +1628,6 @@ static Status CreateMemTableRepFactory(
 #ifndef ROCKSDB_LITE
   } else if (!strcasecmp(FLAGS_memtablerep.c_str(), "prefix_hash")) {
     factory->reset(NewHashSkipListRepFactory(FLAGS_hash_bucket_count));
-  } else if (!strcasecmp(FLAGS_memtablerep.c_str(),
-                         VectorRepFactory::kNickName())) {
-    factory->reset(new VectorRepFactory());
   } else if (!strcasecmp(FLAGS_memtablerep.c_str(), "hash_linkedlist")) {
     factory->reset(NewHashLinkListRepFactory(FLAGS_hash_bucket_count));
 #endif  // ROCKSDB_LITE
@@ -2594,7 +2591,7 @@ class Benchmark {
                         compressed);
   }
 
-  void PrintHeader(const Options& options) {
+  void PrintHeader() {
     PrintEnvironment();
     fprintf(stdout,
             "Keys:       %d bytes each (+ %d bytes user-defined timestamp)\n",
@@ -2644,10 +2641,8 @@ class Benchmark {
     fprintf(stdout, "Compression: %s\n", compression.c_str());
     fprintf(stdout, "Compression sampling rate: %" PRId64 "\n",
             FLAGS_sample_for_compression);
-    if (options.memtable_factory != nullptr) {
-      fprintf(stdout, "Memtablerep: %s\n",
-              options.memtable_factory->GetId().c_str());
-    }
+
+    fprintf(stdout, "Memtablerep: %s\n", FLAGS_memtablerep.c_str());
     fprintf(stdout, "Perf Level: %d\n", FLAGS_perf_level);
 
     PrintWarnings(compression.c_str());
@@ -3126,7 +3121,7 @@ class Benchmark {
       ErrorExit();
     }
     Open(&open_options_);
-    PrintHeader(open_options_);
+    PrintHeader();
     std::stringstream benchmark_stream(FLAGS_benchmarks);
     std::string name;
     std::unique_ptr<ExpiredTimeFilter> filter;
@@ -3963,12 +3958,13 @@ class Benchmark {
                       "HashLinkedList memtablerep is used\n");
       exit(1);
     }
+
     if (FLAGS_use_plain_table) {
 #ifndef ROCKSDB_LITE
       if (!options.memtable_factory->IsInstanceOf("prefix_hash") &&
           !options.memtable_factory->IsInstanceOf("hash_linkedlist")) {
         fprintf(stderr, "Warning: plain table is used with %s\n",
-                options.memtable_factory->Name());
+                FLAGS_memtablerep.c_str());
       }
 
       int bloom_bits_per_key = FLAGS_bloom_bits;
@@ -7064,7 +7060,7 @@ class Benchmark {
 
     // the number of iterations is the larger of read_ or write_
     while (!duration.Done(1)) {
-      int prob_op = thread->rand.Uniform(100);
+      int prob_op = static_cast<int>(thread->rand.Uniform(100));
 
       // Seek
       if (prob_op >= 0 && prob_op < static_cast<int>(FLAGS_readwritepercent)) {

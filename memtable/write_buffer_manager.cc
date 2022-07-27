@@ -207,8 +207,8 @@ std::string WriteBufferManager::GetPrintableOptions() const {
   // The assumed width of the callers display code
   int field_width = 47;
 
-  snprintf(buffer, kBufferSize, "%*s: %" PRIu64 "\n", field_width, "size",
-           buffer_size());
+  snprintf(buffer, kBufferSize, "%*s: %" ROCKSDB_PRIszt "\n", field_width,
+           "size", buffer_size());
   ret.append(buffer);
 
   return ret;

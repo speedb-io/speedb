@@ -961,32 +961,71 @@ list(APPEND SOURCES
   utilities/transactions/lock/range/range_tree/lib/util/dbt.cc
   utilities/transactions/lock/range/range_tree/lib/util/memarena.cc)
 
+set(ROCKSDB_PLUGIN_EXTERNS "")
+set(ROCKSDB_PLUGIN_BUILTINS "")
 message(STATUS "ROCKSDB_PLUGINS: ${ROCKSDB_PLUGINS}")
 if ( ROCKSDB_PLUGINS )
   string(REPLACE " " ";" PLUGINS ${ROCKSDB_PLUGINS})
   foreach (plugin ${PLUGINS})
-    add_subdirectory("plugin/${plugin}")
+    set(plugin_root "plugin/${plugin}/")
+    add_subdirectory(${plugin_root})
+    # Use get_directory_property() to avoid having to declare the variables
+    # with PARENT_SCOPE in the plugin CMakeLists.txt
+    # TODO: Change the plugin support here so that a plugin would simply define
+    # a target that we'll link to.
+    get_directory_property(${plugin}_SOURCES
+      DIRECTORY ${plugin_root}
+      DEFINITION ${plugin}_SOURCES)
+    get_directory_property(${plugin}_COMPILE_FLAGS
+      DIRECTORY ${plugin_root}
+      DEFINITION ${plugin}_COMPILE_FLAGS)
     foreach (src ${${plugin}_SOURCES})
-      list(APPEND SOURCES plugin/${plugin}/${src})
+      list(APPEND SOURCES ${plugin_root}/${src})
       set_source_files_properties(
-        plugin/${plugin}/${src}
+        ${plugin_root}/${src}
         PROPERTIES COMPILE_FLAGS "${${plugin}_COMPILE_FLAGS}")
     endforeach()
+    get_directory_property(${plugin}_TESTS
+      DIRECTORY ${plugin_root}
+      DEFINITION ${plugin}_TESTS)
     foreach (test ${${plugin}_TESTS})
       list(APPEND PLUGIN_TESTS plugin/${plugin}/${test})
       set_source_files_properties(
         plugin/${plugin}/${test}
         PROPERTIES COMPILE_FLAGS "${${plugin}_COMPILE_FLAGS}")
     endforeach()
+    get_directory_property(${plugin}_INCLUDE_PATHS
+      DIRECTORY ${plugin_root}
+      DEFINITION ${plugin}_INCLUDE_PATHS)
     foreach (path ${${plugin}_INCLUDE_PATHS})
       include_directories(${path})
     endforeach()
+    get_directory_property(${plugin}_LIBS
+      DIRECTORY ${plugin_root}
+      DEFINITION ${plugin}_LIBS)
     foreach (lib ${${plugin}_LIBS})
       list(APPEND THIRDPARTY_LIBS ${lib})
     endforeach()
+    get_directory_property(${plugin}_LINK_PATHS
+      DIRECTORY ${plugin_root}
+      DEFINITION ${plugin}_LINK_PATHS)
     foreach (link_path ${${plugin}_LINK_PATHS})
       link_directories(AFTER ${link_path})
     endforeach()
+    get_directory_property(${plugin}_FUNC
+      DIRECTORY ${plugin_root}
+      DEFINITION ${plugin}_FUNC)
+    string(STRIP "${${plugin}_FUNC}" ${plugin}_FUNC)
+    if (NOT "${plugin}_FUNC" STREQUAL "")
+      string(APPEND ROCKSDB_PLUGIN_BUILTINS "{\"${plugin}\", ${${plugin}_FUNC} },")
+      string(APPEND ROCKSDB_PLUGIN_EXTERNS "int ${${plugin}_FUNC} (ROCKSDB_NAMESPACE::ObjectLibrary&, const std::string&); ")
+    endif()
+    get_directory_property(${plugin}_CMAKE_SHARED_LINKER_FLAGS
+      DIRECTORY ${plugin_root}
+      DEFINITION ${plugin}_CMAKE_SHARED_LINKER_FLAGS)
+    get_directory_property(${plugin}_CMAKE_EXE_LINKER_FLAGS
+      DIRECTORY ${plugin_root}
+      DEFINITION ${plugin}_CMAKE_EXE_LINKER_FLAGS)
     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${${plugin}_CMAKE_SHARED_LINKER_FLAGS}")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${${plugin}_CMAKE_EXE_LINKER_FLAGS}")
   endforeach()
@@ -1053,42 +1092,6 @@ if(WIN32)
 else()
   set(SYSTEM_LIBS ${CMAKE_THREAD_LIBS_INIT})
 endif()
-
-set(ROCKSDB_PLUGIN_EXTERNS "")
-set(ROCKSDB_PLUGIN_BUILTINS "")
-message(STATUS "ROCKSDB PLUGINS TO BUILD ${ROCKSDB_PLUGINS}")
-foreach(PLUGIN IN LISTS PLUGINS)
-  set(PLUGIN_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/plugin/${PLUGIN}/")
-  message(STATUS "PLUGIN ${PLUGIN} including rocksb plugin ${PLUGIN_ROOT}")
-  set(PLUGINMKFILE "${PLUGIN_ROOT}${PLUGIN}.mk")
-  if (NOT EXISTS ${PLUGINMKFILE})
-    message(FATAL_ERROR "PLUGIN ${PLUGIN} Missing plugin makefile: ${PLUGINMKFILE}")
-  endif()
-  file(READ ${PLUGINMKFILE} PLUGINMK)
-
-  string(REGEX MATCH "SOURCES = ([^\n]*)" FOO ${PLUGINMK})
-  set(MK_SOURCES ${CMAKE_MATCH_1})
-  separate_arguments(MK_SOURCES)
-  foreach(MK_FILE IN LISTS MK_SOURCES)
-    list(APPEND SOURCES "${PLUGIN_ROOT}${MK_FILE}")
-    message(STATUS "PLUGIN ${PLUGIN} Appending ${PLUGIN_ROOT}${MK_FILE} to SOURCES")
-  endforeach()
-
-  string(REGEX MATCH "_FUNC = ([^\n]*)" FOO ${PLUGINMK})
-  if (NOT ${CMAKE_MATCH_1} STREQUAL "")
-    string(APPEND ROCKSDB_PLUGIN_BUILTINS "{\"${PLUGIN}\", " ${CMAKE_MATCH_1} "},")
-    string(APPEND ROCKSDB_PLUGIN_EXTERNS "int " ${CMAKE_MATCH_1} "(ROCKSDB_NAMESPACE::ObjectLibrary&, const std::string&); ")
-  endif()
-
-  string(REGEX MATCH "_LIBS = ([^\n]*)" FOO ${PLUGINMK})
-  separate_arguments(CMAKE_MATCH_1)
-  foreach(MK_LIB IN LISTS CMAKE_MATCH_1)
-    list(APPEND THIRDPARTY_LIBS "${MK_LIB}")
-  endforeach()
-  message(STATUS "PLUGIN ${PLUGIN} THIRDPARTY_LIBS=${THIRDPARTY_LIBS}")
-
-  #TODO: We need to set any compile/link-time flags and add any link libraries
-endforeach()
 
 string(TIMESTAMP TS "%Y-%m-%d %H:%M:%S" UTC)
 set(BUILD_DATE "${TS}" CACHE STRING "the time we first built rocksdb")

@@ -368,12 +368,9 @@ class ColumnFamilyData {
   // calculate the oldest log needed for the durability of this column family
   uint64_t OldestLogToKeep();
 
-  MemTable* GetSwitchMemtable(SequenceNumber sn);
-
   // See Memtable constructor for explanation of earliest_seq param.
   MemTable* ConstructNewMemtable(const MutableCFOptions& mutable_cf_options,
-                                 SequenceNumber earliest_seq,
-                                 bool pending = false);
+                                 SequenceNumber earliest_seq);
   void CreateNewMemtable(const MutableCFOptions& mutable_cf_options,
                          SequenceNumber earliest_seq);
 
@@ -541,8 +538,6 @@ class ColumnFamilyData {
 
   std::vector<std::string> GetDbPaths() const;
 
-  void PrepareSwitchMemTable();
-
   uint32_t id_;
   const std::string name_;
   Version* dummy_versions_;  // Head of circular doubly-linked list of versions.
@@ -623,12 +618,6 @@ class ColumnFamilyData {
   bool db_paths_registered_;
 
   std::string full_history_ts_low_;
-
-  std::thread switch_memtable_thread_;
-  std::mutex switch_memtable_thread_mutex_;
-  std::condition_variable switch_memtable_thread_cv_;
-  bool terminate_switch_memtable_;
-  std::atomic<MemTable*> switch_mem_;
 };
 
 // ColumnFamilySet has interesting thread-safety requirements

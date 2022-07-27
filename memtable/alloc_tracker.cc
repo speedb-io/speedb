@@ -14,31 +14,18 @@
 
 namespace ROCKSDB_NAMESPACE {
 
-AllocTracker::AllocTracker(WriteBufferManager* write_buffer_manager, bool pending)
+AllocTracker::AllocTracker(WriteBufferManager* write_buffer_manager)
     : write_buffer_manager_(write_buffer_manager),
       bytes_allocated_(0),
       done_allocating_(false),
-      freed_(false),
-      pending_(pending) {}
+      freed_(false) {}
 
 AllocTracker::~AllocTracker() { FreeMem(); }
 
-void AllocTracker::Activate(size_t bytes) {
-  assert(pending_);
-  pending_ = false;
-  Allocate(bytes);
-}
-
-bool AllocTracker::AllocValid() {
-  return  ((write_buffer_manager_->enabled() ||
-      write_buffer_manager_->cost_to_cache()) && !pending_);
-  
-}
-
 void AllocTracker::Allocate(size_t bytes) {
   assert(write_buffer_manager_ != nullptr);
-
-  if (AllocValid()) {
+  if (write_buffer_manager_->enabled() ||
+      write_buffer_manager_->cost_to_cache()) {
     bytes_allocated_.fetch_add(bytes, std::memory_order_relaxed);
     write_buffer_manager_->ReserveMem(bytes);
   }
@@ -46,7 +33,8 @@ void AllocTracker::Allocate(size_t bytes) {
 
 void AllocTracker::DoneAllocating() {
   if (write_buffer_manager_ != nullptr && !done_allocating_) {
-    if (AllocValid()) {
+    if (write_buffer_manager_->enabled() ||
+        write_buffer_manager_->cost_to_cache()) {
       write_buffer_manager_->ScheduleFreeMem(
           bytes_allocated_.load(std::memory_order_relaxed));
     } else {
@@ -61,7 +49,8 @@ void AllocTracker::FreeMem() {
     DoneAllocating();
   }
   if (write_buffer_manager_ != nullptr && !freed_) {
-    if (AllocValid()) {
+    if (write_buffer_manager_->enabled() ||
+        write_buffer_manager_->cost_to_cache()) {
       write_buffer_manager_->FreeMem(
           bytes_allocated_.load(std::memory_order_relaxed));
     } else {

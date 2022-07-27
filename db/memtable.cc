@@ -65,6 +65,21 @@ ImmutableMemTableOptions::ImmutableMemTableOptions(
       info_log(ioptions.logger),
       allow_data_in_errors(ioptions.allow_data_in_errors) {}
 
+void ImmutableMemTableOptions::UpdateMutableOptions(const MutableCFOptions& mutable_cf_options)
+{
+      arena_block_size = mutable_cf_options.arena_block_size;
+      memtable_prefix_bloom_bits = (static_cast<uint32_t>(
+              static_cast<double>(mutable_cf_options.write_buffer_size) *
+              mutable_cf_options.memtable_prefix_bloom_size_ratio) *
+              8u);
+      memtable_huge_page_size = mutable_cf_options.memtable_huge_page_size;
+      memtable_whole_key_filtering =
+          mutable_cf_options.memtable_whole_key_filtering;
+      inplace_update_num_locks = mutable_cf_options.inplace_update_num_locks;
+      max_successive_merges = mutable_cf_options.max_successive_merges;
+}
+
+
 MemTable::MemTable(const InternalKeyComparator& cmp,
                    const ImmutableOptions& ioptions,
                    const MutableCFOptions& mutable_cf_options,
@@ -103,6 +118,8 @@ MemTable::MemTable(const InternalKeyComparator& cmp,
       flush_completed_(false),
       file_number_(0),
       first_seqno_(0),
+      earliest_seqno_(latest_seq),
+      creation_seq_(latest_seq),
       mem_next_logfile_number_(0),
       min_prep_log_referenced_(0),
       locks_(moptions_.inplace_update_support
@@ -116,19 +133,20 @@ MemTable::MemTable(const InternalKeyComparator& cmp,
       oldest_key_time_(std::numeric_limits<uint64_t>::max()),
       atomic_flush_seqno_(kMaxSequenceNumber),
       approximate_memory_usage_(0) {
-  SetInitialSeq(latest_seq);
-  UpdateFlushState();
-  // something went wrong if we need to flush before inserting anything
-  assert(!ShouldScheduleFlush());
-
-  // use bloom_filter_ for both whole key and prefix bloom filter
-  if ((prefix_extractor_ || moptions_.memtable_whole_key_filtering) &&
-      moptions_.memtable_prefix_bloom_bits > 0) {
-    bloom_filter_.reset(
-        new DynamicBloom(&arena_, moptions_.memtable_prefix_bloom_bits,
-                         6 /* hard coded 6 probes */,
-                         moptions_.memtable_huge_page_size, ioptions.logger));
+  if (!pending) {
+      // use bloom_filter_ for both whole key and prefix bloom filter
+      if ((prefix_extractor_ || moptions_.memtable_whole_key_filtering) &&
+          moptions_.memtable_prefix_bloom_bits > 0) {
+        bloom_filter_.reset(
+            new DynamicBloom(&arena_, moptions_.memtable_prefix_bloom_bits,
+                            6 /* hard coded 6 probes */,
+                            moptions_.memtable_huge_page_size, ioptions.logger));
+      }
+      UpdateFlushState();
+      // something went wrong if we need to flush before inserting anything
+      assert(!ShouldScheduleFlush());
   }
+
 }
 
 MemTable::~MemTable() {
@@ -136,15 +154,29 @@ MemTable::~MemTable() {
   assert(refs_ == 0);
 }
 
-void MemTable::SetInitialSeq(SequenceNumber sn) {
-  earliest_seqno_ = sn;
-  creation_seq_ = sn;
+void MemTable::UpdateMutableOptions(const MutableCFOptions& mutable_cf_options) {
+  moptions_.UpdateMutableOptions(mutable_cf_options);
+  kArenaBlockSize = OptimizeBlockSize(moptions_.arena_block_size);
+  arena_.Activate();
+  write_buffer_size_ = mutable_cf_options.write_buffer_size;
+  // use bloom_filter_ for both whole key and prefix bloom filter
+  if ((prefix_extractor_ || moptions_.memtable_whole_key_filtering) &&
+      moptions_.memtable_prefix_bloom_bits > 0) {
+    bloom_filter_.reset(
+        new DynamicBloom(&arena_, moptions_.memtable_prefix_bloom_bits,
+                         6 /* hard coded 6 probes */,
+                         moptions_.memtable_huge_page_size, moptions_.info_log));
+  }
+
 }
 
-void MemTable::Activate(SequenceNumber sn) {
-  SetInitialSeq(sn);
-  arena_.Activate();
-
+void MemTable::Activate(SequenceNumber sn, const MutableCFOptions& mutable_cf_options) {
+  earliest_seqno_ = sn;
+  creation_seq_ = sn;
+  UpdateMutableOptions(mutable_cf_options);
+  UpdateFlushState();
+  // something went wrong if we need to flush before inserting anything
+  assert(!ShouldScheduleFlush());
 }
 
 size_t MemTable::ApproximateMemoryUsage() {

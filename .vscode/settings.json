@@ -1,6 +1,9 @@
 {
     "files.associations": {
-        "chrono": "cpp"
+        "chrono": "cpp",
+        "memory": "cpp",
+        "atomic": "cpp",
+        "condition_variable": "cpp"
     },
     "C_Cpp.default.systemIncludePath": ["/Library/Developer/CommandLineTools/usr/include/"]
 }

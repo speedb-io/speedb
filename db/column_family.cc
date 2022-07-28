@@ -614,8 +614,10 @@ ColumnFamilyData::ColumnFamilyData(
   }
 
   RecalculateWriteStallConditions(mutable_cf_options_);
-  switch_memtable_thread_ =
-      std::thread(&ColumnFamilyData::PrepareSwitchMemTable, this);
+  if (ioptions_.memtable_factory->IsPrepareMemtableCreationSupported()) {
+    switch_memtable_thread_ =
+        std::thread(&ColumnFamilyData::PrepareSwitchMemTable, this);
+  }
 }
 
 void ColumnFamilyData::PrepareSwitchMemTable() {
@@ -630,9 +632,8 @@ void ColumnFamilyData::PrepareSwitchMemTable() {
         switch_memtable_thread_cv_.wait(lck);
       }
     }
-
     // Construct new memtable with an empty initial sequence
-    switch_mem_.store(ConstructNewMemtable(mutable_cf_options_, 0, true),
+    switch_mem_.store(ConstructNewMemtable(mutable_cf_options_, 0, false),
                       std::memory_order_release);
   }
 }
@@ -640,16 +641,18 @@ void ColumnFamilyData::PrepareSwitchMemTable() {
 // DB mutex held
 ColumnFamilyData::~ColumnFamilyData() {
   assert(refs_.load(std::memory_order_relaxed) == 0);
-  {
-    std::unique_lock<std::mutex> lck(switch_memtable_thread_mutex_);
-    terminate_switch_memtable_ = true;
-  }
-  switch_memtable_thread_cv_.notify_one();
-  switch_memtable_thread_.join();
+  if (ioptions_.memtable_factory->IsPrepareMemtableCreationSupported()) {
+    {
+      std::unique_lock<std::mutex> lck(switch_memtable_thread_mutex_);
+      terminate_switch_memtable_ = true;
+    }
+    switch_memtable_thread_cv_.notify_one();
+    switch_memtable_thread_.join();
 
-  const MemTable* memtable = switch_mem_.exchange(nullptr);
-  if (memtable != nullptr) {
-    delete memtable;
+    const MemTable* memtable = switch_mem_.exchange(nullptr);
+    if (memtable != nullptr) {
+      delete memtable;
+    }
   }
 
   // remove from linked list
@@ -1115,9 +1118,9 @@ MemTable* ColumnFamilyData::GetSwitchMemtable(SequenceNumber sn) {
 
 MemTable* ColumnFamilyData::ConstructNewMemtable(
     const MutableCFOptions& mutable_cf_options, SequenceNumber earliest_seq,
-    bool pending) {
+    bool active) {
   return new MemTable(internal_comparator_, ioptions_, mutable_cf_options,
-                      write_buffer_manager_, earliest_seq, id_, pending);
+                      write_buffer_manager_, earliest_seq, id_, active);
 }
 
 void ColumnFamilyData::CreateNewMemtable(

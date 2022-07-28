@@ -19,7 +19,7 @@
             //"program": "${workspaceFolder}/options_util_test",
             //"program": "/usr/bin/gdb",
             //"args": ["/tmp/dbdir"],
-            //"args": ["--gtest_filter=DBTest.DynamicMemtableOptions"],
+            "args": ["--gtest_filter=DBTest.DynamicMemtableOptions"],
             //"args": ["--gtest_filter=DBMemTableTest.InsertWithHint"],
            // "args": ["--gtest_filter=OptionsUtilTest.LoadLatestOptions"],
             //"args": ["--compression_type=None", "-benchmarks=seekrandom", "-value_size=1000", "-num=1000000", "-threads=50", "-db=/tmp/dbdir", "--duration=900"],

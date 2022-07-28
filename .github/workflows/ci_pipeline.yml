@@ -91,13 +91,10 @@ jobs:
         -DWITH_TESTS=1 -DWITH_ALL_TESTS=1 -DWITH_EXAMPLES=1
         ninja
         
-  Performance:
-    if: |
-      !failure() && !cancelled() && 
-      (needs.Build.result == 'success' || needs.Build.result == 'skipped') &&
-      (github.event.review.state == 'approved' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/release'))
-    needs: [Build]
-    uses: speedb-io/speedb/.github/workflows/perf-test.yml@main
+  #Performance:
+    #if: ${{ github.event.review.state == 'approved' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/release') }}
+    #needs: [Build]
+    #uses: speedb-io/speedb/.github/workflows/perf-test.yml@main
   
   QA-Tests:
     if: |

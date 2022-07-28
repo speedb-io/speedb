@@ -322,7 +322,9 @@ class MemTableRepFactory : public Customizable {
   // false when if the <key,seq> already exists.
   // Default: false
   virtual bool CanHandleDuplicatedKey() const { return false; }
-};
+
+  virtual bool IsPrepareMemtableCreationSupported() const { return false; }
+ };
 
 // This uses a skip list to store keys. It is the default.
 //
@@ -351,7 +353,7 @@ class SkipListFactory : public MemTableRepFactory {
   bool IsInsertConcurrentlySupported() const override { return true; }
 
   bool CanHandleDuplicatedKey() const override { return true; }
-
+  
  private:
   size_t lookahead_;
 };

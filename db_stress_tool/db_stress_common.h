@@ -161,6 +161,7 @@ DECLARE_bool(allow_concurrent_memtable_write);
 DECLARE_double(experimental_mempurge_threshold);
 DECLARE_bool(enable_write_thread_adaptive_yield);
 DECLARE_int32(reopen);
+DECLARE_string(filter_uri);
 DECLARE_double(bloom_bits);
 DECLARE_int32(bloom_before_level);
 DECLARE_bool(partition_filters);

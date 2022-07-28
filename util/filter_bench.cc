@@ -14,12 +14,14 @@ int main() {
 #include <cinttypes>
 #include <iostream>
 #include <sstream>
+#include <utility>
 #include <vector>
 
 #include "memory/arena.h"
 #include "port/port.h"
 #include "port/stack_trace.h"
 #include "rocksdb/cache.h"
+#include "rocksdb/convenience.h"
 #include "rocksdb/env.h"
 #include "rocksdb/system_clock.h"
 #include "rocksdb/table.h"
@@ -83,10 +85,10 @@ DEFINE_bool(use_plain_table_bloom, false,
 DEFINE_bool(new_builder, false,
             "Whether to create a new builder for each new filter");
 
-DEFINE_uint32(impl, 0,
+DEFINE_string(impl, "0",
               "Select filter implementation. Without -use_plain_table_bloom:"
-              "0 = legacy full Bloom filter, "
-              "1 = format_version 5 Bloom filter, 2 = Ribbon128 filter. With "
+              "1 = format_version 5 Bloom filter, 2 = Ribbon128 filter. "
+              "name and options of the filter to use.  With "
               "-use_plain_table_bloom: 0 = no locality, 1 = locality.");
 
 DEFINE_bool(net_includes_hashing, false,
@@ -139,36 +141,7 @@ void _always_assert_fail(int line, const char *file, const char *expr) {
 // accurate speed tests
 #define PREDICT_FP_RATE
 #endif
-
-using ROCKSDB_NAMESPACE::Arena;
-using ROCKSDB_NAMESPACE::BlockContents;
-using ROCKSDB_NAMESPACE::BloomFilterPolicy;
-using ROCKSDB_NAMESPACE::BloomHash;
-using ROCKSDB_NAMESPACE::BloomLikeFilterPolicy;
-using ROCKSDB_NAMESPACE::BuiltinFilterBitsBuilder;
-using ROCKSDB_NAMESPACE::CachableEntry;
-using ROCKSDB_NAMESPACE::Cache;
-using ROCKSDB_NAMESPACE::CacheEntryRole;
-using ROCKSDB_NAMESPACE::CacheEntryRoleOptions;
-using ROCKSDB_NAMESPACE::EncodeFixed32;
-using ROCKSDB_NAMESPACE::Env;
-using ROCKSDB_NAMESPACE::FastRange32;
-using ROCKSDB_NAMESPACE::FilterBitsReader;
-using ROCKSDB_NAMESPACE::FilterBuildingContext;
-using ROCKSDB_NAMESPACE::FilterPolicy;
-using ROCKSDB_NAMESPACE::FullFilterBlockReader;
-using ROCKSDB_NAMESPACE::GetSliceHash;
-using ROCKSDB_NAMESPACE::GetSliceHash64;
-using ROCKSDB_NAMESPACE::Lower32of64;
-using ROCKSDB_NAMESPACE::LRUCacheOptions;
-using ROCKSDB_NAMESPACE::ParsedFullFilterBlock;
-using ROCKSDB_NAMESPACE::PlainTableBloomV1;
-using ROCKSDB_NAMESPACE::Random32;
-using ROCKSDB_NAMESPACE::Slice;
-using ROCKSDB_NAMESPACE::static_cast_with_check;
-using ROCKSDB_NAMESPACE::Status;
-using ROCKSDB_NAMESPACE::StderrLogger;
-using ROCKSDB_NAMESPACE::mock::MockBlockBasedTableTester;
+namespace ROCKSDB_NAMESPACE {
 
 struct KeyMaker {
   KeyMaker(size_t avg_size)
@@ -208,17 +181,6 @@ struct KeyMaker {
     return Slice(data, len);
   }
 };
-
-void PrintWarnings() {
-#if defined(__GNUC__) && !defined(__OPTIMIZE__)
-  fprintf(stdout,
-          "WARNING: Optimization is disabled: benchmarks unnecessarily slow\n");
-#endif
-#ifndef NDEBUG
-  fprintf(stdout,
-          "WARNING: Assertions are enabled; benchmarks unnecessarily slow\n");
-#endif
-}
 
 void PrintError(const char *error) { fprintf(stderr, "ERROR: %s\n", error); }
 
@@ -296,17 +258,7 @@ static uint32_t DryRunHash64(Slice &s) {
   return Lower32of64(GetSliceHash64(s));
 }
 
-const std::shared_ptr<const FilterPolicy> &GetPolicy() {
-  static std::shared_ptr<const FilterPolicy> policy;
-  if (!policy) {
-    policy = BloomLikeFilterPolicy::Create(
-        BloomLikeFilterPolicy::GetAllFixedImpls().at(FLAGS_impl),
-        FLAGS_bits_per_key);
-  }
-  return policy;
-}
-
-struct FilterBench : public MockBlockBasedTableTester {
+struct FilterBench : public mock::MockBlockBasedTableTester {
   std::vector<KeyMaker> kms_;
   std::vector<FilterInfo> infos_;
   Random32 random_;
@@ -314,11 +266,14 @@ struct FilterBench : public MockBlockBasedTableTester {
   Arena arena_;
   double m_queries_;
   StderrLogger stderr_logger_;
+  int filter_index_;
 
-  FilterBench()
-      : MockBlockBasedTableTester(GetPolicy()),
+  FilterBench(const std::shared_ptr<const FilterPolicy> &filter_policy,
+              int filter_index)
+      : MockBlockBasedTableTester(filter_policy),
         random_(FLAGS_seed),
-        m_queries_(0) {
+        m_queries_(0),
+        filter_index_(filter_index) {
     for (uint32_t i = 0; i < FLAGS_batch_size; ++i) {
       kms_.emplace_back(FLAGS_key_size < 8 ? 8 : FLAGS_key_size);
     }
@@ -354,17 +309,6 @@ void FilterBench::Go() {
     throw std::runtime_error(
         "Can't combine -use_plain_table_bloom and -use_full_block_reader");
   }
-  if (FLAGS_use_plain_table_bloom) {
-    if (FLAGS_impl > 1) {
-      throw std::runtime_error(
-          "-impl must currently be >= 0 and <= 1 for Plain table");
-    }
-  } else {
-    if (FLAGS_impl > 2) {
-      throw std::runtime_error(
-          "-impl must currently be >= 0 and <= 2 for Block-based table");
-    }
-  }
 
   if (FLAGS_vary_key_count_ratio < 0.0 || FLAGS_vary_key_count_ratio > 1.0) {
     throw std::runtime_error("-vary_key_count_ratio must be >= 0.0 and <= 1.0");
@@ -395,7 +339,7 @@ void FilterBench::Go() {
 
   std::unique_ptr<BuiltinFilterBitsBuilder> builder;
 
-  size_t total_memory_used = 0;
+  [[maybe_unused]] size_t total_memory_used = 0;
   size_t total_size = 0;
   size_t total_keys_added = 0;
 #ifdef PREDICT_FP_RATE
@@ -432,7 +376,7 @@ void FilterBench::Go() {
       info.plain_table_bloom_.reset(new PlainTableBloomV1());
       info.plain_table_bloom_->SetTotalBits(
           &arena_, static_cast<uint32_t>(keys_to_add * FLAGS_bits_per_key),
-          FLAGS_impl, 0 /*huge_page*/, nullptr /*logger*/);
+          filter_index_, 0 /*huge_page*/, nullptr /*logger*/);
       for (uint32_t i = 0; i < keys_to_add; ++i) {
         uint32_t hash = GetSliceHash(kms_[0].Get(filter_id, i));
         info.plain_table_bloom_->AddHash(hash);
@@ -601,7 +545,8 @@ double FilterBench::RandomQueryTest(uint32_t inside_threshold, bool dry_run,
 
   auto dry_run_hash_fn = DryRunNoHash;
   if (!FLAGS_net_includes_hashing) {
-    if (FLAGS_impl == 0 || FLAGS_use_plain_table_bloom) {
+    if ((filter_index_ >= 0 && filter_index_ < 2) ||
+        FLAGS_use_plain_table_bloom) {
       dry_run_hash_fn = DryRunHash32;
     } else {
       dry_run_hash_fn = DryRunHash64;
@@ -790,6 +735,19 @@ double FilterBench::RandomQueryTest(uint32_t inside_threshold, bool dry_run,
   return ns;
 }
 
+}  // namespace ROCKSDB_NAMESPACE
+
+void PrintWarnings() {
+#if defined(__GNUC__) && !defined(__OPTIMIZE__)
+  fprintf(stdout,
+          "WARNING: Optimization is disabled: benchmarks unnecessarily slow\n");
+#endif
+#ifndef NDEBUG
+  fprintf(stdout,
+          "WARNING: Assertions are enabled; benchmarks unnecessarily slow\n");
+#endif
+}
+
 int main(int argc, char **argv) {
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   SetUsageMessage(std::string("\nUSAGE:\n") + std::string(argv[0]) +
@@ -825,13 +783,61 @@ int main(int argc, char **argv) {
         << "  \"Skewed X% in Y%\" - like \"Random filter\" except Y% of"
         << "\n      the filters are designated as \"hot\" and receive X%"
         << "\n      of queries." << std::endl;
-  } else {
-    FilterBench b;
-    for (uint32_t i = 0; i < FLAGS_runs; ++i) {
-      b.Go();
-      FLAGS_seed += 100;
-      b.random_.Seed(FLAGS_seed);
+  } else if (FLAGS_use_plain_table_bloom && FLAGS_use_full_block_reader) {
+    throw std::runtime_error(
+        "Can't combine -use_plain_table_bloom and -use_full_block_reader");
+  } else if (FLAGS_vary_key_count_ratio < 0.0 ||
+             FLAGS_vary_key_count_ratio > 1.0) {
+    throw std::runtime_error("-vary_key_count_ratio must be >= 0.0 and <= 1.0");
+  }
+  std::shared_ptr<const ROCKSDB_NAMESPACE::FilterPolicy> policy;
+
+  int bloom_idx = -1;
+  uint64_t id;
+  const auto &bloom_like_filters =
+      ROCKSDB_NAMESPACE::BloomLikeFilterPolicy::GetAllFixedImpls();
+  ROCKSDB_NAMESPACE::Slice impl(FLAGS_impl);
+  if (ROCKSDB_NAMESPACE::ConsumeDecimalNumber(&impl, &id) &&
+      id < bloom_like_filters.size() && impl.empty()) {
+    policy = ROCKSDB_NAMESPACE::BloomLikeFilterPolicy::Create(
+        bloom_like_filters.at(id), FLAGS_bits_per_key);
+    if (!policy) {
+      fprintf(stderr, "Failed to create BloomLikeFilterPolicy: %s\n",
+              FLAGS_impl.c_str());
+      exit(-1);
+    } else {
+      bloom_idx = static_cast<int>(id);
     }
+  } else {
+    ROCKSDB_NAMESPACE::ConfigOptions config_options;
+    config_options.ignore_unsupported_options = false;
+    std::string bits_str;
+    if (FLAGS_bits_per_key > 0) {
+      bits_str = ":" + std::to_string(FLAGS_bits_per_key);
+    }
+    auto s = ROCKSDB_NAMESPACE::FilterPolicy::CreateFromString(
+        config_options, FLAGS_impl + bits_str, &policy);
+    if (!s.ok() || !policy) {
+      fprintf(stderr, "Failed to create FilterPolicy[%s%s]: %s\n",
+              FLAGS_impl.c_str(), bits_str.c_str(), s.ToString().c_str());
+      exit(-1);
+    }
+  }
+  if (FLAGS_use_plain_table_bloom) {
+    if (bloom_idx < 0 || bloom_idx > 1) {
+      fprintf(stderr, "-impl must currently be 0 or 1 for Plain table");
+      exit(-1);
+    }
+  } else if (bloom_idx == 1) {
+    fprintf(stderr,
+            "Block-based filter not currently supported by filter_bench");
+    exit(-1);
+  }
+  ROCKSDB_NAMESPACE::FilterBench b(policy, bloom_idx);
+  for (uint32_t i = 0; i < FLAGS_runs; ++i) {
+    b.Go();
+    FLAGS_seed += 100;
+    b.random_.Seed(FLAGS_seed);
   }
 
   return 0;

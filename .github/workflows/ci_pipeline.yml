@@ -11,11 +11,11 @@ on:
 permissions: write-all
 
 jobs:
-  #Sanity:
-    #uses: speedb-io/speedb/.github/workflows/sanity_check.yml@main
+  Sanity:
+    uses: speedb-io/speedb/.github/workflows/sanity_check.yml@main
   
   Build:
-    #needs: [Sanity]
+    needs: [Sanity]
     if: ${{ github.event.review.state == 'approved' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/release') }}
     runs-on: [self-hosted, ubuntu, asrunner]
     strategy:

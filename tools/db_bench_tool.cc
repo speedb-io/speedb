@@ -725,9 +725,9 @@ DEFINE_int32(random_access_max_buffer_size, 1024 * 1024,
 DEFINE_int32(writable_file_max_buffer_size, 1024 * 1024,
              "Maximum write buffer for Writable File");
 
-DEFINE_int32(bloom_bits, -1,
-             "Bloom filter bits per key. Negative means use default."
-             "Zero disables.");
+DEFINE_double(bloom_bits, -1,
+              "Bloom filter bits per key. Negative means use default."
+              "Zero disables.");
 
 DEFINE_bool(use_ribbon_filter, false, "Use Ribbon instead of Bloom filter");
 
@@ -1228,6 +1228,7 @@ static bool ValidateTableCacheNumshardbits(const char* flagname,
   return true;
 }
 DEFINE_int32(table_cache_numshardbits, 4, "");
+DEFINE_string(filter_uri, "", "URI for registry FilterPolicy");
 
 #ifndef ROCKSDB_LITE
 DEFINE_string(env_uri, "",
@@ -4350,7 +4351,25 @@ class Benchmark {
       if (FLAGS_cache_size) {
         table_options->block_cache = cache_;
       }
-      if (FLAGS_bloom_bits < 0) {
+      std::string bits_str;
+      if (FLAGS_bloom_bits > 0) {
+        bits_str = ":" + ROCKSDB_NAMESPACE::ToString(FLAGS_bloom_bits);
+        fprintf(stderr, "note: appending --bloom-bits (%f) to --filter-uri\n",
+                FLAGS_bloom_bits);
+      }
+      if (!FLAGS_filter_uri.empty()) {
+        ConfigOptions config_options;
+        config_options.ignore_unsupported_options = false;
+        Status s = FilterPolicy::CreateFromString(
+            config_options, FLAGS_filter_uri + bits_str,
+            &table_options->filter_policy);
+        if (!s.ok()) {
+          fprintf(stderr, "failure creating filter policy[%s%s]: %s\n",
+                  FLAGS_filter_uri.c_str(), bits_str.c_str(),
+                  s.ToString().c_str());
+          exit(1);
+        }
+      } else if (FLAGS_bloom_bits < 0) {
         table_options->filter_policy = BlockBasedTableOptions().filter_policy;
       } else if (FLAGS_bloom_bits == 0) {
         table_options->filter_policy.reset();
@@ -4366,10 +4385,12 @@ class Benchmark {
                   s.ToString().c_str());
           exit(1);
         }
+      } else if (FLAGS_use_ribbon_filter) {
+        table_options->filter_policy.reset(
+            NewRibbonFilterPolicy(FLAGS_bloom_bits));
       } else {
         table_options->filter_policy.reset(
-            FLAGS_use_ribbon_filter ? NewRibbonFilterPolicy(FLAGS_bloom_bits)
-                                    : NewBloomFilterPolicy(FLAGS_bloom_bits));
+            NewBloomFilterPolicy(FLAGS_bloom_bits));
       }
     }
     if (FLAGS_row_cache_size) {

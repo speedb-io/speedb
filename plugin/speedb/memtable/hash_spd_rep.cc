@@ -981,7 +981,7 @@ HashSpdRepFactory::HashSpdRepFactory(size_t bucket_count)
 
 MemTableRep* HashSpdRepFactory::CreateMemTableRep(
     const MemTableRep::KeyComparator& compare, Allocator* allocator,
-    const SliceTransform* /*transform*/, Logger* logger) {
+    const SliceTransform* /*transform*/, Logger* /*logger*/) {
   return new HashLocklessRep(compare, allocator, bucket_count_, 10000);
 }
 

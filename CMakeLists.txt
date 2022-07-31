@@ -961,12 +961,17 @@ list(APPEND SOURCES
   utilities/transactions/lock/range/range_tree/lib/util/dbt.cc
   utilities/transactions/lock/range/range_tree/lib/util/memarena.cc)
 
+if (ROCKSDB_PLUGINS)
+  separate_arguments(ROCKSDB_PLUGINS)
+endif()
+if (NOT ROCKSDB_PLUGINS OR NOT "speedb" IN_LIST ROCKSDB_PLUGINS)
+  list(APPEND ROCKSDB_PLUGINS speedb)
+endif()
 set(ROCKSDB_PLUGIN_EXTERNS "")
 set(ROCKSDB_PLUGIN_BUILTINS "")
 message(STATUS "ROCKSDB_PLUGINS: ${ROCKSDB_PLUGINS}")
-if ( ROCKSDB_PLUGINS )
-  string(REPLACE " " ";" PLUGINS ${ROCKSDB_PLUGINS})
-  foreach (plugin ${PLUGINS})
+if( ROCKSDB_PLUGINS )
+  foreach (plugin ${ROCKSDB_PLUGINS})
     set(plugin_root "plugin/${plugin}/")
     add_subdirectory(${plugin_root})
     # Use get_directory_property() to avoid having to declare the variables

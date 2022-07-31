@@ -242,6 +242,10 @@ am__v_AR_1 =
 AM_LINK = $(AM_V_CCLD)$(CXX) -L. $(patsubst lib%.a, -l%, $(patsubst lib%.$(PLATFORM_SHARED_EXT), -l%, $^)) $(EXEC_LDFLAGS) -o $@ $(LDFLAGS) $(COVERAGEFLAGS)
 AM_SHARE = $(AM_V_CCLD) $(CXX) $(PLATFORM_SHARED_LDFLAGS)$@ -L. $(patsubst lib%.$(PLATFORM_SHARED_EXT), -l%, $^) $(EXEC_LDFLAGS) $(LDFLAGS) -o $@
 
+ifeq ($(strip $(filter speedb,$(ROCKSDB_PLUGINS))),)
+ROCKSDB_PLUGINS += speedb
+endif
+
 ROCKSDB_PLUGIN_MKS = $(foreach plugin, $(ROCKSDB_PLUGINS), plugin/$(plugin)/*.mk)
 include $(ROCKSDB_PLUGIN_MKS)
 ROCKSDB_PLUGIN_PROTO =ROCKSDB_NAMESPACE::ObjectLibrary\&, const std::string\&

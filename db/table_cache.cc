@@ -294,8 +294,7 @@ InternalIterator* TableCache::NewIterator(
     assert(result == nullptr);
     result = NewErrorInternalIterator<Slice>(s, arena);
   } else {
-    result->SetRange(file_meta.smallest.user_key(),
-                     file_meta.largest.user_key());
+    result->SetRange(file_meta.smallest.Encode(), file_meta.largest.Encode());
   }
 
   return result;

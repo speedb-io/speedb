@@ -34,6 +34,47 @@
             "problemMatcher": []
         }, 
         {
+            "label": "db_memtable_test Debug",
+            "type": "shell",
+            "command": "DEBUG_LEVEL=2 make -j 16 db_memtable_test",
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "problemMatcher": []
+        },         
+        {
+            "label": "db_test Debug",
+            "type": "shell",
+            "command": "DEBUG_LEVEL=2 make -j 16 db_test",
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "db_with_timestamp_basic_test Debug",
+            "type": "shell",
+            "command": "DEBUG_LEVEL=2 make -j 16 db_with_timestamp_basic_test",
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "problemMatcher": []
+        },        
+        {
+            "label": "options_util_test Debug",
+            "type": "shell",
+            "command": "DEBUG_LEVEL=2 make -j 16 options_util_test",
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "problemMatcher": []
+        },       
+               
+        {
             "label": "db_stress Debug",
             "type": "shell",
             "command": "DEBUG_LEVEL=1 make -j 16 db_stress",

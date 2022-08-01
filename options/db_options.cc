@@ -966,7 +966,7 @@ MutableDBOptions::MutableDBOptions()
       strict_bytes_per_sync(false),
       compaction_readahead_size(0),
       max_background_flushes(-1),
-      use_spdb_query_builder(false) {}
+      use_spdb_query_builder(true) {}
 
 MutableDBOptions::MutableDBOptions(const DBOptions& options)
     : max_background_jobs(options.max_background_jobs),

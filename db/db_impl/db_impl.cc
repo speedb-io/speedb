@@ -51,7 +51,7 @@
 #include "db/table_properties_collector.h"
 #include "db/transaction_log_impl.h"
 #include "db/version_set.h"
-#include "db/write_batch_internal.
+#include "db/write_batch_internal.h"
 #include "db/write_callback.h"
 #include "env/unique_id_gen.h"
 #include "file/file_util.h"

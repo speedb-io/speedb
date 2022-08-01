@@ -54,9 +54,9 @@ jobs:
           echo $GITHUB_REF_NAME
           if echo $GITHUB_REF_NAME | grep -Eq 'release/'; then
             echo long
-            make clean && ${{ matrix.long_test }} && echo $? || echo $?
+            make clean && ${{ matrix.long_test }}
           else
             echo short
-            make clean && ${{ matrix.short_test }} && echo $? || echo $?
+            make clean && ${{ matrix.short_test }}
           fi
           df -H

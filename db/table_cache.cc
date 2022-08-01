@@ -294,7 +294,11 @@ InternalIterator* TableCache::NewIterator(
     assert(result == nullptr);
     result = NewErrorInternalIterator<Slice>(s, arena);
   } else {
-    result->SetRange(file_meta.smallest.Encode(), file_meta.largest.Encode());
+    if (file_meta.smallest.Valid() && file_meta.largest.Valid()) {
+      result->SetRange(file_meta.smallest.Encode(), file_meta.largest.Encode());
+    } else {
+      fprintf(stderr, "Invalid smallest/largest\n");
+    }
   }
 
   return result;

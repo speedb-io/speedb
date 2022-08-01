@@ -2256,17 +2256,18 @@ static const std::string kPlainTable = "test_PlainTableBloom";
 
 class BloomStatsTestWithParam
     : public DBBloomFilterTest,
-      public testing::WithParamInterface<std::tuple<std::string, bool>> {
+      public testing::WithParamInterface<std::tuple<std::string, bool, bool>> {
  public:
   BloomStatsTestWithParam() {
     bfp_impl_ = std::get<0>(GetParam());
     partition_filters_ = std::get<1>(GetParam());
-
+    use_spdb_query_builder_ = std::get<2>(GetParam());
     options_.create_if_missing = true;
     options_.prefix_extractor.reset(
         ROCKSDB_NAMESPACE::NewFixedPrefixTransform(4));
     options_.memtable_prefix_bloom_size_ratio =
         8.0 * 1024.0 / static_cast<double>(options_.write_buffer_size);
+    options_.use_spdb_query_builder = use_spdb_query_builder_;
     if (bfp_impl_ == kPlainTable) {
       assert(!partition_filters_);  // not supported in plain table
       PlainTableOptions table_options;
@@ -2299,6 +2300,7 @@ class BloomStatsTestWithParam
 
   std::string bfp_impl_;
   bool partition_filters_;
+  bool use_spdb_query_builder_;
   Options options_;
 };
 
@@ -2413,12 +2415,18 @@ TEST_P(BloomStatsTestWithParam, BloomStatsTestWithIter) {
 
 INSTANTIATE_TEST_CASE_P(
     BloomStatsTestWithParam, BloomStatsTestWithParam,
-    ::testing::Values(std::make_tuple(kDeprecatedBlock, false),
-                      std::make_tuple(kLegacyBloom, false),
-                      std::make_tuple(kLegacyBloom, true),
-                      std::make_tuple(kFastLocalBloom, false),
-                      std::make_tuple(kFastLocalBloom, true),
-                      std::make_tuple(kPlainTable, false)));
+    ::testing::Values(std::make_tuple(kDeprecatedBlock, false, false),
+                      std::make_tuple(kDeprecatedBlock, false, true),
+                      std::make_tuple(kLegacyBloom, false, false),
+                      std::make_tuple(kLegacyBloom, false, true),
+                      std::make_tuple(kLegacyBloom, true, false),
+                      std::make_tuple(kLegacyBloom, true, true),
+                      std::make_tuple(kFastLocalBloom, false, false),
+                      std::make_tuple(kFastLocalBloom, false, true),
+                      std::make_tuple(kFastLocalBloom, true, false),
+                      std::make_tuple(kFastLocalBloom, true, true),
+                      std::make_tuple(kPlainTable, false, false),
+                      std::make_tuple(kPlainTable, false, true)));
 
 namespace {
 void PrefixScanInit(DBBloomFilterTest* dbtest) {
@@ -2721,11 +2729,22 @@ int CountIter(std::unique_ptr<Iterator>& iter, const Slice& key) {
   return count;
 }
 
+class BloomTestWithSpdbQueryControl
+    : public DBBloomFilterTest,
+      public testing::WithParamInterface<bool> {
+ public:
+  BloomTestWithSpdbQueryControl() {
+    use_spdb_query_builder_ = GetParam();
+  }
+
+  bool use_spdb_query_builder_;
+};
+
 // use iterate_upper_bound to hint compatiability of existing bloom filters.
 // The BF is considered compatible if 1) upper bound and seek key transform
 // into the same string, or 2) the transformed seek key is of the same length
 // as the upper bound and two keys are adjacent according to the comparator.
-TEST_F(DBBloomFilterTest, DynamicBloomFilterUpperBound) {
+TEST_P(BloomTestWithSpdbQueryControl, DynamicBloomFilterUpperBound) {
   for (const auto& bfp_impl : BloomLikeFilterPolicy::GetAllFixedImpls()) {
     int using_full_builder = bfp_impl != kDeprecatedBlock;
     Options options;
@@ -2734,6 +2753,7 @@ TEST_F(DBBloomFilterTest, DynamicBloomFilterUpperBound) {
     options.prefix_extractor.reset(NewCappedPrefixTransform(4));
     options.disable_auto_compactions = true;
     options.statistics = CreateDBStatistics();
+    options.use_spdb_query_builder = use_spdb_query_builder_;
     // Enable prefix bloom for SST files
     BlockBasedTableOptions table_options;
     table_options.cache_index_and_filter_blocks = true;
@@ -2857,7 +2877,7 @@ TEST_F(DBBloomFilterTest, DynamicBloomFilterUpperBound) {
 
 // Create multiple SST files each with a different prefix_extractor config,
 // verify iterators can read all SST files using the latest config.
-TEST_F(DBBloomFilterTest, DynamicBloomFilterMultipleSST) {
+TEST_P(BloomTestWithSpdbQueryControl, DynamicBloomFilterMultipleSST) {
   for (const auto& bfp_impl : BloomLikeFilterPolicy::GetAllFixedImpls()) {
     int using_full_builder = bfp_impl != kDeprecatedBlock;
     Options options;
@@ -2866,6 +2886,7 @@ TEST_F(DBBloomFilterTest, DynamicBloomFilterMultipleSST) {
     options.prefix_extractor.reset(NewFixedPrefixTransform(1));
     options.disable_auto_compactions = true;
     options.statistics = CreateDBStatistics();
+    options.use_spdb_query_builder = use_spdb_query_builder_;
     // Enable prefix bloom for SST files
     BlockBasedTableOptions table_options;
     table_options.filter_policy = Create(10, bfp_impl);
@@ -2895,6 +2916,10 @@ TEST_F(DBBloomFilterTest, DynamicBloomFilterMultipleSST) {
     ASSERT_EQ(CountIter(iter, "foo"), 2);
     ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_CHECKED),
               1 + using_full_builder);
+    // For spdb query - iter is invalid on initial seek ("gpk" > largest in level ("fpa"))
+    // For NON spdb query , it fails on the check of FullFilterBlockReader::IsFilterCompatible()
+    //   Called from FullFilterBlockReader::RangeMayExist - WHY????
+    //    => filter is not checked in this case so the counter stays as before
     ASSERT_EQ(CountIter(iter, "gpk"), 0);
     ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_CHECKED),
               1 + using_full_builder);
@@ -3049,7 +3074,7 @@ TEST_F(DBBloomFilterTest, DynamicBloomFilterNewColumnFamily) {
 
 // Verify it's possible to change prefix_extractor at runtime and iterators
 // behaves as expected
-TEST_F(DBBloomFilterTest, DynamicBloomFilterOptions) {
+TEST_P(BloomTestWithSpdbQueryControl, DynamicBloomFilterOptions) {
   for (const auto& bfp_impl : BloomLikeFilterPolicy::GetAllFixedImpls()) {
     Options options;
     options.env = CurrentOptions().env;
@@ -3057,6 +3082,7 @@ TEST_F(DBBloomFilterTest, DynamicBloomFilterOptions) {
     options.prefix_extractor.reset(NewFixedPrefixTransform(1));
     options.disable_auto_compactions = true;
     options.statistics = CreateDBStatistics();
+    options.use_spdb_query_builder = use_spdb_query_builder_;
     // Enable prefix bloom for SST files
     BlockBasedTableOptions table_options;
     table_options.cache_index_and_filter_blocks = true;
@@ -3164,6 +3190,11 @@ TEST_F(DBBloomFilterTest, SeekForPrevWithPartitionedFilters) {
 }
 
 #endif  // ROCKSDB_LITE
+
+INSTANTIATE_TEST_CASE_P(
+    BloomTestWithSpdbQueryControl, BloomTestWithSpdbQueryControl,
+    ::testing::Values(false, true));
+
 
 }  // namespace ROCKSDB_NAMESPACE
 

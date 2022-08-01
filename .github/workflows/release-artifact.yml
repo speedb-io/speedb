@@ -6,7 +6,7 @@ on:
 jobs:
 
   cleanup:
-    runs-on: [self-hosted, linux, x64, myrunner]
+    runs-on: [self-hosted, ubuntu, asrunner]
     container:
       image: ubuntu:latest
     steps:

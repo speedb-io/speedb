@@ -122,7 +122,6 @@ class MergingIterator : public InternalIterator {
         }
 
         PERF_TIMER_GUARD(seek_child_seek_time);
-
         child.Seek(target);
       }
 
@@ -416,11 +415,13 @@ IteratorWrapper* MergingIterator::CurrentSmallestKey(const Slice* target) {
                  candidateHeap_->top()->GetSmallsetKeyRange()) > 0))) {
       IteratorWrapper* candidateItem = candidateHeap_->top();
       candidateHeap_->pop();
+      PERF_TIMER_GUARD(seek_child_seek_time);
       if (target) {
         candidateItem->Seek(*target);
       } else {
         candidateItem->SeekToFirst();
       }
+      PERF_COUNTER_ADD(seek_child_seek_count, 1)
       AddToMinHeapOrCheckStatus(candidateItem);
     }
   }

@@ -678,8 +678,8 @@ def finalize_and_sanitize(src_params, counter):
     if dest_params.get("compression_type") != "zstd":
         dest_params["compression_zstd_max_train_bytes"] = 0
     if dest_params.get("allow_concurrent_memtable_write", 1) == 1:
-        dest_params["memtablerep"] = (
-            random.choice(["skip_list", "speedb.HashSpdRepFactory"]),
+        dest_params["memtablerep"] = random.choice(
+            ["skip_list", "speedb.HashSpdRepFactory"]
         )
     if dest_params["mmap_read"] == 1:
         dest_params["use_direct_io_for_flush_and_compaction"] = 0

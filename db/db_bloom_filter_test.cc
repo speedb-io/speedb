@@ -2923,6 +2923,8 @@ TEST_P(BloomTestWithSpdbQueryControl, DynamicBloomFilterMultipleSST) {
     ASSERT_EQ(CountIter(iter, "gpk"), 0);
     ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_CHECKED),
               1 + using_full_builder);
+    uint64_t expected_prefix_checked_counter = 1 + using_full_builder;
+    uint64_t expected_prefix_useful_counter = 0U;
     ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_USEFUL), 0);
 
     // second SST with capped:3 BF
@@ -2935,15 +2937,21 @@ TEST_P(BloomTestWithSpdbQueryControl, DynamicBloomFilterMultipleSST) {
       // BF is cappped:3 now
       std::unique_ptr<Iterator> iter_tmp(db_->NewIterator(read_options));
       ASSERT_EQ(CountIter(iter_tmp, "foo"), 4);
+      expected_prefix_checked_counter += 1 + using_full_builder;
       ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_CHECKED),
-                2 + using_full_builder * 2);
+                // // 2 + using_full_builder * 2);
+                expected_prefix_checked_counter);
       ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_USEFUL), 0);
       ASSERT_EQ(CountIter(iter_tmp, "gpk"), 0);
       // both counters are incremented because BF is "not changed" for 1 of the
       // 2 SST files, so filter is checked once and found no match.
+      // For spdb-query, "gpk" > largest key in both sst-s
+      expected_prefix_checked_counter += !use_spdb_query_builder_;
+      expected_prefix_useful_counter += !use_spdb_query_builder_;
       ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_CHECKED),
-                3 + using_full_builder * 2);
-      ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_USEFUL), 1);
+                // // 3 + using_full_builder * 2);
+                expected_prefix_checked_counter);
+      ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_USEFUL), expected_prefix_useful_counter /*1*/);
     }
 
     ASSERT_OK(dbfull()->SetOptions({{"prefix_extractor", "fixed:2"}}));
@@ -2960,25 +2968,34 @@ TEST_P(BloomTestWithSpdbQueryControl, DynamicBloomFilterMultipleSST) {
       std::unique_ptr<Iterator> iter_tmp(db_->NewIterator(read_options));
       ASSERT_EQ(CountIter(iter_tmp, "foo"), 9);
       // the first and last BF are checked
+      expected_prefix_checked_counter += 1 + using_full_builder;
       ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_CHECKED),
-                4 + using_full_builder * 3);
-      ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_USEFUL), 1);
+                // // 4 + using_full_builder * 3);
+                expected_prefix_checked_counter);
+      ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_USEFUL), expected_prefix_useful_counter /*1*/);
       ASSERT_EQ(CountIter(iter_tmp, "gpk"), 0);
       // only last BF is checked and not found
+      expected_prefix_checked_counter += !use_spdb_query_builder_;
+      expected_prefix_useful_counter += !use_spdb_query_builder_;
       ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_CHECKED),
-                5 + using_full_builder * 3);
-      ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_USEFUL), 2);
+                // // 5 + using_full_builder * 3);
+                expected_prefix_checked_counter);
+      ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_USEFUL), expected_prefix_useful_counter /*2*/);
     }
 
     // iter_old can only see the first SST, so checked plus 1
     ASSERT_EQ(CountIter(iter_old, "foo"), 4);
+    ++expected_prefix_checked_counter;
     ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_CHECKED),
-              6 + using_full_builder * 3);
+              // // 6 + using_full_builder * 3);
+              expected_prefix_checked_counter);
     // iter was created after the first setoptions call so only full filter
     // will check the filter
     ASSERT_EQ(CountIter(iter, "foo"), 2);
+    expected_prefix_checked_counter += using_full_builder;
     ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_CHECKED),
-              6 + using_full_builder * 4);
+              // // 6 + using_full_builder * 4);
+              expected_prefix_checked_counter);
 
     {
       // keys in all three SSTs are visible to iterator
@@ -2986,13 +3003,18 @@ TEST_P(BloomTestWithSpdbQueryControl, DynamicBloomFilterMultipleSST) {
       // so +2 for checked counter
       std::unique_ptr<Iterator> iter_all(db_->NewIterator(read_options));
       ASSERT_EQ(CountIter(iter_all, "foo"), 9);
+      expected_prefix_checked_counter += 1 + using_full_builder;
       ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_CHECKED),
-                7 + using_full_builder * 5);
-      ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_USEFUL), 2);
+                // // 7 + using_full_builder * 5);
+                expected_prefix_checked_counter);
+      ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_USEFUL), expected_prefix_useful_counter /*2*/);
       ASSERT_EQ(CountIter(iter_all, "gpk"), 0);
+      expected_prefix_checked_counter += !use_spdb_query_builder_;
+      expected_prefix_useful_counter += !use_spdb_query_builder_;
       ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_CHECKED),
-                8 + using_full_builder * 5);
-      ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_USEFUL), 3);
+                // // 8 + using_full_builder * 5);
+                expected_prefix_checked_counter);
+      ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_USEFUL), expected_prefix_useful_counter /*3*/);
     }
     ASSERT_OK(dbfull()->SetOptions({{"prefix_extractor", "capped:3"}}));
     ASSERT_EQ(dbfull()->GetOptions().prefix_extractor->AsString(),
@@ -3002,13 +3024,18 @@ TEST_P(BloomTestWithSpdbQueryControl, DynamicBloomFilterMultipleSST) {
       ASSERT_EQ(CountIter(iter_all, "foo"), 6);
       // all three SST are checked because the current options has the same as
       // the remaining SST (capped:3)
+      expected_prefix_checked_counter += 1 + 2 * using_full_builder;
       ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_CHECKED),
-                9 + using_full_builder * 7);
-      ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_USEFUL), 3);
+                // // 9 + using_full_builder * 7);
+                expected_prefix_checked_counter);
+      ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_USEFUL), expected_prefix_useful_counter /*3*/);
       ASSERT_EQ(CountIter(iter_all, "gpk"), 0);
+      expected_prefix_checked_counter += !use_spdb_query_builder_;
+      expected_prefix_useful_counter += !use_spdb_query_builder_;
       ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_CHECKED),
-                10 + using_full_builder * 7);
-      ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_USEFUL), 4);
+                // // 10 + using_full_builder * 7);
+                expected_prefix_checked_counter);
+      ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_USEFUL), expected_prefix_useful_counter /*4*/);
     }
     // TODO(Zhongyi): Maybe also need to add Get calls to test point look up?
   }
@@ -3108,15 +3135,19 @@ TEST_P(BloomTestWithSpdbQueryControl, DynamicBloomFilterOptions) {
 
     ReadOptions read_options;
     read_options.prefix_same_as_start = true;
+    // Incrementing only 1 when spdb query is enabled since Seek() is called only on the first iterator when it is moved
+    // from the candidate heap to the min heap. For the other 2 iterators SeekToFirst() is called => filter is not used
+    uint64_t expected_prefix_checked_counter = use_spdb_query_builder_? 1 : 3;
     {
       std::unique_ptr<Iterator> iter(db_->NewIterator(read_options));
       ASSERT_EQ(CountIter(iter, "foo"), 12);
-      ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_CHECKED), 3);
+      ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_CHECKED), expected_prefix_checked_counter);
       ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_USEFUL), 0);
     }
     std::unique_ptr<Iterator> iter_old(db_->NewIterator(read_options));
     ASSERT_EQ(CountIter(iter_old, "foo"), 12);
-    ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_CHECKED), 6);
+    expected_prefix_checked_counter += (use_spdb_query_builder_? 1 : 3);
+    ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_CHECKED), expected_prefix_checked_counter);
     ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_USEFUL), 0);
 
     ASSERT_OK(dbfull()->SetOptions({{"prefix_extractor", "capped:3"}}));
@@ -3126,16 +3157,20 @@ TEST_P(BloomTestWithSpdbQueryControl, DynamicBloomFilterOptions) {
       std::unique_ptr<Iterator> iter(db_->NewIterator(read_options));
       // "fp*" should be skipped
       ASSERT_EQ(CountIter(iter, "foo"), 9);
-      ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_CHECKED), 6);
+      ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_CHECKED), expected_prefix_checked_counter);
       ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_USEFUL), 0);
     }
 
     // iterator created before should not be affected and see all keys
     ASSERT_EQ(CountIter(iter_old, "foo"), 12);
-    ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_CHECKED), 9);
+    expected_prefix_checked_counter += (use_spdb_query_builder_? 1 : 3);
+    ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_CHECKED), expected_prefix_checked_counter);
     ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_USEFUL), 0);
     ASSERT_EQ(CountIter(iter_old, "abc"), 0);
-    ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_CHECKED), 12);
+    // In this case, the counter is incremented for each sst since Seek() is not valid when moving the iterator
+    // from the candidate heap to the min heap (see MergingIterator::CurrentSmallestKey() for details)
+    expected_prefix_checked_counter += 3;
+    ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_CHECKED), expected_prefix_checked_counter);
     ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_USEFUL), 3);
   }
 }

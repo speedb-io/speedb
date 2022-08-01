@@ -25,6 +25,8 @@
 #include "util/heap.h"
 #include "util/stop_watch.h"
 
+#include <stdio.h>
+
 namespace ROCKSDB_NAMESPACE {
 // Without anonymous namespace here, we fail the warning -Wmissing-prototypes
 namespace {
@@ -72,6 +74,10 @@ class MergingIterator : public InternalIterator {
   }
 
   ~MergingIterator() override {
+    if (candidateHeap_) {
+      printf("Canididate Heap NOT Empty\n");
+    }
+
     for (auto& child : children_) {
       child.DeleteIter(is_arena_mode_);
     }

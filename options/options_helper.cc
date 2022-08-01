@@ -182,6 +182,7 @@ DBOptions BuildDBOptions(const ImmutableDBOptions& immutable_db_options,
   options.checksum_handoff_file_types =
       immutable_db_options.checksum_handoff_file_types;
   options.lowest_used_cache_tier = immutable_db_options.lowest_used_cache_tier;
+  options.use_spdb_query_builder = mutable_db_options.use_spdb_query_builder;
   return options;
 }
 

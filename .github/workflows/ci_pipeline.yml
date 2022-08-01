@@ -11,7 +11,7 @@ on:
 permissions: write-all
 
 jobs:
-  Check buck targets and code format:
+  Sanity:
     uses: speedb-io/speedb/.github/workflows/sanity_check.yml@main
   
   Build:

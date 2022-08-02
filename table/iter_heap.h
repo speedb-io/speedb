@@ -47,8 +47,8 @@ class CandidateIteratorComparator {
       : comparator_(comparator) {}
 
   bool operator()(IteratorWrapper* a, IteratorWrapper* b) const {
-    return comparator_->Compare(a->GetSmallsetKeyRange(),
-                                b->GetSmallsetKeyRange()) > 0;
+    return comparator_->Compare(a->GetSmallestKeyRange(),
+                                b->GetSmallestKeyRange()) > 0;
   }
 
  private:

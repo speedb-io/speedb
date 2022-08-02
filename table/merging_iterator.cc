@@ -423,15 +423,7 @@ IteratorWrapper* MergingIterator::CurrentSmallestKey(const Slice* target) {
       IteratorWrapper* candidateItem = candidateHeap_->top();
       candidateHeap_->pop();
       PERF_TIMER_GUARD(seek_child_seek_time);
-<<<<<<< HEAD
-      if (target) {
-        candidateItem->Seek(*target);
-      } else {
-        candidateItem->SeekToFirst();
-      }
-=======
       candidateItem->Seek(origin_seek_);
->>>>>>> 63617b18c... candidate should seek to the original key
       PERF_COUNTER_ADD(seek_child_seek_count, 1)
       AddToMinHeapOrCheckStatus(candidateItem);
     }

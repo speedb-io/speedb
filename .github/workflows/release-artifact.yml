@@ -34,14 +34,14 @@ jobs:
 
       - name: docker run
         run: |
-          export FLINK_OUTPUT_DIR=~/flink
-          echo $FLINK_OUTPUT_DIR
-          rm -rf $FLINK_OUTPUT_DIR
-          mkdir -p $FLINK_OUTPUT_DIR
-          docker build -f ./xmciber-flink/Dockerfile -t flink-centos-builder .
-          docker run --rm -v $(readlink -f ${FLINK_OUTPUT_DIR}):/out -v $GITHUB_WORKSPACE:/speedb -e GITHUB_WORKSPACE=$GITHUB_WORKSPACE flink-centos-builder xmcyber/speedb1
-          ls -alFh $FLINK_OUTPUT_DIR
-          zip --junk-paths "Release-$GITHUB_REF_NAME.zip" $FLINK_OUTPUT_DIR/*
+          export BUILD_OUTPUT_DIR=~/build
+          echo $BUILD_OUTPUT_DIR
+          rm -rf $BUILD_OUTPUT_DIR
+          mkdir -p $BUILD_OUTPUT_DIR
+          docker build -f ./artifact-build/Dockerfile -t spdb-build .
+          docker run --rm -v $(readlink -f ${BUILD_OUTPUT_DIR}):/out -v $GITHUB_WORKSPACE:/speedb -e GITHUB_WORKSPACE=$GITHUB_WORKSPACE spdb-build
+          ls -alFh $BUILD_OUTPUT_DIR
+          zip --junk-paths "Release-$GITHUB_REF_NAME.zip" $BUILD_OUTPUT_DIR/*
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
@@ -58,17 +58,15 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          upload_url: ${{ steps.create_release.outputs.upload_url }} 
           asset_path: ./Release-${{ github.ref_name}}.zip
           asset_name: Release-${{ github.ref_name}}.zip
           asset_content_type: application/zip
           
       - name: Upload artifacts to S3
         run: |
-          export FLINK_OUTPUT_DIR=~/flink
-          echo $FLINK_OUTPUT_DIR
-          aws s3 cp $FLINK_OUTPUT_DIR s3://spdb-github-artifacts/"release-$GITHUB_REF_NAME" --recursive
+          export BUILD_OUTPUT_DIR=~/build
+          echo $BUILD_OUTPUT_DIR
+          aws s3 cp $BUILD_OUTPUT_DIR s3://spdb-github-artifacts/"release-$GITHUB_REF_NAME" --recursive
           aws s3 ls s3://spdb-github-artifacts/
-          #aws s3 rm s3://spdb-github-artifacts/ --recursive --include "*"
-          #aws s3 ls s3://spdb-github-artifacts
-          rm -rf $FLINK_OUTPUT_DIR
+          rm -rf $BUILD_OUTPUT_DIR

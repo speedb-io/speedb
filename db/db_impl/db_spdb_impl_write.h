@@ -42,7 +42,7 @@ class SpdbWriteImpl {
   void WaitForWalWriteComplete(void* list);
   void SwitchAndWriteBatchGroup();
   void WriteBatchComplete(void* list, bool leader_batch);
-  port::RWMutex& GetFlushRWLock() { return flush_rwlock_; }
+  port::RWMutexWr& GetFlushRWLock() { return flush_rwlock_; }
   void Lock(bool is_read);
   void Unlock(bool is_read);
 
@@ -50,8 +50,8 @@ class SpdbWriteImpl {
   struct WritesBatchList {
     std::list<WriteBatch*> wal_writes_;
     uint64_t max_seq_ = 0;
-    port::RWMutex buffer_write_rw_lock_;
-    port::RWMutex write_ref_rwlock_;
+    port::RWMutexWr buffer_write_rw_lock_;
+    port::RWMutexWr write_ref_rwlock_;
     bool empty_ = true;
     void Clear() {
       wal_writes_.clear();
@@ -83,9 +83,9 @@ class SpdbWriteImpl {
   std::mutex flush_thread_mutex_;
   std::condition_variable flush_thread_cv_;
   port::Mutex add_buffer_mutex_;
-  port::RWMutex flush_rwlock_;
+  port::RWMutexWr flush_rwlock_;
   std::thread flush_thread_;
-  port::RWMutex wal_buffers_rwlock_;
+  port::RWMutexWr wal_buffers_rwlock_;
   port::Mutex wal_write_mutex_;
   WriteBatch tmp_batch_;
 };

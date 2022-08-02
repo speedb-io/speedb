@@ -216,7 +216,7 @@ class InternalIteratorBase : public Cleanable {
     is_range_set_ = true;
   }
 
-  Slice GetSmallsetKeyRange() const { return smallest_key_; }
+  Slice GetSmallestKeyRange() const { return smallest_key_; }
 
  protected:
   void SeekForPrevImpl(const Slice& target, const Comparator* cmp) {

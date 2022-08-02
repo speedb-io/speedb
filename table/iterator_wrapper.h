@@ -173,7 +173,7 @@ class IteratorWrapperBase {
     iter_->SetRange(smallest_key, largest_key);
   }
 
-  Slice GetSmallsetKeyRange() const { return iter_->GetSmallsetKeyRange(); }
+  Slice GetSmallestKeyRange() const { return iter_->GetSmallestKeyRange(); }
 
  private:
   void Update() {

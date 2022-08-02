@@ -138,10 +138,7 @@ class MergingIterator : public InternalIterator {
       }
     }
     direction_ = kForward;
-    {
-      PERF_TIMER_GUARD(seek_min_heap_time);
-      current_ = CurrentSmallestKey();
-    }
+    current_ = CurrentSmallestKey();
   }
 
   void Seek(const Slice& target) override {
@@ -422,10 +419,14 @@ IteratorWrapper* MergingIterator::CurrentSmallestKey() {
                  candidateHeap_->top()->GetSmallestKeyRange()) > 0))) {
       IteratorWrapper* candidateItem = candidateHeap_->top();
       candidateHeap_->pop();
-      PERF_TIMER_GUARD(seek_child_seek_time);
-      candidateItem->Seek(origin_seek_);
-      PERF_COUNTER_ADD(seek_child_seek_count, 1)
-      AddToMinHeapOrCheckStatus(candidateItem);
+      {
+        PERF_TIMER_GUARD(seek_child_seek_time);
+        candidateItem->Seek(origin_seek_);
+      }
+      PERF_COUNTER_ADD(seek_child_seek_count, 1) {
+        PERF_TIMER_GUARD(seek_min_heap_time);
+        AddToMinHeapOrCheckStatus(candidateItem);
+      }
     }
   }
   return !minHeap_.empty() ? minHeap_.top() : nullptr;

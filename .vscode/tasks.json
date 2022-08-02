@@ -34,6 +34,36 @@
             "problemMatcher": []
         }, 
         {
+            "label": "db_with_timestamp_basic_test Debug",
+            "type": "shell",
+            "command": "DEBUG_LEVEL=2 make -j 16 db_with_timestamp_basic_test",
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "problemMatcher": []
+        },  
+        {
+            "label": "transaction_test Debug",
+            "type": "shell",
+            "command": "DEBUG_LEVEL=2 make -j 16 transaction_test",
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "problemMatcher": []
+        },          
+        {
+            "label": "check Debug",
+            "type": "shell",
+            "command": "DEBUG_LEVEL=2 make -j 16 check",
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "problemMatcher": []
+        },                        
+        {
             "label": "db_stress Debug",
             "type": "shell",
             "command": "DEBUG_LEVEL=1 make -j 16 db_stress",

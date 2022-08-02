@@ -985,6 +985,8 @@ PARALLEL ?= parallel
 PARALLEL_OK := $(shell command -v "$(PARALLEL)" 2>&1 >/dev/null && \
                        ("$(PARALLEL)" --gnu --version 2>/dev/null | grep -q 'Ole Tange') && \
                        echo 1)
+# Use a timeout of 10 minutes per test by default
+TEST_TIMEOUT?=600
 
 # Use this regexp to select the subset of tests whose names match.
 tests-regexp = .
@@ -1014,7 +1016,7 @@ check_0: gen_parallel_tests
 	  | grep -E '$(tests-regexp)'					\
 	  | grep -E -v '$(EXCLUDE_TESTS_REGEX)'					\
 	  | "$(PARALLEL)" -j$(J) --plain --joblog=LOG --eta --gnu \
-	    --tmpdir=$(TEST_TMPDIR) '{} $(parallel_redir)' ; \
+	    --tmpdir=$(TEST_TMPDIR) --timeout=$(TEST_TIMEOUT) '{} $(parallel_redir)' ; \
 	parallel_retcode=$$? ; \
 	awk '{ if ($$7 != 0 || $$8 != 0) { if ($$7 == "Exitval") { h = $$0; } else { if (!f) print h; print; f = 1 } } } END { if(f) exit 1; }' < LOG ; \
 	awk_retcode=$$?; \
@@ -1036,7 +1038,7 @@ valgrind_check_0: gen_parallel_tests
 	  | grep -E '$(tests-regexp)'					\
 	  | grep -E -v '$(valgrind-exclude-regexp)'					\
 	  | "$(PARALLEL)" -j$(J) --plain --joblog=LOG --eta --gnu \
-	   --tmpdir=$(TEST_TMPDIR) \
+	   --tmpdir=$(TEST_TMPDIR) --timeout=$(TEST_TIMEOUT) \
 	   '(if [[ "{}" == "./"* ]] ; then $(DRIVER) {}; else {}; fi) \
 	  $(parallel_redir)' \
 

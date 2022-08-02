@@ -1200,6 +1200,20 @@ if(WITH_TESTS OR WITH_BENCHMARK_TOOLS)
 endif()
 
 if(WITH_TESTS)
+  # c_test - doesn't use gtest
+  # env_test - suspicious use of test::TmpDir
+  # deletefile_test - serial because it generates giant temporary files in
+  #   its various tests. Running its tests in parallel can fill up your /dev/shm
+  # db_bloom_filter_test - serial because excessive space usage by instances
+  #   of DBFilterConstructionReserveMemoryTestWithParam can fill up /dev/shm
+  # timer_queue_test - doesn't use gtest
+  set(NON_PARALLEL_TESTS
+    c_test
+    env_test
+    deletefile_test
+    db_bloom_filter_test
+    timer_queue_test
+  )
   set(TESTS
         db/db_basic_test.cc
         env/env_basic_test.cc
@@ -1407,7 +1421,10 @@ if(WITH_TESTS)
       utilities/cassandra/test_utils.cc
   )
   enable_testing()
-  add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND})
+  add_custom_target(check
+    COMMAND ${CMAKE_COMMAND} -P ${PROJECT_SOURCE_DIR}/cmake/CTestRunner.cmake
+    WORKING_DIRECTORY ${PROJECT_BINARY_DIR}
+    VERBATIM USES_TERMINAL)
   set(TESTUTILLIB testutillib${ARTIFACT_SUFFIX})
   add_library(${TESTUTILLIB} STATIC ${TESTUTIL_SOURCE})
   target_link_libraries(${TESTUTILLIB} ${ROCKSDB_LIB})
@@ -1430,10 +1447,12 @@ if(WITH_TESTS)
         OUTPUT_NAME ${exename}${ARTIFACT_SUFFIX}
       )
       target_link_libraries(${exename}${ARTIFACT_SUFFIX} ${TESTUTILLIB} testharness gtest ${THIRDPARTY_LIBS} ${ROCKSDB_LIB})
-      if(NOT "${exename}" MATCHES "db_sanity_test")
+      if(NOT "${exename}" IN_LIST NON_PARALLEL_TESTS)
         gtest_discover_tests(${exename} DISCOVERY_TIMEOUT 120)
-        add_dependencies(check ${exename}${ARTIFACT_SUFFIX})
+      else()
+        add_test(NAME ${exename} COMMAND ${exename}${ARTIFACT_SUFFIX})
       endif()
+      add_dependencies(check ${exename}${ARTIFACT_SUFFIX})
   endforeach(sourcefile ${TESTS})
 
   if(WIN32)

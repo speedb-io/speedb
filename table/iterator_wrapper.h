@@ -162,8 +162,6 @@ class IteratorWrapperBase {
     }
   }
 
-  InternalIteratorBase<TValue>* GetIter() const { return iter_; }
-
   IteratorTargetState ValidateRange(const Slice& target,
                                     const Comparator* cmp) {
     return iter_->ValidateRange(target, cmp);

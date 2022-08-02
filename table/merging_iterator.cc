@@ -140,7 +140,7 @@ class MergingIterator : public InternalIterator {
     direction_ = kForward;
     {
       PERF_TIMER_GUARD(seek_min_heap_time);
-      current_ = CurrentSmallestKey(&target);
+      current_ = CurrentSmallestKey();
     }
   }
 
@@ -230,7 +230,7 @@ class MergingIterator : public InternalIterator {
       minHeap_.pop();
     }
 
-    current_ = is_query_iter_ ? CurrentSmallestKey(nullptr) : CurrentForward();
+    current_ = is_query_iter_ ? CurrentSmallestKey() : CurrentForward();
   }
 
   bool NextAndGetResult(IterateResult* result) override {
@@ -391,7 +391,7 @@ class MergingIterator : public InternalIterator {
     return !maxHeap_->empty() ? maxHeap_->top() : nullptr;
   }
 
-  IteratorWrapper* CurrentSmallestKey(const Slice* target);
+  IteratorWrapper* CurrentSmallestKey();
 };
 
 void MergingIterator::AddToMinHeapOrCheckStatus(IteratorWrapper* child) {
@@ -411,7 +411,7 @@ void MergingIterator::AddToMaxHeapOrCheckStatus(IteratorWrapper* child) {
     considerStatus(child->status());
   }
 }
-IteratorWrapper* MergingIterator::CurrentSmallestKey(const Slice* target) {
+IteratorWrapper* MergingIterator::CurrentSmallestKey() {
   assert(direction_ == kForward);
 
   if (candidateHeap_) {

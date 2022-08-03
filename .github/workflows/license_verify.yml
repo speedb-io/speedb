@@ -1,0 +1,38 @@
+name: Verify Licensing For Changed Files
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  changedfiles:
+    runs-on: ubuntu-latest
+    outputs:
+      changed_files: ${{ steps.changes.outputs.changed_files}}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Get changed files
+        id: changes
+        run: |
+          echo "::set-output name=changed_files::$(git diff --name-only --diff-filter=ACMRT ${{ github.event.pull_request.base.sha }} ${{ github.sha }} | xargs)"
+  lint:
+    runs-on: ubuntu-latest
+    needs: changedfiles
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: echo changed files
+        run: |
+          exit_code=0
+          for file in $(echo ${{needs.changedfiles.outputs.changed_files}})
+          do
+            if ! grep -q "Copyright (C) 2022 Speedb Ltd. All rights reserved." "$file"; then
+              echo $file does not have the Apache 2.0 license header && exit_code=333
+            fi
+          done
+          exit $exit_code

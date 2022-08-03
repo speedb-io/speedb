@@ -21,9 +21,6 @@ speedb_SOURCES = 																			\
 
 speedb_FUNC = register_SpeedbPlugins
 
-speedb_SOURCES = 							  																	\
-										speedb_registry.cc														\
-
 speedb_HEADERS = 																  								\
 										paired_filter/speedb_paired_bloom.h						\
 

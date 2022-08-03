@@ -30,7 +30,19 @@ namespace ROCKSDB_NAMESPACE {
 namespace {
 
 std::shared_ptr<const FilterPolicy> CreateFilterPolicy() {
-  if (FLAGS_bloom_bits < 0) {
+  if (!FLAGS_filter_uri.empty()) {
+    ConfigOptions config_options;
+    std::shared_ptr<const FilterPolicy> policy;
+    config_options.ignore_unsupported_options = false;
+    Status s = FilterPolicy::CreateFromString(config_options, FLAGS_filter_uri,
+                                              &policy);
+    if (!s.ok() || !policy) {
+      fprintf(stderr, "Cannot create filter policy(%s): %s\n",
+              FLAGS_filter_uri.c_str(), s.ToString().c_str());
+      exit(1);
+    }
+    return policy;
+  } else if (FLAGS_bloom_bits < 0) {
     return BlockBasedTableOptions().filter_policy;
   }
   const FilterPolicy* new_policy;

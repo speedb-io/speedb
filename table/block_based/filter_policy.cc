@@ -1970,4 +1970,14 @@ const std::vector<std::string>& BloomLikeFilterPolicy::GetAllFixedImpls() {
   return impls;
 }
 
+int BloomLikeFilterPolicy::GetAllFixedImplIndex(const std::string& name) {
+  const auto& all_names = GetAllFixedImpls();
+  for (size_t idx = 0; idx < all_names.size(); idx++) {
+    if (name == all_names[idx]) {
+      return static_cast<int>(idx);
+    }
+  }
+  return -1;
+}
+
 }  // namespace ROCKSDB_NAMESPACE

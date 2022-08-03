@@ -17,9 +17,7 @@
 #include "plugin/speedb/memtable/hash_spd_rep.h"
 #include "rocksdb/utilities/object_registry.h"
 #include "util/string_util.h"
-
 #include "paired_filter/speedb_paired_bloom.h"
-#include "rocksdb/utilities/object_registry.h"
 
 namespace ROCKSDB_NAMESPACE {
 
@@ -45,6 +43,7 @@ int register_SpeedbPlugins(ObjectLibrary& library, const std::string&) {
         } else {
           guard->reset(new HashSpdRepFactory());
         }
+        return guard->get();
       });
 
   library.AddFactory<const FilterPolicy>(

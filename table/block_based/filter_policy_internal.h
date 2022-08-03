@@ -301,6 +301,9 @@ class BloomLikeFilterPolicy : public BuiltinFilterPolicy {
   // "always use this implementation." Only appropriate for unit tests.
   static const std::vector<std::string>& GetAllFixedImpls();
 
+  // Returns the index in GetAllFixedImpls of "name" if found, -1 if not
+  static int GetAllFixedImplIndex(const std::string& name);
+
   // Convenience function for creating by name for fixed impls
   static std::shared_ptr<const FilterPolicy> Create(const std::string& name,
                                                     double bits_per_key);

@@ -39,7 +39,7 @@ jobs:
           rm -rf $BUILD_OUTPUT_DIR
           mkdir -p $BUILD_OUTPUT_DIR
           docker build -f ./build_tools/Dockerfile -t spdb-build .
-          docker run --rm -v $(readlink -f ${BUILD_OUTPUT_DIR}):/out -v $GITHUB_WORKSPACE:/speedb -e GITHUB_WORKSPACE=$GITHUB_WORKSPACE spdb-build #build/speedb1
+          docker run --rm -v $(readlink -f ${BUILD_OUTPUT_DIR}):/out -v $GITHUB_WORKSPACE:/speedb -e GITHUB_WORKSPACE=$GITHUB_WORKSPACE spdb-build
           ls -alFh $BUILD_OUTPUT_DIR
           zip --junk-paths "Release-$GITHUB_REF_NAME.zip" $BUILD_OUTPUT_DIR/*
 
@@ -70,6 +70,4 @@ jobs:
           echo $BUILD_OUTPUT_DIR
           aws s3 cp $BUILD_OUTPUT_DIR s3://spdb-github-artifacts/"release-$GITHUB_REF_NAME" --recursive
           aws s3 ls s3://spdb-github-artifacts/
-          #aws s3 rm s3://spdb-github-artifacts/ --recursive --include "*"
-          #aws s3 ls s3://spdb-github-artifacts
           rm -rf $BUILD_OUTPUT_DIR

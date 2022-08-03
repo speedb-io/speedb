@@ -4671,7 +4671,9 @@ class Benchmark {
         case SEQUENTIAL:
           return next_++;
         case RANDOM:
-          return rand_->Next() % num_;
+          // // // return rand_->Next() % num_;
+          // Return a random that is in an unlimited range
+          return rand_->Next();
         case UNIQUE_RANDOM:
           assert(next_ < num_);
           return values_[next_++];
@@ -5679,7 +5681,8 @@ class Benchmark {
     uint64_t rand_int = rand->Next();
     int64_t key_rand;
     if (read_random_exp_range_ == 0) {
-      key_rand = rand_int % FLAGS_num;
+      // // // key_rand = rand_int % FLAGS_num;
+      key_rand = rand_int;
     } else {
       const uint64_t kBigInt = static_cast<uint64_t>(1U) << 62;
       long double order = -static_cast<long double>(rand_int % kBigInt) /

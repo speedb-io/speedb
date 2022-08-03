@@ -14,6 +14,9 @@ jobs:
   #Sanity:
     #uses: speedb-io/speedb/.github/workflows/sanity_check.yml@main
   
+  License-Verify:
+    uses: speedb-io/speedb/.github/workflows/license_verify.yml@main
+
   Build:
     #needs: [Sanity]
     if: ${{ github.event.review.state == 'approved' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/release') }}

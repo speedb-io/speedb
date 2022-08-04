@@ -73,3 +73,4 @@ The test will generate a random DB at the specified path. This is also where spe
 
 ## License
 Speedb is licensed under Apache 2.0
+

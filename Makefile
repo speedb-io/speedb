@@ -6,8 +6,8 @@
 
 #-----------------------------------------------
 
-BASH_EXISTS := $(shell which bash)
-SHELL := $(shell which bash)
+# Prefer bash, but don't overwrite the existing setting if not found
+SHELL := $(shell command -v bash || echo $(SHELL))
 include common.mk
 
 CLEAN_FILES = # deliberately empty, so we can append below.
@@ -19,14 +19,11 @@ ARFLAGS = ${EXTRA_ARFLAGS} rs
 STRIPFLAGS = -S -x
 
 # Transform parallel LOG output into something more readable.
-perl_command = perl -n \
-  -e '@a=split("\t",$$_,-1); $$t=$$a[8];'				\
-  -e '$$t =~ /.*if\s\[\[\s"(.*?\.[\w\/]+)/ and $$t=$$1;'		\
-  -e '$$t =~ s,^\./,,;'							\
-  -e '$$t =~ s, >.*,,; chomp $$t;'					\
-  -e '$$t =~ /.*--gtest_filter=(.*?\.[\w\/]+)/ and $$t=$$1;'		\
-  -e 'printf "%7.3f %s %s\n", $$a[3], $$a[6] == 0 ? "PASS" : "FAIL", $$t'
-quoted_perl_command = $(subst ','\'',$(perl_command))
+parallel_log_extract = awk \
+  'BEGIN{FS="\t"} { \
+  	t=$$9; sub(/if *\[\[ *"/,"",t); sub(/" =.*/,"",t); sub(/ >.*/,"",t); sub(/.*--gtest_filter=/,"",t); \
+  	printf("%7.3f %s %s\n",4,($$7 == 0 ? "PASS" : "FAIL"),t) \
+  }'
 
 # DEBUG_LEVEL can have three values:
 # * DEBUG_LEVEL=2; this is the ultimate debug mode. It will compile rocksdb
@@ -967,9 +964,9 @@ gen_parallel_tests:
 # 107.816 PASS t/DBTest.EncodeDecompressedBlockSizeTest
 #
 slow_test_regexp = \
-	^.*MySQLStyleTransactionTest.*$$|^.*SnapshotConcurrentAccessTest.*$$|^.*SeqAdvanceConcurrentTest.*$$|^t/run-table_test-HarnessTest.Randomized$$|^t/run-db_test-.*(?:FileCreationRandomFailure|EncodeDecompressedBlockSizeTest)$$|^.*RecoverFromCorruptedWALWithoutFlush$$
+	^.*MySQLStyleTransactionTest.*$$\|^.*SnapshotConcurrentAccessTest.*$$\|^.*SeqAdvanceConcurrentTest.*$$\|^t/run-table_test-HarnessTest.Randomized$$\|^t/run-db_test-.*FileCreationRandomFailure$$\|^t/run-db_test-.*EncodeDecompressedBlockSizeTest$$\|^.*RecoverFromCorruptedWALWithoutFlush$$
 prioritize_long_running_tests =						\
-  perl -pe 's,($(slow_test_regexp)),100 $$1,'				\
+  sed 's,\($(slow_test_regexp)\),100 \1,'				\
     | sort -k1,1gr							\
     | sed 's/^[.0-9]* //'
 
@@ -997,8 +994,8 @@ else
 endif
 
 .PHONY: check_0
-check_0:
-	printf '%s\n' ''						\
+check_0: gen_parallel_tests
+	$(AM_V_GEN)printf '%s\n' ''						\
 	  'To monitor subtest <duration,pass/fail,name>,'		\
 	  '  run "make watch-log" in a separate window' '';		\
 	{ \
@@ -1019,8 +1016,8 @@ valgrind-exclude-regexp = InlineSkipTest.ConcurrentInsert|TransactionStressTest.
 
 .PHONY: valgrind_check_0
 valgrind_check_0: test_log_prefix := valgrind_
-valgrind_check_0:
-	printf '%s\n' ''						\
+valgrind_check_0: gen_parallel_tests
+	$(AM_V_GEN)printf '%s\n' ''						\
 	  'To monitor subtest <duration,pass/fail,name>,'		\
 	  '  run "make watch-log" in a separate window' '';		\
 	{								\
@@ -1045,20 +1042,19 @@ CLEAN_FILES += t LOG $(TEST_TMPDIR)
 # regardless of their duration. As with any use of "watch", hit ^C to
 # interrupt.
 watch-log:
-	$(WATCH) --interval=0 'sort -k7,7nr -k4,4gr LOG|$(quoted_perl_command)'
+	$(WATCH) --interval=0 'tail -n+2 LOG|sort -k7,7nr -k4,4gr|$(subst ','\'',$(parallel_log_extract))'
 
 dump-log:
-	bash -c '$(quoted_perl_command)' < LOG
+	tail -n+2 LOG|$(parallel_log_extract)
 
 # If J != 1 and GNU parallel is installed, run the tests in parallel,
 # via the check_0 rule above.  Otherwise, run them sequentially.
 check: all
-	$(MAKE) gen_parallel_tests
 	$(AM_V_GEN)if test "$(J)" != 1                                  \
 	    && (build_tools/gnu_parallel --gnu --help 2>/dev/null) |                    \
 	        grep -q 'GNU Parallel';                                 \
 	then                                                            \
-	    $(MAKE) T="$$t" check_0;                       \
+	    $(MAKE) T="$$t" check_0;                                    \
 	else                                                            \
 	    for t in $(TESTS); do                                       \
 	      echo "===== Running $$t (`date`)"; ./$$t || exit 1; done;          \
@@ -1156,7 +1152,6 @@ valgrind_test_some:
 	ROCKSDB_VALGRIND_RUN=1 DISABLE_JEMALLOC=1 $(MAKE) valgrind_check_some
 
 valgrind_check: $(TESTS)
-	$(MAKE) DRIVER="$(VALGRIND_VER) $(VALGRIND_OPTS)" gen_parallel_tests
 	$(AM_V_GEN)if test "$(J)" != 1                                  \
 	    && (build_tools/gnu_parallel --gnu --help 2>/dev/null) |    \
 	        grep -q 'GNU Parallel';                                 \
@@ -1183,11 +1178,8 @@ valgrind_check_some: $(ROCKSDBTESTS_SUBSET)
 	done
 
 test_names = \
-  ./db_test --gtest_list_tests						\
-    | perl -n								\
-      -e 's/ *\#.*//;'							\
-      -e '/^(\s*)(\S+)/; !$$1 and do {$$p=$$2; break};'			\
-      -e 'print qq! $$p$$2!'
+  ./db_test --gtest_list_tests | sed 's/ *\#.*//' | \
+    awk '/^[^ ]/ { prefix = $$1 } /^[ ]/ { print prefix $$1 }'
 
 analyze: clean
 	USE_CLANG=1 $(MAKE) analyze_incremental

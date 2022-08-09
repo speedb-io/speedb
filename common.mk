@@ -21,10 +21,11 @@ endif
 ifeq ($(BASE_TMPDIR),)
 BASE_TMPDIR :=/tmp
 endif
-# Use /dev/shm if it has the sticky bit set (otherwise, /tmp or other
+# Use /dev/shm on Linux if it has the sticky bit set (otherwise, /tmp or other
 # base dir), and create a randomly-named rocksdb.XXXX directory therein.
-TEST_TMPDIR := $(shell f=/dev/shm; test -k $$f || f=$(BASE_TMPDIR); \
-  perl -le 'use File::Temp "tempdir";'	                            \
-    -e 'print tempdir("'$$f'/rocksdb.XXXX", CLEANUP => 0)')
+ifneq ($(shell [ "$$(uname -s)" = "Linux" ] && [ -k /dev/shm ] && echo 1),)
+BASE_TMPDIR :=/dev/shm
+endif
+TEST_TMPDIR := $(shell mktemp -d "$(BASE_TMPDIR)/rocksdb.XXXX")
 endif
 export TEST_TMPDIR

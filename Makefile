@@ -977,7 +977,7 @@ prioritize_long_running_tests =						\
 # See "man parallel" for its "-j ..." option.
 J ?= 100%
 
-PARALLEL ?= build_tools/gnu_parallel
+PARALLEL ?= parallel
 PARALLEL_OK := $(shell command -v "$(PARALLEL)" 2>&1 >/dev/null && \
                        ("$(PARALLEL)" --gnu --version 2>/dev/null | grep -q 'Ole Tange') && \
                        echo 1)
@@ -992,9 +992,8 @@ else ifeq ($(QUIET_PARALLEL_TESTS), 1)
 	parallel_redir = >& t/$(test_log_prefix)log-{/}
 else
 # Default: print failure output only, as it happens
-# Note: gnu_parallel --eta is now always used, but has been modified to provide
-# only infrequent updates when not connected to a terminal. (CircleCI will
-# kill a job if no output for 10min.)
+# Note: parallel --eta is now always used because CircleCI will
+# kill a job if no output for 10min.
 	parallel_redir = >& t/$(test_log_prefix)log-{/} || bash -c "cat t/$(test_log_prefix)log-{/}; exit $$?"
 endif
 

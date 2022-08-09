@@ -1,6 +1,5 @@
 # Speedb
 
-[![GitHub license](https://img.shields.io/github/license/speedb-io/speedb)](https://github.com/speedb-io/speedb)
 ![GitHub contributors](https://img.shields.io/github/contributors/speedb-io/speedb)
 
 

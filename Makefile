@@ -977,6 +977,11 @@ prioritize_long_running_tests =						\
 # See "man parallel" for its "-j ..." option.
 J ?= 100%
 
+PARALLEL ?= build_tools/gnu_parallel
+PARALLEL_OK := $(shell command -v "$(PARALLEL)" 2>&1 >/dev/null && \
+                       ("$(PARALLEL)" --gnu --version 2>/dev/null | grep -q 'Ole Tange') && \
+                       echo 1)
+
 # Use this regexp to select the subset of tests whose names match.
 tests-regexp = .
 EXCLUDE_TESTS_REGEX ?= "^$$"
@@ -1005,7 +1010,7 @@ check_0: gen_parallel_tests
 	  | $(prioritize_long_running_tests)				\
 	  | grep -E '$(tests-regexp)'					\
 	  | grep -E -v '$(EXCLUDE_TESTS_REGEX)'					\
-	  | build_tools/gnu_parallel -j$(J) --plain --joblog=LOG --eta --gnu \
+	  | "$(PARALLEL)" -j$(J) --plain --joblog=LOG --eta --gnu \
 	    --tmpdir=$(TEST_TMPDIR) '{} $(parallel_redir)' ; \
 	parallel_retcode=$$? ; \
 	awk '{ if ($$7 != 0 || $$8 != 0) { if ($$7 == "Exitval") { h = $$0; } else { if (!f) print h; print; f = 1 } } } END { if(f) exit 1; }' < LOG ; \
@@ -1027,7 +1032,7 @@ valgrind_check_0: gen_parallel_tests
 	  | $(prioritize_long_running_tests)				\
 	  | grep -E '$(tests-regexp)'					\
 	  | grep -E -v '$(valgrind-exclude-regexp)'					\
-	  | build_tools/gnu_parallel -j$(J) --plain --joblog=LOG --eta --gnu \
+	  | "$(PARALLEL)" -j$(J) --plain --joblog=LOG --eta --gnu \
 	   --tmpdir=$(TEST_TMPDIR) \
 	   '(if [[ "{}" == "./"* ]] ; then $(DRIVER) {}; else {}; fi) \
 	  $(parallel_redir)' \
@@ -1050,9 +1055,7 @@ dump-log:
 # If J != 1 and GNU parallel is installed, run the tests in parallel,
 # via the check_0 rule above.  Otherwise, run them sequentially.
 check: all
-	$(AM_V_GEN)if test "$(J)" != 1                                  \
-	    && (build_tools/gnu_parallel --gnu --help 2>/dev/null) |                    \
-	        grep -q 'GNU Parallel';                                 \
+	$(AM_V_GEN)if [ "$(J)" != "1" ] && [ "$(PARALLEL_OK)" = "1" ];  \
 	then                                                            \
 	    $(MAKE) T="$$t" check_0;                                    \
 	else                                                            \
@@ -1152,9 +1155,7 @@ valgrind_test_some:
 	ROCKSDB_VALGRIND_RUN=1 DISABLE_JEMALLOC=1 $(MAKE) valgrind_check_some
 
 valgrind_check: $(TESTS)
-	$(AM_V_GEN)if test "$(J)" != 1                                  \
-	    && (build_tools/gnu_parallel --gnu --help 2>/dev/null) |    \
-	        grep -q 'GNU Parallel';                                 \
+	$(AM_V_GEN)if [ "$(J)" != "1" ] && [ "$(PARALLEL_OK)" = "1" ];  \
 	then                                                            \
 	  $(MAKE)                                                       \
 	  DRIVER="$(VALGRIND_VER) $(VALGRIND_OPTS)" valgrind_check_0;   \

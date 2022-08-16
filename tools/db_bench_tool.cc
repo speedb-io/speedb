@@ -4362,7 +4362,7 @@ class Benchmark {
         table_options->filter_policy.reset();
       } else if (FLAGS_use_block_based_filter) {
         // Use back-door way of enabling obsolete block-based Bloom
-        Status s = FilterPolicy::CreateFromString(
+        Status s = FilaterPolicy::CreateFromString(
             ConfigOptions(),
             "rocksdb.internal.DeprecatedBlockBasedBloomFilter:" +
                 ROCKSDB_NAMESPACE::ToString(FLAGS_bloom_bits),

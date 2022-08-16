@@ -26,12 +26,18 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
+      - name: Get current year
+        id: get_current_year
+        shell: cmake -P {0}
+        run: |
+          string(TIMESTAMP current_year "%Y" UTC)
+          message("::set-output name=timestamp::${current_year}")
       - name: echo changed files
         run: |
           exit_code=0
           for file in $(echo ${{needs.changedfiles.outputs.changed_files}})
           do
-            if ! grep -q "Copyright (C) 2022 Speedb Ltd. All rights reserved." "$file"; then
+            if ! grep -q "Copyright (C) ${{steps.get_current_year.outputs.timestamp}} Speedb Ltd. All rights reserved." "$file"; then
               echo $file does not have the Apache 2.0 license header && exit_code=333
             fi
           done

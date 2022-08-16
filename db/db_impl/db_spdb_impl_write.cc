@@ -11,9 +11,18 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+#include <cinttypes>
+
 #include "db/db_impl/db_spdb_impl_write.h"
 
 #include "db/db_impl/db_impl.h"
+
+#include "db/error_handler.h"
+#include "db/event_helpers.h"
+#include "monitoring/perf_context_imp.h"
+#include "options/options_helper.h"
+#include "test_util/sync_point.h"
+#include "util/cast_util.h"
 #include "db/write_batch_internal.h"
 #include "logging/logging.h"
 #include "monitoring/instrumented_mutex.h"
@@ -21,6 +30,8 @@
 #include "rocksdb/status.h"
 #include "rocksdb/system_clock.h"
 #include "util/mutexlock.h"
+#include "rocksdb/perf_context.h"
+
 
 namespace ROCKSDB_NAMESPACE {
 
@@ -147,10 +158,70 @@ bool DBImpl::CheckIfActionNeeded() {
     return true;
   }
 
+  if (write_controller_.IsStopped() ||
+      write_controller_.NeedsDelay()) {
+    return true;
+  }
+
   if (!trim_history_scheduler_.Empty()) {
     return true;
   }
+
+
   return false;
+}
+
+// REQUIRES: mutex_ is held
+Status DBImpl::SpdbDelayWrite() {
+  uint64_t time_delayed = 0;
+  bool delayed = false;
+  {
+    StopWatch sw(immutable_db_options_.clock, stats_, WRITE_STALL,
+                 &time_delayed);
+    uint64_t delay =
+        write_controller_.GetDelay(immutable_db_options_.clock, last_batch_group_size_);
+    if (delay > 0) {
+      TEST_SYNC_POINT("DBImpl::DelayWrite:Sleep");
+      mutex_.Unlock();
+      // We will delay the write until we have slept for `delay` microseconds
+      // or we don't need a delay anymore. We check for cancellation every 1ms
+      // (slightly longer because WriteController minimum delay is 1ms, in
+      // case of sleep imprecision, rounding, etc.)
+      const uint64_t kDelayInterval = 1001;
+      uint64_t stall_end = sw.start_time() + delay;
+      while (write_controller_.NeedsDelay()) {
+        if (immutable_db_options_.clock->NowMicros() >= stall_end) {
+          // We already delayed this write `delay` microseconds
+          break;
+        }
+
+        delayed = true;
+        // Sleep for 0.001 seconds
+        immutable_db_options_.clock->SleepForMicroseconds(kDelayInterval);
+      }
+      mutex_.Lock();
+    }
+  }
+  assert(!delayed);
+  if (delayed) {
+    default_cf_internal_stats_->AddDBStats(
+        InternalStats::kIntStatsWriteStallMicros, time_delayed);
+    RecordTick(stats_, STALL_MICROS, time_delayed);
+  }
+
+  // If DB is not in read-only mode and write_controller is not stopping
+  // writes, we can ignore any background errors and allow the write to
+  // proceed
+  Status s;
+  if (write_controller_.IsStopped()) {
+    // If writes are still stopped, it means we bailed due to a background
+    // error
+    s = Status::Incomplete(error_handler_.GetBGError().ToString());
+  }
+  if (error_handler_.IsDBStopped()) {
+    s = error_handler_.GetBGError();
+  }
+  return s;
 }
 
 Status DBImpl::RegisterFlushOrTrim() {
@@ -170,6 +241,19 @@ Status DBImpl::RegisterFlushOrTrim() {
   if (UNLIKELY(status.ok() && !flush_scheduler_.Empty())) {
     status = ScheduleFlushes(&write_context);
   }
+  PERF_TIMER_GUARD(write_pre_and_post_process_time);
+
+  if (UNLIKELY(status.ok() && (write_controller_.IsStopped() ||
+                               write_controller_.NeedsDelay()))) {
+    PERF_TIMER_STOP(write_pre_and_post_process_time);
+    PERF_TIMER_GUARD(write_delay_time);
+    // We don't know size of curent batch so that we always use the size
+    // for previous one. It might create a fairness issue that expiration
+    // might happen for smaller writes but larger writes can go through.
+    // Can optimize it if it is an issue.
+    status = SpdbDelayWrite();
+    PERF_TIMER_START(write_pre_and_post_process_time);
+  }  
 
   if (UNLIKELY(status.ok() && !trim_history_scheduler_.Empty())) {
     status = TrimMemtableHistory(&write_context);
@@ -226,6 +310,7 @@ void SpdbWriteImpl::Unlock(bool is_read) {
 
 SpdbWriteImpl::WritesBatchList& SpdbWriteImpl::SwitchBatchGroup() {
   MutexLock l(&add_buffer_mutex_);
+  NotifyIfActionNeeded();
   WritesBatchList& batch_group = wb_lists_[active_buffer_index_];
   active_buffer_index_ = (active_buffer_index_ + 1) % wb_lists_.size();
   return batch_group;
@@ -234,7 +319,6 @@ SpdbWriteImpl::WritesBatchList& SpdbWriteImpl::SwitchBatchGroup() {
 void SpdbWriteImpl::SwitchAndWriteBatchGroup() {
   // take the wal write rw lock from protecting another batch group wal write
   MutexLock l(&wal_write_mutex_);
-  NotifyIfActionNeeded();
   WritesBatchList& batch_group = SwitchBatchGroup();
   if (!batch_group.wal_writes_.empty()) {
     auto const& immutable_db_options = db_->immutable_db_options();

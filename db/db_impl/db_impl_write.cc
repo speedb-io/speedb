@@ -1715,6 +1715,7 @@ Status DBImpl::DelayWrite(uint64_t num_bytes,
   return s;
 }
 
+
 // REQUIRES: mutex_ is held
 // REQUIRES: this thread is currently at the front of the writer queue
 void DBImpl::WriteBufferManagerStallWrites() {

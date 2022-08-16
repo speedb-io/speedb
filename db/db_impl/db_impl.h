@@ -1177,6 +1177,8 @@ class DBImpl : public DB {
                           const WriteBatch* to_be_cached_state);
   void SuspendSpdbWrites();
   void ResumeSpdbWrites();
+  Status SpdbDelayWrite();
+
                         
 
  protected:

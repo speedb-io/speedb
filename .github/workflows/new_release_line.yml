@@ -17,7 +17,10 @@ jobs:
 
     steps:
       - name: pre-run
-        run: apk update && apk add git
+        run: |
+          echo "nameserver 8.8.8.8" > /etc/resolv.conf
+          apk update && apk add git
+          
       - uses: actions/checkout@v3
 
       - name: Calculate tag

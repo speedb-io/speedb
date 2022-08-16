@@ -578,10 +578,9 @@ int main(int argc, char** argv) {
 
   std::unique_ptr<ROCKSDB_NAMESPACE::MemTableRepFactory> factory;
   if (FLAGS_memtablerep == "skiplist") {
+    // Needed because of a different name/default than CreateFromString
     factory.reset(new ROCKSDB_NAMESPACE::SkipListFactory);
 #ifndef ROCKSDB_LITE
-  } else if (FLAGS_memtablerep == "vector") {
-    factory.reset(new ROCKSDB_NAMESPACE::VectorRepFactory);
   } else if (FLAGS_memtablerep == "hashskiplist" ||
              FLAGS_memtablerep == "prefix_hash") {
     factory.reset(ROCKSDB_NAMESPACE::NewHashSkipListRepFactory(
@@ -601,12 +600,14 @@ int main(int argc, char** argv) {
   } else {
     ROCKSDB_NAMESPACE::ConfigOptions config_options;
     config_options.ignore_unsupported_options = false;
+    config_options.ignore_unknown_options = false;
 
     ROCKSDB_NAMESPACE::Status s =
         ROCKSDB_NAMESPACE::MemTableRepFactory::CreateFromString(
             config_options, FLAGS_memtablerep, &factory);
-    if (!s.ok()) {
-      fprintf(stdout, "Unknown memtablerep: %s\n", s.ToString().c_str());
+    if (!s.ok() || !factory) {
+      fprintf(stdout, "Unknown memtablerep[%s]: %s\n",
+              FLAGS_memtablerep.c_str(), s.ToString().c_str());
       exit(1);
     }
   }

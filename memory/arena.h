@@ -42,8 +42,6 @@ class Arena : public Allocator {
                  AllocTracker* tracker = nullptr, size_t huge_page_size = 0);
   ~Arena();
 
-  void Activate();
-
   char* Allocate(size_t bytes) override;
 
   // huge_page_size: if >0, will try to allocate from huage page TLB.

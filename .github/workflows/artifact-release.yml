@@ -1,0 +1,73 @@
+name: Create release artifact
+
+on:
+  workflow_dispatch:
+
+jobs:
+
+  cleanup:
+    runs-on: [self-hosted, linux, x64, myrunner]
+    container:
+      image: ubuntu:latest
+    steps:
+      - name: Cleaning up the $GITHUB_WORKSPACE as root from a Docker image
+        run: find /__w/${{ github.event.repository.name }}/${{ github.event.repository.name }}/. -name . -o -prune -exec rm -rf -- {} + || true
+        
+  build:
+    needs: cleanup
+    runs-on: [self-hosted, linux, x64, myrunner]
+
+    steps:
+    
+      - uses: actions/checkout@v3
+
+      - name: install dependencies
+        run: |
+          echo ~ && sudo apt-get update && sudo apt-get upgrade -y && sudo apt-get install -y docker-ce docker-ce-cli containerd.io unzip curl zip unzip
+          
+      - name: Configure AWS credentials from Test account
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-west-2
+
+      - name: docker run
+        run: |
+          export BUILD_OUTPUT_DIR=~/build
+          echo $BUILD_OUTPUT_DIR
+          rm -rf $BUILD_OUTPUT_DIR
+          mkdir -p $BUILD_OUTPUT_DIR
+          docker build -f ./build_tools/Dockerfile -t spdb-build .
+          docker run --rm -v $(readlink -f ${BUILD_OUTPUT_DIR}):/out -v $GITHUB_WORKSPACE:/speedb -e GITHUB_WORKSPACE=$GITHUB_WORKSPACE spdb-build
+          ls -alFh $BUILD_OUTPUT_DIR
+          zip --junk-paths "Release-$GITHUB_REF_NAME.zip" $BUILD_OUTPUT_DIR/*
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+      - name: Upload Release Asset
+        id: upload-release-asset 
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
+          asset_path: ./Release-${{ github.ref_name}}.zip
+          asset_name: Release-${{ github.ref_name}}.zip
+          asset_content_type: application/zip
+          
+      - name: Upload artifacts to S3
+        run: |
+          export BUILD_OUTPUT_DIR=~/build
+          echo $BUILD_OUTPUT_DIR
+          aws s3 cp $BUILD_OUTPUT_DIR s3://spdb-github-artifacts/"release-$GITHUB_REF_NAME" --recursive
+          aws s3 ls s3://spdb-github-artifacts/
+          rm -rf $BUILD_OUTPUT_DIR

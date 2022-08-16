@@ -71,8 +71,6 @@ Speedb is committed to a welcoming and inclusive environment where everyone can
 contribute.
 
 
-The test will generate a random DB at the specified path. This is also where speedb will store the LOG files.
-
 ## Contributing code
 See the [contributing guide](CONTRIBUTING.md).
 

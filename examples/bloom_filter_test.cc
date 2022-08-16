@@ -13,6 +13,9 @@
 #include "rocksdb/options.h"
 #include "rocksdb/table.h"
 #include <rocksdb/filter_policy.h>
+#include <rocksdb/configurable.h>
+#include <rocksdb/convenience.h>
+#include <rocksdb/filter_policy.h>
 
 #include <arpa/inet.h>
 
@@ -24,6 +27,10 @@ using ROCKSDB_NAMESPACE::ReadOptions;
 using ROCKSDB_NAMESPACE::Status;
 using ROCKSDB_NAMESPACE::WriteBatch;
 using ROCKSDB_NAMESPACE::WriteOptions;
+using ROCKSDB_NAMESPACE::ConfigOptions;
+using ROCKSDB_NAMESPACE::FilterPolicy;
+
+
 
 #if defined(OS_WIN)
 std::string kDBPath = "C:\\Windows\\TEMP\\rocksdb_bloom_filter";
@@ -32,7 +39,8 @@ std::string kDBPath = "/data/db/bloom_filter";
 #endif
 static size_t scramble(size_t inp)
 {
-  return (inp << 32) | (inp << 8) | (inp >> 8);
+  return (inp << 32) | (inp * 11111) | inp;
+
 }
 
 int main() {
@@ -44,7 +52,17 @@ int main() {
   options.compression = rocksdb::kNoCompression;
   auto table_options =
     options.table_factory->GetOptions<rocksdb::BlockBasedTableOptions>();
+#if SPDB_BLOOM
+  {
+    ConfigOptions config_options;
+    config_options.ignore_unsupported_options = false;
+    Status s = FilterPolicy::CreateFromString(config_options, std::string("spdb.PairedBloomFilter:16"),
+                                              &table_options->filter_policy);
+    assert(s.ok());
+  }
+#else
   table_options->filter_policy.reset(rocksdb::NewBloomFilterPolicy(16));
+#endif
 
   // create the DB if it's not already present
   options.create_if_missing = true;

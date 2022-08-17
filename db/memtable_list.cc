@@ -365,7 +365,7 @@ void MemTableList::PickMemtablesToFlush(uint64_t max_memtable_id,
       if (num_flush_not_started_ == 0) {
         imm_flush_needed.store(false, std::memory_order_release);
       }
-      m->flush_in_progress_ = true;  // flushing will start very soon
+      m->SetFlushInProgress(true);  // flushing will start very soon
       if (max_next_log_number) {
         *max_next_log_number =
             std::max(m->GetNextLogNumber(), *max_next_log_number);
@@ -390,8 +390,8 @@ void MemTableList::RollbackMemtableFlush(const autovector<MemTable*>& mems,
     assert(m->flush_in_progress_);
     assert(m->file_number_ == 0);
 
-    m->flush_in_progress_ = false;
-    m->flush_completed_ = false;
+    m->SetFlushInProgress(false);
+    m->SetFlushCompleted(false);
     m->edit_.Clear();
     num_flush_not_started_++;
   }
@@ -419,7 +419,7 @@ Status MemTableList::TryInstallMemtableFlushResults(
     // All the edits are associated with the first memtable of this batch.
     assert(i == 0 || mems[i]->GetEdits()->NumEntries() == 0);
 
-    mems[i]->flush_completed_ = true;
+    mems[i]->SetFlushCompleted(true);
     mems[i]->file_number_ = file_number;
   }
 
@@ -701,8 +701,9 @@ void MemTableList::RemoveMemTablesOrRestoreFlags(
                          m->edit_.GetBlobFileAdditions().size(), mem_id);
       }
 
-      m->flush_completed_ = false;
-      m->flush_in_progress_ = false;
+      m->SetFlushCompleted(false);
+      m->SetFlushInProgress(false);
+
       m->edit_.Clear();
       num_flush_not_started_++;
       m->file_number_ = 0;

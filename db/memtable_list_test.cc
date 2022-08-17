@@ -541,313 +541,65 @@ TEST_F(MemTableListTest, GetFromHistoryTest) {
   }
 }
 
+namespace {
+
+void ValidateWbmUsedCounters(const WriteBufferManager& wb,
+                             size_t expected_mutable, size_t expected_immutable,
+                             size_t expected_freed) {
+  ASSERT_EQ(wb.mutable_memtable_memory_usage(), expected_mutable);
+  ASSERT_EQ(wb.immmutable_memtable_memory_usage(), expected_immutable);
+  ASSERT_EQ(wb.memtable_memory_being_freed_usage(), expected_freed);
+}
+
+}  // namespace
+
 TEST_F(MemTableListTest, FlushPendingTest) {
-  const int num_tables = 6;
-  SequenceNumber seq = 1;
-  Status s;
+  for (auto wbm_enabled : {false, true}) {
+    const int num_tables = 6;
+    SequenceNumber seq = 1;
+    Status s;
 
-  auto factory = std::make_shared<SkipListFactory>();
-  options.memtable_factory = factory;
-  ImmutableOptions ioptions(options);
-  InternalKeyComparator cmp(BytewiseComparator());
-  WriteBufferManager wb(options.db_write_buffer_size);
-  autovector<MemTable*> to_delete;
+    auto factory = std::make_shared<SkipListFactory>();
+    options.memtable_factory = factory;
+    options.db_write_buffer_size = wbm_enabled ? (1024 * 1024 * 1024) : 0U;
+    ImmutableOptions ioptions(options);
+    InternalKeyComparator cmp(BytewiseComparator());
+    WriteBufferManager wb(options.db_write_buffer_size);
+    ASSERT_EQ(wb.enabled(), wbm_enabled);
+    autovector<MemTable*> to_delete;
 
-  // Create MemTableList
-  int min_write_buffer_number_to_merge = 3;
-  int max_write_buffer_number_to_maintain = 7;
-  int64_t max_write_buffer_size_to_maintain =
-      7 * static_cast<int>(options.write_buffer_size);
-  MemTableList list(min_write_buffer_number_to_merge,
-                    max_write_buffer_number_to_maintain,
-                    max_write_buffer_size_to_maintain);
+    // Create MemTableList
+    int min_write_buffer_number_to_merge = 3;
+    int max_write_buffer_number_to_maintain = 7;
+    int64_t max_write_buffer_size_to_maintain =
+        7 * static_cast<int>(options.write_buffer_size);
+    MemTableList list(min_write_buffer_number_to_merge,
+                      max_write_buffer_number_to_maintain,
+                      max_write_buffer_size_to_maintain);
 
-  // Create some MemTables
-  uint64_t memtable_id = 0;
-  std::vector<MemTable*> tables;
-  MutableCFOptions mutable_cf_options(options);
-  for (int i = 0; i < num_tables; i++) {
-    MemTable* mem = new MemTable(cmp, ioptions, mutable_cf_options, &wb,
-                                 kMaxSequenceNumber, 0 /* column_family_id */);
-    mem->SetID(memtable_id++);
-    mem->Ref();
-
-    std::string value;
-    MergeContext merge_context;
-
-    ASSERT_OK(mem->Add(++seq, kTypeValue, "key1", ToString(i),
-                       nullptr /* kv_prot_info */));
-    ASSERT_OK(mem->Add(++seq, kTypeValue, "keyN" + ToString(i), "valueN",
-                       nullptr /* kv_prot_info */));
-    ASSERT_OK(mem->Add(++seq, kTypeValue, "keyX" + ToString(i), "value",
-                       nullptr /* kv_prot_info */));
-    ASSERT_OK(mem->Add(++seq, kTypeValue, "keyM" + ToString(i), "valueM",
-                       nullptr /* kv_prot_info */));
-    ASSERT_OK(mem->Add(++seq, kTypeDeletion, "keyX" + ToString(i), "",
-                       nullptr /* kv_prot_info */));
-
-    tables.push_back(mem);
-  }
-
-  // Nothing to flush
-  ASSERT_FALSE(list.IsFlushPending());
-  ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
-  autovector<MemTable*> to_flush;
-  list.PickMemtablesToFlush(port::kMaxUint64 /* memtable_id */, &to_flush);
-  ASSERT_EQ(0, to_flush.size());
-
-  // Request a flush even though there is nothing to flush
-  list.FlushRequested();
-  ASSERT_FALSE(list.IsFlushPending());
-  ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
-
-  // Attempt to 'flush' to clear request for flush
-  list.PickMemtablesToFlush(port::kMaxUint64 /* memtable_id */, &to_flush);
-  ASSERT_EQ(0, to_flush.size());
-  ASSERT_FALSE(list.IsFlushPending());
-  ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
-
-  // Request a flush again
-  list.FlushRequested();
-  // No flush pending since the list is empty.
-  ASSERT_FALSE(list.IsFlushPending());
-  ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
-
-  // Add 2 tables
-  list.Add(tables[0], &to_delete);
-  list.Add(tables[1], &to_delete);
-  ASSERT_EQ(2, list.NumNotFlushed());
-  ASSERT_EQ(0, to_delete.size());
-
-  // Even though we have less than the minimum to flush, a flush is
-  // pending since we had previously requested a flush and never called
-  // PickMemtablesToFlush() to clear the flush.
-  ASSERT_TRUE(list.IsFlushPending());
-  ASSERT_TRUE(list.imm_flush_needed.load(std::memory_order_acquire));
-
-  // Pick tables to flush
-  list.PickMemtablesToFlush(port::kMaxUint64 /* memtable_id */, &to_flush);
-  ASSERT_EQ(2, to_flush.size());
-  ASSERT_EQ(2, list.NumNotFlushed());
-  ASSERT_FALSE(list.IsFlushPending());
-  ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
-
-  // Revert flush
-  list.RollbackMemtableFlush(to_flush, 0);
-  ASSERT_FALSE(list.IsFlushPending());
-  ASSERT_TRUE(list.imm_flush_needed.load(std::memory_order_acquire));
-  to_flush.clear();
-
-  // Add another table
-  list.Add(tables[2], &to_delete);
-  // We now have the minimum to flush regardles of whether FlushRequested()
-  // was called.
-  ASSERT_TRUE(list.IsFlushPending());
-  ASSERT_TRUE(list.imm_flush_needed.load(std::memory_order_acquire));
-  ASSERT_EQ(0, to_delete.size());
-
-  // Pick tables to flush
-  list.PickMemtablesToFlush(port::kMaxUint64 /* memtable_id */, &to_flush);
-  ASSERT_EQ(3, to_flush.size());
-  ASSERT_EQ(3, list.NumNotFlushed());
-  ASSERT_FALSE(list.IsFlushPending());
-  ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
-
-  // Pick tables to flush again
-  autovector<MemTable*> to_flush2;
-  list.PickMemtablesToFlush(port::kMaxUint64 /* memtable_id */, &to_flush2);
-  ASSERT_EQ(0, to_flush2.size());
-  ASSERT_EQ(3, list.NumNotFlushed());
-  ASSERT_FALSE(list.IsFlushPending());
-  ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
-
-  // Add another table
-  list.Add(tables[3], &to_delete);
-  ASSERT_FALSE(list.IsFlushPending());
-  ASSERT_TRUE(list.imm_flush_needed.load(std::memory_order_acquire));
-  ASSERT_EQ(0, to_delete.size());
-
-  // Request a flush again
-  list.FlushRequested();
-  ASSERT_TRUE(list.IsFlushPending());
-  ASSERT_TRUE(list.imm_flush_needed.load(std::memory_order_acquire));
-
-  // Pick tables to flush again
-  list.PickMemtablesToFlush(port::kMaxUint64 /* memtable_id */, &to_flush2);
-  ASSERT_EQ(1, to_flush2.size());
-  ASSERT_EQ(4, list.NumNotFlushed());
-  ASSERT_FALSE(list.IsFlushPending());
-  ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
-
-  // Rollback first pick of tables
-  list.RollbackMemtableFlush(to_flush, 0);
-  ASSERT_TRUE(list.IsFlushPending());
-  ASSERT_TRUE(list.imm_flush_needed.load(std::memory_order_acquire));
-  to_flush.clear();
-
-  // Add another tables
-  list.Add(tables[4], &to_delete);
-  ASSERT_EQ(5, list.NumNotFlushed());
-  // We now have the minimum to flush regardles of whether FlushRequested()
-  ASSERT_TRUE(list.IsFlushPending());
-  ASSERT_TRUE(list.imm_flush_needed.load(std::memory_order_acquire));
-  ASSERT_EQ(0, to_delete.size());
-
-  // Pick tables to flush
-  list.PickMemtablesToFlush(port::kMaxUint64 /* memtable_id */, &to_flush);
-  // Should pick 4 of 5 since 1 table has been picked in to_flush2
-  ASSERT_EQ(4, to_flush.size());
-  ASSERT_EQ(5, list.NumNotFlushed());
-  ASSERT_FALSE(list.IsFlushPending());
-  ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
-
-  // Pick tables to flush again
-  autovector<MemTable*> to_flush3;
-  list.PickMemtablesToFlush(port::kMaxUint64 /* memtable_id */, &to_flush3);
-  ASSERT_EQ(0, to_flush3.size());  // nothing not in progress of being flushed
-  ASSERT_EQ(5, list.NumNotFlushed());
-  ASSERT_FALSE(list.IsFlushPending());
-  ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
-
-  // Flush the 4 memtables that were picked in to_flush
-  s = Mock_InstallMemtableFlushResults(&list, mutable_cf_options, to_flush,
-                                       &to_delete);
-  ASSERT_OK(s);
-
-  // Note:  now to_flush contains tables[0,1,2,4].  to_flush2 contains
-  // tables[3].
-  // Current implementation will only commit memtables in the order they were
-  // created. So TryInstallMemtableFlushResults will install the first 3 tables
-  // in to_flush and stop when it encounters a table not yet flushed.
-  ASSERT_EQ(2, list.NumNotFlushed());
-  int num_in_history =
-      std::min(3, static_cast<int>(max_write_buffer_size_to_maintain) /
-                      static_cast<int>(options.write_buffer_size));
-  ASSERT_EQ(num_in_history, list.NumFlushed());
-  ASSERT_EQ(5 - list.NumNotFlushed() - num_in_history, to_delete.size());
-
-  // Request a flush again. Should be nothing to flush
-  list.FlushRequested();
-  ASSERT_FALSE(list.IsFlushPending());
-  ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
-
-  // Flush the 1 memtable that was picked in to_flush2
-  s = MemTableListTest::Mock_InstallMemtableFlushResults(
-      &list, mutable_cf_options, to_flush2, &to_delete);
-  ASSERT_OK(s);
-
-  // This will actually install 2 tables.  The 1 we told it to flush, and also
-  // tables[4] which has been waiting for tables[3] to commit.
-  ASSERT_EQ(0, list.NumNotFlushed());
-  num_in_history =
-      std::min(5, static_cast<int>(max_write_buffer_size_to_maintain) /
-                      static_cast<int>(options.write_buffer_size));
-  ASSERT_EQ(num_in_history, list.NumFlushed());
-  ASSERT_EQ(5 - list.NumNotFlushed() - num_in_history, to_delete.size());
-
-  for (const auto& m : to_delete) {
-    // Refcount should be 0 after calling TryInstallMemtableFlushResults.
-    // Verify this, by Ref'ing then UnRef'ing:
-    m->Ref();
-    ASSERT_EQ(m, m->Unref());
-    delete m;
-  }
-  to_delete.clear();
-
-  // Add another table
-  list.Add(tables[5], &to_delete);
-  ASSERT_EQ(1, list.NumNotFlushed());
-  ASSERT_EQ(5, list.GetLatestMemTableID());
-  memtable_id = 4;
-  // Pick tables to flush. The tables to pick must have ID smaller than or
-  // equal to 4. Therefore, no table will be selected in this case.
-  autovector<MemTable*> to_flush4;
-  list.FlushRequested();
-  ASSERT_TRUE(list.HasFlushRequested());
-  list.PickMemtablesToFlush(memtable_id, &to_flush4);
-  ASSERT_TRUE(to_flush4.empty());
-  ASSERT_EQ(1, list.NumNotFlushed());
-  ASSERT_TRUE(list.imm_flush_needed.load(std::memory_order_acquire));
-  ASSERT_FALSE(list.IsFlushPending());
-  ASSERT_FALSE(list.HasFlushRequested());
-
-  // Pick tables to flush. The tables to pick must have ID smaller than or
-  // equal to 5. Therefore, only tables[5] will be selected.
-  memtable_id = 5;
-  list.FlushRequested();
-  list.PickMemtablesToFlush(memtable_id, &to_flush4);
-  ASSERT_EQ(1, static_cast<int>(to_flush4.size()));
-  ASSERT_EQ(1, list.NumNotFlushed());
-  ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
-  ASSERT_FALSE(list.IsFlushPending());
-  to_delete.clear();
-
-  list.current()->Unref(&to_delete);
-  int to_delete_size =
-      std::min(num_tables, static_cast<int>(max_write_buffer_size_to_maintain) /
-                               static_cast<int>(options.write_buffer_size));
-  ASSERT_EQ(to_delete_size, to_delete.size());
-
-  for (const auto& m : to_delete) {
-    // Refcount should be 0 after calling TryInstallMemtableFlushResults.
-    // Verify this, by Ref'ing then UnRef'ing:
-    m->Ref();
-    ASSERT_EQ(m, m->Unref());
-    delete m;
-  }
-  to_delete.clear();
-}
-
-TEST_F(MemTableListTest, EmptyAtomicFlusTest) {
-  autovector<MemTableList*> lists;
-  autovector<uint32_t> cf_ids;
-  autovector<const MutableCFOptions*> options_list;
-  autovector<const autovector<MemTable*>*> to_flush;
-  autovector<MemTable*> to_delete;
-  Status s = Mock_InstallMemtableAtomicFlushResults(lists, cf_ids, options_list,
-                                                    to_flush, &to_delete);
-  ASSERT_OK(s);
-  ASSERT_TRUE(to_delete.empty());
-}
-
-TEST_F(MemTableListTest, AtomicFlusTest) {
-  const int num_cfs = 3;
-  const int num_tables_per_cf = 2;
-  SequenceNumber seq = 1;
-
-  auto factory = std::make_shared<SkipListFactory>();
-  options.memtable_factory = factory;
-  ImmutableOptions ioptions(options);
-  InternalKeyComparator cmp(BytewiseComparator());
-  WriteBufferManager wb(options.db_write_buffer_size);
-
-  // Create MemTableLists
-  int min_write_buffer_number_to_merge = 3;
-  int max_write_buffer_number_to_maintain = 7;
-  int64_t max_write_buffer_size_to_maintain =
-      7 * static_cast<int64_t>(options.write_buffer_size);
-  autovector<MemTableList*> lists;
-  for (int i = 0; i != num_cfs; ++i) {
-    lists.emplace_back(new MemTableList(min_write_buffer_number_to_merge,
-                                        max_write_buffer_number_to_maintain,
-                                        max_write_buffer_size_to_maintain));
-  }
-
-  autovector<uint32_t> cf_ids;
-  std::vector<std::vector<MemTable*>> tables(num_cfs);
-  autovector<const MutableCFOptions*> mutable_cf_options_list;
-  uint32_t cf_id = 0;
-  for (auto& elem : tables) {
-    mutable_cf_options_list.emplace_back(new MutableCFOptions(options));
+    // Create some MemTables
     uint64_t memtable_id = 0;
-    for (int i = 0; i != num_tables_per_cf; ++i) {
+    std::vector<MemTable*> tables;
+    MutableCFOptions mutable_cf_options(options);
+    std::vector<size_t> tables_reserved_mem;
+    size_t total_reserved_mem = 0U;
+    for (int i = 0; i < num_tables; i++) {
       MemTable* mem =
-          new MemTable(cmp, ioptions, *(mutable_cf_options_list.back()), &wb,
-                       kMaxSequenceNumber, cf_id);
+          new MemTable(cmp, ioptions, mutable_cf_options, &wb,
+                       kMaxSequenceNumber, 0 /* column_family_id */);
       mem->SetID(memtable_id++);
       mem->Ref();
 
+      auto new_total_reserved_mem = wb.mutable_memtable_memory_usage();
+      if (wbm_enabled) {
+        ASSERT_GT(new_total_reserved_mem, total_reserved_mem);
+      }
+      tables_reserved_mem.push_back(new_total_reserved_mem -
+                                    total_reserved_mem);
+      total_reserved_mem = new_total_reserved_mem;
+
       std::string value;
+      MergeContext merge_context;
 
       ASSERT_OK(mem->Add(++seq, kTypeValue, "key1", ToString(i),
                          nullptr /* kv_prot_info */));
@@ -860,100 +612,490 @@ TEST_F(MemTableListTest, AtomicFlusTest) {
       ASSERT_OK(mem->Add(++seq, kTypeDeletion, "keyX" + ToString(i), "",
                          nullptr /* kv_prot_info */));
 
-      elem.push_back(mem);
+      tables.push_back(mem);
     }
-    cf_ids.push_back(cf_id++);
-  }
 
-  std::vector<autovector<MemTable*>> flush_candidates(num_cfs);
+    // Nothing to flush
+    ASSERT_FALSE(list.IsFlushPending());
+    ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
+    autovector<MemTable*> to_flush;
+    list.PickMemtablesToFlush(port::kMaxUint64 /* memtable_id */, &to_flush);
+    ASSERT_EQ(0, to_flush.size());
 
-  // Nothing to flush
-  for (auto i = 0; i != num_cfs; ++i) {
-    auto* list = lists[i];
-    ASSERT_FALSE(list->IsFlushPending());
-    ASSERT_FALSE(list->imm_flush_needed.load(std::memory_order_acquire));
-    list->PickMemtablesToFlush(port::kMaxUint64 /* memtable_id */,
-                               &flush_candidates[i]);
-    ASSERT_EQ(0, flush_candidates[i].size());
-  }
-  // Request flush even though there is nothing to flush
-  for (auto i = 0; i != num_cfs; ++i) {
-    auto* list = lists[i];
-    list->FlushRequested();
-    ASSERT_FALSE(list->IsFlushPending());
-    ASSERT_FALSE(list->imm_flush_needed.load(std::memory_order_acquire));
-  }
-  autovector<MemTable*> to_delete;
-  // Add tables to the immutable memtalbe lists associated with column families
-  for (auto i = 0; i != num_cfs; ++i) {
-    for (auto j = 0; j != num_tables_per_cf; ++j) {
-      lists[i]->Add(tables[i][j], &to_delete);
+    // Request a flush even though there is nothing to flush
+    list.FlushRequested();
+    ASSERT_FALSE(list.IsFlushPending());
+    ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
+
+    // Attempt to 'flush' to clear request for flush
+    list.PickMemtablesToFlush(port::kMaxUint64 /* memtable_id */, &to_flush);
+    ASSERT_EQ(0, to_flush.size());
+    ASSERT_FALSE(list.IsFlushPending());
+    ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
+
+    // Request a flush again
+    list.FlushRequested();
+    // No flush pending since the list is empty.
+    ASSERT_FALSE(list.IsFlushPending());
+    ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
+
+    // Add 2 tables
+    list.Add(tables[0], &to_delete);
+    list.Add(tables[1], &to_delete);
+    ASSERT_EQ(2, list.NumNotFlushed());
+    ASSERT_EQ(0, to_delete.size());
+    auto expected_mutable_memory_usage =
+        tables_reserved_mem[0] + tables_reserved_mem[1];
+    ValidateWbmUsedCounters(wb,
+                            total_reserved_mem - expected_mutable_memory_usage,
+                            expected_mutable_memory_usage, 0U);
+
+    // Even though we have less than the minimum to flush, a flush is
+    // pending since we had previously requested a flush and never called
+    // PickMemtablesToFlush() to clear the flush.
+    ASSERT_TRUE(list.IsFlushPending());
+    ASSERT_TRUE(list.imm_flush_needed.load(std::memory_order_acquire));
+
+    // Pick tables to flush
+    list.PickMemtablesToFlush(port::kMaxUint64 /* memtable_id */, &to_flush);
+    ASSERT_EQ(2, to_flush.size());
+    ASSERT_EQ(2, list.NumNotFlushed());
+    ASSERT_FALSE(list.IsFlushPending());
+    ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
+    ValidateWbmUsedCounters(
+        wb, total_reserved_mem - expected_mutable_memory_usage,
+        expected_mutable_memory_usage, expected_mutable_memory_usage);
+
+    // Revert flush
+    list.RollbackMemtableFlush(to_flush, 0);
+    ASSERT_FALSE(list.IsFlushPending());
+    ASSERT_TRUE(list.imm_flush_needed.load(std::memory_order_acquire));
+    ValidateWbmUsedCounters(wb,
+                            total_reserved_mem - expected_mutable_memory_usage,
+                            expected_mutable_memory_usage, 0U);
+    to_flush.clear();
+
+    // Add another table
+    list.Add(tables[2], &to_delete);
+    // We now have the minimum to flush regardles of whether FlushRequested()
+    // was called.
+    ASSERT_TRUE(list.IsFlushPending());
+    ASSERT_TRUE(list.imm_flush_needed.load(std::memory_order_acquire));
+    ASSERT_EQ(0, to_delete.size());
+    expected_mutable_memory_usage += tables_reserved_mem[2];
+    ValidateWbmUsedCounters(wb,
+                            total_reserved_mem - expected_mutable_memory_usage,
+                            expected_mutable_memory_usage, 0U);
+
+    // Pick tables to flush
+    list.PickMemtablesToFlush(port::kMaxUint64 /* memtable_id */, &to_flush);
+    ASSERT_EQ(3, to_flush.size());
+    ASSERT_EQ(3, list.NumNotFlushed());
+    ASSERT_FALSE(list.IsFlushPending());
+    ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
+    ValidateWbmUsedCounters(
+        wb, total_reserved_mem - expected_mutable_memory_usage,
+        expected_mutable_memory_usage, expected_mutable_memory_usage);
+
+    // Pick tables to flush again
+    autovector<MemTable*> to_flush2;
+    list.PickMemtablesToFlush(port::kMaxUint64 /* memtable_id */, &to_flush2);
+    ASSERT_EQ(0, to_flush2.size());
+    ASSERT_EQ(3, list.NumNotFlushed());
+    ASSERT_FALSE(list.IsFlushPending());
+    ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
+    ValidateWbmUsedCounters(
+        wb, total_reserved_mem - expected_mutable_memory_usage,
+        expected_mutable_memory_usage, expected_mutable_memory_usage);
+
+    // Add another table
+    list.Add(tables[3], &to_delete);
+    ASSERT_FALSE(list.IsFlushPending());
+    ASSERT_TRUE(list.imm_flush_needed.load(std::memory_order_acquire));
+    ASSERT_EQ(0, to_delete.size());
+    expected_mutable_memory_usage += tables_reserved_mem[3];
+    ValidateWbmUsedCounters(
+        wb, total_reserved_mem - expected_mutable_memory_usage,
+        expected_mutable_memory_usage,
+        expected_mutable_memory_usage - tables_reserved_mem[3]);
+
+    // Request a flush again
+    list.FlushRequested();
+    ASSERT_TRUE(list.IsFlushPending());
+    ASSERT_TRUE(list.imm_flush_needed.load(std::memory_order_acquire));
+
+    // Pick tables to flush again
+    list.PickMemtablesToFlush(port::kMaxUint64 /* memtable_id */, &to_flush2);
+    ASSERT_EQ(1, to_flush2.size());
+    ASSERT_EQ(4, list.NumNotFlushed());
+    ASSERT_FALSE(list.IsFlushPending());
+    ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
+    ValidateWbmUsedCounters(
+        wb, total_reserved_mem - expected_mutable_memory_usage,
+        expected_mutable_memory_usage, expected_mutable_memory_usage);
+
+    // Rollback first pick of tables
+    list.RollbackMemtableFlush(to_flush, 0);
+    ASSERT_TRUE(list.IsFlushPending());
+    ASSERT_TRUE(list.imm_flush_needed.load(std::memory_order_acquire));
+    // table3 was NOT rolled back (to_flush (tables 0, 1, 2) was rolled back,
+    // to_flush2 contains table 3)
+    ValidateWbmUsedCounters(
+        wb, total_reserved_mem - expected_mutable_memory_usage,
+        expected_mutable_memory_usage, tables_reserved_mem[3]);
+    to_flush.clear();
+
+    // Add another tables
+    list.Add(tables[4], &to_delete);
+    ASSERT_EQ(5, list.NumNotFlushed());
+    // We now have the minimum to flush regardles of whether FlushRequested()
+    ASSERT_TRUE(list.IsFlushPending());
+    ASSERT_TRUE(list.imm_flush_needed.load(std::memory_order_acquire));
+    ASSERT_EQ(0, to_delete.size());
+    expected_mutable_memory_usage += tables_reserved_mem[4];
+    ValidateWbmUsedCounters(
+        wb, total_reserved_mem - expected_mutable_memory_usage,
+        expected_mutable_memory_usage, tables_reserved_mem[3]);
+
+    // Pick tables to flush
+    list.PickMemtablesToFlush(port::kMaxUint64 /* memtable_id */, &to_flush);
+    // Should pick 4 of 5 since 1 table has been picked in to_flush2
+    ASSERT_EQ(4, to_flush.size());
+    ASSERT_EQ(5, list.NumNotFlushed());
+    ASSERT_FALSE(list.IsFlushPending());
+    ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
+    // Now all of the immutables tables are being freed (undergoing flush)
+    ValidateWbmUsedCounters(
+        wb, total_reserved_mem - expected_mutable_memory_usage,
+        expected_mutable_memory_usage, expected_mutable_memory_usage);
+
+    // Pick tables to flush again
+    autovector<MemTable*> to_flush3;
+    list.PickMemtablesToFlush(port::kMaxUint64 /* memtable_id */, &to_flush3);
+    ASSERT_EQ(0, to_flush3.size());  // nothing not in progress of being flushed
+    ASSERT_EQ(5, list.NumNotFlushed());
+    ASSERT_FALSE(list.IsFlushPending());
+    ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
+    ValidateWbmUsedCounters(
+        wb, total_reserved_mem - expected_mutable_memory_usage,
+        expected_mutable_memory_usage, expected_mutable_memory_usage);
+
+    // Flush the 4 memtables that were picked in to_flush
+    s = Mock_InstallMemtableFlushResults(&list, mutable_cf_options, to_flush,
+                                         &to_delete);
+    ASSERT_OK(s);
+
+    // Note:  now to_flush contains tables[0,1,2,4].  to_flush2 contains
+    // tables[3].
+    // Current implementation will only commit memtables in the order they were
+    // created. So TryInstallMemtableFlushResults will install the first 3
+    // tables in to_flush and stop when it encounters a table not yet flushed.
+    ASSERT_EQ(2, list.NumNotFlushed());
+    int num_in_history =
+        std::min(3, static_cast<int>(max_write_buffer_size_to_maintain) /
+                        static_cast<int>(options.write_buffer_size));
+    ASSERT_EQ(num_in_history, list.NumFlushed());
+    ASSERT_EQ(5 - list.NumNotFlushed() - num_in_history, to_delete.size());
+    // None of the 5 tables has been freed => no change in the counters
+    ValidateWbmUsedCounters(
+        wb, total_reserved_mem - expected_mutable_memory_usage,
+        expected_mutable_memory_usage, expected_mutable_memory_usage);
+
+    // Request a flush again. Should be nothing to flush
+    list.FlushRequested();
+    ASSERT_FALSE(list.IsFlushPending());
+    ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
+
+    // Flush the 1 memtable that was picked in to_flush2
+    s = MemTableListTest::Mock_InstallMemtableFlushResults(
+        &list, mutable_cf_options, to_flush2, &to_delete);
+    ASSERT_OK(s);
+
+    // This will actually install 2 tables.  The 1 we told it to flush, and also
+    // tables[4] which has been waiting for tables[3] to commit.
+    ASSERT_EQ(0, list.NumNotFlushed());
+    num_in_history =
+        std::min(5, static_cast<int>(max_write_buffer_size_to_maintain) /
+                        static_cast<int>(options.write_buffer_size));
+    ASSERT_EQ(num_in_history, list.NumFlushed());
+    ASSERT_EQ(5 - list.NumNotFlushed() - num_in_history, to_delete.size());
+    // None of the 5 tables has been freed => no change in the counters
+    ValidateWbmUsedCounters(
+        wb, total_reserved_mem - expected_mutable_memory_usage,
+        expected_mutable_memory_usage, expected_mutable_memory_usage);
+
+    // This loop will actually do nothing since to_delete is empty
+    ASSERT_TRUE(to_delete.empty());
+    for (const auto& m : to_delete) {
+      // Refcount should be 0 after calling TryInstallMemtableFlushResults.
+      // Verify this, by Ref'ing then UnRef'ing:
+      m->Ref();
+      ASSERT_EQ(m, m->Unref());
+      delete m;
     }
-    ASSERT_EQ(num_tables_per_cf, lists[i]->NumNotFlushed());
-    ASSERT_TRUE(lists[i]->IsFlushPending());
-    ASSERT_TRUE(lists[i]->imm_flush_needed.load(std::memory_order_acquire));
+    to_delete.clear();
+
+    // Add another table
+    list.Add(tables[5], &to_delete);
+    expected_mutable_memory_usage += tables_reserved_mem[5];
+    ASSERT_EQ(1, list.NumNotFlushed());
+    ASSERT_EQ(5, list.GetLatestMemTableID());
+    ValidateWbmUsedCounters(
+        wb, total_reserved_mem - expected_mutable_memory_usage,
+        expected_mutable_memory_usage,
+        expected_mutable_memory_usage - tables_reserved_mem[5]);
+
+    memtable_id = 4;
+    // Pick tables to flush. The tables to pick must have ID smaller than or
+    // equal to 4. Therefore, no table will be selected in this case.
+    autovector<MemTable*> to_flush4;
+    list.FlushRequested();
+    ASSERT_TRUE(list.HasFlushRequested());
+    list.PickMemtablesToFlush(memtable_id, &to_flush4);
+    ASSERT_TRUE(to_flush4.empty());
+    ASSERT_EQ(1, list.NumNotFlushed());
+    ASSERT_TRUE(list.imm_flush_needed.load(std::memory_order_acquire));
+    ASSERT_FALSE(list.IsFlushPending());
+    ASSERT_FALSE(list.HasFlushRequested());
+    // No change
+    ValidateWbmUsedCounters(
+        wb, total_reserved_mem - expected_mutable_memory_usage,
+        expected_mutable_memory_usage,
+        expected_mutable_memory_usage - tables_reserved_mem[5]);
+
+    // Pick tables to flush. The tables to pick must have ID smaller than or
+    // equal to 5. Therefore, only tables[5] will be selected.
+    memtable_id = 5;
+    list.FlushRequested();
+    list.PickMemtablesToFlush(memtable_id, &to_flush4);
+    ASSERT_EQ(1, static_cast<int>(to_flush4.size()));
+    ASSERT_EQ(1, list.NumNotFlushed());
+    ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
+    ASSERT_FALSE(list.IsFlushPending());
+    // All tables are now flushed or being flushed, but none was deleted
+    ValidateWbmUsedCounters(
+        wb, total_reserved_mem - expected_mutable_memory_usage,
+        expected_mutable_memory_usage, expected_mutable_memory_usage);
+    to_delete.clear();
+
+    list.current()->Unref(&to_delete);
+    int to_delete_size = std::min(
+        num_tables, static_cast<int>(max_write_buffer_size_to_maintain) /
+                        static_cast<int>(options.write_buffer_size));
+    ASSERT_EQ(to_delete_size, to_delete.size());
+
+    for (const auto& m : to_delete) {
+      // Refcount should be 0 after calling TryInstallMemtableFlushResults.
+      // Verify this, by Ref'ing then UnRef'ing:
+      m->Ref();
+      ASSERT_EQ(m, m->Unref());
+      delete m;
+    }
+    to_delete.clear();
+
+    // All memtables have been deleted / freed
+    ValidateWbmUsedCounters(wb, 0U, 0U, 0U);
   }
-  std::vector<uint64_t> flush_memtable_ids = {1, 1, 0};
-  //          +----+
-  // list[0]: |0  1|
-  // list[1]: |0  1|
-  //          | +--+
-  // list[2]: |0| 1
-  //          +-+
-  // Pick memtables to flush
-  for (auto i = 0; i != num_cfs; ++i) {
-    flush_candidates[i].clear();
-    lists[i]->PickMemtablesToFlush(flush_memtable_ids[i], &flush_candidates[i]);
-    ASSERT_EQ(flush_memtable_ids[i] - 0 + 1,
-              static_cast<uint64_t>(flush_candidates[i].size()));
-  }
-  autovector<MemTableList*> tmp_lists;
-  autovector<uint32_t> tmp_cf_ids;
-  autovector<const MutableCFOptions*> tmp_options_list;
+}
+
+TEST_F(MemTableListTest, EmptyAtomicFlushTest) {
+  autovector<MemTableList*> lists;
+  autovector<uint32_t> cf_ids;
+  autovector<const MutableCFOptions*> options_list;
   autovector<const autovector<MemTable*>*> to_flush;
-  for (auto i = 0; i != num_cfs; ++i) {
-    if (!flush_candidates[i].empty()) {
-      to_flush.push_back(&flush_candidates[i]);
-      tmp_lists.push_back(lists[i]);
-      tmp_cf_ids.push_back(i);
-      tmp_options_list.push_back(mutable_cf_options_list[i]);
-    }
-  }
-  Status s = Mock_InstallMemtableAtomicFlushResults(
-      tmp_lists, tmp_cf_ids, tmp_options_list, to_flush, &to_delete);
+  autovector<MemTable*> to_delete;
+  Status s = Mock_InstallMemtableAtomicFlushResults(lists, cf_ids, options_list,
+                                                    to_flush, &to_delete);
   ASSERT_OK(s);
+  ASSERT_TRUE(to_delete.empty());
+}
 
-  for (auto i = 0; i != num_cfs; ++i) {
-    for (auto j = 0; j != num_tables_per_cf; ++j) {
-      if (static_cast<uint64_t>(j) <= flush_memtable_ids[i]) {
-        ASSERT_LT(0, tables[i][j]->GetFileNumber());
+TEST_F(MemTableListTest, AtomicFlushTest) {
+  for (auto wbm_enabled : {false, true}) {
+    const int num_cfs = 3;
+    const int num_tables_per_cf = 2;
+    SequenceNumber seq = 1;
+
+    auto factory = std::make_shared<SkipListFactory>();
+    options.memtable_factory = factory;
+    options.db_write_buffer_size = wbm_enabled ? (1024 * 1024 * 1024) : 0U;
+    ImmutableOptions ioptions(options);
+    InternalKeyComparator cmp(BytewiseComparator());
+    WriteBufferManager wb(options.db_write_buffer_size);
+
+    // Create MemTableLists
+    int min_write_buffer_number_to_merge = 3;
+    int max_write_buffer_number_to_maintain = 7;
+    int64_t max_write_buffer_size_to_maintain =
+        7 * static_cast<int64_t>(options.write_buffer_size);
+    autovector<MemTableList*> lists;
+    for (int i = 0; i != num_cfs; ++i) {
+      lists.emplace_back(new MemTableList(min_write_buffer_number_to_merge,
+                                          max_write_buffer_number_to_maintain,
+                                          max_write_buffer_size_to_maintain));
+    }
+
+    autovector<uint32_t> cf_ids;
+    std::vector<std::vector<MemTable*>> tables(num_cfs);
+    std::vector<size_t> tables_cf_reserved_mem(num_cfs, {0U});
+    std::vector<std::vector<size_t>> tables_reserved_mem(num_cfs, {0U});
+    size_t total_reserved_mem = 0U;
+    autovector<const MutableCFOptions*> mutable_cf_options_list;
+    uint32_t cf_id = 0;
+    for (auto& elem : tables) {
+      mutable_cf_options_list.emplace_back(new MutableCFOptions(options));
+      uint64_t memtable_id = 0;
+      tables_reserved_mem[cf_id].resize(num_tables_per_cf);
+      for (int i = 0; i != num_tables_per_cf; ++i) {
+        MemTable* mem =
+            new MemTable(cmp, ioptions, *(mutable_cf_options_list.back()), &wb,
+                         kMaxSequenceNumber, cf_id);
+        mem->SetID(memtable_id++);
+        mem->Ref();
+
+        auto new_total_reserved_mem = wb.mutable_memtable_memory_usage();
+        if (wbm_enabled) {
+          ASSERT_GT(new_total_reserved_mem, total_reserved_mem);
+        }
+
+        tables_cf_reserved_mem[cf_id] +=
+            new_total_reserved_mem - total_reserved_mem;
+        tables_reserved_mem[cf_id][i] =
+            new_total_reserved_mem - total_reserved_mem;
+        total_reserved_mem = new_total_reserved_mem;
+
+        std::string value;
+
+        ASSERT_OK(mem->Add(++seq, kTypeValue, "key1", ToString(i),
+                           nullptr /* kv_prot_info */));
+        ASSERT_OK(mem->Add(++seq, kTypeValue, "keyN" + ToString(i), "valueN",
+                           nullptr /* kv_prot_info */));
+        ASSERT_OK(mem->Add(++seq, kTypeValue, "keyX" + ToString(i), "value",
+                           nullptr /* kv_prot_info */));
+        ASSERT_OK(mem->Add(++seq, kTypeValue, "keyM" + ToString(i), "valueM",
+                           nullptr /* kv_prot_info */));
+        ASSERT_OK(mem->Add(++seq, kTypeDeletion, "keyX" + ToString(i), "",
+                           nullptr /* kv_prot_info */));
+
+        elem.push_back(mem);
+      }
+      cf_ids.push_back(cf_id++);
+    }
+
+    std::vector<autovector<MemTable*>> flush_candidates(num_cfs);
+
+    // Nothing to flush
+    for (auto i = 0; i != num_cfs; ++i) {
+      auto* list = lists[i];
+      ASSERT_FALSE(list->IsFlushPending());
+      ASSERT_FALSE(list->imm_flush_needed.load(std::memory_order_acquire));
+      list->PickMemtablesToFlush(port::kMaxUint64 /* memtable_id */,
+                                 &flush_candidates[i]);
+      ASSERT_EQ(0, flush_candidates[i].size());
+    }
+    // Request flush even though there is nothing to flush
+    for (auto i = 0; i != num_cfs; ++i) {
+      auto* list = lists[i];
+      list->FlushRequested();
+      ASSERT_FALSE(list->IsFlushPending());
+      ASSERT_FALSE(list->imm_flush_needed.load(std::memory_order_acquire));
+    }
+    // ALL memtables are currently MUTABLE
+    ValidateWbmUsedCounters(wb, total_reserved_mem, 0U, 0U);
+
+    autovector<MemTable*> to_delete;
+    // Add tables to the immutable memtalbe lists associated with column
+    // families
+    for (auto i = 0; i != num_cfs; ++i) {
+      for (auto j = 0; j != num_tables_per_cf; ++j) {
+        lists[i]->Add(tables[i][j], &to_delete);
+      }
+      ASSERT_EQ(num_tables_per_cf, lists[i]->NumNotFlushed());
+      ASSERT_TRUE(lists[i]->IsFlushPending());
+      ASSERT_TRUE(lists[i]->imm_flush_needed.load(std::memory_order_acquire));
+    }
+    // ALL memtables are currently IMMUTABLE
+    ValidateWbmUsedCounters(wb, 0U, total_reserved_mem, 0U);
+
+    std::vector<uint64_t> flush_memtable_ids = {1, 1, 0};
+    //          +----+
+    // list[0]: |0  1|
+    // list[1]: |0  1|
+    //          | +--+
+    // list[2]: |0| 1
+    //          +-+
+    // Pick memtables to flush
+    auto expected_total_size_being_freed = 0U;
+    for (auto i = 0; i != num_cfs; ++i) {
+      flush_candidates[i].clear();
+      lists[i]->PickMemtablesToFlush(flush_memtable_ids[i],
+                                     &flush_candidates[i]);
+      ASSERT_EQ(flush_memtable_ids[i] - 0 + 1,
+                static_cast<uint64_t>(flush_candidates[i].size()));
+
+      for (auto cf_table_idx = 0U; cf_table_idx < flush_candidates[i].size();
+           ++cf_table_idx) {
+        expected_total_size_being_freed += tables_reserved_mem[i][cf_table_idx];
       }
     }
-    ASSERT_EQ(
-        static_cast<size_t>(num_tables_per_cf) - flush_candidates[i].size(),
-        lists[i]->NumNotFlushed());
-  }
+    ValidateWbmUsedCounters(wb, 0U, total_reserved_mem,
+                            expected_total_size_being_freed);
 
-  to_delete.clear();
-  for (auto list : lists) {
-    list->current()->Unref(&to_delete);
-    delete list;
-  }
-  for (auto& mutable_cf_options : mutable_cf_options_list) {
-    if (mutable_cf_options != nullptr) {
-      delete mutable_cf_options;
-      mutable_cf_options = nullptr;
+    autovector<MemTableList*> tmp_lists;
+    autovector<uint32_t> tmp_cf_ids;
+    autovector<const MutableCFOptions*> tmp_options_list;
+    autovector<const autovector<MemTable*>*> to_flush;
+    for (auto i = 0; i != num_cfs; ++i) {
+      if (!flush_candidates[i].empty()) {
+        to_flush.push_back(&flush_candidates[i]);
+        tmp_lists.push_back(lists[i]);
+        tmp_cf_ids.push_back(i);
+        tmp_options_list.push_back(mutable_cf_options_list[i]);
+      }
     }
-  }
-  // All memtables in tables array must have been flushed, thus ready to be
-  // deleted.
-  ASSERT_EQ(to_delete.size(), tables.size() * tables.front().size());
-  for (const auto& m : to_delete) {
-    // Refcount should be 0 after calling InstallMemtableFlushResults.
-    // Verify this by Ref'ing and then Unref'ing.
-    m->Ref();
-    ASSERT_EQ(m, m->Unref());
-    delete m;
+    Status s = Mock_InstallMemtableAtomicFlushResults(
+        tmp_lists, tmp_cf_ids, tmp_options_list, to_flush, &to_delete);
+    ASSERT_OK(s);
+
+    for (auto i = 0; i != num_cfs; ++i) {
+      for (auto j = 0; j != num_tables_per_cf; ++j) {
+        if (static_cast<uint64_t>(j) <= flush_memtable_ids[i]) {
+          ASSERT_LT(0, tables[i][j]->GetFileNumber());
+        }
+      }
+      ASSERT_EQ(
+          static_cast<size_t>(num_tables_per_cf) - flush_candidates[i].size(),
+          lists[i]->NumNotFlushed());
+    }
+
+    // No memtable was freed => No Change
+    ValidateWbmUsedCounters(wb, 0U, total_reserved_mem,
+                            expected_total_size_being_freed);
+
+    to_delete.clear();
+    for (auto list : lists) {
+      list->current()->Unref(&to_delete);
+      delete list;
+    }
+    for (auto& mutable_cf_options : mutable_cf_options_list) {
+      if (mutable_cf_options != nullptr) {
+        delete mutable_cf_options;
+        mutable_cf_options = nullptr;
+      }
+    }
+    // All memtables in tables array must have been flushed, thus ready to be
+    // deleted.
+    ASSERT_EQ(to_delete.size(), tables.size() * tables.front().size());
+    for (const auto& m : to_delete) {
+      // Refcount should be 0 after calling InstallMemtableFlushResults.
+      // Verify this by Ref'ing and then Unref'ing.
+      m->Ref();
+      ASSERT_EQ(m, m->Unref());
+      delete m;
+    }
+
+    // All memtables have been deleted / freed
+    ValidateWbmUsedCounters(wb, 0U, 0U, 0U);
   }
 }
 

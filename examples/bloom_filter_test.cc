@@ -39,7 +39,7 @@ std::string kDBPath = "/data/db/bloom_filter";
 #endif
 static size_t scramble(size_t inp)
 {
-  return (inp << 32) | (inp * 11111) | inp;
+  return inp * 0xdeadbeaf11133311ul; 
 
 }
 
@@ -73,11 +73,11 @@ int main() {
   // open DB
   Status s = DB::Open(options, kDBPath, &db);
   assert(s.ok());
-  const int kDataSize = 1024;
+  const int kDataSize = 24;
   int val[kDataSize/sizeof(int)];
   for (int i =0; i < kDataSize/sizeof(int); i++)
     val[i] = rand();
-  const size_t max_table1_key = 100 * 1000 * 1000;
+  const size_t max_table1_key = 1000 * 1000 * 1000;
   const size_t max_table2_key = 100 * 1000 * 1000;
 
   time_t t = time(0);
@@ -89,7 +89,7 @@ int main() {
   for (uint32_t i = 0; i < max_table1_key; i++) {
     size_t key = scramble(i);
     s = db->Put(write_options, std::string((char *)&key, sizeof(key)),
-                std::string((char *)val, 1024));
+                std::string((char *)val, kDataSize));
   }
 
   printf(" ramdom insert took %lu seconds \n", time(0) - t);
@@ -104,7 +104,7 @@ int main() {
     s = db->Get(read_options, std::string((char *)&key, sizeof(key)), &get_val);
     if (!s.ok()) {
       s = db->Put(write_options, std::string((char *)&key, sizeof(key)),
-                  std::string((char *)val, 1024));     
+                  std::string((char *)val, kDataSize));     
     } else {
       n_found++;
     }

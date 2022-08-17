@@ -24,7 +24,8 @@ WriteBufferManager::WriteBufferManager(size_t _buffer_size,
     : buffer_size_(_buffer_size),
       mutable_limit_(buffer_size_ * 7 / 8),
       memory_used_(0),
-      memory_active_(0),
+      memory_inactive_(0),
+      memory_being_freed_(0U),
       cache_res_mgr_(nullptr),
       allow_stall_(allow_stall),
       stall_active_(false) {
@@ -63,9 +64,6 @@ void WriteBufferManager::ReserveMem(size_t mem) {
   } else if (enabled()) {
     memory_used_.fetch_add(mem, std::memory_order_relaxed);
   }
-  if (enabled()) {
-    memory_active_.fetch_add(mem, std::memory_order_relaxed);
-  }
 }
 
 // Should only be called from write thread
@@ -93,16 +91,47 @@ void WriteBufferManager::ReserveMemWithCache(size_t mem) {
 
 void WriteBufferManager::ScheduleFreeMem(size_t mem) {
   if (enabled()) {
-    memory_active_.fetch_sub(mem, std::memory_order_relaxed);
+    memory_inactive_.fetch_add(mem, std::memory_order_relaxed);
+  }
+}
+
+void WriteBufferManager::FreeMemBegin(size_t mem) {
+  if (enabled()) {
+    memory_being_freed_.fetch_add(mem, std::memory_order_relaxed);
+  }
+}
+
+// Freeing 'mem' bytes was aborted and that memory is no longer in the process
+// of being freed
+void WriteBufferManager::FreeMemAborted(size_t mem) {
+  if (enabled()) {
+    [[maybe_unused]] const auto curr_memory_being_freed =
+        memory_being_freed_.fetch_sub(mem, std::memory_order_relaxed);
+    assert(curr_memory_being_freed >= mem);
   }
 }
 
 void WriteBufferManager::FreeMem(size_t mem) {
+  const auto is_enabled = enabled();
+
   if (cache_res_mgr_ != nullptr) {
     FreeMemWithCache(mem);
-  } else if (enabled()) {
-    memory_used_.fetch_sub(mem, std::memory_order_relaxed);
+  } else if (is_enabled) {
+    [[maybe_unused]] const auto curr_memory_used =
+        memory_used_.fetch_sub(mem, std::memory_order_relaxed);
+    assert(curr_memory_used >= mem);
   }
+
+  if (is_enabled) {
+    [[maybe_unused]] const auto curr_memory_inactive =
+        memory_inactive_.fetch_sub(mem, std::memory_order_relaxed);
+    [[maybe_unused]] const auto curr_memory_being_freed =
+        memory_being_freed_.fetch_sub(mem, std::memory_order_relaxed);
+
+    assert(curr_memory_inactive >= mem);
+    assert(curr_memory_being_freed >= mem);
+  }
+
   // Check if stall is active and can be ended.
   MaybeEndWriteStall();
 }
@@ -113,7 +142,10 @@ void WriteBufferManager::FreeMemWithCache(size_t mem) {
   // Use a mutex to protect various data structures. Can be optimized to a
   // lock-free solution if it ends up with a performance bottleneck.
   std::lock_guard<std::mutex> lock(cache_res_mgr_mu_);
-  size_t new_mem_used = memory_used_.load(std::memory_order_relaxed) - mem;
+
+  const auto curr_memory_used = memory_used_.load(std::memory_order_relaxed);
+  assert(curr_memory_used >= mem);
+  size_t new_mem_used = curr_memory_used - mem;
   memory_used_.store(new_mem_used, std::memory_order_relaxed);
   Status s = cache_res_mgr_->UpdateCacheReservation(new_mem_used);
 

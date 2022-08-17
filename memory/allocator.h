@@ -42,16 +42,30 @@ class AllocTracker {
   // Call when we're finished allocating memory so we can free it from
   // the write buffer's limit.
   void DoneAllocating();
-
+  void FreeMemStarted();
+  void FreeMemAborted();
   void FreeMem();
 
-  bool is_freed() const { return write_buffer_manager_ == nullptr || freed_; }
+  bool HasMemoryFreeingStarted() const {
+    return (state_ == State::kFreeMemStarted);
+  }
+
+  bool IsMemoryFreed() const { return (state_ == State::kFreed); }
 
  private:
-  WriteBufferManager* write_buffer_manager_;
-  std::atomic<size_t> bytes_allocated_;
-  bool done_allocating_;
-  bool freed_;
+  enum class State { kAllocating, kDoneAllocating, kFreeMemStarted, kFreed };
+
+ private:
+  bool ShouldUpdateWriteBufferManager() const {
+    return ((write_buffer_manager_ != nullptr) &&
+            (write_buffer_manager_->enabled() ||
+             write_buffer_manager_->cost_to_cache()));
+  }
+
+ private:
+  WriteBufferManager* write_buffer_manager_ = nullptr;
+  State state_ = State::kAllocating;
+  std::atomic<size_t> bytes_allocated_ = 0U;
 };
 
 }  // namespace ROCKSDB_NAMESPACE

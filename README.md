@@ -3,7 +3,7 @@
 ![GitHub contributors](https://img.shields.io/github/contributors/speedb-io/speedb)
 
 
-Speeb is a library that provides persistent key-value stores. Keys and values are arbitrary byte arrays. The keys are ordered within the key value store according to a user-specified comparator function.
+Speedb is a library that provides persistent key-value stores. Keys and values are arbitrary byte arrays. The keys are ordered within the key value store according to a user-specified comparator function.
 It is maintained by Speedb and is forked from Rocksdb, developed by Facebook.
 
 

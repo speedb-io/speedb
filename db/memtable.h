@@ -479,13 +479,31 @@ class MemTable {
 
   uint64_t GetID() const { return id_; }
 
-  void SetFlushCompleted(bool completed) { flush_completed_ = completed; }
+  void SetFlushCompleted(bool completed) {
+    // Flush Can't complete twice
+    if (completed) {
+      assert(!flush_completed_);
+    }
+    // In case flush is aborted, notify the memory tracker
+    if (flush_completed_ && (completed == false)) {
+      mem_tracker_.FreeMemAborted();
+    }
+    flush_completed_ = completed;
+  }
 
   uint64_t GetFileNumber() const { return file_number_; }
 
   void SetFileNumber(uint64_t file_num) { file_number_ = file_num; }
 
   void SetFlushInProgress(bool in_progress) {
+    if (in_progress && (flush_in_progress_ == false)) {
+      assert(!flush_completed_);
+      mem_tracker_.FreeMemStarted();
+    } else if ((in_progress == false) && flush_in_progress_) {
+      // In case flush is aborted, notify the memory tracker
+      mem_tracker_.FreeMemAborted();
+    }
+
     flush_in_progress_ = in_progress;
   }
 
@@ -528,8 +546,8 @@ class MemTable {
   std::atomic<size_t> write_buffer_size_;
 
   // These are used to manage memtable flushes to storage
-  bool flush_in_progress_; // started the flush
-  bool flush_completed_;   // finished the flush
+  bool flush_in_progress_;  // started the flush
+  bool flush_completed_;    // finished the flush
   uint64_t file_number_;    // filled up after flush is complete
 
   // The updates to be applied to the transaction log when this

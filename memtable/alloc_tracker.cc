@@ -15,48 +15,87 @@
 namespace ROCKSDB_NAMESPACE {
 
 AllocTracker::AllocTracker(WriteBufferManager* write_buffer_manager)
-    : write_buffer_manager_(write_buffer_manager),
-      bytes_allocated_(0),
-      done_allocating_(false),
-      freed_(false) {}
+    : write_buffer_manager_(write_buffer_manager), bytes_allocated_(0) {}
 
 AllocTracker::~AllocTracker() { FreeMem(); }
 
 void AllocTracker::Allocate(size_t bytes) {
   assert(write_buffer_manager_ != nullptr);
-  if (write_buffer_manager_->enabled() ||
-      write_buffer_manager_->cost_to_cache()) {
-    bytes_allocated_.fetch_add(bytes, std::memory_order_relaxed);
-    write_buffer_manager_->ReserveMem(bytes);
+  assert(state_ == State::kAllocating);
+
+  if (state_ == State::kAllocating) {
+    if (ShouldUpdateWriteBufferManager()) {
+      bytes_allocated_.fetch_add(bytes, std::memory_order_relaxed);
+      write_buffer_manager_->ReserveMem(bytes);
+    }
   }
 }
 
 void AllocTracker::DoneAllocating() {
-  if (write_buffer_manager_ != nullptr && !done_allocating_) {
-    if (write_buffer_manager_->enabled() ||
-        write_buffer_manager_->cost_to_cache()) {
+  assert(write_buffer_manager_ != nullptr);
+  assert(state_ == State::kAllocating);
+
+  if (state_ == State::kAllocating) {
+    if (ShouldUpdateWriteBufferManager()) {
       write_buffer_manager_->ScheduleFreeMem(
           bytes_allocated_.load(std::memory_order_relaxed));
     } else {
       assert(bytes_allocated_.load(std::memory_order_relaxed) == 0);
     }
-    done_allocating_ = true;
+    state_ = State::kDoneAllocating;
+  }
+}
+
+void AllocTracker::FreeMemStarted() {
+  assert(write_buffer_manager_ != nullptr);
+  assert(state_ == State::kDoneAllocating);
+
+  if (state_ == State::kDoneAllocating) {
+    if (ShouldUpdateWriteBufferManager()) {
+      write_buffer_manager_->FreeMemBegin(
+          bytes_allocated_.load(std::memory_order_relaxed));
+    }
+    state_ = State::kFreeMemStarted;
+  }
+}
+
+void AllocTracker::FreeMemAborted() {
+  assert(write_buffer_manager_ != nullptr);
+  // May be called without actually starting to free memory
+  assert((state_ == State::kDoneAllocating) ||
+         (state_ == State::kFreeMemStarted));
+
+  if (state_ == State::kFreeMemStarted) {
+    if (ShouldUpdateWriteBufferManager()) {
+      write_buffer_manager_->FreeMemAborted(
+          bytes_allocated_.load(std::memory_order_relaxed));
+    }
+    state_ = State::kDoneAllocating;
   }
 }
 
 void AllocTracker::FreeMem() {
-  if (!done_allocating_) {
+  if (state_ == State::kAllocating) {
     DoneAllocating();
   }
-  if (write_buffer_manager_ != nullptr && !freed_) {
-    if (write_buffer_manager_->enabled() ||
-        write_buffer_manager_->cost_to_cache()) {
+
+  // This is necessary so that the WBM will not decrease the memory being
+  // freed twice in case memory freeing was aborted and then freed via this
+  // call
+  if (state_ == State::kDoneAllocating) {
+    FreeMemStarted();
+  }
+
+  if (state_ == State::kFreeMemStarted) {
+    if (ShouldUpdateWriteBufferManager()) {
       write_buffer_manager_->FreeMem(
           bytes_allocated_.load(std::memory_order_relaxed));
     } else {
       assert(bytes_allocated_.load(std::memory_order_relaxed) == 0);
     }
-    freed_ = true;
   }
+
+  state_ = State::kFreed;
 }
+
 }  // namespace ROCKSDB_NAMESPACE

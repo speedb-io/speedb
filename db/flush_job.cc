@@ -276,16 +276,12 @@ Status FlushJob::Run(LogsWithPrepTracker* prep_tracker, FileMetaData* file_meta,
     s = WriteLevel0Table();
   }
 
-  if (s.ok() && cfd_->IsDropped()) {
-    s = Status::ColumnFamilyDropped("Column family dropped during compaction");
-  }
-  if ((s.ok() || s.IsColumnFamilyDropped()) &&
-      shutting_down_->load(std::memory_order_acquire)) {
-    s = Status::ShutdownInProgress("Database shutdown");
-  }
-
   if (!s.ok()) {
     cfd_->imm()->RollbackMemtableFlush(mems_, meta_.fd.GetNumber());
+  } else if (shutting_down_->load(std::memory_order_acquire)) {
+    s = Status::ShutdownInProgress("Database shutdown");
+  } else if (cfd_->IsDropped()) {
+    s = Status::ColumnFamilyDropped("Column family dropped during flush");
   } else if (write_manifest_) {
     TEST_SYNC_POINT("FlushJob::InstallResults");
     // Replace immutable memtable with the generated Table

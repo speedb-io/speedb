@@ -293,47 +293,42 @@ Status FlushJob::Run(LogsWithPrepTracker* prep_tracker, FileMetaData* file_meta,
     s = WriteLevel0Table();
   }
 
-  if (s.ok() && cfd_->IsDropped()) {
-    s = Status::ColumnFamilyDropped("Column family dropped during compaction");
-  }
-  if ((s.ok() || s.IsColumnFamilyDropped()) &&
-      shutting_down_->load(std::memory_order_acquire)) {
-    s = Status::ShutdownInProgress("Database shutdown");
-  }
-
-  if (s.ok()) {
-    s = MaybeIncreaseFullHistoryTsLowToAboveCutoffUDT();
-  }
-
   if (!s.ok()) {
-    cfd_->imm()->RollbackMemtableFlush(
-        mems_, /*rollback_succeeding_memtables=*/!db_options_.atomic_flush);
-  } else if (write_manifest_) {
-    assert(!db_options_.atomic_flush);
-    if (!db_options_.atomic_flush &&
-        flush_reason_ != FlushReason::kErrorRecovery &&
-        flush_reason_ != FlushReason::kErrorRecoveryRetryFlush &&
-        error_handler && !error_handler->GetBGError().ok() &&
-        error_handler->IsBGWorkStopped()) {
-      cfd_->imm()->RollbackMemtableFlush(
-          mems_, /*rollback_succeeding_memtables=*/!db_options_.atomic_flush);
-      s = error_handler->GetBGError();
-      if (skipped_since_bg_error) {
-        *skipped_since_bg_error = true;
+    cfd_->imm()->RollbackMemtableFlush(mems_, meta_.fd.GetNumber());
+  } else if (shutting_down_->load(std::memory_order_acquire)) {
+    s = Status::ShutdownInProgress("Database shutdown");
+  } else if (cfd_->IsDropped()) {
+    s = Status::ColumnFamilyDropped("Column family dropped during flush");
+  } else {
+    s = MaybeIncreaseFullHistoryTsLowToAboveCutoffUDT();
+
+    if (s.ok() && write_manifest_) {
+      assert(!db_options_.atomic_flush);
+      if (!db_options_.atomic_flush &&
+          flush_reason_ != FlushReason::kErrorRecovery &&
+          flush_reason_ != FlushReason::kErrorRecoveryRetryFlush &&
+          error_handler && !error_handler->GetBGError().ok() &&
+          error_handler->IsBGWorkStopped()) {
+        cfd_->imm()->RollbackMemtableFlush(
+            mems_, /*rollback_succeeding_memtables=*/!db_options_.atomic_flush);
+        s = error_handler->GetBGError();
+        if (skipped_since_bg_error) {
+          *skipped_since_bg_error = true;
+        }
+      } else {
+        TEST_SYNC_POINT("FlushJob::InstallResults");
+        // Replace immutable memtable with the generated Table
+        s = cfd_->imm()->TryInstallMemtableFlushResults(
+                cfd_, mutable_cf_options_, mems_, prep_tracker, versions_, db_mutex_,
+                meta_.fd.GetNumber(), &job_context_->memtables_to_free, db_directory_,
+                log_buffer_, &committed_flush_jobs_info_,
+                !(mempurge_s.ok()) /* write_edit : true if no mempurge happened (or if aborted),
+                                but 'false' if mempurge successful: no new min log number
+                                or new level 0 file path to write to manifest. */);
       }
-    } else {
-      TEST_SYNC_POINT("FlushJob::InstallResults");
-      // Replace immutable memtable with the generated Table
-      s = cfd_->imm()->TryInstallMemtableFlushResults(
-              cfd_, mutable_cf_options_, mems_, prep_tracker, versions_, db_mutex_,
-              meta_.fd.GetNumber(), &job_context_->memtables_to_free, db_directory_,
-              log_buffer_, &committed_flush_jobs_info_,
-              !(mempurge_s.ok()) /* write_edit : true if no mempurge happened (or if aborted),
-                              but 'false' if mempurge successful: no new min log number
-                              or new level 0 file path to write to manifest. */);
     }
   }
-
+  
   if (s.ok() && file_meta != nullptr) {
     *file_meta = meta_;
   }

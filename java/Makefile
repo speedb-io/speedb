@@ -440,10 +440,10 @@ java_test: java resolve_test_deps
 test: java java_test
 	$(MAKE) run_test
 
-run_test:
+run_test: java_test
 	$(JAVA_CMD) $(JAVA_ARGS) -Djava.library.path=target -cp "$(MAIN_CLASSES):$(TEST_CLASSES):$(JAVA_TESTCLASSPATH):target/*" org.rocksdb.test.RocksJunitRunner $(ALL_JAVA_TESTS)
 
-run_plugin_test:
+run_plugin_test: java_test
 	$(JAVA_CMD) $(JAVA_ARGS) -Djava.library.path=target -cp "$(MAIN_CLASSES):$(TEST_CLASSES):$(JAVA_TESTCLASSPATH):target/*" org.rocksdb.test.RocksJunitRunner $(ROCKSDB_PLUGIN_JAVA_TESTS)
 
 db_bench: java

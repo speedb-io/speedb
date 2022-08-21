@@ -37,8 +37,8 @@ jobs:
           exit_code=0
           for file in $(echo ${{needs.changedfiles.outputs.changed_files}})
           do
-            if ! grep -q "Copyright (C) ${{steps.get_current_year.outputs.timestamp}} Speedb Ltd. All rights reserved." "$file"; then
-              echo $file does not have the Apache 2.0 license header && exit_code=333
+            if ! grep -qE "Copyright \(C\) 20[0-9]{2} Speedb Ltd\. All rights reserved\." "$file"; then
+              echo $file does not have the Apache 2.0 license header && exit_code=222
             fi
           done
           exit $exit_code

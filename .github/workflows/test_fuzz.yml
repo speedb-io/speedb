@@ -48,7 +48,7 @@ jobs:
              export PKG_CONFIG_PATH=$PWD:$PWD/external.protobuf/lib/pkgconfig/ \n
              export PATH=$PWD/external.protobuf/bin:$PATH \n
              cd $GITHUB_WORKSPACE \n
-             COMPILE_WITH_ASAN=1 PORTABLE=1 make -j2 static_lib \n
+             COMPILE_WITH_ASAN=1 PORTABLE=1 make -j$(nproc) static_lib \n
              cd $GITHUB_WORKSPACE/fuzz \n
              make ${{ matrix.name }} \n
              ls -alFh $GITHUB_WORKSPACE/fuzz/ \n

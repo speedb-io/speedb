@@ -3,9 +3,14 @@ name: new_fuzz
 on:
   workflow_dispatch:
   workflow_call:
+    secrets:
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
 
 jobs:
-  fuzz:
+  Fuzz:
     runs-on: [self-hosted, ubuntu, asrunner]
     container:
       image: ubuntu:18.04
@@ -16,15 +21,16 @@ jobs:
           - name: db_map_fuzzer
 
     steps:
-      - uses: actions/checkout@v3
-
       - name: Pre-build
         run: |
           apt update && apt install -y sudo python3 git clang-tools cmake make automake ucommon-utils libtool gettext pkg-config build-essential clang-10 zlib1g-dev libbz2-dev ninja-build liblzma-dev autoconf libsnappy-dev libzstd-dev liblz4-dev binutils m4 g++-10 unzip
           curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
           unzip awscliv2.zip
           sudo ./aws/install
+          echo "nameserver 8.8.8.8" > /etc/resolv.conf
       
+      - uses: actions/checkout@v3
+
       - name: Configure AWS credentials from Test account
         uses: aws-actions/configure-aws-credentials@v1
         with:
@@ -56,18 +62,18 @@ jobs:
            chmod +x prepfuz.sh
            bash -xv prepfuz.sh
            mkdir -p $GITHUB_WORKSPACE/out/
-           ASAN_OPTIONS=detect_odr_violation=0 $GITHUB_WORKSPACE/fuzz/${{ matrix.name }} 2>&1 | sudo tee $GITHUB_WORKSPACE/out/${{ matrix.name }}.log-$GITHUB_SHA
-           tail -20 $GITHUB_WORKSPACE/out/${{ matrix.name }}.log-$GITHUB_SHA | grep "==AddressSanitizer. Thread limit (4194304 threads) exceeded\. Dying\." || echo "${{ matrix.name }} failed!"
+           ASAN_OPTIONS=detect_odr_violation=0 $GITHUB_WORKSPACE/fuzz/${{ matrix.name }} 2>&1 | sudo tee $GITHUB_WORKSPACE/out/${{ matrix.name }}.log
+           tail -20 $GITHUB_WORKSPACE/out/${{ matrix.name }}.log | grep "==AddressSanitizer. Thread limit (4194304 threads) exceeded\. Dying\." || echo "${{ matrix.name }} failed!"
            
       - name: Copy ${{ matrix.name }} logs to S3
         run: |
-          aws s3 cp $GITHUB_WORKSPACE/out/${{ matrix.name }}.log-$GITHUB_SHA s3://spdb-github-ci/
+          aws s3 cp $GITHUB_WORKSPACE/out/${{ matrix.name }}.log s3://spdb-github-ci/
     
   fuzzer_sum:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, ubuntu, asrunner]
     container:
       image: ubuntu:18.04
-    needs: [ fuzz ]
+    needs: [ Fuzz ]
       
     steps:
       - uses: actions/checkout@v3
@@ -108,5 +114,3 @@ jobs:
       - name: clear s3 bucket
         run: |
           aws s3 rm s3://spdb-github-ci/ --recursive --include "*"
-
-

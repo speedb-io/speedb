@@ -1,3 +1,5 @@
+<img src="speedb-logo.gif" />
+
 # Speedb
 
 ![GitHub contributors](https://img.shields.io/github/contributors/speedb-io/speedb)
@@ -77,3 +79,5 @@ See the [contributing guide](CONTRIBUTING.md).
 
 ## License
 Speedb is open-source and licensed under the [Apache 2.0 License](LICENSE.Apache).
+
+<img src="speedb-b.gif" />

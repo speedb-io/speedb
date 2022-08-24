@@ -15,6 +15,9 @@
 #pragma once
 
 #ifndef ROCKSDB_LITE
+#include <condition_variable>  // std::condition_variable
+#include <mutex>
+#include <thread>
 
 #include "rocksdb/memtablerep.h"
 
@@ -23,7 +26,7 @@ namespace ROCKSDB_NAMESPACE {
 class HashSpdRepFactory : public MemTableRepFactory {
  public:
   explicit HashSpdRepFactory(size_t bucket_count = 1000000);
-  ~HashSpdRepFactory() override {}
+  ~HashSpdRepFactory() override;
 
   using MemTableRepFactory::CreateMemTableRep;
   MemTableRep* CreateMemTableRep(const MemTableRep::KeyComparator& compare,
@@ -37,7 +40,17 @@ class HashSpdRepFactory : public MemTableRepFactory {
   const char* Name() const override { return kClassName(); }
 
  private:
+  void PrepareSwitchMemTable();
+  MemTableRep* GetSwitchMemtable(const MemTableRep::KeyComparator& compare,
+                                 Allocator* allocator);
+
+ private:
   size_t bucket_count_;
+  std::thread switch_memtable_thread_;
+  std::mutex switch_memtable_thread_mutex_;
+  std::condition_variable switch_memtable_thread_cv_;
+  bool terminate_switch_memtable_ = false;
+  std::atomic<MemTableRep*> switch_mem_ = nullptr;
 };
 
 }  // namespace ROCKSDB_NAMESPACE

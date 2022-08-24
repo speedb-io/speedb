@@ -1009,7 +1009,7 @@ struct RawFilterTester {
   // Points five bytes from the end
   char* metadata_ptr_;
 
-  RawFilterTester() : metadata_ptr_(&*(data_.end() - 5)) {}
+  RawFilterTester() : data_(), metadata_ptr_(&*(data_.end() - 5)) {}
 
   Slice ResetNoFill(uint32_t len_without_metadata, uint32_t num_lines,
                      uint32_t num_probes) {

@@ -84,8 +84,8 @@ struct BucketHeader {
 
   BucketHeader() { items_.clear(); }
 
-  bool InternalContains(const MemTableRep::KeyComparator& comparator,
-                        const char* check_key) {
+  bool InternalContains(const char* check_key,
+                        const MemTableRep::KeyComparator& comparator) {
     if (items_.size() == 0) {
       return false;
     }
@@ -102,17 +102,17 @@ struct BucketHeader {
     return false;
   }
 
-  bool Contains(const MemTableRep::KeyComparator& comparator,
-                const char* check_key) {
+  bool Contains(const char* check_key,
+                const MemTableRep::KeyComparator& comparator) {
     MutexLock l(&mutex_);
-    return InternalContains(comparator, check_key);
+    return InternalContains(check_key, comparator);
   }
 
   bool Add(SortItem* sort_item, const MemTableRep::KeyComparator& comparator,
            bool check_exist) {
     MutexLock l(&mutex_);
     if (check_exist) {
-      if (InternalContains(comparator, sort_item->key_)) return false;
+      if (InternalContains(sort_item->key_, comparator)) return false;
     }
 
     items_.push_front(sort_item);
@@ -703,18 +703,36 @@ class HashLocklessRep : public MemTableRep {
 
   std::shared_ptr<SortVectorContainer> sort_vectors_cont_;
 
-  size_t GetHash(const char* key) const {
-    Slice slice = UserKey(key);
-    return MurmurHash(slice.data(), static_cast<int>(slice.size()), 0) %
-           bucket_size_;
+  static size_t GetHash(const Slice& user_key_without_ts) {
+    return MurmurHash(user_key_without_ts.data(),
+                      static_cast<int>(user_key_without_ts.size()), 0);
   }
+
+  static Slice UserKeyWithoutTimestamp(
+      const Slice internal_key, const MemTableRep::KeyComparator& compare) {
+#if defined(ROCKSDB_USE_RTTI) && !defined(NDEBUG)
+    auto key_comparator =
+        dynamic_cast<const MemTable::KeyComparator*>(&compare);
+    assert(key_comparator != nullptr);
+#else
+    auto key_comparator = static_cast<const MemTable::KeyComparator*>(&compare);
+#endif
+    const Comparator* user_comparator =
+        key_comparator->comparator.user_comparator();
+    const size_t ts_sz = user_comparator->timestamp_size();
+    return ExtractUserKeyAndStripTimestamp(internal_key, ts_sz);
+  }
+
+  BucketHeader* GetBucket(const char* key,
+                          const MemTableRep::KeyComparator& comparator) const {
+    const size_t hash = GetHash(
+        UserKeyWithoutTimestamp(comparator.decode_key(key), comparator));
+    BucketHeader* bucket =
+        const_cast<BucketHeader*>(&buckets_[hash % bucket_size_]);
+    return bucket;
+  }
+
   bool InsertWithCheck(KeyHandle handle);
-
-  BucketHeader* GetBucket(size_t i) const { return &buckets_.get()[i]; }
-
-  BucketHeader* GetBucket(const char* key) const {
-    return GetBucket(GetHash(key));
-  }
 
   class Iterator : public MemTableRep::Iterator {
    public:
@@ -879,7 +897,7 @@ KeyHandle HashLocklessRep::Allocate(const size_t len, char** buf) {
 
 void HashLocklessRep::Insert(KeyHandle handle) {
   SortItem* sort_item = static_cast<SortItem*>(handle);
-  BucketHeader* bucket = GetBucket(sort_item->key_);
+  BucketHeader* bucket = GetBucket(sort_item->key_, this->compare_);
   bucket->Add(sort_item, this->compare_, false);
   // insert to later sorter list
   sort_vectors_cont_->Insert(sort_item);
@@ -889,7 +907,7 @@ void HashLocklessRep::Insert(KeyHandle handle) {
 
 bool HashLocklessRep::InsertWithCheck(KeyHandle handle) {
   SortItem* sort_item = static_cast<SortItem*>(handle);
-  BucketHeader* bucket = GetBucket(sort_item->key_);
+  BucketHeader* bucket = GetBucket(sort_item->key_, this->compare_);
 
   if (!bucket->Add(sort_item, this->compare_, true)) {
     return false;
@@ -920,9 +938,9 @@ bool HashLocklessRep::InsertKeyConcurrently(KeyHandle handle) {
 }
 
 bool HashLocklessRep::Contains(const char* key) const {
-  BucketHeader* bucket = GetBucket(key);
+  BucketHeader* bucket = GetBucket(key, this->compare_);
 
-  return bucket->Contains(this->compare_, key);
+  return bucket->Contains(key, this->compare_);
 }
 
 void HashLocklessRep::MarkReadOnly() { sort_vectors_cont_->Immutable(); }
@@ -934,7 +952,7 @@ size_t HashLocklessRep::ApproximateMemoryUsage() {
 
 void HashLocklessRep::Get(const LookupKey& k, void* callback_args,
                           bool (*callback_func)(void* arg, const char* entry)) {
-  BucketHeader* bucket = GetBucket(k.memtable_key().data());
+  BucketHeader* bucket = GetBucket(k.memtable_key().data(), this->compare_);
   MutexLock l(&bucket->mutex_);
 
   for (auto iter = bucket->items_.begin(); iter != bucket->items_.end();

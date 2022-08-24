@@ -17,7 +17,7 @@ jobs:
   Build:
     #needs: [Sanity]
     if: ${{ github.event.review.state == 'approved' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/release') }}
-    uses: speedb-io/devops-sandbox/.github/workflows/full-builds.yml@devops-ci/move_build_to_reusable_workflow
+    uses: speedb-io/speedb/.github/workflows/full-builds.yml@devops-ci/move_build_to_reusable_workflow
   #Performance:
     #if: ${{ github.event.review.state == 'approved' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/release') }}
     #needs: [Build]

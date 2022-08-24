@@ -1,0 +1,54 @@
+name: Build
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  Build:
+    runs-on: [self-hosted, ubuntu, asrunner]
+    strategy:
+      matrix:
+        include:
+          - name: verify build
+            command: cmake ..  -GNinja
+          - name: optimized build
+            command: cmake .. -DCMAKE_BUILD_TYPE=Release  -GNinja
+          - mame: clang build
+            command: CC=clang CXX=clang++ cmake ..  -GNinja
+    container:
+      image: alpine:3.14
+
+    steps:
+    - name: Pre-build
+      run: |
+        env
+        rm -rf /usr/share/dotnet || echo ""
+        df -h
+        apk add git
+        echo "nameserver 8.8.8.8" > /etc/resolv.conf
+        apk add bash python3 py3-pip clang clang-extra-tools shellcheck gcc g++ cmake ninja ccache \
+        openjdk10 gflags-dev snappy-dev lz4-dev bzip2-dev zstd-dev zlib-dev linux-headers openssh-client tar
+        python3 -m pip install lint-diffs flake8
+        
+        
+    - name: Checkout
+      uses: actions/checkout@v3 
+      
+      
+    - name: Prepare ccache timestamp
+      id: ccache_cache_timestamp
+      shell: cmake -P {0}
+      run: |
+        string(TIMESTAMP current_date "%Y-%m-%d-%H;%M;%S" UTC)
+        message("::set-output name=timestamp::${current_date}")
+        
+        
+    - name: ccache cache files
+      uses: actions/cache@v2
+      with:
+        path: ~/.ccache
+        key: ${{runner.os}}-ccache-${{steps.ccache_cache_timestamp.outputs.timestamp}}
+        restore-keys: |
+          ${{runner.os}}-ccache-
+        

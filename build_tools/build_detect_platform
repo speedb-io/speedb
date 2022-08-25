@@ -130,9 +130,6 @@ PLATFORM_SHARED_LDFLAGS="-Wl,--no-as-needed -shared -Wl,-soname -Wl,"
 PLATFORM_SHARED_CFLAGS="-fPIC"
 PLATFORM_SHARED_VERSIONED=true
 
-# generic port files (working on all platform by #ifdef) go directly in /port
-GENERIC_PORT_FILES=`cd "$ROCKSDB_ROOT"; find port -name '*.cc' | tr "\n" " "`
-
 # On GCC, we pick libc's memcmp over GCC's memcmp via -fno-builtin-memcmp
 case "$TARGET_OS" in
     Darwin)
@@ -140,7 +137,6 @@ case "$TARGET_OS" in
         COMMON_FLAGS="$COMMON_FLAGS -DOS_MACOSX"
         PLATFORM_SHARED_EXT=dylib
         PLATFORM_SHARED_LDFLAGS="-dynamiclib -install_name "
-        # PORT_FILES=port/darwin/darwin_specific.cc
         ;;
     IOS)
         PLATFORM=IOS
@@ -177,27 +173,23 @@ EOF
                 COMMON_FLAGS="$COMMON_FLAGS -DROCKSDB_IOURING_PRESENT"
             fi
         fi
-        # PORT_FILES=port/linux/linux_specific.cc
         ;;
     SunOS)
         PLATFORM=OS_SOLARIS
         COMMON_FLAGS="$COMMON_FLAGS -fno-builtin-memcmp -D_REENTRANT -DOS_SOLARIS -m64"
         PLATFORM_LDFLAGS="$PLATFORM_LDFLAGS -lpthread -lrt -static-libstdc++ -static-libgcc -m64"
-        # PORT_FILES=port/sunos/sunos_specific.cc
         ;;
     AIX)
         PLATFORM=OS_AIX
         CC=gcc
         COMMON_FLAGS="$COMMON_FLAGS -maix64 -pthread -fno-builtin-memcmp -D_REENTRANT -DOS_AIX -D__STDC_FORMAT_MACROS"
         PLATFORM_LDFLAGS="$PLATFORM_LDFLAGS -pthread -lpthread -lrt -maix64 -static-libstdc++ -static-libgcc"
-        # PORT_FILES=port/aix/aix_specific.cc
         ;;
     FreeBSD)
         PLATFORM=OS_FREEBSD
         CXX=clang++
         COMMON_FLAGS="$COMMON_FLAGS -fno-builtin-memcmp -D_REENTRANT -DOS_FREEBSD"
         PLATFORM_LDFLAGS="$PLATFORM_LDFLAGS -lpthread"
-        # PORT_FILES=port/freebsd/freebsd_specific.cc
         ;;
     GNU/kFreeBSD)
         PLATFORM=OS_GNU_KFREEBSD
@@ -208,28 +200,24 @@ EOF
             PLATFORM_LDFLAGS="$PLATFORM_LDFLAGS -latomic"
         fi
         PLATFORM_LDFLAGS="$PLATFORM_LDFLAGS -lpthread -lrt"
-        # PORT_FILES=port/gnu_kfreebsd/gnu_kfreebsd_specific.cc
         ;;
     NetBSD)
         PLATFORM=OS_NETBSD
         COMMON_FLAGS="$COMMON_FLAGS -fno-builtin-memcmp -D_REENTRANT -DOS_NETBSD"
         PLATFORM_LDFLAGS="$PLATFORM_LDFLAGS -lpthread -lgcc_s"
-        # PORT_FILES=port/netbsd/netbsd_specific.cc
         ;;
     OpenBSD)
         PLATFORM=OS_OPENBSD
 	CXX=clang++
         COMMON_FLAGS="$COMMON_FLAGS -fno-builtin-memcmp -D_REENTRANT -DOS_OPENBSD"
         PLATFORM_LDFLAGS="$PLATFORM_LDFLAGS -pthread"
-        # PORT_FILES=port/openbsd/openbsd_specific.cc
-	FIND=gfind
-	WATCH=gnuwatch
+        FIND=gfind
+        WATCH=gnuwatch
         ;;
     DragonFly)
         PLATFORM=OS_DRAGONFLYBSD
         COMMON_FLAGS="$COMMON_FLAGS -fno-builtin-memcmp -D_REENTRANT -DOS_DRAGONFLYBSD"
         PLATFORM_LDFLAGS="$PLATFORM_LDFLAGS -lpthread"
-        # PORT_FILES=port/dragonfly/dragonfly_specific.cc
         ;;
     Cygwin)
         PLATFORM=CYGWIN
@@ -242,13 +230,11 @@ EOF
             PLATFORM_LDFLAGS="$PLATFORM_LDFLAGS -latomic"
         fi
         PLATFORM_LDFLAGS="$PLATFORM_LDFLAGS -lpthread -lrt"
-        # PORT_FILES=port/linux/linux_specific.cc
         ;;
     OS_ANDROID_CROSSCOMPILE)
         PLATFORM=OS_ANDROID
-	COMMON_FLAGS="$COMMON_FLAGS -fno-builtin-memcmp -D_REENTRANT -DOS_ANDROID -DROCKSDB_PLATFORM_POSIX"
-	PLATFORM_LDFLAGS="$PLATFORM_LDFLAGS "  # All pthread features are in the Android C library
-        # PORT_FILES=port/android/android.cc
+        COMMON_FLAGS="$COMMON_FLAGS -fno-builtin-memcmp -D_REENTRANT -DOS_ANDROID -DROCKSDB_PLATFORM_POSIX"
+        PLATFORM_LDFLAGS="$PLATFORM_LDFLAGS "  # All pthread features are in the Android C library
         CROSS_COMPILE=true
         ;;
     *)
@@ -750,9 +736,9 @@ fi
 PLATFORM_CCFLAGS="$PLATFORM_CCFLAGS $COMMON_FLAGS"
 PLATFORM_CXXFLAGS="$PLATFORM_CXXFLAGS $COMMON_FLAGS"
 
-ROCKSDB_MAJOR="$(build_tools/version.sh major)"
-ROCKSDB_MINOR="$(build_tools/version.sh minor)"
-ROCKSDB_PATCH="$(build_tools/version.sh patch)"
+VERSION_MAJOR="$(build_tools/version.sh major)"
+VERSION_MINOR="$(build_tools/version.sh minor)"
+VERSION_PATCH="$(build_tools/version.sh patch)"
 
 TMP_OUTPUT="${OUTPUT}.tmp"
 
@@ -779,9 +765,10 @@ TMP_OUTPUT="${OUTPUT}.tmp"
     echo "EXEC_LDFLAGS=$EXEC_LDFLAGS"
     echo "JEMALLOC_INCLUDE=$JEMALLOC_INCLUDE"
     echo "JEMALLOC_LIB=$JEMALLOC_LIB"
-    echo "ROCKSDB_MAJOR=$ROCKSDB_MAJOR"
-    echo "ROCKSDB_MINOR=$ROCKSDB_MINOR"
-    echo "ROCKSDB_PATCH=$ROCKSDB_PATCH"
+    echo "LIBNAME=$LIBNAME"
+    echo "VERSION_MAJOR=$VERSION_MAJOR"
+    echo "VERSION_MINOR=$VERSION_MINOR"
+    echo "VERSION_PATCH=$VERSION_PATCH"
     echo "CLANG_SCAN_BUILD=$CLANG_SCAN_BUILD"
     echo "CLANG_ANALYZER=$CLANG_ANALYZER"
     echo "PROFILING_FLAGS=$PROFILING_FLAGS"

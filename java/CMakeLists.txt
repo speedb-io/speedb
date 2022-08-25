@@ -540,8 +540,11 @@ elseif(${CMAKE_VERSION} VERSION_LESS "3.11.4")
   # Old CMake
   message("Using an old CMAKE (${CMAKE_VERSION}) - JNI headers generated in separate step")
   add_jar(
-      rocksdbjni_classes
-      SOURCES ${JAVA_MAIN_CLASSES}
+      ${PROJECT_NAME}jni_classes
+      SOURCES
+      ${JAVA_MAIN_CLASSES}
+      ${JAVA_TEST_CLASSES}
+      INCLUDE_JARS ${JAVA_TESTCLASSPATH}
   )
 
 else ()
@@ -549,10 +552,12 @@ else ()
   message("Preparing Jar for JDK ${Java_VERSION_STRING}")
   message("JAVA_TESTCLASSPATH=${JAVA_TESTCLASSPATH}")
   add_jar(
-      rocksdbjni_classes
-      SOURCES ${JAVA_MAIN_CLASSES}
-      INCLUDE_JARS ${ROCKSDBJNI_CLASSES_JAR_FILE} ${JAVA_TESTCLASSPATH}
-      GENERATE_NATIVE_HEADERS rocksdbjni_headers DESTINATION ${JNI_OUTPUT_DIR}
+      ${PROJECT_NAME}jni_classes
+      SOURCES
+      ${JAVA_MAIN_CLASSES}
+      ${JAVA_TEST_CLASSES}
+      INCLUDE_JARS ${JAVA_TESTCLASSPATH}
+      GENERATE_NATIVE_HEADERS ${PROJECT_NAME}jni_headers DESTINATION ${JNI_OUTPUT_DIR}
   )
 
 endif()
@@ -742,9 +747,9 @@ if(${CMAKE_VERSION} VERSION_LESS "3.11.4")
   )
 
   create_javah(
-    TARGET rocksdbjni_headers
+    TARGET ${PROJECT_NAME}jni_headers
     CLASSES ${NATIVE_JAVA_CLASSES}
-    CLASSPATH rocksdbjni_classes ${JAVA_TESTCLASSPATH}
+    CLASSPATH ${PROJECT_NAME}jni_classes ${JAVA_TESTCLASSPATH}
     OUTPUT_DIR ${JNI_OUTPUT_DIR}
   )
 endif()
@@ -753,20 +758,15 @@ if(NOT MSVC)
   set_property(TARGET ${ROCKSDB_STATIC_LIB} PROPERTY POSITION_INDEPENDENT_CODE ON)
 endif()
 
-set(ROCKSDBJNI_STATIC_LIB rocksdbjni${ARTIFACT_SUFFIX})
-if(MINGW)
-  # Build mingw only as staic library.
-  add_library(${ROCKSDBJNI_STATIC_LIB} ${JNI_NATIVE_SOURCES})
-else()
-  add_library(${ROCKSDBJNI_STATIC_LIB} SHARED ${JNI_NATIVE_SOURCES})
-endif()
-add_dependencies(${ROCKSDBJNI_STATIC_LIB} rocksdbjni_headers)
-target_link_libraries(${ROCKSDBJNI_STATIC_LIB} ${ROCKSDB_STATIC_LIB} ${ROCKSDB_LIB})
+set(ROCKSDBJNI_STATIC_LIB ${PROJECT_NAME}jni${ARTIFACT_SUFFIX})
+add_library(${ROCKSDBJNI_STATIC_LIB} ${JNI_NATIVE_SOURCES})
+add_dependencies(${ROCKSDBJNI_STATIC_LIB} ${PROJECT_NAME}jni_headers)
+target_link_libraries(${ROCKSDBJNI_STATIC_LIB} ${ROCKS_STATIC_LIB} ${ROCKS_LIB})
 
 if(NOT MINGW)
-  set(ROCKSDBJNI_SHARED_LIB rocksdbjni-shared${ARTIFACT_SUFFIX})
+  set(ROCKSDBJNI_SHARED_LIB ${PROJECT_NAME}jni-shared${ARTIFACT_SUFFIX})
   add_library(${ROCKSDBJNI_SHARED_LIB} SHARED ${JNI_NATIVE_SOURCES})
-  add_dependencies(${ROCKSDBJNI_SHARED_LIB} rocksdbjni_headers)
+  add_dependencies(${ROCKSDBJNI_SHARED_LIB} ${PROJECT_NAME}jni_headers)
   target_link_libraries(${ROCKSDBJNI_SHARED_LIB} ${ROCKSDB_STATIC_LIB} ${ROCKSDB_LIB})
 
   set_target_properties(

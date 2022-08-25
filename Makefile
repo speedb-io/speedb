@@ -290,7 +290,7 @@ endif
 endif
 
 export JAVAC_ARGS
-CLEAN_FILES += make_config.mk rocksdb.pc
+CLEAN_FILES += make_config.mk test_config.mk rocksdb.pc
 
 ifeq ($(V), 1)
 $(info $(shell uname -a))

@@ -489,7 +489,7 @@ if(CMAKE_COMPILER_IS_GNUCXX)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-builtin-memcmp")
 endif()
 
-option(ROCKSDB_LITE "Build RocksDBLite version" OFF)
+option(ROCKSDB_LITE "Build LITE version" OFF)
 if(ROCKSDB_LITE)
   add_definitions(-DROCKSDB_LITE)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-exceptions -Os")
@@ -1036,10 +1036,10 @@ if(USE_FOLLY)
     third-party/folly/folly/ScopeGuard.cpp)
 endif()
 
-set(ROCKSDB_STATIC_LIB rocksdb${ARTIFACT_SUFFIX})
-set(ROCKSDB_SHARED_LIB rocksdb-shared${ARTIFACT_SUFFIX})
+set(ROCKSDB_STATIC_LIB ${PROJECT_NAME}${ARTIFACT_SUFFIX})
+set(ROCKSDB_SHARED_LIB ${PROJECT_NAME}-shared${ARTIFACT_SUFFIX})
 
-option(ROCKSDB_BUILD_SHARED "Build shared versions of the RocksDB libraries" ON)
+option(ROCKSDB_BUILD_SHARED "Build shared versions of the libraries" ON)
 
 
 if(WIN32)
@@ -1093,9 +1093,9 @@ if(ROCKSDB_BUILD_SHARED)
   else()
     set_target_properties(${ROCKSDB_SHARED_LIB} PROPERTIES
                           LINKER_LANGUAGE CXX
-                          VERSION ${rocksdb_VERSION}
+                          VERSION ${PROJECT_VERSION}
                           SOVERSION ${rocksdb_VERSION_MAJOR}
-                          OUTPUT_NAME "rocksdb${ARTIFACT_SUFFIX}")
+                          OUTPUT_NAME "${PROJECT_NAME}${ARTIFACT_SUFFIX}")
   endif()
 endif()
 
@@ -1138,7 +1138,7 @@ if(NOT WIN32 OR ROCKSDB_INSTALL_ON_WINDOWS)
   include(GNUInstallDirs)
   include(CMakePackageConfigHelpers)
 
-  set(package_config_destination ${CMAKE_INSTALL_LIBDIR}/cmake/rocksdb)
+  set(package_config_destination ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME})
 
   configure_package_config_file(
     ${CMAKE_CURRENT_LIST_DIR}/cmake/RocksDBConfig.cmake.in RocksDBConfig.cmake
@@ -1147,7 +1147,7 @@ if(NOT WIN32 OR ROCKSDB_INSTALL_ON_WINDOWS)
 
   write_basic_package_version_file(
     RocksDBConfigVersion.cmake
-    VERSION ${rocksdb_VERSION}
+    VERSION ${PROJECT_VERSION}
     COMPATIBILITY SameMajorVersion
   )
 

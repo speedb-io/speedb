@@ -1,3 +1,5 @@
+PROJECT_NAME?=rocksdb
+
 NATIVE_JAVA_CLASSES = \
 	org.rocksdb.AbstractCompactionFilter\
 	org.rocksdb.AbstractCompactionFilterFactory\
@@ -95,10 +97,6 @@ NATIVE_JAVA_TEST_CLASSES = \
     org.rocksdb.NativeComparatorWrapperTest.NativeStringComparatorWrapper\
     org.rocksdb.WriteBatchTest\
     org.rocksdb.WriteBatchTestInternalHelper
-
-ROCKSDB_MAJOR = $(shell grep -E "ROCKSDB_MAJOR.[0-9]" ../include/rocksdb/version.h | cut -d ' ' -f 3)
-ROCKSDB_MINOR = $(shell grep -E "ROCKSDB_MINOR.[0-9]" ../include/rocksdb/version.h | cut -d ' ' -f 3)
-ROCKSDB_PATCH = $(shell grep -E "ROCKSDB_PATCH.[0-9]" ../include/rocksdb/version.h | cut -d ' ' -f 3)
 
 NATIVE_INCLUDE = ./include
 ARCH := $(shell getconf LONG_BIT)
@@ -340,32 +338,32 @@ java: java-version
 sample: java
 	$(AM_V_GEN)mkdir -p $(SAMPLES_MAIN_CLASSES)
 	$(AM_V_at)$(JAVAC_CMD) $(JAVAC_ARGS) -cp $(MAIN_CLASSES) -d $(SAMPLES_MAIN_CLASSES) $(SAMPLES_MAIN_SRC)/RocksDBSample.java
-	$(AM_V_at)@rm -rf /tmp/rocksdbjni
-	$(AM_V_at)@rm -rf /tmp/rocksdbjni_not_found
-	$(JAVA_CMD) $(JAVA_ARGS) -Djava.library.path=target -cp $(MAIN_CLASSES):$(SAMPLES_MAIN_CLASSES) RocksDBSample /tmp/rocksdbjni
-	$(AM_V_at)@rm -rf /tmp/rocksdbjni
-	$(AM_V_at)@rm -rf /tmp/rocksdbjni_not_found
+	$(AM_V_at)@rm -rf /tmp/$(PROJECT_NAME)jni
+	$(AM_V_at)@rm -rf /tmp/$(PROJECT_NAME)jni_not_found
+	$(JAVA_CMD) $(JAVA_ARGS) -Djava.library.path=target -cp $(MAIN_CLASSES):$(SAMPLES_MAIN_CLASSES) RocksDBSample /tmp/$(PROJECT_NAME)jni
+	$(AM_V_at)@rm -rf /tmp/$(PROJECT_NAME)jni
+	$(AM_V_at)@rm -rf /tmp/$(PROJECT_NAME)jni_not_found
 
 column_family_sample: java
 	$(AM_V_GEN)mkdir -p $(SAMPLES_MAIN_CLASSES)
 	$(AM_V_at)$(JAVAC_CMD) $(JAVAC_ARGS) -cp $(MAIN_CLASSES) -d $(SAMPLES_MAIN_CLASSES) $(SAMPLES_MAIN_SRC)/RocksDBColumnFamilySample.java
-	$(AM_V_at)@rm -rf /tmp/rocksdbjni
-	$(JAVA_CMD) $(JAVA_ARGS) -Djava.library.path=target -cp $(MAIN_CLASSES):$(SAMPLES_MAIN_CLASSES) RocksDBColumnFamilySample /tmp/rocksdbjni
-	$(AM_V_at)@rm -rf /tmp/rocksdbjni
+	$(AM_V_at)@rm -rf /tmp/$(PROJECT_NAME)jni
+	$(JAVA_CMD) $(JAVA_ARGS) -Djava.library.path=target -cp $(MAIN_CLASSES):$(SAMPLES_MAIN_CLASSES) RocksDBColumnFamilySample /tmp/$(PROJECT_NAME)jni
+	$(AM_V_at)@rm -rf /tmp/$(PROJECT_NAME)jni
 
 transaction_sample: java
 	$(AM_V_GEN)mkdir -p $(SAMPLES_MAIN_CLASSES)
 	$(AM_V_at)$(JAVAC_CMD) -cp $(MAIN_CLASSES) -d $(SAMPLES_MAIN_CLASSES) $(SAMPLES_MAIN_SRC)/TransactionSample.java
-	$(AM_V_at)@rm -rf /tmp/rocksdbjni
-	$(JAVA_CMD) -ea -Xcheck:jni -Djava.library.path=target -cp $(MAIN_CLASSES):$(SAMPLES_MAIN_CLASSES) TransactionSample /tmp/rocksdbjni
-	$(AM_V_at)@rm -rf /tmp/rocksdbjni
+	$(AM_V_at)@rm -rf /tmp/$(PROJECT_NAME)jni
+	$(JAVA_CMD) -ea -Xcheck:jni -Djava.library.path=target -cp $(MAIN_CLASSES):$(SAMPLES_MAIN_CLASSES) TransactionSample /tmp/$(PROJECT_NAME)jni
+	$(AM_V_at)@rm -rf /tmp/$(PROJECT_NAME)jni
 
 optimistic_transaction_sample: java
 	$(AM_V_GEN)mkdir -p $(SAMPLES_MAIN_CLASSES)
 	$(AM_V_at)$(JAVAC_CMD) -cp $(MAIN_CLASSES) -d $(SAMPLES_MAIN_CLASSES) $(SAMPLES_MAIN_SRC)/OptimisticTransactionSample.java
-	$(AM_V_at)@rm -rf /tmp/rocksdbjni
-	$(JAVA_CMD) -ea -Xcheck:jni -Djava.library.path=target -cp $(MAIN_CLASSES):$(SAMPLES_MAIN_CLASSES) OptimisticTransactionSample /tmp/rocksdbjni
-	$(AM_V_at)@rm -rf /tmp/rocksdbjni
+	$(AM_V_at)@rm -rf /tmp/$(PROJECT_NAME)jni
+	$(JAVA_CMD) -ea -Xcheck:jni -Djava.library.path=target -cp $(MAIN_CLASSES):$(SAMPLES_MAIN_CLASSES) OptimisticTransactionSample /tmp/$(PROJECT_NAME)jni
+	$(AM_V_at)@rm -rf /tmp/$(PROJECT_NAME)jni
 
 $(JAVA_TEST_LIBDIR):
 	mkdir -p "$(JAVA_TEST_LIBDIR)"

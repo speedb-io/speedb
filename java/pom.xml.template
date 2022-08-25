@@ -4,7 +4,7 @@
 
     <groupId>org.rocksdb</groupId>
     <artifactId>rocksdbjni</artifactId>
-    <version>${ROCKSDB_JAVA_VERSION}</version>  <!-- this will be replaced by the Makefile's rocksdbjavageneratepom target -->
+    <version>${LIB_JAVA_VERSION}</version>  <!-- this will be replaced by the Makefile's rocksdbjavageneratepom target -->
 
     <name>RocksDB JNI</name>
     <description>RocksDB fat jar that contains .so files for linux32 and linux64 (glibc and musl-libc), jnilib files
@@ -123,14 +123,7 @@
                                 <name>Xenu</name>
                             </defaults>
                             <source>
-                                String fileContents = new File(project.basedir.absolutePath + '/../include/rocksdb/version.h').getText('UTF-8')
-                                matcher = (fileContents =~ /(?s).*ROCKSDB_MAJOR ([0-9]+).*?/)
-                                String major_version = matcher.getAt(0).getAt(1)
-                                matcher = (fileContents =~ /(?s).*ROCKSDB_MINOR ([0-9]+).*?/)
-                                String minor_version = matcher.getAt(0).getAt(1)
-                                matcher = (fileContents =~ /(?s).*ROCKSDB_PATCH ([0-9]+).*?/)
-                                String patch_version = matcher.getAt(0).getAt(1)
-                                String version = String.format('%s.%s.%s', major_version, minor_version, patch_version)
+                                String version = "${LIB_JAVA_VERSION}"
                                 // Set version to be used in pom.properties
                                 project.version = version
                                 // Set version to be set as jar name

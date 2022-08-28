@@ -24,6 +24,16 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <queue>
+#include <stack>
+#include <map>
+#include <atomic>
+#include <mutex>
+#include <thread>
+#include <chrono>
+#include <condition_variable>
+#include <fstream>
+#include <sstream>
 
 #include "rocksdb/customizable.h"
 #include "rocksdb/functor_wrapper.h"
@@ -43,6 +53,18 @@
 #else
 #define ROCKSDB_PRINTF_FORMAT_ATTR(format_param, dots_param)
 #endif
+
+#define PERF
+
+#ifdef PERF
+    #define PERF_MARKER_LEVEL(name, level) ROCKSDB_NAMESPACE::ScopedCpuMarker sm(name,level);
+    #define PERF_MARKER(name) ROCKSDB_NAMESPACE::ScopedCpuMarker sm(name);
+#else
+    #define PERF_MARKER(name)
+#endif
+
+#define PERF_THRESHOLD_LEVEL 1
+
 
 namespace ROCKSDB_NAMESPACE {
 
@@ -1166,6 +1188,112 @@ enum InfoLogLevel : unsigned char {
   HEADER_LEVEL,
   NUM_INFO_LOG_LEVELS,
 };
+
+class RotatingFileWrapper{
+  struct FileDescriptor_{
+    std::string filePath;
+    std::ofstream file;
+  };
+private:
+  int m_nCurrentFileIndex;
+  std::mutex m_dumpFileMutex;
+  std::map<int, FileDescriptor_> m_files;
+  int m_fileSize;
+  std::string m_dumpDirectory;
+
+public:
+  RotatingFileWrapper(std::string dumpDirectory):m_fileSize(1e9),m_dumpDirectory(dumpDirectory)
+  {
+    m_nCurrentFileIndex = 0;
+  }
+  bool is_open();
+  void open_file();
+  std::string getFilePath();
+  void close();
+  void write(std::stringstream &ss);
+  void setMaxFileSize(int);
+
+};
+
+typedef std::chrono::high_resolution_clock::time_point Timestamp;
+struct MarkerElement {
+  const char* name;
+  Timestamp timestamp_start;
+  Timestamp timestamp_end;
+  unsigned short tid;
+  int perf_overhead;
+};
+
+typedef std::shared_ptr<MarkerElement> Marker_p;
+
+
+class StackProfiler{
+  public:
+  /******************************* Type Definitions ********************************/
+    typedef std::stack<std::pair<const char *, Timestamp>> MarkersStack; 
+    typedef std::queue<Marker_p> DataQueue;
+/*********************************************************************************/
+
+    StackProfiler(StackProfiler &other) = delete;
+    void operator=(const StackProfiler &) = delete;
+
+    static StackProfiler* Instance();
+
+    static void* writeThreadWrapper(void* arg);
+    static void* writeQueuesWrapper(void* arg);
+    void writeQueues();
+    void writeToFileThread();
+    virtual ~StackProfiler();
+    Marker_p pushMarker(const char* marker);
+    void close_profiler();
+    bool isOpen() const;
+    int flushQ(std::shared_ptr<DataQueue> queue);
+
+    std::chrono::_V2::system_clock::time_point m_profiling_start_time;
+  private:
+    
+    StackProfiler():m_bIsRunning(false), m_bIsRunningQ(false)
+    {
+      m_frontQ = std::make_shared<DataQueue>();
+    };
+    std::string getFilePath();
+    void flushQQs();
+    void Init();
+    void Add(const Timestamp& timestamp, const char* name, MarkerElement val);
+    
+/************************* Members ***************************************/    
+    static StackProfiler* m_instance;
+    std::unique_ptr<RotatingFileWrapper> m_fileHandle;
+    std::shared_ptr<DataQueue> m_frontQ;
+    std::atomic_bool m_bIsRunning;
+    std::atomic_bool m_bIsRunningQ;
+    std::mutex m_lock;
+    std::condition_variable m_cv;
+    std::thread m_writtingThread;
+    std::thread m_writtingQThread;
+    std::queue<std::shared_ptr<DataQueue>> m_QQ;
+    std::mutex m_qqmutex;
+    
+/**************************************************************************/
+};
+
+class ScopedCpuMarker
+     {
+     public:
+      Marker_p m_marker;
+         ScopedCpuMarker(const char* name, unsigned char marker_level = 1)
+         {
+           if (marker_level >= PERF_THRESHOLD_LEVEL){
+            m_marker = StackProfiler::Instance()->pushMarker(name);
+           }
+         };
+         ~ScopedCpuMarker()
+         {
+           if (m_marker != nullptr){
+            m_marker->timestamp_end = std::chrono::high_resolution_clock::now();
+           }
+         };
+     };
 
 // An interface for writing log messages.
 //

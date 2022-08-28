@@ -27,7 +27,7 @@
 #include "rocksdb/utilities/options_type.h"
 #include "util/autovector.h"
 #include "util/string_util.h"
-
+#include "unistd.h"
 namespace ROCKSDB_NAMESPACE {
 namespace {
 #ifndef ROCKSDB_LITE
@@ -915,6 +915,288 @@ void Logger::Logv(const InfoLogLevel log_level, const char* format, va_list ap) 
     Flush();
   }
 }
+
+
+bool RotatingFileWrapper::is_open(){
+  return m_files[m_nCurrentFileIndex].file.is_open();
+}
+
+void RotatingFileWrapper::close(){
+  m_dumpFileMutex.lock();
+  for(auto it = m_files.begin(); it != m_files.end(); ){
+    it->second.file.close();
+    it = m_files.erase(it);
+  }
+  m_dumpFileMutex.unlock();
+}
+
+void RotatingFileWrapper::open_file(){
+  int prev_index = m_nCurrentFileIndex;
+
+  m_nCurrentFileIndex++;
+
+  std::string filename = getFilePath();
+  m_files[m_nCurrentFileIndex].filePath = filename + std::to_string(m_nCurrentFileIndex);
+
+  m_dumpFileMutex.lock();
+
+  if(m_files[m_nCurrentFileIndex].file.is_open()){
+    m_files[m_nCurrentFileIndex].file.close();
+  }
+#ifdef PERF
+  m_files[m_nCurrentFileIndex].file.open( m_files[m_nCurrentFileIndex].filePath , std::ios::out | std::ios::app  );
+#endif
+  m_dumpFileMutex.unlock();
+
+}
+
+void RotatingFileWrapper::setMaxFileSize(int size){
+  if(size>0 && size < 100e9)
+    this->m_fileSize = size;
+}
+
+std::string RotatingFileWrapper::getFilePath(){
+  std::time_t t = std::time(0);  
+  std::tm* now = std::localtime(&t);
+  std::stringstream ss;
+
+  ss << m_dumpDirectory<<"perfdata_" << now->tm_mday <<'_'<< (now->tm_mon + 1) << '_'<<now->tm_hour<<'-'<<now->tm_min<<'-'<<now->tm_sec<<"_";
+  return ss.str();
+}
+
+void RotatingFileWrapper::write(std::stringstream &ss){  
+  auto input = ss.str();
+  std::string output;
+  CompressionOptions copts;
+  CompressionContext context(kZlibCompression);
+  constexpr uint64_t sample_for_compression = 0;
+  copts.window_bits = 15;
+  copts.enabled = true;
+
+  CompressionInfo _info(copts, context, CompressionDict::GetEmptyDict(), kZlibCompression, sample_for_compression);
+  if (!Zlib_Compress(_info, 1, input.data(), input.size(), &output)) {
+   if( !Snappy_Compress(_info, input.data(), input.size(), &output)) {
+    output = std::move(input);
+   }
+  }
+  m_dumpFileMutex.lock();
+  m_files[m_nCurrentFileIndex].file.write(output.data(), output.size());
+  m_dumpFileMutex.unlock();
+
+
+  long pos_bytes = m_files[m_nCurrentFileIndex].file.tellp();
+  if(pos_bytes > m_fileSize){
+    this->open_file();
+  }
+  
+}
+
+StackProfiler* StackProfiler::m_instance = nullptr;
+
+StackProfiler::~StackProfiler(){
+  close_profiler();
+}
+
+
+bool StackProfiler::isOpen() const{
+  return m_bIsRunning;
+}
+
+Marker_p StackProfiler::pushMarker(const char* marker){
+  if (!isOpen())
+		return nullptr;
+	auto data = std::make_shared<MarkerElement>();
+	data->timestamp_start = std::chrono::high_resolution_clock::now();
+	data->name = marker;
+
+#ifdef linux
+  data->tid = gettid();
+#else
+  data->tid = std::hash<std::thread::id>{}(std::this_thread::get_id());
+#endif
+
+  m_lock.lock();
+	m_frontQ->push(data);
+	m_lock.unlock();
+  auto finish = std::chrono::high_resolution_clock::now();
+  auto markerDuration_ = std::chrono::duration_cast<std::chrono::microseconds>(finish-data->timestamp_start).count(); 
+  data->perf_overhead = markerDuration_;
+
+  return data;
+}
+
+void* StackProfiler::writeThreadWrapper(void* arg){
+  auto s_profiler = (StackProfiler*)arg;
+  s_profiler->writeToFileThread();
+  return 0;
+}
+
+void* StackProfiler::writeQueuesWrapper(void* arg){
+  auto s_profiler = (StackProfiler*)arg;
+  s_profiler->writeQueues();
+  return 0;
+}
+
+void StackProfiler::close_profiler(){
+
+	m_bIsRunning = false;
+		
+  m_cv.notify_all();
+  
+  if (m_writtingThread.joinable())
+  {
+    m_writtingThread.join();
+  }
+
+  m_bIsRunningQ = false;
+
+  if(m_writtingQThread.joinable()){
+    m_writtingQThread.join();
+  }
+
+  m_fileHandle->close();
+}
+
+int StackProfiler::flushQ(std::shared_ptr<DataQueue> queue){
+  if (queue == nullptr){
+    return 0;
+  }
+    
+	int count = 0;
+  std::stringstream stringifiedData;
+  
+	while (!queue->empty())
+	{  
+
+		auto val = queue->front();
+  	queue->pop();  
+
+		if (m_fileHandle->is_open())
+		{
+      auto ts_s = std::chrono::duration_cast<std::chrono::microseconds>(val->timestamp_start.time_since_epoch()).count() + val->perf_overhead;
+      auto ts_e = std::chrono::duration_cast<std::chrono::microseconds>(val->timestamp_end.time_since_epoch()).count();
+      stringifiedData << val->tid << "," << val->name << ",";
+      stringifiedData << ts_s << "," << ts_e << std::endl;
+			count++;
+		}
+		
+	}
+
+  m_fileHandle->write(stringifiedData);
+
+	return count;
+}
+
+void StackProfiler::flushQQs(){
+    m_qqmutex.lock();
+    bool Q_empty = m_QQ.empty();
+    m_qqmutex.unlock();
+
+    while(!Q_empty){
+      m_qqmutex.lock();
+      auto q = m_QQ.front();
+      m_QQ.pop();
+      Q_empty = m_QQ.empty();
+      m_qqmutex.unlock();
+
+      flushQ(q);
+    }
+}
+
+void StackProfiler::writeQueues(){
+  std::mutex endFileMutex;
+  while (m_bIsRunningQ)
+	{
+    if (m_QQ.empty()){
+      std::this_thread::sleep_for(std::chrono::milliseconds(100));
+      continue;
+    }
+
+    flushQQs();
+    
+  }
+
+  if(!m_QQ.empty()){
+    flushQQs();
+  }
+}
+
+void StackProfiler::writeToFileThread(){
+	
+  std::mutex endFileMutex;
+  while (m_bIsRunning)
+	{
+    std::unique_lock<std::mutex> lk(endFileMutex);
+    m_cv.wait_for(lk,std::chrono::milliseconds(100), []{return false;});
+
+		auto temp = std::make_shared<DataQueue>();
+    
+		m_lock.lock();
+    
+    std::swap(m_frontQ, temp);
+		m_lock.unlock();
+
+    m_qqmutex.lock();
+    m_QQ.push(temp);
+    
+    m_qqmutex.unlock();
+    
+    
+	}
+  if(m_frontQ->size() > 0){
+    m_qqmutex.lock();
+    m_QQ.push(m_frontQ);
+    m_qqmutex.unlock();
+  }
+
+}
+
+void StackProfiler::Init(){
+
+  if (m_bIsRunning){
+    return;
+  }
+  m_bIsRunning = true;
+  m_bIsRunningQ = true;
+
+  m_fileHandle = std::unique_ptr<RotatingFileWrapper>(new RotatingFileWrapper("/tmp/perfdata/"));
+  m_fileHandle->setMaxFileSize(5e8);
+  m_fileHandle->open_file();
+
+  if (m_fileHandle->is_open()){
+    m_writtingThread =std::thread(&StackProfiler::writeThreadWrapper, (void*)this);
+    m_writtingQThread =std::thread(&StackProfiler::writeQueuesWrapper, (void*)this);
+  }
+
+}
+
+
+void StackProfiler::Add(const Timestamp& timestamp, const char* name, MarkerElement val){
+
+  if (!isOpen())
+		return;
+	auto data = std::make_shared<MarkerElement>();
+	data->timestamp_start = timestamp;
+	data->name = name;
+  data->tid = val.tid;
+
+  m_lock.lock();
+	m_frontQ->push(data);
+	m_lock.unlock();
+  auto finish = std::chrono::high_resolution_clock::now();
+  auto markerDuration_ = std::chrono::duration_cast<std::chrono::microseconds>(finish-timestamp).count(); 
+  data->perf_overhead = markerDuration_;
+}
+
+StackProfiler* StackProfiler::Instance(){
+  if(m_instance==nullptr){
+    m_instance = new StackProfiler();
+    m_instance->m_profiling_start_time = std::chrono::high_resolution_clock::now();
+    m_instance->Init();
+  }
+  return m_instance;
+}
+
 
 static void Logv(const InfoLogLevel log_level, Logger *info_log, const char *format, va_list ap) {
   if (info_log && info_log->GetInfoLogLevel() <= log_level) {

@@ -5,9 +5,9 @@
 <div align="center">
 
 ![GitHub](https://img.shields.io/github/license/speedb-io/speedb)
-![GitHub contributors](https://img.shields.io/github/contributors/speedb-io/speedb)
+![GitHub contributors](https://img.shields.io/github/contributors/speedb-io/speedb?color=blue)
 ![GitHub pull requests](https://img.shields.io/github/issues-pr/speedb-io/speedb)
-![GitHub closed pull requests](https://img.shields.io/github/issues-pr-closed/speedb-io/speedb)
+![GitHub closed pull requests](https://img.shields.io/github/issues-pr-closed/speedb-io/speedb?color=green)
 </div>
 
 # Speedb

@@ -13,8 +13,9 @@
 # Speedb
 Speedb is a library that provides persistent key-value stores. Keys and values are arbitrary byte arrays. The keys are ordered within the key value store according to a user-specified comparator function.
 It is maintained by Speedb and is forked from Rocksdb, developed by Facebook.
-<img src="bee.gif" width="80px" />
-
+<div>
+  <img src="bee.gif" width="80px" />
+</div>
 
 ## Usage
 * If speedb is in your default library path:

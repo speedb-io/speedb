@@ -38,6 +38,7 @@ std::unique_ptr<InternalIterator> MakeRangeDelIter(
 std::vector<std::unique_ptr<FragmentedRangeTombstoneList>>
 MakeFragmentedTombstoneLists(
     const std::vector<std::vector<RangeTombstone>>& range_dels_list) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::vector<std::unique_ptr<FragmentedRangeTombstoneList>> fragment_lists;
   for (const auto& range_dels : range_dels_list) {
     auto range_del_iter = MakeRangeDelIter(range_dels);
@@ -73,16 +74,19 @@ struct IsRangeOverlappedTestCase {
 };
 
 ParsedInternalKey UncutEndpoint(const Slice& s) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return ParsedInternalKey(s, kMaxSequenceNumber, kTypeRangeDeletion);
 }
 
 ParsedInternalKey InternalValue(const Slice& key, SequenceNumber seq) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return ParsedInternalKey(key, seq, kTypeValue);
 }
 
 void VerifyIterator(
     TruncatedRangeDelIterator* iter, const InternalKeyComparator& icmp,
     const std::vector<TruncatedIterScanTestCase>& expected_range_dels) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Test forward iteration.
   iter->SeekToFirst();
   for (size_t i = 0; i < expected_range_dels.size(); i++, iter->Next()) {
@@ -112,6 +116,7 @@ void VerifyIterator(
 void VerifySeek(TruncatedRangeDelIterator* iter,
                 const InternalKeyComparator& icmp,
                 const std::vector<TruncatedIterSeekTestCase>& test_cases) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (const auto& test_case : test_cases) {
     iter->Seek(test_case.target);
     if (test_case.invalid) {
@@ -128,6 +133,7 @@ void VerifySeek(TruncatedRangeDelIterator* iter,
 void VerifySeekForPrev(
     TruncatedRangeDelIterator* iter, const InternalKeyComparator& icmp,
     const std::vector<TruncatedIterSeekTestCase>& test_cases) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (const auto& test_case : test_cases) {
     iter->SeekForPrev(test_case.target);
     if (test_case.invalid) {
@@ -143,6 +149,7 @@ void VerifySeekForPrev(
 
 void VerifyShouldDelete(RangeDelAggregator* range_del_agg,
                         const std::vector<ShouldDeleteTestCase>& test_cases) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (const auto& test_case : test_cases) {
     EXPECT_EQ(
         test_case.result,
@@ -161,6 +168,7 @@ void VerifyShouldDelete(RangeDelAggregator* range_del_agg,
 void VerifyIsRangeOverlapped(
     ReadRangeDelAggregator* range_del_agg,
     const std::vector<IsRangeOverlappedTestCase>& test_cases) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (const auto& test_case : test_cases) {
     EXPECT_EQ(test_case.result,
               range_del_agg->IsRangeOverlapped(test_case.start, test_case.end));
@@ -169,6 +177,7 @@ void VerifyIsRangeOverlapped(
 
 void CheckIterPosition(const RangeTombstone& tombstone,
                        const FragmentedRangeTombstoneIterator* iter) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Test InternalIterator interface.
   EXPECT_EQ(tombstone.start_key_, ExtractUserKey(iter->key()));
   EXPECT_EQ(tombstone.end_key_, iter->value());
@@ -183,6 +192,7 @@ void CheckIterPosition(const RangeTombstone& tombstone,
 void VerifyFragmentedRangeDels(
     FragmentedRangeTombstoneIterator* iter,
     const std::vector<RangeTombstone>& expected_tombstones) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   iter->SeekToFirst();
   for (size_t i = 0; i < expected_tombstones.size(); i++, iter->Next()) {
     ASSERT_TRUE(iter->Valid());
@@ -194,6 +204,7 @@ void VerifyFragmentedRangeDels(
 }  // namespace
 
 TEST_F(RangeDelAggregatorTest, EmptyTruncatedIter) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto range_del_iter = MakeRangeDelIter({});
   FragmentedRangeTombstoneList fragment_list(std::move(range_del_iter),
                                              bytewise_icmp);
@@ -212,6 +223,7 @@ TEST_F(RangeDelAggregatorTest, EmptyTruncatedIter) {
 }
 
 TEST_F(RangeDelAggregatorTest, UntruncatedIter) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto range_del_iter =
       MakeRangeDelIter({{"a", "e", 10}, {"e", "g", 8}, {"j", "n", 4}});
   FragmentedRangeTombstoneList fragment_list(std::move(range_del_iter),
@@ -246,6 +258,7 @@ TEST_F(RangeDelAggregatorTest, UntruncatedIter) {
 }
 
 TEST_F(RangeDelAggregatorTest, UntruncatedIterWithSnapshot) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto range_del_iter =
       MakeRangeDelIter({{"a", "e", 10}, {"e", "g", 8}, {"j", "n", 4}});
   FragmentedRangeTombstoneList fragment_list(std::move(range_del_iter),
@@ -279,6 +292,7 @@ TEST_F(RangeDelAggregatorTest, UntruncatedIterWithSnapshot) {
 }
 
 TEST_F(RangeDelAggregatorTest, TruncatedIterPartiallyCutTombstones) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto range_del_iter =
       MakeRangeDelIter({{"a", "e", 10}, {"e", "g", 8}, {"j", "n", 4}});
   FragmentedRangeTombstoneList fragment_list(std::move(range_del_iter),
@@ -315,6 +329,7 @@ TEST_F(RangeDelAggregatorTest, TruncatedIterPartiallyCutTombstones) {
 }
 
 TEST_F(RangeDelAggregatorTest, TruncatedIterFullyCutTombstones) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto range_del_iter =
       MakeRangeDelIter({{"a", "e", 10}, {"e", "g", 8}, {"j", "n", 4}});
   FragmentedRangeTombstoneList fragment_list(std::move(range_del_iter),
@@ -345,6 +360,7 @@ TEST_F(RangeDelAggregatorTest, TruncatedIterFullyCutTombstones) {
 }
 
 TEST_F(RangeDelAggregatorTest, SingleIterInAggregator) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto range_del_iter = MakeRangeDelIter({{"a", "e", 10}, {"c", "g", 8}});
   FragmentedRangeTombstoneList fragment_list(std::move(range_del_iter),
                                              bytewise_icmp);
@@ -369,6 +385,7 @@ TEST_F(RangeDelAggregatorTest, SingleIterInAggregator) {
 }
 
 TEST_F(RangeDelAggregatorTest, MultipleItersInAggregator) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto fragment_lists = MakeFragmentedTombstoneLists(
       {{{"a", "e", 10}, {"c", "g", 8}},
        {{"a", "b", 20}, {"h", "i", 25}, {"ii", "j", 15}}});
@@ -401,6 +418,7 @@ TEST_F(RangeDelAggregatorTest, MultipleItersInAggregator) {
 }
 
 TEST_F(RangeDelAggregatorTest, MultipleItersInAggregatorWithUpperBound) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto fragment_lists = MakeFragmentedTombstoneLists(
       {{{"a", "e", 10}, {"c", "g", 8}},
        {{"a", "b", 20}, {"h", "i", 25}, {"ii", "j", 15}}});
@@ -433,6 +451,7 @@ TEST_F(RangeDelAggregatorTest, MultipleItersInAggregatorWithUpperBound) {
 }
 
 TEST_F(RangeDelAggregatorTest, MultipleTruncatedItersInAggregator) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto fragment_lists = MakeFragmentedTombstoneLists(
       {{{"a", "z", 10}}, {{"a", "z", 10}}, {{"a", "z", 10}}});
   std::vector<std::pair<InternalKey, InternalKey>> iter_bounds = {
@@ -473,6 +492,7 @@ TEST_F(RangeDelAggregatorTest, MultipleTruncatedItersInAggregator) {
 }
 
 TEST_F(RangeDelAggregatorTest, MultipleTruncatedItersInAggregatorSameLevel) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto fragment_lists = MakeFragmentedTombstoneLists(
       {{{"a", "z", 10}}, {{"a", "z", 10}}, {{"a", "z", 10}}});
   std::vector<std::pair<InternalKey, InternalKey>> iter_bounds = {
@@ -517,6 +537,7 @@ TEST_F(RangeDelAggregatorTest, MultipleTruncatedItersInAggregatorSameLevel) {
 }
 
 TEST_F(RangeDelAggregatorTest, CompactionAggregatorNoSnapshots) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto fragment_lists = MakeFragmentedTombstoneLists(
       {{{"a", "e", 10}, {"c", "g", 8}},
        {{"a", "b", 20}, {"h", "i", 25}, {"ii", "j", 15}}});
@@ -551,6 +572,7 @@ TEST_F(RangeDelAggregatorTest, CompactionAggregatorNoSnapshots) {
 }
 
 TEST_F(RangeDelAggregatorTest, CompactionAggregatorWithSnapshots) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto fragment_lists = MakeFragmentedTombstoneLists(
       {{{"a", "e", 10}, {"c", "g", 8}},
        {{"a", "b", 20}, {"h", "i", 25}, {"ii", "j", 15}}});
@@ -592,6 +614,7 @@ TEST_F(RangeDelAggregatorTest, CompactionAggregatorWithSnapshots) {
 }
 
 TEST_F(RangeDelAggregatorTest, CompactionAggregatorEmptyIteratorLeft) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto fragment_lists = MakeFragmentedTombstoneLists(
       {{{"a", "e", 10}, {"c", "g", 8}},
        {{"a", "b", 20}, {"h", "i", 25}, {"ii", "j", 15}}});
@@ -610,6 +633,7 @@ TEST_F(RangeDelAggregatorTest, CompactionAggregatorEmptyIteratorLeft) {
 }
 
 TEST_F(RangeDelAggregatorTest, CompactionAggregatorEmptyIteratorRight) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto fragment_lists = MakeFragmentedTombstoneLists(
       {{{"a", "e", 10}, {"c", "g", 8}},
        {{"a", "b", 20}, {"h", "i", 25}, {"ii", "j", 15}}});
@@ -635,6 +659,7 @@ TEST_F(RangeDelAggregatorTest, CompactionAggregatorEmptyIteratorRight) {
 }
 
 TEST_F(RangeDelAggregatorTest, CompactionAggregatorBoundedIterator) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto fragment_lists = MakeFragmentedTombstoneLists(
       {{{"a", "e", 10}, {"c", "g", 8}},
        {{"a", "b", 20}, {"h", "i", 25}, {"ii", "j", 15}}});
@@ -664,6 +689,7 @@ TEST_F(RangeDelAggregatorTest, CompactionAggregatorBoundedIterator) {
 
 TEST_F(RangeDelAggregatorTest,
        CompactionAggregatorBoundedIteratorExtraFragments) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto fragment_lists = MakeFragmentedTombstoneLists(
       {{{"a", "d", 10}, {"c", "g", 8}},
        {{"b", "c", 20}, {"d", "f", 30}, {"h", "i", 25}, {"ii", "j", 15}}});
@@ -705,6 +731,7 @@ TEST_F(RangeDelAggregatorTest,
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

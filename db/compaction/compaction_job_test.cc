@@ -38,6 +38,7 @@ namespace {
 
 void VerifyInitializationOfCompactionJobStats(
       const CompactionJobStats& compaction_job_stats) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #if !defined(IOS_CROSS_COMPILE)
   ASSERT_EQ(compaction_job_stats.elapsed_micros, 0U);
 
@@ -90,6 +91,7 @@ class CompactionJobTestBase : public testing::Test {
         mock_table_factory_(new mock::MockTableFactory()),
         error_handler_(nullptr, db_options_, &mutex_),
         encode_u64_ts_(std::move(encode_u64_ts)) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Env* base_env = Env::Default();
     EXPECT_OK(
         test::CreateEnvFromSystem(ConfigOptions(), &base_env, &env_guard_));
@@ -108,6 +110,7 @@ class CompactionJobTestBase : public testing::Test {
   }
 
   std::string GenerateFileName(uint64_t file_number) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     FileMetaData meta;
     std::vector<DbPath> db_paths;
     db_paths.emplace_back(dbname_, std::numeric_limits<uint64_t>::max());
@@ -117,12 +120,14 @@ class CompactionJobTestBase : public testing::Test {
 
   std::string KeyStr(const std::string& user_key, const SequenceNumber seq_num,
                      const ValueType t, uint64_t ts = 0) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::string user_key_with_ts = user_key + encode_u64_ts_(ts);
     return InternalKey(user_key_with_ts, seq_num, t).Encode().ToString();
   }
 
   static std::string BlobStr(uint64_t blob_file_number, uint64_t offset,
                              uint64_t size) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::string blob_index;
     BlobIndex::EncodeBlob(&blob_index, blob_file_number, offset, size,
                           kNoCompression);
@@ -131,6 +136,7 @@ class CompactionJobTestBase : public testing::Test {
 
   static std::string BlobStrTTL(uint64_t blob_file_number, uint64_t offset,
                                 uint64_t size, uint64_t expiration) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::string blob_index;
     BlobIndex::EncodeBlobTTL(&blob_index, expiration, blob_file_number, offset,
                              size, kNoCompression);
@@ -139,12 +145,14 @@ class CompactionJobTestBase : public testing::Test {
 
   static std::string BlobStrInlinedTTL(const Slice& value,
                                        uint64_t expiration) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::string blob_index;
     BlobIndex::EncodeInlinedTTL(&blob_index, expiration, value);
     return blob_index;
   }
 
   void AddMockFile(const mock::KVVector& contents, int level = 0) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(contents.size() > 0);
 
     bool first_key = true;
@@ -216,6 +224,7 @@ class CompactionJobTestBase : public testing::Test {
   }
 
   void SetLastSequence(const SequenceNumber sequence_number) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     versions_->SetLastAllocatedSequence(sequence_number + 1);
     versions_->SetLastPublishedSequence(sequence_number + 1);
     versions_->SetLastSequence(sequence_number + 1);
@@ -223,6 +232,7 @@ class CompactionJobTestBase : public testing::Test {
 
   // returns expected result after compaction
   mock::KVVector CreateTwoFiles(bool gen_corrupted_keys) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     stl_wrappers::KVMap expected_results;
     constexpr int kKeysPerFile = 10000;
     constexpr int kCorruptKeysPerFile = 200;
@@ -271,6 +281,7 @@ class CompactionJobTestBase : public testing::Test {
   }
 
   void NewDB() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     EXPECT_OK(DestroyDB(dbname_, Options()));
     EXPECT_OK(env_->CreateDirIfMissing(dbname_));
     versions_.reset(
@@ -322,6 +333,7 @@ class CompactionJobTestBase : public testing::Test {
       SequenceNumber earliest_write_conflict_snapshot = kMaxSequenceNumber,
       int output_level = 1, bool verify = true,
       uint64_t expected_oldest_blob_file_number = kInvalidBlobFileNumber) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     auto cfd = versions_->GetColumnFamilySet()->GetDefault();
 
     size_t num_input_files = 0;
@@ -428,6 +440,7 @@ class CompactionJobTest : public CompactionJobTestBase {
 };
 
 TEST_F(CompactionJobTest, Simple) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewDB();
 
   auto expected_results = CreateTwoFiles(false);
@@ -438,6 +451,7 @@ TEST_F(CompactionJobTest, Simple) {
 }
 
 TEST_F(CompactionJobTest, DISABLED_SimpleCorrupted) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewDB();
 
   auto expected_results = CreateTwoFiles(true);
@@ -448,6 +462,7 @@ TEST_F(CompactionJobTest, DISABLED_SimpleCorrupted) {
 }
 
 TEST_F(CompactionJobTest, SimpleDeletion) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewDB();
 
   auto file1 = mock::MakeMockFile({{KeyStr("c", 4U, kTypeDeletion), ""},
@@ -467,6 +482,7 @@ TEST_F(CompactionJobTest, SimpleDeletion) {
 }
 
 TEST_F(CompactionJobTest, OutputNothing) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewDB();
 
   auto file1 = mock::MakeMockFile({{KeyStr("a", 1U, kTypeValue), "val"}});
@@ -485,6 +501,7 @@ TEST_F(CompactionJobTest, OutputNothing) {
 }
 
 TEST_F(CompactionJobTest, SimpleOverwrite) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewDB();
 
   auto file1 = mock::MakeMockFile({
@@ -507,6 +524,7 @@ TEST_F(CompactionJobTest, SimpleOverwrite) {
 }
 
 TEST_F(CompactionJobTest, SimpleNonLastLevel) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewDB();
 
   auto file1 = mock::MakeMockFile({
@@ -536,6 +554,7 @@ TEST_F(CompactionJobTest, SimpleNonLastLevel) {
 }
 
 TEST_F(CompactionJobTest, SimpleMerge) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   merge_op_ = MergeOperators::CreateStringAppendOperator();
   NewDB();
 
@@ -560,6 +579,7 @@ TEST_F(CompactionJobTest, SimpleMerge) {
 }
 
 TEST_F(CompactionJobTest, NonAssocMerge) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   merge_op_ = MergeOperators::CreateStringAppendTESTOperator();
   NewDB();
 
@@ -585,6 +605,7 @@ TEST_F(CompactionJobTest, NonAssocMerge) {
 
 // Filters merge operands with value 10.
 TEST_F(CompactionJobTest, MergeOperandFilter) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   merge_op_ = MergeOperators::CreateUInt64AddOperator();
   compaction_filter_.reset(new test::FilterNumber(10U));
   NewDB();
@@ -611,6 +632,7 @@ TEST_F(CompactionJobTest, MergeOperandFilter) {
 }
 
 TEST_F(CompactionJobTest, FilterSomeMergeOperands) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   merge_op_ = MergeOperators::CreateUInt64AddOperator();
   compaction_filter_.reset(new test::FilterNumber(10U));
   NewDB();
@@ -648,6 +670,7 @@ TEST_F(CompactionJobTest, FilterSomeMergeOperands) {
 
 // Test where all operands/merge results are filtered out.
 TEST_F(CompactionJobTest, FilterAllMergeOperands) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   merge_op_ = MergeOperators::CreateUInt64AddOperator();
   compaction_filter_.reset(new test::FilterNumber(10U));
   NewDB();
@@ -683,6 +706,7 @@ TEST_F(CompactionJobTest, FilterAllMergeOperands) {
 }
 
 TEST_F(CompactionJobTest, SimpleSingleDelete) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewDB();
 
   auto file1 = mock::MakeMockFile({
@@ -709,6 +733,7 @@ TEST_F(CompactionJobTest, SimpleSingleDelete) {
 }
 
 TEST_F(CompactionJobTest, SingleDeleteSnapshots) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewDB();
 
   auto file1 = mock::MakeMockFile({
@@ -774,6 +799,7 @@ TEST_F(CompactionJobTest, SingleDeleteSnapshots) {
 }
 
 TEST_F(CompactionJobTest, EarliestWriteConflictSnapshot) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewDB();
 
   // Test multiple snapshots where the earliest snapshot is not a
@@ -852,6 +878,7 @@ TEST_F(CompactionJobTest, EarliestWriteConflictSnapshot) {
 }
 
 TEST_F(CompactionJobTest, SingleDeleteZeroSeq) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewDB();
 
   auto file1 = mock::MakeMockFile({
@@ -875,6 +902,7 @@ TEST_F(CompactionJobTest, SingleDeleteZeroSeq) {
 }
 
 TEST_F(CompactionJobTest, MultiSingleDelete) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Tests three scenarios involving multiple single delete/put pairs:
   //
   // A: Put Snapshot SDel Put SDel -> Put Snapshot SDel
@@ -1032,6 +1060,7 @@ TEST_F(CompactionJobTest, MultiSingleDelete) {
 // gets written out. TODO(noetzli): We probably want a better way to treat
 // corrupt keys.
 TEST_F(CompactionJobTest, DISABLED_CorruptionAfterDeletion) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewDB();
 
   auto file1 =
@@ -1058,6 +1087,7 @@ TEST_F(CompactionJobTest, DISABLED_CorruptionAfterDeletion) {
 }
 
 TEST_F(CompactionJobTest, OldestBlobFileNumber) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewDB();
 
   // Note: blob1 is inlined TTL, so it will not be considered for the purposes
@@ -1106,6 +1136,7 @@ TEST_F(CompactionJobTest, OldestBlobFileNumber) {
 }
 
 TEST_F(CompactionJobTest, InputSerialization) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Setup a random CompactionServiceInput
   CompactionServiceInput input;
   const int kStrMaxLen = 1000;
@@ -1196,6 +1227,7 @@ TEST_F(CompactionJobTest, InputSerialization) {
 }
 
 TEST_F(CompactionJobTest, ResultSerialization) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Setup a random CompactionServiceResult
   CompactionServiceResult result;
   const int kStrMaxLen = 1000;
@@ -1295,6 +1327,7 @@ class CompactionJobTimestampTest : public CompactionJobTestBase {
 };
 
 TEST_F(CompactionJobTimestampTest, GCDisabled) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewDB();
 
   auto file1 =
@@ -1328,6 +1361,7 @@ TEST_F(CompactionJobTimestampTest, GCDisabled) {
 }
 
 TEST_F(CompactionJobTimestampTest, NoKeyExpired) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewDB();
 
   auto file1 =
@@ -1356,6 +1390,7 @@ TEST_F(CompactionJobTimestampTest, NoKeyExpired) {
 }
 
 TEST_F(CompactionJobTimestampTest, AllKeysExpired) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewDB();
 
   auto file1 = mock::MakeMockFile(
@@ -1382,6 +1417,7 @@ TEST_F(CompactionJobTimestampTest, AllKeysExpired) {
 }
 
 TEST_F(CompactionJobTimestampTest, SomeKeysExpired) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewDB();
 
   auto file1 =
@@ -1410,6 +1446,7 @@ TEST_F(CompactionJobTimestampTest, SomeKeysExpired) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   RegisterCustomObjects(argc, argv);
   return RUN_ALL_TESTS();
@@ -1419,6 +1456,7 @@ int main(int argc, char** argv) {
 #include <stdio.h>
 
 int main(int /*argc*/, char** /*argv*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   fprintf(stderr,
           "SKIPPED as CompactionJobStats is not supported in ROCKSDB_LITE\n");
   return 0;

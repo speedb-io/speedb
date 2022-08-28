@@ -21,6 +21,7 @@ namespace ROCKSDB_NAMESPACE {
 
 Status ImportColumnFamilyJob::Prepare(uint64_t next_file_number,
                                       SuperVersion* sv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Status status;
 
   // Read the information of files we are importing
@@ -133,6 +134,7 @@ Status ImportColumnFamilyJob::Prepare(uint64_t next_file_number,
 // REQUIRES: we have become the only writer by entering both write_thread_ and
 // nonmem_write_thread_
 Status ImportColumnFamilyJob::Run() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Status status;
   edit_.SetColumnFamily(cfd_->GetID());
 
@@ -170,6 +172,7 @@ Status ImportColumnFamilyJob::Run() {
 }
 
 void ImportColumnFamilyJob::Cleanup(const Status& status) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!status.ok()) {
     // We failed to add files to the database remove all the files we copied.
     for (const auto& f : files_to_import_) {
@@ -200,6 +203,7 @@ void ImportColumnFamilyJob::Cleanup(const Status& status) {
 Status ImportColumnFamilyJob::GetIngestedFileInfo(
     const std::string& external_file, uint64_t new_file_number,
     IngestedFileInfo* file_to_import, SuperVersion* sv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   file_to_import->external_file_path = external_file;
 
   // Get external file size

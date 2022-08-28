@@ -18,6 +18,7 @@ namespace ROCKSDB_NAMESPACE {
 class BlobFileAdditionTest : public testing::Test {
  public:
   static void TestEncodeDecode(const BlobFileAddition& blob_file_addition) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::string encoded;
     blob_file_addition.EncodeTo(&encoded);
 
@@ -30,6 +31,7 @@ class BlobFileAdditionTest : public testing::Test {
 };
 
 TEST_F(BlobFileAdditionTest, Empty) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   BlobFileAddition blob_file_addition;
 
   ASSERT_EQ(blob_file_addition.GetBlobFileNumber(), kInvalidBlobFileNumber);
@@ -42,6 +44,7 @@ TEST_F(BlobFileAdditionTest, Empty) {
 }
 
 TEST_F(BlobFileAdditionTest, NonEmpty) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr uint64_t blob_file_number = 123;
   constexpr uint64_t total_blob_count = 2;
   constexpr uint64_t total_blob_bytes = 123456;
@@ -64,6 +67,7 @@ TEST_F(BlobFileAdditionTest, NonEmpty) {
 }
 
 TEST_F(BlobFileAdditionTest, DecodeErrors) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string str;
   Slice slice(str);
 
@@ -139,8 +143,10 @@ TEST_F(BlobFileAdditionTest, DecodeErrors) {
 }
 
 TEST_F(BlobFileAdditionTest, ForwardCompatibleCustomField) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   SyncPoint::GetInstance()->SetCallBack(
       "BlobFileAddition::EncodeTo::CustomFields", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         std::string* output = static_cast<std::string*>(arg);
 
         constexpr uint32_t forward_compatible_tag = 2;
@@ -167,8 +173,10 @@ TEST_F(BlobFileAdditionTest, ForwardCompatibleCustomField) {
 }
 
 TEST_F(BlobFileAdditionTest, ForwardIncompatibleCustomField) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   SyncPoint::GetInstance()->SetCallBack(
       "BlobFileAddition::EncodeTo::CustomFields", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         std::string* output = static_cast<std::string*>(arg);
 
         constexpr uint32_t forward_incompatible_tag = (1 << 6) + 1;
@@ -205,6 +213,7 @@ TEST_F(BlobFileAdditionTest, ForwardIncompatibleCustomField) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

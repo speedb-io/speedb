@@ -102,21 +102,25 @@ class MyTestCompactionService : public CompactionService {
   CompactionServiceJobInfo GetCompactionInfoForWait() { return wait_info_; }
 
   void OverrideStartStatus(CompactionServiceJobStatus s) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     is_override_start_status_ = true;
     override_start_status_ = s;
   }
 
   void OverrideWaitStatus(CompactionServiceJobStatus s) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     is_override_wait_status_ = true;
     override_wait_status_ = s;
   }
 
   void OverrideWaitResult(std::string str) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     is_override_wait_result_ = true;
     override_wait_result_ = std::move(str);
   }
 
   void ResetOverride() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     is_override_wait_result_ = false;
     is_override_start_status_ = false;
     is_override_wait_status_ = false;
@@ -152,6 +156,7 @@ class CompactionServiceTest : public DBTestBase {
 
  protected:
   void ReopenWithCompactionService(Options* options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     options->env = env_;
     primary_statistics_ = CreateDBStatistics();
     options->statistics = primary_statistics_;
@@ -168,11 +173,13 @@ class CompactionServiceTest : public DBTestBase {
   Statistics* GetPrimaryStatistics() { return primary_statistics_.get(); }
 
   MyTestCompactionService* GetCompactionService() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     CompactionService* cs = compaction_service_.get();
     return static_cast_with_check<MyTestCompactionService>(cs);
   }
 
   void GenerateTestData() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // Generate 20 files @ L2
     for (int i = 0; i < 20; i++) {
       for (int j = 0; j < 10; j++) {
@@ -196,6 +203,7 @@ class CompactionServiceTest : public DBTestBase {
   }
 
   void VerifyTestData() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     for (int i = 0; i < 200; i++) {
       auto result = Get(Key(i));
       if (i % 2) {
@@ -215,6 +223,7 @@ class CompactionServiceTest : public DBTestBase {
 };
 
 TEST_F(CompactionServiceTest, BasicCompactions) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   ReopenWithCompactionService(&options);
 
@@ -302,6 +311,7 @@ TEST_F(CompactionServiceTest, BasicCompactions) {
 }
 
 TEST_F(CompactionServiceTest, ManualCompaction) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.disable_auto_compactions = true;
   ReopenWithCompactionService(&options);
@@ -339,6 +349,7 @@ TEST_F(CompactionServiceTest, ManualCompaction) {
 }
 
 TEST_F(CompactionServiceTest, CancelCompactionOnRemoteSide) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.disable_auto_compactions = true;
   ReopenWithCompactionService(&options);
@@ -369,6 +380,7 @@ TEST_F(CompactionServiceTest, CancelCompactionOnRemoteSide) {
   std::atomic_bool cancel_issued{false};
   SyncPoint::GetInstance()->SetCallBack("CompactionJob::Run():Inprogress",
                                         [&](void* /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
                                           cancel_issued = true;
                                           my_cs->SetCanceled(true);
                                         });
@@ -384,6 +396,7 @@ TEST_F(CompactionServiceTest, CancelCompactionOnRemoteSide) {
 }
 
 TEST_F(CompactionServiceTest, FailedToStart) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.disable_auto_compactions = true;
   ReopenWithCompactionService(&options);
@@ -402,6 +415,7 @@ TEST_F(CompactionServiceTest, FailedToStart) {
 }
 
 TEST_F(CompactionServiceTest, InvalidResult) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.disable_auto_compactions = true;
   ReopenWithCompactionService(&options);
@@ -420,6 +434,7 @@ TEST_F(CompactionServiceTest, InvalidResult) {
 }
 
 TEST_F(CompactionServiceTest, SubCompaction) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.max_subcompactions = 10;
   options.target_file_size_base = 1 << 10;  // 1KB
@@ -459,6 +474,7 @@ class PartialDeleteCompactionFilter : public CompactionFilter {
 };
 
 TEST_F(CompactionServiceTest, CompactionFilter) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   std::unique_ptr<CompactionFilter> delete_comp_filter(
       new PartialDeleteCompactionFilter());
@@ -500,6 +516,7 @@ TEST_F(CompactionServiceTest, CompactionFilter) {
 }
 
 TEST_F(CompactionServiceTest, Snapshot) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   ReopenWithCompactionService(&options);
 
@@ -521,6 +538,7 @@ TEST_F(CompactionServiceTest, Snapshot) {
 }
 
 TEST_F(CompactionServiceTest, ConcurrentCompaction) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.level0_file_num_compaction_trigger = 100;
   options.max_background_jobs = 20;
@@ -558,6 +576,7 @@ TEST_F(CompactionServiceTest, ConcurrentCompaction) {
 }
 
 TEST_F(CompactionServiceTest, CompactionInfo) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   ReopenWithCompactionService(&options);
 
@@ -637,6 +656,7 @@ TEST_F(CompactionServiceTest, CompactionInfo) {
 }
 
 TEST_F(CompactionServiceTest, FallbackLocalAuto) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   ReopenWithCompactionService(&options);
 
@@ -689,6 +709,7 @@ TEST_F(CompactionServiceTest, FallbackLocalAuto) {
 }
 
 TEST_F(CompactionServiceTest, FallbackLocalManual) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.disable_auto_compactions = true;
   ReopenWithCompactionService(&options);
@@ -747,6 +768,7 @@ TEST_F(CompactionServiceTest, FallbackLocalManual) {
 }
 
 TEST_F(CompactionServiceTest, RemoteEventListener) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   class RemoteEventListenerTest : public EventListener {
    public:
     const char* Name() const override { return "RemoteEventListenerTest"; }
@@ -831,6 +853,7 @@ TEST_F(CompactionServiceTest, RemoteEventListener) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   RegisterCustomObjects(argc, argv);
@@ -841,6 +864,7 @@ int main(int argc, char** argv) {
 #include <stdio.h>
 
 int main(int /*argc*/, char** /*argv*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   fprintf(stderr,
           "SKIPPED as CompactionService is not supported in ROCKSDB_LITE\n");
   return 0;

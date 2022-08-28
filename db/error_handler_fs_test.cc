@@ -26,11 +26,13 @@ class DBErrorHandlingFSTest : public DBTestBase {
  public:
   DBErrorHandlingFSTest()
       : DBTestBase("db_error_handling_fs_test", /*env_do_fsync=*/true) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     fault_fs_.reset(new FaultInjectionTestFS(env_->GetFileSystem()));
     fault_env_.reset(new CompositeEnvWrapper(env_, fault_fs_));
   }
 
   std::string GetManifestNameFromLiveFiles() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::vector<std::string> live_files;
     uint64_t manifest_size;
 
@@ -64,6 +66,7 @@ class ErrorHandlerFSListener : public EventListener {
         file_count_(0),
         fault_fs_(nullptr) {}
   ~ErrorHandlerFSListener() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     file_creation_error_.PermitUncheckedError();
     bg_error_.PermitUncheckedError();
     new_bg_error_.PermitUncheckedError();
@@ -98,6 +101,7 @@ class ErrorHandlerFSListener : public EventListener {
   }
 
   bool WaitForRecovery(uint64_t /*abs_time_us*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     InstrumentedMutexLock l(&mutex_);
     while (!recovery_complete_) {
       cv_.Wait(/*abs_time_us*/);
@@ -110,6 +114,7 @@ class ErrorHandlerFSListener : public EventListener {
   }
 
   void WaitForTableFileCreationStarted(uint64_t /*abs_time_us*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     InstrumentedMutexLock l(&mutex_);
     while (!file_creation_started_) {
       cv_.Wait(/*abs_time_us*/);
@@ -128,12 +133,14 @@ class ErrorHandlerFSListener : public EventListener {
   void EnableAutoRecovery(bool enable = true) { no_auto_recovery_ = !enable; }
 
   void OverrideBGError(Status bg_err) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     bg_error_ = bg_err;
     override_bg_error_ = true;
   }
 
   void InjectFileCreationError(FaultInjectionTestFS* fs, int file_count,
                                IOStatus io_s) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     fault_fs_ = fs;
     file_count_ = file_count;
     file_creation_error_ = io_s;
@@ -156,6 +163,7 @@ class ErrorHandlerFSListener : public EventListener {
 };
 
 TEST_F(DBErrorHandlingFSTest, FLushWriteError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<ErrorHandlerFSListener> listener(
       new ErrorHandlerFSListener());
   Options options = GetDefaultOptions();
@@ -170,6 +178,7 @@ TEST_F(DBErrorHandlingFSTest, FLushWriteError) {
 
   ASSERT_OK(Put(Key(0), "val"));
   SyncPoint::GetInstance()->SetCallBack("FlushJob::Start", [&](void*) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     fault_fs_->SetFilesystemActive(false, IOStatus::NoSpace("Out of space"));
   });
   SyncPoint::GetInstance()->EnableProcessing();
@@ -245,6 +254,7 @@ TEST_F(DBErrorHandlingFSTest, FLushWriteNoSpaceError) {
 }
 
 TEST_F(DBErrorHandlingFSTest, FLushWriteRetryableError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<ErrorHandlerFSListener> listener(
       new ErrorHandlerFSListener());
   Options options = GetDefaultOptions();
@@ -319,6 +329,7 @@ TEST_F(DBErrorHandlingFSTest, FLushWriteRetryableError) {
 }
 
 TEST_F(DBErrorHandlingFSTest, FLushWriteFileScopeError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<ErrorHandlerFSListener> listener(
       new ErrorHandlerFSListener());
   Options options = GetDefaultOptions();
@@ -403,6 +414,7 @@ TEST_F(DBErrorHandlingFSTest, FLushWriteFileScopeError) {
 }
 
 TEST_F(DBErrorHandlingFSTest, FLushWALWriteRetryableError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<ErrorHandlerFSListener> listener(
       new ErrorHandlerFSListener());
   Options options = GetDefaultOptions();
@@ -447,6 +459,7 @@ TEST_F(DBErrorHandlingFSTest, FLushWALWriteRetryableError) {
 }
 
 TEST_F(DBErrorHandlingFSTest, FLushWALAtomicWriteRetryableError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<ErrorHandlerFSListener> listener(
       new ErrorHandlerFSListener());
   Options options = GetDefaultOptions();
@@ -493,6 +506,7 @@ TEST_F(DBErrorHandlingFSTest, FLushWALAtomicWriteRetryableError) {
 
 // The flush error is injected before we finish the table build
 TEST_F(DBErrorHandlingFSTest, FLushWritNoWALRetryableError1) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<ErrorHandlerFSListener> listener(
       new ErrorHandlerFSListener());
   Options options = GetDefaultOptions();
@@ -549,6 +563,7 @@ TEST_F(DBErrorHandlingFSTest, FLushWritNoWALRetryableError1) {
 
 // The retryable IO error is injected before we sync table
 TEST_F(DBErrorHandlingFSTest, FLushWriteNoWALRetryableError2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<ErrorHandlerFSListener> listener(
       new ErrorHandlerFSListener());
   Options options = GetDefaultOptions();
@@ -593,6 +608,7 @@ TEST_F(DBErrorHandlingFSTest, FLushWriteNoWALRetryableError2) {
 
 // The retryable IO error is injected before we close the table file
 TEST_F(DBErrorHandlingFSTest, FLushWriteNoWALRetryableError3) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<ErrorHandlerFSListener> listener(
       new ErrorHandlerFSListener());
   Options options = GetDefaultOptions();
@@ -636,6 +652,7 @@ TEST_F(DBErrorHandlingFSTest, FLushWriteNoWALRetryableError3) {
 }
 
 TEST_F(DBErrorHandlingFSTest, ManifestWriteError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<ErrorHandlerFSListener> listener(
       new ErrorHandlerFSListener());
   Options options = GetDefaultOptions();
@@ -655,6 +672,7 @@ TEST_F(DBErrorHandlingFSTest, ManifestWriteError) {
   ASSERT_OK(Put(Key(1), "val"));
   SyncPoint::GetInstance()->SetCallBack(
       "VersionSet::LogAndApply:WriteManifest", [&](void*) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         fault_fs_->SetFilesystemActive(false,
                                        IOStatus::NoSpace("Out of space"));
       });
@@ -677,6 +695,7 @@ TEST_F(DBErrorHandlingFSTest, ManifestWriteError) {
 }
 
 TEST_F(DBErrorHandlingFSTest, ManifestWriteRetryableError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<ErrorHandlerFSListener> listener(
       new ErrorHandlerFSListener());
   Options options = GetDefaultOptions();
@@ -720,6 +739,7 @@ TEST_F(DBErrorHandlingFSTest, ManifestWriteRetryableError) {
 }
 
 TEST_F(DBErrorHandlingFSTest, ManifestWriteFileScopeError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<ErrorHandlerFSListener> listener(
       new ErrorHandlerFSListener());
   Options options = GetDefaultOptions();
@@ -766,6 +786,7 @@ TEST_F(DBErrorHandlingFSTest, ManifestWriteFileScopeError) {
 }
 
 TEST_F(DBErrorHandlingFSTest, ManifestWriteNoWALRetryableError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<ErrorHandlerFSListener> listener(
       new ErrorHandlerFSListener());
   Options options = GetDefaultOptions();
@@ -811,6 +832,7 @@ TEST_F(DBErrorHandlingFSTest, ManifestWriteNoWALRetryableError) {
 }
 
 TEST_F(DBErrorHandlingFSTest, DoubleManifestWriteError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<ErrorHandlerFSListener> listener(
       new ErrorHandlerFSListener());
   Options options = GetDefaultOptions();
@@ -830,6 +852,7 @@ TEST_F(DBErrorHandlingFSTest, DoubleManifestWriteError) {
   ASSERT_OK(Put(Key(1), "val"));
   SyncPoint::GetInstance()->SetCallBack(
       "VersionSet::LogAndApply:WriteManifest", [&](void*) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         fault_fs_->SetFilesystemActive(false,
                                        IOStatus::NoSpace("Out of space"));
       });
@@ -859,6 +882,7 @@ TEST_F(DBErrorHandlingFSTest, DoubleManifestWriteError) {
 }
 
 TEST_F(DBErrorHandlingFSTest, CompactionManifestWriteError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (mem_env_ != nullptr) {
     ROCKSDB_GTEST_SKIP("Test requires non-mock environment");
     return;
@@ -899,6 +923,7 @@ TEST_F(DBErrorHandlingFSTest, CompactionManifestWriteError) {
       "BackgroundCallCompaction:0", [&](void*) { fail_manifest.store(true); });
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "VersionSet::LogAndApply:WriteManifest", [&](void*) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         if (fail_manifest.load()) {
           fault_fs_->SetFilesystemActive(false,
                                          IOStatus::NoSpace("Out of space"));
@@ -933,6 +958,7 @@ TEST_F(DBErrorHandlingFSTest, CompactionManifestWriteError) {
 }
 
 TEST_F(DBErrorHandlingFSTest, CompactionManifestWriteRetryableError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<ErrorHandlerFSListener> listener(
       new ErrorHandlerFSListener());
   Options options = GetDefaultOptions();
@@ -972,6 +998,7 @@ TEST_F(DBErrorHandlingFSTest, CompactionManifestWriteRetryableError) {
       "BackgroundCallCompaction:0", [&](void*) { fail_manifest.store(true); });
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "VersionSet::LogAndApply:WriteManifest", [&](void*) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         if (fail_manifest.load()) {
           fault_fs_->SetFilesystemActive(false, error_msg);
         }
@@ -1005,6 +1032,7 @@ TEST_F(DBErrorHandlingFSTest, CompactionManifestWriteRetryableError) {
 }
 
 TEST_F(DBErrorHandlingFSTest, CompactionWriteError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<ErrorHandlerFSListener> listener(
       new ErrorHandlerFSListener());
   Options options = GetDefaultOptions();
@@ -1028,6 +1056,7 @@ TEST_F(DBErrorHandlingFSTest, CompactionWriteError) {
         "BackgroundCallCompaction:0"}});
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "BackgroundCallCompaction:0", [&](void*) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         fault_fs_->SetFilesystemActive(false,
                                        IOStatus::NoSpace("Out of space"));
       });
@@ -1047,6 +1076,7 @@ TEST_F(DBErrorHandlingFSTest, CompactionWriteError) {
 }
 
 TEST_F(DBErrorHandlingFSTest, DISABLED_CompactionWriteRetryableError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<ErrorHandlerFSListener> listener(
       new ErrorHandlerFSListener());
   Options options = GetDefaultOptions();
@@ -1094,6 +1124,7 @@ TEST_F(DBErrorHandlingFSTest, DISABLED_CompactionWriteRetryableError) {
 }
 
 TEST_F(DBErrorHandlingFSTest, DISABLED_CompactionWriteFileScopeError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<ErrorHandlerFSListener> listener(
       new ErrorHandlerFSListener());
   Options options = GetDefaultOptions();
@@ -1145,6 +1176,7 @@ TEST_F(DBErrorHandlingFSTest, DISABLED_CompactionWriteFileScopeError) {
 }
 
 TEST_F(DBErrorHandlingFSTest, CorruptionError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = GetDefaultOptions();
   options.env = fault_env_.get();
   options.create_if_missing = true;
@@ -1162,6 +1194,7 @@ TEST_F(DBErrorHandlingFSTest, CorruptionError) {
         "BackgroundCallCompaction:0"}});
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "BackgroundCallCompaction:0", [&](void*) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         fault_fs_->SetFilesystemActive(false,
                                        IOStatus::Corruption("Corruption"));
       });
@@ -1182,6 +1215,7 @@ TEST_F(DBErrorHandlingFSTest, CorruptionError) {
 }
 
 TEST_F(DBErrorHandlingFSTest, AutoRecoverFlushError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (mem_env_ != nullptr) {
     ROCKSDB_GTEST_SKIP("Test requires non-mock environment");
     return;
@@ -1200,6 +1234,7 @@ TEST_F(DBErrorHandlingFSTest, AutoRecoverFlushError) {
 
   ASSERT_OK(Put(Key(0), "val"));
   SyncPoint::GetInstance()->SetCallBack("FlushJob::Start", [&](void*) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     fault_fs_->SetFilesystemActive(false, IOStatus::NoSpace("Out of space"));
   });
   SyncPoint::GetInstance()->EnableProcessing();
@@ -1231,6 +1266,7 @@ TEST_F(DBErrorHandlingFSTest, AutoRecoverFlushError) {
 }
 
 TEST_F(DBErrorHandlingFSTest, FailRecoverFlushError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<ErrorHandlerFSListener> listener(
       new ErrorHandlerFSListener());
   Options options = GetDefaultOptions();
@@ -1244,6 +1280,7 @@ TEST_F(DBErrorHandlingFSTest, FailRecoverFlushError) {
 
   ASSERT_OK(Put(Key(0), "val"));
   SyncPoint::GetInstance()->SetCallBack("FlushJob::Start", [&](void*) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     fault_fs_->SetFilesystemActive(false, IOStatus::NoSpace("Out of space"));
   });
   SyncPoint::GetInstance()->EnableProcessing();
@@ -1256,6 +1293,7 @@ TEST_F(DBErrorHandlingFSTest, FailRecoverFlushError) {
 }
 
 TEST_F(DBErrorHandlingFSTest, WALWriteError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (mem_env_ != nullptr) {
     ROCKSDB_GTEST_SKIP("Test requires non-mock environment");
     return;
@@ -1295,6 +1333,7 @@ TEST_F(DBErrorHandlingFSTest, WALWriteError) {
 
     SyncPoint::GetInstance()->SetCallBack(
         "WritableFileWriter::Append:BeforePrepareWrite", [&](void*) {
+PERF_MARKER(__PRETTY_FUNCTION__);
           write_error++;
           if (write_error > 2) {
             fault_fs_->SetFilesystemActive(false,
@@ -1329,6 +1368,7 @@ TEST_F(DBErrorHandlingFSTest, WALWriteError) {
 }
 
 TEST_F(DBErrorHandlingFSTest, WALWriteRetryableError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<ErrorHandlerFSListener> listener(
       new ErrorHandlerFSListener());
   Options options = GetDefaultOptions();
@@ -1370,6 +1410,7 @@ TEST_F(DBErrorHandlingFSTest, WALWriteRetryableError) {
 
     SyncPoint::GetInstance()->SetCallBack(
         "WritableFileWriter::Append:BeforePrepareWrite", [&](void*) {
+PERF_MARKER(__PRETTY_FUNCTION__);
           write_error++;
           if (write_error > 2) {
             fault_fs_->SetFilesystemActive(false, error_msg);
@@ -1420,6 +1461,7 @@ TEST_F(DBErrorHandlingFSTest, WALWriteRetryableError) {
 }
 
 TEST_F(DBErrorHandlingFSTest, MultiCFWALWriteError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (mem_env_ != nullptr) {
     ROCKSDB_GTEST_SKIP("Test requires non-mock environment");
     return;
@@ -1461,6 +1503,7 @@ TEST_F(DBErrorHandlingFSTest, MultiCFWALWriteError) {
 
     SyncPoint::GetInstance()->SetCallBack(
         "WritableFileWriter::Append:BeforePrepareWrite", [&](void*) {
+PERF_MARKER(__PRETTY_FUNCTION__);
           write_error++;
           if (write_error > 2) {
             fault_fs_->SetFilesystemActive(false,
@@ -1505,6 +1548,7 @@ TEST_F(DBErrorHandlingFSTest, MultiCFWALWriteError) {
 }
 
 TEST_F(DBErrorHandlingFSTest, MultiDBCompactionError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (mem_env_ != nullptr) {
     ROCKSDB_GTEST_SKIP("Test requires non-mock environment");
     return;
@@ -1612,6 +1656,7 @@ TEST_F(DBErrorHandlingFSTest, MultiDBCompactionError) {
 }
 
 TEST_F(DBErrorHandlingFSTest, MultiDBVariousErrors) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (mem_env_ != nullptr) {
     ROCKSDB_GTEST_SKIP("Test requires non-mock environment");
     return;
@@ -1823,6 +1868,7 @@ TEST_F(DBErrorHandlingFSTest, FLushWritNoWALRetryableErrorAutoRecover1) {
 }
 
 TEST_F(DBErrorHandlingFSTest, FLushWritNoWALRetryableErrorAutoRecover2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Activate the FS before the first resume
   std::shared_ptr<ErrorHandlerFSListener> listener(
       new ErrorHandlerFSListener());
@@ -1884,6 +1930,7 @@ TEST_F(DBErrorHandlingFSTest, FLushWritNoWALRetryableErrorAutoRecover2) {
 // Auto resume fromt the flush retryable IO error. Activate the FS before the
 // first resume. Resume is successful
 TEST_F(DBErrorHandlingFSTest, FLushWritRetryableErrorAutoRecover1) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Activate the FS before the first resume
   std::shared_ptr<ErrorHandlerFSListener> listener(
       new ErrorHandlerFSListener());
@@ -1977,6 +2024,7 @@ TEST_F(DBErrorHandlingFSTest, FLushWritRetryableErrorAutoRecover2) {
 // Auto resume fromt the flush retryable IO error and set the retry limit count.
 // Fail the first resume and let the second resume be successful.
 TEST_F(DBErrorHandlingFSTest, ManifestWriteRetryableErrorAutoRecover) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Fail the first resume and let the second resume be successful
   std::shared_ptr<ErrorHandlerFSListener> listener(
       new ErrorHandlerFSListener());
@@ -2030,6 +2078,7 @@ TEST_F(DBErrorHandlingFSTest, ManifestWriteRetryableErrorAutoRecover) {
 }
 
 TEST_F(DBErrorHandlingFSTest, ManifestWriteNoWALRetryableErrorAutoRecover) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Fail the first resume and let the second resume be successful
   std::shared_ptr<ErrorHandlerFSListener> listener(
       new ErrorHandlerFSListener());
@@ -2086,6 +2135,7 @@ TEST_F(DBErrorHandlingFSTest, ManifestWriteNoWALRetryableErrorAutoRecover) {
 
 TEST_F(DBErrorHandlingFSTest,
        CompactionManifestWriteRetryableErrorAutoRecover) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<ErrorHandlerFSListener> listener(
       new ErrorHandlerFSListener());
   Options options = GetDefaultOptions();
@@ -2136,6 +2186,7 @@ TEST_F(DBErrorHandlingFSTest,
       "BackgroundCallCompaction:0", [&](void*) { fail_manifest.store(true); });
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "VersionSet::LogAndApply:WriteManifest", [&](void*) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         if (fail_manifest.load()) {
           fault_fs_->SetFilesystemActive(false, error_msg);
         }
@@ -2170,6 +2221,7 @@ TEST_F(DBErrorHandlingFSTest,
 }
 
 TEST_F(DBErrorHandlingFSTest, CompactionWriteRetryableErrorAutoRecover) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // In this test, in the first round of compaction, the FS is set to error.
   // So the first compaction fails due to retryable IO error and it is mapped
   // to soft error. Then, compaction is rescheduled, in the second round of
@@ -2210,6 +2262,7 @@ TEST_F(DBErrorHandlingFSTest, CompactionWriteRetryableErrorAutoRecover) {
       "BackgroundCallCompaction:0", [&](void*) { fail_first.store(true); });
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "CompactionJob::OpenCompactionOutputFile", [&](void*) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         if (fail_first.load() && fail_second.load()) {
           fault_fs_->SetFilesystemActive(false, error_msg);
           fail_second.store(false);
@@ -2230,6 +2283,7 @@ TEST_F(DBErrorHandlingFSTest, CompactionWriteRetryableErrorAutoRecover) {
 }
 
 TEST_F(DBErrorHandlingFSTest, WALWriteRetryableErrorAutoRecover1) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<ErrorHandlerFSListener> listener(
       new ErrorHandlerFSListener());
   Options options = GetDefaultOptions();
@@ -2278,6 +2332,7 @@ TEST_F(DBErrorHandlingFSTest, WALWriteRetryableErrorAutoRecover1) {
 
     SyncPoint::GetInstance()->SetCallBack(
         "WritableFileWriter::Append:BeforePrepareWrite", [&](void*) {
+PERF_MARKER(__PRETTY_FUNCTION__);
           write_error++;
           if (write_error > 2) {
             fault_fs_->SetFilesystemActive(false, error_msg);
@@ -2332,6 +2387,7 @@ TEST_F(DBErrorHandlingFSTest, WALWriteRetryableErrorAutoRecover1) {
 }
 
 TEST_F(DBErrorHandlingFSTest, WALWriteRetryableErrorAutoRecover2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Fail the first recover and try second time.
   std::shared_ptr<ErrorHandlerFSListener> listener(
       new ErrorHandlerFSListener());
@@ -2380,6 +2436,7 @@ TEST_F(DBErrorHandlingFSTest, WALWriteRetryableErrorAutoRecover2) {
 
     SyncPoint::GetInstance()->SetCallBack(
         "WritableFileWriter::Append:BeforePrepareWrite", [&](void*) {
+PERF_MARKER(__PRETTY_FUNCTION__);
           write_error++;
           if (write_error > 2) {
             fault_fs_->SetFilesystemActive(false, error_msg);
@@ -2469,6 +2526,7 @@ TEST_F(DBErrorHandlingFSTest, FLushWritRetryableErrorAbortRecovery) {
 }
 
 TEST_F(DBErrorHandlingFSTest, FlushReadError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<ErrorHandlerFSListener> listener =
       std::make_shared<ErrorHandlerFSListener>();
   Options options = GetDefaultOptions();
@@ -2484,6 +2542,7 @@ TEST_F(DBErrorHandlingFSTest, FlushReadError) {
   ASSERT_OK(Put(Key(0), "val"));
   SyncPoint::GetInstance()->SetCallBack(
       "BuildTable:BeforeOutputValidation", [&](void*) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         IOStatus st = IOStatus::IOError();
         st.SetRetryable(true);
         st.SetScope(IOStatus::IOErrorScope::kIOErrorScopeFile);
@@ -2516,6 +2575,7 @@ TEST_F(DBErrorHandlingFSTest, FlushReadError) {
 }
 
 TEST_F(DBErrorHandlingFSTest, AtomicFlushReadError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<ErrorHandlerFSListener> listener =
       std::make_shared<ErrorHandlerFSListener>();
   Options options = GetDefaultOptions();
@@ -2533,6 +2593,7 @@ TEST_F(DBErrorHandlingFSTest, AtomicFlushReadError) {
   ASSERT_OK(Put(1, Key(0), "val"));
   SyncPoint::GetInstance()->SetCallBack(
       "BuildTable:BeforeOutputValidation", [&](void*) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         IOStatus st = IOStatus::IOError();
         st.SetRetryable(true);
         st.SetScope(IOStatus::IOErrorScope::kIOErrorScopeFile);
@@ -2566,6 +2627,7 @@ TEST_F(DBErrorHandlingFSTest, AtomicFlushReadError) {
 }
 
 TEST_F(DBErrorHandlingFSTest, AtomicFlushNoSpaceError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<ErrorHandlerFSListener> listener =
       std::make_shared<ErrorHandlerFSListener>();
   Options options = GetDefaultOptions();
@@ -2582,6 +2644,7 @@ TEST_F(DBErrorHandlingFSTest, AtomicFlushNoSpaceError) {
   ASSERT_OK(Put(0, Key(0), "val"));
   ASSERT_OK(Put(1, Key(0), "val"));
   SyncPoint::GetInstance()->SetCallBack("BuildTable:create_file", [&](void*) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     IOStatus st = IOStatus::NoSpace();
     fault_fs_->SetFilesystemActive(false, st);
   });
@@ -2607,6 +2670,7 @@ TEST_F(DBErrorHandlingFSTest, AtomicFlushNoSpaceError) {
 }
 
 TEST_F(DBErrorHandlingFSTest, CompactionReadRetryableErrorAutoRecover) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // In this test, in the first round of compaction, the FS is set to error.
   // So the first compaction fails due to retryable IO error and it is mapped
   // to soft error. Then, compaction is rescheduled, in the second round of
@@ -2652,6 +2716,7 @@ TEST_F(DBErrorHandlingFSTest, CompactionReadRetryableErrorAutoRecover) {
       "BackgroundCallCompaction:0", [&](void*) { fail_first.store(true); });
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "CompactionJob::Run():PausingManualCompaction:2", [&](void*) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         if (fail_first.load() && fail_second.load()) {
           fault_fs_->SetFilesystemActive(false, error_msg);
           fail_second.store(false);
@@ -2676,6 +2741,7 @@ class DBErrorHandlingFencingTest : public DBErrorHandlingFSTest,
                                    public testing::WithParamInterface<bool> {};
 
 TEST_P(DBErrorHandlingFencingTest, FLushWriteFenced) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<ErrorHandlerFSListener> listener(
       new ErrorHandlerFSListener());
   Options options = GetDefaultOptions();
@@ -2690,6 +2756,7 @@ TEST_P(DBErrorHandlingFencingTest, FLushWriteFenced) {
 
   ASSERT_OK(Put(Key(0), "val"));
   SyncPoint::GetInstance()->SetCallBack("FlushJob::Start", [&](void*) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     fault_fs_->SetFilesystemActive(false, IOStatus::IOFenced("IO fenced"));
   });
   SyncPoint::GetInstance()->EnableProcessing();
@@ -2704,6 +2771,7 @@ TEST_P(DBErrorHandlingFencingTest, FLushWriteFenced) {
 }
 
 TEST_P(DBErrorHandlingFencingTest, ManifestWriteFenced) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<ErrorHandlerFSListener> listener(
       new ErrorHandlerFSListener());
   Options options = GetDefaultOptions();
@@ -2724,6 +2792,7 @@ TEST_P(DBErrorHandlingFencingTest, ManifestWriteFenced) {
   ASSERT_OK(Put(Key(1), "val"));
   SyncPoint::GetInstance()->SetCallBack(
       "VersionSet::LogAndApply:WriteManifest", [&](void*) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         fault_fs_->SetFilesystemActive(false, IOStatus::IOFenced("IO fenced"));
       });
   SyncPoint::GetInstance()->EnableProcessing();
@@ -2739,6 +2808,7 @@ TEST_P(DBErrorHandlingFencingTest, ManifestWriteFenced) {
 }
 
 TEST_P(DBErrorHandlingFencingTest, CompactionWriteFenced) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<ErrorHandlerFSListener> listener(
       new ErrorHandlerFSListener());
   Options options = GetDefaultOptions();
@@ -2761,6 +2831,7 @@ TEST_P(DBErrorHandlingFencingTest, CompactionWriteFenced) {
         "BackgroundCallCompaction:0"}});
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "BackgroundCallCompaction:0", [&](void*) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         fault_fs_->SetFilesystemActive(false, IOStatus::IOFenced("IO fenced"));
       });
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->EnableProcessing();
@@ -2780,6 +2851,7 @@ TEST_P(DBErrorHandlingFencingTest, CompactionWriteFenced) {
 }
 
 TEST_P(DBErrorHandlingFencingTest, WALWriteFenced) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<ErrorHandlerFSListener> listener(
       new ErrorHandlerFSListener());
   Options options = GetDefaultOptions();
@@ -2816,6 +2888,7 @@ TEST_P(DBErrorHandlingFencingTest, WALWriteFenced) {
 
     SyncPoint::GetInstance()->SetCallBack(
         "WritableFileWriter::Append:BeforePrepareWrite", [&](void*) {
+PERF_MARKER(__PRETTY_FUNCTION__);
           write_error++;
           if (write_error > 2) {
             fault_fs_->SetFilesystemActive(false,
@@ -2851,6 +2924,7 @@ INSTANTIATE_TEST_CASE_P(DBErrorHandlingFSTest, DBErrorHandlingFencingTest,
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
@@ -2860,6 +2934,7 @@ int main(int argc, char** argv) {
 #include <stdio.h>
 
 int main(int /*argc*/, char** /*argv*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   fprintf(stderr, "SKIPPED as Cuckoo table is not supported in ROCKSDB_LITE\n");
   return 0;
 }

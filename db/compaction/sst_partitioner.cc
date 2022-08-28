@@ -24,11 +24,13 @@ static std::unordered_map<std::string, OptionTypeInfo>
 
 SstPartitionerFixedPrefixFactory::SstPartitionerFixedPrefixFactory(size_t len)
     : len_(len) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   RegisterOptions("Length", &len_, &sst_fixed_prefix_type_info);
 }
 
 PartitionerResult SstPartitionerFixedPrefix::ShouldPartition(
     const PartitionerRequest& request) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Slice last_key_fixed(*request.prev_user_key);
   if (last_key_fixed.size() > len_) {
     last_key_fixed.size_ = len_;
@@ -43,6 +45,7 @@ PartitionerResult SstPartitionerFixedPrefix::ShouldPartition(
 
 bool SstPartitionerFixedPrefix::CanDoTrivialMove(
     const Slice& smallest_user_key, const Slice& largest_user_key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return ShouldPartition(PartitionerRequest(smallest_user_key, largest_user_key,
                                             0)) == kNotRequired;
 }
@@ -55,6 +58,7 @@ SstPartitionerFixedPrefixFactory::CreatePartitioner(
 
 std::shared_ptr<SstPartitionerFactory> NewSstPartitionerFixedPrefixFactory(
     size_t prefix_len) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return std::make_shared<SstPartitionerFixedPrefixFactory>(prefix_len);
 }
 
@@ -62,6 +66,7 @@ std::shared_ptr<SstPartitionerFactory> NewSstPartitionerFixedPrefixFactory(
 namespace {
 static int RegisterSstPartitionerFactories(ObjectLibrary& library,
                                            const std::string& /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   library.AddFactory<SstPartitionerFactory>(
       SstPartitionerFixedPrefixFactory::kClassName(),
       [](const std::string& /*uri*/,
@@ -78,6 +83,7 @@ static int RegisterSstPartitionerFactories(ObjectLibrary& library,
 Status SstPartitionerFactory::CreateFromString(
     const ConfigOptions& options, const std::string& value,
     std::shared_ptr<SstPartitionerFactory>* result) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifndef ROCKSDB_LITE
   static std::once_flag once;
   std::call_once(once, [&]() {

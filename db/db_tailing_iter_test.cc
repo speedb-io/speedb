@@ -25,6 +25,7 @@ class DBTestTailingIterator : public DBTestBase {
 };
 
 TEST_F(DBTestTailingIterator, TailingIteratorSingle) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ReadOptions read_options;
   read_options.tailing = true;
 
@@ -44,6 +45,7 @@ TEST_F(DBTestTailingIterator, TailingIteratorSingle) {
 }
 
 TEST_F(DBTestTailingIterator, TailingIteratorKeepAdding) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   CreateAndReopenWithCF({"pikachu"}, CurrentOptions());
   ReadOptions read_options;
   read_options.tailing = true;
@@ -67,6 +69,7 @@ TEST_F(DBTestTailingIterator, TailingIteratorKeepAdding) {
 }
 
 TEST_F(DBTestTailingIterator, TailingIteratorSeekToNext) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   CreateAndReopenWithCF({"pikachu"}, CurrentOptions());
   ReadOptions read_options;
   read_options.tailing = true;
@@ -126,6 +129,7 @@ TEST_F(DBTestTailingIterator, TailingIteratorSeekToNext) {
 }
 
 TEST_F(DBTestTailingIterator, TailingIteratorTrimSeekToNext) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const uint64_t k150KB = 150 * 1024;
   Options options;
   options.write_buffer_size = k150KB;
@@ -153,12 +157,14 @@ TEST_F(DBTestTailingIterator, TailingIteratorTrimSeekToNext) {
   bool file_iters_renewed_copy = false;
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "ForwardIterator::SeekInternal:Return", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         ForwardIterator* fiter = reinterpret_cast<ForwardIterator*>(arg);
         ASSERT_TRUE(!file_iters_deleted ||
                     fiter->TEST_CheckDeletedIters(&deleted_iters, &num_iters));
       });
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "ForwardIterator::Next:Return", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         ForwardIterator* fiter = reinterpret_cast<ForwardIterator*>(arg);
         ASSERT_TRUE(!file_iters_deleted ||
                     fiter->TEST_CheckDeletedIters(&deleted_iters, &num_iters));
@@ -266,6 +272,7 @@ TEST_F(DBTestTailingIterator, TailingIteratorTrimSeekToNext) {
 }
 
 TEST_F(DBTestTailingIterator, TailingIteratorDeletes) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   CreateAndReopenWithCF({"pikachu"}, CurrentOptions());
   ReadOptions read_options;
   read_options.tailing = true;
@@ -306,6 +313,7 @@ TEST_F(DBTestTailingIterator, TailingIteratorDeletes) {
 }
 
 TEST_F(DBTestTailingIterator, TailingIteratorPrefixSeek) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ReadOptions read_options;
   read_options.tailing = true;
 
@@ -339,6 +347,7 @@ TEST_F(DBTestTailingIterator, TailingIteratorPrefixSeek) {
 }
 
 TEST_F(DBTestTailingIterator, TailingIteratorIncomplete) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   CreateAndReopenWithCF({"pikachu"}, CurrentOptions());
   ReadOptions read_options;
   read_options.tailing = true;
@@ -362,6 +371,7 @@ TEST_F(DBTestTailingIterator, TailingIteratorIncomplete) {
 }
 
 TEST_F(DBTestTailingIterator, TailingIteratorSeekToSame) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.compaction_style = kCompactionStyleUniversal;
   options.write_buffer_size = 1000;
@@ -401,6 +411,7 @@ TEST_F(DBTestTailingIterator, TailingIteratorSeekToSame) {
 // Seek() on immutable iterators when target key is >= prev_key and all
 // iterators, including the memtable iterator, are over the upper bound.
 TEST_F(DBTestTailingIterator, TailingIteratorUpperBound) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   CreateAndReopenWithCF({"pikachu"}, CurrentOptions());
 
   const Slice upper_bound("20", 3);
@@ -443,6 +454,7 @@ TEST_F(DBTestTailingIterator, TailingIteratorUpperBound) {
 }
 
 TEST_F(DBTestTailingIterator, TailingIteratorGap) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // level 1:            [20, 25]  [35, 40]
   // level 2:  [10 - 15]                    [45 - 50]
   // level 3:            [20,    30,    40]
@@ -498,6 +510,7 @@ TEST_F(DBTestTailingIterator, TailingIteratorGap) {
 }
 
 TEST_F(DBTestTailingIterator, SeekWithUpperBoundBug) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ReadOptions read_options;
   read_options.tailing = true;
   const Slice upper_bound("cc", 3);
@@ -521,6 +534,7 @@ TEST_F(DBTestTailingIterator, SeekWithUpperBoundBug) {
 }
 
 TEST_F(DBTestTailingIterator, SeekToFirstWithUpperBoundBug) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ReadOptions read_options;
   read_options.tailing = true;
   const Slice upper_bound("cc", 3);
@@ -555,6 +569,7 @@ TEST_F(DBTestTailingIterator, SeekToFirstWithUpperBoundBug) {
 #endif  // !defined(ROCKSDB_LITE)
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #if !defined(ROCKSDB_LITE)
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);

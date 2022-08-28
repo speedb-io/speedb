@@ -228,6 +228,7 @@ std::map<std::tuple<BackgroundErrorReason, bool>, Status::Severity>
 };
 
 void ErrorHandler::CancelErrorRecovery() {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifndef ROCKSDB_LITE
   db_mutex_->AssertHeld();
 
@@ -532,6 +533,7 @@ Status ErrorHandler::OverrideNoSpaceError(const Status& bg_error,
 }
 
 void ErrorHandler::RecoverFromNoSpace() {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifndef ROCKSDB_LITE
   SstFileManagerImpl* sfm =
       reinterpret_cast<SstFileManagerImpl*>(db_options_.sst_file_manager.get());
@@ -544,6 +546,7 @@ void ErrorHandler::RecoverFromNoSpace() {
 }
 
 Status ErrorHandler::ClearBGError() {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifndef ROCKSDB_LITE
   db_mutex_->AssertHeld();
 
@@ -569,6 +572,7 @@ Status ErrorHandler::ClearBGError() {
 }
 
 Status ErrorHandler::RecoverFromBGError(bool is_manual) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifndef ROCKSDB_LITE
   InstrumentedMutexLock l(db_mutex_);
   bool no_bg_work_original_flag = soft_error_no_bg_work_;
@@ -630,6 +634,7 @@ Status ErrorHandler::RecoverFromBGError(bool is_manual) {
 
 const Status& ErrorHandler::StartRecoverFromRetryableBGIOError(
     const IOStatus& io_error) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifndef ROCKSDB_LITE
   db_mutex_->AssertHeld();
   if (bg_error_.ok()) {
@@ -673,6 +678,7 @@ const Status& ErrorHandler::StartRecoverFromRetryableBGIOError(
 // Automatic recover from Retryable BG IO error. Must be called after db
 // mutex is released.
 void ErrorHandler::RecoverFromRetryableBGIOError() {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifndef ROCKSDB_LITE
   TEST_SYNC_POINT("RecoverFromRetryableBGIOError:BeforeStart");
   InstrumentedMutexLock l(db_mutex_);
@@ -786,6 +792,7 @@ void ErrorHandler::RecoverFromRetryableBGIOError() {
 }
 
 void ErrorHandler::CheckAndSetRecoveryAndBGError(const Status& bg_err) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (recovery_in_prog_ && recovery_error_.ok()) {
     recovery_error_ = bg_err;
   }
@@ -796,6 +803,7 @@ void ErrorHandler::CheckAndSetRecoveryAndBGError(const Status& bg_err) {
 }
 
 void ErrorHandler::EndAutoRecovery() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   db_mutex_->AssertHeld();
   if (!end_recovery_) {
     end_recovery_ = true;

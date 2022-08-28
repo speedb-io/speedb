@@ -6,6 +6,7 @@
 #if !defined(GFLAGS) || defined(ROCKSDB_LITE)
 #include <cstdio>
 int main() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   fprintf(stderr, "Please install gflags to run rocksdb tools\n");
   return 1;
 }
@@ -91,11 +92,13 @@ struct Reader {
   explicit Reader(std::vector<ShardState>* shard_states,
                   ROCKSDB_NAMESPACE::DB* db)
       : shard_states_(shard_states), db_(db) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     sem_init(&sem_, 0, 0);
     thread_ = port::Thread(&Reader::run, this);
   }
 
   void run() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     while (1) {
       sem_wait(&sem_);
       if (done_.load()) {
@@ -115,6 +118,7 @@ struct Reader {
   }
 
   void readOnceFromShard(uint64_t shard) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ShardState& state = (*shard_states_)[shard];
     if (!state.it) {
       // Initialize iterators
@@ -138,6 +142,7 @@ struct Reader {
     const uint64_t upto = state.last_written.load();
     for (ROCKSDB_NAMESPACE::Iterator* it :
          {state.it_cacheonly.get(), state.it.get()}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
       if (it == nullptr) {
         continue;
       }
@@ -172,6 +177,7 @@ struct Reader {
   }
 
   void onWrite(uint64_t shard) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     {
       std::lock_guard<std::mutex> guard(queue_mutex_);
       if (!shards_pending_set_.test(shard)) {
@@ -183,6 +189,7 @@ struct Reader {
   }
 
   ~Reader() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     done_.store(true);
     sem_post(&sem_);
     thread_.join();
@@ -209,6 +216,7 @@ struct Writer {
   void start() { thread_ = port::Thread(&Writer::run, this); }
 
   void run() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::queue<std::chrono::steady_clock::time_point> workq;
     std::chrono::steady_clock::time_point deadline(
         std::chrono::steady_clock::now() +
@@ -272,6 +280,7 @@ struct StatsThread {
       : db_(db), thread_(&StatsThread::run, this) {}
 
   void run() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     auto tstart = std::chrono::steady_clock::now(), tlast = tstart;
     uint64_t wlast = 0, rlast = 0;
     while (!done_.load()) {
@@ -300,6 +309,7 @@ struct StatsThread {
   }
 
   ~StatsThread() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     {
       std::lock_guard<std::mutex> guard(cvm_);
       done_.store(true);
@@ -317,6 +327,7 @@ struct StatsThread {
 };
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   GFLAGS_NAMESPACE::ParseCommandLineFlags(&argc, &argv, true);
 
   std::mt19937 rng{std::random_device()()};

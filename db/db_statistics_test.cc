@@ -20,6 +20,7 @@ class DBStatisticsTest : public DBTestBase {
 };
 
 TEST_F(DBStatisticsTest, CompressionStatsTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   CompressionType type;
 
   if (Snappy_Supported()) {
@@ -91,6 +92,7 @@ TEST_F(DBStatisticsTest, CompressionStatsTest) {
 }
 
 TEST_F(DBStatisticsTest, MutexWaitStatsDisabledByDefault) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.create_if_missing = true;
   options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
@@ -104,6 +106,7 @@ TEST_F(DBStatisticsTest, MutexWaitStatsDisabledByDefault) {
 }
 
 TEST_F(DBStatisticsTest, MutexWaitStats) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.create_if_missing = true;
   options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
@@ -118,6 +121,7 @@ TEST_F(DBStatisticsTest, MutexWaitStats) {
 }
 
 TEST_F(DBStatisticsTest, ResetStats) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.create_if_missing = true;
   options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
@@ -143,6 +147,7 @@ TEST_F(DBStatisticsTest, ResetStats) {
 }
 
 TEST_F(DBStatisticsTest, ExcludeTickers) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
   DestroyAndReopen(options);
@@ -158,6 +163,7 @@ TEST_F(DBStatisticsTest, ExcludeTickers) {
 #ifndef ROCKSDB_LITE
 
 TEST_F(DBStatisticsTest, VerifyChecksumReadStat) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.file_checksum_gen_factory = GetFileChecksumGenCrc32cFactory();
   options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
@@ -207,6 +213,7 @@ TEST_F(DBStatisticsTest, VerifyChecksumReadStat) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

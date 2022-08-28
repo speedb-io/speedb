@@ -42,6 +42,7 @@ class DBMergeOperatorTest : public DBTestBase {
   std::string GetWithReadCallback(SnapshotChecker* snapshot_checker,
                                   const Slice& key,
                                   const Snapshot* snapshot = nullptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     SequenceNumber seq = snapshot == nullptr ? db_->GetLatestSequenceNumber()
                                              : snapshot->GetSequenceNumber();
     TestReadCallback read_callback(snapshot_checker, seq);
@@ -61,6 +62,7 @@ class DBMergeOperatorTest : public DBTestBase {
 };
 
 TEST_F(DBMergeOperatorTest, LimitMergeOperands) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   class LimitedStringAppendMergeOp : public StringAppendTESTOperator {
    public:
     LimitedStringAppendMergeOp(int limit, char delim)
@@ -135,6 +137,7 @@ TEST_F(DBMergeOperatorTest, LimitMergeOperands) {
 }
 
 TEST_F(DBMergeOperatorTest, MergeErrorOnRead) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.create_if_missing = true;
   options.merge_operator.reset(new TestPutOperator());
@@ -148,6 +151,7 @@ TEST_F(DBMergeOperatorTest, MergeErrorOnRead) {
 }
 
 TEST_F(DBMergeOperatorTest, MergeErrorOnWrite) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.create_if_missing = true;
   options.merge_operator.reset(new TestPutOperator());
@@ -164,6 +168,7 @@ TEST_F(DBMergeOperatorTest, MergeErrorOnWrite) {
 }
 
 TEST_F(DBMergeOperatorTest, MergeErrorOnIteration) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.create_if_missing = true;
   options.merge_operator.reset(new TestPutOperator());
@@ -217,6 +222,7 @@ INSTANTIATE_TEST_CASE_P(MergeOperatorPinningTest, MergeOperatorPinningTest,
 
 #ifndef ROCKSDB_LITE
 TEST_P(MergeOperatorPinningTest, OperandsMultiBlocks) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   BlockBasedTableOptions table_options;
   table_options.block_size = 1;  // every block will contain one entry
@@ -300,6 +306,7 @@ class MergeOperatorHook : public MergeOperator {
 };
 
 TEST_P(MergeOperatorPinningTest, EvictCacheBeforeMerge) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
 
   auto merge_hook =
@@ -373,6 +380,7 @@ TEST_P(MergeOperatorPinningTest, EvictCacheBeforeMerge) {
 }
 
 TEST_P(MergeOperatorPinningTest, TailingIterator) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.merge_operator = MergeOperators::CreateMaxOperator();
   BlockBasedTableOptions bbto;
@@ -430,6 +438,7 @@ TEST_P(MergeOperatorPinningTest, TailingIterator) {
 }
 
 TEST_F(DBMergeOperatorTest, TailingIteratorMemtableUnrefedBySomeoneElse) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.merge_operator = MergeOperators::CreateStringAppendOperator();
   DestroyAndReopen(options);
@@ -463,12 +472,14 @@ TEST_F(DBMergeOperatorTest, TailingIteratorMemtableUnrefedBySomeoneElse) {
   bool stepped_to_next_operand = false;
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBIter::MergeValuesNewToOld:PushedFirstOperand", [&](void*) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         EXPECT_FALSE(pushed_first_operand);
         pushed_first_operand = true;
         EXPECT_OK(db_->Flush(FlushOptions()));  // Switch to SuperVersion B
       });
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBIter::MergeValuesNewToOld:SteppedToNextOperand", [&](void*) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         EXPECT_FALSE(stepped_to_next_operand);
         stepped_to_next_operand = true;
         someone_else.reset(); // Unpin SuperVersion A
@@ -489,6 +500,7 @@ TEST_F(DBMergeOperatorTest, TailingIteratorMemtableUnrefedBySomeoneElse) {
 #endif  // ROCKSDB_LITE
 
 TEST_F(DBMergeOperatorTest, SnapshotCheckerAndReadCallback) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.merge_operator = MergeOperators::CreateStringAppendOperator();
   DestroyAndReopen(options);
@@ -587,6 +599,7 @@ class PerConfigMergeOperatorPinningTest
       public testing::WithParamInterface<std::tuple<bool, int>> {
  public:
   PerConfigMergeOperatorPinningTest() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::tie(disable_block_cache_, option_config_) = GetParam();
   }
 
@@ -600,6 +613,7 @@ INSTANTIATE_TEST_CASE_P(
                                         static_cast<int>(DBTestBase::kEnd))));
 
 TEST_P(PerConfigMergeOperatorPinningTest, Randomized) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (ShouldSkipOptions(option_config_, kSkipMergePut)) {
     return;
   }
@@ -665,6 +679,7 @@ TEST_P(PerConfigMergeOperatorPinningTest, Randomized) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

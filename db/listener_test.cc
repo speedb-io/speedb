@@ -41,6 +41,7 @@ class EventListenerTest : public DBTestBase {
 
   static std::string BlobStr(uint64_t blob_file_number, uint64_t offset,
                              uint64_t size) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::string blob_index;
     BlobIndex::EncodeBlob(&blob_index, blob_file_number, offset, size,
                           kNoCompression);
@@ -132,6 +133,7 @@ class TestCompactionListener : public EventListener {
     ASSERT_GT(ci.thread_id, 0U);
 
     for (auto fl : {ci.input_files, ci.output_files}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
       for (auto fn : fl) {
         auto it = ci.table_properties.find(fn);
         ASSERT_NE(it, ci.table_properties.end());
@@ -148,6 +150,7 @@ class TestCompactionListener : public EventListener {
 };
 
 TEST_F(EventListenerTest, OnSingleDBCompactionTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kTestKeySize = 16;
   const int kTestValueSize = 984;
   const int kEntrySize = kTestKeySize + kTestValueSize;
@@ -208,10 +211,12 @@ class TestFlushListener : public EventListener {
  public:
   TestFlushListener(Env* env, EventListenerTest* test)
       : slowdown_count(0), stop_count(0), db_closed(), env_(env), test_(test) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     db_closed = false;
   }
 
   virtual ~TestFlushListener() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     prev_fc_info_.status.PermitUncheckedError();  // Ignore the status
   }
   void OnTableFileCreated(
@@ -309,6 +314,7 @@ class TestFlushListener : public EventListener {
 };
 
 TEST_F(EventListenerTest, OnSingleDBFlushTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = CurrentOptions().env;
   options.write_buffer_size = k110KB;
@@ -355,6 +361,7 @@ TEST_F(EventListenerTest, OnSingleDBFlushTest) {
 }
 
 TEST_F(EventListenerTest, MultiCF) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = CurrentOptions().env;
   options.write_buffer_size = k110KB;
@@ -362,6 +369,7 @@ TEST_F(EventListenerTest, MultiCF) {
   options.enable_thread_tracking = true;
 #endif  // ROCKSDB_USING_THREAD_STATUS
   for (auto atomic_flush : {false, true}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     options.atomic_flush = atomic_flush;
     options.create_if_missing = true;
     DestroyAndReopen(options);
@@ -407,6 +415,7 @@ TEST_F(EventListenerTest, MultiCF) {
 }
 
 TEST_F(EventListenerTest, MultiDBMultiListeners) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = CurrentOptions().env;
 #ifdef ROCKSDB_USING_THREAD_STATUS
@@ -498,6 +507,7 @@ TEST_F(EventListenerTest, MultiDBMultiListeners) {
 }
 
 TEST_F(EventListenerTest, DisableBGCompaction) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = CurrentOptions().env;
 #ifdef ROCKSDB_USING_THREAD_STATUS
@@ -551,6 +561,7 @@ class TestCompactionReasonListener : public EventListener {
 };
 
 TEST_F(EventListenerTest, CompactionReasonLevel) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = CurrentOptions().env;
   options.create_if_missing = true;
@@ -617,6 +628,7 @@ TEST_F(EventListenerTest, CompactionReasonLevel) {
 }
 
 TEST_F(EventListenerTest, CompactionReasonUniversal) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = CurrentOptions().env;
   options.create_if_missing = true;
@@ -679,6 +691,7 @@ TEST_F(EventListenerTest, CompactionReasonUniversal) {
 }
 
 TEST_F(EventListenerTest, CompactionReasonFIFO) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = CurrentOptions().env;
   options.create_if_missing = true;
@@ -733,12 +746,14 @@ class TableFileCreationListener : public EventListener {
   };
 
   TableFileCreationListener() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     for (int i = 0; i < 2; i++) {
       started_[i] = finished_[i] = failure_[i] = 0;
     }
   }
 
   int Index(TableFileCreationReason reason) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     int idx;
     switch (reason) {
       case TableFileCreationReason::kFlush:
@@ -756,6 +771,7 @@ class TableFileCreationListener : public EventListener {
   void CheckAndResetCounters(int flush_started, int flush_finished,
                              int flush_failure, int compaction_started,
                              int compaction_finished, int compaction_failure) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_EQ(started_[0], flush_started);
     ASSERT_EQ(finished_[0], flush_finished);
     ASSERT_EQ(failure_[0], flush_failure);
@@ -813,6 +829,7 @@ class TableFileCreationListener : public EventListener {
 };
 
 TEST_F(EventListenerTest, TableFileCreationListenersTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto listener = std::make_shared<TableFileCreationListener>();
   Options options;
   std::unique_ptr<TableFileCreationListener::TestEnv> test_env(
@@ -901,6 +918,7 @@ public:
 };
 
 TEST_F(EventListenerTest, MemTableSealedListenerTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto listener = std::make_shared<MemTableSealedListener>();
   Options options;
   options.env = CurrentOptions().env;
@@ -926,6 +944,7 @@ class ColumnFamilyHandleDeletionStartedListener : public EventListener {
   explicit ColumnFamilyHandleDeletionStartedListener(
       const std::vector<std::string>& cfs)
       : cfs_(cfs), counter(0) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     cfs_.insert(cfs_.begin(), kDefaultColumnFamilyName);
   }
   void OnColumnFamilyHandleDeletionStarted(
@@ -937,6 +956,7 @@ class ColumnFamilyHandleDeletionStartedListener : public EventListener {
 };
 
 TEST_F(EventListenerTest, ColumnFamilyHandleDeletionStartedListenerTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::vector<std::string> cfs{"pikachu", "eevee", "Mewtwo"};
   auto listener =
       std::make_shared<ColumnFamilyHandleDeletionStartedListener>(cfs);
@@ -977,6 +997,7 @@ class BackgroundErrorListener : public EventListener {
 };
 
 TEST_F(EventListenerTest, BackgroundErrorListenerFailedFlushTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto listener = std::make_shared<BackgroundErrorListener>(env_);
   Options options;
   options.create_if_missing = true;
@@ -1006,6 +1027,7 @@ TEST_F(EventListenerTest, BackgroundErrorListenerFailedFlushTest) {
 }
 
 TEST_F(EventListenerTest, BackgroundErrorListenerFailedCompactionTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto listener = std::make_shared<BackgroundErrorListener>(env_);
   Options options;
   options.create_if_missing = true;
@@ -1046,6 +1068,7 @@ TEST_F(EventListenerTest, BackgroundErrorListenerFailedCompactionTest) {
 class TestFileOperationListener : public EventListener {
  public:
   TestFileOperationListener() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     file_reads_.store(0);
     file_reads_success_.store(0);
     file_writes_.store(0);
@@ -1165,6 +1188,7 @@ class TestFileOperationListener : public EventListener {
 };
 
 TEST_F(EventListenerTest, OnFileOperationTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = CurrentOptions().env;
   options.create_if_missing = true;
@@ -1207,6 +1231,7 @@ TEST_F(EventListenerTest, OnFileOperationTest) {
 }
 
 TEST_F(EventListenerTest, OnBlobFileOperationTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = CurrentOptions().env;
   options.create_if_missing = true;
@@ -1247,6 +1272,7 @@ TEST_F(EventListenerTest, OnBlobFileOperationTest) {
 }
 
 TEST_F(EventListenerTest, ReadManifestAndWALOnRecovery) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = CurrentOptions().env;
   options.create_if_missing = true;
@@ -1313,6 +1339,7 @@ class BlobDBJobLevelEventListenerTest : public EventListener {
   }
 
   std::vector<std::string> GetFlushedFiles() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::lock_guard<std::mutex> lock(mutex_);
     std::vector<std::string> result;
     for (const auto& fname : flushed_files_) {
@@ -1362,6 +1389,7 @@ class BlobDBJobLevelEventListenerTest : public EventListener {
 
 // Test OnFlushCompleted EventListener called for blob files
 TEST_F(EventListenerTest, BlobDBOnFlushCompleted) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = CurrentOptions().env;
   options.enable_blob_files = true;
@@ -1391,6 +1419,7 @@ TEST_F(EventListenerTest, BlobDBOnFlushCompleted) {
 
 // Test OnCompactionCompleted EventListener called for blob files
 TEST_F(EventListenerTest, BlobDBOnCompactionCompleted) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = CurrentOptions().env;
   options.enable_blob_files = true;
@@ -1435,6 +1464,7 @@ TEST_F(EventListenerTest, BlobDBOnCompactionCompleted) {
 // Test CompactFiles calls OnCompactionCompleted EventListener for blob files
 // and populate the blob files info.
 TEST_F(EventListenerTest, BlobDBCompactFiles) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = CurrentOptions().env;
   options.enable_blob_files = true;
@@ -1532,6 +1562,7 @@ class BlobDBFileLevelEventListener : public EventListener {
   }
 
   void CheckCounters() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     EXPECT_EQ(files_started_, files_created_);
     EXPECT_GT(files_started_, 0U);
     EXPECT_GT(files_deleted_, 0U);
@@ -1545,6 +1576,7 @@ class BlobDBFileLevelEventListener : public EventListener {
 };
 
 TEST_F(EventListenerTest, BlobDBFileTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = CurrentOptions().env;
   options.enable_blob_files = true;
@@ -1590,6 +1622,7 @@ TEST_F(EventListenerTest, BlobDBFileTest) {
 #endif  // ROCKSDB_LITE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

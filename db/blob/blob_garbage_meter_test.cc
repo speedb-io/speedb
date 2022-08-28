@@ -16,6 +16,7 @@
 namespace ROCKSDB_NAMESPACE {
 
 TEST(BlobGarbageMeterTest, MeasureGarbage) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   BlobGarbageMeter blob_garbage_meter;
 
   struct BlobDescriptor {
@@ -122,6 +123,7 @@ TEST(BlobGarbageMeterTest, MeasureGarbage) {
 }
 
 TEST(BlobGarbageMeterTest, PlainValue) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr char user_key[] = "user_key";
   constexpr SequenceNumber seq = 123;
 
@@ -139,6 +141,7 @@ TEST(BlobGarbageMeterTest, PlainValue) {
 }
 
 TEST(BlobGarbageMeterTest, CorruptInternalKey) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr char corrupt_key[] = "i_am_corrupt";
   const Slice key_slice(corrupt_key);
 
@@ -152,6 +155,7 @@ TEST(BlobGarbageMeterTest, CorruptInternalKey) {
 }
 
 TEST(BlobGarbageMeterTest, CorruptBlobIndex) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr char user_key[] = "user_key";
   constexpr SequenceNumber seq = 123;
 
@@ -168,6 +172,7 @@ TEST(BlobGarbageMeterTest, CorruptBlobIndex) {
 }
 
 TEST(BlobGarbageMeterTest, InlinedTTLBlobIndex) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr char user_key[] = "user_key";
   constexpr SequenceNumber seq = 123;
 
@@ -191,6 +196,7 @@ TEST(BlobGarbageMeterTest, InlinedTTLBlobIndex) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

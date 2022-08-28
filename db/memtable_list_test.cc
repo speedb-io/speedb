@@ -28,6 +28,7 @@ class MemTableListTest : public testing::Test {
   std::atomic<uint64_t> file_number;
 
   MemTableListTest() : db(nullptr), file_number(1) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     dbname = test::PerThreadDBPath("memtable_list_test");
     options.create_if_missing = true;
     EXPECT_OK(DestroyDB(dbname, options));
@@ -35,6 +36,7 @@ class MemTableListTest : public testing::Test {
 
   // Create a test db if not yet created
   void CreateDB() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (db == nullptr) {
       options.create_if_missing = true;
       EXPECT_OK(DestroyDB(dbname, options));
@@ -201,6 +203,7 @@ class MemTableListTest : public testing::Test {
 };
 
 TEST_F(MemTableListTest, Empty) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Create an empty MemTableList and validate basic functions.
   MemTableList list(1, 0, 0);
 
@@ -218,6 +221,7 @@ TEST_F(MemTableListTest, Empty) {
 }
 
 TEST_F(MemTableListTest, GetTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Create MemTableList
   int min_write_buffer_number_to_merge = 2;
   int max_write_buffer_number_to_maintain = 0;
@@ -341,6 +345,7 @@ TEST_F(MemTableListTest, GetTest) {
 }
 
 TEST_F(MemTableListTest, GetFromHistoryTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Create MemTableList
   int min_write_buffer_number_to_merge = 2;
   int max_write_buffer_number_to_maintain = 2;
@@ -542,6 +547,7 @@ TEST_F(MemTableListTest, GetFromHistoryTest) {
 }
 
 TEST_F(MemTableListTest, FlushPendingTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int num_tables = 6;
   SequenceNumber seq = 1;
   Status s;
@@ -799,6 +805,7 @@ TEST_F(MemTableListTest, FlushPendingTest) {
 }
 
 TEST_F(MemTableListTest, EmptyAtomicFlusTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   autovector<MemTableList*> lists;
   autovector<uint32_t> cf_ids;
   autovector<const MutableCFOptions*> options_list;
@@ -811,6 +818,7 @@ TEST_F(MemTableListTest, EmptyAtomicFlusTest) {
 }
 
 TEST_F(MemTableListTest, AtomicFlusTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int num_cfs = 3;
   const int num_tables_per_cf = 2;
   SequenceNumber seq = 1;
@@ -960,6 +968,7 @@ TEST_F(MemTableListTest, AtomicFlusTest) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

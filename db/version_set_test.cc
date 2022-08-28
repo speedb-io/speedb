@@ -41,6 +41,7 @@ class GenerateLevelFilesBriefTest : public testing::Test {
   void Add(const char* smallest, const char* largest,
            SequenceNumber smallest_seq = 100,
            SequenceNumber largest_seq = 100) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     FileMetaData* f = new FileMetaData(
         files_.size() + 1, 0, 0,
         InternalKey(smallest, smallest_seq, kTypeValue),
@@ -54,6 +55,7 @@ class GenerateLevelFilesBriefTest : public testing::Test {
   }
 
   int Compare() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     int diff = 0;
     for (size_t i = 0; i < files_.size(); i++) {
       if (file_level_.files[i].fd.GetNumber() != files_[i]->fd.GetNumber()) {
@@ -65,12 +67,14 @@ class GenerateLevelFilesBriefTest : public testing::Test {
 };
 
 TEST_F(GenerateLevelFilesBriefTest, Empty) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   DoGenerateLevelFilesBrief(&file_level_, files_, &arena_);
   ASSERT_EQ(0u, file_level_.num_files);
   ASSERT_EQ(0, Compare());
 }
 
 TEST_F(GenerateLevelFilesBriefTest, Single) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Add("p", "q");
   DoGenerateLevelFilesBrief(&file_level_, files_, &arena_);
   ASSERT_EQ(1u, file_level_.num_files);
@@ -78,6 +82,7 @@ TEST_F(GenerateLevelFilesBriefTest, Single) {
 }
 
 TEST_F(GenerateLevelFilesBriefTest, Multiple) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Add("150", "200");
   Add("200", "250");
   Add("300", "350");
@@ -97,6 +102,7 @@ class CountingLogger : public Logger {
 
 Options GetOptionsWithNumLevels(int num_levels,
                                 std::shared_ptr<CountingLogger> logger) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options opt;
   opt.num_levels = num_levels;
   opt.info_log = logger;
@@ -115,6 +121,7 @@ class VersionStorageInfoTestBase : public testing::Test {
 
   InternalKey GetInternalKey(const char* ukey,
                              SequenceNumber smallest_seq = 100) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return InternalKey(ukey, smallest_seq, kTypeValue);
   }
 
@@ -142,6 +149,7 @@ class VersionStorageInfoTestBase : public testing::Test {
   void Add(int level, uint32_t file_number, const char* smallest,
            const char* largest, uint64_t file_size = 0,
            uint64_t oldest_blob_file_number = kInvalidBlobFileNumber) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     constexpr SequenceNumber dummy_seq = 0;
 
     Add(level, file_number, GetInternalKey(smallest, dummy_seq),
@@ -151,6 +159,7 @@ class VersionStorageInfoTestBase : public testing::Test {
   void Add(int level, uint32_t file_number, const InternalKey& smallest,
            const InternalKey& largest, uint64_t file_size = 0,
            uint64_t oldest_blob_file_number = kInvalidBlobFileNumber) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(level < vstorage_.num_levels());
     FileMetaData* f = new FileMetaData(
         file_number, 0, file_size, smallest, largest, /* smallest_seq */ 0,
@@ -167,6 +176,7 @@ class VersionStorageInfoTestBase : public testing::Test {
                uint64_t total_blob_bytes,
                BlobFileMetaData::LinkedSsts linked_ssts,
                uint64_t garbage_blob_count, uint64_t garbage_blob_bytes) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     auto shared_meta = SharedBlobFileMetaData::Create(
         blob_file_number, total_blob_count, total_blob_bytes,
         /* checksum_method */ std::string(),
@@ -179,12 +189,14 @@ class VersionStorageInfoTestBase : public testing::Test {
   }
 
   void UpdateVersionStorageInfo() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     vstorage_.PrepareForVersionAppend(ioptions_, mutable_cf_options_);
     vstorage_.SetFinalized();
   }
 
   std::string GetOverlappingFiles(int level, const InternalKey& begin,
                                   const InternalKey& end) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::vector<FileMetaData*> inputs;
     vstorage_.GetOverlappingInputs(level, &begin, &end, &inputs);
 
@@ -207,6 +219,7 @@ class VersionStorageInfoTest : public VersionStorageInfoTestBase {
 };
 
 TEST_F(VersionStorageInfoTest, MaxBytesForLevelStatic) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ioptions_.level_compaction_dynamic_level_bytes = false;
   mutable_cf_options_.max_bytes_for_level_base = 10;
   mutable_cf_options_.max_bytes_for_level_multiplier = 5;
@@ -225,6 +238,7 @@ TEST_F(VersionStorageInfoTest, MaxBytesForLevelStatic) {
 }
 
 TEST_F(VersionStorageInfoTest, MaxBytesForLevelDynamic_1) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ioptions_.level_compaction_dynamic_level_bytes = true;
   mutable_cf_options_.max_bytes_for_level_base = 1000;
   mutable_cf_options_.max_bytes_for_level_multiplier = 5;
@@ -238,6 +252,7 @@ TEST_F(VersionStorageInfoTest, MaxBytesForLevelDynamic_1) {
 }
 
 TEST_F(VersionStorageInfoTest, MaxBytesForLevelDynamic_2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ioptions_.level_compaction_dynamic_level_bytes = true;
   mutable_cf_options_.max_bytes_for_level_base = 1000;
   mutable_cf_options_.max_bytes_for_level_multiplier = 5;
@@ -253,6 +268,7 @@ TEST_F(VersionStorageInfoTest, MaxBytesForLevelDynamic_2) {
 }
 
 TEST_F(VersionStorageInfoTest, MaxBytesForLevelDynamic_3) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ioptions_.level_compaction_dynamic_level_bytes = true;
   mutable_cf_options_.max_bytes_for_level_base = 1000;
   mutable_cf_options_.max_bytes_for_level_multiplier = 5;
@@ -269,6 +285,7 @@ TEST_F(VersionStorageInfoTest, MaxBytesForLevelDynamic_3) {
 }
 
 TEST_F(VersionStorageInfoTest, MaxBytesForLevelDynamic_4) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ioptions_.level_compaction_dynamic_level_bytes = true;
   mutable_cf_options_.max_bytes_for_level_base = 1000;
   mutable_cf_options_.max_bytes_for_level_multiplier = 5;
@@ -288,6 +305,7 @@ TEST_F(VersionStorageInfoTest, MaxBytesForLevelDynamic_4) {
 }
 
 TEST_F(VersionStorageInfoTest, MaxBytesForLevelDynamic_5) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ioptions_.level_compaction_dynamic_level_bytes = true;
   mutable_cf_options_.max_bytes_for_level_base = 1000;
   mutable_cf_options_.max_bytes_for_level_multiplier = 5;
@@ -311,6 +329,7 @@ TEST_F(VersionStorageInfoTest, MaxBytesForLevelDynamic_5) {
 }
 
 TEST_F(VersionStorageInfoTest, MaxBytesForLevelDynamicLotsOfData) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ioptions_.level_compaction_dynamic_level_bytes = true;
   mutable_cf_options_.max_bytes_for_level_base = 100;
   mutable_cf_options_.max_bytes_for_level_multiplier = 2;
@@ -333,6 +352,7 @@ TEST_F(VersionStorageInfoTest, MaxBytesForLevelDynamicLotsOfData) {
 }
 
 TEST_F(VersionStorageInfoTest, MaxBytesForLevelDynamicLargeLevel) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t kOneGB = 1000U * 1000U * 1000U;
   ioptions_.level_compaction_dynamic_level_bytes = true;
   mutable_cf_options_.max_bytes_for_level_base = 10U * kOneGB;
@@ -354,6 +374,7 @@ TEST_F(VersionStorageInfoTest, MaxBytesForLevelDynamicLargeLevel) {
 }
 
 TEST_F(VersionStorageInfoTest, MaxBytesForLevelDynamicWithLargeL0_1) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ioptions_.level_compaction_dynamic_level_bytes = true;
   mutable_cf_options_.max_bytes_for_level_base = 40000;
   mutable_cf_options_.max_bytes_for_level_multiplier = 5;
@@ -381,6 +402,7 @@ TEST_F(VersionStorageInfoTest, MaxBytesForLevelDynamicWithLargeL0_1) {
 }
 
 TEST_F(VersionStorageInfoTest, MaxBytesForLevelDynamicWithLargeL0_2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ioptions_.level_compaction_dynamic_level_bytes = true;
   mutable_cf_options_.max_bytes_for_level_base = 10000;
   mutable_cf_options_.max_bytes_for_level_multiplier = 5;
@@ -411,6 +433,7 @@ TEST_F(VersionStorageInfoTest, MaxBytesForLevelDynamicWithLargeL0_2) {
 }
 
 TEST_F(VersionStorageInfoTest, MaxBytesForLevelDynamicWithLargeL0_3) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ioptions_.level_compaction_dynamic_level_bytes = true;
   mutable_cf_options_.max_bytes_for_level_base = 10000;
   mutable_cf_options_.max_bytes_for_level_multiplier = 5;
@@ -444,6 +467,7 @@ TEST_F(VersionStorageInfoTest, MaxBytesForLevelDynamicWithLargeL0_3) {
 }
 
 TEST_F(VersionStorageInfoTest, EstimateLiveDataSize) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Test whether the overlaps are detected as expected
   Add(1, 1U, "4", "7", 1U);  // Perfect overlap with last level
   Add(2, 2U, "3", "5", 1U);  // Partial overlap with last level
@@ -459,6 +483,7 @@ TEST_F(VersionStorageInfoTest, EstimateLiveDataSize) {
 }
 
 TEST_F(VersionStorageInfoTest, EstimateLiveDataSize2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Add(0, 1U, "9", "9", 1U);  // Level 0 is not ordered
   Add(0, 2U, "5", "6", 1U);  // Ignored because of [5,6] in l1
   Add(1, 3U, "1", "2", 1U);  // Ignored because of [2,3] in l2
@@ -473,6 +498,7 @@ TEST_F(VersionStorageInfoTest, EstimateLiveDataSize2) {
 }
 
 TEST_F(VersionStorageInfoTest, GetOverlappingInputs) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Two files that overlap at the range deletion tombstone sentinel.
   Add(1, 1U, {"a", 0, kTypeValue}, {"b", kMaxSequenceNumber, kTypeRangeDeletion}, 1);
   Add(1, 2U, {"b", 0, kTypeValue}, {"c", 0, kTypeValue}, 1);
@@ -506,6 +532,7 @@ TEST_F(VersionStorageInfoTest, GetOverlappingInputs) {
 }
 
 TEST_F(VersionStorageInfoTest, FileLocationAndMetaDataByNumber) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Add(0, 11U, "1", "2", 5000U);
   Add(0, 12U, "1", "2", 5000U);
 
@@ -530,6 +557,7 @@ TEST_F(VersionStorageInfoTest, FileLocationAndMetaDataByNumber) {
 }
 
 TEST_F(VersionStorageInfoTest, ForcedBlobGCEmpty) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // No SST or blob files in VersionStorageInfo
   UpdateVersionStorageInfo();
 
@@ -541,6 +569,7 @@ TEST_F(VersionStorageInfoTest, ForcedBlobGCEmpty) {
 }
 
 TEST_F(VersionStorageInfoTest, ForcedBlobGCSingleBatch) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Test the edge case when all blob files are part of the oldest batch.
   // We have one L0 SST file #1, and four blob files #10, #11, #12, and #13.
   // The oldest blob file used by SST #1 is blob file #10.
@@ -665,6 +694,7 @@ TEST_F(VersionStorageInfoTest, ForcedBlobGCSingleBatch) {
 }
 
 TEST_F(VersionStorageInfoTest, ForcedBlobGCMultipleBatches) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Add three L0 SSTs (1, 2, and 3) and four blob files (10, 11, 12, and 13).
   // The first two SSTs have the same oldest blob file, namely, the very oldest
   // one (10), while the third SST's oldest blob file reference points to the
@@ -865,6 +895,7 @@ class VersionStorageInfoTimestampTest : public VersionStorageInfoTestBase {
  public:
   VersionStorageInfoTimestampTest()
       : VersionStorageInfoTestBase(test::BytewiseComparatorWithU64TsWrapper()) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   }
   ~VersionStorageInfoTimestampTest() override {}
   std::string Timestamp(uint64_t ts) const {
@@ -881,6 +912,7 @@ class VersionStorageInfoTimestampTest : public VersionStorageInfoTestBase {
 };
 
 TEST_F(VersionStorageInfoTimestampTest, GetOverlappingInputs) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Add(/*level=*/1, /*file_number=*/1, /*smallest=*/
       {PackUserKeyAndTimestamp("a", /*ts=*/9), /*s=*/0, kTypeValue},
       /*largest=*/
@@ -923,6 +955,7 @@ class FindLevelFileTest : public testing::Test {
   ~FindLevelFileTest() override {}
 
   void LevelFileInit(size_t num = 0) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     char* mem = arena_.AllocateAligned(num * sizeof(FdWithKeyRange));
     file_level_.files = new (mem)FdWithKeyRange[num];
     file_level_.num_files = 0;
@@ -931,6 +964,7 @@ class FindLevelFileTest : public testing::Test {
   void Add(const char* smallest, const char* largest,
            SequenceNumber smallest_seq = 100,
            SequenceNumber largest_seq = 100) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     InternalKey smallest_key = InternalKey(smallest, smallest_seq, kTypeValue);
     InternalKey largest_key = InternalKey(largest, largest_seq, kTypeValue);
 
@@ -954,12 +988,14 @@ class FindLevelFileTest : public testing::Test {
   }
 
   int Find(const char* key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     InternalKey target(key, 100, kTypeValue);
     InternalKeyComparator cmp(BytewiseComparator());
     return FindFile(cmp, file_level_, target.Encode());
   }
 
   bool Overlaps(const char* smallest, const char* largest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     InternalKeyComparator cmp(BytewiseComparator());
     Slice s(smallest != nullptr ? smallest : "");
     Slice l(largest != nullptr ? largest : "");
@@ -970,6 +1006,7 @@ class FindLevelFileTest : public testing::Test {
 };
 
 TEST_F(FindLevelFileTest, LevelEmpty) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   LevelFileInit(0);
 
   ASSERT_EQ(0, Find("foo"));
@@ -980,6 +1017,7 @@ TEST_F(FindLevelFileTest, LevelEmpty) {
 }
 
 TEST_F(FindLevelFileTest, LevelSingle) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   LevelFileInit(1);
 
   Add("p", "q");
@@ -1012,6 +1050,7 @@ TEST_F(FindLevelFileTest, LevelSingle) {
 }
 
 TEST_F(FindLevelFileTest, LevelMultiple) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   LevelFileInit(4);
 
   Add("150", "200");
@@ -1052,6 +1091,7 @@ TEST_F(FindLevelFileTest, LevelMultiple) {
 }
 
 TEST_F(FindLevelFileTest, LevelMultipleNullBoundaries) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   LevelFileInit(4);
 
   Add("150", "200");
@@ -1074,6 +1114,7 @@ TEST_F(FindLevelFileTest, LevelMultipleNullBoundaries) {
 }
 
 TEST_F(FindLevelFileTest, LevelOverlapSequenceChecks) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   LevelFileInit(1);
 
   Add("200", "200", 5000, 3000);
@@ -1085,6 +1126,7 @@ TEST_F(FindLevelFileTest, LevelOverlapSequenceChecks) {
 }
 
 TEST_F(FindLevelFileTest, LevelOverlappingFiles) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   LevelFileInit(2);
 
   Add("150", "600");
@@ -1123,6 +1165,7 @@ class VersionSetTestBase {
         write_buffer_manager_(db_options_.db_write_buffer_size),
         shutting_down_(false),
         mock_table_factory_(std::make_shared<mock::MockTableFactory>()) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     EXPECT_OK(test::CreateEnvFromSystem(ConfigOptions(), &env_, &env_guard_));
     if (env_ == Env::Default() && getenv("MEM_ENV")) {
       env_guard_.reset(NewMemEnv(Env::Default()));
@@ -1153,6 +1196,7 @@ class VersionSetTestBase {
   }
 
   virtual ~VersionSetTestBase() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (getenv("KEEP_DB")) {
       fprintf(stdout, "DB is still at %s\n", dbname_.c_str());
     } else {
@@ -1166,6 +1210,7 @@ class VersionSetTestBase {
   virtual void PrepareManifest(
       std::vector<ColumnFamilyDescriptor>* column_families,
       SequenceNumber* last_seqno, std::unique_ptr<log::Writer>* log_writer) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(column_families != nullptr);
     assert(last_seqno != nullptr);
     assert(log_writer != nullptr);
@@ -1229,6 +1274,7 @@ class VersionSetTestBase {
 
   // Create DB with 3 column families.
   void NewDB() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     SequenceNumber last_seqno;
     std::unique_ptr<log::Writer> log_writer;
     SetIdentityFile(env_, dbname_);
@@ -1244,6 +1290,7 @@ class VersionSetTestBase {
   }
 
   void ReopenDB() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     versions_.reset(
         new VersionSet(dbname_, &db_options_, env_options_, table_cache_.get(),
                        &write_buffer_manager_, &write_controller_,
@@ -1262,6 +1309,7 @@ class VersionSetTestBase {
   }
 
   Status LogAndApplyToDefaultCF(VersionEdit& edit) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     mutex_.Lock();
     Status s =
         versions_->LogAndApply(versions_->GetColumnFamilySet()->GetDefault(),
@@ -1285,6 +1333,7 @@ class VersionSetTestBase {
   }
 
   void CreateNewManifest() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     constexpr FSDirectory* db_directory = nullptr;
     constexpr bool new_descriptor_log = true;
     mutex_.Lock();
@@ -1297,6 +1346,7 @@ class VersionSetTestBase {
 
   ColumnFamilyData* CreateColumnFamily(const std::string& cf_name,
                                        const ColumnFamilyOptions& cf_options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     VersionEdit new_cf;
     new_cf.AddColumnFamily(cf_name);
     uint32_t new_id = versions_->GetColumnFamilySet()->GetNextColumnFamilyID();
@@ -1349,6 +1399,7 @@ class VersionSetTest : public VersionSetTestBase, public testing::Test {
 };
 
 TEST_F(VersionSetTest, SameColumnFamilyGroupCommit) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewDB();
   const int kGroupSize = 5;
   autovector<VersionEdit> edits;
@@ -1371,6 +1422,7 @@ TEST_F(VersionSetTest, SameColumnFamilyGroupCommit) {
   int count = 0;
   SyncPoint::GetInstance()->SetCallBack(
       "VersionSet::ProcessManifestWrites:SameColumnFamily", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         uint32_t* cf_id = reinterpret_cast<uint32_t*>(arg);
         EXPECT_EQ(0u, *cf_id);
         ++count;
@@ -1385,6 +1437,7 @@ TEST_F(VersionSetTest, SameColumnFamilyGroupCommit) {
 }
 
 TEST_F(VersionSetTest, PersistBlobFileStateInNewManifest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Initialize the database and add a couple of blob files, one with some
   // garbage in it, and one without any garbage.
   NewDB();
@@ -1468,6 +1521,7 @@ TEST_F(VersionSetTest, PersistBlobFileStateInNewManifest) {
 }
 
 TEST_F(VersionSetTest, AddLiveBlobFiles) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Initialize the database and add a blob file.
   NewDB();
 
@@ -1560,6 +1614,7 @@ TEST_F(VersionSetTest, AddLiveBlobFiles) {
 }
 
 TEST_F(VersionSetTest, ObsoleteBlobFile) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Initialize the database and add a blob file that is entirely garbage
   // and thus can immediately be marked obsolete.
   NewDB();
@@ -1629,6 +1684,7 @@ TEST_F(VersionSetTest, ObsoleteBlobFile) {
 }
 
 TEST_F(VersionSetTest, WalEditsNotAppliedToVersion) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewDB();
 
   constexpr uint64_t kNumWals = 5;
@@ -1662,6 +1718,7 @@ TEST_F(VersionSetTest, WalEditsNotAppliedToVersion) {
 
 // Similar to WalEditsNotAppliedToVersion, but contains a non-WAL edit.
 TEST_F(VersionSetTest, NonWalEditsAppliedToVersion) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewDB();
 
   const std::string kDBId = "db_db";
@@ -1697,6 +1754,7 @@ TEST_F(VersionSetTest, NonWalEditsAppliedToVersion) {
 }
 
 TEST_F(VersionSetTest, WalAddition) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewDB();
 
   constexpr WalNumber kLogNumber = 10;
@@ -1765,6 +1823,7 @@ TEST_F(VersionSetTest, WalAddition) {
 }
 
 TEST_F(VersionSetTest, WalCloseWithoutSync) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewDB();
 
   constexpr WalNumber kLogNumber = 10;
@@ -1832,6 +1891,7 @@ TEST_F(VersionSetTest, WalCloseWithoutSync) {
 }
 
 TEST_F(VersionSetTest, WalDeletion) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewDB();
 
   constexpr WalNumber kClosedLogNumber = 10;
@@ -1888,6 +1948,7 @@ TEST_F(VersionSetTest, WalDeletion) {
     std::vector<WalAddition> wal_additions;
     SyncPoint::GetInstance()->SetCallBack(
         "VersionSet::WriteCurrentStateToManifest:SaveWal", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
           VersionEdit* edit = reinterpret_cast<VersionEdit*>(arg);
           ASSERT_TRUE(edit->IsWalAddition());
           for (auto& addition : edit->GetWalAdditions()) {
@@ -1922,6 +1983,7 @@ TEST_F(VersionSetTest, WalDeletion) {
 }
 
 TEST_F(VersionSetTest, WalCreateTwice) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewDB();
 
   constexpr WalNumber kLogNumber = 10;
@@ -1939,6 +2001,7 @@ TEST_F(VersionSetTest, WalCreateTwice) {
 }
 
 TEST_F(VersionSetTest, WalCreateAfterClose) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewDB();
 
   constexpr WalNumber kLogNumber = 10;
@@ -1968,6 +2031,7 @@ TEST_F(VersionSetTest, WalCreateAfterClose) {
 }
 
 TEST_F(VersionSetTest, AddWalWithSmallerSize) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewDB();
 
   constexpr WalNumber kLogNumber = 10;
@@ -1999,6 +2063,7 @@ TEST_F(VersionSetTest, AddWalWithSmallerSize) {
 }
 
 TEST_F(VersionSetTest, DeleteWalsBeforeNonExistingWalNumber) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewDB();
 
   constexpr WalNumber kLogNumber0 = 10;
@@ -2039,6 +2104,7 @@ TEST_F(VersionSetTest, DeleteWalsBeforeNonExistingWalNumber) {
 }
 
 TEST_F(VersionSetTest, DeleteAllWals) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewDB();
 
   constexpr WalNumber kMaxLogNumber = 10;
@@ -2074,6 +2140,7 @@ TEST_F(VersionSetTest, DeleteAllWals) {
 }
 
 TEST_F(VersionSetTest, AtomicGroupWithWalEdits) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewDB();
 
   constexpr int kAtomicGroupSize = 7;
@@ -2148,6 +2215,7 @@ class VersionSetWithTimestampTest : public VersionSetTest {
 
   void GenVersionEditsToSetFullHistoryTsLow(
       const std::vector<uint64_t>& ts_lbs) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     for (const auto ts_lb : ts_lbs) {
       VersionEdit* edit = new VersionEdit;
       edit->SetColumnFamily(cfd_->GetID());
@@ -2158,6 +2226,7 @@ class VersionSetWithTimestampTest : public VersionSetTest {
   }
 
   void VerifyFullHistoryTsLow(uint64_t expected_ts_low) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::unique_ptr<VersionSet> vset(
         new VersionSet(dbname_, &db_options_, env_options_, table_cache_.get(),
                        &write_buffer_manager_, &write_controller_,
@@ -2176,6 +2245,7 @@ class VersionSetWithTimestampTest : public VersionSetTest {
   }
 
   void DoTest(const std::vector<uint64_t>& ts_lbs) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (ts_lbs.empty()) {
       return;
     }
@@ -2200,12 +2270,14 @@ class VersionSetWithTimestampTest : public VersionSetTest {
 const std::string VersionSetWithTimestampTest::kNewCfName("new_cf");
 
 TEST_F(VersionSetWithTimestampTest, SetFullHistoryTsLbOnce) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr uint64_t kTsLow = 100;
   DoTest({kTsLow});
 }
 
 // Simulate the application increasing full_history_ts_low.
 TEST_F(VersionSetWithTimestampTest, IncreaseFullHistoryTsLb) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const std::vector<uint64_t> ts_lbs = {100, 101, 102, 103};
   DoTest(ts_lbs);
 }
@@ -2218,6 +2290,7 @@ TEST_F(VersionSetWithTimestampTest, IncreaseFullHistoryTsLb) {
 // so, the lower bound cannot be decreased. The application will be notified
 // via return value of the API.
 TEST_F(VersionSetWithTimestampTest, TryDecreaseFullHistoryTsLb) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const std::vector<uint64_t> ts_lbs = {103, 102, 101, 100};
   DoTest(ts_lbs);
 }
@@ -2234,6 +2307,7 @@ class VersionSetAtomicGroupTest : public VersionSetTestBase,
   }
 
   void SetupValidAtomicGroup(int atomic_group_size) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     edits_.resize(atomic_group_size);
     int remaining = atomic_group_size;
     for (size_t i = 0; i != edits_.size(); ++i) {
@@ -2246,6 +2320,7 @@ class VersionSetAtomicGroupTest : public VersionSetTestBase,
   }
 
   void SetupIncompleteTrailingAtomicGroup(int atomic_group_size) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     edits_.resize(atomic_group_size);
     int remaining = atomic_group_size;
     for (size_t i = 0; i != edits_.size(); ++i) {
@@ -2258,6 +2333,7 @@ class VersionSetAtomicGroupTest : public VersionSetTestBase,
   }
 
   void SetupCorruptedAtomicGroup(int atomic_group_size) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     edits_.resize(atomic_group_size);
     int remaining = atomic_group_size;
     for (size_t i = 0; i != edits_.size(); ++i) {
@@ -2272,6 +2348,7 @@ class VersionSetAtomicGroupTest : public VersionSetTestBase,
   }
 
   void SetupIncorrectAtomicGroup(int atomic_group_size) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     edits_.resize(atomic_group_size);
     int remaining = atomic_group_size;
     for (size_t i = 0; i != edits_.size(); ++i) {
@@ -2288,10 +2365,12 @@ class VersionSetAtomicGroupTest : public VersionSetTestBase,
   }
 
   void SetupTestSyncPoints() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     SyncPoint::GetInstance()->DisableProcessing();
     SyncPoint::GetInstance()->ClearAllCallBacks();
     SyncPoint::GetInstance()->SetCallBack(
         "AtomicGroupReadBuffer::AddEdit:FirstInAtomicGroup", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
           VersionEdit* e = reinterpret_cast<VersionEdit*>(arg);
           EXPECT_EQ(edits_.front().DebugString(),
                     e->DebugString());  // compare based on value
@@ -2299,6 +2378,7 @@ class VersionSetAtomicGroupTest : public VersionSetTestBase,
         });
     SyncPoint::GetInstance()->SetCallBack(
         "AtomicGroupReadBuffer::AddEdit:LastInAtomicGroup", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
           VersionEdit* e = reinterpret_cast<VersionEdit*>(arg);
           EXPECT_EQ(edits_.back().DebugString(),
                     e->DebugString());  // compare based on value
@@ -2307,6 +2387,7 @@ class VersionSetAtomicGroupTest : public VersionSetTestBase,
         });
     SyncPoint::GetInstance()->SetCallBack(
         "VersionEditHandlerBase::Iterate:Finish", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
           num_recovered_edits_ = *reinterpret_cast<size_t*>(arg);
         });
     SyncPoint::GetInstance()->SetCallBack(
@@ -2315,11 +2396,13 @@ class VersionSetAtomicGroupTest : public VersionSetTestBase,
     SyncPoint::GetInstance()->SetCallBack(
         "AtomicGroupReadBuffer::AddEdit:AtomicGroupMixedWithNormalEdits",
         [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
           corrupted_edit_ = *reinterpret_cast<VersionEdit*>(arg);
         });
     SyncPoint::GetInstance()->SetCallBack(
         "AtomicGroupReadBuffer::AddEdit:IncorrectAtomicGroupSize",
         [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
           edit_with_incorrect_group_size_ =
               *reinterpret_cast<VersionEdit*>(arg);
         });
@@ -2327,6 +2410,7 @@ class VersionSetAtomicGroupTest : public VersionSetTestBase,
   }
 
   void AddNewEditsToLog(int num_edits) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     for (int i = 0; i < num_edits; i++) {
       std::string record;
       edits_[i].EncodeTo(&record);
@@ -2354,6 +2438,7 @@ class VersionSetAtomicGroupTest : public VersionSetTestBase,
 };
 
 TEST_F(VersionSetAtomicGroupTest, HandleValidAtomicGroupWithVersionSetRecover) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kAtomicGroupSize = 3;
   SetupValidAtomicGroup(kAtomicGroupSize);
   AddNewEditsToLog(kAtomicGroupSize);
@@ -2367,6 +2452,7 @@ TEST_F(VersionSetAtomicGroupTest, HandleValidAtomicGroupWithVersionSetRecover) {
 
 TEST_F(VersionSetAtomicGroupTest,
        HandleValidAtomicGroupWithReactiveVersionSetRecover) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kAtomicGroupSize = 3;
   SetupValidAtomicGroup(kAtomicGroupSize);
   AddNewEditsToLog(kAtomicGroupSize);
@@ -2388,6 +2474,7 @@ TEST_F(VersionSetAtomicGroupTest,
 
 TEST_F(VersionSetAtomicGroupTest,
        HandleValidAtomicGroupWithReactiveVersionSetReadAndApply) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kAtomicGroupSize = 3;
   SetupValidAtomicGroup(kAtomicGroupSize);
   std::unique_ptr<log::FragmentBufferedReader> manifest_reader;
@@ -2414,6 +2501,7 @@ TEST_F(VersionSetAtomicGroupTest,
 
 TEST_F(VersionSetAtomicGroupTest,
        HandleIncompleteTrailingAtomicGroupWithVersionSetRecover) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kAtomicGroupSize = 4;
   const int kNumberOfPersistedVersionEdits = kAtomicGroupSize - 1;
   SetupIncompleteTrailingAtomicGroup(kAtomicGroupSize);
@@ -2429,6 +2517,7 @@ TEST_F(VersionSetAtomicGroupTest,
 
 TEST_F(VersionSetAtomicGroupTest,
        HandleIncompleteTrailingAtomicGroupWithReactiveVersionSetRecover) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kAtomicGroupSize = 4;
   const int kNumberOfPersistedVersionEdits = kAtomicGroupSize - 1;
   SetupIncompleteTrailingAtomicGroup(kAtomicGroupSize);
@@ -2467,6 +2556,7 @@ TEST_F(VersionSetAtomicGroupTest,
 
 TEST_F(VersionSetAtomicGroupTest,
        HandleIncompleteTrailingAtomicGroupWithReactiveVersionSetReadAndApply) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kAtomicGroupSize = 4;
   const int kNumberOfPersistedVersionEdits = kAtomicGroupSize - 1;
   SetupIncompleteTrailingAtomicGroup(kAtomicGroupSize);
@@ -2499,6 +2589,7 @@ TEST_F(VersionSetAtomicGroupTest,
 
 TEST_F(VersionSetAtomicGroupTest,
        HandleCorruptedAtomicGroupWithVersionSetRecover) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kAtomicGroupSize = 4;
   SetupCorruptedAtomicGroup(kAtomicGroupSize);
   AddNewEditsToLog(kAtomicGroupSize);
@@ -2511,6 +2602,7 @@ TEST_F(VersionSetAtomicGroupTest,
 
 TEST_F(VersionSetAtomicGroupTest,
        HandleCorruptedAtomicGroupWithReactiveVersionSetRecover) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kAtomicGroupSize = 4;
   SetupCorruptedAtomicGroup(kAtomicGroupSize);
   AddNewEditsToLog(kAtomicGroupSize);
@@ -2528,6 +2620,7 @@ TEST_F(VersionSetAtomicGroupTest,
 
 TEST_F(VersionSetAtomicGroupTest,
        HandleCorruptedAtomicGroupWithReactiveVersionSetReadAndApply) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kAtomicGroupSize = 4;
   SetupCorruptedAtomicGroup(kAtomicGroupSize);
   InstrumentedMutex mu;
@@ -2550,6 +2643,7 @@ TEST_F(VersionSetAtomicGroupTest,
 
 TEST_F(VersionSetAtomicGroupTest,
        HandleIncorrectAtomicGroupSizeWithVersionSetRecover) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kAtomicGroupSize = 4;
   SetupIncorrectAtomicGroup(kAtomicGroupSize);
   AddNewEditsToLog(kAtomicGroupSize);
@@ -2562,6 +2656,7 @@ TEST_F(VersionSetAtomicGroupTest,
 
 TEST_F(VersionSetAtomicGroupTest,
        HandleIncorrectAtomicGroupSizeWithReactiveVersionSetRecover) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kAtomicGroupSize = 4;
   SetupIncorrectAtomicGroup(kAtomicGroupSize);
   AddNewEditsToLog(kAtomicGroupSize);
@@ -2579,6 +2674,7 @@ TEST_F(VersionSetAtomicGroupTest,
 
 TEST_F(VersionSetAtomicGroupTest,
        HandleIncorrectAtomicGroupSizeWithReactiveVersionSetReadAndApply) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kAtomicGroupSize = 4;
   SetupIncorrectAtomicGroup(kAtomicGroupSize);
   InstrumentedMutex mu;
@@ -2623,6 +2719,7 @@ class VersionSetTestDropOneCF : public VersionSetTestBase,
 //  Repeat the test for i = 1, 2, 3 to simulate dropping the first, middle and
 //  last column family in an atomic group.
 TEST_P(VersionSetTestDropOneCF, HandleDroppedColumnFamilyInAtomicGroup) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::vector<ColumnFamilyDescriptor> column_families;
   SequenceNumber last_seqno;
   std::unique_ptr<log::Writer> log_writer;
@@ -2684,6 +2781,7 @@ TEST_P(VersionSetTestDropOneCF, HandleDroppedColumnFamilyInAtomicGroup) {
   SyncPoint::GetInstance()->ClearAllCallBacks();
   SyncPoint::GetInstance()->SetCallBack(
       "VersionSet::ProcessManifestWrites:CheckOneAtomicGroup", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         std::vector<VersionEdit*>* tmp_edits =
             reinterpret_cast<std::vector<VersionEdit*>*>(arg);
         EXPECT_EQ(kAtomicGroupSize - 1, tmp_edits->size());
@@ -2821,6 +2919,7 @@ class VersionSetTestEmptyDb
 const std::string VersionSetTestEmptyDb::kUnknownColumnFamilyName = "unknown";
 
 TEST_P(VersionSetTestEmptyDb, OpenFromIncompleteManifest0) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   db_options_.write_dbid_to_manifest = std::get<0>(GetParam());
   PrepareManifest(nullptr, nullptr, &log_writer_);
   log_writer_.reset();
@@ -2855,6 +2954,7 @@ TEST_P(VersionSetTestEmptyDb, OpenFromIncompleteManifest0) {
 }
 
 TEST_P(VersionSetTestEmptyDb, OpenFromIncompleteManifest1) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   db_options_.write_dbid_to_manifest = std::get<0>(GetParam());
   PrepareManifest(nullptr, nullptr, &log_writer_);
   // Only a subset of column families in the MANIFEST.
@@ -2897,6 +2997,7 @@ TEST_P(VersionSetTestEmptyDb, OpenFromIncompleteManifest1) {
 }
 
 TEST_P(VersionSetTestEmptyDb, OpenFromInCompleteManifest2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   db_options_.write_dbid_to_manifest = std::get<0>(GetParam());
   PrepareManifest(nullptr, nullptr, &log_writer_);
   // Write all column families but no log_number, next_file_number and
@@ -2944,6 +3045,7 @@ TEST_P(VersionSetTestEmptyDb, OpenFromInCompleteManifest2) {
 }
 
 TEST_P(VersionSetTestEmptyDb, OpenManifestWithUnknownCF) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   db_options_.write_dbid_to_manifest = std::get<0>(GetParam());
   PrepareManifest(nullptr, nullptr, &log_writer_);
   // Write all column families but no log_number, next_file_number and
@@ -3002,6 +3104,7 @@ TEST_P(VersionSetTestEmptyDb, OpenManifestWithUnknownCF) {
 }
 
 TEST_P(VersionSetTestEmptyDb, OpenCompleteManifest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   db_options_.write_dbid_to_manifest = std::get<0>(GetParam());
   PrepareManifest(nullptr, nullptr, &log_writer_);
   // Write all column families but no log_number, next_file_number and
@@ -3195,6 +3298,7 @@ class VersionSetTestMissingFiles : public VersionSetTestBase,
   // are used.
   void CreateDummyTableFiles(const std::vector<SstInfo>& file_infos,
                              std::vector<FileMetaData>* file_metas) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(file_metas != nullptr);
     for (const auto& info : file_infos) {
       uint64_t file_num = info.file_number;
@@ -3234,6 +3338,7 @@ class VersionSetTestMissingFiles : public VersionSetTestBase,
   void WriteFileAdditionAndDeletionToManifest(
       uint32_t cf, const std::vector<std::pair<int, FileMetaData>>& added_files,
       const std::vector<std::pair<int, uint64_t>>& deleted_files) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     VersionEdit edit;
     edit.SetColumnFamily(cf);
     for (const auto& elem : added_files) {
@@ -3262,6 +3367,7 @@ class VersionSetTestMissingFiles : public VersionSetTestBase,
 };
 
 TEST_F(VersionSetTestMissingFiles, ManifestFarBehindSst) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::vector<SstInfo> existing_files = {
       SstInfo(100, kDefaultColumnFamilyName, "a"),
       SstInfo(102, kDefaultColumnFamilyName, "b"),
@@ -3311,6 +3417,7 @@ TEST_F(VersionSetTestMissingFiles, ManifestFarBehindSst) {
 }
 
 TEST_F(VersionSetTestMissingFiles, ManifestAheadofSst) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::vector<SstInfo> existing_files = {
       SstInfo(100, kDefaultColumnFamilyName, "a"),
       SstInfo(102, kDefaultColumnFamilyName, "b"),
@@ -3372,6 +3479,7 @@ TEST_F(VersionSetTestMissingFiles, ManifestAheadofSst) {
 }
 
 TEST_F(VersionSetTestMissingFiles, NoFileMissing) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::vector<SstInfo> existing_files = {
       SstInfo(100, kDefaultColumnFamilyName, "a"),
       SstInfo(102, kDefaultColumnFamilyName, "b"),
@@ -3424,6 +3532,7 @@ TEST_F(VersionSetTestMissingFiles, NoFileMissing) {
 }
 
 TEST_F(VersionSetTestMissingFiles, MinLogNumberToKeep2PC) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   db_options_.allow_2pc = true;
   NewDB();
 
@@ -3448,6 +3557,7 @@ TEST_F(VersionSetTestMissingFiles, MinLogNumberToKeep2PC) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

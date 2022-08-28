@@ -34,6 +34,7 @@ BlobLogWriter::BlobLogWriter(std::unique_ptr<WritableFileWriter>&& dest,
 BlobLogWriter::~BlobLogWriter() = default;
 
 Status BlobLogWriter::Sync() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   TEST_SYNC_POINT("BlobLogWriter::Sync");
 
   StopWatch sync_sw(clock_, statistics_, BLOB_DB_BLOB_FILE_SYNC_MICROS);
@@ -43,6 +44,7 @@ Status BlobLogWriter::Sync() {
 }
 
 Status BlobLogWriter::WriteHeader(BlobLogHeader& header) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(block_offset_ == 0);
   assert(last_elem_type_ == kEtNone);
   std::string str;
@@ -64,6 +66,7 @@ Status BlobLogWriter::WriteHeader(BlobLogHeader& header) {
 Status BlobLogWriter::AppendFooter(BlobLogFooter& footer,
                                    std::string* checksum_method,
                                    std::string* checksum_value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(block_offset_ != 0);
   assert(last_elem_type_ == kEtFileHdr || last_elem_type_ == kEtRecord);
 
@@ -113,6 +116,7 @@ Status BlobLogWriter::AppendFooter(BlobLogFooter& footer,
 Status BlobLogWriter::AddRecord(const Slice& key, const Slice& val,
                                 uint64_t expiration, uint64_t* key_offset,
                                 uint64_t* blob_offset) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(block_offset_ != 0);
   assert(last_elem_type_ == kEtFileHdr || last_elem_type_ == kEtRecord);
 
@@ -125,6 +129,7 @@ Status BlobLogWriter::AddRecord(const Slice& key, const Slice& val,
 
 Status BlobLogWriter::AddRecord(const Slice& key, const Slice& val,
                                 uint64_t* key_offset, uint64_t* blob_offset) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(block_offset_ != 0);
   assert(last_elem_type_ == kEtFileHdr || last_elem_type_ == kEtRecord);
 
@@ -137,6 +142,7 @@ Status BlobLogWriter::AddRecord(const Slice& key, const Slice& val,
 
 void BlobLogWriter::ConstructBlobHeader(std::string* buf, const Slice& key,
                                         const Slice& val, uint64_t expiration) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   BlobLogRecord record;
   record.key = key;
   record.value = val;
@@ -148,6 +154,7 @@ Status BlobLogWriter::EmitPhysicalRecord(const std::string& headerbuf,
                                          const Slice& key, const Slice& val,
                                          uint64_t* key_offset,
                                          uint64_t* blob_offset) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   StopWatch write_sw(clock_, statistics_, BLOB_DB_BLOB_FILE_WRITE_MICROS);
   Status s = dest_->Append(Slice(headerbuf));
   if (s.ok()) {

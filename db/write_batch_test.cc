@@ -28,6 +28,7 @@ namespace ROCKSDB_NAMESPACE {
 
 static std::string PrintContents(WriteBatch* b,
                                  bool merge_operator_supported = true) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   InternalKeyComparator cmp(BytewiseComparator());
   auto factory = std::make_shared<SkipListFactory>();
   Options options;
@@ -141,6 +142,7 @@ static std::string PrintContents(WriteBatch* b,
 class WriteBatchTest : public testing::Test {};
 
 TEST_F(WriteBatchTest, Empty) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   WriteBatch batch;
   ASSERT_EQ("", PrintContents(&batch));
   ASSERT_EQ(0u, WriteBatchInternal::Count(&batch));
@@ -148,6 +150,7 @@ TEST_F(WriteBatchTest, Empty) {
 }
 
 TEST_F(WriteBatchTest, Multiple) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   WriteBatch batch;
   ASSERT_OK(batch.Put(Slice("foo"), Slice("bar")));
   ASSERT_OK(batch.Delete(Slice("box")));
@@ -166,6 +169,7 @@ TEST_F(WriteBatchTest, Multiple) {
 }
 
 TEST_F(WriteBatchTest, Corruption) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   WriteBatch batch;
   ASSERT_OK(batch.Put(Slice("foo"), Slice("bar")));
   ASSERT_OK(batch.Delete(Slice("box")));
@@ -179,6 +183,7 @@ TEST_F(WriteBatchTest, Corruption) {
 }
 
 TEST_F(WriteBatchTest, Append) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   WriteBatch b1, b2;
   WriteBatchInternal::SetSequence(&b1, 200);
   WriteBatchInternal::SetSequence(&b2, 300);
@@ -230,6 +235,7 @@ TEST_F(WriteBatchTest, Append) {
 }
 
 TEST_F(WriteBatchTest, SingleDeletion) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   WriteBatch batch;
   WriteBatchInternal::SetSequence(&batch, 100);
   ASSERT_EQ("", PrintContents(&batch));
@@ -331,6 +337,7 @@ namespace {
 }
 
 TEST_F(WriteBatchTest, PutNotImplemented) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   WriteBatch batch;
   ASSERT_OK(batch.Put(Slice("k1"), Slice("v1")));
   ASSERT_EQ(1u, batch.Count());
@@ -341,6 +348,7 @@ TEST_F(WriteBatchTest, PutNotImplemented) {
 }
 
 TEST_F(WriteBatchTest, DeleteNotImplemented) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   WriteBatch batch;
   ASSERT_OK(batch.Delete(Slice("k2")));
   ASSERT_EQ(1u, batch.Count());
@@ -351,6 +359,7 @@ TEST_F(WriteBatchTest, DeleteNotImplemented) {
 }
 
 TEST_F(WriteBatchTest, SingleDeleteNotImplemented) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   WriteBatch batch;
   ASSERT_OK(batch.SingleDelete(Slice("k2")));
   ASSERT_EQ(1u, batch.Count());
@@ -361,6 +370,7 @@ TEST_F(WriteBatchTest, SingleDeleteNotImplemented) {
 }
 
 TEST_F(WriteBatchTest, MergeNotImplemented) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   WriteBatch batch;
   ASSERT_OK(batch.Merge(Slice("foo"), Slice("bar")));
   ASSERT_EQ(1u, batch.Count());
@@ -371,6 +381,7 @@ TEST_F(WriteBatchTest, MergeNotImplemented) {
 }
 
 TEST_F(WriteBatchTest, MergeWithoutOperatorInsertionFailure) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   WriteBatch batch;
   ASSERT_OK(batch.Merge(Slice("foo"), Slice("bar")));
   ASSERT_EQ(1u, batch.Count());
@@ -381,6 +392,7 @@ TEST_F(WriteBatchTest, MergeWithoutOperatorInsertionFailure) {
 }
 
 TEST_F(WriteBatchTest, Blob) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   WriteBatch batch;
   ASSERT_OK(batch.Put(Slice("k1"), Slice("v1")));
   ASSERT_OK(batch.Put(Slice("k2"), Slice("v2")));
@@ -415,6 +427,7 @@ TEST_F(WriteBatchTest, Blob) {
 }
 
 TEST_F(WriteBatchTest, PrepareCommit) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   WriteBatch batch;
   ASSERT_OK(WriteBatchInternal::InsertNoop(&batch));
   ASSERT_OK(batch.Put(Slice("k1"), Slice("v1")));
@@ -443,6 +456,7 @@ TEST_F(WriteBatchTest, PrepareCommit) {
 // allocation of more than 30GB.
 // Not all platform can run it. Also it runs a long time. So disable it.
 TEST_F(WriteBatchTest, DISABLED_ManyUpdates) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Insert key and value of 3GB and push total batch size to 12GB.
   static const size_t kKeyValueSize = 4u;
   static const uint32_t kNumUpdates = uint32_t{3} << 30;
@@ -505,6 +519,7 @@ TEST_F(WriteBatchTest, DISABLED_ManyUpdates) {
 // The test requires more than 18GB memory to run it, with single memory
 // allocation of more than 12GB. Not all the platform can run it. So disable it.
 TEST_F(WriteBatchTest, DISABLED_LargeKeyValue) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Insert key and value of 3GB and push total batch size to 12GB.
   static const size_t kKeyValueSize = 3221225472u;
   std::string raw(kKeyValueSize, 'A');
@@ -554,6 +569,7 @@ TEST_F(WriteBatchTest, DISABLED_LargeKeyValue) {
 }
 
 TEST_F(WriteBatchTest, Continue) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   WriteBatch batch;
 
   struct Handler : public TestHandler {
@@ -602,6 +618,7 @@ TEST_F(WriteBatchTest, Continue) {
 }
 
 TEST_F(WriteBatchTest, PutGatherSlices) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   WriteBatch batch;
   ASSERT_OK(batch.Put(Slice("foo"), Slice("bar")));
 
@@ -648,6 +665,7 @@ class ColumnFamilyHandleImplDummy : public ColumnFamilyHandleImpl {
 }  // namespace anonymous
 
 TEST_F(WriteBatchTest, ColumnFamiliesBatchTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   WriteBatch batch;
   ColumnFamilyHandleImplDummy zero(0), two(2), three(3), eight(8);
   ASSERT_OK(batch.Put(&zero, Slice("foo"), Slice("bar")));
@@ -677,6 +695,7 @@ TEST_F(WriteBatchTest, ColumnFamiliesBatchTest) {
 
 #ifndef ROCKSDB_LITE
 TEST_F(WriteBatchTest, ColumnFamiliesBatchWithIndexTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   WriteBatchWithIndex batch;
   ColumnFamilyHandleImplDummy zero(0), two(2), three(3), eight(8);
   ASSERT_OK(batch.Put(&zero, Slice("foo"), Slice("bar")));
@@ -780,6 +799,7 @@ TEST_F(WriteBatchTest, ColumnFamiliesBatchWithIndexTest) {
 #endif  // !ROCKSDB_LITE
 
 TEST_F(WriteBatchTest, SavePointTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Status s;
   WriteBatch batch;
   batch.SetSavePoint();
@@ -898,6 +918,7 @@ TEST_F(WriteBatchTest, SavePointTest) {
 }
 
 TEST_F(WriteBatchTest, MemoryLimitTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Status s;
   // The header size is 12 bytes. The two Puts take 8 bytes which gives total
   // of 12 + 8 * 2 = 28 bytes.
@@ -944,12 +965,14 @@ class TimestampChecker : public WriteBatch::Handler {
 Status CheckTimestampsInWriteBatch(
     WriteBatch& wb, Slice timestamp,
     std::unordered_map<uint32_t, const Comparator*> cf_to_ucmps) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   TimestampChecker ts_checker(cf_to_ucmps, timestamp);
   return wb.Iterate(&ts_checker);
 }
 }  // namespace
 
 TEST_F(WriteBatchTest, SanityChecks) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ColumnFamilyHandleImplDummy cf0(0,
                                   test::BytewiseComparatorWithU64TsWrapper());
   ColumnFamilyHandleImplDummy cf4(4);
@@ -992,6 +1015,7 @@ TEST_F(WriteBatchTest, SanityChecks) {
 }
 
 TEST_F(WriteBatchTest, UpdateTimestamps) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // We assume the last eight bytes of each key is reserved for timestamps.
   // Therefore, we must make sure each key is longer than eight bytes.
   constexpr size_t key_size = 16;
@@ -1090,6 +1114,7 @@ TEST_F(WriteBatchTest, UpdateTimestamps) {
 }
 
 TEST_F(WriteBatchTest, CommitWithTimestamp) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   WriteBatch wb;
   const std::string txn_name = "xid1";
   std::string ts;
@@ -1106,6 +1131,7 @@ TEST_F(WriteBatchTest, CommitWithTimestamp) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

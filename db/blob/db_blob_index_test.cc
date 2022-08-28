@@ -47,21 +47,25 @@ class DBBlobIndexTest : public DBTestBase {
   ColumnFamilyHandle* cfh() { return dbfull()->DefaultColumnFamily(); }
 
   ColumnFamilyData* cfd() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return static_cast_with_check<ColumnFamilyHandleImpl>(cfh())->cfd();
   }
 
   Status PutBlobIndex(WriteBatch* batch, const Slice& key,
                       const Slice& blob_index) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return WriteBatchInternal::PutBlobIndex(batch, cfd()->GetID(), key,
                                             blob_index);
   }
 
   Status Write(WriteBatch* batch) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return dbfull()->Write(WriteOptions(), batch);
   }
 
   std::string GetImpl(const Slice& key, bool* is_blob_index = nullptr,
                       const Snapshot* snapshot = nullptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ReadOptions read_options;
     read_options.snapshot = snapshot;
     PinnableSlice value;
@@ -87,6 +91,7 @@ class DBBlobIndexTest : public DBTestBase {
 
   std::string GetBlobIndex(const Slice& key,
                            const Snapshot* snapshot = nullptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     bool is_blob_index = false;
     std::string value = GetImpl(key, &is_blob_index, snapshot);
     if (!is_blob_index) {
@@ -96,12 +101,14 @@ class DBBlobIndexTest : public DBTestBase {
   }
 
   ArenaWrappedDBIter* GetBlobIterator() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return dbfull()->NewIteratorImpl(
         ReadOptions(), cfd(), dbfull()->GetLatestSequenceNumber(),
         nullptr /*read_callback*/, true /*expose_blob_index*/);
   }
 
   Options GetTestOptions() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Options options;
     options.env = CurrentOptions().env;
     options.create_if_missing = true;
@@ -115,6 +122,7 @@ class DBBlobIndexTest : public DBTestBase {
   }
 
   void MoveDataTo(Tier tier) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     switch (tier) {
       case Tier::kMemtable:
         break;
@@ -143,6 +151,7 @@ class DBBlobIndexTest : public DBTestBase {
 // implementation. We should be able to write kTypeBlobIndex to memtables and
 // SST files.
 TEST_F(DBBlobIndexTest, Write) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (auto tier : kAllTiers) {
     DestroyAndReopen(GetTestOptions());
 
@@ -184,6 +193,7 @@ TEST_F(DBBlobIndexTest, Write) {
 // accidentally opening the base DB of a stacked BlobDB and actual corruption
 // when using the integrated BlobDB.
 TEST_F(DBBlobIndexTest, Get) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string blob_index;
   BlobIndex::EncodeInlinedTTL(&blob_index, /* expiration */ 9876543210, "blob");
 
@@ -223,6 +233,7 @@ TEST_F(DBBlobIndexTest, Get) {
 // if blob index is updated with a normal value. See the test case above for
 // more details.
 TEST_F(DBBlobIndexTest, Updated) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string blob_index;
   BlobIndex::EncodeInlinedTTL(&blob_index, /* expiration */ 9876543210, "blob");
 
@@ -273,6 +284,7 @@ TEST_F(DBBlobIndexTest, Updated) {
 // corresponding blob value. If a regular DBIter is created (i.e.
 // expose_blob_index is not set), it should return Status::Corruption.
 TEST_F(DBBlobIndexTest, Iterate) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const std::vector<std::vector<ValueType>> data = {
       /*00*/ {kTypeValue},
       /*01*/ {kTypeBlobIndex},
@@ -381,6 +393,7 @@ TEST_F(DBBlobIndexTest, Iterate) {
   };
 
   for (auto tier : {Tier::kMemtable} /*kAllTiers*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // Avoid values from being purged.
     std::vector<const Snapshot*> snapshots;
     DestroyAndReopen(GetTestOptions());
@@ -493,6 +506,7 @@ TEST_F(DBBlobIndexTest, Iterate) {
 }
 
 TEST_F(DBBlobIndexTest, IntegratedBlobIterate) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const std::vector<std::vector<std::string>> data = {
       /*00*/ {"Put"},
       /*01*/ {"Put", "Merge", "Merge", "Merge"},
@@ -596,6 +610,7 @@ TEST_F(DBBlobIndexTest, IntegratedBlobIterate) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   RegisterCustomObjects(argc, argv);

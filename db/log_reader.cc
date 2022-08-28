@@ -22,6 +22,7 @@ namespace ROCKSDB_NAMESPACE {
 namespace log {
 
 Reader::Reporter::~Reporter() {
+PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 Reader::Reader(std::shared_ptr<Logger> info_log,
@@ -46,6 +47,7 @@ Reader::Reader(std::shared_ptr<Logger> info_log,
       uncompress_(nullptr) {}
 
 Reader::~Reader() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   delete[] backing_store_;
   if (uncompress_) {
     delete uncompress_;
@@ -61,6 +63,7 @@ Reader::~Reader() {
 // restrict the inconsistency to only the last log
 bool Reader::ReadRecord(Slice* record, std::string* scratch,
                         WALRecoveryMode wal_recovery_mode) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   scratch->clear();
   record->clear();
   if (uncompress_) {
@@ -264,14 +267,17 @@ bool Reader::ReadRecord(Slice* record, std::string* scratch,
 }
 
 uint64_t Reader::LastRecordOffset() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return last_record_offset_;
 }
 
 uint64_t Reader::LastRecordEnd() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return end_of_buffer_offset_ - buffer_.size();
 }
 
 void Reader::UnmarkEOF() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (read_error_) {
     return;
   }
@@ -283,6 +289,7 @@ void Reader::UnmarkEOF() {
 }
 
 void Reader::UnmarkEOFInternal() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // If the EOF was in the middle of a block (a partial block was read) we have
   // to read the rest of the block as ReadPhysicalRecord can only read full
   // blocks and expects the file position indicator to be aligned to the start
@@ -336,16 +343,19 @@ void Reader::UnmarkEOFInternal() {
 }
 
 void Reader::ReportCorruption(size_t bytes, const char* reason) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ReportDrop(bytes, Status::Corruption(reason));
 }
 
 void Reader::ReportDrop(size_t bytes, const Status& reason) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (reporter_ != nullptr) {
     reporter_->Corruption(bytes, reason);
   }
 }
 
 bool Reader::ReadMore(size_t* drop_size, int *error) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!eof_ && !read_error_) {
     // Last read was a full read, so this is a trailer to skip
     buffer_.clear();
@@ -381,6 +391,7 @@ bool Reader::ReadMore(size_t* drop_size, int *error) {
 }
 
 unsigned int Reader::ReadPhysicalRecord(Slice* result, size_t* drop_size) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   while (true) {
     // We need at least the minimum header size
     if (buffer_.size() < static_cast<size_t>(kHeaderSize)) {
@@ -486,6 +497,7 @@ unsigned int Reader::ReadPhysicalRecord(Slice* result, size_t* drop_size) {
 
 // Initialize uncompress related fields
 void Reader::InitCompression(const CompressionTypeRecord& compression_record) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   compression_type_ = compression_record.GetCompressionType();
   compression_type_record_read_ = true;
   constexpr uint32_t compression_format_version = 2;
@@ -498,6 +510,7 @@ void Reader::InitCompression(const CompressionTypeRecord& compression_record) {
 
 bool FragmentBufferedReader::ReadRecord(Slice* record, std::string* scratch,
                                         WALRecoveryMode /*unused*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(record != nullptr);
   assert(scratch != nullptr);
   record->clear();
@@ -628,6 +641,7 @@ bool FragmentBufferedReader::ReadRecord(Slice* record, std::string* scratch,
 }
 
 void FragmentBufferedReader::UnmarkEOF() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (read_error_) {
     return;
   }
@@ -636,6 +650,7 @@ void FragmentBufferedReader::UnmarkEOF() {
 }
 
 bool FragmentBufferedReader::TryReadMore(size_t* drop_size, int* error) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!eof_ && !read_error_) {
     // Last read was a full read, so this is a trailer to skip
     buffer_.clear();
@@ -672,6 +687,7 @@ bool FragmentBufferedReader::TryReadMore(size_t* drop_size, int* error) {
 // return true if the caller should process the fragment_type_or_err.
 bool FragmentBufferedReader::TryReadFragment(
     Slice* fragment, size_t* drop_size, unsigned int* fragment_type_or_err) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(fragment != nullptr);
   assert(drop_size != nullptr);
   assert(fragment_type_or_err != nullptr);

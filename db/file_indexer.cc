@@ -74,6 +74,7 @@ void FileIndexer::GetNextLevelIndex(const size_t level, const size_t file_index,
 
 void FileIndexer::UpdateIndex(Arena* arena, const size_t num_levels,
                               std::vector<FileMetaData*>* const files) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (files == nullptr) {
     return;
   }
@@ -145,6 +146,7 @@ void FileIndexer::CalculateLB(
     const std::vector<FileMetaData*>& lower_files, IndexLevel* index_level,
     std::function<int(const FileMetaData*, const FileMetaData*)> cmp_op,
     std::function<void(IndexUnit*, int32_t)> set_index) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int32_t upper_size = static_cast<int32_t>(upper_files.size());
   const int32_t lower_size = static_cast<int32_t>(lower_files.size());
   int32_t upper_idx = 0;
@@ -182,6 +184,7 @@ void FileIndexer::CalculateRB(
     const std::vector<FileMetaData*>& lower_files, IndexLevel* index_level,
     std::function<int(const FileMetaData*, const FileMetaData*)> cmp_op,
     std::function<void(IndexUnit*, int32_t)> set_index) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int32_t upper_size = static_cast<int32_t>(upper_files.size());
   const int32_t lower_size = static_cast<int32_t>(lower_files.size());
   int32_t upper_idx = upper_size - 1;

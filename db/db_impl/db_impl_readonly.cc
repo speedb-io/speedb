@@ -22,6 +22,7 @@ DBImplReadOnly::DBImplReadOnly(const DBOptions& db_options,
                                const std::string& dbname)
     : DBImpl(db_options, dbname, /*seq_per_batch*/ false,
              /*batch_per_txn*/ true, /*read_only*/ true) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKS_LOG_INFO(immutable_db_options_.info_log,
                  "Opening the db in read only mode");
   LogFlush(immutable_db_options_.info_log);
@@ -33,6 +34,7 @@ DBImplReadOnly::~DBImplReadOnly() {}
 Status DBImplReadOnly::Get(const ReadOptions& read_options,
                            ColumnFamilyHandle* column_family, const Slice& key,
                            PinnableSlice* pinnable_val) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(pinnable_val != nullptr);
   // TODO: stopwatch DB_GET needed?, perf timer needed?
   PERF_TIMER_GUARD(get_snapshot_time);
@@ -83,6 +85,7 @@ Status DBImplReadOnly::Get(const ReadOptions& read_options,
 
 Iterator* DBImplReadOnly::NewIterator(const ReadOptions& read_options,
                                       ColumnFamilyHandle* column_family) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(column_family);
   const Comparator* ucmp = column_family->GetComparator();
   assert(ucmp);
@@ -117,6 +120,7 @@ Status DBImplReadOnly::NewIterators(
     const ReadOptions& read_options,
     const std::vector<ColumnFamilyHandle*>& column_families,
     std::vector<Iterator*>* iterators) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (read_options.timestamp) {
     // TODO: support timestamp
     return Status::NotSupported();
@@ -169,6 +173,7 @@ namespace {
 // create_if_missing
 Status OpenForReadOnlyCheckExistence(const DBOptions& db_options,
                                      const std::string& dbname) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Status s;
   if (!db_options.create_if_missing) {
     // Attempt to read "CURRENT" file
@@ -187,6 +192,7 @@ Status OpenForReadOnlyCheckExistence(const DBOptions& db_options,
 
 Status DB::OpenForReadOnly(const Options& options, const std::string& dbname,
                            DB** dbptr, bool /*error_if_wal_file_exists*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Status s = OpenForReadOnlyCheckExistence(options, dbname);
   if (!s.ok()) {
     return s;
@@ -223,6 +229,7 @@ Status DB::OpenForReadOnly(
     const std::vector<ColumnFamilyDescriptor>& column_families,
     std::vector<ColumnFamilyHandle*>* handles, DB** dbptr,
     bool error_if_wal_file_exists) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // If dbname does not exist in the file system, should not do anything
   Status s = OpenForReadOnlyCheckExistence(db_options, dbname);
   if (!s.ok()) {
@@ -239,6 +246,7 @@ Status DBImplReadOnly::OpenForReadOnlyWithoutCheck(
     const std::vector<ColumnFamilyDescriptor>& column_families,
     std::vector<ColumnFamilyHandle*>* handles, DB** dbptr,
     bool error_if_wal_file_exists) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   *dbptr = nullptr;
   handles->clear();
 
@@ -288,6 +296,7 @@ Status DBImplReadOnly::OpenForReadOnlyWithoutCheck(
 Status DB::OpenForReadOnly(const Options& /*options*/,
                            const std::string& /*dbname*/, DB** /*dbptr*/,
                            bool /*error_if_wal_file_exists*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return Status::NotSupported("Not supported in ROCKSDB_LITE.");
 }
 
@@ -296,6 +305,7 @@ Status DB::OpenForReadOnly(
     const std::vector<ColumnFamilyDescriptor>& /*column_families*/,
     std::vector<ColumnFamilyHandle*>* /*handles*/, DB** /*dbptr*/,
     bool /*error_if_wal_file_exists*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return Status::NotSupported("Not supported in ROCKSDB_LITE.");
 }
 #endif  // !ROCKSDB_LITE

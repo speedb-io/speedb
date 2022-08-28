@@ -13,12 +13,14 @@ namespace ROCKSDB_NAMESPACE {
 
 PeriodicWorkScheduler::PeriodicWorkScheduler(
     const std::shared_ptr<SystemClock>& clock) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   timer = std::unique_ptr<Timer>(new Timer(clock.get()));
 }
 
 Status PeriodicWorkScheduler::Register(DBImpl* dbi,
                                        unsigned int stats_dump_period_sec,
                                        unsigned int stats_persist_period_sec) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   MutexLock l(&timer_mu_);
   static std::atomic<uint64_t> initial_delay(0);
   timer->Start();
@@ -54,6 +56,7 @@ Status PeriodicWorkScheduler::Register(DBImpl* dbi,
 }
 
 void PeriodicWorkScheduler::Unregister(DBImpl* dbi) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   MutexLock l(&timer_mu_);
   timer->Cancel(GetTaskName(dbi, "dump_st"));
   timer->Cancel(GetTaskName(dbi, "pst_st"));
@@ -64,6 +67,7 @@ void PeriodicWorkScheduler::Unregister(DBImpl* dbi) {
 }
 
 PeriodicWorkScheduler* PeriodicWorkScheduler::Default() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Always use the default SystemClock for the scheduler, as we only use the
   // NowMicros which is the same for all clocks. The Env could only be
   // overridden in test.
@@ -73,6 +77,7 @@ PeriodicWorkScheduler* PeriodicWorkScheduler::Default() {
 
 std::string PeriodicWorkScheduler::GetTaskName(DBImpl* dbi,
                                                const std::string& func_name) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string db_session_id;
   // TODO: Should this error be ignored?
   dbi->GetDbSessionId(db_session_id).PermitUncheckedError();
@@ -87,6 +92,7 @@ std::string PeriodicWorkScheduler::GetTaskName(DBImpl* dbi,
 // MockClock, Close all db instances and then re-open them.
 PeriodicWorkTestScheduler* PeriodicWorkTestScheduler::Default(
     const std::shared_ptr<SystemClock>& clock) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   static PeriodicWorkTestScheduler scheduler(clock);
   static port::Mutex mutex;
   {

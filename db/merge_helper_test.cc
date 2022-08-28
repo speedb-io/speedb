@@ -27,6 +27,7 @@ class MergeHelperTest : public testing::Test {
 
   Status Run(SequenceNumber stop_before, bool at_bottom,
              SequenceNumber latest_snapshot = 0) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     iter_.reset(new VectorIterator(ks_, vs_, &icmp_));
     iter_->SeekToFirst();
     merge_helper_.reset(new MergeHelper(env_, icmp_.user_comparator(),
@@ -41,6 +42,7 @@ class MergeHelperTest : public testing::Test {
   void AddKeyVal(const std::string& user_key, const SequenceNumber& seq,
                  const ValueType& t, const std::string& val,
                  bool corrupt = false) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     InternalKey ikey(user_key, seq, t);
     if (corrupt) {
       test::CorruptKeyType(&ikey);
@@ -62,6 +64,7 @@ class MergeHelperTest : public testing::Test {
 // If MergeHelper encounters a new key on the last level, we know that
 // the key has no more history and it can merge keys.
 TEST_F(MergeHelperTest, MergeAtBottomSuccess) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   merge_op_ = MergeOperators::CreateUInt64AddOperator();
 
   AddKeyVal("a", 20, kTypeMerge, test::EncodeInt(1U));
@@ -78,6 +81,7 @@ TEST_F(MergeHelperTest, MergeAtBottomSuccess) {
 
 // Merging with a value results in a successful merge.
 TEST_F(MergeHelperTest, MergeValue) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   merge_op_ = MergeOperators::CreateUInt64AddOperator();
 
   AddKeyVal("a", 40, kTypeMerge, test::EncodeInt(1U));
@@ -95,6 +99,7 @@ TEST_F(MergeHelperTest, MergeValue) {
 
 // Merging stops before a snapshot.
 TEST_F(MergeHelperTest, SnapshotBeforeValue) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   merge_op_ = MergeOperators::CreateUInt64AddOperator();
 
   AddKeyVal("a", 50, kTypeMerge, test::EncodeInt(1U));
@@ -114,6 +119,7 @@ TEST_F(MergeHelperTest, SnapshotBeforeValue) {
 // MergeHelper preserves the operand stack for merge operators that
 // cannot do a partial merge.
 TEST_F(MergeHelperTest, NoPartialMerge) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   merge_op_ = MergeOperators::CreateStringAppendTESTOperator();
 
   AddKeyVal("a", 50, kTypeMerge, "v2");
@@ -132,6 +138,7 @@ TEST_F(MergeHelperTest, NoPartialMerge) {
 
 // A single operand can not be merged.
 TEST_F(MergeHelperTest, SingleOperand) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   merge_op_ = MergeOperators::CreateUInt64AddOperator();
 
   AddKeyVal("a", 50, kTypeMerge, test::EncodeInt(1U));
@@ -146,6 +153,7 @@ TEST_F(MergeHelperTest, SingleOperand) {
 
 // Merging with a deletion turns the deletion into a value
 TEST_F(MergeHelperTest, MergeDeletion) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   merge_op_ = MergeOperators::CreateUInt64AddOperator();
 
   AddKeyVal("a", 30, kTypeMerge, test::EncodeInt(3U));
@@ -161,6 +169,7 @@ TEST_F(MergeHelperTest, MergeDeletion) {
 
 // The merge helper stops upon encountering a corrupt key
 TEST_F(MergeHelperTest, CorruptKey) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   merge_op_ = MergeOperators::CreateUInt64AddOperator();
 
   AddKeyVal("a", 30, kTypeMerge, test::EncodeInt(3U));
@@ -178,6 +187,7 @@ TEST_F(MergeHelperTest, CorruptKey) {
 
 // The compaction filter is called on every merge operand
 TEST_F(MergeHelperTest, FilterMergeOperands) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   merge_op_ = MergeOperators::CreateUInt64AddOperator();
   filter_.reset(new test::FilterNumber(5U));
 
@@ -200,6 +210,7 @@ TEST_F(MergeHelperTest, FilterMergeOperands) {
 }
 
 TEST_F(MergeHelperTest, FilterAllMergeOperands) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   merge_op_ = MergeOperators::CreateUInt64AddOperator();
   filter_.reset(new test::FilterNumber(5U));
 
@@ -234,6 +245,7 @@ TEST_F(MergeHelperTest, FilterAllMergeOperands) {
 
 // Make sure that merge operands are filtered at the beginning
 TEST_F(MergeHelperTest, FilterFirstMergeOperand) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   merge_op_ = MergeOperators::CreateUInt64AddOperator();
   filter_.reset(new test::FilterNumber(5U));
 
@@ -265,6 +277,7 @@ TEST_F(MergeHelperTest, FilterFirstMergeOperand) {
 // Make sure that merge operands are not filtered out if there's a snapshot
 // pointing at them
 TEST_F(MergeHelperTest, DontFilterMergeOperandsBeforeSnapshotTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   merge_op_ = MergeOperators::CreateUInt64AddOperator();
   filter_.reset(new test::FilterNumber(5U));
 
@@ -291,6 +304,7 @@ TEST_F(MergeHelperTest, DontFilterMergeOperandsBeforeSnapshotTest) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

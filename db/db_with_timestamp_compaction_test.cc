@@ -16,6 +16,7 @@ namespace ROCKSDB_NAMESPACE {
 
 namespace {
 std::string Key1(uint64_t key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string ret;
   PutFixed64(&ret, key);
   std::reverse(ret.begin(), ret.end());
@@ -23,6 +24,7 @@ std::string Key1(uint64_t key) {
 }
 
 std::string Timestamp(uint64_t ts) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string ret;
   PutFixed64(&ret, ts);
   return ret;
@@ -35,6 +37,7 @@ class TimestampCompatibleCompactionTest : public DBTestBase {
       : DBTestBase("ts_compatible_compaction_test", /*env_do_fsync=*/true) {}
 
   std::string Get(const std::string& key, uint64_t ts) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ReadOptions read_opts;
     std::string ts_str = Timestamp(ts);
     Slice ts_slice = ts_str;
@@ -51,6 +54,7 @@ class TimestampCompatibleCompactionTest : public DBTestBase {
 };
 
 TEST_F(TimestampCompatibleCompactionTest, UserKeyCrossFileBoundary) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.env = env_;
   options.compaction_style = kCompactionStyleLevel;
@@ -64,6 +68,7 @@ TEST_F(TimestampCompatibleCompactionTest, UserKeyCrossFileBoundary) {
   SyncPoint::GetInstance()->ClearAllCallBacks();
   SyncPoint::GetInstance()->SetCallBack(
       "LevelCompactionPicker::PickCompaction:Return", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         const auto* compaction = reinterpret_cast<Compaction*>(arg);
         ASSERT_NE(nullptr, compaction);
         ASSERT_EQ(0, compaction->start_level());
@@ -112,6 +117,7 @@ TEST_F(TimestampCompatibleCompactionTest, UserKeyCrossFileBoundary) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

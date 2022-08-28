@@ -21,6 +21,7 @@ enum class WriteBatchOpType {
 
 // Integer addition is needed for `::testing::Range()` to take the enum type.
 WriteBatchOpType operator+(WriteBatchOpType lhs, const int rhs) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   using T = std::underlying_type<WriteBatchOpType>::type;
   return static_cast<WriteBatchOpType>(static_cast<T>(lhs) + rhs);
 }
@@ -31,11 +32,13 @@ class DbKvChecksumTest
  public:
   DbKvChecksumTest()
       : DBTestBase("db_kv_checksum_test", /*env_do_fsync=*/false) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     op_type_ = std::get<0>(GetParam());
     corrupt_byte_addend_ = std::get<1>(GetParam());
   }
 
   std::pair<WriteBatch, Status> GetWriteBatch(ColumnFamilyHandle* cf_handle) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Status s;
     WriteBatch wb(0 /* reserved_bytes */, 0 /* max_bytes */,
                   8 /* protection_bytes_per_entry */, 0 /* default_cf_ts_sz */);
@@ -78,6 +81,7 @@ class DbKvChecksumTest
   }
 
   void CorruptNextByteCallBack(void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Slice encoded = *static_cast<Slice*>(arg);
     if (entry_len_ == port::kMaxSizet) {
       // We learn the entry size on the first attempt
@@ -101,6 +105,7 @@ class DbKvChecksumTest
 
 std::string GetTestNameSuffix(
     ::testing::TestParamInfo<std::tuple<WriteBatchOpType, char>> info) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::ostringstream oss;
   switch (std::get<0>(info.param)) {
     case WriteBatchOpType::kPut:
@@ -137,6 +142,7 @@ INSTANTIATE_TEST_CASE_P(
     GetTestNameSuffix);
 
 TEST_P(DbKvChecksumTest, MemTableAddCorrupted) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // This test repeatedly attempts to write `WriteBatch`es containing a single
   // entry of type `op_type_`. Each attempt has one byte corrupted in its
   // memtable entry by adding `corrupt_byte_addend_` to its original value. The
@@ -166,6 +172,7 @@ TEST_P(DbKvChecksumTest, MemTableAddCorrupted) {
 }
 
 TEST_P(DbKvChecksumTest, MemTableAddWithColumnFamilyCorrupted) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // This test repeatedly attempts to write `WriteBatch`es containing a single
   // entry of type `op_type_` to a non-default column family. Each attempt has
   // one byte corrupted in its memtable entry by adding `corrupt_byte_addend_`
@@ -199,6 +206,7 @@ TEST_P(DbKvChecksumTest, MemTableAddWithColumnFamilyCorrupted) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

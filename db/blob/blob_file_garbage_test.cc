@@ -18,6 +18,7 @@ namespace ROCKSDB_NAMESPACE {
 class BlobFileGarbageTest : public testing::Test {
  public:
   static void TestEncodeDecode(const BlobFileGarbage& blob_file_garbage) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::string encoded;
     blob_file_garbage.EncodeTo(&encoded);
 
@@ -30,6 +31,7 @@ class BlobFileGarbageTest : public testing::Test {
 };
 
 TEST_F(BlobFileGarbageTest, Empty) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   BlobFileGarbage blob_file_garbage;
 
   ASSERT_EQ(blob_file_garbage.GetBlobFileNumber(), kInvalidBlobFileNumber);
@@ -40,6 +42,7 @@ TEST_F(BlobFileGarbageTest, Empty) {
 }
 
 TEST_F(BlobFileGarbageTest, NonEmpty) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr uint64_t blob_file_number = 123;
   constexpr uint64_t garbage_blob_count = 1;
   constexpr uint64_t garbage_blob_bytes = 9876;
@@ -55,6 +58,7 @@ TEST_F(BlobFileGarbageTest, NonEmpty) {
 }
 
 TEST_F(BlobFileGarbageTest, DecodeErrors) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string str;
   Slice slice(str);
 
@@ -108,8 +112,10 @@ TEST_F(BlobFileGarbageTest, DecodeErrors) {
 }
 
 TEST_F(BlobFileGarbageTest, ForwardCompatibleCustomField) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   SyncPoint::GetInstance()->SetCallBack(
       "BlobFileGarbage::EncodeTo::CustomFields", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         std::string* output = static_cast<std::string*>(arg);
 
         constexpr uint32_t forward_compatible_tag = 2;
@@ -133,8 +139,10 @@ TEST_F(BlobFileGarbageTest, ForwardCompatibleCustomField) {
 }
 
 TEST_F(BlobFileGarbageTest, ForwardIncompatibleCustomField) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   SyncPoint::GetInstance()->SetCallBack(
       "BlobFileGarbage::EncodeTo::CustomFields", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         std::string* output = static_cast<std::string*>(arg);
 
         constexpr uint32_t forward_incompatible_tag = (1 << 6) + 1;
@@ -168,6 +176,7 @@ TEST_F(BlobFileGarbageTest, ForwardIncompatibleCustomField) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

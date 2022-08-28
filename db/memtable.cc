@@ -112,6 +112,7 @@ MemTable::MemTable(const InternalKeyComparator& cmp,
       oldest_key_time_(std::numeric_limits<uint64_t>::max()),
       atomic_flush_seqno_(kMaxSequenceNumber),
       approximate_memory_usage_(0) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   UpdateFlushState();
   // something went wrong if we need to flush before inserting anything
   assert(!ShouldScheduleFlush());
@@ -127,11 +128,13 @@ MemTable::MemTable(const InternalKeyComparator& cmp,
 }
 
 MemTable::~MemTable() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   mem_tracker_.FreeMem();
   assert(refs_ == 0);
 }
 
 size_t MemTable::ApproximateMemoryUsage() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   autovector<size_t> usages = {
       arena_.ApproximateMemoryUsage(), table_->ApproximateMemoryUsage(),
       range_del_table_->ApproximateMemoryUsage(),
@@ -151,6 +154,7 @@ size_t MemTable::ApproximateMemoryUsage() {
 }
 
 bool MemTable::ShouldFlushNow() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   size_t write_buffer_size = write_buffer_size_.load(std::memory_order_relaxed);
   // In a lot of times, we cannot allocate arena blocks that exactly matches the
   // buffer size. Thus we have to decide if we should over-allocate or
@@ -211,6 +215,7 @@ bool MemTable::ShouldFlushNow() {
 }
 
 void MemTable::UpdateFlushState() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto state = flush_state_.load(std::memory_order_relaxed);
   if (state == FLUSH_NOT_REQUESTED && ShouldFlushNow()) {
     // ignore CAS failure, because that means somebody else requested
@@ -222,6 +227,7 @@ void MemTable::UpdateFlushState() {
 }
 
 void MemTable::UpdateOldestKeyTime() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t oldest_key_time = oldest_key_time_.load(std::memory_order_relaxed);
   if (oldest_key_time == std::numeric_limits<uint64_t>::max()) {
     int64_t current_time = 0;
@@ -253,6 +259,7 @@ int MemTable::KeyComparator::operator()(const char* prefix_len_key,
 }
 
 void MemTableRep::InsertConcurrently(KeyHandle /*handle*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifndef ROCKSDB_LITE
   throw std::runtime_error("concurrent insert not supported");
 #else
@@ -266,6 +273,7 @@ Slice MemTableRep::UserKey(const char* key) const {
 }
 
 KeyHandle MemTableRep::Allocate(const size_t len, char** buf) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   *buf = allocator_->Allocate(len);
   return static_cast<KeyHandle>(*buf);
 }
@@ -274,6 +282,7 @@ KeyHandle MemTableRep::Allocate(const size_t len, char** buf) {
 // Uses *scratch as scratch space, and the returned pointer will point
 // into this scratch space.
 const char* EncodeKey(std::string* scratch, const Slice& target) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   scratch->clear();
   PutVarint32(scratch, static_cast<uint32_t>(target.size()));
   scratch->append(target.data(), target.size());
@@ -291,6 +300,7 @@ class MemTableIterator : public InternalIterator {
         arena_mode_(arena != nullptr),
         value_pinned_(
             !mem.GetImmutableMemTableOptions()->inplace_update_support) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (use_range_del_table) {
       iter_ = mem.range_del_table_->GetIterator(arena);
     } else if (prefix_extractor_ != nullptr && !read_options.total_order_seek &&
@@ -437,6 +447,7 @@ class MemTableIterator : public InternalIterator {
 
 InternalIterator* MemTable::NewIterator(const ReadOptions& read_options,
                                         Arena* arena) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(arena != nullptr);
   auto mem = arena->AllocateAligned(sizeof(MemTableIterator));
   return new (mem) MemTableIterator(*this, read_options, arena);
@@ -444,6 +455,7 @@ InternalIterator* MemTable::NewIterator(const ReadOptions& read_options,
 
 FragmentedRangeTombstoneIterator* MemTable::NewRangeTombstoneIterator(
     const ReadOptions& read_options, SequenceNumber read_seq) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (read_options.ignore_range_deletions ||
       is_range_del_table_empty_.load(std::memory_order_relaxed)) {
     return nullptr;
@@ -453,6 +465,7 @@ FragmentedRangeTombstoneIterator* MemTable::NewRangeTombstoneIterator(
 
 FragmentedRangeTombstoneIterator* MemTable::NewRangeTombstoneIteratorInternal(
     const ReadOptions& read_options, SequenceNumber read_seq) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto* unfragmented_iter = new MemTableIterator(
       *this, read_options, nullptr /* arena */, true /* use_range_del_table */);
   auto fragmented_tombstone_list =
@@ -466,11 +479,13 @@ FragmentedRangeTombstoneIterator* MemTable::NewRangeTombstoneIteratorInternal(
 }
 
 port::RWMutex* MemTable::GetLock(const Slice& key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return &locks_[GetSliceRangedNPHash(key, locks_.size())];
 }
 
 MemTable::MemTableStats MemTable::ApproximateStats(const Slice& start_ikey,
                                                    const Slice& end_ikey) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t entry_count = table_->ApproximateNumEntries(start_ikey, end_ikey);
   entry_count += range_del_table_->ApproximateNumEntries(start_ikey, end_ikey);
   if (entry_count == 0) {
@@ -492,6 +507,7 @@ MemTable::MemTableStats MemTable::ApproximateStats(const Slice& start_ikey,
 
 Status MemTable::VerifyEncodedEntry(Slice encoded,
                                     const ProtectionInfoKVOS64& kv_prot_info) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint32_t ikey_len = 0;
   if (!GetVarint32(&encoded, &ikey_len)) {
     return Status::Corruption("Unable to parse internal key length");
@@ -536,6 +552,7 @@ Status MemTable::Add(SequenceNumber s, ValueType type,
                      const ProtectionInfoKVOS64* kv_prot_info,
                      bool allow_concurrent,
                      MemTablePostProcessInfo* post_process_info, void** hint) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Format of an entry is concatenation of:
   //  key_size     : varint32 of internal_key.size()
   //  key bytes    : char[internal_key.size()]
@@ -691,6 +708,7 @@ struct Saver {
   bool* is_blob_index;
   bool allow_data_in_errors;
   bool CheckCallback(SequenceNumber _seq) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (callback_) {
       return callback_->IsVisible(_seq);
     }
@@ -700,6 +718,7 @@ struct Saver {
 }  // namespace
 
 static bool SaveValue(void* arg, const char* entry) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Saver* s = reinterpret_cast<Saver*>(arg);
   assert(s != nullptr);
   MergeContext* merge_context = s->merge_context;
@@ -868,6 +887,7 @@ bool MemTable::Get(const LookupKey& key, std::string* value,
                    SequenceNumber* max_covering_tombstone_seq,
                    SequenceNumber* seq, const ReadOptions& read_opts,
                    ReadCallback* callback, bool* is_blob_index, bool do_merge) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // The sequence number is updated synchronously in version_set.h
   if (IsEmpty()) {
     // Avoiding recording stats for speed.
@@ -930,6 +950,7 @@ void MemTable::GetFromTable(const LookupKey& key,
                             std::string* timestamp, Status* s,
                             MergeContext* merge_context, SequenceNumber* seq,
                             bool* found_final_value, bool* merge_in_progress) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Saver saver;
   saver.status = s;
   saver.found_final_value = found_final_value;
@@ -956,6 +977,7 @@ void MemTable::GetFromTable(const LookupKey& key,
 
 void MemTable::MultiGet(const ReadOptions& read_options, MultiGetRange* range,
                         ReadCallback* callback) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // The sequence number is updated synchronously in version_set.h
   if (IsEmpty()) {
     // Avoiding recording stats for speed.
@@ -1043,6 +1065,7 @@ void MemTable::MultiGet(const ReadOptions& read_options, MultiGetRange* range,
 Status MemTable::Update(SequenceNumber seq, const Slice& key,
                         const Slice& value,
                         const ProtectionInfoKVOS64* kv_prot_info) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   LookupKey lkey(key, seq);
   Slice mem_key = lkey.memtable_key();
 
@@ -1106,6 +1129,7 @@ Status MemTable::Update(SequenceNumber seq, const Slice& key,
 Status MemTable::UpdateCallback(SequenceNumber seq, const Slice& key,
                                 const Slice& delta,
                                 const ProtectionInfoKVOS64* kv_prot_info) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   LookupKey lkey(key, seq);
   Slice memkey = lkey.memtable_key();
 
@@ -1200,6 +1224,7 @@ Status MemTable::UpdateCallback(SequenceNumber seq, const Slice& key,
 }
 
 size_t MemTable::CountSuccessiveMergeEntries(const LookupKey& key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Slice memkey = key.memtable_key();
 
   // A total ordered iterator is costly for some memtablerep (prefix aware
@@ -1236,6 +1261,7 @@ size_t MemTable::CountSuccessiveMergeEntries(const LookupKey& key) {
 
 void MemTableRep::Get(const LookupKey& k, void* callback_args,
                       bool (*callback_func)(void* arg, const char* entry)) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto iter = GetDynamicPrefixIterator();
   for (iter->Seek(k.internal_key(), k.memtable_key().data());
        iter->Valid() && callback_func(callback_args, iter->key());
@@ -1244,6 +1270,7 @@ void MemTableRep::Get(const LookupKey& k, void* callback_args,
 }
 
 void MemTable::RefLogContainingPrepSection(uint64_t log) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(log > 0);
   auto cur = min_prep_log_referenced_.load();
   while ((log < cur || cur == 0) &&
@@ -1253,6 +1280,7 @@ void MemTable::RefLogContainingPrepSection(uint64_t log) {
 }
 
 uint64_t MemTable::GetMinLogContainingPrepSection() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return min_prep_log_referenced_.load();
 }
 

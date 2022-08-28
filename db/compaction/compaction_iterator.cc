@@ -93,6 +93,7 @@ CompactionIterator::CompactionIterator(
       current_key_committed_(false),
       cmp_with_history_ts_low_(0),
       level_(compaction_ == nullptr ? 0 : compaction_->level()) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(snapshots_ != nullptr);
   bottommost_level_ = compaction_ == nullptr
                           ? false
@@ -126,11 +127,13 @@ CompactionIterator::CompactionIterator(
 }
 
 CompactionIterator::~CompactionIterator() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // input_ Iterator lifetime is longer than pinned_iters_mgr_ lifetime
   input_.SetPinnedItersMgr(nullptr);
 }
 
 void CompactionIterator::ResetRecordCounts() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   iter_stats_.num_record_drop_user = 0;
   iter_stats_.num_record_drop_hidden = 0;
   iter_stats_.num_record_drop_obsolete = 0;
@@ -140,11 +143,13 @@ void CompactionIterator::ResetRecordCounts() {
 }
 
 void CompactionIterator::SeekToFirst() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NextFromInput();
   PrepareOutput();
 }
 
 void CompactionIterator::Next() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // If there is a merge output, return it before continuing to process the
   // input.
   if (merge_out_iter_.Valid()) {
@@ -195,6 +200,7 @@ void CompactionIterator::Next() {
 
 bool CompactionIterator::InvokeFilterIfNeeded(bool* need_skip,
                                               Slice* skip_until) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!compaction_filter_ ||
       (ikey_.type != kTypeValue && ikey_.type != kTypeBlobIndex)) {
     return true;
@@ -351,6 +357,7 @@ bool CompactionIterator::InvokeFilterIfNeeded(bool* need_skip,
 }
 
 void CompactionIterator::NextFromInput() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   at_next_ = false;
   valid_ = false;
 
@@ -911,6 +918,7 @@ void CompactionIterator::NextFromInput() {
 }
 
 bool CompactionIterator::ExtractLargeValueIfNeededImpl() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!blob_file_builder_) {
     return false;
   }
@@ -935,6 +943,7 @@ bool CompactionIterator::ExtractLargeValueIfNeededImpl() {
 }
 
 void CompactionIterator::ExtractLargeValueIfNeeded() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(ikey_.type == kTypeValue);
 
   if (!ExtractLargeValueIfNeededImpl()) {
@@ -946,6 +955,7 @@ void CompactionIterator::ExtractLargeValueIfNeeded() {
 }
 
 void CompactionIterator::GarbageCollectBlobIfNeeded() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(ikey_.type == kTypeBlobIndex);
 
   if (!compaction_) {
@@ -1045,6 +1055,7 @@ void CompactionIterator::GarbageCollectBlobIfNeeded() {
 }
 
 void CompactionIterator::PrepareOutput() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (valid_) {
     if (ikey_.type == kTypeValue) {
       ExtractLargeValueIfNeeded();
@@ -1099,6 +1110,7 @@ void CompactionIterator::PrepareOutput() {
 
 inline SequenceNumber CompactionIterator::findEarliestVisibleSnapshot(
     SequenceNumber in, SequenceNumber* prev_snapshot) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(snapshots_->size());
   if (snapshots_->size() == 0) {
     ROCKS_LOG_FATAL(info_log_,
@@ -1144,6 +1156,7 @@ inline SequenceNumber CompactionIterator::findEarliestVisibleSnapshot(
 
 uint64_t CompactionIterator::ComputeBlobGarbageCollectionCutoffFileNumber(
     const CompactionProxy* compaction) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!compaction) {
     return 0;
   }
@@ -1175,6 +1188,7 @@ uint64_t CompactionIterator::ComputeBlobGarbageCollectionCutoffFileNumber(
 
 std::unique_ptr<BlobFetcher> CompactionIterator::CreateBlobFetcherIfNeeded(
     const CompactionProxy* compaction) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!compaction) {
     return nullptr;
   }
@@ -1190,6 +1204,7 @@ std::unique_ptr<BlobFetcher> CompactionIterator::CreateBlobFetcherIfNeeded(
 std::unique_ptr<PrefetchBufferCollection>
 CompactionIterator::CreatePrefetchBufferCollectionIfNeeded(
     const CompactionProxy* compaction) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!compaction) {
     return nullptr;
   }

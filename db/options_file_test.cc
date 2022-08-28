@@ -24,6 +24,7 @@ namespace {
 void UpdateOptionsFiles(DB* db,
                         std::unordered_set<std::string>* filename_history,
                         int* options_files_count) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::vector<std::string> filenames;
   EXPECT_OK(db->GetEnv()->GetChildren(db->GetName(), &filenames));
   uint64_t number;
@@ -40,6 +41,7 @@ void UpdateOptionsFiles(DB* db,
 // Verify whether the current Options Files are the latest ones.
 void VerifyOptionsFileName(
     DB* db, const std::unordered_set<std::string>& past_filenames) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::vector<std::string> filenames;
   std::unordered_set<std::string> current_filenames;
   EXPECT_OK(db->GetEnv()->GetChildren(db->GetName(), &filenames));
@@ -62,6 +64,7 @@ void VerifyOptionsFileName(
 }  // namespace
 
 TEST_F(OptionsFileTest, NumberOfOptionsFiles) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kReopenCount = 20;
   Options opt;
   opt.create_if_missing = true;
@@ -81,6 +84,7 @@ TEST_F(OptionsFileTest, NumberOfOptionsFiles) {
 }
 
 TEST_F(OptionsFileTest, OptionsFileName) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const uint64_t kOptionsFileNum = 12345;
   uint64_t number;
   FileType type;
@@ -101,6 +105,7 @@ TEST_F(OptionsFileTest, OptionsFileName) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #if !(defined NDEBUG) || !defined(OS_WIN)
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
@@ -113,6 +118,7 @@ int main(int argc, char** argv) {
 #include <cstdio>
 
 int main(int /*argc*/, char** /*argv*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   printf("Skipped as Options file is not supported in RocksDBLite.\n");
   return 0;
 }

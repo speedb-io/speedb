@@ -58,6 +58,7 @@ class CompactionPickerTest : public testing::Test {
         log_buffer_(InfoLogLevel::INFO_LEVEL, &logger_),
         file_num_(1),
         vstorage_(nullptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     mutable_cf_options_.ttl = 0;
     mutable_cf_options_.periodic_compaction_seconds = 0;
     // ioptions_.compaction_pri = kMinOverlappingRatio has its own set of
@@ -72,6 +73,7 @@ class CompactionPickerTest : public testing::Test {
   ~CompactionPickerTest() override {}
 
   void NewVersionStorage(int num_levels, CompactionStyle style) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     DeleteVersionStorage();
     options_.num_levels = num_levels;
     vstorage_.reset(new VersionStorageInfo(&icmp_, ucmp_, options_.num_levels,
@@ -82,12 +84,14 @@ class CompactionPickerTest : public testing::Test {
   // Create a new VersionStorageInfo object so we can add mode files and then
   // merge it with the existing VersionStorageInfo
   void AddVersionStorage() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     temp_vstorage_.reset(new VersionStorageInfo(
         &icmp_, ucmp_, options_.num_levels, ioptions_.compaction_style,
         vstorage_.get(), false));
   }
 
   void DeleteVersionStorage() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     vstorage_.reset();
     temp_vstorage_.reset();
     files_.clear();
@@ -101,6 +105,7 @@ class CompactionPickerTest : public testing::Test {
            size_t compensated_file_size = 0, bool marked_for_compact = false,
            Temperature temperature = Temperature::kUnknown,
            uint64_t oldest_ancestor_time = kUnknownOldestAncesterTime) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     VersionStorageInfo* vstorage;
     if (temp_vstorage_) {
       vstorage = temp_vstorage_.get();
@@ -125,6 +130,7 @@ class CompactionPickerTest : public testing::Test {
   }
 
   void SetCompactionInputFilesLevels(int level_count, int start_level) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     input_files_.resize(level_count);
     for (int i = 0; i < level_count; ++i) {
       input_files_[i].level = start_level + i;
@@ -133,6 +139,7 @@ class CompactionPickerTest : public testing::Test {
   }
 
   void AddToCompactionFiles(uint32_t file_number) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     auto iter = file_map_.find(file_number);
     assert(iter != file_map_.end());
     int level = iter->second.second;
@@ -142,6 +149,7 @@ class CompactionPickerTest : public testing::Test {
   }
 
   void UpdateVersionStorageInfo() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (temp_vstorage_) {
       VersionBuilder builder(FileOptions(), &ioptions_, nullptr,
                              vstorage_.get(), nullptr);
@@ -158,6 +166,7 @@ class CompactionPickerTest : public testing::Test {
 };
 
 TEST_F(CompactionPickerTest, Empty) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewVersionStorage(6, kCompactionStyleLevel);
   UpdateVersionStorageInfo();
   std::unique_ptr<Compaction> compaction(level_compaction_picker.PickCompaction(
@@ -167,6 +176,7 @@ TEST_F(CompactionPickerTest, Empty) {
 }
 
 TEST_F(CompactionPickerTest, Single) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewVersionStorage(6, kCompactionStyleLevel);
   mutable_cf_options_.level0_file_num_compaction_trigger = 2;
   Add(0, 1U, "p", "q");
@@ -179,6 +189,7 @@ TEST_F(CompactionPickerTest, Single) {
 }
 
 TEST_F(CompactionPickerTest, Level0Trigger) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewVersionStorage(6, kCompactionStyleLevel);
   mutable_cf_options_.level0_file_num_compaction_trigger = 2;
   Add(0, 1U, "150", "200");
@@ -196,6 +207,7 @@ TEST_F(CompactionPickerTest, Level0Trigger) {
 }
 
 TEST_F(CompactionPickerTest, Level1Trigger) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewVersionStorage(6, kCompactionStyleLevel);
   Add(1, 66U, "150", "200", 1000000000U);
   UpdateVersionStorageInfo();
@@ -209,6 +221,7 @@ TEST_F(CompactionPickerTest, Level1Trigger) {
 }
 
 TEST_F(CompactionPickerTest, Level1Trigger2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   mutable_cf_options_.target_file_size_base = 10000000000;
   mutable_cf_options_.RefreshDerivedOptions(ioptions_);
   NewVersionStorage(6, kCompactionStyleLevel);
@@ -232,6 +245,7 @@ TEST_F(CompactionPickerTest, Level1Trigger2) {
 }
 
 TEST_F(CompactionPickerTest, LevelMaxScore) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewVersionStorage(6, kCompactionStyleLevel);
   mutable_cf_options_.target_file_size_base = 10000000;
   mutable_cf_options_.max_bytes_for_level_base = 10 * 1024 * 1024;
@@ -263,6 +277,7 @@ TEST_F(CompactionPickerTest, LevelMaxScore) {
 }
 
 TEST_F(CompactionPickerTest, NeedsCompactionLevel) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kLevels = 6;
   const int kFileCount = 20;
 
@@ -288,6 +303,7 @@ TEST_F(CompactionPickerTest, NeedsCompactionLevel) {
 }
 
 TEST_F(CompactionPickerTest, Level0TriggerDynamic) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   int num_levels = ioptions_.num_levels;
   ioptions_.level_compaction_dynamic_level_bytes = true;
   mutable_cf_options_.level0_file_num_compaction_trigger = 2;
@@ -311,6 +327,7 @@ TEST_F(CompactionPickerTest, Level0TriggerDynamic) {
 }
 
 TEST_F(CompactionPickerTest, Level0TriggerDynamic2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   int num_levels = ioptions_.num_levels;
   ioptions_.level_compaction_dynamic_level_bytes = true;
   mutable_cf_options_.level0_file_num_compaction_trigger = 2;
@@ -336,6 +353,7 @@ TEST_F(CompactionPickerTest, Level0TriggerDynamic2) {
 }
 
 TEST_F(CompactionPickerTest, Level0TriggerDynamic3) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   int num_levels = ioptions_.num_levels;
   ioptions_.level_compaction_dynamic_level_bytes = true;
   mutable_cf_options_.level0_file_num_compaction_trigger = 2;
@@ -362,6 +380,7 @@ TEST_F(CompactionPickerTest, Level0TriggerDynamic3) {
 }
 
 TEST_F(CompactionPickerTest, Level0TriggerDynamic4) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   int num_levels = ioptions_.num_levels;
   ioptions_.level_compaction_dynamic_level_bytes = true;
   mutable_cf_options_.level0_file_num_compaction_trigger = 2;
@@ -396,6 +415,7 @@ TEST_F(CompactionPickerTest, Level0TriggerDynamic4) {
 }
 
 TEST_F(CompactionPickerTest, LevelTriggerDynamic4) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   int num_levels = ioptions_.num_levels;
   ioptions_.level_compaction_dynamic_level_bytes = true;
   ioptions_.compaction_pri = kMinOverlappingRatio;
@@ -427,6 +447,7 @@ TEST_F(CompactionPickerTest, LevelTriggerDynamic4) {
 // Universal and FIFO Compactions are not supported in ROCKSDB_LITE
 #ifndef ROCKSDB_LITE
 TEST_F(CompactionPickerTest, NeedsCompactionUniversal) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewVersionStorage(1, kCompactionStyleUniversal);
   UniversalCompactionPicker universal_compaction_picker(
       ioptions_, &icmp_);
@@ -449,6 +470,7 @@ TEST_F(CompactionPickerTest, NeedsCompactionUniversal) {
 }
 
 TEST_F(CompactionPickerTest, CompactionUniversalIngestBehindReservedLevel) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const uint64_t kFileSize = 100000;
   NewVersionStorage(1, kCompactionStyleUniversal);
   ioptions_.allow_ingest_behind = true;
@@ -484,6 +506,7 @@ TEST_F(CompactionPickerTest, CompactionUniversalIngestBehindReservedLevel) {
 // be trivially moved.
 
 TEST_F(CompactionPickerTest, CannotTrivialMoveUniversal) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const uint64_t kFileSize = 100000;
 
   mutable_cf_options_.compaction_options_universal.allow_trivial_move = true;
@@ -517,6 +540,7 @@ TEST_F(CompactionPickerTest, CannotTrivialMoveUniversal) {
 // In this test as the input files doesn't overlaps, they should
 // be trivially moved.
 TEST_F(CompactionPickerTest, AllowsTrivialMoveUniversal) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const uint64_t kFileSize = 100000;
 
   mutable_cf_options_.compaction_options_universal.allow_trivial_move = true;
@@ -541,6 +565,7 @@ TEST_F(CompactionPickerTest, AllowsTrivialMoveUniversal) {
 }
 
 TEST_F(CompactionPickerTest, UniversalPeriodicCompaction1) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // The case where universal periodic compaction can be picked
   // with some newer files being compacted.
   const uint64_t kFileSize = 100000;
@@ -573,6 +598,7 @@ TEST_F(CompactionPickerTest, UniversalPeriodicCompaction1) {
 }
 
 TEST_F(CompactionPickerTest, UniversalPeriodicCompaction2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // The case where universal periodic compaction does not
   // pick up only level to compact if it doesn't cover
   // any file marked as periodic compaction.
@@ -601,6 +627,7 @@ TEST_F(CompactionPickerTest, UniversalPeriodicCompaction2) {
 }
 
 TEST_F(CompactionPickerTest, UniversalPeriodicCompaction3) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // The case where universal periodic compaction does not
   // pick up only the last sorted run which is an L0 file if it isn't
   // marked as periodic compaction.
@@ -628,6 +655,7 @@ TEST_F(CompactionPickerTest, UniversalPeriodicCompaction3) {
 }
 
 TEST_F(CompactionPickerTest, UniversalPeriodicCompaction4) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // The case where universal periodic compaction couldn't form
   // a compaction that includes any file marked for periodic compaction.
   // Right now we form the compaction anyway if it is more than one
@@ -659,6 +687,7 @@ TEST_F(CompactionPickerTest, UniversalPeriodicCompaction4) {
 }
 
 TEST_F(CompactionPickerTest, UniversalPeriodicCompaction5) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Test single L0 file periodic compaction triggering.
   const uint64_t kFileSize = 100000;
 
@@ -683,6 +712,7 @@ TEST_F(CompactionPickerTest, UniversalPeriodicCompaction5) {
 }
 
 TEST_F(CompactionPickerTest, UniversalPeriodicCompaction6) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Test single sorted run non-L0 periodic compaction
   const uint64_t kFileSize = 100000;
 
@@ -709,6 +739,7 @@ TEST_F(CompactionPickerTest, UniversalPeriodicCompaction6) {
 }
 
 TEST_F(CompactionPickerTest, UniversalIncrementalSpace1) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const uint64_t kFileSize = 100000;
 
   mutable_cf_options_.max_compaction_bytes = 555555;
@@ -752,6 +783,7 @@ TEST_F(CompactionPickerTest, UniversalIncrementalSpace1) {
 }
 
 TEST_F(CompactionPickerTest, UniversalIncrementalSpace2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const uint64_t kFileSize = 100000;
 
   mutable_cf_options_.max_compaction_bytes = 400000;
@@ -790,6 +822,7 @@ TEST_F(CompactionPickerTest, UniversalIncrementalSpace2) {
 }
 
 TEST_F(CompactionPickerTest, UniversalIncrementalSpace3) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Test bottom level files falling between gaps between two upper level
   // files
   const uint64_t kFileSize = 100000;
@@ -834,6 +867,7 @@ TEST_F(CompactionPickerTest, UniversalIncrementalSpace3) {
 }
 
 TEST_F(CompactionPickerTest, UniversalIncrementalSpace4) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Test compaction candidates always cover many files.
   const uint64_t kFileSize = 100000;
 
@@ -880,6 +914,7 @@ TEST_F(CompactionPickerTest, UniversalIncrementalSpace4) {
 }
 
 TEST_F(CompactionPickerTest, UniversalIncrementalSpace5) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Test compaction candidates always cover many files with some single
   // files larger than size threshold.
   const uint64_t kFileSize = 100000;
@@ -924,6 +959,7 @@ TEST_F(CompactionPickerTest, UniversalIncrementalSpace5) {
 }
 
 TEST_F(CompactionPickerTest, NeedsCompactionFIFO) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewVersionStorage(1, kCompactionStyleFIFO);
   const int kFileCount =
       mutable_cf_options_.level0_file_num_compaction_trigger * 3;
@@ -951,6 +987,7 @@ TEST_F(CompactionPickerTest, NeedsCompactionFIFO) {
 }
 
 TEST_F(CompactionPickerTest, FIFOToWarm1) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewVersionStorage(1, kCompactionStyleFIFO);
   const uint64_t kFileSize = 100000;
   const uint64_t kMaxSize = kFileSize * 100000;
@@ -987,6 +1024,7 @@ TEST_F(CompactionPickerTest, FIFOToWarm1) {
 }
 
 TEST_F(CompactionPickerTest, FIFOToWarm2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewVersionStorage(1, kCompactionStyleFIFO);
   const uint64_t kFileSize = 100000;
   const uint64_t kMaxSize = kFileSize * 100000;
@@ -1026,6 +1064,7 @@ TEST_F(CompactionPickerTest, FIFOToWarm2) {
 }
 
 TEST_F(CompactionPickerTest, FIFOToWarmMaxSize) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewVersionStorage(1, kCompactionStyleFIFO);
   const uint64_t kFileSize = 100000;
   const uint64_t kMaxSize = kFileSize * 100000;
@@ -1067,6 +1106,7 @@ TEST_F(CompactionPickerTest, FIFOToWarmMaxSize) {
 }
 
 TEST_F(CompactionPickerTest, FIFOToWarmWithExistingWarm) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewVersionStorage(1, kCompactionStyleFIFO);
   const uint64_t kFileSize = 100000;
   const uint64_t kMaxSize = kFileSize * 100000;
@@ -1108,6 +1148,7 @@ TEST_F(CompactionPickerTest, FIFOToWarmWithExistingWarm) {
 }
 
 TEST_F(CompactionPickerTest, FIFOToWarmWithOngoing) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewVersionStorage(1, kCompactionStyleFIFO);
   const uint64_t kFileSize = 100000;
   const uint64_t kMaxSize = kFileSize * 100000;
@@ -1148,6 +1189,7 @@ TEST_F(CompactionPickerTest, FIFOToWarmWithOngoing) {
 }
 
 TEST_F(CompactionPickerTest, FIFOToWarmWithHotBetweenWarms) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewVersionStorage(1, kCompactionStyleFIFO);
   const uint64_t kFileSize = 100000;
   const uint64_t kMaxSize = kFileSize * 100000;
@@ -1191,6 +1233,7 @@ TEST_F(CompactionPickerTest, FIFOToWarmWithHotBetweenWarms) {
 #endif  // ROCKSDB_LITE
 
 TEST_F(CompactionPickerTest, CompactionPriMinOverlapping1) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewVersionStorage(6, kCompactionStyleLevel);
   ioptions_.compaction_pri = kMinOverlappingRatio;
   mutable_cf_options_.target_file_size_base = 100000000000;
@@ -1222,6 +1265,7 @@ TEST_F(CompactionPickerTest, CompactionPriMinOverlapping1) {
 }
 
 TEST_F(CompactionPickerTest, CompactionPriMinOverlapping2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewVersionStorage(6, kCompactionStyleLevel);
   ioptions_.compaction_pri = kMinOverlappingRatio;
   mutable_cf_options_.target_file_size_base = 10000000;
@@ -1253,6 +1297,7 @@ TEST_F(CompactionPickerTest, CompactionPriMinOverlapping2) {
 }
 
 TEST_F(CompactionPickerTest, CompactionPriMinOverlapping3) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewVersionStorage(6, kCompactionStyleLevel);
   ioptions_.compaction_pri = kMinOverlappingRatio;
   mutable_cf_options_.max_bytes_for_level_base = 10000000;
@@ -1281,6 +1326,7 @@ TEST_F(CompactionPickerTest, CompactionPriMinOverlapping3) {
 }
 
 TEST_F(CompactionPickerTest, CompactionPriMinOverlapping4) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewVersionStorage(6, kCompactionStyleLevel);
   ioptions_.compaction_pri = kMinOverlappingRatio;
   mutable_cf_options_.max_bytes_for_level_base = 10000000;
@@ -1313,6 +1359,7 @@ TEST_F(CompactionPickerTest, CompactionPriMinOverlapping4) {
 // This test exhibits the bug where we don't properly reset parent_index in
 // PickCompaction()
 TEST_F(CompactionPickerTest, ParentIndexResetBug) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   int num_levels = ioptions_.num_levels;
   mutable_cf_options_.level0_file_num_compaction_trigger = 2;
   mutable_cf_options_.max_bytes_for_level_base = 200;
@@ -1337,6 +1384,7 @@ TEST_F(CompactionPickerTest, ParentIndexResetBug) {
 // This test checks ExpandWhileOverlapping() by having overlapping user keys
 // ranges (with different sequence numbers) in the input files.
 TEST_F(CompactionPickerTest, OverlappingUserKeys) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewVersionStorage(6, kCompactionStyleLevel);
   ioptions_.compaction_pri = kByCompensatedSize;
 
@@ -1358,6 +1406,7 @@ TEST_F(CompactionPickerTest, OverlappingUserKeys) {
 }
 
 TEST_F(CompactionPickerTest, OverlappingUserKeys2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewVersionStorage(6, kCompactionStyleLevel);
   // Overlapping user keys on same level and output level
   Add(1, 1U, "200", "400", 1000000000U);
@@ -1382,6 +1431,7 @@ TEST_F(CompactionPickerTest, OverlappingUserKeys2) {
 }
 
 TEST_F(CompactionPickerTest, OverlappingUserKeys3) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewVersionStorage(6, kCompactionStyleLevel);
   // Chain of overlapping user key ranges (forces ExpandWhileOverlapping() to
   // expand multiple times)
@@ -1412,6 +1462,7 @@ TEST_F(CompactionPickerTest, OverlappingUserKeys3) {
 }
 
 TEST_F(CompactionPickerTest, OverlappingUserKeys4) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewVersionStorage(6, kCompactionStyleLevel);
   mutable_cf_options_.max_bytes_for_level_base = 1000000;
 
@@ -1438,6 +1489,7 @@ TEST_F(CompactionPickerTest, OverlappingUserKeys4) {
 }
 
 TEST_F(CompactionPickerTest, OverlappingUserKeys5) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewVersionStorage(6, kCompactionStyleLevel);
   // Overlapping user keys on same level and output level
   Add(1, 1U, "200", "400", 1000000000U);
@@ -1457,6 +1509,7 @@ TEST_F(CompactionPickerTest, OverlappingUserKeys5) {
 }
 
 TEST_F(CompactionPickerTest, OverlappingUserKeys6) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewVersionStorage(6, kCompactionStyleLevel);
   // Overlapping user keys on same level and output level
   Add(1, 1U, "200", "400", 1U, 0, 0);
@@ -1482,6 +1535,7 @@ TEST_F(CompactionPickerTest, OverlappingUserKeys6) {
 }
 
 TEST_F(CompactionPickerTest, OverlappingUserKeys7) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewVersionStorage(6, kCompactionStyleLevel);
   mutable_cf_options_.max_compaction_bytes = 100000000000u;
   // Overlapping user keys on same level and output level
@@ -1505,6 +1559,7 @@ TEST_F(CompactionPickerTest, OverlappingUserKeys7) {
 }
 
 TEST_F(CompactionPickerTest, OverlappingUserKeys8) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewVersionStorage(6, kCompactionStyleLevel);
   mutable_cf_options_.max_compaction_bytes = 100000000000u;
   // grow the number of inputs in "level" without
@@ -1537,6 +1592,7 @@ TEST_F(CompactionPickerTest, OverlappingUserKeys8) {
 }
 
 TEST_F(CompactionPickerTest, OverlappingUserKeys9) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewVersionStorage(6, kCompactionStyleLevel);
   mutable_cf_options_.max_compaction_bytes = 100000000000u;
   // grow the number of inputs in "level" without
@@ -1571,6 +1627,7 @@ TEST_F(CompactionPickerTest, OverlappingUserKeys9) {
 }
 
 TEST_F(CompactionPickerTest, OverlappingUserKeys10) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Locked file encountered when pulling in extra input-level files with same
   // user keys. Verify we pick the next-best file from the same input level.
   NewVersionStorage(6, kCompactionStyleLevel);
@@ -1608,6 +1665,7 @@ TEST_F(CompactionPickerTest, OverlappingUserKeys10) {
 }
 
 TEST_F(CompactionPickerTest, OverlappingUserKeys11) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Locked file encountered when pulling in extra output-level files with same
   // user keys. Expected to skip that compaction and pick the next-best choice.
   NewVersionStorage(6, kCompactionStyleLevel);
@@ -1647,6 +1705,7 @@ TEST_F(CompactionPickerTest, OverlappingUserKeys11) {
 }
 
 TEST_F(CompactionPickerTest, FileTtlBooster) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Set TTL to 2048
   // TTL boosting for all levels starts at 1024,
   // Whole TTL range is 2048 * 31 / 32 - 1024 = 1984 - 1024 = 960.
@@ -1707,6 +1766,7 @@ TEST_F(CompactionPickerTest, FileTtlBooster) {
 }
 
 TEST_F(CompactionPickerTest, NotScheduleL1IfL0WithHigherPri1) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewVersionStorage(6, kCompactionStyleLevel);
   mutable_cf_options_.level0_file_num_compaction_trigger = 2;
   mutable_cf_options_.max_bytes_for_level_base = 900000000U;
@@ -1740,6 +1800,7 @@ TEST_F(CompactionPickerTest, NotScheduleL1IfL0WithHigherPri1) {
 }
 
 TEST_F(CompactionPickerTest, NotScheduleL1IfL0WithHigherPri2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewVersionStorage(6, kCompactionStyleLevel);
   mutable_cf_options_.level0_file_num_compaction_trigger = 2;
   mutable_cf_options_.max_bytes_for_level_base = 900000000U;
@@ -1771,6 +1832,7 @@ TEST_F(CompactionPickerTest, NotScheduleL1IfL0WithHigherPri2) {
 }
 
 TEST_F(CompactionPickerTest, NotScheduleL1IfL0WithHigherPri3) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewVersionStorage(6, kCompactionStyleLevel);
   mutable_cf_options_.level0_file_num_compaction_trigger = 2;
   mutable_cf_options_.max_bytes_for_level_base = 900000000U;
@@ -1805,6 +1867,7 @@ TEST_F(CompactionPickerTest, NotScheduleL1IfL0WithHigherPri3) {
 }
 
 TEST_F(CompactionPickerTest, EstimateCompactionBytesNeeded1) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   int num_levels = ioptions_.num_levels;
   ioptions_.level_compaction_dynamic_level_bytes = false;
   mutable_cf_options_.level0_file_num_compaction_trigger = 4;
@@ -1838,6 +1901,7 @@ TEST_F(CompactionPickerTest, EstimateCompactionBytesNeeded1) {
 }
 
 TEST_F(CompactionPickerTest, EstimateCompactionBytesNeeded2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   int num_levels = ioptions_.num_levels;
   ioptions_.level_compaction_dynamic_level_bytes = false;
   mutable_cf_options_.level0_file_num_compaction_trigger = 3;
@@ -1865,6 +1929,7 @@ TEST_F(CompactionPickerTest, EstimateCompactionBytesNeeded2) {
 }
 
 TEST_F(CompactionPickerTest, EstimateCompactionBytesNeeded3) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   int num_levels = ioptions_.num_levels;
   ioptions_.level_compaction_dynamic_level_bytes = false;
   mutable_cf_options_.level0_file_num_compaction_trigger = 3;
@@ -1888,6 +1953,7 @@ TEST_F(CompactionPickerTest, EstimateCompactionBytesNeeded3) {
 }
 
 TEST_F(CompactionPickerTest, EstimateCompactionBytesNeededDynamicLevel) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   int num_levels = ioptions_.num_levels;
   ioptions_.level_compaction_dynamic_level_bytes = true;
   mutable_cf_options_.level0_file_num_compaction_trigger = 3;
@@ -1921,6 +1987,7 @@ TEST_F(CompactionPickerTest, EstimateCompactionBytesNeededDynamicLevel) {
 }
 
 TEST_F(CompactionPickerTest, IsBottommostLevelTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // case 1: Higher levels are empty
   NewVersionStorage(6, kCompactionStyleLevel);
   Add(0, 1U, "a", "m");
@@ -2079,6 +2146,7 @@ TEST_F(CompactionPickerTest, IsBottommostLevelTest) {
 }
 
 TEST_F(CompactionPickerTest, MaxCompactionBytesHit) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   mutable_cf_options_.max_bytes_for_level_base = 1000000u;
   mutable_cf_options_.max_compaction_bytes = 800000u;
   ioptions_.level_compaction_dynamic_level_bytes = false;
@@ -2105,6 +2173,7 @@ TEST_F(CompactionPickerTest, MaxCompactionBytesHit) {
 }
 
 TEST_F(CompactionPickerTest, MaxCompactionBytesNotHit) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   mutable_cf_options_.max_bytes_for_level_base = 800000u;
   mutable_cf_options_.max_compaction_bytes = 1000000u;
   ioptions_.level_compaction_dynamic_level_bytes = false;
@@ -2132,6 +2201,7 @@ TEST_F(CompactionPickerTest, MaxCompactionBytesNotHit) {
 }
 
 TEST_F(CompactionPickerTest, IsTrivialMoveOn) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   mutable_cf_options_.max_bytes_for_level_base = 10000u;
   mutable_cf_options_.max_compaction_bytes = 10001u;
   ioptions_.level_compaction_dynamic_level_bytes = false;
@@ -2156,6 +2226,7 @@ TEST_F(CompactionPickerTest, IsTrivialMoveOn) {
 }
 
 TEST_F(CompactionPickerTest, IsTrivialMoveOffSstPartitioned) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   mutable_cf_options_.max_bytes_for_level_base = 10000u;
   mutable_cf_options_.max_compaction_bytes = 10001u;
   ioptions_.level_compaction_dynamic_level_bytes = false;
@@ -2182,6 +2253,7 @@ TEST_F(CompactionPickerTest, IsTrivialMoveOffSstPartitioned) {
 }
 
 TEST_F(CompactionPickerTest, IsTrivialMoveOff) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   mutable_cf_options_.max_bytes_for_level_base = 1000000u;
   mutable_cf_options_.max_compaction_bytes = 10000u;
   ioptions_.level_compaction_dynamic_level_bytes = false;
@@ -2204,6 +2276,7 @@ TEST_F(CompactionPickerTest, IsTrivialMoveOff) {
 }
 
 TEST_F(CompactionPickerTest, CacheNextCompactionIndex) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NewVersionStorage(6, kCompactionStyleLevel);
   mutable_cf_options_.max_compaction_bytes = 100000000000u;
 
@@ -2250,6 +2323,7 @@ TEST_F(CompactionPickerTest, CacheNextCompactionIndex) {
 }
 
 TEST_F(CompactionPickerTest, IntraL0MaxCompactionBytesNotHit) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Intra L0 compaction triggers only if there are at least
   // level0_file_num_compaction_trigger + 2 L0 files.
   mutable_cf_options_.level0_file_num_compaction_trigger = 3;
@@ -2280,6 +2354,7 @@ TEST_F(CompactionPickerTest, IntraL0MaxCompactionBytesNotHit) {
 }
 
 TEST_F(CompactionPickerTest, IntraL0MaxCompactionBytesHit) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Intra L0 compaction triggers only if there are at least
   // level0_file_num_compaction_trigger + 2 L0 files.
   mutable_cf_options_.level0_file_num_compaction_trigger = 3;
@@ -2311,6 +2386,7 @@ TEST_F(CompactionPickerTest, IntraL0MaxCompactionBytesHit) {
 }
 
 TEST_F(CompactionPickerTest, IntraL0ForEarliestSeqno) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Intra L0 compaction triggers only if there are at least
   // level0_file_num_compaction_trigger + 2 L0 files.
   mutable_cf_options_.level0_file_num_compaction_trigger = 3;
@@ -2345,6 +2421,7 @@ TEST_F(CompactionPickerTest, IntraL0ForEarliestSeqno) {
 
 #ifndef ROCKSDB_LITE
 TEST_F(CompactionPickerTest, UniversalMarkedCompactionFullOverlap) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const uint64_t kFileSize = 100000;
 
   ioptions_.compaction_style = kCompactionStyleUniversal;
@@ -2390,6 +2467,7 @@ TEST_F(CompactionPickerTest, UniversalMarkedCompactionFullOverlap) {
 }
 
 TEST_F(CompactionPickerTest, UniversalMarkedCompactionFullOverlap2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const uint64_t kFileSize = 100000;
 
   ioptions_.compaction_style = kCompactionStyleUniversal;
@@ -2434,6 +2512,7 @@ TEST_F(CompactionPickerTest, UniversalMarkedCompactionFullOverlap2) {
 }
 
 TEST_F(CompactionPickerTest, UniversalMarkedCompactionStartOutputOverlap) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // The case where universal periodic compaction can be picked
   // with some newer files being compacted.
   const uint64_t kFileSize = 100000;
@@ -2448,6 +2527,7 @@ TEST_F(CompactionPickerTest, UniversalMarkedCompactionStartOutputOverlap) {
   size_t random_index = 0;
   SyncPoint::GetInstance()->SetCallBack(
       "CompactionPicker::PickFilesMarkedForCompaction", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         size_t* index = static_cast<size_t*>(arg);
         *index = random_index;
       });
@@ -2508,6 +2588,7 @@ TEST_F(CompactionPickerTest, UniversalMarkedCompactionStartOutputOverlap) {
 }
 
 TEST_F(CompactionPickerTest, UniversalMarkedL0NoOverlap) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const uint64_t kFileSize = 100000;
 
   ioptions_.compaction_style = kCompactionStyleUniversal;
@@ -2543,6 +2624,7 @@ TEST_F(CompactionPickerTest, UniversalMarkedL0NoOverlap) {
 }
 
 TEST_F(CompactionPickerTest, UniversalMarkedL0WithOverlap) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const uint64_t kFileSize = 100000;
 
   ioptions_.compaction_style = kCompactionStyleUniversal;
@@ -2578,6 +2660,7 @@ TEST_F(CompactionPickerTest, UniversalMarkedL0WithOverlap) {
 }
 
 TEST_F(CompactionPickerTest, UniversalMarkedL0Overlap2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const uint64_t kFileSize = 100000;
 
   ioptions_.compaction_style = kCompactionStyleUniversal;
@@ -2628,6 +2711,7 @@ TEST_F(CompactionPickerTest, UniversalMarkedL0Overlap2) {
 }
 
 TEST_F(CompactionPickerTest, UniversalMarkedManualCompaction) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const uint64_t kFileSize = 100000;
   const int kNumLevels = 7;
 
@@ -2677,6 +2761,7 @@ TEST_F(CompactionPickerTest, UniversalMarkedManualCompaction) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

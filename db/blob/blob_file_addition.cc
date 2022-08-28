@@ -48,6 +48,7 @@ void BlobFileAddition::EncodeTo(std::string* output) const {
 }
 
 Status BlobFileAddition::DecodeFrom(Slice* input) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr char class_name[] = "BlobFileAddition";
 
   if (!GetVarint64(input, &blob_file_number_)) {
@@ -118,6 +119,7 @@ std::string BlobFileAddition::DebugJSON() const {
 }
 
 bool operator==(const BlobFileAddition& lhs, const BlobFileAddition& rhs) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return lhs.GetBlobFileNumber() == rhs.GetBlobFileNumber() &&
          lhs.GetTotalBlobCount() == rhs.GetTotalBlobCount() &&
          lhs.GetTotalBlobBytes() == rhs.GetTotalBlobBytes() &&
@@ -126,11 +128,13 @@ bool operator==(const BlobFileAddition& lhs, const BlobFileAddition& rhs) {
 }
 
 bool operator!=(const BlobFileAddition& lhs, const BlobFileAddition& rhs) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return !(lhs == rhs);
 }
 
 std::ostream& operator<<(std::ostream& os,
                          const BlobFileAddition& blob_file_addition) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   os << "blob_file_number: " << blob_file_addition.GetBlobFileNumber()
      << " total_blob_count: " << blob_file_addition.GetTotalBlobCount()
      << " total_blob_bytes: " << blob_file_addition.GetTotalBlobBytes()
@@ -143,6 +147,7 @@ std::ostream& operator<<(std::ostream& os,
 
 JSONWriter& operator<<(JSONWriter& jw,
                        const BlobFileAddition& blob_file_addition) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   jw << "BlobFileNumber" << blob_file_addition.GetBlobFileNumber()
      << "TotalBlobCount" << blob_file_addition.GetTotalBlobCount()
      << "TotalBlobBytes" << blob_file_addition.GetTotalBlobBytes()

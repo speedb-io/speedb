@@ -22,6 +22,7 @@ class DBBlobBasicTest : public DBTestBase {
 };
 
 TEST_F(DBBlobBasicTest, GetBlob) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = GetDefaultOptions();
   options.enable_blob_files = true;
   options.min_blob_size = 0;
@@ -49,6 +50,7 @@ TEST_F(DBBlobBasicTest, GetBlob) {
 }
 
 TEST_F(DBBlobBasicTest, MultiGetBlobs) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr size_t min_blob_size = 6;
 
   Options options = GetDefaultOptions();
@@ -129,6 +131,7 @@ TEST_F(DBBlobBasicTest, MultiGetBlobs) {
 
 #ifndef ROCKSDB_LITE
 TEST_F(DBBlobBasicTest, MultiGetWithDirectIO) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = GetDefaultOptions();
 
   // First, create an external SST file ["b"].
@@ -262,6 +265,7 @@ TEST_F(DBBlobBasicTest, MultiGetWithDirectIO) {
   SyncPoint::GetInstance()->ClearAllCallBacks();
   SyncPoint::GetInstance()->SetCallBack(
       "RandomAccessFileReader::MultiRead:AlignedReqs", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         auto* aligned_reqs = static_cast<std::vector<FSReadRequest>*>(arg);
         assert(aligned_reqs);
         ASSERT_EQ(1, aligned_reqs->size());
@@ -319,6 +323,7 @@ TEST_F(DBBlobBasicTest, MultiGetWithDirectIO) {
 #endif  // !ROCKSDB_LITE
 
 TEST_F(DBBlobBasicTest, MultiGetBlobsFromMultipleFiles) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = GetDefaultOptions();
   options.enable_blob_files = true;
   options.min_blob_size = 0;
@@ -359,6 +364,7 @@ TEST_F(DBBlobBasicTest, MultiGetBlobsFromMultipleFiles) {
 }
 
 TEST_F(DBBlobBasicTest, GetBlob_CorruptIndex) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = GetDefaultOptions();
   options.enable_blob_files = true;
   options.min_blob_size = 0;
@@ -373,6 +379,7 @@ TEST_F(DBBlobBasicTest, GetBlob_CorruptIndex) {
 
   SyncPoint::GetInstance()->SetCallBack(
       "Version::Get::TamperWithBlobIndex", [](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         Slice* const blob_index = static_cast<Slice*>(arg);
         assert(blob_index);
         assert(!blob_index->empty());
@@ -389,6 +396,7 @@ TEST_F(DBBlobBasicTest, GetBlob_CorruptIndex) {
 }
 
 TEST_F(DBBlobBasicTest, MultiGetBlob_CorruptIndex) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = GetDefaultOptions();
   options.enable_blob_files = true;
   options.min_blob_size = 0;
@@ -416,6 +424,7 @@ TEST_F(DBBlobBasicTest, MultiGetBlob_CorruptIndex) {
 
   SyncPoint::GetInstance()->SetCallBack(
       "Version::MultiGet::TamperWithBlobIndex", [&key](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         KeyContext* const key_context = static_cast<KeyContext*>(arg);
         assert(key_context);
         assert(key_context->key);
@@ -448,6 +457,7 @@ TEST_F(DBBlobBasicTest, MultiGetBlob_CorruptIndex) {
 }
 
 TEST_F(DBBlobBasicTest, MultiGetBlob_ExceedSoftLimit) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = GetDefaultOptions();
   options.enable_blob_files = true;
   options.min_blob_size = 0;
@@ -479,6 +489,7 @@ TEST_F(DBBlobBasicTest, MultiGetBlob_ExceedSoftLimit) {
 }
 
 TEST_F(DBBlobBasicTest, GetBlob_InlinedTTLIndex) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr uint64_t min_blob_size = 10;
 
   Options options = GetDefaultOptions();
@@ -511,6 +522,7 @@ TEST_F(DBBlobBasicTest, GetBlob_InlinedTTLIndex) {
 }
 
 TEST_F(DBBlobBasicTest, GetBlob_IndexWithInvalidFileNumber) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = GetDefaultOptions();
   options.enable_blob_files = true;
   options.min_blob_size = 0;
@@ -542,6 +554,7 @@ TEST_F(DBBlobBasicTest, GetBlob_IndexWithInvalidFileNumber) {
 
 #ifndef ROCKSDB_LITE
 TEST_F(DBBlobBasicTest, GenerateIOTracing) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = GetDefaultOptions();
   options.enable_blob_files = true;
   options.min_blob_size = 0;
@@ -598,6 +611,7 @@ TEST_F(DBBlobBasicTest, GenerateIOTracing) {
 #endif  // !ROCKSDB_LITE
 
 TEST_F(DBBlobBasicTest, BestEffortsRecovery_MissingNewestBlobFile) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = GetDefaultOptions();
   options.enable_blob_files = true;
   options.min_blob_size = 0;
@@ -641,6 +655,7 @@ TEST_F(DBBlobBasicTest, BestEffortsRecovery_MissingNewestBlobFile) {
 }
 
 TEST_F(DBBlobBasicTest, GetMergeBlobWithPut) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = GetDefaultOptions();
   options.merge_operator = MergeOperators::CreateStringAppendOperator();
   options.enable_blob_files = true;
@@ -661,6 +676,7 @@ TEST_F(DBBlobBasicTest, GetMergeBlobWithPut) {
 }
 
 TEST_F(DBBlobBasicTest, MultiGetMergeBlobWithPut) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr size_t num_keys = 3;
 
   Options options = GetDefaultOptions();
@@ -699,6 +715,7 @@ TEST_F(DBBlobBasicTest, MultiGetMergeBlobWithPut) {
 
 #ifndef ROCKSDB_LITE
 TEST_F(DBBlobBasicTest, Properties) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = GetDefaultOptions();
   options.enable_blob_files = true;
   options.min_blob_size = 0;
@@ -807,6 +824,7 @@ TEST_F(DBBlobBasicTest, Properties) {
 }
 
 TEST_F(DBBlobBasicTest, PropertiesMultiVersion) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = GetDefaultOptions();
   options.enable_blob_files = true;
   options.min_blob_size = 0;
@@ -866,6 +884,7 @@ class DBBlobBasicIOErrorTest : public DBBlobBasicTest,
                                public testing::WithParamInterface<std::string> {
  protected:
   DBBlobBasicIOErrorTest() : sync_point_(GetParam()) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     fault_injection_env_.reset(new FaultInjectionTestEnv(env_));
   }
   ~DBBlobBasicIOErrorTest() { Close(); }
@@ -890,6 +909,7 @@ INSTANTIATE_TEST_CASE_P(DBBlobBasicTest, DBBlobBasicIOErrorMultiGetTest,
                             "BlobFileReader::MultiGetBlob:ReadFromFile"}));
 
 TEST_P(DBBlobBasicIOErrorTest, GetBlob_IOError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = fault_injection_env_.get();
   options.enable_blob_files = true;
@@ -905,6 +925,7 @@ TEST_P(DBBlobBasicIOErrorTest, GetBlob_IOError) {
   ASSERT_OK(Flush());
 
   SyncPoint::GetInstance()->SetCallBack(sync_point_, [this](void* /* arg */) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     fault_injection_env_->SetFilesystemActive(false,
                                               Status::IOError(sync_point_));
   });
@@ -919,6 +940,7 @@ TEST_P(DBBlobBasicIOErrorTest, GetBlob_IOError) {
 }
 
 TEST_P(DBBlobBasicIOErrorMultiGetTest, MultiGetBlobs_IOError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = GetDefaultOptions();
   options.env = fault_injection_env_.get();
   options.enable_blob_files = true;
@@ -945,6 +967,7 @@ TEST_P(DBBlobBasicIOErrorMultiGetTest, MultiGetBlobs_IOError) {
   std::array<Status, num_keys> statuses;
 
   SyncPoint::GetInstance()->SetCallBack(sync_point_, [this](void* /* arg */) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     fault_injection_env_->SetFilesystemActive(false,
                                               Status::IOError(sync_point_));
   });
@@ -961,6 +984,7 @@ TEST_P(DBBlobBasicIOErrorMultiGetTest, MultiGetBlobs_IOError) {
 }
 
 TEST_P(DBBlobBasicIOErrorMultiGetTest, MultipleBlobFiles) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = GetDefaultOptions();
   options.env = fault_injection_env_.get();
   options.enable_blob_files = true;
@@ -989,6 +1013,7 @@ TEST_P(DBBlobBasicIOErrorMultiGetTest, MultipleBlobFiles) {
   bool first_blob_file = true;
   SyncPoint::GetInstance()->SetCallBack(
       sync_point_, [&first_blob_file, this](void* /* arg */) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         if (first_blob_file) {
           first_blob_file = false;
           return;
@@ -1031,6 +1056,7 @@ class ReadBlobCompactionFilter : public CompactionFilter {
 }  // anonymous namespace
 
 TEST_P(DBBlobBasicIOErrorTest, CompactionFilterReadBlob_IOError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = GetDefaultOptions();
   options.env = fault_injection_env_.get();
   options.enable_blob_files = true;
@@ -1047,6 +1073,7 @@ TEST_P(DBBlobBasicIOErrorTest, CompactionFilterReadBlob_IOError) {
   ASSERT_OK(Flush());
 
   SyncPoint::GetInstance()->SetCallBack(sync_point_, [this](void* /* arg */) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     fault_injection_env_->SetFilesystemActive(false,
                                               Status::IOError(sync_point_));
   });
@@ -1063,6 +1090,7 @@ TEST_P(DBBlobBasicIOErrorTest, CompactionFilterReadBlob_IOError) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   RegisterCustomObjects(argc, argv);

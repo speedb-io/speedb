@@ -12,6 +12,7 @@
 namespace ROCKSDB_NAMESPACE {
 
 void TrimHistoryScheduler::ScheduleWork(ColumnFamilyData* cfd) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::lock_guard<std::mutex> lock(checking_mutex_);
   cfd->Ref();
   cfds_.push_back(cfd);
@@ -19,6 +20,7 @@ void TrimHistoryScheduler::ScheduleWork(ColumnFamilyData* cfd) {
 }
 
 ColumnFamilyData* TrimHistoryScheduler::TakeNextColumnFamily() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::lock_guard<std::mutex> lock(checking_mutex_);
   while (true) {
     if (cfds_.empty()) {
@@ -39,11 +41,13 @@ ColumnFamilyData* TrimHistoryScheduler::TakeNextColumnFamily() {
 }
 
 bool TrimHistoryScheduler::Empty() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   bool is_empty = is_empty_.load(std::memory_order_relaxed);
   return is_empty;
 }
 
 void TrimHistoryScheduler::Clear() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ColumnFamilyData* cfd;
   while ((cfd = TakeNextColumnFamily()) != nullptr) {
     cfd->UnrefAndTryDelete();

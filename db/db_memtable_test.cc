@@ -127,6 +127,7 @@ class TestPrefixExtractor : public SliceTransform {
 
 // Test that ::Add properly returns false when inserting duplicate keys
 TEST_F(DBMemTableTest, DuplicateSeq) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   SequenceNumber seq = 123;
   std::string value;
   MergeContext merge_context;
@@ -211,6 +212,7 @@ TEST_F(DBMemTableTest, DuplicateSeq) {
 
 // A simple test to verify that the concurrent merge writes is functional
 TEST_F(DBMemTableTest, ConcurrentMergeWrite) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   int num_ops = 1000;
   std::string value;
   MergeContext merge_context;
@@ -277,6 +279,7 @@ TEST_F(DBMemTableTest, ConcurrentMergeWrite) {
 }
 
 TEST_F(DBMemTableTest, InsertWithHint) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.allow_concurrent_memtable_write = false;
   options.create_if_missing = true;
@@ -316,6 +319,7 @@ TEST_F(DBMemTableTest, InsertWithHint) {
 }
 
 TEST_F(DBMemTableTest, ColumnFamilyId) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Verifies MemTableRepFactory is told the right column family id.
   Options options;
   options.env = CurrentOptions().env;
@@ -337,6 +341,7 @@ TEST_F(DBMemTableTest, ColumnFamilyId) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

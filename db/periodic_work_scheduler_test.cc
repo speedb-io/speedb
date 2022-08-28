@@ -16,6 +16,7 @@ class PeriodicWorkSchedulerTest : public DBTestBase {
  public:
   PeriodicWorkSchedulerTest()
       : DBTestBase("periodic_work_scheduler_test", /*env_do_fsync=*/true) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     mock_clock_ = std::make_shared<MockSystemClock>(env_->GetSystemClock());
     mock_env_.reset(new CompositeEnvWrapper(env_, mock_clock_));
   }
@@ -28,6 +29,7 @@ class PeriodicWorkSchedulerTest : public DBTestBase {
     mock_clock_->InstallTimedWaitFixCallback();
     SyncPoint::GetInstance()->SetCallBack(
         "DBImpl::StartPeriodicWorkScheduler:Init", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
           auto* periodic_work_scheduler_ptr =
               reinterpret_cast<PeriodicWorkScheduler**>(arg);
           *periodic_work_scheduler_ptr =
@@ -37,6 +39,7 @@ class PeriodicWorkSchedulerTest : public DBTestBase {
 };
 
 TEST_F(PeriodicWorkSchedulerTest, Basic) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr unsigned int kPeriodSec =
       PeriodicWorkScheduler::kDefaultFlushInfoLogPeriodSec;
   Close();
@@ -127,6 +130,7 @@ TEST_F(PeriodicWorkSchedulerTest, Basic) {
 }
 
 TEST_F(PeriodicWorkSchedulerTest, MultiInstances) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr int kPeriodSec = 5;
   const int kInstanceNum = 10;
 
@@ -195,6 +199,7 @@ TEST_F(PeriodicWorkSchedulerTest, MultiInstances) {
 }
 
 TEST_F(PeriodicWorkSchedulerTest, MultiEnv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr int kDumpPeriodSec = 5;
   constexpr int kPersistPeriodSec = 10;
   Close();
@@ -230,6 +235,7 @@ TEST_F(PeriodicWorkSchedulerTest, MultiEnv) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
 
   return RUN_ALL_TESTS();

@@ -26,6 +26,7 @@ namespace ROCKSDB_NAMESPACE {
 
 static uint64_t TestGetTickerCount(const Options& options,
                                    Tickers ticker_type) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return options.statistics->getTickerCount(ticker_type);
 }
 
@@ -37,31 +38,38 @@ class TestIterator : public InternalIterator {
         sequence_number_(0),
         iter_(0),
         cmp(comparator) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     data_.reserve(16);
   }
 
   void AddPut(std::string argkey, std::string argvalue) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Add(argkey, kTypeValue, argvalue);
   }
 
   void AddDeletion(std::string argkey) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Add(argkey, kTypeDeletion, std::string());
   }
 
   void AddSingleDeletion(std::string argkey) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Add(argkey, kTypeSingleDeletion, std::string());
   }
 
   void AddMerge(std::string argkey, std::string argvalue) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Add(argkey, kTypeMerge, argvalue);
   }
 
   void Add(std::string argkey, ValueType type, std::string argvalue) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Add(argkey, type, argvalue, sequence_number_++);
   }
 
   void Add(std::string argkey, ValueType type, std::string argvalue,
            size_t seq_num, bool update_iter = false) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     valid_ = true;
     ParsedInternalKey internal_key(argkey, seq_num, type);
     data_.push_back(
@@ -78,10 +86,12 @@ class TestIterator : public InternalIterator {
 
   // should be called before operations with iterator
   void Finish() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     initialized_ = true;
     std::sort(data_.begin(), data_.end(),
               [this](std::pair<std::string, std::string> a,
                      std::pair<std::string, std::string> b) {
+PERF_MARKER(__PRETTY_FUNCTION__);
       return (cmp.Compare(a.first, b.first) < 0);
     });
   }
@@ -93,6 +103,7 @@ class TestIterator : public InternalIterator {
   // Used for simulating ForwardIterator updating to a new version that doesn't
   // have some of the keys (e.g. after compaction with a filter).
   void Vanish(std::string _key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (valid_ && data_[iter_].first == _key) {
       delete_current_ = true;
       return;
@@ -220,6 +231,7 @@ class TestIterator : public InternalIterator {
   bool delete_current_ = false;
 
   void DeleteCurrentIfNeeded() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (!delete_current_) {
       return;
     }
@@ -236,6 +248,7 @@ class DBIteratorTest : public testing::Test {
 };
 
 TEST_F(DBIteratorTest, DBIteratorPrevNext) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   ImmutableOptions ioptions = ImmutableOptions(options);
   MutableCFOptions mutable_cf_options = MutableCFOptions(options);
@@ -676,6 +689,7 @@ TEST_F(DBIteratorTest, DBIteratorPrevNext) {
 }
 
 TEST_F(DBIteratorTest, DBIteratorEmpty) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   ImmutableOptions ioptions = ImmutableOptions(options);
   MutableCFOptions mutable_cf_options = MutableCFOptions(options);
@@ -711,6 +725,7 @@ TEST_F(DBIteratorTest, DBIteratorEmpty) {
 }
 
 TEST_F(DBIteratorTest, DBIteratorUseSkipCountSkips) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ReadOptions ro;
   Options options;
   options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
@@ -754,6 +769,7 @@ TEST_F(DBIteratorTest, DBIteratorUseSkipCountSkips) {
 }
 
 TEST_F(DBIteratorTest, DBIteratorUseSkip) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ReadOptions ro;
   Options options;
   options.merge_operator = MergeOperators::CreateFromStringId("stringappend");
@@ -1003,6 +1019,7 @@ TEST_F(DBIteratorTest, DBIteratorUseSkip) {
 }
 
 TEST_F(DBIteratorTest, DBIteratorSkipInternalKeys) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   ImmutableOptions ioptions = ImmutableOptions(options);
   MutableCFOptions mutable_cf_options = MutableCFOptions(options);
@@ -1386,6 +1403,7 @@ TEST_F(DBIteratorTest, DBIteratorSkipInternalKeys) {
 }
 
 TEST_F(DBIteratorTest, DBIterator1) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ReadOptions ro;
   Options options;
   options.merge_operator = MergeOperators::CreateFromStringId("stringappend");
@@ -1415,6 +1433,7 @@ TEST_F(DBIteratorTest, DBIterator1) {
 }
 
 TEST_F(DBIteratorTest, DBIterator2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ReadOptions ro;
   Options options;
   options.merge_operator = MergeOperators::CreateFromStringId("stringappend");
@@ -1441,6 +1460,7 @@ TEST_F(DBIteratorTest, DBIterator2) {
 }
 
 TEST_F(DBIteratorTest, DBIterator3) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ReadOptions ro;
   Options options;
   options.merge_operator = MergeOperators::CreateFromStringId("stringappend");
@@ -1467,6 +1487,7 @@ TEST_F(DBIteratorTest, DBIterator3) {
 }
 
 TEST_F(DBIteratorTest, DBIterator4) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ReadOptions ro;
   Options options;
   options.merge_operator = MergeOperators::CreateFromStringId("stringappend");
@@ -1497,6 +1518,7 @@ TEST_F(DBIteratorTest, DBIterator4) {
 }
 
 TEST_F(DBIteratorTest, DBIterator5) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ReadOptions ro;
   Options options;
   options.merge_operator = MergeOperators::CreateFromStringId("stringappend");
@@ -1695,6 +1717,7 @@ TEST_F(DBIteratorTest, DBIterator5) {
 }
 
 TEST_F(DBIteratorTest, DBIterator6) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ReadOptions ro;
   Options options;
   options.merge_operator = MergeOperators::CreateFromStringId("stringappend");
@@ -1867,6 +1890,7 @@ TEST_F(DBIteratorTest, DBIterator6) {
 }
 
 TEST_F(DBIteratorTest, DBIterator7) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ReadOptions ro;
   Options options;
   options.merge_operator = MergeOperators::CreateFromStringId("stringappend");
@@ -2272,6 +2296,7 @@ TEST_F(DBIteratorTest, DBIterator7) {
 }
 
 TEST_F(DBIteratorTest, DBIterator8) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ReadOptions ro;
   Options options;
   options.merge_operator = MergeOperators::CreateFromStringId("stringappend");
@@ -2301,6 +2326,7 @@ TEST_F(DBIteratorTest, DBIterator8) {
 // TODO(3.13): fix the issue of Seek() then Prev() which might not necessary
 //             return the biggest element smaller than the seek key.
 TEST_F(DBIteratorTest, DBIterator9) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ReadOptions ro;
   Options options;
   options.merge_operator = MergeOperators::CreateFromStringId("stringappend");
@@ -2372,6 +2398,7 @@ TEST_F(DBIteratorTest, DBIterator9) {
 // TODO(3.13): fix the issue of Seek() then Prev() which might not necessary
 //             return the biggest element smaller than the seek key.
 TEST_F(DBIteratorTest, DBIterator10) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ReadOptions ro;
   Options options;
 
@@ -2414,6 +2441,7 @@ TEST_F(DBIteratorTest, DBIterator10) {
 }
 
 TEST_F(DBIteratorTest, SeekToLastOccurrenceSeq0) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ReadOptions ro;
   Options options;
   options.merge_operator = nullptr;
@@ -2440,6 +2468,7 @@ TEST_F(DBIteratorTest, SeekToLastOccurrenceSeq0) {
 }
 
 TEST_F(DBIteratorTest, DBIterator11) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ReadOptions ro;
   Options options;
   options.merge_operator = MergeOperators::CreateFromStringId("stringappend");
@@ -2469,6 +2498,7 @@ TEST_F(DBIteratorTest, DBIterator11) {
 }
 
 TEST_F(DBIteratorTest, DBIterator12) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ReadOptions ro;
   Options options;
   options.merge_operator = nullptr;
@@ -2497,6 +2527,7 @@ TEST_F(DBIteratorTest, DBIterator12) {
 }
 
 TEST_F(DBIteratorTest, DBIterator13) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ReadOptions ro;
   Options options;
   options.merge_operator = nullptr;
@@ -2530,6 +2561,7 @@ TEST_F(DBIteratorTest, DBIterator13) {
 }
 
 TEST_F(DBIteratorTest, DBIterator14) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ReadOptions ro;
   Options options;
   options.merge_operator = nullptr;
@@ -2566,6 +2598,7 @@ class DBIterWithMergeIterTest : public testing::Test {
  public:
   DBIterWithMergeIterTest()
       : env_(Env::Default()), icomp_(BytewiseComparator()) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     options_.merge_operator = nullptr;
 
     internal_iter1_ = new TestIterator(BytewiseComparator());
@@ -2606,6 +2639,7 @@ class DBIterWithMergeIterTest : public testing::Test {
 };
 
 TEST_F(DBIterWithMergeIterTest, InnerMergeIterator1) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   db_iter_->SeekToFirst();
   ASSERT_TRUE(db_iter_->Valid());
   ASSERT_EQ(db_iter_->key().ToString(), "a");
@@ -2635,6 +2669,7 @@ TEST_F(DBIterWithMergeIterTest, InnerMergeIterator1) {
 }
 
 TEST_F(DBIterWithMergeIterTest, InnerMergeIterator2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Test Prev() when one child iterator is at its end.
   db_iter_->SeekForPrev("g");
   ASSERT_TRUE(db_iter_->Valid());
@@ -2663,6 +2698,7 @@ TEST_F(DBIterWithMergeIterTest, InnerMergeIterator2) {
 }
 
 TEST_F(DBIterWithMergeIterTest, InnerMergeIteratorDataRace1) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Test Prev() when one child iterator is at its end but more rows
   // are added.
   db_iter_->Seek("f");
@@ -2699,6 +2735,7 @@ TEST_F(DBIterWithMergeIterTest, InnerMergeIteratorDataRace1) {
 }
 
 TEST_F(DBIterWithMergeIterTest, InnerMergeIteratorDataRace2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Test Prev() when one child iterator is at its end but more rows
   // are added.
   db_iter_->Seek("f");
@@ -2711,6 +2748,7 @@ TEST_F(DBIterWithMergeIterTest, InnerMergeIteratorDataRace2) {
   // its end and before an SeekToLast() is called.
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "MergeIterator::Prev:BeforePrev", [&](void* /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         internal_iter2_->Add("z", kTypeValue, "7", 12u);
         internal_iter2_->Add("z", kTypeValue, "7", 11u);
       });
@@ -2737,6 +2775,7 @@ TEST_F(DBIterWithMergeIterTest, InnerMergeIteratorDataRace2) {
 }
 
 TEST_F(DBIterWithMergeIterTest, InnerMergeIteratorDataRace3) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Test Prev() when one child iterator is at its end but more rows
   // are added and max_skipped is triggered.
   db_iter_->Seek("f");
@@ -2749,6 +2788,7 @@ TEST_F(DBIterWithMergeIterTest, InnerMergeIteratorDataRace3) {
   // its end and before an SeekToLast() is called.
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "MergeIterator::Prev:BeforePrev", [&](void* /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         internal_iter2_->Add("z", kTypeValue, "7", 16u, true);
         internal_iter2_->Add("z", kTypeValue, "7", 15u, true);
         internal_iter2_->Add("z", kTypeValue, "7", 14u, true);
@@ -2779,6 +2819,7 @@ TEST_F(DBIterWithMergeIterTest, InnerMergeIteratorDataRace3) {
 }
 
 TEST_F(DBIterWithMergeIterTest, InnerMergeIteratorDataRace4) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Test Prev() when one child iterator has more rows inserted
   // between Seek() and Prev() when changing directions.
   internal_iter2_->Add("z", kTypeValue, "9", 4u);
@@ -2793,6 +2834,7 @@ TEST_F(DBIterWithMergeIterTest, InnerMergeIteratorDataRace4) {
   // Seek() and before calling Prev()
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "MergeIterator::Prev:BeforePrev", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         IteratorWrapper* it = reinterpret_cast<IteratorWrapper*>(arg);
         if (it->key().starts_with("z")) {
           internal_iter2_->Add("x", kTypeValue, "7", 16u, true);
@@ -2830,6 +2872,7 @@ TEST_F(DBIterWithMergeIterTest, InnerMergeIteratorDataRace4) {
 }
 
 TEST_F(DBIterWithMergeIterTest, InnerMergeIteratorDataRace5) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   internal_iter2_->Add("z", kTypeValue, "9", 4u);
 
   // Test Prev() when one child iterator has more rows inserted
@@ -2844,6 +2887,7 @@ TEST_F(DBIterWithMergeIterTest, InnerMergeIteratorDataRace5) {
   // Seek() and before calling Prev()
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "MergeIterator::Prev:BeforePrev", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         IteratorWrapper* it = reinterpret_cast<IteratorWrapper*>(arg);
         if (it->key().starts_with("z")) {
           internal_iter2_->Add("x", kTypeValue, "7", 16u, true);
@@ -2877,6 +2921,7 @@ TEST_F(DBIterWithMergeIterTest, InnerMergeIteratorDataRace5) {
 }
 
 TEST_F(DBIterWithMergeIterTest, InnerMergeIteratorDataRace6) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   internal_iter2_->Add("z", kTypeValue, "9", 4u);
 
   // Test Prev() when one child iterator has more rows inserted
@@ -2891,6 +2936,7 @@ TEST_F(DBIterWithMergeIterTest, InnerMergeIteratorDataRace6) {
   // Seek() and before calling Prev()
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "MergeIterator::Prev:BeforePrev", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         IteratorWrapper* it = reinterpret_cast<IteratorWrapper*>(arg);
         if (it->key().starts_with("z")) {
           internal_iter2_->Add("x", kTypeValue, "7", 16u, true);
@@ -2923,6 +2969,7 @@ TEST_F(DBIterWithMergeIterTest, InnerMergeIteratorDataRace6) {
 }
 
 TEST_F(DBIterWithMergeIterTest, InnerMergeIteratorDataRace7) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   internal_iter1_->Add("u", kTypeValue, "10", 4u);
   internal_iter1_->Add("v", kTypeValue, "11", 4u);
   internal_iter1_->Add("w", kTypeValue, "12", 4u);
@@ -2940,6 +2987,7 @@ TEST_F(DBIterWithMergeIterTest, InnerMergeIteratorDataRace7) {
   // Seek() and before calling Prev()
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "MergeIterator::Prev:BeforePrev", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         IteratorWrapper* it = reinterpret_cast<IteratorWrapper*>(arg);
         if (it->key().starts_with("z")) {
           internal_iter2_->Add("x", kTypeValue, "7", 16u, true);
@@ -2977,6 +3025,7 @@ TEST_F(DBIterWithMergeIterTest, InnerMergeIteratorDataRace7) {
 }
 
 TEST_F(DBIterWithMergeIterTest, InnerMergeIteratorDataRace8) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // internal_iter1_: a, f, g
   // internal_iter2_: a, b, c, d, adding (z)
   internal_iter2_->Add("z", kTypeValue, "9", 4u);
@@ -2993,6 +3042,7 @@ TEST_F(DBIterWithMergeIterTest, InnerMergeIteratorDataRace8) {
   // before calling Prev()
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "MergeIterator::Prev:BeforePrev", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         IteratorWrapper* it = reinterpret_cast<IteratorWrapper*>(arg);
         if (it->key().starts_with("z")) {
           internal_iter2_->Add("x", kTypeValue, "7", 16u, true);
@@ -3015,6 +3065,7 @@ TEST_F(DBIterWithMergeIterTest, InnerMergeIteratorDataRace8) {
 
 
 TEST_F(DBIteratorTest, SeekPrefixTombstones) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ReadOptions ro;
   Options options;
   options.prefix_extractor.reset(NewNoopTransform());
@@ -3050,6 +3101,7 @@ TEST_F(DBIteratorTest, SeekPrefixTombstones) {
 }
 
 TEST_F(DBIteratorTest, SeekToFirstLowerBound) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kNumKeys = 3;
   for (int i = 0; i < kNumKeys + 2; ++i) {
     // + 2 for two special cases: lower bound before and lower bound after the
@@ -3092,6 +3144,7 @@ TEST_F(DBIteratorTest, SeekToFirstLowerBound) {
 }
 
 TEST_F(DBIteratorTest, PrevLowerBound) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kNumKeys = 3;
   const int kLowerBound = 2;
   TestIterator* internal_iter = new TestIterator(BytewiseComparator());
@@ -3121,6 +3174,7 @@ TEST_F(DBIteratorTest, PrevLowerBound) {
 }
 
 TEST_F(DBIteratorTest, SeekLessLowerBound) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kNumKeys = 3;
   const int kLowerBound = 2;
   TestIterator* internal_iter = new TestIterator(BytewiseComparator());
@@ -3149,6 +3203,7 @@ TEST_F(DBIteratorTest, SeekLessLowerBound) {
 }
 
 TEST_F(DBIteratorTest, ReverseToForwardWithDisappearingKeys) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.prefix_extractor.reset(NewCappedPrefixTransform(0));
 
@@ -3187,6 +3242,7 @@ TEST_F(DBIteratorTest, ReverseToForwardWithDisappearingKeys) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

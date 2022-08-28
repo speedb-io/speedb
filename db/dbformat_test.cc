@@ -17,18 +17,21 @@ namespace ROCKSDB_NAMESPACE {
 static std::string IKey(const std::string& user_key,
                         uint64_t seq,
                         ValueType vt) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string encoded;
   AppendInternalKey(&encoded, ParsedInternalKey(user_key, seq, vt));
   return encoded;
 }
 
 static std::string Shorten(const std::string& s, const std::string& l) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string result = s;
   InternalKeyComparator(BytewiseComparator()).FindShortestSeparator(&result, l);
   return result;
 }
 
 static std::string ShortSuccessor(const std::string& s) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string result = s;
   InternalKeyComparator(BytewiseComparator()).FindShortSuccessor(&result);
   return result;
@@ -37,6 +40,7 @@ static std::string ShortSuccessor(const std::string& s) {
 static void TestKey(const std::string& key,
                     uint64_t seq,
                     ValueType vt) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string encoded = IKey(key, seq, vt);
 
   Slice in(encoded);
@@ -53,6 +57,7 @@ static void TestKey(const std::string& key,
 class FormatTest : public testing::Test {};
 
 TEST_F(FormatTest, InternalKey_EncodeDecode) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const char* keys[] = { "", "k", "hello", "longggggggggggggggggggggg" };
   const uint64_t seq[] = {
     1, 2, 3,
@@ -69,6 +74,7 @@ TEST_F(FormatTest, InternalKey_EncodeDecode) {
 }
 
 TEST_F(FormatTest, InternalKeyShortSeparator) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // When user keys are same
   ASSERT_EQ(IKey("foo", 100, kTypeValue),
             Shorten(IKey("foo", 100, kTypeValue),
@@ -129,6 +135,7 @@ TEST_F(FormatTest, InternalKeyShortSeparator) {
 }
 
 TEST_F(FormatTest, InternalKeyShortestSuccessor) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_EQ(IKey("g", kMaxSequenceNumber, kValueTypeForSeek),
             ShortSuccessor(IKey("foo", 100, kTypeValue)));
   ASSERT_EQ(IKey("\xff\xff", 100, kTypeValue),
@@ -136,6 +143,7 @@ TEST_F(FormatTest, InternalKeyShortestSuccessor) {
 }
 
 TEST_F(FormatTest, IterKeyOperation) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   IterKey k;
   const char p[] = "abcdefghijklmnopqrstuvwxyz";
   const char q[] = "0123456789";
@@ -175,6 +183,7 @@ TEST_F(FormatTest, IterKeyOperation) {
 }
 
 TEST_F(FormatTest, UpdateInternalKey) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string user_key("abcdefghijklmnopqrstuvwxyz");
   uint64_t new_seq = 0x123456;
   ValueType new_val_type = kTypeDeletion;
@@ -194,6 +203,7 @@ TEST_F(FormatTest, UpdateInternalKey) {
 }
 
 TEST_F(FormatTest, RangeTombstoneSerializeEndKey) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   RangeTombstone t("a", "b", 2);
   InternalKey k("b", 3, kTypeValue);
   const InternalKeyComparator cmp(BytewiseComparator());
@@ -203,6 +213,7 @@ TEST_F(FormatTest, RangeTombstoneSerializeEndKey) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   RegisterCustomObjects(argc, argv);
   return RUN_ALL_TESTS();

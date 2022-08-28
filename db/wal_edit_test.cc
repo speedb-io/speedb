@@ -15,6 +15,7 @@
 namespace ROCKSDB_NAMESPACE {
 
 TEST(WalSet, AddDeleteReset) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   WalSet wals;
   ASSERT_TRUE(wals.GetWals().empty());
 
@@ -39,6 +40,7 @@ TEST(WalSet, AddDeleteReset) {
 }
 
 TEST(WalSet, Overwrite) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr WalNumber kNumber = 100;
   constexpr uint64_t kBytes = 200;
   WalSet wals;
@@ -50,6 +52,7 @@ TEST(WalSet, Overwrite) {
 }
 
 TEST(WalSet, SmallerSyncedSize) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr WalNumber kNumber = 100;
   constexpr uint64_t kBytes = 100;
   WalSet wals;
@@ -63,6 +66,7 @@ TEST(WalSet, SmallerSyncedSize) {
 }
 
 TEST(WalSet, CreateTwice) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr WalNumber kNumber = 100;
   WalSet wals;
   ASSERT_OK(wals.AddWal(WalAddition(kNumber)));
@@ -73,6 +77,7 @@ TEST(WalSet, CreateTwice) {
 }
 
 TEST(WalSet, DeleteAllWals) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr WalNumber kMaxWalNumber = 10;
   WalSet wals;
   for (WalNumber i = 1; i <= kMaxWalNumber; i++) {
@@ -82,6 +87,7 @@ TEST(WalSet, DeleteAllWals) {
 }
 
 TEST(WalSet, AddObsoleteWal) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr WalNumber kNumber = 100;
   WalSet wals;
   ASSERT_OK(wals.DeleteWalsBefore(kNumber + 1));
@@ -90,6 +96,7 @@ TEST(WalSet, AddObsoleteWal) {
 }
 
 TEST(WalSet, MinWalNumberToKeep) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr WalNumber kNumber = 100;
   WalSet wals;
   ASSERT_EQ(wals.GetMinWalNumberToKeep(), 0);
@@ -118,6 +125,7 @@ class WalSetTest : public DBTestBase {
 
   void CreateWalOnDisk(WalNumber number, const std::string& fname,
                        uint64_t size_bytes) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::unique_ptr<WritableFile> f;
     std::string fpath = Path(fname);
     ASSERT_OK(env_->NewWritableFile(fpath, &f, EnvOptions()));
@@ -129,6 +137,7 @@ class WalSetTest : public DBTestBase {
   }
 
   void AddWalToWalSet(WalNumber number, uint64_t size_bytes) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // Create WAL.
     ASSERT_OK(wals_.AddWal(WalAddition(number)));
     // Close WAL.
@@ -149,6 +158,7 @@ class WalSetTest : public DBTestBase {
 TEST_F(WalSetTest, CheckEmptyWals) { ASSERT_OK(CheckWals()); }
 
 TEST_F(WalSetTest, CheckWals) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (int number = 1; number < 10; number++) {
     uint64_t size = rand() % 100;
     std::stringstream ss;
@@ -164,6 +174,7 @@ TEST_F(WalSetTest, CheckWals) {
 }
 
 TEST_F(WalSetTest, CheckMissingWals) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (int number = 1; number < 10; number++) {
     uint64_t size = rand() % 100;
     AddWalToWalSet(number, size);
@@ -186,6 +197,7 @@ TEST_F(WalSetTest, CheckMissingWals) {
 }
 
 TEST_F(WalSetTest, CheckWalsWithShrinkedSize) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (int number = 1; number < 10; number++) {
     uint64_t size = rand() % 100 + 1;
     AddWalToWalSet(number, size);
@@ -208,6 +220,7 @@ TEST_F(WalSetTest, CheckWalsWithShrinkedSize) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

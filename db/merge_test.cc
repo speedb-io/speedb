@@ -37,6 +37,7 @@ void resetNumPartialMergeCalls() { num_partial_merge_calls = 0; }
 class CountMergeOperator : public AssociativeMergeOperator {
  public:
   CountMergeOperator() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     mergeOperator_ = MergeOperators::CreateUInt64AddOperator();
   }
 
@@ -86,6 +87,7 @@ class EnvMergeTest : public EnvWrapper {
   static std::unique_ptr<EnvMergeTest> singleton_;
 
   static EnvMergeTest* GetInstance() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (nullptr == singleton_) singleton_.reset(new EnvMergeTest);
     return singleton_.get();
   }
@@ -96,6 +98,7 @@ std::unique_ptr<EnvMergeTest> EnvMergeTest::singleton_;
 
 std::shared_ptr<DB> OpenDb(const std::string& dbname, const bool ttl = false,
                            const size_t max_successive_merges = 0) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   DB* db;
   Options options;
   options.create_if_missing = true;
@@ -147,6 +150,7 @@ class Counters {
         get_option_(),
         delete_option_(),
         default_(defaultCount) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(db_);
   }
 
@@ -158,6 +162,7 @@ class Counters {
 
   // mapped to a levedb Put
   bool set(const std::string& key, uint64_t value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // just treat the internal rep of int64 as the string
     char buf[sizeof(value)];
     EncodeFixed64(buf, value);
@@ -174,6 +179,7 @@ class Counters {
 
   // mapped to a rocksdb Delete
   bool remove(const std::string& key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     auto s = db_->Delete(delete_option_, key);
 
     if (s.ok()) {
@@ -186,6 +192,7 @@ class Counters {
 
   // mapped to a rocksdb Get
   bool get(const std::string& key, uint64_t* value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::string str;
     auto s = db_->Get(get_option_, key, &str);
 
@@ -210,18 +217,21 @@ class Counters {
   // 'add' is implemented as get -> modify -> set
   // An alternative is a single merge operation, see MergeBasedCounters
   virtual bool add(const std::string& key, uint64_t value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     uint64_t base = default_;
     return get(key, &base) && set(key, base + value);
   }
 
   // convenience functions for testing
   void assert_set(const std::string& key, uint64_t value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(set(key, value));
   }
 
   void assert_remove(const std::string& key) { assert(remove(key)); }
 
   uint64_t assert_get(const std::string& key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     uint64_t value = default_;
     int result = get(key, &value);
     assert(result);
@@ -230,6 +240,7 @@ class Counters {
   }
 
   void assert_add(const std::string& key, uint64_t value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     int result = add(key, value);
     assert(result);
     if (result == 0) exit(1);  // Disable unused variable warning.
@@ -262,6 +273,7 @@ class MergeBasedCounters : public Counters {
 };
 
 void dumpDb(DB* db) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto it = std::unique_ptr<Iterator>(db->NewIterator(ReadOptions()));
   for (it->SeekToFirst(); it->Valid(); it->Next()) {
     // uint64_t value = DecodeFixed64(it->value().data());
@@ -271,6 +283,7 @@ void dumpDb(DB* db) {
 }
 
 void testCounters(Counters& counters, DB* db, bool test_compaction) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   FlushOptions o;
   o.wait = true;
 
@@ -321,6 +334,7 @@ void testCounters(Counters& counters, DB* db, bool test_compaction) {
 }
 
 void testCountersWithFlushAndCompaction(Counters& counters, DB* db) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(db->Put({}, "1", "1"));
   ASSERT_OK(db->Flush(FlushOptions()));
 
@@ -333,6 +347,7 @@ void testCountersWithFlushAndCompaction(Counters& counters, DB* db) {
   SyncPoint::GetInstance()->ClearAllCallBacks();
   SyncPoint::GetInstance()->SetCallBack(
       "VersionSet::LogAndApply:BeforeWriterWaiting", [&](void* /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         int thread_id = get_thread_id();
         if (1 == thread_id) {
           TEST_SYNC_POINT(
@@ -344,6 +359,7 @@ void testCountersWithFlushAndCompaction(Counters& counters, DB* db) {
       });
   SyncPoint::GetInstance()->SetCallBack(
       "VersionSet::LogAndApply:WriteManifest", [&](void* /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         int thread_id = get_thread_id();
         if (0 == thread_id) {
           TEST_SYNC_POINT(
@@ -354,6 +370,7 @@ void testCountersWithFlushAndCompaction(Counters& counters, DB* db) {
       });
   SyncPoint::GetInstance()->SetCallBack(
       "VersionSet::LogAndApply:WakeUpAndDone", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         auto* mutex = reinterpret_cast<InstrumentedMutex*>(arg);
         mutex->AssertHeld();
         int thread_id = get_thread_id();
@@ -412,6 +429,7 @@ void testCountersWithFlushAndCompaction(Counters& counters, DB* db) {
 
 void testSuccessiveMerge(Counters& counters, size_t max_num_merges,
                          size_t num_merges) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   counters.assert_remove("z");
   uint64_t sum = 0;
 
@@ -434,6 +452,7 @@ void testSuccessiveMerge(Counters& counters, size_t max_num_merges,
 
 void testPartialMerge(Counters* counters, DB* db, size_t max_merge,
                       size_t min_merge, size_t count) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   FlushOptions o;
   o.wait = true;
 
@@ -475,6 +494,7 @@ void testPartialMerge(Counters* counters, DB* db, size_t max_merge,
 
 void testSingleBatchSuccessiveMerge(DB* db, size_t max_num_merges,
                                     size_t num_merges) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_GT(num_merges, max_num_merges);
 
   Slice key("BatchSuccessiveMerge");
@@ -508,6 +528,7 @@ void testSingleBatchSuccessiveMerge(DB* db, size_t max_num_merges,
 }
 
 void runTest(const std::string& dbname, const bool use_ttl = false) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   {
     auto db = OpenDb(dbname, use_ttl);
 
@@ -592,16 +613,19 @@ void runTest(const std::string& dbname, const bool use_ttl = false) {
 }
 
 TEST_F(MergeTest, MergeDbTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   runTest(test::PerThreadDBPath("merge_testdb"));
 }
 
 #ifndef ROCKSDB_LITE
 TEST_F(MergeTest, MergeDbTtlTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   runTest(test::PerThreadDBPath("merge_testdbttl"),
           true);  // Run test on TTL database
 }
 
 TEST_F(MergeTest, MergeWithCompactionAndFlush) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const std::string dbname =
       test::PerThreadDBPath("merge_with_compaction_and_flush");
   {
@@ -618,6 +642,7 @@ TEST_F(MergeTest, MergeWithCompactionAndFlush) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::use_compression = false;
   if (argc > 1) {
     ROCKSDB_NAMESPACE::use_compression = true;

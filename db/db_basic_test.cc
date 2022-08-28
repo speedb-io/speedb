@@ -36,6 +36,7 @@ class DBBasicTest : public DBTestBase {
 };
 
 TEST_F(DBBasicTest, OpenWhenOpen) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.env = env_;
   DB* db2 = nullptr;
@@ -52,6 +53,7 @@ TEST_F(DBBasicTest, OpenWhenOpen) {
 }
 
 TEST_F(DBBasicTest, EnableDirectIOWithZeroBuf) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!IsDirectIOSupported()) {
     ROCKSDB_GTEST_BYPASS("Direct IO not supported");
     return;
@@ -70,6 +72,7 @@ TEST_F(DBBasicTest, EnableDirectIOWithZeroBuf) {
 }
 
 TEST_F(DBBasicTest, UniqueSession) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   std::string sid1, sid2, sid3, sid4;
 
@@ -127,6 +130,7 @@ TEST_F(DBBasicTest, UniqueSession) {
 
 #ifndef ROCKSDB_LITE
 TEST_F(DBBasicTest, ReadOnlyDB) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(Put("foo", "v1"));
   ASSERT_OK(Put("bar", "v2"));
   ASSERT_OK(Put("foo", "v3"));
@@ -179,6 +183,7 @@ TEST_F(DBBasicTest, ReadOnlyDB) {
 // does not actually write to FS (use open read-only with
 // CompositeEnvWrapper+ReadOnlyFileSystem).
 TEST_F(DBBasicTest, DISABLED_ReadOnlyDBWithWriteDBIdToManifestSet) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(Put("foo", "v1"));
   ASSERT_OK(Put("bar", "v2"));
   ASSERT_OK(Put("foo", "v3"));
@@ -217,6 +222,7 @@ TEST_F(DBBasicTest, DISABLED_ReadOnlyDBWithWriteDBIdToManifestSet) {
 }
 
 TEST_F(DBBasicTest, CompactedDB) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const uint64_t kFileSize = 1 << 20;
   Options options = CurrentOptions();
   options.disable_auto_compactions = true;
@@ -318,6 +324,7 @@ TEST_F(DBBasicTest, CompactedDB) {
 }
 
 TEST_F(DBBasicTest, LevelLimitReopen) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   CreateAndReopenWithCF({"pikachu"}, options);
 
@@ -343,6 +350,7 @@ TEST_F(DBBasicTest, LevelLimitReopen) {
 #endif  // ROCKSDB_LITE
 
 TEST_F(DBBasicTest, PutDeleteGet) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     CreateAndReopenWithCF({"pikachu"}, CurrentOptions());
     ASSERT_OK(Put(1, "foo", "v1"));
@@ -355,6 +363,7 @@ TEST_F(DBBasicTest, PutDeleteGet) {
 }
 
 TEST_F(DBBasicTest, PutSingleDeleteGet) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     CreateAndReopenWithCF({"pikachu"}, CurrentOptions());
     ASSERT_OK(Put(1, "foo", "v1"));
@@ -371,6 +380,7 @@ TEST_F(DBBasicTest, PutSingleDeleteGet) {
 }
 
 TEST_F(DBBasicTest, EmptyFlush) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // It is possible to produce empty flushes when using single deletes. Tests
   // whether empty flushes cause issues.
   do {
@@ -393,6 +403,7 @@ TEST_F(DBBasicTest, EmptyFlush) {
 }
 
 TEST_F(DBBasicTest, GetFromVersions) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     CreateAndReopenWithCF({"pikachu"}, CurrentOptions());
     ASSERT_OK(Put(1, "foo", "v1"));
@@ -404,6 +415,7 @@ TEST_F(DBBasicTest, GetFromVersions) {
 
 #ifndef ROCKSDB_LITE
 TEST_F(DBBasicTest, GetSnapshot) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   anon::OptionsOverride options_override;
   options_override.skip_policy = kSkipNoSnapshot;
   do {
@@ -426,6 +438,7 @@ TEST_F(DBBasicTest, GetSnapshot) {
 #endif  // ROCKSDB_LITE
 
 TEST_F(DBBasicTest, CheckLock) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     DB* localdb = nullptr;
     Options options = CurrentOptions();
@@ -444,6 +457,7 @@ TEST_F(DBBasicTest, CheckLock) {
 }
 
 TEST_F(DBBasicTest, FlushMultipleMemtable) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     Options options = CurrentOptions();
     WriteOptions writeOpt = WriteOptions();
@@ -463,6 +477,7 @@ TEST_F(DBBasicTest, FlushMultipleMemtable) {
 }
 
 TEST_F(DBBasicTest, FlushEmptyColumnFamily) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Block flush thread and disable compaction thread
   env_->SetBackgroundThreads(1, Env::HIGH);
   env_->SetBackgroundThreads(1, Env::LOW);
@@ -508,6 +523,7 @@ TEST_F(DBBasicTest, FlushEmptyColumnFamily) {
 }
 
 TEST_F(DBBasicTest, Flush) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     CreateAndReopenWithCF({"pikachu"}, CurrentOptions());
     WriteOptions writeOpt = WriteOptions();
@@ -554,6 +570,7 @@ TEST_F(DBBasicTest, Flush) {
 }
 
 TEST_F(DBBasicTest, ManifestRollOver) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     Options options;
     options.max_manifest_file_size = 10;  // 10 bytes
@@ -578,6 +595,7 @@ TEST_F(DBBasicTest, ManifestRollOver) {
 }
 
 TEST_F(DBBasicTest, IdentityAcrossRestarts1) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     std::string id1;
     ASSERT_OK(db_->GetDbIdentity(id1));
@@ -604,6 +622,7 @@ TEST_F(DBBasicTest, IdentityAcrossRestarts1) {
 }
 
 TEST_F(DBBasicTest, IdentityAcrossRestarts2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     std::string id1;
     ASSERT_OK(db_->GetDbIdentity(id1));
@@ -628,6 +647,7 @@ TEST_F(DBBasicTest, IdentityAcrossRestarts2) {
 
 #ifndef ROCKSDB_LITE
 TEST_F(DBBasicTest, Snapshot) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   env_->SetMockSleep();
   anon::OptionsOverride options_override;
   options_override.skip_policy = kSkipNoSnapshot;
@@ -706,6 +726,7 @@ class DBBasicMultiConfigs : public DBBasicTest,
   DBBasicMultiConfigs() { option_config_ = GetParam(); }
 
   static std::vector<int> GenerateOptionConfigs() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::vector<int> option_configs;
     for (int option_config = kDefault; option_config < kEnd; ++option_config) {
       if (!ShouldSkipOptions(option_config, kSkipFIFOCompaction)) {
@@ -717,6 +738,7 @@ class DBBasicMultiConfigs : public DBBasicTest,
 };
 
 TEST_P(DBBasicMultiConfigs, CompactBetweenSnapshots) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   anon::OptionsOverride options_override;
   options_override.skip_policy = kSkipNoSnapshot;
   Options options = CurrentOptions(options_override);
@@ -774,6 +796,7 @@ INSTANTIATE_TEST_CASE_P(
     ::testing::ValuesIn(DBBasicMultiConfigs::GenerateOptionConfigs()));
 
 TEST_F(DBBasicTest, DBOpen_Options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   Close();
   Destroy(options);
@@ -813,6 +836,7 @@ TEST_F(DBBasicTest, DBOpen_Options) {
 }
 
 TEST_F(DBBasicTest, CompactOnFlush) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   anon::OptionsOverride options_override;
   options_override.skip_policy = kSkipNoSnapshot;
   do {
@@ -906,6 +930,7 @@ TEST_F(DBBasicTest, CompactOnFlush) {
 }
 
 TEST_F(DBBasicTest, FlushOneColumnFamily) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   CreateAndReopenWithCF({"pikachu", "ilya", "muromec", "dobrynia", "nikitich",
                          "alyosha", "popovich"},
@@ -928,6 +953,7 @@ TEST_F(DBBasicTest, FlushOneColumnFamily) {
 }
 
 TEST_F(DBBasicTest, MultiGetSimple) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     CreateAndReopenWithCF({"pikachu"}, CurrentOptions());
     SetPerfLevel(kEnableCount);
@@ -965,6 +991,7 @@ TEST_F(DBBasicTest, MultiGetSimple) {
 }
 
 TEST_F(DBBasicTest, MultiGetEmpty) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     CreateAndReopenWithCF({"pikachu"}, CurrentOptions());
     // Empty Key Set
@@ -1001,6 +1028,7 @@ INSTANTIATE_TEST_CASE_P(FormatVersions, DBBlockChecksumTest,
                         testing::ValuesIn(test::kFooterFormatVersionsToTest));
 
 TEST_P(DBBlockChecksumTest, BlockChecksumTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   BlockBasedTableOptions table_options;
   table_options.format_version = GetParam();
   Options options = CurrentOptions();
@@ -1042,6 +1070,7 @@ TEST_P(DBBlockChecksumTest, BlockChecksumTest) {
 // sense to run
 #ifndef OS_WIN
 TEST_F(DBBasicTest, MmapAndBufferOptions) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!IsMemoryMappedAccessSupported()) {
     return;
   }
@@ -1088,6 +1117,7 @@ class TestEnv : public EnvWrapper {
 
    private:
     Status CloseHelper() {
+PERF_MARKER(__PRETTY_FUNCTION__);
       env->CloseCountInc();
       ;
       return Status::IOError();
@@ -1110,6 +1140,7 @@ class TestEnv : public EnvWrapper {
 };
 
 TEST_F(DBBasicTest, DBClose) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = GetDefaultOptions();
   std::string dbname = test::PerThreadDBPath("db_close_test");
   ASSERT_OK(DestroyDB(dbname, options));
@@ -1153,6 +1184,7 @@ TEST_F(DBBasicTest, DBClose) {
 }
 
 TEST_F(DBBasicTest, DBCloseFlushError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<FaultInjectionTestEnv> fault_injection_env(
       new FaultInjectionTestEnv(env_));
   Options options = GetDefaultOptions();
@@ -1184,6 +1216,7 @@ class DBMultiGetTestWithParam : public DBBasicTest,
                                 public testing::WithParamInterface<bool> {};
 
 TEST_P(DBMultiGetTestWithParam, MultiGetMultiCF) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   CreateAndReopenWithCF({"pikachu", "ilya", "muromec", "dobrynia", "nikitich",
                          "alyosha", "popovich"},
@@ -1207,6 +1240,7 @@ TEST_P(DBMultiGetTestWithParam, MultiGetMultiCF) {
   ROCKSDB_NAMESPACE::DBImpl* db = static_cast_with_check<DBImpl>(db_);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::MultiGet::AfterRefSV", [&](void* /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         if (++get_sv_count == 2) {
           // After MultiGet refs a couple of CFs, flush all CFs so MultiGet
           // is forced to repeat the process
@@ -1283,6 +1317,7 @@ TEST_P(DBMultiGetTestWithParam, MultiGetMultiCF) {
 }
 
 TEST_P(DBMultiGetTestWithParam, MultiGetMultiCFMutex) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   CreateAndReopenWithCF({"pikachu", "ilya", "muromec", "dobrynia", "nikitich",
                          "alyosha", "popovich"},
@@ -1298,11 +1333,13 @@ TEST_P(DBMultiGetTestWithParam, MultiGetMultiCFMutex) {
   bool last_try = false;
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::MultiGet::LastTry", [&](void* /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         last_try = true;
         ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->DisableProcessing();
       });
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::MultiGet::AfterRefSV", [&](void* /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         if (last_try) {
           return;
         }
@@ -1345,6 +1382,7 @@ TEST_P(DBMultiGetTestWithParam, MultiGetMultiCFMutex) {
 }
 
 TEST_P(DBMultiGetTestWithParam, MultiGetMultiCFSnapshot) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   CreateAndReopenWithCF({"pikachu", "ilya", "muromec", "dobrynia", "nikitich",
                          "alyosha", "popovich"},
@@ -1359,6 +1397,7 @@ TEST_P(DBMultiGetTestWithParam, MultiGetMultiCFSnapshot) {
   ROCKSDB_NAMESPACE::DBImpl* db = static_cast_with_check<DBImpl>(db_);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::MultiGet::AfterRefSV", [&](void* /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         if (++get_sv_count == 2) {
           for (int i = 0; i < 8; ++i) {
             ASSERT_OK(Flush(i));
@@ -1405,6 +1444,7 @@ TEST_P(DBMultiGetTestWithParam, MultiGetMultiCFSnapshot) {
 }
 
 TEST_P(DBMultiGetTestWithParam, MultiGetMultiCFUnsorted) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   CreateAndReopenWithCF({"one", "two"}, options);
 
@@ -1430,6 +1470,7 @@ INSTANTIATE_TEST_CASE_P(DBMultiGetTestWithParam, DBMultiGetTestWithParam,
                         testing::Bool());
 
 TEST_F(DBBasicTest, MultiGetBatchedSimpleUnsorted) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     CreateAndReopenWithCF({"pikachu"}, CurrentOptions());
     SetPerfLevel(kEnableCount);
@@ -1471,6 +1512,7 @@ TEST_F(DBBasicTest, MultiGetBatchedSimpleUnsorted) {
 }
 
 TEST_F(DBBasicTest, MultiGetBatchedSortedMultiFile) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     CreateAndReopenWithCF({"pikachu"}, CurrentOptions());
     SetPerfLevel(kEnableCount);
@@ -1516,6 +1558,7 @@ TEST_F(DBBasicTest, MultiGetBatchedSortedMultiFile) {
 }
 
 TEST_F(DBBasicTest, MultiGetBatchedDuplicateKeys) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options opts = CurrentOptions();
   opts.merge_operator = MergeOperators::CreateStringAppendOperator();
   CreateAndReopenWithCF({"pikachu"}, opts);
@@ -1567,6 +1610,7 @@ TEST_F(DBBasicTest, MultiGetBatchedDuplicateKeys) {
 }
 
 TEST_F(DBBasicTest, MultiGetBatchedMultiLevel) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.disable_auto_compactions = true;
   Reopen(options);
@@ -1642,6 +1686,7 @@ TEST_F(DBBasicTest, MultiGetBatchedMultiLevel) {
 }
 
 TEST_F(DBBasicTest, MultiGetBatchedMultiLevelMerge) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.disable_auto_compactions = true;
   options.merge_operator = MergeOperators::CreateStringAppendOperator();
@@ -1728,6 +1773,7 @@ TEST_F(DBBasicTest, MultiGetBatchedMultiLevelMerge) {
 }
 
 TEST_F(DBBasicTest, MultiGetBatchedValueSizeInMemory) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   CreateAndReopenWithCF({"pikachu"}, CurrentOptions());
   SetPerfLevel(kEnableCount);
   ASSERT_OK(Put(1, "k1", "v_1"));
@@ -1762,6 +1808,7 @@ TEST_F(DBBasicTest, MultiGetBatchedValueSizeInMemory) {
 }
 
 TEST_F(DBBasicTest, MultiGetBatchedValueSize) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     CreateAndReopenWithCF({"pikachu"}, CurrentOptions());
     SetPerfLevel(kEnableCount);
@@ -1837,6 +1884,7 @@ TEST_F(DBBasicTest, MultiGetBatchedValueSize) {
 }
 
 TEST_F(DBBasicTest, MultiGetBatchedValueSizeMultiLevelMerge) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.disable_auto_compactions = true;
   options.merge_operator = MergeOperators::CreateStringAppendOperator();
@@ -1940,6 +1988,7 @@ TEST_F(DBBasicTest, MultiGetBatchedValueSizeMultiLevelMerge) {
 }
 
 TEST_F(DBBasicTest, MultiGetStats) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.create_if_missing = true;
   options.disable_auto_compactions = true;
@@ -2039,6 +2088,7 @@ class MultiGetPrefixExtractorTest : public DBBasicTest,
 };
 
 TEST_P(MultiGetPrefixExtractorTest, Batched) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.prefix_extractor.reset(NewFixedPrefixTransform(2));
   options.memtable_prefix_bloom_size_ratio = 10;
@@ -2096,6 +2146,7 @@ class DBMultiGetRowCacheTest : public DBBasicTest,
                                public ::testing::WithParamInterface<bool> {};
 
 TEST_P(DBMultiGetRowCacheTest, MultiGetBatched) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     option_config_ = kRowCache;
     Options options = CurrentOptions();
@@ -2184,6 +2235,7 @@ INSTANTIATE_TEST_CASE_P(DBMultiGetRowCacheTest, DBMultiGetRowCacheTest,
                         testing::Values(true, false));
 
 TEST_F(DBBasicTest, GetAllKeyVersions) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.env = env_;
   options.create_if_missing = true;
@@ -2232,6 +2284,7 @@ TEST_F(DBBasicTest, GetAllKeyVersions) {
 #endif  // !ROCKSDB_LITE
 
 TEST_F(DBBasicTest, MultiGetIOBufferOverrun) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   Random rnd(301);
   BlockBasedTableOptions table_options;
@@ -2271,6 +2324,7 @@ TEST_F(DBBasicTest, MultiGetIOBufferOverrun) {
 }
 
 TEST_F(DBBasicTest, IncrementalRecoveryNoCorrupt) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   DestroyAndReopen(options);
   CreateAndReopenWithCF({"pikachu", "eevee"}, options);
@@ -2309,6 +2363,7 @@ TEST_F(DBBasicTest, IncrementalRecoveryNoCorrupt) {
 }
 
 TEST_F(DBBasicTest, BestEffortsRecoveryWithVersionBuildingFailure) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   DestroyAndReopen(options);
   ASSERT_OK(Put("foo", "value"));
@@ -2317,6 +2372,7 @@ TEST_F(DBBasicTest, BestEffortsRecoveryWithVersionBuildingFailure) {
   SyncPoint::GetInstance()->ClearAllCallBacks();
   SyncPoint::GetInstance()->SetCallBack(
       "VersionBuilder::CheckConsistencyBeforeReturn", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         ASSERT_NE(nullptr, arg);
         *(reinterpret_cast<Status*>(arg)) =
             Status::Corruption("Inject corruption");
@@ -2339,6 +2395,7 @@ class TableFileListener : public EventListener {
     cf_to_paths_[info.cf_name].push_back(info.file_path);
   }
   std::vector<std::string>& GetFiles(const std::string& cf_name) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     InstrumentedMutexLock lock(&mutex_);
     return cf_to_paths_[cf_name];
   }
@@ -2350,6 +2407,7 @@ class TableFileListener : public EventListener {
 }  // namespace
 
 TEST_F(DBBasicTest, LastSstFileNotInManifest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // If the last sst file is not tracked in MANIFEST,
   // or the VersionEdit for the last sst file is not synced,
   // on recovery, the last sst file should be deleted,
@@ -2387,6 +2445,7 @@ TEST_F(DBBasicTest, LastSstFileNotInManifest) {
 }
 
 TEST_F(DBBasicTest, RecoverWithMissingFiles) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   DestroyAndReopen(options);
   TableFileListener* listener = new TableFileListener();
@@ -2452,6 +2511,7 @@ TEST_F(DBBasicTest, RecoverWithMissingFiles) {
 }
 
 TEST_F(DBBasicTest, BestEffortsRecoveryTryMultipleManifests) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.env = env_;
   DestroyAndReopen(options);
@@ -2478,6 +2538,7 @@ TEST_F(DBBasicTest, BestEffortsRecoveryTryMultipleManifests) {
 }
 
 TEST_F(DBBasicTest, RecoverWithNoCurrentFile) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.env = env_;
   DestroyAndReopen(options);
@@ -2501,6 +2562,7 @@ TEST_F(DBBasicTest, RecoverWithNoCurrentFile) {
 }
 
 TEST_F(DBBasicTest, RecoverWithNoManifest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.env = env_;
   DestroyAndReopen(options);
@@ -2530,6 +2592,7 @@ TEST_F(DBBasicTest, RecoverWithNoManifest) {
 }
 
 TEST_F(DBBasicTest, SkipWALIfMissingTableFiles) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   DestroyAndReopen(options);
   TableFileListener* listener = new TableFileListener();
@@ -2571,6 +2634,7 @@ TEST_F(DBBasicTest, SkipWALIfMissingTableFiles) {
 }
 
 TEST_F(DBBasicTest, DisableTrackWal) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // If WAL tracking was enabled, and then disabled during reopen,
   // the previously tracked WALs should be removed from MANIFEST.
 
@@ -2608,6 +2672,7 @@ TEST_F(DBBasicTest, DisableTrackWal) {
 #endif  // !ROCKSDB_LITE
 
 TEST_F(DBBasicTest, ManifestChecksumMismatch) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   DestroyAndReopen(options);
   ASSERT_OK(Put("bar", "value"));
@@ -2616,6 +2681,7 @@ TEST_F(DBBasicTest, ManifestChecksumMismatch) {
   SyncPoint::GetInstance()->ClearAllCallBacks();
   SyncPoint::GetInstance()->SetCallBack(
       "LogWriter::EmitPhysicalRecord:BeforeEncodeChecksum", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         auto* crc = reinterpret_cast<uint32_t*>(arg);
         *crc = *crc + 1;
       });
@@ -2635,6 +2701,7 @@ TEST_F(DBBasicTest, ManifestChecksumMismatch) {
 }
 
 TEST_F(DBBasicTest, ConcurrentlyCloseDB) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   DestroyAndReopen(options);
   std::vector<std::thread> workers;
@@ -2657,6 +2724,7 @@ class DBBasicTestTrackWal : public DBTestBase,
       : DBTestBase("db_basic_test_track_wal", /*env_do_fsync=*/false) {}
 
   int CountWalFiles() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     VectorLogPtr log_files;
     EXPECT_OK(dbfull()->GetSortedWalFiles(log_files));
     return static_cast<int>(log_files.size());
@@ -2664,6 +2732,7 @@ class DBBasicTestTrackWal : public DBTestBase,
 };
 
 TEST_P(DBBasicTestTrackWal, DoNotTrackObsoleteWal) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // If a WAL becomes obsolete after flushing, but is not deleted from disk yet,
   // then if SyncWAL is called afterwards, the obsolete WAL should not be
   // tracked in MANIFEST.
@@ -2713,6 +2782,7 @@ class DBBasicTestMultiGet : public DBTestBase {
                       bool uncompressed_cache, bool _compression_enabled,
                       bool _fill_cache, uint32_t compression_parallel_threads)
       : DBTestBase(test_dir, /*env_do_fsync=*/false) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     compression_enabled_ = _compression_enabled;
     fill_cache_ = _fill_cache;
 
@@ -2825,6 +2895,7 @@ class DBBasicTestMultiGet : public DBTestBase {
   }
 
   bool CheckValue(int i, const std::string& value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (values_[i].compare(value) == 0) {
       return true;
     }
@@ -2832,6 +2903,7 @@ class DBBasicTestMultiGet : public DBTestBase {
   }
 
   bool CheckUncompressableValue(int i, const std::string& value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (uncompressable_values_[i].compare(value) == 0) {
       return true;
     }
@@ -2961,6 +3033,7 @@ class DBBasicTestWithParallelIO
 };
 
 TEST_P(DBBasicTestWithParallelIO, MultiGet) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::vector<std::string> key_data(10);
   std::vector<Slice> keys;
   // We cannot resize a PinnableSlice vector, so just set initial size to
@@ -3085,6 +3158,7 @@ TEST_P(DBBasicTestWithParallelIO, MultiGet) {
 
 #ifndef ROCKSDB_LITE
 TEST_P(DBBasicTestWithParallelIO, MultiGetDirectIO) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   class FakeDirectIOEnv : public EnvWrapper {
     class FakeDirectIOSequentialFile;
     class FakeDirectIORandomAccessFile;
@@ -3203,6 +3277,7 @@ TEST_P(DBBasicTestWithParallelIO, MultiGetDirectIO) {
 #endif  // ROCKSDB_LITE
 
 TEST_P(DBBasicTestWithParallelIO, MultiGetWithChecksumMismatch) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::vector<std::string> key_data(10);
   std::vector<Slice> keys;
   // We cannot resize a PinnableSlice vector, so just set initial size to
@@ -3215,6 +3290,7 @@ TEST_P(DBBasicTestWithParallelIO, MultiGetWithChecksumMismatch) {
 
   SyncPoint::GetInstance()->SetCallBack(
       "RetrieveMultipleBlocks:VerifyChecksum", [&](void* status) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         Status* s = static_cast<Status*>(status);
         read_count++;
         if (read_count == 2) {
@@ -3241,6 +3317,7 @@ TEST_P(DBBasicTestWithParallelIO, MultiGetWithChecksumMismatch) {
 }
 
 TEST_P(DBBasicTestWithParallelIO, MultiGetWithMissingFile) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::vector<std::string> key_data(10);
   std::vector<Slice> keys;
   // We cannot resize a PinnableSlice vector, so just set initial size to
@@ -3252,6 +3329,7 @@ TEST_P(DBBasicTestWithParallelIO, MultiGetWithMissingFile) {
 
   SyncPoint::GetInstance()->SetCallBack(
       "TableCache::MultiGet:FindTable", [&](void* status) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         Status* s = static_cast<Status*>(status);
         *s = Status::IOError();
       });
@@ -3264,6 +3342,7 @@ TEST_P(DBBasicTestWithParallelIO, MultiGetWithMissingFile) {
   // during MultiGet
   SyncPoint::GetInstance()->SetCallBack(
       "SanitizeOptions::AfterChangeMaxOpenFiles", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         int* max_open_files = (int*)arg;
         *max_open_files = 11;
       });
@@ -3358,6 +3437,7 @@ class DeadlineFS : public FileSystemWrapper {
   void SetDelayTrigger(const std::chrono::microseconds deadline,
                        const std::chrono::microseconds io_timeout,
                        const int trigger) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     delay_trigger_ = trigger;
     io_count_ = 0;
     deadline_ = deadline;
@@ -3367,6 +3447,7 @@ class DeadlineFS : public FileSystemWrapper {
 
   // Increment the IO counter and return a delay in microseconds
   IOStatus ShouldDelay(const IOOptions& opts) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (timedout_) {
       return IOStatus::TimedOut();
     } else if (!deadline_.count() && !io_timeout_.count()) {
@@ -3383,10 +3464,12 @@ class DeadlineFS : public FileSystemWrapper {
   }
 
   const std::chrono::microseconds GetDeadline() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return ignore_deadline_ ? std::chrono::microseconds::zero() : deadline_;
   }
 
   const std::chrono::microseconds GetIOTimeout() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return ignore_deadline_ ? std::chrono::microseconds::zero() : io_timeout_;
   }
 
@@ -3457,6 +3540,7 @@ IOStatus DeadlineRandomAccessFile::MultiRead(FSReadRequest* reqs,
                                              size_t num_reqs,
                                              const IOOptions& options,
                                              IODebugContext* dbg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const std::chrono::microseconds deadline = fs_.GetDeadline();
   const std::chrono::microseconds io_timeout = fs_.GetIOTimeout();
   IOStatus s;
@@ -3485,6 +3569,7 @@ class DBBasicTestMultiGetDeadline : public DBBasicTestMultiGet {
             1 /*# of parallel compression threads*/) {}
 
   inline void CheckStatus(std::vector<Status>& statuses, size_t num_ok) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     for (size_t i = 0; i < statuses.size(); ++i) {
       if (i < num_ok) {
         EXPECT_OK(statuses[i]);
@@ -3496,6 +3581,7 @@ class DBBasicTestMultiGetDeadline : public DBBasicTestMultiGet {
 };
 
 TEST_F(DBBasicTestMultiGetDeadline, MultiGetDeadlineExceeded) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<DeadlineFS> fs = std::make_shared<DeadlineFS>(env_, false);
   std::unique_ptr<Env> env(new CompositeEnvWrapper(env_, fs));
   Options options = CurrentOptions();
@@ -3629,6 +3715,7 @@ TEST_F(DBBasicTestMultiGetDeadline, MultiGetDeadlineExceeded) {
 }
 
 TEST_F(DBBasicTest, ManifestWriteFailure) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = GetDefaultOptions();
   options.create_if_missing = true;
   options.disable_auto_compactions = true;
@@ -3656,6 +3743,7 @@ TEST_F(DBBasicTest, ManifestWriteFailure) {
 }
 
 TEST_F(DBBasicTest, DestroyDefaultCfHandle) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = GetDefaultOptions();
   options.create_if_missing = true;
   DestroyAndReopen(options);
@@ -3686,6 +3774,7 @@ TEST_F(DBBasicTest, DestroyDefaultCfHandle) {
 
 #ifndef ROCKSDB_LITE
 TEST_F(DBBasicTest, VerifyFileChecksums) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = GetDefaultOptions();
   options.create_if_missing = true;
   options.env = env_;
@@ -3736,6 +3825,7 @@ class DBBasicTestDeadline
       public testing::WithParamInterface<std::tuple<bool, bool>> {};
 
 TEST_P(DBBasicTestDeadline, PointLookupDeadline) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<DeadlineFS> fs = std::make_shared<DeadlineFS>(env_, true);
   std::unique_ptr<Env> env(new CompositeEnvWrapper(env_, fs));
   bool set_deadline = std::get<0>(GetParam());
@@ -3771,6 +3861,7 @@ TEST_P(DBBasicTestDeadline, PointLookupDeadline) {
     // during MultiGet
     SyncPoint::GetInstance()->SetCallBack(
         "SanitizeOptions::AfterChangeMaxOpenFiles", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
           int* max_open_files = (int*)arg;
           *max_open_files = 11;
         });
@@ -3829,6 +3920,7 @@ TEST_P(DBBasicTestDeadline, PointLookupDeadline) {
 }
 
 TEST_P(DBBasicTestDeadline, IteratorDeadline) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<DeadlineFS> fs = std::make_shared<DeadlineFS>(env_, true);
   std::unique_ptr<Env> env(new CompositeEnvWrapper(env_, fs));
   bool set_deadline = std::get<0>(GetParam());
@@ -3925,6 +4017,7 @@ INSTANTIATE_TEST_CASE_P(DBBasicTestDeadline, DBBasicTestDeadline,
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   RegisterCustomObjects(argc, argv);

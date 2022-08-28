@@ -17,6 +17,7 @@ class DBRangeDelTest : public DBTestBase {
   DBRangeDelTest() : DBTestBase("db_range_del_test", /*env_do_fsync=*/false) {}
 
   std::string GetNumericStr(int key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     uint64_t uint64_key = static_cast<uint64_t>(key);
     std::string str;
     str.resize(8);
@@ -29,10 +30,12 @@ class DBRangeDelTest : public DBTestBase {
 // supported in ROCKSDB_LITE
 #ifndef ROCKSDB_LITE
 TEST_F(DBRangeDelTest, NonBlockBasedTableNotSupported) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // TODO: figure out why MmapReads trips the iterator pinning assertion in
   // RangeDelAggregator. Ideally it would be supported; otherwise it should at
   // least be explicitly unsupported.
   for (auto config : {kPlainTableAllBytesPrefix, /* kWalDirAndMmapReads */}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     option_config_ = config;
     DestroyAndReopen(CurrentOptions());
     ASSERT_TRUE(db_->DeleteRange(WriteOptions(), db_->DefaultColumnFamily(),
@@ -42,6 +45,7 @@ TEST_F(DBRangeDelTest, NonBlockBasedTableNotSupported) {
 }
 
 TEST_F(DBRangeDelTest, WriteBatchWithIndexNotSupported) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   WriteBatchWithIndex indexedBatch{};
   ASSERT_TRUE(indexedBatch.DeleteRange(db_->DefaultColumnFamily(), "dr1", "dr1")
                   .IsNotSupported());
@@ -49,6 +53,7 @@ TEST_F(DBRangeDelTest, WriteBatchWithIndexNotSupported) {
 }
 
 TEST_F(DBRangeDelTest, EndSameAsStartCoversNothing) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(db_->Put(WriteOptions(), "b", "val"));
   ASSERT_OK(
       db_->DeleteRange(WriteOptions(), db_->DefaultColumnFamily(), "b", "b"));
@@ -56,6 +61,7 @@ TEST_F(DBRangeDelTest, EndSameAsStartCoversNothing) {
 }
 
 TEST_F(DBRangeDelTest, EndComesBeforeStartInvalidArgument) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(db_->Put(WriteOptions(), "b", "val"));
   ASSERT_TRUE(
       db_->DeleteRange(WriteOptions(), db_->DefaultColumnFamily(), "b", "a")
@@ -64,6 +70,7 @@ TEST_F(DBRangeDelTest, EndComesBeforeStartInvalidArgument) {
 }
 
 TEST_F(DBRangeDelTest, FlushOutputHasOnlyRangeTombstones) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     DestroyAndReopen(CurrentOptions());
     ASSERT_OK(db_->DeleteRange(WriteOptions(), db_->DefaultColumnFamily(),
@@ -74,6 +81,7 @@ TEST_F(DBRangeDelTest, FlushOutputHasOnlyRangeTombstones) {
 }
 
 TEST_F(DBRangeDelTest, DictionaryCompressionWithOnlyRangeTombstones) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options opts = CurrentOptions();
   opts.compression_opts.max_dict_bytes = 16384;
   Reopen(opts);
@@ -83,6 +91,7 @@ TEST_F(DBRangeDelTest, DictionaryCompressionWithOnlyRangeTombstones) {
 }
 
 TEST_F(DBRangeDelTest, CompactionOutputHasOnlyRangeTombstone) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     Options opts = CurrentOptions();
     opts.disable_auto_compactions = true;
@@ -111,6 +120,7 @@ TEST_F(DBRangeDelTest, CompactionOutputHasOnlyRangeTombstone) {
 }
 
 TEST_F(DBRangeDelTest, CompactionOutputFilesExactlyFilled) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // regression test for exactly filled compaction output files. Previously
   // another file would be generated containing all range deletions, which
   // could invalidate the non-overlapping file boundary invariant.
@@ -157,6 +167,7 @@ TEST_F(DBRangeDelTest, CompactionOutputFilesExactlyFilled) {
 }
 
 TEST_F(DBRangeDelTest, MaxCompactionBytesCutsOutputFiles) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Ensures range deletion spanning multiple compaction output files that are
   // cut by max_compaction_bytes will have non-overlapping key-ranges.
   // https://github.com/facebook/rocksdb/issues/1778
@@ -229,6 +240,7 @@ TEST_F(DBRangeDelTest, MaxCompactionBytesCutsOutputFiles) {
 }
 
 TEST_F(DBRangeDelTest, SentinelsOmittedFromOutputFile) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Regression test for bug where sentinel range deletions (i.e., ones with
   // sequence number of zero) were included in output files.
   // snapshot protects range tombstone from dropping due to becoming obsolete.
@@ -251,6 +263,7 @@ TEST_F(DBRangeDelTest, SentinelsOmittedFromOutputFile) {
 }
 
 TEST_F(DBRangeDelTest, FlushRangeDelsSameStartKey) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(db_->Put(WriteOptions(), "b1", "val"));
   ASSERT_OK(
       db_->DeleteRange(WriteOptions(), db_->DefaultColumnFamily(), "a", "c"));
@@ -271,6 +284,7 @@ TEST_F(DBRangeDelTest, FlushRangeDelsSameStartKey) {
 }
 
 TEST_F(DBRangeDelTest, CompactRangeDelsSameStartKey) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(db_->Put(WriteOptions(), "unused",
                      "val"));  // prevents empty after compaction
   ASSERT_OK(db_->Put(WriteOptions(), "b1", "val"));
@@ -297,6 +311,7 @@ TEST_F(DBRangeDelTest, CompactRangeDelsSameStartKey) {
 #endif  // ROCKSDB_LITE
 
 TEST_F(DBRangeDelTest, FlushRemovesCoveredKeys) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kNum = 300, kRangeBegin = 50, kRangeEnd = 250;
   Options opts = CurrentOptions();
   opts.comparator = test::Uint64Comparator();
@@ -334,6 +349,7 @@ TEST_F(DBRangeDelTest, FlushRemovesCoveredKeys) {
 // NumTableFilesAtLevel() is not supported in ROCKSDB_LITE
 #ifndef ROCKSDB_LITE
 TEST_F(DBRangeDelTest, CompactionRemovesCoveredKeys) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kNumPerFile = 100, kNumFiles = 4;
   Options opts = CurrentOptions();
   opts.comparator = test::Uint64Comparator();
@@ -390,6 +406,7 @@ TEST_F(DBRangeDelTest, CompactionRemovesCoveredKeys) {
 }
 
 TEST_F(DBRangeDelTest, ValidLevelSubcompactionBoundaries) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kNumPerFile = 100, kNumFiles = 4, kFileBytes = 100 << 10;
   Options options = CurrentOptions();
   options.disable_auto_compactions = true;
@@ -447,6 +464,7 @@ TEST_F(DBRangeDelTest, ValidLevelSubcompactionBoundaries) {
 }
 
 TEST_F(DBRangeDelTest, ValidUniversalSubcompactionBoundaries) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kNumPerFile = 100, kFilesPerLevel = 4, kNumLevels = 4;
   Options options = CurrentOptions();
   options.compaction_options_universal.min_merge_width = kFilesPerLevel;
@@ -505,6 +523,7 @@ TEST_F(DBRangeDelTest, ValidUniversalSubcompactionBoundaries) {
 #endif  // ROCKSDB_LITE
 
 TEST_F(DBRangeDelTest, CompactionRemovesCoveredMergeOperands) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kNumPerFile = 3, kNumFiles = 3;
   Options opts = CurrentOptions();
   opts.disable_auto_compactions = true;
@@ -551,6 +570,7 @@ TEST_F(DBRangeDelTest, CompactionRemovesCoveredMergeOperands) {
 }
 
 TEST_F(DBRangeDelTest, PutDeleteRangeMergeFlush) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Test the sequence of operations: (1) Put, (2) DeleteRange, (3) Merge, (4)
   // Flush. The `CompactionIterator` previously had a bug where we forgot to
   // check for covering range tombstones when processing the (1) Put, causing
@@ -577,6 +597,7 @@ TEST_F(DBRangeDelTest, PutDeleteRangeMergeFlush) {
 // NumTableFilesAtLevel() is not supported in ROCKSDB_LITE
 #ifndef ROCKSDB_LITE
 TEST_F(DBRangeDelTest, ObsoleteTombstoneCleanup) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // During compaction to bottommost level, verify range tombstones older than
   // the oldest snapshot are removed, while others are preserved.
   Options opts = CurrentOptions();
@@ -606,6 +627,7 @@ TEST_F(DBRangeDelTest, ObsoleteTombstoneCleanup) {
 }
 
 TEST_F(DBRangeDelTest, TableEvictedDuringScan) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // The RangeDelAggregator holds pointers into range deletion blocks created by
   // table readers. This test ensures the aggregator can still access those
   // blocks even if it outlives the table readers that created them.
@@ -692,6 +714,7 @@ TEST_F(DBRangeDelTest, TableEvictedDuringScan) {
 }
 
 TEST_F(DBRangeDelTest, GetCoveredKeyFromMutableMemtable) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     DestroyAndReopen(CurrentOptions());
     ASSERT_OK(db_->Put(WriteOptions(), "key", "val"));
@@ -705,6 +728,7 @@ TEST_F(DBRangeDelTest, GetCoveredKeyFromMutableMemtable) {
 }
 
 TEST_F(DBRangeDelTest, GetCoveredKeyFromImmutableMemtable) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     Options opts = CurrentOptions();
     opts.max_write_buffer_number = 3;
@@ -728,6 +752,7 @@ TEST_F(DBRangeDelTest, GetCoveredKeyFromImmutableMemtable) {
 }
 
 TEST_F(DBRangeDelTest, GetCoveredKeyFromSst) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     DestroyAndReopen(CurrentOptions());
     ASSERT_OK(db_->Put(WriteOptions(), "key", "val"));
@@ -745,6 +770,7 @@ TEST_F(DBRangeDelTest, GetCoveredKeyFromSst) {
 }
 
 TEST_F(DBRangeDelTest, GetCoveredMergeOperandFromMemtable) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kNumMergeOps = 10;
   Options opts = CurrentOptions();
   opts.merge_operator = MergeOperators::CreateUInt64AddOperator();
@@ -775,6 +801,7 @@ TEST_F(DBRangeDelTest, GetCoveredMergeOperandFromMemtable) {
 }
 
 TEST_F(DBRangeDelTest, GetIgnoresRangeDeletions) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options opts = CurrentOptions();
   opts.max_write_buffer_number = 4;
   opts.min_write_buffer_number_to_merge = 3;
@@ -797,6 +824,7 @@ TEST_F(DBRangeDelTest, GetIgnoresRangeDeletions) {
   ReadOptions read_opts;
   read_opts.ignore_range_deletions = true;
   for (std::string key : {"sst_key", "imm_key", "mem_key"}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::string value;
     ASSERT_OK(db_->Get(read_opts, key, &value));
   }
@@ -804,6 +832,7 @@ TEST_F(DBRangeDelTest, GetIgnoresRangeDeletions) {
 }
 
 TEST_F(DBRangeDelTest, IteratorRemovesCoveredKeys) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kNum = 200, kRangeBegin = 50, kRangeEnd = 150, kNumPerFile = 25;
   Options opts = CurrentOptions();
   opts.comparator = test::Uint64Comparator();
@@ -839,6 +868,7 @@ TEST_F(DBRangeDelTest, IteratorRemovesCoveredKeys) {
 }
 
 TEST_F(DBRangeDelTest, IteratorOverUserSnapshot) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kNum = 200, kRangeBegin = 50, kRangeEnd = 150, kNumPerFile = 25;
   Options opts = CurrentOptions();
   opts.comparator = test::Uint64Comparator();
@@ -873,6 +903,7 @@ TEST_F(DBRangeDelTest, IteratorOverUserSnapshot) {
 }
 
 TEST_F(DBRangeDelTest, IteratorIgnoresRangeDeletions) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options opts = CurrentOptions();
   opts.max_write_buffer_number = 4;
   opts.min_write_buffer_number_to_merge = 3;
@@ -909,6 +940,7 @@ TEST_F(DBRangeDelTest, IteratorIgnoresRangeDeletions) {
 
 #ifndef ROCKSDB_UBSAN_RUN
 TEST_F(DBRangeDelTest, TailingIteratorRangeTombstoneUnsupported) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(db_->Put(WriteOptions(), "key", "val"));
   // snapshot prevents key from being deleted during flush
   const Snapshot* snapshot = db_->GetSnapshot();
@@ -938,6 +970,7 @@ TEST_F(DBRangeDelTest, TailingIteratorRangeTombstoneUnsupported) {
 #endif  // !ROCKSDB_UBSAN_RUN
 
 TEST_F(DBRangeDelTest, SubcompactionHasEmptyDedicatedRangeDelFile) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kNumFiles = 2, kNumKeysPerFile = 4;
   Options options = CurrentOptions();
   options.compression = kNoCompression;
@@ -984,6 +1017,7 @@ TEST_F(DBRangeDelTest, SubcompactionHasEmptyDedicatedRangeDelFile) {
 }
 
 TEST_F(DBRangeDelTest, MemtableBloomFilter) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // regression test for #2743. the range delete tombstones in memtable should
   // be added even when Get() skips searching due to its prefix bloom filter
   const int kMemtableSize = 1 << 20;              // 1MB
@@ -1011,6 +1045,7 @@ TEST_F(DBRangeDelTest, MemtableBloomFilter) {
 }
 
 TEST_F(DBRangeDelTest, CompactionTreatsSplitInputLevelDeletionAtomically) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // This test originally verified that compaction treated files containing a
   // split range deletion in the input level as an atomic unit. I.e.,
   // compacting any input-level file(s) containing a portion of the range
@@ -1084,6 +1119,7 @@ TEST_F(DBRangeDelTest, CompactionTreatsSplitInputLevelDeletionAtomically) {
 }
 
 TEST_F(DBRangeDelTest, RangeTombstoneEndKeyAsSstableUpperBound) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Test the handling of the range-tombstone end-key as the
   // upper-bound for an sstable.
 
@@ -1176,6 +1212,7 @@ TEST_F(DBRangeDelTest, RangeTombstoneEndKeyAsSstableUpperBound) {
 }
 
 TEST_F(DBRangeDelTest, UnorderedTombstones) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Regression test for #2752. Range delete tombstones between
   // different snapshot stripes are not stored in order, so the first
   // tombstone of each snapshot stripe should be checked as a smallest
@@ -1224,6 +1261,7 @@ class MockMergeOperator : public MergeOperator {
 };
 
 TEST_F(DBRangeDelTest, KeyAtOverlappingEndpointReappears) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // This test uses a non-associative merge operator since that is a convenient
   // way to get compaction to write out files with overlapping user-keys at the
   // endpoints. Note, however, overlapping endpoints can also occur with other
@@ -1291,6 +1329,7 @@ TEST_F(DBRangeDelTest, KeyAtOverlappingEndpointReappears) {
 }
 
 TEST_F(DBRangeDelTest, UntruncatedTombstoneDoesNotDeleteNewerKey) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Verify a key newer than a range tombstone cannot be deleted by being
   // compacted to the bottom level (and thus having its seqnum zeroed) before
   // the range tombstone. This used to happen when range tombstones were
@@ -1407,6 +1446,7 @@ TEST_F(DBRangeDelTest, UntruncatedTombstoneDoesNotDeleteNewerKey) {
 }
 
 TEST_F(DBRangeDelTest, DeletedMergeOperandReappearsIterPrev) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Exposes a bug where we were using
   // `RangeDelPositioningMode::kBackwardTraversal` while scanning merge operands
   // in the forward direction. Confusingly, this case happened during
@@ -1475,6 +1515,7 @@ TEST_F(DBRangeDelTest, DeletedMergeOperandReappearsIterPrev) {
 }
 
 TEST_F(DBRangeDelTest, SnapshotPreventsDroppedKeys) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kFileBytes = 1 << 20;
 
   Options options = CurrentOptions();
@@ -1508,6 +1549,7 @@ TEST_F(DBRangeDelTest, SnapshotPreventsDroppedKeys) {
 }
 
 TEST_F(DBRangeDelTest, SnapshotPreventsDroppedKeysInImmMemTables) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kFileBytes = 1 << 20;
 
   Options options = CurrentOptions();
@@ -1550,6 +1592,7 @@ TEST_F(DBRangeDelTest, SnapshotPreventsDroppedKeysInImmMemTables) {
 }
 
 TEST_F(DBRangeDelTest, RangeTombstoneWrittenToMinimalSsts) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Adapted from
   // https://github.com/cockroachdb/cockroach/blob/de8b3ea603dd1592d9dc26443c2cc92c356fbc2f/pkg/storage/engine/rocksdb_test.go#L1267-L1398.
   // Regression test for issue where range tombstone was written to more files
@@ -1569,6 +1612,7 @@ TEST_F(DBRangeDelTest, RangeTombstoneWrittenToMinimalSsts) {
 
   Random rnd(301);
   for (char first_char : {'a', 'b', 'c'}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     for (int i = 0; i < kFileBytes / kValueBytes; ++i) {
       std::string key(1, first_char);
       key.append(Key(i));
@@ -1617,6 +1661,7 @@ TEST_F(DBRangeDelTest, RangeTombstoneWrittenToMinimalSsts) {
   }
   std::sort(l1_metadata.begin(), l1_metadata.end(),
             [&](const LiveFileMetaData& a, const LiveFileMetaData& b) {
+PERF_MARKER(__PRETTY_FUNCTION__);
               return options.comparator->Compare(a.smallestkey, b.smallestkey) <
                      0;
             });
@@ -1644,6 +1689,7 @@ TEST_F(DBRangeDelTest, RangeTombstoneWrittenToMinimalSsts) {
 }
 
 TEST_F(DBRangeDelTest, OverlappedTombstones) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kNumPerFile = 4, kNumFiles = 2;
   Options options = CurrentOptions();
   options.disable_auto_compactions = true;
@@ -1684,6 +1730,7 @@ TEST_F(DBRangeDelTest, OverlappedTombstones) {
 }
 
 TEST_F(DBRangeDelTest, OverlappedKeys) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kNumPerFile = 4, kNumFiles = 2;
   Options options = CurrentOptions();
   options.disable_auto_compactions = true;
@@ -1725,9 +1772,11 @@ TEST_F(DBRangeDelTest, OverlappedKeys) {
 }
 
 TEST_F(DBRangeDelTest, IteratorRefresh) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Refreshing an iterator after a range tombstone is added should cause the
   // deleted range of keys to disappear.
   for (bool sv_changed : {false, true}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_OK(db_->Put(WriteOptions(), "key1", "value1"));
     ASSERT_OK(db_->Put(WriteOptions(), "key2", "value2"));
 
@@ -1757,6 +1806,7 @@ TEST_F(DBRangeDelTest, IteratorRefresh) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

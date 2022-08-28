@@ -24,6 +24,7 @@ namespace ROCKSDB_NAMESPACE {
 class CompactFilesTest : public testing::Test {
  public:
   CompactFilesTest() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     env_ = Env::Default();
     db_name_ = test::PerThreadDBPath("compact_files_test");
   }
@@ -44,6 +45,7 @@ class FlushedFileCollector : public EventListener {
   }
 
   std::vector<std::string> GetFlushedFiles() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::lock_guard<std::mutex> lock(mutex_);
     std::vector<std::string> result;
     for (auto fname : flushed_files_) {
@@ -52,6 +54,7 @@ class FlushedFileCollector : public EventListener {
     return result;
   }
   void ClearFlushedFiles() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::lock_guard<std::mutex> lock(mutex_);
     flushed_files_.clear();
   }
@@ -62,6 +65,7 @@ class FlushedFileCollector : public EventListener {
 };
 
 TEST_F(CompactFilesTest, L0ConflictsFiles) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   // to trigger compaction more easily
   const int kWriteBufferSize = 10000;
@@ -119,6 +123,7 @@ TEST_F(CompactFilesTest, L0ConflictsFiles) {
 }
 
 TEST_F(CompactFilesTest, MultipleLevel) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.create_if_missing = true;
   options.level_compaction_dynamic_level_bytes = true;
@@ -194,6 +199,7 @@ TEST_F(CompactFilesTest, MultipleLevel) {
 }
 
 TEST_F(CompactFilesTest, ObsoleteFiles) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   // to trigger compaction more easily
   const int kWriteBufferSize = 65536;
@@ -234,6 +240,7 @@ TEST_F(CompactFilesTest, ObsoleteFiles) {
 }
 
 TEST_F(CompactFilesTest, NotCutOutputOnLevel0) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.create_if_missing = true;
   // Disable RocksDB background compaction.
@@ -276,6 +283,7 @@ TEST_F(CompactFilesTest, NotCutOutputOnLevel0) {
 }
 
 TEST_F(CompactFilesTest, CapturingPendingFiles) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.create_if_missing = true;
   // Disable RocksDB background compaction.
@@ -335,6 +343,7 @@ TEST_F(CompactFilesTest, CapturingPendingFiles) {
 }
 
 TEST_F(CompactFilesTest, CompactionFilterWithGetSv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   class FilterWithGet : public CompactionFilter {
    public:
     bool Filter(int /*level*/, const Slice& /*key*/, const Slice& /*value*/,
@@ -349,6 +358,7 @@ TEST_F(CompactFilesTest, CompactionFilterWithGetSv) {
     }
 
     void SetDB(DB* db) {
+PERF_MARKER(__PRETTY_FUNCTION__);
       db_ = db;
     }
 
@@ -390,6 +400,7 @@ TEST_F(CompactFilesTest, CompactionFilterWithGetSv) {
 }
 
 TEST_F(CompactFilesTest, SentinelCompressionType) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!Zlib_Supported()) {
     fprintf(stderr, "zlib compression not supported, skip this test\n");
     return;
@@ -404,6 +415,7 @@ TEST_F(CompactFilesTest, SentinelCompressionType) {
        {CompactionStyle::kCompactionStyleLevel,
         CompactionStyle::kCompactionStyleUniversal,
         CompactionStyle::kCompactionStyleNone}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     DestroyDB(db_name_, Options());
     Options options;
     options.compaction_style = compaction_style;
@@ -442,6 +454,7 @@ TEST_F(CompactFilesTest, SentinelCompressionType) {
 }
 
 TEST_F(CompactFilesTest, GetCompactionJobInfo) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.create_if_missing = true;
   // Disable RocksDB background compaction.
@@ -490,6 +503,7 @@ TEST_F(CompactFilesTest, GetCompactionJobInfo) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }
@@ -498,6 +512,7 @@ int main(int argc, char** argv) {
 #include <stdio.h>
 
 int main(int /*argc*/, char** /*argv*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   fprintf(stderr,
           "SKIPPED as DBImpl::CompactFiles is not supported in ROCKSDB_LITE\n");
   return 0;

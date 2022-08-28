@@ -24,6 +24,7 @@ BlobLogSequentialReader::~BlobLogSequentialReader() = default;
 
 Status BlobLogSequentialReader::ReadSlice(uint64_t size, Slice* slice,
                                           char* buf) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(slice);
   assert(file_);
 
@@ -44,6 +45,7 @@ Status BlobLogSequentialReader::ReadSlice(uint64_t size, Slice* slice,
 }
 
 Status BlobLogSequentialReader::ReadHeader(BlobLogHeader* header) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(header);
   assert(next_byte_ == 0);
 
@@ -65,6 +67,7 @@ Status BlobLogSequentialReader::ReadHeader(BlobLogHeader* header) {
 Status BlobLogSequentialReader::ReadRecord(BlobLogRecord* record,
                                            ReadLevel level,
                                            uint64_t* blob_offset) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(record);
   static_assert(BlobLogRecord::kHeaderSize <= sizeof(header_buf_),
                 "Buffer is smaller than BlobLogRecord::kHeaderSize");
@@ -115,6 +118,7 @@ Status BlobLogSequentialReader::ReadRecord(BlobLogRecord* record,
 }
 
 Status BlobLogSequentialReader::ReadFooter(BlobLogFooter* footer) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(footer);
   static_assert(BlobLogFooter::kSize <= sizeof(header_buf_),
                 "Buffer is smaller than BlobLogFooter::kSize");

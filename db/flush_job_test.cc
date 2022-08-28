@@ -45,6 +45,7 @@ class FlushJobTestBase : public testing::Test {
         mock_table_factory_(new mock::MockTableFactory()) {}
 
   virtual ~FlushJobTestBase() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (getenv("KEEP_DB")) {
       fprintf(stdout, "db is still in %s\n", dbname_.c_str());
     } else {
@@ -55,6 +56,7 @@ class FlushJobTestBase : public testing::Test {
   }
 
   void NewDB() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_OK(SetIdentityFile(env_, dbname_));
     VersionEdit new_db;
 
@@ -158,6 +160,7 @@ class FlushJobTest : public FlushJobTestBase {
 };
 
 TEST_F(FlushJobTest, Empty) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   JobContext job_context(0);
   auto cfd = versions_->GetColumnFamilySet()->GetDefault();
   EventLogger event_logger(db_options_.info_log.get());
@@ -179,6 +182,7 @@ TEST_F(FlushJobTest, Empty) {
 }
 
 TEST_F(FlushJobTest, NonEmpty) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   JobContext job_context(0);
   auto cfd = versions_->GetColumnFamilySet()->GetDefault();
   auto new_mem = cfd->ConstructNewMemtable(*cfd->GetLatestMutableCFOptions(),
@@ -274,6 +278,7 @@ TEST_F(FlushJobTest, NonEmpty) {
 }
 
 TEST_F(FlushJobTest, FlushMemTablesSingleColumnFamily) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const size_t num_mems = 2;
   const size_t num_mems_to_flush = 1;
   const size_t num_keys_per_table = 100;
@@ -340,6 +345,7 @@ TEST_F(FlushJobTest, FlushMemTablesSingleColumnFamily) {
 }
 
 TEST_F(FlushJobTest, FlushMemtablesMultipleColumnFamilies) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   autovector<ColumnFamilyData*> all_cfds;
   for (auto cfd : *versions_->GetColumnFamilySet()) {
     all_cfds.push_back(cfd);
@@ -458,6 +464,7 @@ TEST_F(FlushJobTest, FlushMemtablesMultipleColumnFamilies) {
 }
 
 TEST_F(FlushJobTest, Snapshots) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   JobContext job_context(0);
   auto cfd = versions_->GetColumnFamilySet()->GetDefault();
   auto new_mem = cfd->ConstructNewMemtable(*cfd->GetLatestMutableCFOptions(),
@@ -535,6 +542,7 @@ class FlushJobTimestampTest : public FlushJobTestBase {
   void AddKeyValueToMemtable(MemTable* memtable, std::string key, uint64_t ts,
                              SequenceNumber seq, ValueType value_type,
                              Slice value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::string key_str(std::move(key));
     PutFixed64(&key_str, ts);
     ASSERT_OK(memtable->Add(seq, value_type, key_str, value,
@@ -549,6 +557,7 @@ class FlushJobTimestampTest : public FlushJobTestBase {
 };
 
 TEST_F(FlushJobTimestampTest, AllKeysExpired) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ColumnFamilyData* cfd = versions_->GetColumnFamilySet()->GetDefault();
   autovector<MemTable*> to_delete;
 
@@ -604,6 +613,7 @@ TEST_F(FlushJobTimestampTest, AllKeysExpired) {
 }
 
 TEST_F(FlushJobTimestampTest, NoKeyExpired) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ColumnFamilyData* cfd = versions_->GetColumnFamilySet()->GetDefault();
   autovector<MemTable*> to_delete;
 
@@ -659,6 +669,7 @@ TEST_F(FlushJobTimestampTest, NoKeyExpired) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

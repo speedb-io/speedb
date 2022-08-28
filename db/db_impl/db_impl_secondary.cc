@@ -34,6 +34,7 @@ Status DBImplSecondary::Recover(
     const std::vector<ColumnFamilyDescriptor>& column_families,
     bool /*readonly*/, bool /*error_if_wal_file_exists*/,
     bool /*error_if_data_exists_in_wals*/, uint64_t*) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   mutex_.AssertHeld();
 
   JobContext job_context(0);
@@ -84,6 +85,7 @@ Status DBImplSecondary::Recover(
 Status DBImplSecondary::FindAndRecoverLogFiles(
     std::unordered_set<ColumnFamilyData*>* cfds_changed,
     JobContext* job_context) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(nullptr != cfds_changed);
   assert(nullptr != job_context);
   Status s;
@@ -98,6 +100,7 @@ Status DBImplSecondary::FindAndRecoverLogFiles(
 
 // List wal_dir and find all new WALs, return these log numbers
 Status DBImplSecondary::FindNewLogNumbers(std::vector<uint64_t>* logs) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(logs != nullptr);
   std::vector<std::string> filenames;
   Status s;
@@ -133,6 +136,7 @@ Status DBImplSecondary::FindNewLogNumbers(std::vector<uint64_t>* logs) {
 
 Status DBImplSecondary::MaybeInitLogReader(
     uint64_t log_number, log::FragmentBufferedReader** log_reader) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto iter = log_readers_.find(log_number);
   // make sure the log file is still present
   if (iter == log_readers_.end() ||
@@ -184,6 +188,7 @@ Status DBImplSecondary::RecoverLogFiles(
     const std::vector<uint64_t>& log_numbers, SequenceNumber* next_sequence,
     std::unordered_set<ColumnFamilyData*>* cfds_changed,
     JobContext* job_context) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(nullptr != cfds_changed);
   assert(nullptr != job_context);
   mutex_.AssertHeld();
@@ -328,12 +333,14 @@ Status DBImplSecondary::RecoverLogFiles(
 Status DBImplSecondary::Get(const ReadOptions& read_options,
                             ColumnFamilyHandle* column_family, const Slice& key,
                             PinnableSlice* value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return GetImpl(read_options, column_family, key, value);
 }
 
 Status DBImplSecondary::GetImpl(const ReadOptions& read_options,
                                 ColumnFamilyHandle* column_family,
                                 const Slice& key, PinnableSlice* pinnable_val) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(pinnable_val != nullptr);
   PERF_CPU_TIMER_GUARD(get_cpu_nanos, immutable_db_options_.clock);
   StopWatch sw(immutable_db_options_.clock, stats_, DB_GET);
@@ -405,6 +412,7 @@ Status DBImplSecondary::GetImpl(const ReadOptions& read_options,
 
 Iterator* DBImplSecondary::NewIterator(const ReadOptions& read_options,
                                        ColumnFamilyHandle* column_family) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (read_options.managed) {
     return NewErrorIterator(
         Status::NotSupported("Managed iterator is not supported anymore."));
@@ -444,6 +452,7 @@ ArenaWrappedDBIter* DBImplSecondary::NewIteratorImpl(
     const ReadOptions& read_options, ColumnFamilyData* cfd,
     SequenceNumber snapshot, ReadCallback* read_callback,
     bool expose_blob_index, bool allow_refresh) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(nullptr != cfd);
   SuperVersion* super_version = cfd->GetReferencedSuperVersion(this);
   assert(snapshot == kMaxSequenceNumber);
@@ -467,6 +476,7 @@ Status DBImplSecondary::NewIterators(
     const ReadOptions& read_options,
     const std::vector<ColumnFamilyHandle*>& column_families,
     std::vector<Iterator*>* iterators) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (read_options.managed) {
     return Status::NotSupported("Managed iterator is not supported anymore.");
   }
@@ -512,6 +522,7 @@ Status DBImplSecondary::NewIterators(
 }
 
 Status DBImplSecondary::CheckConsistency() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   mutex_.AssertHeld();
   Status s = DBImpl::CheckConsistency();
   // If DBImpl::CheckConsistency() which is stricter returns success, then we
@@ -555,6 +566,7 @@ Status DBImplSecondary::CheckConsistency() {
 }
 
 Status DBImplSecondary::TryCatchUpWithPrimary() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(versions_.get() != nullptr);
   assert(manifest_reader_.get() != nullptr);
   Status s;
@@ -622,6 +634,7 @@ Status DBImplSecondary::TryCatchUpWithPrimary() {
 
 Status DB::OpenAsSecondary(const Options& options, const std::string& dbname,
                            const std::string& secondary_path, DB** dbptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   *dbptr = nullptr;
 
   DBOptions db_options(options);
@@ -644,6 +657,7 @@ Status DB::OpenAsSecondary(
     const std::string& secondary_path,
     const std::vector<ColumnFamilyDescriptor>& column_families,
     std::vector<ColumnFamilyHandle*>* handles, DB** dbptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   *dbptr = nullptr;
   if (db_options.max_open_files != -1) {
     // TODO (yanqin) maybe support max_open_files != -1 by creating hard links
@@ -712,6 +726,7 @@ Status DB::OpenAsSecondary(
 Status DBImplSecondary::CompactWithoutInstallation(
     const OpenAndCompactOptions& options, ColumnFamilyHandle* cfh,
     const CompactionServiceInput& input, CompactionServiceResult* result) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (options.canceled && options.canceled->load(std::memory_order_acquire)) {
     return Status::Incomplete(Status::SubCode::kManualCompactionPaused);
   }
@@ -799,6 +814,7 @@ Status DB::OpenAndCompact(
     const std::string& output_directory, const std::string& input,
     std::string* output,
     const CompactionServiceOptionsOverride& override_options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (options.canceled && options.canceled->load(std::memory_order_acquire)) {
     return Status::Incomplete(Status::SubCode::kManualCompactionPaused);
   }
@@ -874,6 +890,7 @@ Status DB::OpenAndCompact(
     const std::string& name, const std::string& output_directory,
     const std::string& input, std::string* output,
     const CompactionServiceOptionsOverride& override_options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return OpenAndCompact(OpenAndCompactOptions(), name, output_directory, input,
                         output, override_options);
 }
@@ -884,6 +901,7 @@ Status DB::OpenAsSecondary(const Options& /*options*/,
                            const std::string& /*name*/,
                            const std::string& /*secondary_path*/,
                            DB** /*dbptr*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return Status::NotSupported("Not supported in ROCKSDB_LITE.");
 }
 
@@ -892,6 +910,7 @@ Status DB::OpenAsSecondary(
     const std::string& /*secondary_path*/,
     const std::vector<ColumnFamilyDescriptor>& /*column_families*/,
     std::vector<ColumnFamilyHandle*>* /*handles*/, DB** /*dbptr*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return Status::NotSupported("Not supported in ROCKSDB_LITE.");
 }
 #endif  // !ROCKSDB_LITE

@@ -34,6 +34,7 @@ namespace ROCKSDB_NAMESPACE {
 namespace {
 
 void VerifyTableProperties(DB* db, uint64_t expected_entries_size) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   TablePropertiesCollection props;
   ASSERT_OK(db->GetPropertiesOfAllTables(&props));
 
@@ -65,6 +66,7 @@ class DBTablePropertiesTest : public DBTestBase,
 };
 
 TEST_F(DBTablePropertiesTest, GetPropertiesOfAllTablesTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.level0_file_num_compaction_trigger = 8;
   // Part of strategy to prevent pinning table files
@@ -132,6 +134,7 @@ TEST_F(DBTablePropertiesTest, GetPropertiesOfAllTablesTest) {
   // It's not practical to prevent table file read on Open, so we
   // corrupt after open and after purging table cache.
   for (bool direct : {true, false}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Reopen(options);
     // Clear out auto-opened files
     dbfull()->TEST_table_cache()->EraseUnRefEntries();
@@ -174,6 +177,7 @@ TEST_F(DBTablePropertiesTest, GetPropertiesOfAllTablesTest) {
 }
 
 TEST_F(DBTablePropertiesTest, InvalidIgnored) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // RocksDB versions 2.5 - 2.7 generate some properties that Block considers
   // invalid in some way. This approximates that.
 
@@ -181,6 +185,7 @@ TEST_F(DBTablePropertiesTest, InvalidIgnored) {
   SyncPoint::GetInstance()->SetCallBack(
       "BlockBasedTableBuilder::WritePropertiesBlock:BlockData",
       [&](void* block_data) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         *reinterpret_cast<Slice*>(block_data) = Slice("X");
       });
   SyncPoint::GetInstance()->EnableProcessing();
@@ -199,6 +204,7 @@ TEST_F(DBTablePropertiesTest, InvalidIgnored) {
 }
 
 TEST_F(DBTablePropertiesTest, CreateOnDeletionCollectorFactory) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ConfigOptions options;
   options.ignore_unsupported_options = false;
 
@@ -233,6 +239,7 @@ TablePropertiesCollection
 DBTablePropertiesTest::TestGetPropertiesOfTablesInRange(
     std::vector<Range> ranges, std::size_t* num_properties,
     std::size_t* num_files) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 
   // Since we deref zero element in the vector it can not be empty
   // otherwise we pass an address to some random memory
@@ -273,6 +280,7 @@ DBTablePropertiesTest::TestGetPropertiesOfTablesInRange(
 }
 
 TEST_F(DBTablePropertiesTest, GetPropertiesOfTablesInRange) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Fixed random sead
   Random rnd(301);
 
@@ -365,6 +373,7 @@ TEST_F(DBTablePropertiesTest, GetPropertiesOfTablesInRange) {
 }
 
 TEST_F(DBTablePropertiesTest, GetColumnFamilyNameProperty) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string kExtraCfName = "pikachu";
   CreateAndReopenWithCF({kExtraCfName}, CurrentOptions());
 
@@ -392,6 +401,7 @@ TEST_F(DBTablePropertiesTest, GetColumnFamilyNameProperty) {
 }
 
 TEST_F(DBTablePropertiesTest, GetDbIdentifiersProperty) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   CreateAndReopenWithCF({"goku"}, CurrentOptions());
 
   for (uint32_t cf = 0; cf < 2; ++cf) {
@@ -421,6 +431,7 @@ class DBTableHostnamePropertyTest
 };
 
 TEST_P(DBTableHostnamePropertyTest, DbHostLocationProperty) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   option_config_ = std::get<0>(GetParam());
   Options opts = CurrentOptions();
   std::string expected_host_id = std::get<1>(GetParam());
@@ -474,6 +485,7 @@ class DeletionTriggeredCompactionTestListener : public EventListener {
 };
 
 TEST_P(DBTablePropertiesTest, DeletionTriggeredCompactionMarking) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   int kNumKeys = 1000;
   int kWindowSize = 100;
   int kNumDelsTrigger = 90;
@@ -557,6 +569,7 @@ TEST_P(DBTablePropertiesTest, DeletionTriggeredCompactionMarking) {
 }
 
 TEST_P(DBTablePropertiesTest, RatioBasedDeletionTriggeredCompactionMarking) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr int kNumKeys = 1000;
   constexpr int kWindowSize = 0;
   constexpr int kNumDelsTrigger = 0;
@@ -617,6 +630,7 @@ INSTANTIATE_TEST_CASE_P(
 #endif  // ROCKSDB_LITE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

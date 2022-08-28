@@ -28,6 +28,7 @@ class BoundsCheckingVectorIterator : public VectorIterator {
                                const Slice* start, const Slice* end,
                                const Comparator* cmp)
       : VectorIterator(keys, values, cmp), start_(start), end_(end), cmp_(cmp) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(cmp_);
   }
 
@@ -80,6 +81,7 @@ class ClippingIteratorTest
       public ::testing::WithParamInterface<std::tuple<bool, size_t, size_t>> {};
 
 TEST_P(ClippingIteratorTest, Clip) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const std::vector<std::string> keys{"key0", "key1", "key2", "key3", "key4",
                                       "key5", "key6", "key7", "key8", "key9"};
   const std::vector<std::string> values{
@@ -253,6 +255,7 @@ INSTANTIATE_TEST_CASE_P(
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

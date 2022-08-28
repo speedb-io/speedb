@@ -19,6 +19,7 @@ class DBEncryptionTest : public DBTestBase {
   DBEncryptionTest()
       : DBTestBase("db_encryption_test", /*env_do_fsync=*/true) {}
   Env* GetTargetEnv() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (encrypted_env_ != nullptr) {
       return (static_cast<EnvWrapper*>(encrypted_env_))->target();
     } else {
@@ -30,6 +31,7 @@ class DBEncryptionTest : public DBTestBase {
 #ifndef ROCKSDB_LITE
 
 TEST_F(DBEncryptionTest, CheckEncrypted) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(Put("foo567", "v1.fetdq"));
   ASSERT_OK(Put("bar123", "v2.dfgkjdfghsd"));
   Close();
@@ -92,6 +94,7 @@ TEST_F(DBEncryptionTest, CheckEncrypted) {
 }
 
 TEST_F(DBEncryptionTest, ReadEmptyFile) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto defaultEnv = GetTargetEnv();
 
   // create empty file for reading it back in later
@@ -124,6 +127,7 @@ TEST_F(DBEncryptionTest, ReadEmptyFile) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

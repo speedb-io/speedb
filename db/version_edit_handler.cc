@@ -21,6 +21,7 @@ namespace ROCKSDB_NAMESPACE {
 
 void VersionEditHandlerBase::Iterate(log::Reader& reader,
                                      Status* log_read_status) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Slice record;
   std::string scratch;
   assert(log_read_status);
@@ -97,6 +98,7 @@ void VersionEditHandlerBase::Iterate(log::Reader& reader,
 
 Status ListColumnFamiliesHandler::ApplyVersionEdit(
     VersionEdit& edit, ColumnFamilyData** /*unused*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Status s;
   if (edit.is_column_family_add_) {
     if (column_family_names_.find(edit.column_family_) !=
@@ -119,6 +121,7 @@ Status ListColumnFamiliesHandler::ApplyVersionEdit(
 
 Status FileChecksumRetriever::ApplyVersionEdit(VersionEdit& edit,
                                                ColumnFamilyData** /*unused*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (const auto& deleted_file : edit.GetDeletedFiles()) {
     Status s = file_checksum_list_.RemoveOneFileChecksum(deleted_file.second);
     if (!s.ok()) {
@@ -164,10 +167,12 @@ VersionEditHandler::VersionEditHandler(
       io_tracer_(io_tracer),
       skip_load_table_files_(skip_load_table_files),
       initialized_(false) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(version_set_ != nullptr);
 }
 
 Status VersionEditHandler::Initialize() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Status s;
   if (!initialized_) {
     for (const auto& cf_desc : column_families_) {
@@ -195,6 +200,7 @@ Status VersionEditHandler::Initialize() {
 
 Status VersionEditHandler::ApplyVersionEdit(VersionEdit& edit,
                                             ColumnFamilyData** cfd) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Status s;
   if (edit.is_column_family_add_) {
     s = OnColumnFamilyAdd(edit, cfd);
@@ -216,6 +222,7 @@ Status VersionEditHandler::ApplyVersionEdit(VersionEdit& edit,
 
 Status VersionEditHandler::OnColumnFamilyAdd(VersionEdit& edit,
                                              ColumnFamilyData** cfd) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   bool cf_in_not_found = false;
   bool cf_in_builders = false;
   CheckColumnFamilyId(edit, &cf_in_not_found, &cf_in_builders);
@@ -254,6 +261,7 @@ Status VersionEditHandler::OnColumnFamilyAdd(VersionEdit& edit,
 
 Status VersionEditHandler::OnColumnFamilyDrop(VersionEdit& edit,
                                               ColumnFamilyData** cfd) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   bool cf_in_not_found = false;
   bool cf_in_builders = false;
   CheckColumnFamilyId(edit, &cf_in_not_found, &cf_in_builders);
@@ -274,11 +282,13 @@ Status VersionEditHandler::OnColumnFamilyDrop(VersionEdit& edit,
 }
 
 Status VersionEditHandler::OnWalAddition(VersionEdit& edit) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(edit.IsWalAddition());
   return version_set_->wals_.AddWals(edit.GetWalAdditions());
 }
 
 Status VersionEditHandler::OnWalDeletion(VersionEdit& edit) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(edit.IsWalDeletion());
   return version_set_->wals_.DeleteWalsBefore(
       edit.GetWalDeletion().GetLogNumber());
@@ -286,6 +296,7 @@ Status VersionEditHandler::OnWalDeletion(VersionEdit& edit) {
 
 Status VersionEditHandler::OnNonCfOperation(VersionEdit& edit,
                                             ColumnFamilyData** cfd) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   bool cf_in_not_found = false;
   bool cf_in_builders = false;
   CheckColumnFamilyId(edit, &cf_in_not_found, &cf_in_builders);
@@ -359,6 +370,7 @@ void VersionEditHandler::CheckColumnFamilyId(const VersionEdit& edit,
 
 void VersionEditHandler::CheckIterationResult(const log::Reader& reader,
                                               Status* s) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(s != nullptr);
   if (!s->ok()) {
     // Do nothing here.
@@ -477,6 +489,7 @@ void VersionEditHandler::CheckIterationResult(const log::Reader& reader,
 
 ColumnFamilyData* VersionEditHandler::CreateCfAndInit(
     const ColumnFamilyOptions& cf_options, const VersionEdit& edit) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ColumnFamilyData* cfd = version_set_->CreateColumnFamily(cf_options, &edit);
   assert(cfd != nullptr);
   cfd->set_initialized();
@@ -494,6 +507,7 @@ ColumnFamilyData* VersionEditHandler::CreateCfAndInit(
 
 ColumnFamilyData* VersionEditHandler::DestroyCfAndCleanup(
     const VersionEdit& edit) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto builder_iter = builders_.find(edit.column_family_);
   assert(builder_iter != builders_.end());
   builders_.erase(builder_iter);
@@ -520,6 +534,7 @@ ColumnFamilyData* VersionEditHandler::DestroyCfAndCleanup(
 Status VersionEditHandler::MaybeCreateVersion(const VersionEdit& /*edit*/,
                                               ColumnFamilyData* cfd,
                                               bool force_create_version) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(cfd->initialized());
   Status s;
   if (force_create_version) {
@@ -546,6 +561,7 @@ Status VersionEditHandler::MaybeCreateVersion(const VersionEdit& /*edit*/,
 Status VersionEditHandler::LoadTables(ColumnFamilyData* cfd,
                                       bool prefetch_index_and_filter_in_cache,
                                       bool is_initial_load) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   bool skip_load_table_files = skip_load_table_files_;
   TEST_SYNC_POINT_CALLBACK(
       "VersionEditHandler::LoadTables:skip_load_table_files",
@@ -577,6 +593,7 @@ Status VersionEditHandler::LoadTables(ColumnFamilyData* cfd,
 
 Status VersionEditHandler::ExtractInfoFromVersionEdit(ColumnFamilyData* cfd,
                                                       const VersionEdit& edit) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Status s;
   if (edit.has_db_id_) {
     version_set_->db_id_ = edit.GetDbId();
@@ -648,6 +665,7 @@ VersionEditHandlerPointInTime::VersionEditHandlerPointInTime(
                          /*no_error_if_files_missing=*/true, io_tracer) {}
 
 VersionEditHandlerPointInTime::~VersionEditHandlerPointInTime() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (const auto& elem : versions_) {
     delete elem.second;
   }
@@ -656,6 +674,7 @@ VersionEditHandlerPointInTime::~VersionEditHandlerPointInTime() {
 
 void VersionEditHandlerPointInTime::CheckIterationResult(
     const log::Reader& reader, Status* s) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   VersionEditHandler::CheckIterationResult(reader, s);
   assert(s != nullptr);
   if (s->ok()) {
@@ -682,6 +701,7 @@ void VersionEditHandlerPointInTime::CheckIterationResult(
 
 ColumnFamilyData* VersionEditHandlerPointInTime::DestroyCfAndCleanup(
     const VersionEdit& edit) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ColumnFamilyData* cfd = VersionEditHandler::DestroyCfAndCleanup(edit);
   auto v_iter = versions_.find(edit.column_family_);
   if (v_iter != versions_.end()) {
@@ -693,6 +713,7 @@ ColumnFamilyData* VersionEditHandlerPointInTime::DestroyCfAndCleanup(
 
 Status VersionEditHandlerPointInTime::MaybeCreateVersion(
     const VersionEdit& edit, ColumnFamilyData* cfd, bool force_create_version) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(cfd != nullptr);
   if (!force_create_version) {
     assert(edit.column_family_ == cfd->GetID());
@@ -825,12 +846,14 @@ Status VersionEditHandlerPointInTime::MaybeCreateVersion(
 
 Status VersionEditHandlerPointInTime::VerifyFile(const std::string& fpath,
                                                  const FileMetaData& fmeta) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return version_set_->VerifyFileMetadata(fpath, fmeta);
 }
 
 Status VersionEditHandlerPointInTime::VerifyBlobFile(
     ColumnFamilyData* cfd, uint64_t blob_file_num,
     const BlobFileAddition& blob_addition) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   BlobFileCache* blob_file_cache = cfd->blob_file_cache();
   assert(blob_file_cache);
   CacheHandleGuard<BlobFileReader> blob_file_reader;
@@ -845,6 +868,7 @@ Status VersionEditHandlerPointInTime::VerifyBlobFile(
 }
 
 Status ManifestTailer::Initialize() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (Mode::kRecovery == mode_) {
     return VersionEditHandler::Initialize();
   }
@@ -874,6 +898,7 @@ Status ManifestTailer::Initialize() {
 
 Status ManifestTailer::ApplyVersionEdit(VersionEdit& edit,
                                         ColumnFamilyData** cfd) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Status s = VersionEditHandler::ApplyVersionEdit(edit, cfd);
   if (s.ok()) {
     assert(cfd);
@@ -886,6 +911,7 @@ Status ManifestTailer::ApplyVersionEdit(VersionEdit& edit,
 
 Status ManifestTailer::OnColumnFamilyAdd(VersionEdit& edit,
                                          ColumnFamilyData** cfd) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (Mode::kRecovery == mode_) {
     return VersionEditHandler::OnColumnFamilyAdd(edit, cfd);
   }
@@ -920,6 +946,7 @@ Status ManifestTailer::OnColumnFamilyAdd(VersionEdit& edit,
 
 void ManifestTailer::CheckIterationResult(const log::Reader& reader,
                                           Status* s) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   VersionEditHandlerPointInTime::CheckIterationResult(reader, s);
   assert(s);
   if (s->ok()) {
@@ -933,6 +960,7 @@ void ManifestTailer::CheckIterationResult(const log::Reader& reader,
 
 Status ManifestTailer::VerifyFile(const std::string& fpath,
                                   const FileMetaData& fmeta) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Status s = VersionEditHandlerPointInTime::VerifyFile(fpath, fmeta);
   // TODO: Open file or create hard link to prevent the file from being
   // deleted.
@@ -941,6 +969,7 @@ Status ManifestTailer::VerifyFile(const std::string& fpath,
 
 void DumpManifestHandler::CheckIterationResult(const log::Reader& reader,
                                                Status* s) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   VersionEditHandler::CheckIterationResult(reader, s);
   if (!s->ok()) {
     fprintf(stdout, "%s\n", s->ToString().c_str());

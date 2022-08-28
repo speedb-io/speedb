@@ -56,6 +56,7 @@ class DBBlockCacheTest : public DBTestBase {
       : DBTestBase("db_block_cache_test", /*env_do_fsync=*/true) {}
 
   BlockBasedTableOptions GetTableOptions() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     BlockBasedTableOptions table_options;
     // Set a small enough block size so that each key-value get its own block.
     table_options.block_size = 1;
@@ -63,6 +64,7 @@ class DBBlockCacheTest : public DBTestBase {
   }
 
   Options GetOptions(const BlockBasedTableOptions& table_options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Options options = CurrentOptions();
     options.create_if_missing = true;
     options.avoid_flush_during_recovery = false;
@@ -73,6 +75,7 @@ class DBBlockCacheTest : public DBTestBase {
   }
 
   void InitTable(const Options& /*options*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::string value(kValueSize, 'a');
     for (size_t i = 0; i < kNumBlocks; i++) {
       ASSERT_OK(Put(ToString(i), value.c_str()));
@@ -80,6 +83,7 @@ class DBBlockCacheTest : public DBTestBase {
   }
 
   void RecordCacheCounters(const Options& options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     miss_count_ = TestGetTickerCount(options, BLOCK_CACHE_MISS);
     hit_count_ = TestGetTickerCount(options, BLOCK_CACHE_HIT);
     insert_count_ = TestGetTickerCount(options, BLOCK_CACHE_ADD);
@@ -95,6 +99,7 @@ class DBBlockCacheTest : public DBTestBase {
   }
 
   void RecordCacheCountersForCompressionDict(const Options& options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     compression_dict_miss_count_ =
         TestGetTickerCount(options, BLOCK_CACHE_COMPRESSION_DICT_MISS);
     compression_dict_hit_count_ =
@@ -106,6 +111,7 @@ class DBBlockCacheTest : public DBTestBase {
   void CheckCacheCounters(const Options& options, size_t expected_misses,
                           size_t expected_hits, size_t expected_inserts,
                           size_t expected_failures) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     size_t new_miss_count = TestGetTickerCount(options, BLOCK_CACHE_MISS);
     size_t new_hit_count = TestGetTickerCount(options, BLOCK_CACHE_HIT);
     size_t new_insert_count = TestGetTickerCount(options, BLOCK_CACHE_ADD);
@@ -125,6 +131,7 @@ class DBBlockCacheTest : public DBTestBase {
       const Options& options, size_t expected_compression_dict_misses,
       size_t expected_compression_dict_hits,
       size_t expected_compression_dict_inserts) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     size_t new_compression_dict_miss_count =
         TestGetTickerCount(options, BLOCK_CACHE_COMPRESSION_DICT_MISS);
     size_t new_compression_dict_hit_count =
@@ -148,6 +155,7 @@ class DBBlockCacheTest : public DBTestBase {
                                     size_t expected_hits,
                                     size_t expected_inserts,
                                     size_t expected_failures) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     size_t new_miss_count =
         TestGetTickerCount(options, BLOCK_CACHE_COMPRESSED_MISS);
     size_t new_hit_count =
@@ -168,6 +176,7 @@ class DBBlockCacheTest : public DBTestBase {
 
 #ifndef ROCKSDB_LITE
   const std::array<size_t, kNumCacheEntryRoles> GetCacheEntryRoleCountsBg() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // Verify in cache entry role stats
     ColumnFamilyHandleImpl* cfh =
         static_cast<ColumnFamilyHandleImpl*>(dbfull()->DefaultColumnFamily());
@@ -181,6 +190,7 @@ class DBBlockCacheTest : public DBTestBase {
 };
 
 TEST_F(DBBlockCacheTest, IteratorBlockCacheUsage) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ReadOptions read_options;
   read_options.fill_cache = false;
   auto table_options = GetTableOptions();
@@ -212,6 +222,7 @@ TEST_F(DBBlockCacheTest, IteratorBlockCacheUsage) {
 }
 
 TEST_F(DBBlockCacheTest, TestWithoutCompressedBlockCache) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ReadOptions read_options;
   auto table_options = GetTableOptions();
   auto options = GetOptions(table_options);
@@ -271,6 +282,7 @@ TEST_F(DBBlockCacheTest, TestWithoutCompressedBlockCache) {
 
 #ifdef SNAPPY
 TEST_F(DBBlockCacheTest, TestWithCompressedBlockCache) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.create_if_missing = true;
   options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
@@ -411,6 +423,7 @@ class ReadOnlyCacheWrapper : public CacheWrapper {
 }  // namespace
 
 TEST_F(DBBlockCacheTest, TestWithSameCompressed) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto table_options = GetTableOptions();
   auto options = GetOptions(table_options);
   InitTable(options);
@@ -490,6 +503,7 @@ TEST_F(DBBlockCacheTest, TestWithSameCompressed) {
 // Make sure that when options.block_cache is set, after a new table is
 // created its index/filter blocks are added to block cache.
 TEST_F(DBBlockCacheTest, IndexAndFilterBlocksOfNewTableAddedToCache) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.create_if_missing = true;
   options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
@@ -544,6 +558,7 @@ TEST_F(DBBlockCacheTest, IndexAndFilterBlocksOfNewTableAddedToCache) {
 // db, verify dummy entries inserted in `BlockBasedTable::NewDataBlockIterator`
 // does not cause heap-use-after-free errors in COMPILE_WITH_ASAN=1 runs
 TEST_F(DBBlockCacheTest, FillCacheAndIterateDB) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ReadOptions read_options;
   read_options.fill_cache = false;
   auto table_options = GetTableOptions();
@@ -576,6 +591,7 @@ TEST_F(DBBlockCacheTest, FillCacheAndIterateDB) {
 }
 
 TEST_F(DBBlockCacheTest, IndexAndFilterBlocksStats) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.create_if_missing = true;
   options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
@@ -672,6 +688,7 @@ INSTANTIATE_TEST_CASE_P(DBBlockCacheTest1, DBBlockCacheTest1,
                         ::testing::Values(1, 2, 3));
 
 TEST_P(DBBlockCacheTest1, WarmCacheWithBlocksDuringFlush) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.create_if_missing = true;
   options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
@@ -756,6 +773,7 @@ TEST_P(DBBlockCacheTest1, WarmCacheWithBlocksDuringFlush) {
 }
 
 TEST_F(DBBlockCacheTest, DynamicallyWarmCacheDuringFlush) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.create_if_missing = true;
   options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
@@ -818,6 +836,7 @@ class MockCache : public LRUCache {
   MockCache()
       : LRUCache((size_t)1 << 25 /*capacity*/, 0 /*num_shard_bits*/,
                  false /*strict_capacity_limit*/, 0.0 /*high_pri_pool_ratio*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   }
 
   using ShardedCache::Insert;
@@ -841,7 +860,9 @@ uint32_t MockCache::low_pri_insert_count = 0;
 }  // anonymous namespace
 
 TEST_F(DBBlockCacheTest, IndexAndFilterBlocksCachePriority) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (auto priority : {Cache::Priority::LOW, Cache::Priority::HIGH}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Options options = CurrentOptions();
     options.create_if_missing = true;
     options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
@@ -929,12 +950,14 @@ class LookupLiarCache : public CacheWrapper {
 }  // anonymous namespace
 
 TEST_F(DBBlockCacheTest, AddRedundantStats) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const size_t capacity = size_t{1} << 25;
   const int num_shard_bits = 0;  // 1 shard
   int iterations_tested = 0;
   for (std::shared_ptr<Cache> base_cache :
        {NewLRUCache(capacity, num_shard_bits),
         NewClockCache(capacity, num_shard_bits)}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (!base_cache) {
       // Skip clock cache when not supported
       continue;
@@ -1032,6 +1055,7 @@ TEST_F(DBBlockCacheTest, AddRedundantStats) {
 }
 
 TEST_F(DBBlockCacheTest, ParanoidFileChecks) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.create_if_missing = true;
   options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
@@ -1076,6 +1100,7 @@ TEST_F(DBBlockCacheTest, ParanoidFileChecks) {
 }
 
 TEST_F(DBBlockCacheTest, CompressedCache) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!Snappy_Supported()) {
     return;
   }
@@ -1194,6 +1219,7 @@ TEST_F(DBBlockCacheTest, CompressedCache) {
 }
 
 TEST_F(DBBlockCacheTest, CacheCompressionDict) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kNumFiles = 4;
   const int kNumEntriesPerFile = 128;
   const int kNumBytesPerEntry = 1024;
@@ -1266,6 +1292,7 @@ TEST_F(DBBlockCacheTest, CacheCompressionDict) {
 }
 
 static void ClearCache(Cache* cache) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto roles = CopyCacheDeleterRoleMap();
   std::deque<std::string> keys;
   Cache::ApplyToAllEntriesOptions opts;
@@ -1284,11 +1311,14 @@ static void ClearCache(Cache* cache) {
 }
 
 TEST_F(DBBlockCacheTest, CacheEntryRoleStats) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const size_t capacity = size_t{1} << 25;
   int iterations_tested = 0;
   for (bool partition : {false, true}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     for (std::shared_ptr<Cache> cache :
          {NewLRUCache(capacity), NewClockCache(capacity)}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
       if (!cache) {
         // Skip clock cache when not supported
         continue;
@@ -1372,6 +1402,7 @@ TEST_F(DBBlockCacheTest, CacheEntryRoleStats) {
       SyncPoint::GetInstance()->SetCallBack(
           "CacheEntryStatsCollector::GetStats:AfterApplyToAllEntries",
           [this](void*) {
+PERF_MARKER(__PRETTY_FUNCTION__);
             // To spend no more than 0.2% of time scanning, we would need
             // interval of at least 10000s
             env_->MockSleepForSeconds(20);
@@ -1466,6 +1497,7 @@ TEST_F(DBBlockCacheTest, CacheEntryRoleStats) {
       SyncPoint::GetInstance()->SetCallBack(
           "CacheEntryStatsCollector::GetStats:AfterApplyToAllEntries",
           [this, &scan_count](void*) {
+PERF_MARKER(__PRETTY_FUNCTION__);
             dbfull()->TEST_LockMutex();
             dbfull()->TEST_UnlockMutex();
             ++scan_count;
@@ -1527,6 +1559,7 @@ class StableCacheKeyTestFS : public FaultInjectionTestFS {
  public:
   explicit StableCacheKeyTestFS(const std::shared_ptr<FileSystem>& base)
       : FaultInjectionTestFS(base) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     SetFailGetUniqueId(true);
   }
 
@@ -1539,6 +1572,7 @@ class StableCacheKeyTestFS : public FaultInjectionTestFS {
 };
 
 TEST_P(DBBlockCacheKeyTest, StableCacheKeys) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<StableCacheKeyTestFS> test_fs{
       new StableCacheKeyTestFS(env_->GetFileSystem())};
   std::unique_ptr<CompositeEnvWrapper> test_env{
@@ -1718,6 +1752,7 @@ TEST_P(DBBlockCacheKeyTest, StableCacheKeys) {
 class CacheKeyTest : public testing::Test {
  public:
   void SetupStableBase() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // Like SemiStructuredUniqueIdGen::GenerateNext
     tp_.db_session_id = EncodeSessionId(base_session_upper_,
                                         base_session_lower_ ^ session_counter_);
@@ -1732,6 +1767,7 @@ class CacheKeyTest : public testing::Test {
     ASSERT_TRUE(is_stable);
   }
   CacheKey WithOffset(uint64_t offset) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return BlockBasedTable::GetCacheKey(base_cache_key_,
                                         BlockHandle(offset, /*size*/ 5));
   }
@@ -1750,6 +1786,7 @@ class CacheKeyTest : public testing::Test {
 namespace {
 template <typename T>
 int CountBitsDifferent(const T& t1, const T& t2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   int diff = 0;
   const uint8_t* p1 = reinterpret_cast<const uint8_t*>(&t1);
   const uint8_t* p2 = reinterpret_cast<const uint8_t*>(&t2);
@@ -1763,6 +1800,7 @@ int CountBitsDifferent(const T& t1, const T& t2) {
 }  // namespace
 
 TEST_F(CacheKeyTest, DBImplSessionIdStructure) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // We have to generate our own session IDs for simulation purposes in other
   // tests. Here we verify that the DBImpl implementation seems to match
   // our construction here, by using lowest XORed-in bits for "session
@@ -1781,6 +1819,7 @@ TEST_F(CacheKeyTest, DBImplSessionIdStructure) {
 }
 
 TEST_F(CacheKeyTest, StandardEncodingLimit) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   base_session_upper_ = 1234;
   base_session_lower_ = 5678;
   session_counter_ = 42;
@@ -1808,6 +1847,7 @@ TEST_F(CacheKeyTest, StandardEncodingLimit) {
 }
 
 TEST_F(CacheKeyTest, Encodings) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Claim from cache_key.cc:
   // In fact, if our SST files are all < 4TB (see
   // BlockBasedTable::kMaxFileSizeStandardEncoding), then SST files generated
@@ -1973,6 +2013,7 @@ class DBBlockCachePinningTest
 };
 
 TEST_P(DBBlockCachePinningTest, TwoLevelDB) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Creates one file in L0 and one file in L1. Both files have enough data that
   // their index and filter blocks are partitioned. The L1 file will also have
   // a compression dictionary (those are trained only during compaction), which
@@ -2114,6 +2155,7 @@ INSTANTIATE_TEST_CASE_P(
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

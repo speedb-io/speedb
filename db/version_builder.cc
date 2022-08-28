@@ -109,11 +109,13 @@ class VersionBuilder::Rep {
     }
 
     void AddGarbage(uint64_t count, uint64_t bytes) {
+PERF_MARKER(__PRETTY_FUNCTION__);
       additional_garbage_count_ += count;
       additional_garbage_bytes_ += bytes;
     }
 
     void LinkSst(uint64_t sst_file_number) {
+PERF_MARKER(__PRETTY_FUNCTION__);
       assert(newly_linked_ssts_.find(sst_file_number) ==
              newly_linked_ssts_.end());
 
@@ -130,6 +132,7 @@ class VersionBuilder::Rep {
     }
 
     void UnlinkSst(uint64_t sst_file_number) {
+PERF_MARKER(__PRETTY_FUNCTION__);
       assert(newly_unlinked_ssts_.find(sst_file_number) ==
              newly_unlinked_ssts_.end());
 
@@ -192,6 +195,7 @@ class VersionBuilder::Rep {
     uint64_t GetGarbageBlobBytes() const { return garbage_blob_bytes_; }
 
     bool AddGarbage(uint64_t count, uint64_t bytes) {
+PERF_MARKER(__PRETTY_FUNCTION__);
       assert(shared_meta_);
 
       if (garbage_blob_count_ + count > shared_meta_->GetTotalBlobCount() ||
@@ -208,6 +212,7 @@ class VersionBuilder::Rep {
     }
 
     void LinkSst(uint64_t sst_file_number) {
+PERF_MARKER(__PRETTY_FUNCTION__);
       delta_.LinkSst(sst_file_number);
 
       assert(linked_ssts_.find(sst_file_number) == linked_ssts_.end());
@@ -215,6 +220,7 @@ class VersionBuilder::Rep {
     }
 
     void UnlinkSst(uint64_t sst_file_number) {
+PERF_MARKER(__PRETTY_FUNCTION__);
       delta_.UnlinkSst(sst_file_number);
 
       assert(linked_ssts_.find(sst_file_number) != linked_ssts_.end());
@@ -267,12 +273,14 @@ class VersionBuilder::Rep {
         num_levels_(base_vstorage->num_levels()),
         has_invalid_levels_(false),
         level_nonzero_cmp_(base_vstorage_->InternalComparator()) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(ioptions_);
 
     levels_ = new LevelState[num_levels_];
   }
 
   ~Rep() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     for (int level = 0; level < num_levels_; level++) {
       const auto& added = levels_[level].added_files;
       for (auto& pair : added) {
@@ -284,6 +292,7 @@ class VersionBuilder::Rep {
   }
 
   void UnrefFile(FileMetaData* f) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     f->refs--;
     if (f->refs <= 0) {
       if (f->table_reader_handle) {
@@ -305,6 +314,7 @@ class VersionBuilder::Rep {
   static void UpdateExpectedLinkedSsts(
       uint64_t table_file_number, uint64_t blob_file_number,
       ExpectedLinkedSsts* expected_linked_ssts) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(expected_linked_ssts);
 
     if (blob_file_number == kInvalidBlobFileNumber) {
@@ -550,6 +560,7 @@ class VersionBuilder::Rep {
 
   MutableBlobFileMetaData* GetOrCreateMutableBlobFileMetaData(
       uint64_t blob_file_number) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     auto mutable_it = mutable_blob_file_metas_.find(blob_file_number);
     if (mutable_it != mutable_blob_file_metas_.end()) {
       return &mutable_it->second;
@@ -569,6 +580,7 @@ class VersionBuilder::Rep {
   }
 
   Status ApplyBlobFileAddition(const BlobFileAddition& blob_file_addition) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     const uint64_t blob_file_number = blob_file_addition.GetBlobFileNumber();
 
     if (IsBlobFileInVersion(blob_file_number)) {
@@ -609,6 +621,7 @@ class VersionBuilder::Rep {
   }
 
   Status ApplyBlobFileGarbage(const BlobFileGarbage& blob_file_garbage) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     const uint64_t blob_file_number = blob_file_garbage.GetBlobFileNumber();
 
     MutableBlobFileMetaData* const mutable_meta =
@@ -664,6 +677,7 @@ class VersionBuilder::Rep {
   }
 
   Status ApplyFileDeletion(int level, uint64_t file_number) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(level != VersionStorageInfo::FileLocation::Invalid().GetLevel());
 
     const int current_level = GetCurrentLevelForTableFile(file_number);
@@ -727,6 +741,7 @@ class VersionBuilder::Rep {
   }
 
   Status ApplyFileAddition(int level, const FileMetaData& meta) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(level != VersionStorageInfo::FileLocation::Invalid().GetLevel());
 
     const uint64_t file_number = meta.fd.GetNumber();
@@ -784,6 +799,7 @@ class VersionBuilder::Rep {
 
   // Apply all of the edits in *edit to the current state.
   Status Apply(const VersionEdit* edit) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     {
       const Status s = CheckConsistency(base_vstorage_);
       if (!s.ok()) {
@@ -918,6 +934,7 @@ class VersionBuilder::Rep {
   template <typename Meta>
   static bool CheckLinkedSsts(const Meta& meta,
                               uint64_t* min_oldest_blob_file_num) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(min_oldest_blob_file_num);
 
     if (!meta.GetLinkedSsts().empty()) {
@@ -970,6 +987,7 @@ class VersionBuilder::Rep {
 
   static std::shared_ptr<BlobFileMetaData> CreateBlobFileMetaData(
       const MutableBlobFileMetaData& mutable_meta) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return BlobFileMetaData::Create(
         mutable_meta.GetSharedMeta(), mutable_meta.GetLinkedSsts(),
         mutable_meta.GetGarbageBlobCount(), mutable_meta.GetGarbageBlobBytes());
@@ -979,6 +997,7 @@ class VersionBuilder::Rep {
   // contain valid data (blobs).
   template <typename Meta>
   static void AddBlobFileIfNeeded(VersionStorageInfo* vstorage, Meta&& meta) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(vstorage);
     assert(meta);
 
@@ -1140,6 +1159,7 @@ class VersionBuilder::Rep {
       bool prefetch_index_and_filter_in_cache, bool is_initial_load,
       const std::shared_ptr<const SliceTransform>& prefix_extractor,
       size_t max_file_size_for_l0_meta_pin) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(table_cache_ != nullptr);
 
     size_t table_cache_capacity = table_cache_->get_cache()->GetCapacity();
@@ -1250,10 +1270,12 @@ VersionBuilder::VersionBuilder(const FileOptions& file_options,
 VersionBuilder::~VersionBuilder() = default;
 
 bool VersionBuilder::CheckConsistencyForNumLevels() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return rep_->CheckConsistencyForNumLevels();
 }
 
 Status VersionBuilder::Apply(const VersionEdit* edit) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return rep_->Apply(edit);
 }
 
@@ -1266,6 +1288,7 @@ Status VersionBuilder::LoadTableHandlers(
     bool prefetch_index_and_filter_in_cache, bool is_initial_load,
     const std::shared_ptr<const SliceTransform>& prefix_extractor,
     size_t max_file_size_for_l0_meta_pin) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return rep_->LoadTableHandlers(
       internal_stats, max_threads, prefetch_index_and_filter_in_cache,
       is_initial_load, prefix_extractor, max_file_size_for_l0_meta_pin);
@@ -1282,6 +1305,7 @@ BaseReferencedVersionBuilder::BaseReferencedVersionBuilder(
           cfd->table_cache(), cfd->current()->storage_info(),
           cfd->current()->version_set())),
       version_(cfd->current()) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   version_->Ref();
 }
 
@@ -1291,10 +1315,12 @@ BaseReferencedVersionBuilder::BaseReferencedVersionBuilder(
           cfd->current()->version_set()->file_options(), cfd->ioptions(),
           cfd->table_cache(), v->storage_info(), v->version_set())),
       version_(v) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(version_ != cfd->current());
 }
 
 BaseReferencedVersionBuilder::~BaseReferencedVersionBuilder() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   version_->Unref();
 }
 

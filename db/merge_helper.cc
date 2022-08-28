@@ -48,6 +48,7 @@ MergeHelper::MergeHelper(Env* env, const Comparator* user_comparator,
       filter_timer_(clock_),
       total_filter_time_(0U),
       stats_(stats) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(user_comparator_ != nullptr);
   if (user_merge_operator_) {
     allow_single_operand_ = user_merge_operator_->AllowSingleOperand();
@@ -61,6 +62,7 @@ Status MergeHelper::TimedFullMerge(const MergeOperator* merge_operator,
                                    Statistics* statistics, SystemClock* clock,
                                    Slice* result_operand,
                                    bool update_num_ops_stats) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(merge_operator != nullptr);
 
   if (operands.size() == 0) {
@@ -127,6 +129,7 @@ Status MergeHelper::MergeUntil(InternalIterator* iter,
                                const BlobFetcher* blob_fetcher,
                                PrefetchBufferCollection* prefetch_buffers,
                                CompactionIterationStats* c_iter_stats) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Get a copy of the internal key, before it's invalidated by iter->Next()
   // Also maintain the list of merge operands seen.
   assert(HasOperator());
@@ -414,11 +417,13 @@ Status MergeHelper::MergeUntil(InternalIterator* iter,
 
 MergeOutputIterator::MergeOutputIterator(const MergeHelper* merge_helper)
     : merge_helper_(merge_helper) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   it_keys_ = merge_helper_->keys().rend();
   it_values_ = merge_helper_->values().rend();
 }
 
 void MergeOutputIterator::SeekToFirst() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const auto& keys = merge_helper_->keys();
   const auto& values = merge_helper_->values();
   assert(keys.size() == values.size());
@@ -427,12 +432,14 @@ void MergeOutputIterator::SeekToFirst() {
 }
 
 void MergeOutputIterator::Next() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ++it_keys_;
   ++it_values_;
 }
 
 CompactionFilter::Decision MergeHelper::FilterMerge(const Slice& user_key,
                                                     const Slice& value_slice) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (compaction_filter_ == nullptr) {
     return CompactionFilter::Decision::kKeep;
   }

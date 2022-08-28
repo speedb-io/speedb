@@ -18,6 +18,7 @@
 namespace ROCKSDB_NAMESPACE {
 
 static std::string CompressibleString(Random* rnd, int len) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string r;
   test::CompressibleString(rnd, 0.8, len, &r);
   return r;
@@ -53,6 +54,7 @@ namespace {
 void VerifyCompactionResult(
     const ColumnFamilyMetaData& cf_meta,
     const std::set<std::string>& overlapping_file_numbers) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifndef NDEBUG
   for (auto& level : cf_meta.levels) {
     for (auto& file : level.files) {
@@ -98,6 +100,7 @@ class KeepFilterFactory : public CompactionFilterFactory {
 // Make sure we don't trigger a problem if the trigger condtion is given
 // to be 0, which is invalid.
 TEST_P(DBTestUniversalCompaction, UniversalCompactionSingleSortedRun) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
 
   options.compaction_style = kCompactionStyleUniversal;
@@ -136,6 +139,7 @@ TEST_P(DBTestUniversalCompaction, UniversalCompactionSingleSortedRun) {
 }
 
 TEST_P(DBTestUniversalCompaction, OptimizeFiltersForHits) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.compaction_style = kCompactionStyleUniversal;
   options.compaction_options_universal.size_ratio = 5;
@@ -205,6 +209,7 @@ TEST_P(DBTestUniversalCompaction, OptimizeFiltersForHits) {
 //  2. Made assumption on the memtable flush conditions, which may change from
 //     time to time.
 TEST_P(DBTestUniversalCompaction, UniversalCompactionTrigger) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.compaction_style = kCompactionStyleUniversal;
   options.compaction_options_universal.size_ratio = 5;
@@ -224,6 +229,7 @@ TEST_P(DBTestUniversalCompaction, UniversalCompactionTrigger) {
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBTestWritableFile.GetPreallocationStatus", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         ASSERT_TRUE(arg != nullptr);
         size_t preallocation_size = *(static_cast<size_t*>(arg));
         if (num_levels_ > 3) {
@@ -312,6 +318,7 @@ TEST_P(DBTestUniversalCompaction, UniversalCompactionTrigger) {
 }
 
 TEST_P(DBTestUniversalCompaction, UniversalCompactionSizeAmplification) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.compaction_style = kCompactionStyleUniversal;
   options.num_levels = num_levels_;
@@ -354,6 +361,7 @@ TEST_P(DBTestUniversalCompaction, UniversalCompactionSizeAmplification) {
 }
 
 TEST_P(DBTestUniversalCompaction, DynamicUniversalCompactionSizeAmplification) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.compaction_style = kCompactionStyleUniversal;
   options.num_levels = 1;
@@ -370,6 +378,7 @@ TEST_P(DBTestUniversalCompaction, DynamicUniversalCompactionSizeAmplification) {
   int total_size_amp_compactions = 0;
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "UniversalCompactionBuilder::PickCompaction:Return", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         if (arg) {
           total_picked_compactions++;
           Compaction* c = static_cast<Compaction*>(arg);
@@ -434,6 +443,7 @@ TEST_P(DBTestUniversalCompaction, DynamicUniversalCompactionSizeAmplification) {
 }
 
 TEST_P(DBTestUniversalCompaction, DynamicUniversalCompactionReadAmplification) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.compaction_style = kCompactionStyleUniversal;
   options.num_levels = 1;
@@ -451,6 +461,7 @@ TEST_P(DBTestUniversalCompaction, DynamicUniversalCompactionReadAmplification) {
   int total_size_ratio_compactions = 0;
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "UniversalCompactionBuilder::PickCompaction:Return", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         if (arg) {
           total_picked_compactions++;
           Compaction* c = static_cast<Compaction*>(arg);
@@ -531,6 +542,7 @@ TEST_P(DBTestUniversalCompaction, DynamicUniversalCompactionReadAmplification) {
 }
 
 TEST_P(DBTestUniversalCompaction, CompactFilesOnUniversalCompaction) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kTestKeySize = 16;
   const int kTestValueSize = 984;
   const int kEntrySize = kTestKeySize + kTestValueSize;
@@ -602,6 +614,7 @@ TEST_P(DBTestUniversalCompaction, CompactFilesOnUniversalCompaction) {
 }
 
 TEST_P(DBTestUniversalCompaction, UniversalCompactionTargetLevel) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.compaction_style = kCompactionStyleUniversal;
   options.write_buffer_size = 100 << 10;     // 100KB
@@ -646,6 +659,7 @@ class DBTestUniversalCompactionMultiLevels
 };
 
 TEST_P(DBTestUniversalCompactionMultiLevels, UniversalCompactionMultiLevels) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.compaction_style = kCompactionStyleUniversal;
   options.num_levels = num_levels_;
@@ -675,6 +689,7 @@ TEST_P(DBTestUniversalCompactionMultiLevels, UniversalCompactionMultiLevels) {
 
 // Tests universal compaction with trivial move enabled
 TEST_P(DBTestUniversalCompactionMultiLevels, UniversalCompactionTrivialMove) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   int32_t trivial_move = 0;
   int32_t non_trivial_move = 0;
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
@@ -682,6 +697,7 @@ TEST_P(DBTestUniversalCompactionMultiLevels, UniversalCompactionTrivialMove) {
       [&](void* /*arg*/) { trivial_move++; });
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::BackgroundCompaction:NonTrivial", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         non_trivial_move++;
         ASSERT_TRUE(arg != nullptr);
         int output_level = *(static_cast<int*>(arg));
@@ -734,6 +750,7 @@ class DBTestUniversalCompactionParallel :
 };
 
 TEST_P(DBTestUniversalCompactionParallel, UniversalCompactionParallel) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.compaction_style = kCompactionStyleUniversal;
   options.num_levels = num_levels_;
@@ -752,6 +769,7 @@ TEST_P(DBTestUniversalCompactionParallel, UniversalCompactionParallel) {
   std::atomic<bool> has_parallel(false);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "CompactionJob::Run():Start", [&](void* /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         if (num_compactions_running.fetch_add(1) > 0) {
           has_parallel.store(true);
           return;
@@ -795,6 +813,7 @@ TEST_P(DBTestUniversalCompactionParallel, UniversalCompactionParallel) {
 }
 
 TEST_P(DBTestUniversalCompactionParallel, PickByFileNumberBug) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.compaction_style = kCompactionStyleUniversal;
   options.num_levels = num_levels_;
@@ -819,6 +838,7 @@ TEST_P(DBTestUniversalCompactionParallel, PickByFileNumberBug) {
   int total_picked_compactions = 0;
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "UniversalCompactionBuilder::PickCompaction:Return", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         if (arg) {
           total_picked_compactions++;
         }
@@ -917,6 +937,7 @@ INSTANTIATE_TEST_CASE_P(Parallel, DBTestUniversalCompactionParallel,
 #endif  // !defined(ROCKSDB_VALGRIND_RUN) || defined(ROCKSDB_FULL_VALGRIND_RUN)
 
 TEST_P(DBTestUniversalCompaction, UniversalCompactionOptions) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.compaction_style = kCompactionStyleUniversal;
   options.write_buffer_size = 105 << 10;    // 105KB
@@ -949,6 +970,7 @@ TEST_P(DBTestUniversalCompaction, UniversalCompactionOptions) {
 }
 
 TEST_P(DBTestUniversalCompaction, UniversalCompactionStopStyleSimilarSize) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.compaction_style = kCompactionStyleUniversal;
   options.write_buffer_size = 105 << 10;    // 105KB
@@ -1033,6 +1055,7 @@ TEST_P(DBTestUniversalCompaction, UniversalCompactionStopStyleSimilarSize) {
 }
 
 TEST_P(DBTestUniversalCompaction, UniversalCompactionCompressRatio1) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!Snappy_Supported()) {
     return;
   }
@@ -1101,6 +1124,7 @@ TEST_P(DBTestUniversalCompaction, UniversalCompactionCompressRatio1) {
 }
 
 TEST_P(DBTestUniversalCompaction, UniversalCompactionCompressRatio2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!Snappy_Supported()) {
     return;
   }
@@ -1133,6 +1157,7 @@ TEST_P(DBTestUniversalCompaction, UniversalCompactionCompressRatio2) {
 #if !defined(ROCKSDB_VALGRIND_RUN) || defined(ROCKSDB_FULL_VALGRIND_RUN)
 // Test that checks trivial move in universal compaction
 TEST_P(DBTestUniversalCompaction, UniversalCompactionTrivialMoveTest1) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   int32_t trivial_move = 0;
   int32_t non_trivial_move = 0;
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
@@ -1140,6 +1165,7 @@ TEST_P(DBTestUniversalCompaction, UniversalCompactionTrivialMoveTest1) {
       [&](void* /*arg*/) { trivial_move++; });
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::BackgroundCompaction:NonTrivial", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         non_trivial_move++;
         ASSERT_TRUE(arg != nullptr);
         int output_level = *(static_cast<int*>(arg));
@@ -1180,12 +1206,14 @@ TEST_P(DBTestUniversalCompaction, UniversalCompactionTrivialMoveTest1) {
 }
 // Test that checks trivial move in universal compaction
 TEST_P(DBTestUniversalCompaction, UniversalCompactionTrivialMoveTest2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   int32_t trivial_move = 0;
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::BackgroundCompaction:TrivialMove",
       [&](void* /*arg*/) { trivial_move++; });
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::BackgroundCompaction:NonTrivial", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         ASSERT_TRUE(arg != nullptr);
         int output_level = *(static_cast<int*>(arg));
         ASSERT_EQ(output_level, 0);
@@ -1226,6 +1254,7 @@ TEST_P(DBTestUniversalCompaction, UniversalCompactionTrivialMoveTest2) {
 #endif  // !defined(ROCKSDB_VALGRIND_RUN) || defined(ROCKSDB_FULL_VALGRIND_RUN)
 
 TEST_P(DBTestUniversalCompaction, UniversalCompactionFourPaths) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.db_paths.emplace_back(dbname_, 300 * 1024);
   options.db_paths.emplace_back(dbname_ + "_2", 300 * 1024);
@@ -1330,6 +1359,7 @@ TEST_P(DBTestUniversalCompaction, UniversalCompactionFourPaths) {
 }
 
 TEST_P(DBTestUniversalCompaction, UniversalCompactionCFPathUse) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.db_paths.emplace_back(dbname_, 300 * 1024);
   options.db_paths.emplace_back(dbname_ + "_2", 300 * 1024);
@@ -1470,7 +1500,9 @@ TEST_P(DBTestUniversalCompaction, UniversalCompactionCFPathUse) {
 }
 
 TEST_P(DBTestUniversalCompaction, IncreaseUniversalCompactionNumLevels) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::function<void(int)> verify_func = [&](int num_keys_in_db) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::string keys_in_db;
     Iterator* iter = dbfull()->NewIterator(ReadOptions(), handles_[1]);
     for (iter->SeekToFirst(); iter->Valid(); iter->Next()) {
@@ -1569,6 +1601,7 @@ TEST_P(DBTestUniversalCompaction, IncreaseUniversalCompactionNumLevels) {
 
 
 TEST_P(DBTestUniversalCompaction, UniversalCompactionSecondPathRatio) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!Snappy_Supported()) {
     return;
   }
@@ -1671,6 +1704,7 @@ TEST_P(DBTestUniversalCompaction, UniversalCompactionSecondPathRatio) {
 }
 
 TEST_P(DBTestUniversalCompaction, ConcurrentBottomPriLowPriCompactions) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (num_levels_ == 1) {
     // for single-level universal, everything's bottom level so nothing should
     // be executed in bottom-pri thread pool.
@@ -1731,6 +1765,7 @@ TEST_P(DBTestUniversalCompaction, ConcurrentBottomPriLowPriCompactions) {
 }
 
 TEST_P(DBTestUniversalCompaction, RecalculateScoreAfterPicking) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Regression test for extra compactions scheduled. Once enough compactions
   // have been scheduled to bring the score below one, we should stop
   // scheduling more; otherwise, other CFs/DBs may be delayed unnecessarily.
@@ -1766,6 +1801,7 @@ TEST_P(DBTestUniversalCompaction, RecalculateScoreAfterPicking) {
 }
 
 TEST_P(DBTestUniversalCompaction, FinalSortedRunCompactFilesConflict) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Regression test for conflict between:
   // (1) Running CompactFiles including file in the final sorted run; and
   // (2) Picking universal size-amp-triggered compaction, which always includes
@@ -1836,6 +1872,7 @@ class DBTestUniversalManualCompactionOutputPathId
 
 TEST_P(DBTestUniversalManualCompactionOutputPathId,
        ManualCompactionOutputPathId) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.create_if_missing = true;
   options.db_paths.emplace_back(dbname_, 1000000000);
@@ -1898,6 +1935,7 @@ INSTANTIATE_TEST_CASE_P(OutputPathId,
                                            ::testing::Bool()));
 
 TEST_F(DBTestUniversalCompaction2, BasicL0toL1) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kNumKeys = 3000;
   const int kWindowSize = 100;
   const int kNumDelsTrigger = 90;
@@ -1940,6 +1978,7 @@ TEST_F(DBTestUniversalCompaction2, BasicL0toL1) {
 
 #if defined(ENABLE_SINGLE_LEVEL_DTC)
 TEST_F(DBTestUniversalCompaction2, SingleLevel) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kNumKeys = 3000;
   const int kWindowSize = 100;
   const int kNumDelsTrigger = 90;
@@ -1980,6 +2019,7 @@ TEST_F(DBTestUniversalCompaction2, SingleLevel) {
 #endif  // ENABLE_SINGLE_LEVEL_DTC
 
 TEST_F(DBTestUniversalCompaction2, MultipleLevels) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kWindowSize = 100;
   const int kNumDelsTrigger = 90;
 
@@ -2052,6 +2092,7 @@ TEST_F(DBTestUniversalCompaction2, MultipleLevels) {
 }
 
 TEST_F(DBTestUniversalCompaction2, OverlappingL0) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kWindowSize = 100;
   const int kNumDelsTrigger = 90;
 
@@ -2092,6 +2133,7 @@ TEST_F(DBTestUniversalCompaction2, OverlappingL0) {
 }
 
 TEST_F(DBTestUniversalCompaction2, IngestBehind) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kNumKeys = 3000;
   const int kWindowSize = 100;
   const int kNumDelsTrigger = 90;
@@ -2135,6 +2177,7 @@ TEST_F(DBTestUniversalCompaction2, IngestBehind) {
 }
 
 TEST_F(DBTestUniversalCompaction2, PeriodicCompactionDefault) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.compaction_style = kCompactionStyleUniversal;
   options.env = env_;
@@ -2159,6 +2202,7 @@ TEST_F(DBTestUniversalCompaction2, PeriodicCompactionDefault) {
 }
 
 TEST_F(DBTestUniversalCompaction2, PeriodicCompaction) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options opts = CurrentOptions();
   opts.env = env_;
   opts.compaction_style = kCompactionStyleUniversal;
@@ -2180,6 +2224,7 @@ TEST_F(DBTestUniversalCompaction2, PeriodicCompaction) {
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "UniversalCompactionPicker::PickPeriodicCompaction:Return",
       [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         Compaction* compaction = reinterpret_cast<Compaction*>(arg);
         ASSERT_TRUE(arg != nullptr);
         ASSERT_TRUE(compaction->compaction_reason() ==
@@ -2231,6 +2276,7 @@ TEST_F(DBTestUniversalCompaction2, PeriodicCompaction) {
 #endif  // !defined(ROCKSDB_LITE)
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #if !defined(ROCKSDB_LITE)
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);

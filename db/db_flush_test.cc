@@ -50,6 +50,7 @@ class DBAtomicFlushTest : public DBFlushTest,
 // We had issue when two background threads trying to flush at the same time,
 // only one of them get committed. The test verifies the issue is fixed.
 TEST_F(DBFlushTest, FlushWhileWritingManifest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.disable_auto_compactions = true;
   options.max_background_flushes = 2;
@@ -81,6 +82,7 @@ TEST_F(DBFlushTest, FlushWhileWritingManifest) {
 // Disable this test temporarily on Travis as it fails intermittently.
 // Github issue: #4151
 TEST_F(DBFlushTest, SyncFail) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<FaultInjectionTestEnv> fault_injection_env(
       new FaultInjectionTestEnv(env_));
   Options options;
@@ -112,6 +114,7 @@ TEST_F(DBFlushTest, SyncFail) {
 }
 
 TEST_F(DBFlushTest, SyncSkip) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
 
   SyncPoint::GetInstance()->LoadDependency(
@@ -136,6 +139,7 @@ TEST_F(DBFlushTest, SyncSkip) {
 }
 
 TEST_F(DBFlushTest, FlushInLowPriThreadPool) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Verify setting an empty high-pri (flush) thread pool causes flushes to be
   // scheduled in the low-pri (compaction) thread pool.
   Options options = CurrentOptions();
@@ -148,6 +152,7 @@ TEST_F(DBFlushTest, FlushInLowPriThreadPool) {
   int num_flushes = 0, num_compactions = 0;
   SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::BGWorkFlush", [&](void* /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         if (tid == std::thread::id()) {
           tid = std::this_thread::get_id();
         } else {
@@ -157,6 +162,7 @@ TEST_F(DBFlushTest, FlushInLowPriThreadPool) {
       });
   SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::BGWorkCompaction", [&](void* /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         ASSERT_EQ(tid, std::this_thread::get_id());
         ++num_compactions;
       });
@@ -175,6 +181,7 @@ TEST_F(DBFlushTest, FlushInLowPriThreadPool) {
 // Test when flush job is submitted to low priority thread pool and when DB is
 // closed in the meanwhile, CloseHelper doesn't hang.
 TEST_F(DBFlushTest, CloseDBWhenFlushInLowPri) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.max_background_flushes = 1;
   options.max_total_wal_size = 8192;
@@ -193,6 +200,7 @@ TEST_F(DBFlushTest, CloseDBWhenFlushInLowPri) {
   int num_low_flush_unscheduled = 0;
   SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::UnscheduleLowFlushCallback", [&](void* /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         num_low_flush_unscheduled++;
         // There should be one flush job in low pool that needs to be
         // unscheduled
@@ -202,6 +210,7 @@ TEST_F(DBFlushTest, CloseDBWhenFlushInLowPri) {
   int num_high_flush_unscheduled = 0;
   SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::UnscheduleHighFlushCallback", [&](void* /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         num_high_flush_unscheduled++;
         // There should be no flush job in high pool
         ASSERT_EQ(num_high_flush_unscheduled, 0);
@@ -233,6 +242,7 @@ TEST_F(DBFlushTest, CloseDBWhenFlushInLowPri) {
 }
 
 TEST_F(DBFlushTest, ManualFlushWithMinWriteBufferNumberToMerge) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.write_buffer_size = 100;
   options.max_write_buffer_number = 4;
@@ -268,6 +278,7 @@ TEST_F(DBFlushTest, ManualFlushWithMinWriteBufferNumberToMerge) {
 }
 
 TEST_F(DBFlushTest, ScheduleOnlyOneBgThread) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   Reopen(options);
   SyncPoint::GetInstance()->DisableProcessing();
@@ -275,6 +286,7 @@ TEST_F(DBFlushTest, ScheduleOnlyOneBgThread) {
   int called = 0;
   SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::MaybeScheduleFlushOrCompaction:AfterSchedule:0", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         ASSERT_NE(nullptr, arg);
         auto unscheduled_flushes = *reinterpret_cast<int*>(arg);
         ASSERT_EQ(0, unscheduled_flushes);
@@ -314,6 +326,7 @@ TEST_F(DBFlushTest, ScheduleOnlyOneBgThread) {
 // corresponding memtable, since data in memtable is uncompressed.
 
 TEST_F(DBFlushTest, StatisticsGarbageBasic) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
 
   // The following options are used to enforce several values that
@@ -466,6 +479,7 @@ TEST_F(DBFlushTest, StatisticsGarbageBasic) {
 }
 
 TEST_F(DBFlushTest, StatisticsGarbageInsertAndDeletes) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.statistics = CreateDBStatistics();
   options.statistics->set_stats_level(StatsLevel::kAll);
@@ -557,6 +571,7 @@ TEST_F(DBFlushTest, StatisticsGarbageInsertAndDeletes) {
 }
 
 TEST_F(DBFlushTest, StatisticsGarbageRangeDeletes) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.statistics = CreateDBStatistics();
   options.statistics->set_stats_level(StatsLevel::kAll);
@@ -670,6 +685,7 @@ class TestFlushListener : public EventListener {
  public:
   TestFlushListener(Env* env, DBFlushTest* test)
       : slowdown_count(0), stop_count(0), db_closed(), env_(env), test_(test) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     db_closed = false;
   }
 
@@ -747,6 +763,7 @@ class TestFlushListener : public EventListener {
 #endif  // !ROCKSDB_LITE
 
 TEST_F(DBFlushTest, MemPurgeBasic) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
 
   // The following options are used to enforce several values that
@@ -915,6 +932,7 @@ TEST_F(DBFlushTest, MemPurgeBasic) {
 }
 
 TEST_F(DBFlushTest, MemPurgeDeleteAndDeleteRange) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
 
   options.statistics = CreateDBStatistics();
@@ -1105,6 +1123,7 @@ class ConditionalUpdateFilterFactory : public CompactionFilterFactory {
 };
 
 TEST_F(DBFlushTest, MemPurgeAndCompactionFilter) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
 
   std::string KEY1 = "ThisIsKey1";
@@ -1201,6 +1220,7 @@ TEST_F(DBFlushTest, MemPurgeAndCompactionFilter) {
 }
 
 TEST_F(DBFlushTest, DISABLED_MemPurgeWALSupport) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
 
   options.statistics = CreateDBStatistics();
@@ -1375,6 +1395,7 @@ TEST_F(DBFlushTest, DISABLED_MemPurgeWALSupport) {
 }
 
 TEST_F(DBFlushTest, MemPurgeCorrectLogNumberAndSSTFileCreation) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Before our bug fix, we noticed that when 2 memtables were
   // being flushed (with one memtable being the output of a
   // previous MemPurge and one memtable being a newly-sealed memtable),
@@ -1424,6 +1445,7 @@ TEST_F(DBFlushTest, MemPurgeCorrectLogNumberAndSSTFileCreation) {
   std::atomic<uint64_t> num_memtable_at_first_flush(0);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "FlushJob::WriteLevel0Table:num_memtables", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         uint64_t* mems_size = reinterpret_cast<uint64_t*>(arg);
         // atomic_compare_exchange_strong sometimes updates the value
         // of ZERO (the "expected" object), so we make sure ZERO is indeed...
@@ -1509,6 +1531,7 @@ TEST_F(DBFlushTest, MemPurgeCorrectLogNumberAndSSTFileCreation) {
 }
 
 TEST_P(DBFlushDirectIOTest, DirectIO) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.create_if_missing = true;
   options.disable_auto_compactions = true;
@@ -1533,6 +1556,7 @@ TEST_P(DBFlushDirectIOTest, DirectIO) {
 }
 
 TEST_F(DBFlushTest, FlushError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   std::unique_ptr<FaultInjectionTestEnv> fault_injection_env(
       new FaultInjectionTestEnv(env_));
@@ -1553,6 +1577,7 @@ TEST_F(DBFlushTest, FlushError) {
 }
 
 TEST_F(DBFlushTest, ManualFlushFailsInReadOnlyMode) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Regression test for bug where manual flush hangs forever when the DB
   // is in read-only mode. Verify it now at least returns, despite failing.
   Options options;
@@ -1594,6 +1619,7 @@ TEST_F(DBFlushTest, ManualFlushFailsInReadOnlyMode) {
 }
 
 TEST_F(DBFlushTest, CFDropRaceWithWaitForFlushMemTables) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.create_if_missing = true;
   CreateAndReopenWithCF({"pikachu"}, options);
@@ -1628,6 +1654,7 @@ TEST_F(DBFlushTest, CFDropRaceWithWaitForFlushMemTables) {
 
 #ifndef ROCKSDB_LITE
 TEST_F(DBFlushTest, FireOnFlushCompletedAfterCommittedResult) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   class TestListener : public EventListener {
    public:
     void OnFlushCompleted(DB* db, const FlushJobInfo& info) override {
@@ -1649,6 +1676,7 @@ TEST_F(DBFlushTest, FireOnFlushCompletedAfterCommittedResult) {
     }
 
     void CheckFlushResultCommitted(DB* db, SequenceNumber seq) {
+PERF_MARKER(__PRETTY_FUNCTION__);
       DBImpl* db_impl = static_cast_with_check<DBImpl>(db);
       InstrumentedMutex* mutex = db_impl->mutex();
       mutex->Lock();
@@ -1673,6 +1701,7 @@ TEST_F(DBFlushTest, FireOnFlushCompletedAfterCommittedResult) {
         "DBFlushTest::FireOnFlushCompletedAfterCommittedResult:WaitSecond"}});
   SyncPoint::GetInstance()->SetCallBack(
       "FlushJob::WriteLevel0Table", [&listener](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         // Wait for the second flush finished, out of mutex.
         auto* mems = reinterpret_cast<autovector<MemTable*>*>(arg);
         if (mems->front()->GetEarliestSequenceNumber() == listener->seq1 - 1) {
@@ -1720,6 +1749,7 @@ TEST_F(DBFlushTest, FireOnFlushCompletedAfterCommittedResult) {
 #endif  // !ROCKSDB_LITE
 
 TEST_F(DBFlushTest, FlushWithBlob) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr uint64_t min_blob_size = 10;
 
   Options options;
@@ -1799,6 +1829,7 @@ TEST_F(DBFlushTest, FlushWithBlob) {
 }
 
 TEST_F(DBFlushTest, FlushWithChecksumHandoff1) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (mem_env_ || encrypted_env_) {
     ROCKSDB_GTEST_SKIP("Test requires non-mem or non-encrypted environment");
     return;
@@ -1849,6 +1880,7 @@ TEST_F(DBFlushTest, FlushWithChecksumHandoff1) {
   // unrecoverable error.
   fault_fs->SetChecksumHandoffFuncType(ChecksumType::kCRC32c);
   SyncPoint::GetInstance()->SetCallBack("FlushJob::Start", [&](void*) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     fault_fs->IngestDataCorruptionBeforeWrite();
   });
   ASSERT_OK(Put("key7", "value7"));
@@ -1863,6 +1895,7 @@ TEST_F(DBFlushTest, FlushWithChecksumHandoff1) {
 }
 
 TEST_F(DBFlushTest, FlushWithChecksumHandoff2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (mem_env_ || encrypted_env_) {
     ROCKSDB_GTEST_SKIP("Test requires non-mem or non-encrypted environment");
     return;
@@ -1905,6 +1938,7 @@ TEST_F(DBFlushTest, FlushWithChecksumHandoff2) {
   // options is not set, the checksum handoff will not be triggered
   fault_fs->SetChecksumHandoffFuncType(ChecksumType::kCRC32c);
   SyncPoint::GetInstance()->SetCallBack("FlushJob::Start", [&](void*) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     fault_fs->IngestDataCorruptionBeforeWrite();
   });
   ASSERT_OK(Put("key7", "value7"));
@@ -1917,6 +1951,7 @@ TEST_F(DBFlushTest, FlushWithChecksumHandoff2) {
 }
 
 TEST_F(DBFlushTest, FlushWithChecksumHandoffManifest1) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (mem_env_ || encrypted_env_) {
     ROCKSDB_GTEST_SKIP("Test requires non-mem or non-encrypted environment");
     return;
@@ -1957,6 +1992,7 @@ TEST_F(DBFlushTest, FlushWithChecksumHandoffManifest1) {
 }
 
 TEST_F(DBFlushTest, FlushWithChecksumHandoffManifest2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (mem_env_ || encrypted_env_) {
     ROCKSDB_GTEST_SKIP("Test requires non-mem or non-encrypted environment");
     return;
@@ -1997,6 +2033,7 @@ TEST_F(DBFlushTest, FlushWithChecksumHandoffManifest2) {
 }
 
 TEST_F(DBFlushTest, PickRightMemtables) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   DestroyAndReopen(options);
   options.create_if_missing = true;
@@ -2017,6 +2054,7 @@ TEST_F(DBFlushTest, PickRightMemtables) {
   SyncPoint::GetInstance()->ClearAllCallBacks();
   SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::SyncClosedLogs:BeforeReLock", [&](void* /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         ASSERT_OK(db_->Put(WriteOptions(), handles_[1], "what", "v"));
         auto* cfhi =
             static_cast_with_check<ColumnFamilyHandleImpl>(handles_[1]);
@@ -2025,6 +2063,7 @@ TEST_F(DBFlushTest, PickRightMemtables) {
       });
   SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::FlushMemTableToOutputFile:AfterPickMemtables", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         auto* job = reinterpret_cast<FlushJob*>(arg);
         assert(job);
         const auto& mems = job->GetMemTables();
@@ -2054,6 +2093,7 @@ INSTANTIATE_TEST_CASE_P(DBFlushTestBlobError, DBFlushTestBlobError,
                             "BlobFileBuilder::WriteBlobToFile:AppendFooter"}));
 
 TEST_P(DBFlushTestBlobError, FlushError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.enable_blob_files = true;
   options.disable_auto_compactions = true;
@@ -2138,6 +2178,7 @@ TEST_P(DBFlushTestBlobError, FlushError) {
 
 #ifndef ROCKSDB_LITE
 TEST_F(DBFlushTest, TombstoneVisibleInSnapshot) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   class SimpleTestFlushListener : public EventListener {
    public:
     explicit SimpleTestFlushListener(DBFlushTest* _test) : test_(_test) {}
@@ -2193,6 +2234,7 @@ TEST_F(DBFlushTest, TombstoneVisibleInSnapshot) {
 }
 
 TEST_P(DBAtomicFlushTest, ManualFlushUnder2PC) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.create_if_missing = true;
   options.allow_2pc = true;
@@ -2282,6 +2324,7 @@ TEST_P(DBAtomicFlushTest, ManualFlushUnder2PC) {
 #endif  // ROCKSDB_LITE
 
 TEST_P(DBAtomicFlushTest, ManualAtomicFlush) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.create_if_missing = true;
   options.atomic_flush = GetParam();
@@ -2317,6 +2360,7 @@ TEST_P(DBAtomicFlushTest, ManualAtomicFlush) {
 }
 
 TEST_P(DBAtomicFlushTest, PrecomputeMinLogNumberToKeepNon2PC) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.create_if_missing = true;
   options.atomic_flush = GetParam();
@@ -2374,6 +2418,7 @@ TEST_P(DBAtomicFlushTest, PrecomputeMinLogNumberToKeepNon2PC) {
 }
 
 TEST_P(DBAtomicFlushTest, AtomicFlushTriggeredByMemTableFull) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.create_if_missing = true;
   options.atomic_flush = GetParam();
@@ -2419,6 +2464,7 @@ TEST_P(DBAtomicFlushTest, AtomicFlushTriggeredByMemTableFull) {
 }
 
 TEST_P(DBAtomicFlushTest, AtomicFlushRollbackSomeJobs) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   bool atomic_flush = GetParam();
   if (!atomic_flush) {
     return;
@@ -2466,6 +2512,7 @@ TEST_P(DBAtomicFlushTest, AtomicFlushRollbackSomeJobs) {
 }
 
 TEST_P(DBAtomicFlushTest, FlushMultipleCFs_DropSomeBeforeRequestFlush) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   bool atomic_flush = GetParam();
   if (!atomic_flush) {
     return;
@@ -2495,6 +2542,7 @@ TEST_P(DBAtomicFlushTest, FlushMultipleCFs_DropSomeBeforeRequestFlush) {
 
 TEST_P(DBAtomicFlushTest,
        FlushMultipleCFs_DropSomeAfterScheduleFlushBeforeFlushJobRun) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   bool atomic_flush = GetParam();
   if (!atomic_flush) {
     return;
@@ -2547,6 +2595,7 @@ TEST_P(DBAtomicFlushTest,
 }
 
 TEST_P(DBAtomicFlushTest, TriggerFlushAndClose) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   bool atomic_flush = GetParam();
   if (!atomic_flush) {
     return;
@@ -2573,6 +2622,7 @@ TEST_P(DBAtomicFlushTest, TriggerFlushAndClose) {
 }
 
 TEST_P(DBAtomicFlushTest, PickMemtablesRaceWithBackgroundFlush) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   bool atomic_flush = GetParam();
   Options options = CurrentOptions();
   options.create_if_missing = true;
@@ -2604,6 +2654,7 @@ TEST_P(DBAtomicFlushTest, PickMemtablesRaceWithBackgroundFlush) {
 }
 
 TEST_P(DBAtomicFlushTest, CFDropRaceWithWaitForFlushMemTables) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   bool atomic_flush = GetParam();
   if (!atomic_flush) {
     return;
@@ -2647,6 +2698,7 @@ TEST_P(DBAtomicFlushTest, CFDropRaceWithWaitForFlushMemTables) {
 }
 
 TEST_P(DBAtomicFlushTest, RollbackAfterFailToInstallResults) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   bool atomic_flush = GetParam();
   if (!atomic_flush) {
     return;
@@ -2695,6 +2747,7 @@ TEST_P(DBAtomicFlushTest, RollbackAfterFailToInstallResults) {
 //  |                                     detect IO error and stop waiting
 //  V
 TEST_P(DBAtomicFlushTest, BgThreadNoWaitAfterManifestError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   bool atomic_flush = GetParam();
   if (!atomic_flush) {
     return;
@@ -2728,6 +2781,7 @@ TEST_P(DBAtomicFlushTest, BgThreadNoWaitAfterManifestError) {
   std::thread::id bg_flush_thr1, bg_flush_thr2;
   SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::BackgroundCallFlush:start", [&](void*) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         if (bg_flush_thr1 == std::thread::id()) {
           bg_flush_thr1 = std::this_thread::get_id();
         } else if (bg_flush_thr2 == std::thread::id()) {
@@ -2738,6 +2792,7 @@ TEST_P(DBAtomicFlushTest, BgThreadNoWaitAfterManifestError) {
   int called = 0;
   SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::AtomicFlushMemTablesToOutputFiles:WaitToCommit", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         if (std::this_thread::get_id() == bg_flush_thr2) {
           const auto* ptr = reinterpret_cast<std::pair<Status, bool>*>(arg);
           assert(ptr);
@@ -2758,6 +2813,7 @@ TEST_P(DBAtomicFlushTest, BgThreadNoWaitAfterManifestError) {
   SyncPoint::GetInstance()->SetCallBack(
       "VersionSet::ProcessManifestWrites:BeforeWriteLastVersionEdit:0",
       [&](void*) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         if (std::this_thread::get_id() == bg_flush_thr1) {
           TEST_SYNC_POINT("BgFlushThr1:BeforeWriteManifest");
         }
@@ -2765,6 +2821,7 @@ TEST_P(DBAtomicFlushTest, BgThreadNoWaitAfterManifestError) {
 
   SyncPoint::GetInstance()->SetCallBack(
       "VersionSet::LogAndApply:WriteManifest", [&](void*) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         if (std::this_thread::get_id() != bg_flush_thr1) {
           return;
         }
@@ -2778,6 +2835,7 @@ TEST_P(DBAtomicFlushTest, BgThreadNoWaitAfterManifestError) {
 
   SyncPoint::GetInstance()->SetCallBack(
       "VersionSet::ProcessManifestWrites:AfterSyncManifest", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         auto* ptr = reinterpret_cast<IOStatus*>(arg);
         assert(ptr);
         *ptr = IOStatus::IOError("Injected failure");
@@ -2799,6 +2857,7 @@ INSTANTIATE_TEST_CASE_P(DBAtomicFlushTest, DBAtomicFlushTest, testing::Bool());
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

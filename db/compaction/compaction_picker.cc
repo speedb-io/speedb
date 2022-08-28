@@ -29,6 +29,7 @@ namespace ROCKSDB_NAMESPACE {
 
 namespace {
 uint64_t TotalCompensatedFileSize(const std::vector<FileMetaData*>& files) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t sum = 0;
   for (size_t i = 0; i < files.size() && files[i]; i++) {
     sum += files[i]->compensated_file_size;
@@ -43,6 +44,7 @@ bool FindIntraL0Compaction(const std::vector<FileMetaData*>& level_files,
                            uint64_t max_compaction_bytes,
                            CompactionInputFiles* comp_inputs,
                            SequenceNumber earliest_mem_seqno) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Do not pick ingested file when there is at least one memtable not flushed
   // which of seqno is overlap with the sst.
   TEST_SYNC_POINT("FindIntraL0Compaction");
@@ -104,6 +106,7 @@ CompressionType GetCompressionType(const VersionStorageInfo* vstorage,
                                    const MutableCFOptions& mutable_cf_options,
                                    int level, int base_level,
                                    const bool enable_compression) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!enable_compression) {
     // disable compression
     return kNoCompression;
@@ -139,6 +142,7 @@ CompressionOptions GetCompressionOptions(const MutableCFOptions& cf_options,
                                          const VersionStorageInfo* vstorage,
                                          int level,
                                          const bool enable_compression) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!enable_compression) {
     return cf_options.compression_opts;
   }
@@ -159,6 +163,7 @@ CompactionPicker::~CompactionPicker() {}
 
 // Delete this compaction from the list of running compactions.
 void CompactionPicker::ReleaseCompactionFiles(Compaction* c, Status status) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   UnregisterCompaction(c);
   if (!status.ok()) {
     c->ResetNextCompactionIndex();
@@ -244,6 +249,7 @@ bool CompactionPicker::ExpandInputsToCleanCut(const std::string& /*cf_name*/,
                                               VersionStorageInfo* vstorage,
                                               CompactionInputFiles* inputs,
                                               InternalKey** next_smallest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // This isn't good compaction
   assert(!inputs->empty());
 
@@ -321,6 +327,7 @@ bool CompactionPicker::FilesRangeOverlapWithCompaction(
 // Returns true if any one of specified files are being compacted
 bool CompactionPicker::AreFilesInCompaction(
     const std::vector<FileMetaData*>& files) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (size_t i = 0; i < files.size(); i++) {
     if (files[i]->being_compacted) {
       return true;
@@ -334,6 +341,7 @@ Compaction* CompactionPicker::CompactFiles(
     const std::vector<CompactionInputFiles>& input_files, int output_level,
     VersionStorageInfo* vstorage, const MutableCFOptions& mutable_cf_options,
     const MutableDBOptions& mutable_db_options, uint32_t output_path_id) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(input_files.size());
   // This compaction output should not overlap with a running compaction as
   // `SanitizeCompactionInputFiles` should've checked earlier and db mutex
@@ -420,6 +428,7 @@ bool CompactionPicker::IsRangeInCompaction(VersionStorageInfo* vstorage,
                                            const InternalKey* smallest,
                                            const InternalKey* largest,
                                            int level, int* level_index) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::vector<FileMetaData*> inputs;
   assert(level < NumberLevels());
 
@@ -443,6 +452,7 @@ bool CompactionPicker::SetupOtherInputs(
     VersionStorageInfo* vstorage, CompactionInputFiles* inputs,
     CompactionInputFiles* output_level_inputs, int* parent_index,
     int base_index) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(!inputs->empty());
   assert(output_level_inputs->empty());
   const int input_level = inputs->level;
@@ -551,6 +561,7 @@ void CompactionPicker::GetGrandparents(
     VersionStorageInfo* vstorage, const CompactionInputFiles& inputs,
     const CompactionInputFiles& output_level_inputs,
     std::vector<FileMetaData*>* grandparents) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   InternalKey start, limit;
   GetRange(inputs, output_level_inputs, &start, &limit);
   // Compute the set of grandparent files that overlap this compaction
@@ -572,6 +583,7 @@ Compaction* CompactionPicker::CompactRange(
     const CompactRangeOptions& compact_range_options, const InternalKey* begin,
     const InternalKey* end, InternalKey** compaction_end, bool* manual_conflict,
     uint64_t max_file_num_to_ignore, const std::string& trim_ts) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // CompactionPickerFIFO has its own implementation of compact range
   assert(ioptions_.compaction_style != kCompactionStyleFIFO);
 
@@ -838,6 +850,7 @@ namespace {
 // Test whether two files have overlapping key-ranges.
 bool HaveOverlappingKeyRanges(const Comparator* c, const SstFileMetaData& a,
                               const SstFileMetaData& b) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (c->Compare(a.smallestkey, b.smallestkey) >= 0) {
     if (c->Compare(a.smallestkey, b.largestkey) <= 0) {
       // b.smallestkey <= a.smallestkey <= b.largestkey
@@ -1071,6 +1084,7 @@ Status CompactionPicker::SanitizeCompactionInputFiles(
 #endif  // !ROCKSDB_LITE
 
 void CompactionPicker::RegisterCompaction(Compaction* c) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (c == nullptr) {
     return;
   }
@@ -1087,6 +1101,7 @@ void CompactionPicker::RegisterCompaction(Compaction* c) {
 }
 
 void CompactionPicker::UnregisterCompaction(Compaction* c) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (c == nullptr) {
     return;
   }
@@ -1100,6 +1115,7 @@ void CompactionPicker::UnregisterCompaction(Compaction* c) {
 void CompactionPicker::PickFilesMarkedForCompaction(
     const std::string& cf_name, VersionStorageInfo* vstorage, int* start_level,
     int* output_level, CompactionInputFiles* start_level_inputs) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (vstorage->FilesMarkedForCompaction().empty()) {
     return;
   }
@@ -1146,6 +1162,7 @@ void CompactionPicker::PickFilesMarkedForCompaction(
 bool CompactionPicker::GetOverlappingL0Files(
     VersionStorageInfo* vstorage, CompactionInputFiles* start_level_inputs,
     int output_level, int* parent_index) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Two level 0 compaction won't run at the same time, so don't need to worry
   // about files on level 0 being compacted.
   assert(level0_compactions_in_progress()->empty());

@@ -26,6 +26,7 @@ class RepairTest : public DBTestBase {
   RepairTest() : DBTestBase("repair_test", /*env_do_fsync=*/true) {}
 
   Status GetFirstSstPath(std::string* first_sst_path) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(first_sst_path != nullptr);
     first_sst_path->clear();
     uint64_t manifest_size;
@@ -46,6 +47,7 @@ class RepairTest : public DBTestBase {
 };
 
 TEST_F(RepairTest, LostManifest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Add a couple SST files, delete the manifest, and verify RepairDB() saves
   // the day.
   ASSERT_OK(Put("key", "val"));
@@ -68,6 +70,7 @@ TEST_F(RepairTest, LostManifest) {
 }
 
 TEST_F(RepairTest, LostManifestMoreDbFeatures) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Add a couple SST files, delete the manifest, and verify RepairDB() saves
   // the day.
   ASSERT_OK(Put("key", "val"));
@@ -97,6 +100,7 @@ TEST_F(RepairTest, LostManifestMoreDbFeatures) {
 }
 
 TEST_F(RepairTest, CorruptManifest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Manifest is in an invalid format. Expect a full recovery.
   ASSERT_OK(Put("key", "val"));
   ASSERT_OK(Flush());
@@ -120,6 +124,7 @@ TEST_F(RepairTest, CorruptManifest) {
 }
 
 TEST_F(RepairTest, IncompleteManifest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // In this case, the manifest is valid but does not reference all of the SST
   // files. Expect a full recovery.
   ASSERT_OK(Put("key", "val"));
@@ -146,6 +151,7 @@ TEST_F(RepairTest, IncompleteManifest) {
 }
 
 TEST_F(RepairTest, PostRepairSstFileNumbering) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Verify after a DB is repaired, new files will be assigned higher numbers
   // than old files.
   ASSERT_OK(Put("key", "val"));
@@ -163,6 +169,7 @@ TEST_F(RepairTest, PostRepairSstFileNumbering) {
 }
 
 TEST_F(RepairTest, LostSst) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Delete one of the SST files but preserve the manifest that refers to it,
   // then verify the DB is still usable for the intact SST.
   ASSERT_OK(Put("key", "val"));
@@ -183,6 +190,7 @@ TEST_F(RepairTest, LostSst) {
 }
 
 TEST_F(RepairTest, CorruptSst) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Corrupt one of the SST files but preserve the manifest that refers to it,
   // then verify the DB is still usable for the intact SST.
   ASSERT_OK(Put("key", "val"));
@@ -205,6 +213,7 @@ TEST_F(RepairTest, CorruptSst) {
 }
 
 TEST_F(RepairTest, UnflushedSst) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // This test case invokes repair while some data is unflushed, then verifies
   // that data is in the db.
   ASSERT_OK(Put("key", "val"));
@@ -240,6 +249,7 @@ TEST_F(RepairTest, UnflushedSst) {
 }
 
 TEST_F(RepairTest, SeparateWalDir) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     Options options = CurrentOptions();
     DestroyAndReopen(options);
@@ -281,6 +291,7 @@ TEST_F(RepairTest, SeparateWalDir) {
 }
 
 TEST_F(RepairTest, RepairMultipleColumnFamilies) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Verify repair logic associates SST files with their original column
   // families.
   const int kNumCfs = 3;
@@ -319,6 +330,7 @@ TEST_F(RepairTest, RepairMultipleColumnFamilies) {
 }
 
 TEST_F(RepairTest, RepairColumnFamilyOptions) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Verify repair logic uses correct ColumnFamilyOptions when repairing a
   // database with different options for column families.
   const int kNumCfs = 2;
@@ -383,6 +395,7 @@ TEST_F(RepairTest, RepairColumnFamilyOptions) {
 }
 
 TEST_F(RepairTest, DbNameContainsTrailingSlash) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   {
     bool tmp;
     if (env_->AreFilesSame("", "", &tmp).IsNotSupported()) {
@@ -405,6 +418,7 @@ TEST_F(RepairTest, DbNameContainsTrailingSlash) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }
@@ -413,6 +427,7 @@ int main(int argc, char** argv) {
 #include <stdio.h>
 
 int main(int /*argc*/, char** /*argv*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   fprintf(stderr, "SKIPPED as RepairDB is not supported in ROCKSDB_LITE\n");
   return 0;
 }

@@ -26,6 +26,7 @@ class DBWALTestBase : public DBTestBase {
  public:
 #if defined(ROCKSDB_FALLOCATE_PRESENT)
   bool IsFallocateSupported() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // Test fallocate support of running file system.
     // Skip this test if fallocate is not supported.
     std::string fname_test_fallocate = dbname_ + "/preallocate_testfile";
@@ -49,6 +50,7 @@ class DBWALTestBase : public DBTestBase {
 #endif  // ROCKSDB_FALLOCATE_PRESENT
 
   uint64_t GetAllocatedFileSize(std::string file_name) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     struct stat sbuf;
     int err = stat(file_name.c_str(), &sbuf);
     assert(err == 0);
@@ -99,6 +101,7 @@ class EnrichedSpecialEnv : public SpecialEnv {
     return SpecialEnv::DeleteFile(fname);
   }
   bool IsWAL(const std::string& fname) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // printf("iswal %s\n", fname.c_str());
     return fname.compare(fname.size() - 3, 3, "log") == 0;
   }
@@ -120,6 +123,7 @@ class DBWALTestWithEnrichedEnv : public DBTestBase {
  public:
   DBWALTestWithEnrichedEnv()
       : DBTestBase("db_wal_test", /*env_do_fsync=*/true) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     enriched_env_ = new EnrichedSpecialEnv(env_->target());
     auto options = CurrentOptions();
     options.env = enriched_env_;
@@ -140,6 +144,7 @@ class DBWALTestWithEnrichedEnv : public DBTestBase {
 // create the gap by manipulating the env to skip deletion of the first WAL but
 // not the ones after it.
 TEST_F(DBWALTestWithEnrichedEnv, SkipDeletedWALs) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto options = last_options_;
   // To cause frequent WAL deletion
   options.write_buffer_size = 128;
@@ -166,6 +171,7 @@ TEST_F(DBWALTestWithEnrichedEnv, SkipDeletedWALs) {
 }
 
 TEST_F(DBWALTest, WAL) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     CreateAndReopenWithCF({"pikachu"}, CurrentOptions());
     WriteOptions writeOpt = WriteOptions();
@@ -200,6 +206,7 @@ TEST_F(DBWALTest, WAL) {
 }
 
 TEST_F(DBWALTest, RollLog) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     CreateAndReopenWithCF({"pikachu"}, CurrentOptions());
     ASSERT_OK(Put(1, "foo", "v1"));
@@ -217,6 +224,7 @@ TEST_F(DBWALTest, RollLog) {
 }
 
 TEST_F(DBWALTest, SyncWALNotBlockWrite) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.max_write_buffer_number = 4;
   DestroyAndReopen(options);
@@ -255,6 +263,7 @@ TEST_F(DBWALTest, SyncWALNotBlockWrite) {
 }
 
 TEST_F(DBWALTest, SyncWALNotWaitWrite) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(Put("foo1", "bar1"));
   ASSERT_OK(Put("foo3", "bar3"));
 
@@ -280,6 +289,7 @@ TEST_F(DBWALTest, SyncWALNotWaitWrite) {
 }
 
 TEST_F(DBWALTest, Recover) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     CreateAndReopenWithCF({"pikachu"}, CurrentOptions());
     ASSERT_OK(Put(1, "foo", "v1"));
@@ -302,6 +312,7 @@ TEST_F(DBWALTest, Recover) {
 }
 
 TEST_F(DBWALTest, RecoverWithTableHandle) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     Options options = CurrentOptions();
     options.create_if_missing = true;
@@ -363,6 +374,7 @@ TEST_F(DBWALTest, RecoverWithTableHandle) {
 }
 
 TEST_F(DBWALTest, RecoverWithBlob) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Write a value that's below the prospective size limit for blobs and another
   // one that's above. Note that blob files are not actually enabled at this
   // point.
@@ -464,6 +476,7 @@ TEST_F(DBWALTest, RecoverWithBlob) {
 }
 
 TEST_F(DBWALTest, RecoverWithBlobMultiSST) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Write several large (4 KB) values without flushing. Note that blob files
   // are not actually enabled at this point.
   std::string large_value(1 << 12, 'a');
@@ -530,6 +543,7 @@ TEST_F(DBWALTest, RecoverWithBlobMultiSST) {
 }
 
 TEST_F(DBWALTest, WALWithChecksumHandoff) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifndef ROCKSDB_ASSERT_STATUS_CHECKED
   if (mem_env_ || encrypted_env_) {
     ROCKSDB_GTEST_SKIP("Test requires non-mem or non-encrypted environment");
@@ -625,12 +639,14 @@ INSTANTIATE_TEST_CASE_P(DBRecoveryTestBlobError, DBRecoveryTestBlobError,
                             "BlobFileBuilder::WriteBlobToFile:AppendFooter"}));
 
 TEST_P(DBRecoveryTestBlobError, RecoverWithBlobError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Write a value. Note that blob files are not actually enabled at this point.
   ASSERT_OK(Put("key", "blob"));
 
   // Reopen with blob files enabled but make blob file writing fail during
   // recovery.
   SyncPoint::GetInstance()->SetCallBack(sync_point_, [this](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Status* const s = static_cast<Status*>(arg);
     assert(s);
 
@@ -666,6 +682,7 @@ TEST_P(DBRecoveryTestBlobError, RecoverWithBlobError) {
 }
 
 TEST_F(DBWALTest, IgnoreRecoveredLog) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string backup_logs = dbname_ + "/backup_logs";
 
   do {
@@ -745,6 +762,7 @@ TEST_F(DBWALTest, IgnoreRecoveredLog) {
 }
 
 TEST_F(DBWALTest, RecoveryWithEmptyLog) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     CreateAndReopenWithCF({"pikachu"}, CurrentOptions());
     ASSERT_OK(Put(1, "foo", "v1"));
@@ -759,6 +777,7 @@ TEST_F(DBWALTest, RecoveryWithEmptyLog) {
 
 #if !(defined NDEBUG) || !defined(OS_WIN)
 TEST_F(DBWALTest, PreallocateBlock) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.write_buffer_size = 10 * 1000 * 1000;
   options.max_total_wal_size = 0;
@@ -771,6 +790,7 @@ TEST_F(DBWALTest, PreallocateBlock) {
   std::atomic<int> called(0);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBTestWalFile.GetPreallocationStatus", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         ASSERT_TRUE(arg != nullptr);
         size_t preallocation_size = *(static_cast<size_t*>(arg));
         ASSERT_EQ(expected_preallocation_size, preallocation_size);
@@ -790,6 +810,7 @@ TEST_F(DBWALTest, PreallocateBlock) {
   called.store(0);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBTestWalFile.GetPreallocationStatus", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         ASSERT_TRUE(arg != nullptr);
         size_t preallocation_size = *(static_cast<size_t*>(arg));
         ASSERT_EQ(expected_preallocation_size, preallocation_size);
@@ -810,6 +831,7 @@ TEST_F(DBWALTest, PreallocateBlock) {
   called.store(0);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBTestWalFile.GetPreallocationStatus", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         ASSERT_TRUE(arg != nullptr);
         size_t preallocation_size = *(static_cast<size_t*>(arg));
         ASSERT_EQ(expected_preallocation_size, preallocation_size);
@@ -831,6 +853,7 @@ TEST_F(DBWALTest, PreallocateBlock) {
   called.store(0);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBTestWalFile.GetPreallocationStatus", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         ASSERT_TRUE(arg != nullptr);
         size_t preallocation_size = *(static_cast<size_t*>(arg));
         ASSERT_EQ(expected_preallocation_size, preallocation_size);
@@ -848,6 +871,7 @@ TEST_F(DBWALTest, PreallocateBlock) {
 
 #ifndef ROCKSDB_LITE
 TEST_F(DBWALTest, DISABLED_FullPurgePreservesRecycledLog) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // TODO(ajkr): Disabled until WAL recycling is fixed for
   // `kPointInTimeRecovery`.
 
@@ -887,6 +911,7 @@ TEST_F(DBWALTest, DISABLED_FullPurgePreservesRecycledLog) {
 }
 
 TEST_F(DBWALTest, DISABLED_FullPurgePreservesLogPendingReuse) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // TODO(ajkr): Disabled until WAL recycling is fixed for
   // `kPointInTimeRecovery`.
 
@@ -930,6 +955,7 @@ TEST_F(DBWALTest, DISABLED_FullPurgePreservesLogPendingReuse) {
 }
 
 TEST_F(DBWALTest, GetSortedWalFiles) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     CreateAndReopenWithCF({"pikachu"}, CurrentOptions());
     VectorLogPtr log_files;
@@ -943,6 +969,7 @@ TEST_F(DBWALTest, GetSortedWalFiles) {
 }
 
 TEST_F(DBWALTest, GetCurrentWalFile) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     CreateAndReopenWithCF({"pikachu"}, CurrentOptions());
 
@@ -993,6 +1020,7 @@ TEST_F(DBWALTest, GetCurrentWalFile) {
 }
 
 TEST_F(DBWALTest, RecoveryWithLogDataForSomeCFs) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Test for regression of WAL cleanup missing files that don't contain data
   // for every column family.
   do {
@@ -1018,6 +1046,7 @@ TEST_F(DBWALTest, RecoveryWithLogDataForSomeCFs) {
 }
 
 TEST_F(DBWALTest, RecoverWithLargeLog) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     {
       Options options = CurrentOptions();
@@ -1050,6 +1079,7 @@ TEST_F(DBWALTest, RecoverWithLargeLog) {
 // we try to create the smallest number of table files by merging
 // updates from multiple logs
 TEST_F(DBWALTest, RecoverCheckFileAmountWithSmallWriteBuffer) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.write_buffer_size = 5000000;
   CreateAndReopenWithCF({"pikachu", "dobrynia", "nikitich"}, options);
@@ -1106,6 +1136,7 @@ TEST_F(DBWALTest, RecoverCheckFileAmountWithSmallWriteBuffer) {
 // we try to create the smallest number of table files by merging
 // updates from multiple logs
 TEST_F(DBWALTest, RecoverCheckFileAmount) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.write_buffer_size = 100000;
   options.arena_block_size = 4 * 1024;
@@ -1172,6 +1203,7 @@ TEST_F(DBWALTest, RecoverCheckFileAmount) {
 }
 
 TEST_F(DBWALTest, SyncMultipleLogs) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const uint64_t kNumBatches = 2;
   const int kBatchSize = 1000;
 
@@ -1201,6 +1233,7 @@ TEST_F(DBWALTest, SyncMultipleLogs) {
 // ignoring actual sequence id of the records. This is incorrect if some writes
 // come with WAL disabled.
 TEST_F(DBWALTest, PartOfWritesWithWALDisabled) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<FaultInjectionTestEnv> fault_env(
       new FaultInjectionTestEnv(env_));
   Options options = CurrentOptions();
@@ -1247,6 +1280,7 @@ class RecoveryTestHelper {
   // Create WAL files with values filled in
   static void FillData(DBWALTestBase* test, const Options& options,
                        const size_t wal_count, size_t* count) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // Calling internal functions requires sanitized options.
     Options sanitized_options = SanitizeOptions(test->dbname_, options);
     const ImmutableDBOptions db_options(sanitized_options);
@@ -1306,6 +1340,7 @@ class RecoveryTestHelper {
 
   // Recreate and fill the store with some data
   static size_t FillData(DBWALTestBase* test, Options* options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     options->create_if_missing = true;
     test->DestroyAndReopen(*options);
     test->Close();
@@ -1317,6 +1352,7 @@ class RecoveryTestHelper {
 
   // Read back all the keys we wrote and return the number of keys found
   static size_t GetData(DBWALTestBase* test) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     size_t count = 0;
     for (size_t i = 0; i < kWALFilesCount * kKeysPerWALFile; i++) {
       if (test->Get("key" + ToString(i)) != "NOT_FOUND") {
@@ -1330,6 +1366,7 @@ class RecoveryTestHelper {
   static void CorruptWAL(DBWALTestBase* test, const Options& options,
                          const double off, const double len,
                          const int wal_file_id, const bool trunc = false) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Env* env = options.env;
     std::string fname = LogFileName(test->dbname_, wal_file_id);
     uint64_t size;
@@ -1399,6 +1436,7 @@ INSTANTIATE_TEST_CASE_P(
 // at the end of any of the logs
 // - We do not expect to open the data store for corruption
 TEST_P(DBWALTestWithParams, kTolerateCorruptedTailRecords) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   bool trunc = std::get<0>(GetParam());  // Corruption style
   // Corruption offset position
   int corrupt_offset = std::get<1>(GetParam());
@@ -1427,6 +1465,7 @@ TEST_P(DBWALTestWithParams, kTolerateCorruptedTailRecords) {
 // We don't expect the data store to be opened if there is any corruption
 // (leading, middle or trailing -- incomplete writes or corruption)
 TEST_P(DBWALTestWithParams, kAbsoluteConsistency) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Verify clean slate behavior
   Options options = CurrentOptions();
   const size_t row_count = RecoveryTestHelper::FillData(this, &options);
@@ -1461,6 +1500,7 @@ TEST_P(DBWALTestWithParams, kAbsoluteConsistency) {
 // We don't expect the data store to be opened if there is any inconsistency
 // between WAL and SST files
 TEST_F(DBWALTest, kPointInTimeRecoveryCFConsistency) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.avoid_flush_during_recovery = true;
 
@@ -1491,6 +1531,7 @@ TEST_F(DBWALTest, kPointInTimeRecoveryCFConsistency) {
 }
 
 TEST_F(DBWALTest, RaceInstallFlushResultsWithWalObsoletion) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.env = env_;
   options.track_and_verify_wals_in_manifest = true;
@@ -1529,6 +1570,7 @@ TEST_F(DBWALTest, RaceInstallFlushResultsWithWalObsoletion) {
   SyncPoint::GetInstance()->SetCallBack(
       "MemTableList::TryInstallMemtableFlushResults:AfterComputeMinWalToKeep",
       [&](void* /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         dbfull()->mutex()->AssertHeld();
         if (!called) {
           // We are the first bg flush thread in the MANIFEST write queue.
@@ -1581,6 +1623,7 @@ TEST_F(DBWALTest, RaceInstallFlushResultsWithWalObsoletion) {
 // - We expect to open data store under all circumstances
 // - We expect only data upto the point where the first error was encountered
 TEST_P(DBWALTestWithParams, kPointInTimeRecovery) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int maxkeys =
       RecoveryTestHelper::kWALFilesCount * RecoveryTestHelper::kKeysPerWALFile;
 
@@ -1638,6 +1681,7 @@ TEST_P(DBWALTestWithParams, kPointInTimeRecovery) {
 // - We expect to open the data store under all scenarios
 // - We expect to have recovered records past the corruption zone
 TEST_P(DBWALTestWithParams, kSkipAnyCorruptedRecords) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   bool trunc = std::get<0>(GetParam());  // Corruption style
   // Corruption offset position
   int corrupt_offset = std::get<1>(GetParam());
@@ -1669,6 +1713,7 @@ TEST_P(DBWALTestWithParams, kSkipAnyCorruptedRecords) {
 }
 
 TEST_F(DBWALTest, AvoidFlushDuringRecovery) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.disable_auto_compactions = true;
   options.avoid_flush_during_recovery = false;
@@ -1717,6 +1762,7 @@ TEST_F(DBWALTest, AvoidFlushDuringRecovery) {
 }
 
 TEST_F(DBWALTest, WalCleanupAfterAvoidFlushDuringRecovery) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Verifies WAL files that were present during recovery, but not flushed due
   // to avoid_flush_during_recovery, will be considered for deletion at a later
   // stage. We check at least one such file is deleted during Flush().
@@ -1743,6 +1789,7 @@ TEST_F(DBWALTest, WalCleanupAfterAvoidFlushDuringRecovery) {
 }
 
 TEST_F(DBWALTest, RecoverWithoutFlush) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.avoid_flush_during_recovery = true;
   options.create_if_missing = false;
@@ -1784,6 +1831,7 @@ TEST_F(DBWALTest, RecoverWithoutFlush) {
 }
 
 TEST_F(DBWALTest, RecoverWithoutFlushMultipleCF) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const std::string kSmallValue = "v";
   const std::string kLargeValue = DummyString(1024);
   Options options = CurrentOptions();
@@ -1847,6 +1895,7 @@ TEST_F(DBWALTest, RecoverWithoutFlushMultipleCF) {
 //   4. Open again. See if it can correctly handle previous corruption.
 TEST_P(DBWALTestWithParamsVaryingRecoveryMode,
        RecoverFromCorruptedWALWithoutFlush) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kAppendKeys = 100;
   Options options = CurrentOptions();
   options.avoid_flush_during_recovery = true;
@@ -1907,6 +1956,7 @@ TEST_P(DBWALTestWithParamsVaryingRecoveryMode,
 // avoid_flush_during_recovery=true.
 // Flush should trigger if max_total_wal_size is reached.
 TEST_F(DBWALTest, RestoreTotalLogSizeAfterRecoverWithoutFlush) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto test_listener = std::make_shared<FlushCounterListener>();
   test_listener->expected_flush_reason = FlushReason::kWalFull;
 
@@ -1960,6 +2010,7 @@ TEST_F(DBWALTest, RestoreTotalLogSizeAfterRecoverWithoutFlush) {
 // Tests that we will truncate the preallocated space of the last log from
 // previous.
 TEST_F(DBWALTest, TruncateLastLogAfterRecoverWithoutFlush) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr size_t kKB = 1024;
   Options options = CurrentOptions();
   options.env = env_;
@@ -1996,6 +2047,7 @@ TEST_F(DBWALTest, TruncateLastLogAfterRecoverWithoutFlush) {
 // Tests that we will truncate the preallocated space of the last log from
 // previous.
 TEST_F(DBWALTest, TruncateLastLogAfterRecoverWithFlush) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr size_t kKB = 1024;
   Options options = CurrentOptions();
   options.env = env_;
@@ -2046,6 +2098,7 @@ TEST_F(DBWALTest, TruncateLastLogAfterRecoverWithFlush) {
 }
 
 TEST_F(DBWALTest, TruncateLastLogAfterRecoverWALEmpty) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.env = env_;
   options.avoid_flush_during_recovery = false;
@@ -2109,6 +2162,7 @@ TEST_F(DBWALTest, TruncateLastLogAfterRecoverWALEmpty) {
 }
 
 TEST_F(DBWALTest, ReadOnlyRecoveryNoTruncate) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr size_t kKB = 1024;
   Options options = CurrentOptions();
   options.env = env_;
@@ -2126,6 +2180,7 @@ TEST_F(DBWALTest, ReadOnlyRecoveryNoTruncate) {
 
   SyncPoint::GetInstance()->SetCallBack(
       "PosixWritableFile::Close", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         if (!enable_truncate) {
           *(reinterpret_cast<size_t*>(arg)) = 0;
         }
@@ -2168,6 +2223,7 @@ TEST_F(DBWALTest, ReadOnlyRecoveryNoTruncate) {
 #endif  // ROCKSDB_LITE
 
 TEST_F(DBWALTest, WalTermTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.env = env_;
   CreateAndReopenWithCF({"pikachu"}, options);
@@ -2193,6 +2249,7 @@ TEST_F(DBWALTest, WalTermTest) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

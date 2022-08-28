@@ -34,6 +34,7 @@ namespace ROCKSDB_NAMESPACE {
 namespace {
 std::shared_ptr<const FilterPolicy> Create(double bits_per_key,
                                            const std::string& name) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return BloomLikeFilterPolicy::Create(name, bits_per_key);
 }
 const std::string kLegacyBloom = test::LegacyBloomFilterPolicy::kClassName();
@@ -104,6 +105,7 @@ class SliceTransformLimitedDomainGeneric : public SliceTransform {
 // To make test deterministic, use a much larger number of bits per key-20 than
 // bits in the key, so that false positives are eliminated
 TEST_P(DBBloomFilterTestDefFormatVersion, KeyMayExist) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     ReadOptions ropts;
     std::string value;
@@ -181,7 +183,9 @@ TEST_P(DBBloomFilterTestDefFormatVersion, KeyMayExist) {
 }
 
 TEST_F(DBBloomFilterTest, GetFilterByPrefixBloomCustomPrefixExtractor) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (bool partition_filters : {true, false}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Options options = last_options_;
     options.prefix_extractor =
         std::make_shared<SliceTransformLimitedDomainGeneric>();
@@ -260,7 +264,9 @@ TEST_F(DBBloomFilterTest, GetFilterByPrefixBloomCustomPrefixExtractor) {
 }
 
 TEST_F(DBBloomFilterTest, GetFilterByPrefixBloom) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (bool partition_filters : {true, false}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Options options = last_options_;
     options.prefix_extractor.reset(NewFixedPrefixTransform(8));
     options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
@@ -323,7 +329,9 @@ TEST_F(DBBloomFilterTest, GetFilterByPrefixBloom) {
 }
 
 TEST_F(DBBloomFilterTest, WholeKeyFilterProp) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (bool partition_filters : {true, false}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Options options = last_options_;
     options.prefix_extractor.reset(NewFixedPrefixTransform(3));
     options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
@@ -487,6 +495,7 @@ TEST_F(DBBloomFilterTest, WholeKeyFilterProp) {
 }
 
 TEST_P(DBBloomFilterTestWithParam, BloomFilter) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     Options options = CurrentOptions();
     env_->count_random_reads_ = true;
@@ -617,6 +626,7 @@ class AlwaysTrueFilterPolicy : public ReadOnlyBuiltinFilterPolicy {
 }  // namespace
 
 TEST_P(DBBloomFilterTestWithParam, SkipFilterOnEssentiallyZeroBpk) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr int maxKey = 10;
   auto PutFn = [&]() {
     int i;
@@ -769,6 +779,7 @@ INSTANTIATE_TEST_CASE_P(
 #endif  // !defined(ROCKSDB_VALGRIND_RUN) || defined(ROCKSDB_FULL_VALGRIND_RUN)
 
 TEST_F(DBBloomFilterTest, BloomFilterRate) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   while (ChangeFilterOptions()) {
     Options options = CurrentOptions();
     options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
@@ -808,6 +819,7 @@ struct CompatibilityConfig {
   uint32_t format_version;
 
   void SetInTableOptions(BlockBasedTableOptions* table_options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     table_options->filter_policy = policy;
     table_options->partition_filters = partitioned;
     if (partitioned) {
@@ -840,6 +852,7 @@ std::vector<CompatibilityConfig> kCompatibilityConfigs = {
 }  // namespace
 
 TEST_F(DBBloomFilterTest, BloomFilterCompatibility) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
   options.level0_file_num_compaction_trigger =
@@ -943,6 +956,7 @@ class FilterConstructResPeakTrackingCache : public CacheWrapper {
   std::deque<std::size_t> GetReservedCachePeaks() { return cache_res_peaks_; }
 
   std::size_t GetReservedCacheIncrementSum() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return cache_res_increments_sum_;
   }
 
@@ -978,6 +992,7 @@ class DBFilterConstructionReserveMemoryTestWithParam
         policy_(std::get<1>(GetParam())),
         partition_filters_(std::get<2>(GetParam())),
         detect_filter_construct_corruption_(std::get<3>(GetParam())) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (!reserve_table_builder_memory_ || policy_ == kDeprecatedBlock ||
         policy_ == kLegacyBloom) {
       // For these cases, we only interested in whether filter construction
@@ -1020,6 +1035,7 @@ class DBFilterConstructionReserveMemoryTestWithParam
   }
 
   BlockBasedTableOptions GetBlockBasedTableOptions() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     BlockBasedTableOptions table_options;
 
     // We set cache capacity big enough to prevent cache full for convenience in
@@ -1061,6 +1077,7 @@ class DBFilterConstructionReserveMemoryTestWithParam
 
   std::shared_ptr<FilterConstructResPeakTrackingCache>
   GetFilterConstructResPeakTrackingCache() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return cache_;
   }
 
@@ -1120,6 +1137,7 @@ INSTANTIATE_TEST_CASE_P(
 // since CacheReservationManager is not exposed at the high level.
 //
 TEST_P(DBFilterConstructionReserveMemoryTestWithParam, ReserveMemory) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   // We set write_buffer_size big enough so that in the case where there is
   // filter construction cache reservation, flush won't be triggered before we
@@ -1443,6 +1461,7 @@ class DBFilterConstructionCorruptionTestWithParam
                    /*env_do_fsync=*/true) {}
 
   BlockBasedTableOptions GetBlockBasedTableOptions() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     BlockBasedTableOptions table_options;
     table_options.detect_filter_construct_corruption = std::get<0>(GetParam());
     table_options.filter_policy = Create(10, std::get<1>(GetParam()));
@@ -1473,6 +1492,7 @@ INSTANTIATE_TEST_CASE_P(
                       std::make_tuple(true, kStandard128Ribbon, true)));
 
 TEST_P(DBFilterConstructionCorruptionTestWithParam, DetectCorruption) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   BlockBasedTableOptions table_options = GetBlockBasedTableOptions();
   options.table_factory.reset(NewBlockBasedTableFactory(table_options));
@@ -1497,6 +1517,7 @@ TEST_P(DBFilterConstructionCorruptionTestWithParam, DetectCorruption) {
 
   SyncPoint::GetInstance()->SetCallBack(
       "XXPH3FilterBitsBuilder::Finish::TamperHashEntries", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         std::deque<uint64_t>* hash_entries_to_corrupt =
             (std::deque<uint64_t>*)arg;
         assert(!hash_entries_to_corrupt->empty());
@@ -1530,6 +1551,7 @@ TEST_P(DBFilterConstructionCorruptionTestWithParam, DetectCorruption) {
 
   SyncPoint::GetInstance()->SetCallBack(
       "XXPH3FilterBitsBuilder::Finish::TamperFilter", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         std::pair<std::unique_ptr<char[]>*, std::size_t>* TEST_arg_pair =
             (std::pair<std::unique_ptr<char[]>*, std::size_t>*)arg;
         std::size_t filter_size = TEST_arg_pair->second;
@@ -1561,6 +1583,7 @@ TEST_P(DBFilterConstructionCorruptionTestWithParam, DetectCorruption) {
 #ifndef ROCKSDB_LITE
 TEST_P(DBFilterConstructionCorruptionTestWithParam,
        DynamicallyTurnOnAndOffDetectConstructCorruption) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   BlockBasedTableOptions table_options = GetBlockBasedTableOptions();
   // We intend to turn on
@@ -1583,6 +1606,7 @@ TEST_P(DBFilterConstructionCorruptionTestWithParam,
 
   SyncPoint::GetInstance()->SetCallBack(
       "XXPH3FilterBitsBuilder::Finish::TamperHashEntries", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         std::deque<uint64_t>* hash_entries_to_corrupt =
             (std::deque<uint64_t>*)arg;
         assert(!hash_entries_to_corrupt->empty());
@@ -1612,6 +1636,7 @@ TEST_P(DBFilterConstructionCorruptionTestWithParam,
 
   SyncPoint::GetInstance()->SetCallBack(
       "XXPH3FilterBitsBuilder::Finish::TamperHashEntries", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         std::deque<uint64_t>* hash_entries_to_corrupt =
             (std::deque<uint64_t>*)arg;
         assert(!hash_entries_to_corrupt->empty());
@@ -1702,6 +1727,7 @@ class TestingContextCustomFilterPolicy
   explicit TestingContextCustomFilterPolicy(int bpk_fifo, int bpk_l0_other,
                                             int bpk_otherwise)
       : LevelAndStyleCustomFilterPolicy(bpk_fifo, bpk_l0_other, bpk_otherwise) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   }
 
   FilterBitsBuilder* GetBuilderWithContext(
@@ -1725,6 +1751,7 @@ class TestingContextCustomFilterPolicy
   }
 
   std::string DumpTestReport() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::string rv;
     std::swap(rv, test_report_);
     return rv;
@@ -1736,9 +1763,11 @@ class TestingContextCustomFilterPolicy
 }  // namespace
 
 TEST_F(DBBloomFilterTest, ContextCustomFilterPolicy) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto policy = std::make_shared<TestingContextCustomFilterPolicy>(15, 8, 5);
   Options options;
   for (bool fifo : {true, false}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     options = CurrentOptions();
     options.max_open_files = fifo ? -1 : options.max_open_files;
     options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
@@ -1852,6 +1881,7 @@ class SliceTransformLimitedDomain : public SliceTransform {
 };
 
 TEST_F(DBBloomFilterTest, PrefixExtractorFullFilter) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   BlockBasedTableOptions bbto;
   // Full Filter Block
   bbto.filter_policy.reset(ROCKSDB_NAMESPACE::NewBloomFilterPolicy(10, false));
@@ -1881,6 +1911,7 @@ TEST_F(DBBloomFilterTest, PrefixExtractorFullFilter) {
 }
 
 TEST_F(DBBloomFilterTest, PrefixExtractorBlockFilter) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   BlockBasedTableOptions bbto;
   // Block Filter Block
   bbto.filter_policy.reset(ROCKSDB_NAMESPACE::NewBloomFilterPolicy(10, true));
@@ -1914,6 +1945,7 @@ TEST_F(DBBloomFilterTest, PrefixExtractorBlockFilter) {
 }
 
 TEST_F(DBBloomFilterTest, MemtableWholeKeyBloomFilter) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // regression test for #2743. the range delete tombstones in memtable should
   // be added even when Get() skips searching due to its prefix bloom filter
   const int kMemtableSize = 1 << 20;              // 1MB
@@ -1965,6 +1997,7 @@ TEST_F(DBBloomFilterTest, MemtableWholeKeyBloomFilter) {
 }
 
 TEST_F(DBBloomFilterTest, MemtableWholeKeyBloomFilterMultiGet) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.memtable_prefix_bloom_size_ratio = 0.015;
   options.memtable_whole_key_filtering = true;
@@ -2022,6 +2055,7 @@ TEST_F(DBBloomFilterTest, MemtableWholeKeyBloomFilterMultiGet) {
 }
 
 TEST_F(DBBloomFilterTest, MemtablePrefixBloomOutOfDomain) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr size_t kPrefixSize = 8;
   const std::string kKey = "key";
   assert(kKey.size() < kPrefixSize);
@@ -2062,6 +2096,7 @@ class DBBloomFilterTestVaryPrefixAndFormatVer
 };
 
 TEST_P(DBBloomFilterTestVaryPrefixAndFormatVer, PartitionedMultiGet) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   if (use_prefix_) {
     // Entire key from UKey()
@@ -2119,6 +2154,7 @@ TEST_P(DBBloomFilterTestVaryPrefixAndFormatVer, PartitionedMultiGet) {
   // And that spread out keys load many partition filters.
   // In both cases, mix present vs. not present keys.
   for (uint32_t stride : {uint32_t{1}, (N / Q) | 1}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     for (uint32_t i = 0; i < Q; ++i) {
       keys[i] = UKey(i * stride);
       key_slices[i] = Slice(keys[i]);
@@ -2259,6 +2295,7 @@ class BloomStatsTestWithParam
       public testing::WithParamInterface<std::tuple<std::string, bool>> {
  public:
   BloomStatsTestWithParam() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     bfp_impl_ = std::get<0>(GetParam());
     partition_filters_ = std::get<1>(GetParam());
 
@@ -2310,6 +2347,7 @@ class BloomStatsTestWithParam
 // 6 Call Get() for nonexisting key - expect SST bloom miss stat to be 1
 // Test both: block and plain SST
 TEST_P(BloomStatsTestWithParam, BloomStatsTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string key1("AAAA");
   std::string key2("RXDB");  // not in DB
   std::string key3("ZBRA");
@@ -2352,6 +2390,7 @@ TEST_P(BloomStatsTestWithParam, BloomStatsTest) {
 
 // Same scenario as in BloomStatsTest but using an iterator
 TEST_P(BloomStatsTestWithParam, BloomStatsTestWithIter) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string key1("AAAA");
   std::string key2("RXDB");  // not in DB
   std::string key3("ZBRA");
@@ -2422,6 +2461,7 @@ INSTANTIATE_TEST_CASE_P(
 
 namespace {
 void PrefixScanInit(DBBloomFilterTest* dbtest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   char buf[100];
   std::string keystr;
   const int small_range_sstfiles = 5;
@@ -2472,6 +2512,7 @@ void PrefixScanInit(DBBloomFilterTest* dbtest) {
 }  // namespace
 
 TEST_F(DBBloomFilterTest, PrefixScan) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   while (ChangeFilterOptions()) {
     int count;
     Slice prefix;
@@ -2523,6 +2564,7 @@ TEST_F(DBBloomFilterTest, PrefixScan) {
 }
 
 TEST_F(DBBloomFilterTest, OptimizeFiltersForHits) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.write_buffer_size = 64 * 1024;
   options.arena_block_size = 4 * 1024;
@@ -2713,6 +2755,7 @@ TEST_F(DBBloomFilterTest, OptimizeFiltersForHits) {
 }
 
 int CountIter(std::unique_ptr<Iterator>& iter, const Slice& key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   int count = 0;
   for (iter->Seek(key); iter->Valid(); iter->Next()) {
     count++;
@@ -2726,6 +2769,7 @@ int CountIter(std::unique_ptr<Iterator>& iter, const Slice& key) {
 // into the same string, or 2) the transformed seek key is of the same length
 // as the upper bound and two keys are adjacent according to the comparator.
 TEST_F(DBBloomFilterTest, DynamicBloomFilterUpperBound) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (const auto& bfp_impl : BloomLikeFilterPolicy::GetAllFixedImpls()) {
     int using_full_builder = bfp_impl != kDeprecatedBlock;
     Options options;
@@ -2858,6 +2902,7 @@ TEST_F(DBBloomFilterTest, DynamicBloomFilterUpperBound) {
 // Create multiple SST files each with a different prefix_extractor config,
 // verify iterators can read all SST files using the latest config.
 TEST_F(DBBloomFilterTest, DynamicBloomFilterMultipleSST) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (const auto& bfp_impl : BloomLikeFilterPolicy::GetAllFixedImpls()) {
     int using_full_builder = bfp_impl != kDeprecatedBlock;
     Options options;
@@ -2993,6 +3038,7 @@ TEST_F(DBBloomFilterTest, DynamicBloomFilterMultipleSST) {
 // dynamically, verify the iterator created on the new column family behaves
 // as expected
 TEST_F(DBBloomFilterTest, DynamicBloomFilterNewColumnFamily) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   int iteration = 0;
   for (const auto& bfp_impl : BloomLikeFilterPolicy::GetAllFixedImpls()) {
     Options options = CurrentOptions();
@@ -3050,6 +3096,7 @@ TEST_F(DBBloomFilterTest, DynamicBloomFilterNewColumnFamily) {
 // Verify it's possible to change prefix_extractor at runtime and iterators
 // behaves as expected
 TEST_F(DBBloomFilterTest, DynamicBloomFilterOptions) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (const auto& bfp_impl : BloomLikeFilterPolicy::GetAllFixedImpls()) {
     Options options;
     options.env = CurrentOptions().env;
@@ -3115,6 +3162,7 @@ TEST_F(DBBloomFilterTest, DynamicBloomFilterOptions) {
 }
 
 TEST_F(DBBloomFilterTest, SeekForPrevWithPartitionedFilters) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   constexpr size_t kNumKeys = 10000;
   static_assert(kNumKeys <= 10000, "kNumKeys have to be <= 10000");
@@ -3168,6 +3216,7 @@ TEST_F(DBBloomFilterTest, SeekForPrevWithPartitionedFilters) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

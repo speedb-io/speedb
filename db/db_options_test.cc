@@ -32,6 +32,7 @@ class DBOptionsTest : public DBTestBase {
 #ifndef ROCKSDB_LITE
   std::unordered_map<std::string, std::string> GetMutableDBOptionsMap(
       const DBOptions& options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::string options_str;
     std::unordered_map<std::string, std::string> mutable_map;
     ConfigOptions config_options(options);
@@ -46,6 +47,7 @@ class DBOptionsTest : public DBTestBase {
 
   std::unordered_map<std::string, std::string> GetMutableCFOptionsMap(
       const ColumnFamilyOptions& options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::string options_str;
     ConfigOptions config_options;
     config_options.delimiter = "; ";
@@ -59,6 +61,7 @@ class DBOptionsTest : public DBTestBase {
 
   std::unordered_map<std::string, std::string> GetRandomizedMutableCFOptionsMap(
       Random* rnd) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Options options = CurrentOptions();
     options.env = env_;
     ImmutableDBOptions db_options(options);
@@ -71,6 +74,7 @@ class DBOptionsTest : public DBTestBase {
 
   std::unordered_map<std::string, std::string> GetRandomizedMutableDBOptionsMap(
       Random* rnd) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     DBOptions db_options;
     test::RandomInitDBOptions(&db_options, rnd);
     auto sanitized_options = SanitizeOptions(dbname_, db_options);
@@ -80,6 +84,7 @@ class DBOptionsTest : public DBTestBase {
 };
 
 TEST_F(DBOptionsTest, ImmutableTrackAndVerifyWalsInManifest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = env_;
   options.track_and_verify_wals_in_manifest = true;
@@ -99,6 +104,7 @@ TEST_F(DBOptionsTest, ImmutableTrackAndVerifyWalsInManifest) {
 #ifndef ROCKSDB_LITE
 
 TEST_F(DBOptionsTest, AvoidUpdatingOptions) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = env_;
   options.max_background_jobs = 4;
@@ -111,6 +117,7 @@ TEST_F(DBOptionsTest, AvoidUpdatingOptions) {
   bool is_changed_stats = false;
   SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::WriteOptionsFile:PersistOptions", [&](void* /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         ASSERT_FALSE(is_changed_stats);  // should only save options file once
         is_changed_stats = true;
       });
@@ -159,6 +166,7 @@ TEST_F(DBOptionsTest, AvoidUpdatingOptions) {
 }
 
 TEST_F(DBOptionsTest, GetLatestDBOptions) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // GetOptions should be able to get latest option changed by SetOptions.
   Options options;
   options.create_if_missing = true;
@@ -171,6 +179,7 @@ TEST_F(DBOptionsTest, GetLatestDBOptions) {
 }
 
 TEST_F(DBOptionsTest, GetLatestCFOptions) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // GetOptions should be able to get latest option changed by SetOptions.
   Options options;
   options.create_if_missing = true;
@@ -190,6 +199,7 @@ TEST_F(DBOptionsTest, GetLatestCFOptions) {
 }
 
 TEST_F(DBOptionsTest, SetMutableTableOptions) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.create_if_missing = true;
   options.env = env_;
@@ -267,6 +277,7 @@ TEST_F(DBOptionsTest, SetMutableTableOptions) {
 }
 
 TEST_F(DBOptionsTest, SetWithCustomMemTableFactory) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   class DummySkipListFactory : public SkipListFactory {
    public:
     static const char* kClassName() { return "DummySkipListFactory"; }
@@ -285,6 +296,7 @@ TEST_F(DBOptionsTest, SetWithCustomMemTableFactory) {
   options.create_if_missing = true;
   // Try with fail_if_options_file_error=false/true to update the options
   for (bool on_error : {false, true}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     options.fail_if_options_file_error = on_error;
     options.env = env_;
     options.disable_auto_compactions = false;
@@ -311,6 +323,7 @@ TEST_F(DBOptionsTest, SetWithCustomMemTableFactory) {
 }
 
 TEST_F(DBOptionsTest, SetBytesPerSync) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const size_t kValueSize = 1024 * 1024;  // 1MB
   Options options;
   options.create_if_missing = true;
@@ -361,6 +374,7 @@ TEST_F(DBOptionsTest, SetBytesPerSync) {
 }
 
 TEST_F(DBOptionsTest, SetWalBytesPerSync) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const size_t kValueSize = 1024 * 1024 * 3;
   Options options;
   options.create_if_missing = true;
@@ -399,6 +413,7 @@ TEST_F(DBOptionsTest, SetWalBytesPerSync) {
 }
 
 TEST_F(DBOptionsTest, WritableFileMaxBufferSize) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.create_if_missing = true;
   options.writable_file_max_buffer_size = 1024 * 1024;
@@ -414,6 +429,7 @@ TEST_F(DBOptionsTest, WritableFileMaxBufferSize) {
   std::atomic<int> unmatch_cnt(0);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "WritableFileWriter::WritableFileWriter:0", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         int value = static_cast<int>(reinterpret_cast<uintptr_t>(arg));
         if (value == buffer_size) {
           match_cnt++;
@@ -452,6 +468,7 @@ TEST_F(DBOptionsTest, WritableFileMaxBufferSize) {
 }
 
 TEST_F(DBOptionsTest, SetOptionsAndReopen) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Random rnd(1044);
   auto rand_opts = GetRandomizedMutableCFOptionsMap(&rnd);
   ASSERT_OK(dbfull()->SetOptions(rand_opts));
@@ -462,6 +479,7 @@ TEST_F(DBOptionsTest, SetOptionsAndReopen) {
 }
 
 TEST_F(DBOptionsTest, EnableAutoCompactionAndTriggerStall) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const std::string kValue(1024, 'v');
   for (int method_type = 0; method_type < 2; method_type++) {
     for (int option_type = 0; option_type < 4; option_type++) {
@@ -566,6 +584,7 @@ TEST_F(DBOptionsTest, EnableAutoCompactionAndTriggerStall) {
 }
 
 TEST_F(DBOptionsTest, SetOptionsMayTriggerCompaction) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.create_if_missing = true;
   options.level0_file_num_compaction_trigger = 1000;
@@ -585,6 +604,7 @@ TEST_F(DBOptionsTest, SetOptionsMayTriggerCompaction) {
 }
 
 TEST_F(DBOptionsTest, SetBackgroundCompactionThreads) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.create_if_missing = true;
   options.max_background_compactions = 1;   // default value
@@ -598,6 +618,7 @@ TEST_F(DBOptionsTest, SetBackgroundCompactionThreads) {
 }
 
 TEST_F(DBOptionsTest, SetBackgroundFlushThreads) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.create_if_missing = true;
   options.max_background_flushes = 1;
@@ -612,6 +633,7 @@ TEST_F(DBOptionsTest, SetBackgroundFlushThreads) {
 
 
 TEST_F(DBOptionsTest, SetBackgroundJobs) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.create_if_missing = true;
   options.max_background_jobs = 8;
@@ -646,6 +668,7 @@ TEST_F(DBOptionsTest, SetBackgroundJobs) {
 }
 
 TEST_F(DBOptionsTest, AvoidFlushDuringShutdown) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.create_if_missing = true;
   options.disable_auto_compactions = true;
@@ -669,6 +692,7 @@ TEST_F(DBOptionsTest, AvoidFlushDuringShutdown) {
 }
 
 TEST_F(DBOptionsTest, SetDelayedWriteRateOption) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.create_if_missing = true;
   options.delayed_write_rate = 2 * 1024U * 1024U;
@@ -681,6 +705,7 @@ TEST_F(DBOptionsTest, SetDelayedWriteRateOption) {
 }
 
 TEST_F(DBOptionsTest, MaxTotalWalSizeChange) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Random rnd(1044);
   const auto value_size = size_t(1024);
   std::string value = rnd.RandomString(value_size);
@@ -708,6 +733,7 @@ TEST_F(DBOptionsTest, MaxTotalWalSizeChange) {
 }
 
 TEST_F(DBOptionsTest, SetStatsDumpPeriodSec) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.create_if_missing = true;
   options.stats_dump_period_sec = 5;
@@ -725,6 +751,7 @@ TEST_F(DBOptionsTest, SetStatsDumpPeriodSec) {
 }
 
 TEST_F(DBOptionsTest, SetOptionsStatsPersistPeriodSec) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.create_if_missing = true;
   options.stats_persist_period_sec = 5;
@@ -739,6 +766,7 @@ TEST_F(DBOptionsTest, SetOptionsStatsPersistPeriodSec) {
 }
 
 static void assert_candidate_files_empty(DBImpl* dbfull, const bool empty) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   dbfull->TEST_LockMutex();
   JobContext job_context(0);
   dbfull->FindObsoleteFiles(&job_context, false);
@@ -753,6 +781,7 @@ static void assert_candidate_files_empty(DBImpl* dbfull, const bool empty) {
 }
 
 TEST_F(DBOptionsTest, DeleteObsoleteFilesPeriodChange) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = env_;
   SetTimeElapseOnlySleepOnReopen(&options);
@@ -784,6 +813,7 @@ TEST_F(DBOptionsTest, DeleteObsoleteFilesPeriodChange) {
 }
 
 TEST_F(DBOptionsTest, MaxOpenFilesChange) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   SpecialEnv env(env_);
   Options options;
   options.env = CurrentOptions().env;
@@ -803,6 +833,7 @@ TEST_F(DBOptionsTest, MaxOpenFilesChange) {
 }
 
 TEST_F(DBOptionsTest, SanitizeDelayedWriteRate) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = CurrentOptions().env;
   options.delayed_write_rate = 0;
@@ -815,6 +846,7 @@ TEST_F(DBOptionsTest, SanitizeDelayedWriteRate) {
 }
 
 TEST_F(DBOptionsTest, SanitizeUniversalTTLCompaction) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = CurrentOptions().env;
   options.compaction_style = kCompactionStyleUniversal;
@@ -845,6 +877,7 @@ TEST_F(DBOptionsTest, SanitizeUniversalTTLCompaction) {
 }
 
 TEST_F(DBOptionsTest, SanitizeTtlDefault) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = CurrentOptions().env;
   Reopen(options);
@@ -861,6 +894,7 @@ TEST_F(DBOptionsTest, SanitizeTtlDefault) {
 }
 
 TEST_F(DBOptionsTest, SanitizeFIFOPeriodicCompaction) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.compaction_style = kCompactionStyleFIFO;
   options.env = CurrentOptions().env;
@@ -888,6 +922,7 @@ TEST_F(DBOptionsTest, SanitizeFIFOPeriodicCompaction) {
 }
 
 TEST_F(DBOptionsTest, SetFIFOCompactionOptions) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = CurrentOptions().env;
   options.compaction_style = kCompactionStyleFIFO;
@@ -998,6 +1033,7 @@ TEST_F(DBOptionsTest, SetFIFOCompactionOptions) {
 }
 
 TEST_F(DBOptionsTest, CompactionReadaheadSizeChange) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   SpecialEnv env(env_);
   Options options;
   options.env = &env;
@@ -1024,6 +1060,7 @@ TEST_F(DBOptionsTest, CompactionReadaheadSizeChange) {
 }
 
 TEST_F(DBOptionsTest, FIFOTtlBackwardCompatible) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.compaction_style = kCompactionStyleFIFO;
   options.write_buffer_size = 10 << 10;  // 10KB
@@ -1071,6 +1108,7 @@ TEST_F(DBOptionsTest, FIFOTtlBackwardCompatible) {
 }
 
 TEST_F(DBOptionsTest, ChangeCompression) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!Snappy_Supported() || !LZ4_Supported()) {
     return;
   }
@@ -1091,6 +1129,7 @@ TEST_F(DBOptionsTest, ChangeCompression) {
   bool compacted = false;
   SyncPoint::GetInstance()->SetCallBack(
       "LevelCompactionPicker::PickCompaction:Return", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         Compaction* c = reinterpret_cast<Compaction*>(arg);
         compression_used = c->output_compression();
         compression_opt_used = c->output_compression_opts();
@@ -1134,6 +1173,7 @@ TEST_F(DBOptionsTest, ChangeCompression) {
 #endif  // ROCKSDB_LITE
 
 TEST_F(DBOptionsTest, BottommostCompressionOptsWithFallbackType) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Verify the bottommost compression options still take effect even when the
   // bottommost compression type is left at its default value. Verify for both
   // automatic and manual compaction.
@@ -1158,6 +1198,7 @@ TEST_F(DBOptionsTest, BottommostCompressionOptsWithFallbackType) {
   bool compacted = false;
   SyncPoint::GetInstance()->SetCallBack(
       "CompactionPicker::RegisterCompaction:Registered", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         Compaction* c = static_cast<Compaction*>(arg);
         compression_used = c->output_compression();
         compression_opt_used = c->output_compression_opts();
@@ -1196,6 +1237,7 @@ TEST_F(DBOptionsTest, BottommostCompressionOptsWithFallbackType) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

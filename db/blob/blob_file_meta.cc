@@ -25,6 +25,7 @@ std::string SharedBlobFileMetaData::DebugString() const {
 
 std::ostream& operator<<(std::ostream& os,
                          const SharedBlobFileMetaData& shared_meta) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   os << "blob_file_number: " << shared_meta.GetBlobFileNumber()
      << " total_blob_count: " << shared_meta.GetTotalBlobCount()
      << " total_blob_bytes: " << shared_meta.GetTotalBlobBytes()
@@ -43,6 +44,7 @@ std::string BlobFileMetaData::DebugString() const {
 }
 
 std::ostream& operator<<(std::ostream& os, const BlobFileMetaData& meta) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const auto& shared_meta = meta.GetSharedMeta();
   assert(shared_meta);
   os << (*shared_meta);

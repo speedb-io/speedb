@@ -75,6 +75,7 @@
 namespace ROCKSDB_NAMESPACE {
 
 const char* GetCompactionReasonString(CompactionReason compaction_reason) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   switch (compaction_reason) {
     case CompactionReason::kUnknown:
       return "Unknown";
@@ -159,6 +160,7 @@ struct CompactionJob::SubcompactionState {
   std::unique_ptr<TableBuilder> builder;
 
   Output* current_output() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (outputs.empty()) {
       // This subcompaction's output could be empty if compaction was aborted
       // before this subcompaction had a chance to generate any output files.
@@ -207,12 +209,14 @@ struct CompactionJob::SubcompactionState {
         end(_end),
         approx_size(size),
         sub_job_id(_sub_job_id) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(compaction != nullptr);
   }
 
   // Adds the key and value to the builder
   // If paranoid is true, adds the key-value to the paranoid hash
   Status AddToBuilder(const Slice& key, const Slice& value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     auto curr = current_output();
     assert(builder != nullptr);
     assert(curr != nullptr);
@@ -229,6 +233,7 @@ struct CompactionJob::SubcompactionState {
   // Returns true iff we should stop building the current output
   // before processing "internal_key".
   bool ShouldStopBefore(const Slice& internal_key, uint64_t curr_file_size) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     const InternalKeyComparator* icmp =
         &compaction->column_family_data()->internal_comparator();
     const std::vector<FileMetaData*>& grandparents = compaction->grandparents();
@@ -296,6 +301,7 @@ struct CompactionJob::SubcompactionState {
   }
 
   Status ProcessOutFlowIfNeeded(const Slice& key, const Slice& value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (!blob_garbage_meter) {
       return Status::OK();
     }
@@ -305,6 +311,7 @@ struct CompactionJob::SubcompactionState {
 };
 
 void CompactionJob::SubcompactionState::FillFilesToCutForTtl() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (compaction->immutable_options()->compaction_style !=
           CompactionStyle::kCompactionStyleLevel ||
       compaction->immutable_options()->compaction_pri !=
@@ -362,6 +369,7 @@ struct CompactionJob::CompactionState {
   explicit CompactionState(Compaction* c) : compaction(c) {}
 
   Slice SmallestUserKey() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     for (const auto& sub_compact_state : sub_compact_states) {
       if (!sub_compact_state.outputs.empty() &&
           sub_compact_state.outputs[0].finished) {
@@ -373,6 +381,7 @@ struct CompactionJob::CompactionState {
   }
 
   Slice LargestUserKey() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     for (auto it = sub_compact_states.rbegin(); it < sub_compact_states.rend();
          ++it) {
       if (!it->outputs.empty() && it->current_output()->finished) {
@@ -386,6 +395,7 @@ struct CompactionJob::CompactionState {
 };
 
 void CompactionJob::AggregateStatistics() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(compact_);
 
   for (SubcompactionState& sc : compact_->sub_compact_states) {
@@ -473,6 +483,7 @@ CompactionJob::CompactionJob(
       full_history_ts_low_(std::move(full_history_ts_low)),
       trim_ts_(std::move(trim_ts)),
       blob_callback_(blob_callback) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(compaction_job_stats_ != nullptr);
   assert(log_buffer_ != nullptr);
   const auto* cfd = compact_->compaction->column_family_data();
@@ -483,11 +494,13 @@ CompactionJob::CompactionJob(
 }
 
 CompactionJob::~CompactionJob() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(compact_ == nullptr);
   ThreadStatusUtil::ResetThreadStatus();
 }
 
 void CompactionJob::ReportStartedCompaction(Compaction* compaction) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const auto* cfd = compact_->compaction->column_family_data();
   ThreadStatusUtil::SetColumnFamily(cfd, cfd->ioptions()->env,
                                     db_options_.enable_thread_tracking);
@@ -531,6 +544,7 @@ void CompactionJob::ReportStartedCompaction(Compaction* compaction) {
 }
 
 void CompactionJob::Prepare() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   AutoThreadOperationStageUpdater stage_updater(
       ThreadStatus::STAGE_COMPACTION_PREPARE);
 
@@ -578,6 +592,7 @@ struct RangeWithSize {
 };
 
 void CompactionJob::GenSubcompactionBoundaries() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto* c = compact_->compaction;
   auto* cfd = c->column_family_data();
   const Comparator* cfd_comparator = cfd->user_comparator();
@@ -707,6 +722,7 @@ void CompactionJob::GenSubcompactionBoundaries() {
 }
 
 Status CompactionJob::Run() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   AutoThreadOperationStageUpdater stage_updater(
       ThreadStatus::STAGE_COMPACTION_RUN);
   TEST_SYNC_POINT("CompactionJob::Run():Start");
@@ -897,6 +913,7 @@ Status CompactionJob::Run() {
 }
 
 Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(compact_);
 
   AutoThreadOperationStageUpdater stage_updater(
@@ -1040,6 +1057,7 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options) {
 CompactionServiceJobStatus
 CompactionJob::ProcessKeyValueCompactionWithCompactionService(
     SubcompactionState* sub_compact) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(sub_compact);
   assert(sub_compact->compaction);
   assert(db_options_.compaction_service);
@@ -1244,6 +1262,7 @@ void CompactionJob::BuildSubcompactionJobInfo(
 
 void CompactionJob::NotifyOnSubcompactionBegin(
     SubcompactionState* sub_compact) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifndef ROCKSDB_LITE
   Compaction* c = compact_->compaction;
 
@@ -1275,6 +1294,7 @@ void CompactionJob::NotifyOnSubcompactionBegin(
 
 void CompactionJob::NotifyOnSubcompactionCompleted(
     SubcompactionState* sub_compact) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifndef ROCKSDB_LITE
 
   if (db_options_.listeners.empty()) {
@@ -1300,6 +1320,7 @@ void CompactionJob::NotifyOnSubcompactionCompleted(
 }
 
 void CompactionJob::ProcessKeyValueCompaction(SubcompactionState* sub_compact) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(sub_compact);
   assert(sub_compact->compaction);
 
@@ -1722,12 +1743,14 @@ void CompactionJob::ProcessKeyValueCompaction(SubcompactionState* sub_compact) {
 }
 
 uint64_t CompactionJob::GetCompactionId(SubcompactionState* sub_compact) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return (uint64_t)job_id_ << 32 | sub_compact->sub_job_id;
 }
 
 void CompactionJob::RecordDroppedKeys(
     const CompactionIterationStats& c_iter_stats,
     CompactionJobStats* compaction_job_stats) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (c_iter_stats.num_record_drop_user > 0) {
     RecordTick(stats_, COMPACTION_KEY_DROP_USER,
                c_iter_stats.num_record_drop_user);
@@ -1767,6 +1790,7 @@ Status CompactionJob::FinishCompactionOutputFile(
     CompactionRangeDelAggregator* range_del_agg,
     CompactionIterationStats* range_del_out_stats,
     const Slice* next_table_min_key /* = nullptr */) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   AutoThreadOperationStageUpdater stage_updater(
       ThreadStatus::STAGE_COMPACTION_SYNC_FILE);
   assert(sub_compact != nullptr);
@@ -2102,6 +2126,7 @@ Status CompactionJob::FinishCompactionOutputFile(
 
 Status CompactionJob::InstallCompactionResults(
     const MutableCFOptions& mutable_cf_options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(compact_);
 
   db_mutex_->AssertHeld();
@@ -2165,6 +2190,7 @@ Status CompactionJob::InstallCompactionResults(
 }
 
 void CompactionJob::RecordCompactionIOStats() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   RecordTick(stats_, COMPACT_READ_BYTES, IOSTATS(bytes_read));
   RecordTick(stats_, COMPACT_WRITE_BYTES, IOSTATS(bytes_written));
   CompactionReason compaction_reason =
@@ -2189,6 +2215,7 @@ void CompactionJob::RecordCompactionIOStats() {
 
 Status CompactionJob::OpenCompactionOutputFile(
     SubcompactionState* sub_compact) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(sub_compact != nullptr);
   assert(sub_compact->builder == nullptr);
   // no need to lock because VersionSet::next_file_number_ is atomic
@@ -2313,6 +2340,7 @@ Status CompactionJob::OpenCompactionOutputFile(
 }
 
 void CompactionJob::CleanupCompaction() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (SubcompactionState& sub_compact : compact_->sub_compact_states) {
     const auto& sub_status = sub_compact.status;
 
@@ -2341,6 +2369,7 @@ void CompactionJob::CleanupCompaction() {
 #ifndef ROCKSDB_LITE
 namespace {
 void CopyPrefix(const Slice& src, size_t prefix_length, std::string* dst) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(prefix_length > 0);
   size_t length = src.size() > prefix_length ? prefix_length : src.size();
   dst->assign(src.data(), length);
@@ -2350,6 +2379,7 @@ void CopyPrefix(const Slice& src, size_t prefix_length, std::string* dst) {
 #endif  // !ROCKSDB_LITE
 
 void CompactionJob::UpdateCompactionStats() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(compact_);
 
   Compaction* compaction = compact_->compaction;
@@ -2389,6 +2419,7 @@ void CompactionJob::UpdateCompactionStats() {
 void CompactionJob::UpdateCompactionInputStatsHelper(int* num_files,
                                                      uint64_t* bytes_read,
                                                      int input_level) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const Compaction* compaction = compact_->compaction;
   auto num_input_files = compaction->num_input_files(input_level);
   *num_files += static_cast<int>(num_input_files);
@@ -2436,6 +2467,7 @@ void CompactionJob::UpdateCompactionJobStats(
 }
 
 void CompactionJob::LogCompaction() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Compaction* compaction = compact_->compaction;
   ColumnFamilyData* cfd = compaction->column_family_data();
 
@@ -2471,6 +2503,7 @@ void CompactionJob::LogCompaction() {
 }
 
 std::string CompactionJob::GetTableFileName(uint64_t file_number) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return TableFileName(compact_->compaction->immutable_options()->cf_paths,
                        file_number, compact_->compaction->output_path_id());
 }
@@ -2478,10 +2511,12 @@ std::string CompactionJob::GetTableFileName(uint64_t file_number) {
 #ifndef ROCKSDB_LITE
 std::string CompactionServiceCompactionJob::GetTableFileName(
     uint64_t file_number) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return MakeTableFileName(output_path_, file_number);
 }
 
 void CompactionServiceCompactionJob::RecordCompactionIOStats() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   compaction_result_->bytes_read += IOSTATS(bytes_read);
   compaction_result_->bytes_written += IOSTATS(bytes_written);
   CompactionJob::RecordCompactionIOStats();
@@ -2516,6 +2551,7 @@ CompactionServiceCompactionJob::CompactionServiceCompactionJob(
       compaction_result_(compaction_service_result) {}
 
 Status CompactionServiceCompactionJob::Run() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   AutoThreadOperationStageUpdater stage_updater(
       ThreadStatus::STAGE_COMPACTION_RUN);
 
@@ -2604,6 +2640,7 @@ Status CompactionServiceCompactionJob::Run() {
 }
 
 void CompactionServiceCompactionJob::CleanupCompaction() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   CompactionJob::CleanupCompaction();
 }
 
@@ -2622,12 +2659,14 @@ static std::unordered_map<std::string, OptionTypeInfo> cfd_type_info = {
       OptionTypeFlags::kNone,
       [](const ConfigOptions& opts, const std::string& /*name*/,
          const std::string& value, void* addr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         auto cf_options = static_cast<ColumnFamilyOptions*>(addr);
         return GetColumnFamilyOptionsFromString(opts, ColumnFamilyOptions(),
                                                 value, cf_options);
       },
       [](const ConfigOptions& opts, const std::string& /*name*/,
          const void* addr, std::string* value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         const auto cf_options = static_cast<const ColumnFamilyOptions*>(addr);
         std::string result;
         auto status =
@@ -2637,6 +2676,7 @@ static std::unordered_map<std::string, OptionTypeInfo> cfd_type_info = {
       },
       [](const ConfigOptions& opts, const std::string& name, const void* addr1,
          const void* addr2, std::string* mismatch) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         const auto this_one = static_cast<const ColumnFamilyOptions*>(addr1);
         const auto that_one = static_cast<const ColumnFamilyOptions*>(addr2);
         auto this_conf = CFOptionsAsConfigurable(*this_one);
@@ -2663,11 +2703,13 @@ static std::unordered_map<std::string, OptionTypeInfo> cs_input_type_info = {
       OptionTypeFlags::kNone,
       [](const ConfigOptions& opts, const std::string& /*name*/,
          const std::string& value, void* addr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         auto options = static_cast<DBOptions*>(addr);
         return GetDBOptionsFromString(opts, DBOptions(), value, options);
       },
       [](const ConfigOptions& opts, const std::string& /*name*/,
          const void* addr, std::string* value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         const auto options = static_cast<const DBOptions*>(addr);
         std::string result;
         auto status = GetStringFromDBOptions(opts, *options, &result);
@@ -2676,6 +2718,7 @@ static std::unordered_map<std::string, OptionTypeInfo> cs_input_type_info = {
       },
       [](const ConfigOptions& opts, const std::string& name, const void* addr1,
          const void* addr2, std::string* mismatch) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         const auto this_one = static_cast<const DBOptions*>(addr1);
         const auto that_one = static_cast<const DBOptions*>(addr2);
         auto this_conf = DBOptionsAsConfigurable(*this_one);
@@ -2888,6 +2931,7 @@ struct StatusSerializationAdapter {
 
   StatusSerializationAdapter() {}
   explicit StatusSerializationAdapter(const Status& s) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     code = s.code();
     subcode = s.subcode();
     severity = s.severity();
@@ -2896,6 +2940,7 @@ struct StatusSerializationAdapter {
   }
 
   Status GetStatus() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return Status(static_cast<Status::Code>(code),
                   static_cast<Status::SubCode>(subcode),
                   static_cast<Status::Severity>(severity), message);
@@ -2930,6 +2975,7 @@ static std::unordered_map<std::string, OptionTypeInfo> cs_result_type_info = {
       OptionTypeFlags::kNone,
       [](const ConfigOptions& opts, const std::string& /*name*/,
          const std::string& value, void* addr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         auto status_obj = static_cast<Status*>(addr);
         StatusSerializationAdapter adapter;
         Status s = OptionTypeInfo::ParseType(
@@ -2939,6 +2985,7 @@ static std::unordered_map<std::string, OptionTypeInfo> cs_result_type_info = {
       },
       [](const ConfigOptions& opts, const std::string& /*name*/,
          const void* addr, std::string* value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         const auto status_obj = static_cast<const Status*>(addr);
         StatusSerializationAdapter adapter(*status_obj);
         std::string result;
@@ -2949,6 +2996,7 @@ static std::unordered_map<std::string, OptionTypeInfo> cs_result_type_info = {
       },
       [](const ConfigOptions& opts, const std::string& /*name*/,
          const void* addr1, const void* addr2, std::string* mismatch) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         const auto status1 = static_cast<const Status*>(addr1);
         const auto status2 = static_cast<const Status*>(addr2);
         StatusSerializationAdapter adatper1(*status1);
@@ -2994,6 +3042,7 @@ static std::unordered_map<std::string, OptionTypeInfo> cs_result_type_info = {
 
 Status CompactionServiceInput::Read(const std::string& data_str,
                                     CompactionServiceInput* obj) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (data_str.size() <= sizeof(BinaryFormatVersion)) {
     return Status::InvalidArgument("Invalid CompactionServiceInput string");
   }
@@ -3013,6 +3062,7 @@ Status CompactionServiceInput::Read(const std::string& data_str,
 }
 
 Status CompactionServiceInput::Write(std::string* output) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   char buf[sizeof(BinaryFormatVersion)];
   EncodeFixed32(buf, kOptionsString);
   output->append(buf, sizeof(BinaryFormatVersion));
@@ -3023,6 +3073,7 @@ Status CompactionServiceInput::Write(std::string* output) {
 
 Status CompactionServiceResult::Read(const std::string& data_str,
                                      CompactionServiceResult* obj) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (data_str.size() <= sizeof(BinaryFormatVersion)) {
     return Status::InvalidArgument("Invalid CompactionServiceResult string");
   }
@@ -3042,6 +3093,7 @@ Status CompactionServiceResult::Read(const std::string& data_str,
 }
 
 Status CompactionServiceResult::Write(std::string* output) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   char buf[sizeof(BinaryFormatVersion)];
   EncodeFixed32(buf, kOptionsString);
   output->append(buf, sizeof(BinaryFormatVersion));
@@ -3052,12 +3104,14 @@ Status CompactionServiceResult::Write(std::string* output) {
 
 #ifndef NDEBUG
 bool CompactionServiceResult::TEST_Equals(CompactionServiceResult* other) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string mismatch;
   return TEST_Equals(other, &mismatch);
 }
 
 bool CompactionServiceResult::TEST_Equals(CompactionServiceResult* other,
                                           std::string* mismatch) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ConfigOptions cf;
   cf.invoke_prepare_options = false;
   return OptionTypeInfo::TypesAreEqual(cf, cs_result_type_info, this, other,
@@ -3065,12 +3119,14 @@ bool CompactionServiceResult::TEST_Equals(CompactionServiceResult* other,
 }
 
 bool CompactionServiceInput::TEST_Equals(CompactionServiceInput* other) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string mismatch;
   return TEST_Equals(other, &mismatch);
 }
 
 bool CompactionServiceInput::TEST_Equals(CompactionServiceInput* other,
                                          std::string* mismatch) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ConfigOptions cf;
   cf.invoke_prepare_options = false;
   return OptionTypeInfo::TypesAreEqual(cf, cs_input_type_info, this, other,

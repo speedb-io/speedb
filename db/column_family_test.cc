@@ -40,6 +40,7 @@ class EnvCounter : public SpecialEnv {
   explicit EnvCounter(Env* base)
       : SpecialEnv(base), num_new_writable_file_(0) {}
   int GetNumberOfNewWritableFileCalls() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return num_new_writable_file_;
   }
   Status NewWritableFile(const std::string& f, std::unique_ptr<WritableFile>* r,
@@ -55,6 +56,7 @@ class EnvCounter : public SpecialEnv {
 class ColumnFamilyTestBase : public testing::Test {
  public:
   explicit ColumnFamilyTestBase(uint32_t format) : rnd_(139), format_(format) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Env* base_env = Env::Default();
     EXPECT_OK(
         test::CreateEnvFromSystem(ConfigOptions(), &base_env, &env_guard_));
@@ -86,6 +88,7 @@ class ColumnFamilyTestBase : public testing::Test {
   }
 
   BlockBasedTableOptions GetBlockBasedTableOptions() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     BlockBasedTableOptions options;
     options.format_version = format_;
     return options;
@@ -93,6 +96,7 @@ class ColumnFamilyTestBase : public testing::Test {
 
   // Return the value to associate with the specified key
   Slice Value(int k, std::string* storage) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (k == 0) {
       // Ugh.  Random seed of 0 used to produce no entropy.  This code
       // preserves the implementation that was in place when all of the
@@ -106,6 +110,7 @@ class ColumnFamilyTestBase : public testing::Test {
   }
 
   void Build(int base, int n, int flush_every = 0) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::string key_space, value_space;
     WriteBatch batch;
 
@@ -127,6 +132,7 @@ class ColumnFamilyTestBase : public testing::Test {
   }
 
   void CheckMissed() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     uint64_t next_expected = 0;
     uint64_t missed = 0;
     int bad_keys = 0;
@@ -163,6 +169,7 @@ class ColumnFamilyTestBase : public testing::Test {
   }
 
   void Close() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     for (auto h : handles_) {
       if (h) {
         ASSERT_OK(db_->DestroyColumnFamilyHandle(h));
@@ -176,6 +183,7 @@ class ColumnFamilyTestBase : public testing::Test {
 
   Status TryOpen(std::vector<std::string> cf,
                  std::vector<ColumnFamilyOptions> options = {}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::vector<ColumnFamilyDescriptor> column_families;
     names_.clear();
     for (size_t i = 0; i < cf.size(); ++i) {
@@ -188,6 +196,7 @@ class ColumnFamilyTestBase : public testing::Test {
 
   Status OpenReadOnly(std::vector<std::string> cf,
                          std::vector<ColumnFamilyOptions> options = {}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::vector<ColumnFamilyDescriptor> column_families;
     names_.clear();
     for (size_t i = 0; i < cf.size(); ++i) {
@@ -202,6 +211,7 @@ class ColumnFamilyTestBase : public testing::Test {
 #ifndef ROCKSDB_LITE  // ReadOnlyDB is not supported
   void AssertOpenReadOnly(std::vector<std::string> cf,
                     std::vector<ColumnFamilyOptions> options = {}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_OK(OpenReadOnly(cf, options));
   }
 #endif  // !ROCKSDB_LITE
@@ -209,16 +219,19 @@ class ColumnFamilyTestBase : public testing::Test {
 
   void Open(std::vector<std::string> cf,
             std::vector<ColumnFamilyOptions> options = {}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_OK(TryOpen(cf, options));
   }
 
   void Open() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Open({"default"});
   }
 
   DBImpl* dbfull() { return static_cast_with_check<DBImpl>(db_); }
 
   int GetProperty(int cf, std::string property) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::string value;
     EXPECT_TRUE(dbfull()->GetProperty(handles_[cf], property, &value));
 #ifndef CYGWIN
@@ -229,6 +242,7 @@ class ColumnFamilyTestBase : public testing::Test {
   }
 
   bool IsDbWriteStopped() {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifndef ROCKSDB_LITE
     uint64_t v;
     EXPECT_TRUE(dbfull()->GetIntProperty("rocksdb.is-write-stopped", &v));
@@ -239,6 +253,7 @@ class ColumnFamilyTestBase : public testing::Test {
   }
 
   uint64_t GetDbDelayedWriteRate() {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifndef ROCKSDB_LITE
     uint64_t v;
     EXPECT_TRUE(
@@ -254,6 +269,7 @@ class ColumnFamilyTestBase : public testing::Test {
 
   void Destroy(const std::vector<ColumnFamilyDescriptor>& column_families =
                   std::vector<ColumnFamilyDescriptor>()) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Close();
     ASSERT_OK(DestroyDB(dbname_, Options(db_options_, column_family_options_),
                         column_families));
@@ -262,6 +278,7 @@ class ColumnFamilyTestBase : public testing::Test {
   void CreateColumnFamilies(
       const std::vector<std::string>& cfs,
       const std::vector<ColumnFamilyOptions> options = {}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     int cfi = static_cast<int>(handles_.size());
     handles_.resize(cfi + cfs.size());
     names_.resize(cfi + cfs.size());
@@ -287,6 +304,7 @@ class ColumnFamilyTestBase : public testing::Test {
   }
 
   void Reopen(const std::vector<ColumnFamilyOptions> options = {}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::vector<std::string> names;
     for (auto name : names_) {
       if (name != "") {
@@ -299,11 +317,13 @@ class ColumnFamilyTestBase : public testing::Test {
   }
 
   void CreateColumnFamiliesAndReopen(const std::vector<std::string>& cfs) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     CreateColumnFamilies(cfs);
     Reopen();
   }
 
   void DropColumnFamilies(const std::vector<int>& cfs) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     for (auto cf : cfs) {
       ASSERT_OK(db_->DropColumnFamily(handles_[cf]));
       ASSERT_OK(db_->DestroyColumnFamilyHandle(handles_[cf]));
@@ -313,6 +333,7 @@ class ColumnFamilyTestBase : public testing::Test {
   }
 
   void PutRandomData(int cf, int num, int key_value_size, bool save = false) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (cf >= static_cast<int>(keys_.size())) {
       keys_.resize(cf + 1);
     }
@@ -332,33 +353,41 @@ class ColumnFamilyTestBase : public testing::Test {
 
 #ifndef ROCKSDB_LITE  // TEST functions in DB are not supported in lite
   void WaitForFlush(int cf) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_OK(dbfull()->TEST_WaitForFlushMemTable(handles_[cf]));
   }
 
   void WaitForCompaction() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_OK(dbfull()->TEST_WaitForCompact());
   }
 
   uint64_t MaxTotalInMemoryState() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return dbfull()->TEST_MaxTotalInMemoryState();
   }
 
   void AssertMaxTotalInMemoryState(uint64_t value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_EQ(value, MaxTotalInMemoryState());
   }
 #endif  // !ROCKSDB_LITE
 
   Status Put(int cf, const std::string& key, const std::string& value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return db_->Put(WriteOptions(), handles_[cf], Slice(key), Slice(value));
   }
   Status Merge(int cf, const std::string& key, const std::string& value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return db_->Merge(WriteOptions(), handles_[cf], Slice(key), Slice(value));
   }
   Status Flush(int cf) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return db_->Flush(FlushOptions(), handles_[cf]);
   }
 
   std::string Get(int cf, const std::string& key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ReadOptions options;
     options.verify_checksums = true;
     std::string result;
@@ -372,16 +401,19 @@ class ColumnFamilyTestBase : public testing::Test {
   }
 
   void CompactAll(int cf) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_OK(db_->CompactRange(CompactRangeOptions(), handles_[cf], nullptr,
                                 nullptr));
   }
 
   void Compact(int cf, const Slice& start, const Slice& limit) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_OK(
         db_->CompactRange(CompactRangeOptions(), handles_[cf], &start, &limit));
   }
 
   int NumTableFilesAtLevel(int level, int cf) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return GetProperty(cf,
                        "rocksdb.num-files-at-level" + ToString(level));
   }
@@ -389,6 +421,7 @@ class ColumnFamilyTestBase : public testing::Test {
 #ifndef ROCKSDB_LITE
   // Return spread of files per level
   std::string FilesPerLevel(int cf) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::string result;
     int last_non_zero_offset = 0;
     for (int level = 0; level < dbfull()->NumberLevels(handles_[cf]); level++) {
@@ -406,6 +439,7 @@ class ColumnFamilyTestBase : public testing::Test {
 #endif
 
   void AssertFilesPerLevel(const std::string& value, int cf) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifndef ROCKSDB_LITE
     ASSERT_EQ(value, FilesPerLevel(cf));
 #else
@@ -416,6 +450,7 @@ class ColumnFamilyTestBase : public testing::Test {
 
 #ifndef ROCKSDB_LITE  // GetLiveFilesMetaData is not supported
   int CountLiveFiles() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::vector<LiveFileMetaData> metadata;
     db_->GetLiveFilesMetaData(&metadata);
     return static_cast<int>(metadata.size());
@@ -423,6 +458,7 @@ class ColumnFamilyTestBase : public testing::Test {
 #endif  // !ROCKSDB_LITE
 
   void AssertCountLiveFiles(int expected_value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifndef ROCKSDB_LITE
     ASSERT_EQ(expected_value, CountLiveFiles());
 #else
@@ -434,6 +470,7 @@ class ColumnFamilyTestBase : public testing::Test {
   // covering the range [small,large].
   void MakeTables(int cf, int n, const std::string& small,
                   const std::string& large) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     for (int i = 0; i < n; i++) {
       ASSERT_OK(Put(cf, small, "begin"));
       ASSERT_OK(Put(cf, large, "end"));
@@ -443,6 +480,7 @@ class ColumnFamilyTestBase : public testing::Test {
 
 #ifndef ROCKSDB_LITE  // GetSortedWalFiles is not supported
   int CountLiveLogFiles() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     int micros_wait_for_log_deletion = 20000;
     env_->SleepForMicroseconds(micros_wait_for_log_deletion);
     int ret = 0;
@@ -473,6 +511,7 @@ class ColumnFamilyTestBase : public testing::Test {
 #endif  // !ROCKSDB_LITE
 
   void AssertCountLiveLogFiles(int value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifndef ROCKSDB_LITE  // GetSortedWalFiles is not supported
     ASSERT_EQ(value, CountLiveLogFiles());
 #else
@@ -481,6 +520,7 @@ class ColumnFamilyTestBase : public testing::Test {
   }
 
   void AssertNumberOfImmutableMemtables(std::vector<int> num_per_cf) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(num_per_cf.size() == handles_.size());
 
 #ifndef ROCKSDB_LITE  // GetProperty is not supported in lite
@@ -493,6 +533,7 @@ class ColumnFamilyTestBase : public testing::Test {
 
   void CopyFile(const std::string& source, const std::string& destination,
                 uint64_t size = 0) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     const EnvOptions soptions;
     std::unique_ptr<SequentialFile> srcfile;
     ASSERT_OK(env_->NewSequentialFile(source, &srcfile, soptions));
@@ -516,6 +557,7 @@ class ColumnFamilyTestBase : public testing::Test {
   }
 
   int GetSstFileCount(std::string path) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::vector<std::string> files;
     DBTestBase::GetSstFiles(env_, path, &files);
     return static_cast<int>(files.size());
@@ -557,6 +599,7 @@ INSTANTIATE_TEST_CASE_P(FormatLatest, ColumnFamilyTest,
                         testing::Values(kLatestFormatVersion));
 
 TEST_P(ColumnFamilyTest, DontReuseColumnFamilyID) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (int iter = 0; iter < 3; ++iter) {
     Open();
     CreateColumnFamilies({"one", "two", "three"});
@@ -586,6 +629,7 @@ TEST_P(ColumnFamilyTest, DontReuseColumnFamilyID) {
 
 #ifndef ROCKSDB_LITE
 TEST_P(ColumnFamilyTest, CreateCFRaceWithGetAggProperty) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Open();
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->LoadDependency(
@@ -625,6 +669,7 @@ class FlushEmptyCFTestWithParam
 };
 
 TEST_P(FlushEmptyCFTestWithParam, FlushEmptyCFTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<FaultInjectionTestEnv> fault_env(
       new FaultInjectionTestEnv(env_));
   db_options_.env = fault_env.get();
@@ -681,6 +726,7 @@ TEST_P(FlushEmptyCFTestWithParam, FlushEmptyCFTest) {
 }
 
 TEST_P(FlushEmptyCFTestWithParam, FlushEmptyCFTest2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<FaultInjectionTestEnv> fault_env(
       new FaultInjectionTestEnv(env_));
   db_options_.env = fault_env.get();
@@ -750,6 +796,7 @@ INSTANTIATE_TEST_CASE_P(
                     std::make_tuple(kLatestFormatVersion, false)));
 
 TEST_P(ColumnFamilyTest, AddDrop) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Open();
   CreateColumnFamilies({"one", "two", "three"});
   ASSERT_EQ("NOT_FOUND", Get(1, "fodor"));
@@ -776,6 +823,7 @@ TEST_P(ColumnFamilyTest, AddDrop) {
 }
 
 TEST_P(ColumnFamilyTest, BulkAddDrop) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr int kNumCF = 1000;
   ColumnFamilyOptions cf_options;
   WriteOptions write_options;
@@ -814,6 +862,7 @@ TEST_P(ColumnFamilyTest, BulkAddDrop) {
 }
 
 TEST_P(ColumnFamilyTest, DropTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // first iteration - don't reopen DB before dropping
   // second iteration - reopen DB before dropping
   for (int iter = 0; iter < 2; ++iter) {
@@ -838,6 +887,7 @@ TEST_P(ColumnFamilyTest, DropTest) {
 }
 
 TEST_P(ColumnFamilyTest, WriteBatchFailure) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Open();
   CreateColumnFamiliesAndReopen({"one", "two"});
   WriteBatch batch;
@@ -858,6 +908,7 @@ TEST_P(ColumnFamilyTest, WriteBatchFailure) {
 }
 
 TEST_P(ColumnFamilyTest, ReadWrite) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Open();
   CreateColumnFamiliesAndReopen({"one", "two"});
   ASSERT_OK(Put(0, "foo", "v1"));
@@ -882,6 +933,7 @@ TEST_P(ColumnFamilyTest, ReadWrite) {
 }
 
 TEST_P(ColumnFamilyTest, IgnoreRecoveredLog) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string backup_logs = dbname_ + "/backup_logs";
 
   // delete old files in backup_logs directory
@@ -952,6 +1004,7 @@ TEST_P(ColumnFamilyTest, IgnoreRecoveredLog) {
 
 #ifndef ROCKSDB_LITE  // TEST functions used are not supported
 TEST_P(ColumnFamilyTest, FlushTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Open();
   CreateColumnFamiliesAndReopen({"one", "two"});
   ASSERT_OK(Put(0, "foo", "v1"));
@@ -1001,6 +1054,7 @@ TEST_P(ColumnFamilyTest, FlushTest) {
 
 // Makes sure that obsolete log files get deleted
 TEST_P(ColumnFamilyTest, LogDeletionTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   db_options_.max_total_wal_size = std::numeric_limits<uint64_t>::max();
   column_family_options_.arena_block_size = 4 * 1024;
   column_family_options_.write_buffer_size = 128000;  // 128KB
@@ -1069,6 +1123,7 @@ TEST_P(ColumnFamilyTest, LogDeletionTest) {
 #endif  // !ROCKSDB_LITE
 
 TEST_P(ColumnFamilyTest, CrashAfterFlush) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<FaultInjectionTestEnv> fault_env(
       new FaultInjectionTestEnv(env_));
   db_options_.env = fault_env.get();
@@ -1101,6 +1156,7 @@ TEST_P(ColumnFamilyTest, CrashAfterFlush) {
 }
 
 TEST_P(ColumnFamilyTest, OpenNonexistentColumnFamily) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(TryOpen({"default"}));
   Close();
   ASSERT_TRUE(TryOpen({"default", "dne"}).IsInvalidArgument());
@@ -1109,6 +1165,7 @@ TEST_P(ColumnFamilyTest, OpenNonexistentColumnFamily) {
 #ifndef ROCKSDB_LITE  // WaitForFlush() is not supported
 // Makes sure that obsolete log files get deleted
 TEST_P(ColumnFamilyTest, DifferentWriteBufferSizes) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // disable flushing stale column families
   db_options_.max_total_wal_size = std::numeric_limits<uint64_t>::max();
   Open();
@@ -1223,6 +1280,7 @@ TEST_P(ColumnFamilyTest, DifferentWriteBufferSizes) {
 //
 // #ifndef ROCKSDB_LITE  // Cuckoo is not supported in lite
 //   TEST_P(ColumnFamilyTest, MemtableNotSupportSnapshot) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 //   db_options_.allow_concurrent_memtable_write = false;
 //   Open();
 //   auto* s1 = dbfull()->GetSnapshot();
@@ -1260,6 +1318,7 @@ static TestComparator fourth_comparator;
 
 // Test that we can retrieve the comparator from a created CF
 TEST_P(ColumnFamilyTest, GetComparator) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Open();
   // Add a column family with no comparator specified
   CreateColumnFamilies({"first"});
@@ -1279,6 +1338,7 @@ TEST_P(ColumnFamilyTest, GetComparator) {
 }
 
 TEST_P(ColumnFamilyTest, DifferentMergeOperators) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Open();
   CreateColumnFamilies({"first", "second"});
   ColumnFamilyOptions default_cf, first, second;
@@ -1310,6 +1370,7 @@ TEST_P(ColumnFamilyTest, DifferentMergeOperators) {
 
 #ifndef ROCKSDB_LITE  // WaitForFlush() is not supported
 TEST_P(ColumnFamilyTest, DifferentCompactionStyles) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Open();
   CreateColumnFamilies({"one", "two"});
   ColumnFamilyOptions default_cf, one, two;
@@ -1382,6 +1443,7 @@ TEST_P(ColumnFamilyTest, DifferentCompactionStyles) {
 // Sync points not supported in RocksDB Lite
 
 TEST_P(ColumnFamilyTest, MultipleManualCompactions) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Open();
   CreateColumnFamilies({"one", "two"});
   ColumnFamilyOptions default_cf, one, two;
@@ -1425,6 +1487,7 @@ TEST_P(ColumnFamilyTest, MultipleManualCompactions) {
        {"ColumnFamilyTest::MultiManual:2", "ColumnFamilyTest::MultiManual:3"}});
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::BackgroundCompaction:NonTrivial:AfterRun", [&](void* /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         if (cf_1_1) {
           TEST_SYNC_POINT("ColumnFamilyTest::MultiManual:4");
           cf_1_1 = false;
@@ -1481,6 +1544,7 @@ TEST_P(ColumnFamilyTest, MultipleManualCompactions) {
 }
 
 TEST_P(ColumnFamilyTest, AutomaticAndManualCompactions) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Open();
   CreateColumnFamilies({"one", "two"});
   ColumnFamilyOptions default_cf, one, two;
@@ -1521,6 +1585,7 @@ TEST_P(ColumnFamilyTest, AutomaticAndManualCompactions) {
        {"ColumnFamilyTest::AutoManual:2", "ColumnFamilyTest::AutoManual:3"}});
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::BackgroundCompaction:NonTrivial:AfterRun", [&](void* /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         if (cf_1_1) {
           cf_1_1 = false;
           TEST_SYNC_POINT("ColumnFamilyTest::AutoManual:4");
@@ -1577,6 +1642,7 @@ TEST_P(ColumnFamilyTest, AutomaticAndManualCompactions) {
 }
 
 TEST_P(ColumnFamilyTest, ManualAndAutomaticCompactions) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Open();
   CreateColumnFamilies({"one", "two"});
   ColumnFamilyOptions default_cf, one, two;
@@ -1625,6 +1691,7 @@ TEST_P(ColumnFamilyTest, ManualAndAutomaticCompactions) {
        {"ColumnFamilyTest::ManualAuto:2", "ColumnFamilyTest::ManualAuto:3"}});
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::BackgroundCompaction:NonTrivial:AfterRun", [&](void* /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         if (cf_1_1) {
           TEST_SYNC_POINT("ColumnFamilyTest::ManualAuto:4");
           cf_1_1 = false;
@@ -1676,6 +1743,7 @@ TEST_P(ColumnFamilyTest, ManualAndAutomaticCompactions) {
 }
 
 TEST_P(ColumnFamilyTest, SameCFManualManualCompactions) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Open();
   CreateColumnFamilies({"one"});
   ColumnFamilyOptions default_cf, one;
@@ -1721,6 +1789,7 @@ TEST_P(ColumnFamilyTest, SameCFManualManualCompactions) {
         "ColumnFamilyTest::ManualManual:3"}});
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::BackgroundCompaction:NonTrivial:AfterRun", [&](void* /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         if (cf_1_1) {
           TEST_SYNC_POINT("ColumnFamilyTest::ManualManual:4");
           cf_1_1 = false;
@@ -1778,6 +1847,7 @@ TEST_P(ColumnFamilyTest, SameCFManualManualCompactions) {
 }
 
 TEST_P(ColumnFamilyTest, SameCFManualAutomaticCompactions) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Open();
   CreateColumnFamilies({"one"});
   ColumnFamilyOptions default_cf, one;
@@ -1822,6 +1892,7 @@ TEST_P(ColumnFamilyTest, SameCFManualAutomaticCompactions) {
        {"ColumnFamilyTest::ManualAuto:1", "ColumnFamilyTest::ManualAuto:3"}});
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::BackgroundCompaction:NonTrivial:AfterRun", [&](void* /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         if (cf_1_1) {
           TEST_SYNC_POINT("ColumnFamilyTest::ManualAuto:4");
           cf_1_1 = false;
@@ -1871,6 +1942,7 @@ TEST_P(ColumnFamilyTest, SameCFManualAutomaticCompactions) {
 }
 
 TEST_P(ColumnFamilyTest, SameCFManualAutomaticCompactionsLevel) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Open();
   CreateColumnFamilies({"one"});
   ColumnFamilyOptions default_cf, one;
@@ -1917,6 +1989,7 @@ TEST_P(ColumnFamilyTest, SameCFManualAutomaticCompactionsLevel) {
        {"ColumnFamilyTest::ManualAuto:1", "ColumnFamilyTest::ManualAuto:3"}});
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::BackgroundCompaction:NonTrivial:AfterRun", [&](void* /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         if (cf_1_1) {
           TEST_SYNC_POINT("ColumnFamilyTest::ManualAuto:4");
           cf_1_1 = false;
@@ -2007,6 +2080,7 @@ TEST_P(ColumnFamilyTest, SameCFAutomaticManualCompactions) {
         "ColumnFamilyTest::AutoManual:3"}});
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::BackgroundCompaction:NonTrivial:AfterRun", [&](void* /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         if (cf_1_1) {
           TEST_SYNC_POINT("ColumnFamilyTest::AutoManual:4");
           cf_1_1 = false;
@@ -2059,6 +2133,7 @@ TEST_P(ColumnFamilyTest, SameCFAutomaticManualCompactions) {
 #ifndef ROCKSDB_LITE  // Tailing iterator not supported
 namespace {
 std::string IterStatus(Iterator* iter) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string result;
   if (iter->Valid()) {
     result = iter->key().ToString() + "->" + iter->value().ToString();
@@ -2071,6 +2146,7 @@ std::string IterStatus(Iterator* iter) {
 }  // anonymous namespace
 
 TEST_P(ColumnFamilyTest, NewIteratorsTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // iter == 0 -- no tailing
   // iter == 2 -- tailing
   for (int iter = 0; iter < 2; ++iter) {
@@ -2118,6 +2194,7 @@ TEST_P(ColumnFamilyTest, NewIteratorsTest) {
 
 #ifndef ROCKSDB_LITE  // ReadOnlyDB is not supported
 TEST_P(ColumnFamilyTest, ReadOnlyDBTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Open();
   CreateColumnFamiliesAndReopen({"one", "two", "three", "four"});
   ASSERT_OK(Put(0, "a", "b"));
@@ -2170,6 +2247,7 @@ TEST_P(ColumnFamilyTest, ReadOnlyDBTest) {
 
 #ifndef ROCKSDB_LITE  //  WaitForFlush() is not supported in lite
 TEST_P(ColumnFamilyTest, DontRollEmptyLogs) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Open();
   CreateColumnFamiliesAndReopen({"one", "two", "three", "four"});
 
@@ -2194,6 +2272,7 @@ TEST_P(ColumnFamilyTest, DontRollEmptyLogs) {
 
 #ifndef ROCKSDB_LITE  //  WaitForCompaction() is not supported in lite
 TEST_P(ColumnFamilyTest, FlushStaleColumnFamilies) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Open();
   CreateColumnFamilies({"one", "two"});
   ColumnFamilyOptions default_cf, one, two;
@@ -2229,6 +2308,7 @@ TEST_P(ColumnFamilyTest, FlushStaleColumnFamilies) {
 #endif  // !ROCKSDB_LITE
 
 TEST_P(ColumnFamilyTest, CreateMissingColumnFamilies) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Status s = TryOpen({"one", "two"});
   ASSERT_TRUE(!s.ok());
   db_options_.create_missing_column_families = true;
@@ -2238,6 +2318,7 @@ TEST_P(ColumnFamilyTest, CreateMissingColumnFamilies) {
 }
 
 TEST_P(ColumnFamilyTest, SanitizeOptions) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   DBOptions db_options;
   for (int s = kCompactionStyleLevel; s <= kCompactionStyleUniversal; ++s) {
     for (int l = 0; l <= 2; l++) {
@@ -2289,6 +2370,7 @@ TEST_P(ColumnFamilyTest, SanitizeOptions) {
 }
 
 TEST_P(ColumnFamilyTest, ReadDroppedColumnFamily) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // iter 0 -- drop CF, don't reopen
   // iter 1 -- delete CF, reopen
   for (int iter = 0; iter < 2; ++iter) {
@@ -2361,6 +2443,7 @@ TEST_P(ColumnFamilyTest, ReadDroppedColumnFamily) {
 }
 
 TEST_P(ColumnFamilyTest, LiveIteratorWithDroppedColumnFamily) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   db_options_.create_missing_column_families = true;
   db_options_.max_open_files = 20;
   // delete obsolete files always
@@ -2399,6 +2482,7 @@ TEST_P(ColumnFamilyTest, LiveIteratorWithDroppedColumnFamily) {
 }
 
 TEST_P(ColumnFamilyTest, FlushAndDropRaceCondition) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   db_options_.create_missing_column_families = true;
   Open({"default", "one"});
   ColumnFamilyOptions options;
@@ -2475,6 +2559,7 @@ const int kMainThreadStartPersistingOptionsFile = 1;
 const int kChildThreadFinishDroppingColumnFamily = 2;
 void DropSingleColumnFamily(ColumnFamilyTest* cf_test, int cf_id,
                             std::vector<Comparator*>* comparators) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   while (test_stage < kMainThreadStartPersistingOptionsFile &&
          !ordered_by_writethread) {
     Env::Default()->SleepForMicroseconds(100);
@@ -2489,6 +2574,7 @@ void DropSingleColumnFamily(ColumnFamilyTest* cf_test, int cf_id,
 }  // namespace
 
 TEST_P(ColumnFamilyTest, CreateAndDropRace) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kCfCount = 5;
   std::vector<ColumnFamilyOptions> cf_opts;
   std::vector<Comparator*> comparators;
@@ -2518,6 +2604,7 @@ TEST_P(ColumnFamilyTest, CreateAndDropRace) {
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "WriteThread::EnterUnbatched:Wait", [&](void* /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         // This means a thread doing DropColumnFamily() is waiting for
         // other thread to finish persisting options.
         // In such case, we update the test_stage to unblock the main thread.
@@ -2552,6 +2639,7 @@ TEST_P(ColumnFamilyTest, CreateAndDropRace) {
 #endif  // !ROCKSDB_LITE
 
 TEST_P(ColumnFamilyTest, WriteStallSingleColumnFamily) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const uint64_t kBaseRate = 800000u;
   db_options_.delayed_write_rate = kBaseRate;
   db_options_.max_background_compactions = 6;
@@ -2734,6 +2822,7 @@ TEST_P(ColumnFamilyTest, WriteStallSingleColumnFamily) {
 }
 
 TEST_P(ColumnFamilyTest, CompactionSpeedupSingleColumnFamily) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   db_options_.max_background_compactions = 6;
   Open({"default"});
   ColumnFamilyData* cfd =
@@ -2798,6 +2887,7 @@ TEST_P(ColumnFamilyTest, CompactionSpeedupSingleColumnFamily) {
 }
 
 TEST_P(ColumnFamilyTest, WriteStallTwoColumnFamilies) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const uint64_t kBaseRate = 810000u;
   db_options_.delayed_write_rate = kBaseRate;
   Open();
@@ -2873,6 +2963,7 @@ TEST_P(ColumnFamilyTest, WriteStallTwoColumnFamilies) {
 }
 
 TEST_P(ColumnFamilyTest, CompactionSpeedupTwoColumnFamilies) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   db_options_.max_background_compactions = 6;
   column_family_options_.soft_pending_compaction_bytes_limit = 200;
   column_family_options_.hard_pending_compaction_bytes_limit = 2000;
@@ -2938,6 +3029,7 @@ TEST_P(ColumnFamilyTest, CompactionSpeedupTwoColumnFamilies) {
 }
 
 TEST_P(ColumnFamilyTest, CreateAndDestoryOptions) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<ColumnFamilyOptions> cfo(new ColumnFamilyOptions());
   ColumnFamilyHandle* cfh;
   Open();
@@ -2950,6 +3042,7 @@ TEST_P(ColumnFamilyTest, CreateAndDestoryOptions) {
 }
 
 TEST_P(ColumnFamilyTest, CreateDropAndDestroy) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ColumnFamilyHandle* cfh;
   Open();
   ASSERT_OK(db_->CreateColumnFamily(ColumnFamilyOptions(), "yoyo", &cfh));
@@ -2961,6 +3054,7 @@ TEST_P(ColumnFamilyTest, CreateDropAndDestroy) {
 
 #ifndef ROCKSDB_LITE
 TEST_P(ColumnFamilyTest, CreateDropAndDestroyWithoutFileDeletion) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ColumnFamilyHandle* cfh;
   Open();
   ASSERT_OK(db_->CreateColumnFamily(ColumnFamilyOptions(), "yoyo", &cfh));
@@ -2972,6 +3066,7 @@ TEST_P(ColumnFamilyTest, CreateDropAndDestroyWithoutFileDeletion) {
 }
 
 TEST_P(ColumnFamilyTest, FlushCloseWALFiles) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   SpecialEnv env(Env::Default());
   db_options_.env = &env;
   db_options_.max_background_flushes = 1;
@@ -3018,6 +3113,7 @@ TEST_P(ColumnFamilyTest, FlushCloseWALFiles) {
 
 #ifndef ROCKSDB_LITE  // WaitForFlush() is not supported
 TEST_P(ColumnFamilyTest, IteratorCloseWALFile1) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   SpecialEnv env(Env::Default());
   db_options_.env = &env;
   db_options_.max_background_flushes = 1;
@@ -3068,6 +3164,7 @@ TEST_P(ColumnFamilyTest, IteratorCloseWALFile1) {
 }
 
 TEST_P(ColumnFamilyTest, IteratorCloseWALFile2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   SpecialEnv env(Env::Default());
   // Allow both of flush and purge job to schedule.
   env.SetBackgroundThreads(2, Env::HIGH);
@@ -3127,6 +3224,7 @@ TEST_P(ColumnFamilyTest, IteratorCloseWALFile2) {
 
 #ifndef ROCKSDB_LITE  // TEST functions are not supported in lite
 TEST_P(ColumnFamilyTest, ForwardIteratorCloseWALFile) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   SpecialEnv env(Env::Default());
   // Allow both of flush and purge job to schedule.
   env.SetBackgroundThreads(2, Env::HIGH);
@@ -3207,6 +3305,7 @@ TEST_P(ColumnFamilyTest, ForwardIteratorCloseWALFile) {
 // to return true which is not so in unbuffered mode.
 #ifndef OS_WIN
 TEST_P(ColumnFamilyTest, LogSyncConflictFlush) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Open();
   CreateColumnFamiliesAndReopen({"one", "two"});
 
@@ -3242,6 +3341,7 @@ TEST_P(ColumnFamilyTest, LogSyncConflictFlush) {
 // Basic idea is to test that WAL truncation is being detected and not
 // ignored
 TEST_P(ColumnFamilyTest, DISABLED_LogTruncationTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Open();
   CreateColumnFamiliesAndReopen({"one", "two"});
 
@@ -3312,6 +3412,7 @@ TEST_P(ColumnFamilyTest, DISABLED_LogTruncationTest) {
 }
 
 TEST_P(ColumnFamilyTest, DefaultCfPathsTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Open();
   // Leave cf_paths for one column families to be empty.
   // Files should be generated according to db_paths for that
@@ -3339,6 +3440,7 @@ TEST_P(ColumnFamilyTest, DefaultCfPathsTest) {
 }
 
 TEST_P(ColumnFamilyTest, MultipleCFPathsTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Open();
   // Configure Column family specific paths.
   ColumnFamilyOptions cf_opt1, cf_opt2;
@@ -3384,6 +3486,7 @@ TEST_P(ColumnFamilyTest, MultipleCFPathsTest) {
 }
 
 TEST(ColumnFamilyTest, ValidateBlobGCCutoff) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   DBOptions db_options;
 
   ColumnFamilyOptions cf_options;
@@ -3408,6 +3511,7 @@ TEST(ColumnFamilyTest, ValidateBlobGCCutoff) {
 }
 
 TEST(ColumnFamilyTest, ValidateBlobGCForceThreshold) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   DBOptions db_options;
 
   ColumnFamilyOptions cf_options;
@@ -3434,6 +3538,7 @@ TEST(ColumnFamilyTest, ValidateBlobGCForceThreshold) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   RegisterCustomObjects(argc, argv);

@@ -20,6 +20,7 @@ namespace ROCKSDB_NAMESPACE {
 
 Status ArenaWrappedDBIter::GetProperty(std::string prop_name,
                                        std::string* prop) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (prop_name == "rocksdb.iterator.super-version-number") {
     // First try to pass the value returned from inner iterator.
     if (!db_iter_->GetProperty(prop_name, prop).ok()) {
@@ -36,6 +37,7 @@ void ArenaWrappedDBIter::Init(
     const SequenceNumber& sequence, uint64_t max_sequential_skip_in_iteration,
     uint64_t version_number, ReadCallback* read_callback, DBImpl* db_impl,
     ColumnFamilyData* cfd, bool expose_blob_index, bool allow_refresh) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto mem = arena_.AllocateAligned(sizeof(DBIter));
   db_iter_ =
       new (mem) DBIter(env, read_options, ioptions, mutable_cf_options,
@@ -48,6 +50,7 @@ void ArenaWrappedDBIter::Init(
 }
 
 Status ArenaWrappedDBIter::Refresh() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (cfd_ == nullptr || db_impl_ == nullptr || !allow_refresh_) {
     return Status::NotSupported("Creating renew iterator is not allowed.");
   }
@@ -117,6 +120,7 @@ ArenaWrappedDBIter* NewArenaWrappedDbIterator(
     const SequenceNumber& sequence, uint64_t max_sequential_skip_in_iterations,
     uint64_t version_number, ReadCallback* read_callback, DBImpl* db_impl,
     ColumnFamilyData* cfd, bool expose_blob_index, bool allow_refresh) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ArenaWrappedDBIter* iter = new ArenaWrappedDBIter();
   iter->Init(env, read_options, ioptions, mutable_cf_options, version, sequence,
              max_sequential_skip_in_iterations, version_number, read_callback,

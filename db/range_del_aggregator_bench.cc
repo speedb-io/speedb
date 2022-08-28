@@ -6,6 +6,7 @@
 #ifndef GFLAGS
 #include <cstdio>
 int main() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   fprintf(stderr, "Please install gflags to run rocksdb tools\n");
   return 1;
 }
@@ -63,6 +64,7 @@ struct Stats {
 };
 
 std::ostream& operator<<(std::ostream& os, const Stats& s) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::ios fmt_holder(nullptr);
   fmt_holder.copyfmt(os);
 
@@ -103,6 +105,7 @@ struct PersistentRangeTombstone {
   PersistentRangeTombstone(std::string start, std::string end,
                            SequenceNumber seq)
       : start_key(std::move(start)), end_key(std::move(end)) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     tombstone = RangeTombstone(start_key, end_key, seq);
   }
 
@@ -111,6 +114,7 @@ struct PersistentRangeTombstone {
   PersistentRangeTombstone(const PersistentRangeTombstone& t) { *this = t; }
 
   PersistentRangeTombstone& operator=(const PersistentRangeTombstone& t) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     start_key = t.start_key;
     end_key = t.end_key;
     tombstone = RangeTombstone(start_key, end_key, t.tombstone.seq_);
@@ -121,6 +125,7 @@ struct PersistentRangeTombstone {
   PersistentRangeTombstone(PersistentRangeTombstone&& t) noexcept { *this = t; }
 
   PersistentRangeTombstone& operator=(PersistentRangeTombstone&& t) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     start_key = std::move(t.start_key);
     end_key = std::move(t.end_key);
     tombstone = RangeTombstone(start_key, end_key, t.tombstone.seq_);
@@ -141,6 +146,7 @@ struct TombstoneStartKeyComparator {
 
 std::unique_ptr<InternalIterator> MakeRangeDelIterator(
     const std::vector<PersistentRangeTombstone>& range_dels) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::vector<std::string> keys, values;
   for (const auto& range_del : range_dels) {
     auto key_and_value = range_del.tombstone.Serialize();
@@ -153,6 +159,7 @@ std::unique_ptr<InternalIterator> MakeRangeDelIterator(
 
 // convert long to a big-endian slice key
 static std::string Key(int64_t val) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string little_endian_key;
   std::string big_endian_key;
   PutFixed64(&little_endian_key, val);
@@ -169,6 +176,7 @@ static std::string Key(int64_t val) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ParseCommandLineFlags(&argc, &argv, true);
 
   Stats stats;

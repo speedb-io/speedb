@@ -9,6 +9,7 @@ namespace ROCKSDB_NAMESPACE {
 
 FilePrefetchBuffer* PrefetchBufferCollection::GetOrCreatePrefetchBuffer(
     uint64_t file_number) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto& prefetch_buffer = prefetch_buffers_[file_number];
   if (!prefetch_buffer) {
     prefetch_buffer.reset(

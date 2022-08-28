@@ -36,6 +36,7 @@ void WriteBlobFile(const ImmutableOptions& immutable_options,
                    const std::vector<Slice>& blobs, CompressionType compression,
                    std::vector<uint64_t>& blob_offsets,
                    std::vector<uint64_t>& blob_sizes) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(!immutable_options.cf_paths.empty());
   size_t num = keys.size();
   assert(num == blobs.size());
@@ -114,6 +115,7 @@ void WriteBlobFile(const ImmutableOptions& immutable_options,
                    uint64_t blob_file_number, const Slice& key,
                    const Slice& blob, CompressionType compression,
                    uint64_t* blob_offset, uint64_t* blob_size) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::vector<Slice> keys{key};
   std::vector<Slice> blobs{blob};
   std::vector<uint64_t> blob_offsets{0};
@@ -139,6 +141,7 @@ class BlobFileReaderTest : public testing::Test {
 };
 
 TEST_F(BlobFileReaderTest, CreateReaderAndGetBlob) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = mock_env_.get();
   options.cf_paths.emplace_back(
@@ -398,6 +401,7 @@ TEST_F(BlobFileReaderTest, CreateReaderAndGetBlob) {
 }
 
 TEST_F(BlobFileReaderTest, Malformed) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Write a blob file consisting of nothing but a header, and make sure we
   // detect the error when we open it for reading
 
@@ -454,6 +458,7 @@ TEST_F(BlobFileReaderTest, Malformed) {
 }
 
 TEST_F(BlobFileReaderTest, TTL) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = mock_env_.get();
   options.cf_paths.emplace_back(
@@ -488,6 +493,7 @@ TEST_F(BlobFileReaderTest, TTL) {
 }
 
 TEST_F(BlobFileReaderTest, ExpirationRangeInHeader) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = mock_env_.get();
   options.cf_paths.emplace_back(
@@ -527,6 +533,7 @@ TEST_F(BlobFileReaderTest, ExpirationRangeInHeader) {
 }
 
 TEST_F(BlobFileReaderTest, ExpirationRangeInFooter) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = mock_env_.get();
   options.cf_paths.emplace_back(
@@ -566,6 +573,7 @@ TEST_F(BlobFileReaderTest, ExpirationRangeInFooter) {
 }
 
 TEST_F(BlobFileReaderTest, IncorrectColumnFamily) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = mock_env_.get();
   options.cf_paths.emplace_back(
@@ -604,6 +612,7 @@ TEST_F(BlobFileReaderTest, IncorrectColumnFamily) {
 }
 
 TEST_F(BlobFileReaderTest, BlobCRCError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = mock_env_.get();
   options.cf_paths.emplace_back(
@@ -637,6 +646,7 @@ TEST_F(BlobFileReaderTest, BlobCRCError) {
 
   SyncPoint::GetInstance()->SetCallBack(
       "BlobFileReader::VerifyBlob:CheckBlobCRC", [](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         BlobLogRecord* const record = static_cast<BlobLogRecord*>(arg);
         assert(record);
 
@@ -661,6 +671,7 @@ TEST_F(BlobFileReaderTest, BlobCRCError) {
 }
 
 TEST_F(BlobFileReaderTest, Compression) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!Snappy_Supported()) {
     return;
   }
@@ -732,6 +743,7 @@ TEST_F(BlobFileReaderTest, Compression) {
 }
 
 TEST_F(BlobFileReaderTest, UncompressionError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!Snappy_Supported()) {
     return;
   }
@@ -770,6 +782,7 @@ TEST_F(BlobFileReaderTest, UncompressionError) {
 
   SyncPoint::GetInstance()->SetCallBack(
       "BlobFileReader::UncompressBlobIfNeeded:TamperWithResult", [](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         CacheAllocationPtr* const output =
             static_cast<CacheAllocationPtr*>(arg);
         assert(output);
@@ -799,6 +812,7 @@ class BlobFileReaderIOErrorTest
       public testing::WithParamInterface<std::string> {
  protected:
   BlobFileReaderIOErrorTest() : sync_point_(GetParam()) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     mock_env_.reset(MockEnv::Create(Env::Default()));
     fault_injection_env_.reset(new FaultInjectionTestEnv(mock_env_.get()));
   }
@@ -817,6 +831,7 @@ INSTANTIATE_TEST_CASE_P(BlobFileReaderTest, BlobFileReaderIOErrorTest,
                             "BlobFileReader::GetBlob:ReadFromFile"}));
 
 TEST_P(BlobFileReaderIOErrorTest, IOError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Simulates an I/O error during the specified step
 
   Options options;
@@ -844,6 +859,7 @@ TEST_P(BlobFileReaderIOErrorTest, IOError) {
                 &blob_offset, &blob_size);
 
   SyncPoint::GetInstance()->SetCallBack(sync_point_, [this](void* /* arg */) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     fault_injection_env_->SetFilesystemActive(false,
                                               Status::IOError(sync_point_));
   });
@@ -886,6 +902,7 @@ class BlobFileReaderDecodingErrorTest
       public testing::WithParamInterface<std::string> {
  protected:
   BlobFileReaderDecodingErrorTest() : sync_point_(GetParam()) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     mock_env_.reset(MockEnv::Create(Env::Default()));
   }
 
@@ -900,6 +917,7 @@ INSTANTIATE_TEST_CASE_P(BlobFileReaderTest, BlobFileReaderDecodingErrorTest,
                             "BlobFileReader::GetBlob:TamperWithResult"}));
 
 TEST_P(BlobFileReaderDecodingErrorTest, DecodingError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = mock_env_.get();
   options.cf_paths.emplace_back(
@@ -925,6 +943,7 @@ TEST_P(BlobFileReaderDecodingErrorTest, DecodingError) {
                 &blob_offset, &blob_size);
 
   SyncPoint::GetInstance()->SetCallBack(sync_point_, [](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Slice* const slice = static_cast<Slice*>(arg);
     assert(slice);
     assert(!slice->empty());
@@ -969,6 +988,7 @@ TEST_P(BlobFileReaderDecodingErrorTest, DecodingError) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

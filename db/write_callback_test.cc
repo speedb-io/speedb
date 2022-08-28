@@ -29,6 +29,7 @@ class WriteCallbackTest : public testing::Test {
   string dbname;
 
   WriteCallbackTest() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     dbname = test::PerThreadDBPath("write_callback_testdb");
   }
 };
@@ -67,6 +68,7 @@ class MockWriteCallback : public WriteCallback {
   MockWriteCallback() {}
 
   MockWriteCallback(const MockWriteCallback& other) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     should_fail_ = other.should_fail_;
     allow_batching_ = other.allow_batching_;
     was_called_.store(other.was_called_.load());
@@ -91,6 +93,7 @@ class WriteCallbackPTest
           std::tuple<bool, bool, bool, bool, bool, bool, bool>> {
  public:
   WriteCallbackPTest() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::tie(unordered_write_, seq_per_batch_, two_queues_, allow_parallel_,
              allow_batching_, enable_WAL_, enable_pipelined_write_) =
         GetParam();
@@ -107,15 +110,18 @@ class WriteCallbackPTest
 };
 
 TEST_P(WriteCallbackPTest, WriteWithCallbackTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   struct WriteOP {
     WriteOP(bool should_fail = false) { callback_.should_fail_ = should_fail; }
 
     void Put(const string& key, const string& val) {
+PERF_MARKER(__PRETTY_FUNCTION__);
       kvs_.push_back(std::make_pair(key, val));
       ASSERT_OK(write_batch_.Put(key, val));
     }
 
     void Clear() {
+PERF_MARKER(__PRETTY_FUNCTION__);
       kvs_.clear();
       write_batch_.Clear();
       callback_.was_called_.store(false);
@@ -212,6 +218,7 @@ TEST_P(WriteCallbackPTest, WriteWithCallbackTest) {
     // Verification once writers call JoinBatchGroup.
     ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
         "WriteThread::JoinBatchGroup:Wait", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
           uint64_t cur_threads_linked = threads_linked.fetch_add(1);
           bool is_leader = false;
           bool is_last = false;
@@ -250,6 +257,7 @@ TEST_P(WriteCallbackPTest, WriteWithCallbackTest) {
 
     ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
         "WriteThread::JoinBatchGroup:DoneWaiting", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
           // check my state
           auto* writer = reinterpret_cast<WriteThread::Writer*>(arg);
 
@@ -380,6 +388,7 @@ INSTANTIATE_TEST_CASE_P(WriteCallbackPTest, WriteCallbackPTest,
 #endif  // !defined(ROCKSDB_VALGRIND_RUN) || defined(ROCKSDB_FULL_VALGRIND_RUN)
 
 TEST_F(WriteCallbackTest, WriteCallBackTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   WriteOptions write_options;
   ReadOptions read_options;
@@ -443,6 +452,7 @@ TEST_F(WriteCallbackTest, WriteCallBackTest) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }
@@ -451,6 +461,7 @@ int main(int argc, char** argv) {
 #include <stdio.h>
 
 int main(int /*argc*/, char** /*argv*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   fprintf(stderr,
           "SKIPPED as WriteWithCallback is not supported in ROCKSDB_LITE\n");
   return 0;

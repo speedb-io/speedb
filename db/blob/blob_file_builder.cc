@@ -77,6 +77,7 @@ BlobFileBuilder::BlobFileBuilder(
       blob_file_additions_(blob_file_additions),
       blob_count_(0),
       blob_bytes_(0) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(file_number_generator_);
   assert(fs_);
   assert(immutable_options_);
@@ -91,6 +92,7 @@ BlobFileBuilder::~BlobFileBuilder() = default;
 
 Status BlobFileBuilder::Add(const Slice& key, const Slice& value,
                             std::string* blob_index) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(blob_index);
   assert(blob_index->empty());
 
@@ -140,6 +142,7 @@ Status BlobFileBuilder::Add(const Slice& key, const Slice& value,
 }
 
 Status BlobFileBuilder::Finish() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!IsBlobFileOpen()) {
     return Status::OK();
   }
@@ -150,6 +153,7 @@ Status BlobFileBuilder::Finish() {
 bool BlobFileBuilder::IsBlobFileOpen() const { return !!writer_; }
 
 Status BlobFileBuilder::OpenBlobFileIfNeeded() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (IsBlobFileOpen()) {
     return Status::OK();
   }
@@ -273,6 +277,7 @@ Status BlobFileBuilder::CompressBlobIfNeeded(
 Status BlobFileBuilder::WriteBlobToFile(const Slice& key, const Slice& blob,
                                         uint64_t* blob_file_number,
                                         uint64_t* blob_offset) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(IsBlobFileOpen());
   assert(blob_file_number);
   assert(blob_offset);
@@ -296,6 +301,7 @@ Status BlobFileBuilder::WriteBlobToFile(const Slice& key, const Slice& blob,
 }
 
 Status BlobFileBuilder::CloseBlobFile() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(IsBlobFileOpen());
 
   BlobLogFooter footer;
@@ -341,6 +347,7 @@ Status BlobFileBuilder::CloseBlobFile() {
 }
 
 Status BlobFileBuilder::CloseBlobFileIfNeeded() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(IsBlobFileOpen());
 
   const WritableFileWriter* const file_writer = writer_->file();
@@ -354,6 +361,7 @@ Status BlobFileBuilder::CloseBlobFileIfNeeded() {
 }
 
 void BlobFileBuilder::Abandon(const Status& s) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!IsBlobFileOpen()) {
     return;
   }

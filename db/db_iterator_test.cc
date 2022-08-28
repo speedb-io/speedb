@@ -39,6 +39,7 @@ class DBIteratorTest : public DBTestBase,
 
   Iterator* NewIterator(const ReadOptions& read_options,
                         ColumnFamilyHandle* column_family = nullptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (column_family == nullptr) {
       column_family = db_->DefaultColumnFamily();
     }
@@ -65,6 +66,7 @@ class DBIteratorTest : public DBTestBase,
 };
 
 TEST_P(DBIteratorTest, IteratorProperty) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // The test needs to be changed if kPersistedTier is supported in iterator.
   Options options = CurrentOptions();
   CreateAndReopenWithCF({"pikachu"}, options);
@@ -93,6 +95,7 @@ TEST_P(DBIteratorTest, IteratorProperty) {
 }
 
 TEST_P(DBIteratorTest, PersistedTierOnIterator) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // The test needs to be changed if kPersistedTier is supported in iterator.
   Options options = CurrentOptions();
   CreateAndReopenWithCF({"pikachu"}, options);
@@ -109,6 +112,7 @@ TEST_P(DBIteratorTest, PersistedTierOnIterator) {
 }
 
 TEST_P(DBIteratorTest, NonBlockingIteration) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     ReadOptions non_blocking_opts, regular_opts;
     Options options = CurrentOptions();
@@ -171,6 +175,7 @@ TEST_P(DBIteratorTest, NonBlockingIteration) {
 }
 
 TEST_P(DBIteratorTest, IterSeekBeforePrev) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(Put("a", "b"));
   ASSERT_OK(Put("c", "d"));
   EXPECT_OK(dbfull()->Flush(FlushOptions()));
@@ -187,6 +192,7 @@ TEST_P(DBIteratorTest, IterSeekBeforePrev) {
 }
 
 TEST_P(DBIteratorTest, IterReseekNewUpperBound) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Random rnd(301);
   Options options = CurrentOptions();
   BlockBasedTableOptions table_options;
@@ -214,6 +220,7 @@ TEST_P(DBIteratorTest, IterReseekNewUpperBound) {
 }
 
 TEST_P(DBIteratorTest, IterSeekForPrevBeforeNext) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(Put("a", "b"));
   ASSERT_OK(Put("c", "d"));
   EXPECT_OK(dbfull()->Flush(FlushOptions()));
@@ -231,11 +238,13 @@ TEST_P(DBIteratorTest, IterSeekForPrevBeforeNext) {
 
 namespace {
 std::string MakeLongKey(size_t length, char c) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return std::string(length, c);
 }
 }  // namespace
 
 TEST_P(DBIteratorTest, IterLongKeys) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(Put(MakeLongKey(20, 0), "0"));
   ASSERT_OK(Put(MakeLongKey(32, 2), "2"));
   ASSERT_OK(Put("a", "b"));
@@ -276,6 +285,7 @@ TEST_P(DBIteratorTest, IterLongKeys) {
 }
 
 TEST_P(DBIteratorTest, IterNextWithNewerSeq) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(Put("0", "0"));
   EXPECT_OK(dbfull()->Flush(FlushOptions()));
   ASSERT_OK(Put("a", "b"));
@@ -302,6 +312,7 @@ TEST_P(DBIteratorTest, IterNextWithNewerSeq) {
 }
 
 TEST_P(DBIteratorTest, IterPrevWithNewerSeq) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(Put("0", "0"));
   EXPECT_OK(dbfull()->Flush(FlushOptions()));
   ASSERT_OK(Put("a", "b"));
@@ -333,6 +344,7 @@ TEST_P(DBIteratorTest, IterPrevWithNewerSeq) {
 }
 
 TEST_P(DBIteratorTest, IterPrevWithNewerSeq2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(Put("0", "0"));
   EXPECT_OK(dbfull()->Flush(FlushOptions()));
   ASSERT_OK(Put("a", "b"));
@@ -362,6 +374,7 @@ TEST_P(DBIteratorTest, IterPrevWithNewerSeq2) {
 }
 
 TEST_P(DBIteratorTest, IterEmpty) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     CreateAndReopenWithCF({"pikachu"}, CurrentOptions());
     Iterator* iter = NewIterator(ReadOptions(), handles_[1]);
@@ -385,6 +398,7 @@ TEST_P(DBIteratorTest, IterEmpty) {
 }
 
 TEST_P(DBIteratorTest, IterSingle) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     CreateAndReopenWithCF({"pikachu"}, CurrentOptions());
     ASSERT_OK(Put(1, "a", "va"));
@@ -436,6 +450,7 @@ TEST_P(DBIteratorTest, IterSingle) {
 }
 
 TEST_P(DBIteratorTest, IterMulti) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     CreateAndReopenWithCF({"pikachu"}, CurrentOptions());
     ASSERT_OK(Put(1, "a", "va"));
@@ -535,6 +550,7 @@ TEST_P(DBIteratorTest, IterMulti) {
 // Check that we can skip over a run of user keys
 // by using reseek rather than sequential scan
 TEST_P(DBIteratorTest, IterReseek) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   anon::OptionsOverride options_override;
   options_override.skip_policy = kSkipNoSnapshot;
   Options options = CurrentOptions(options_override);
@@ -621,6 +637,7 @@ TEST_P(DBIteratorTest, IterReseek) {
 }
 
 TEST_F(DBIteratorTest, ReseekUponDirectionChange) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = GetDefaultOptions();
   options.create_if_missing = true;
   options.prefix_extractor.reset(NewFixedPrefixTransform(1));
@@ -655,6 +672,7 @@ TEST_F(DBIteratorTest, ReseekUponDirectionChange) {
 }
 
 TEST_P(DBIteratorTest, IterSmallAndLargeMix) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     CreateAndReopenWithCF({"pikachu"}, CurrentOptions());
     ASSERT_OK(Put(1, "a", "va"));
@@ -696,6 +714,7 @@ TEST_P(DBIteratorTest, IterSmallAndLargeMix) {
 }
 
 TEST_P(DBIteratorTest, IterMultiWithDelete) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     CreateAndReopenWithCF({"pikachu"}, CurrentOptions());
     ASSERT_OK(Put(1, "ka", "va"));
@@ -722,6 +741,7 @@ TEST_P(DBIteratorTest, IterMultiWithDelete) {
 }
 
 TEST_P(DBIteratorTest, IterPrevMaxSkip) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     CreateAndReopenWithCF({"pikachu"}, CurrentOptions());
     for (int i = 0; i < 2; i++) {
@@ -752,6 +772,7 @@ TEST_P(DBIteratorTest, IterPrevMaxSkip) {
 }
 
 TEST_P(DBIteratorTest, IterWithSnapshot) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   anon::OptionsOverride options_override;
   options_override.skip_policy = kSkipNoSnapshot;
   do {
@@ -818,6 +839,7 @@ TEST_P(DBIteratorTest, IterWithSnapshot) {
 }
 
 TEST_P(DBIteratorTest, IteratorPinsRef) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     CreateAndReopenWithCF({"pikachu"}, CurrentOptions());
     ASSERT_OK(Put(1, "foo", "hello"));
@@ -844,6 +866,7 @@ TEST_P(DBIteratorTest, IteratorPinsRef) {
 }
 
 TEST_P(DBIteratorTest, IteratorDeleteAfterCfDelete) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   CreateAndReopenWithCF({"pikachu"}, CurrentOptions());
 
   ASSERT_OK(Put(1, "foo", "delete-cf-then-delete-iter"));
@@ -867,6 +890,7 @@ TEST_P(DBIteratorTest, IteratorDeleteAfterCfDelete) {
 }
 
 TEST_P(DBIteratorTest, IteratorDeleteAfterCfDrop) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   CreateAndReopenWithCF({"pikachu"}, CurrentOptions());
 
   ASSERT_OK(Put(1, "foo", "drop-cf-then-delete-iter"));
@@ -890,6 +914,7 @@ TEST_P(DBIteratorTest, IteratorDeleteAfterCfDrop) {
 // SetOptions not defined in ROCKSDB LITE
 #ifndef ROCKSDB_LITE
 TEST_P(DBIteratorTest, DBIteratorBoundTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.env = env_;
   options.create_if_missing = true;
@@ -1062,6 +1087,7 @@ TEST_P(DBIteratorTest, DBIteratorBoundTest) {
 }
 
 TEST_P(DBIteratorTest, DBIteratorBoundMultiSeek) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.env = env_;
   options.create_if_missing = true;
@@ -1117,7 +1143,9 @@ TEST_P(DBIteratorTest, DBIteratorBoundMultiSeek) {
 #endif
 
 TEST_P(DBIteratorTest, DBIteratorBoundOptimizationTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (auto format_version : {2, 3, 4}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     int upper_bound_hits = 0;
     Options options = CurrentOptions();
     ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
@@ -1164,6 +1192,7 @@ TEST_P(DBIteratorTest, DBIteratorBoundOptimizationTest) {
 // Enable kBinarySearchWithFirstKey, do some iterator operations and check that
 // they don't do unnecessary block reads.
 TEST_P(DBIteratorTest, IndexWithFirstKey) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (int tailing = 0; tailing < 2; ++tailing) {
     SCOPED_TRACE("tailing = " + std::to_string(tailing));
     Options options = CurrentOptions();
@@ -1287,6 +1316,7 @@ TEST_P(DBIteratorTest, IndexWithFirstKey) {
 }
 
 TEST_P(DBIteratorTest, IndexWithFirstKeyGet) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.env = env_;
   options.create_if_missing = true;
@@ -1336,6 +1366,7 @@ TEST_P(DBIteratorTest, IndexWithFirstKeyGet) {
 // TODO(3.13): fix the issue of Seek() + Prev() which might not necessary
 //             return the biggest key which is smaller than the seek key.
 TEST_P(DBIteratorTest, PrevAfterAndNextAfterMerge) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.create_if_missing = true;
   options.merge_operator = MergeOperators::CreatePutOperator();
@@ -1378,6 +1409,7 @@ class DBIteratorTestForPinnedData : public DBIteratorTest {
   };
   DBIteratorTestForPinnedData() : DBIteratorTest() {}
   void PinnedDataIteratorRandomized(TestConfig run_config) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // Generate Random data
     Random rnd(301);
 
@@ -1538,20 +1570,24 @@ class DBIteratorTestForPinnedData : public DBIteratorTest {
 
 #if !defined(ROCKSDB_VALGRIND_RUN) || defined(ROCKSDB_FULL_VALGRIND_RUN)
 TEST_P(DBIteratorTestForPinnedData, PinnedDataIteratorRandomizedNormal) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   PinnedDataIteratorRandomized(TestConfig::NORMAL);
 }
 #endif  // !defined(ROCKSDB_VALGRIND_RUN) || defined(ROCKSDB_FULL_VALGRIND_RUN)
 
 TEST_P(DBIteratorTestForPinnedData, PinnedDataIteratorRandomizedCLoseAndOpen) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   PinnedDataIteratorRandomized(TestConfig::CLOSE_AND_OPEN);
 }
 
 TEST_P(DBIteratorTestForPinnedData,
        PinnedDataIteratorRandomizedCompactBeforeRead) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   PinnedDataIteratorRandomized(TestConfig::COMPACT_BEFORE_READ);
 }
 
 TEST_P(DBIteratorTestForPinnedData, PinnedDataIteratorRandomizedFlush) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   PinnedDataIteratorRandomized(TestConfig::FLUSH_EVERY_1000);
 }
 
@@ -1561,6 +1597,7 @@ INSTANTIATE_TEST_CASE_P(DBIteratorTestForPinnedDataInstance,
 
 #ifndef ROCKSDB_LITE
 TEST_P(DBIteratorTest, PinnedDataIteratorMultipleFiles) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   BlockBasedTableOptions table_options;
   table_options.use_delta_encoding = false;
@@ -1632,6 +1669,7 @@ TEST_P(DBIteratorTest, PinnedDataIteratorMultipleFiles) {
 #endif
 
 TEST_P(DBIteratorTest, PinnedDataIteratorMergeOperator) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   BlockBasedTableOptions table_options;
   table_options.use_delta_encoding = false;
@@ -1692,6 +1730,7 @@ TEST_P(DBIteratorTest, PinnedDataIteratorMergeOperator) {
 }
 
 TEST_P(DBIteratorTest, PinnedDataIteratorReadAfterUpdate) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   BlockBasedTableOptions table_options;
   table_options.use_delta_encoding = false;
@@ -1762,6 +1801,7 @@ class SliceTransformLimitedDomainGeneric : public SliceTransform {
 };
 
 TEST_P(DBIteratorTest, IterSeekForPrevCrossingFiles) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.prefix_extractor.reset(NewFixedPrefixTransform(1));
   options.disable_auto_compactions = true;
@@ -1817,6 +1857,7 @@ TEST_P(DBIteratorTest, IterSeekForPrevCrossingFiles) {
 }
 
 TEST_P(DBIteratorTest, IterSeekForPrevCrossingFilesCustomPrefixExtractor) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.prefix_extractor =
       std::make_shared<SliceTransformLimitedDomainGeneric>();
@@ -1873,6 +1914,7 @@ TEST_P(DBIteratorTest, IterSeekForPrevCrossingFilesCustomPrefixExtractor) {
 }
 
 TEST_P(DBIteratorTest, IterPrevKeyCrossingBlocks) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   BlockBasedTableOptions table_options;
   table_options.block_size = 1;  // every block will contain one entry
@@ -1941,6 +1983,7 @@ TEST_P(DBIteratorTest, IterPrevKeyCrossingBlocks) {
 }
 
 TEST_P(DBIteratorTest, IterPrevKeyCrossingBlocksRandomized) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.merge_operator = MergeOperators::CreateStringAppendTESTOperator();
   options.disable_auto_compactions = true;
@@ -2088,6 +2131,7 @@ TEST_P(DBIteratorTest, IterPrevKeyCrossingBlocksRandomized) {
 }
 
 TEST_P(DBIteratorTest, IteratorWithLocalStatistics) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
   DestroyAndReopen(options);
@@ -2182,6 +2226,7 @@ TEST_P(DBIteratorTest, IteratorWithLocalStatistics) {
 }
 
 TEST_P(DBIteratorTest, ReadAhead) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   env_->count_random_reads_ = true;
   options.env = env_;
@@ -2259,6 +2304,7 @@ TEST_P(DBIteratorTest, ReadAhead) {
 // seek to a smaller key. Expect DBIter to fall back to a seek instead of
 // going through all the overwrites linearly.
 TEST_P(DBIteratorTest, DBIteratorSkipRecentDuplicatesTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.env = env_;
   options.create_if_missing = true;
@@ -2312,6 +2358,7 @@ TEST_P(DBIteratorTest, DBIteratorSkipRecentDuplicatesTest) {
 }
 
 TEST_P(DBIteratorTest, Refresh) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(Put("x", "y"));
 
   std::unique_ptr<Iterator> iter(NewIterator(ReadOptions()));
@@ -2374,6 +2421,7 @@ TEST_P(DBIteratorTest, Refresh) {
 }
 
 TEST_P(DBIteratorTest, RefreshWithSnapshot) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(Put("x", "y"));
   const Snapshot* snapshot = db_->GetSnapshot();
   ReadOptions options;
@@ -2403,8 +2451,10 @@ TEST_P(DBIteratorTest, RefreshWithSnapshot) {
 }
 
 TEST_P(DBIteratorTest, CreationFailure) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::NewInternalIterator:StatusCallback", [](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         *(reinterpret_cast<Status*>(arg)) = Status::Corruption("test status");
       });
   SyncPoint::GetInstance()->EnableProcessing();
@@ -2416,6 +2466,7 @@ TEST_P(DBIteratorTest, CreationFailure) {
 }
 
 TEST_P(DBIteratorTest, UpperBoundWithChangeDirection) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.max_sequential_skip_in_iterations = 3;
   DestroyAndReopen(options);
@@ -2453,6 +2504,7 @@ TEST_P(DBIteratorTest, UpperBoundWithChangeDirection) {
 }
 
 TEST_P(DBIteratorTest, TableFilter) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(Put("a", "1"));
   EXPECT_OK(dbfull()->Flush(FlushOptions()));
   ASSERT_OK(Put("b", "2"));
@@ -2468,6 +2520,7 @@ TEST_P(DBIteratorTest, TableFilter) {
     std::set<uint64_t> unseen{1, 2, 3};
     ReadOptions opts;
     opts.table_filter = [&](const TableProperties& props) {
+PERF_MARKER(__PRETTY_FUNCTION__);
       auto it = unseen.find(props.num_entries);
       if (it == unseen.end()) {
         ADD_FAILURE() << "saw table properties with an unexpected "
@@ -2501,6 +2554,7 @@ TEST_P(DBIteratorTest, TableFilter) {
   {
     ReadOptions opts;
     opts.table_filter = [](const TableProperties& props) {
+PERF_MARKER(__PRETTY_FUNCTION__);
       return props.num_entries != 2;
     };
     auto iter = NewIterator(opts);
@@ -2519,6 +2573,7 @@ TEST_P(DBIteratorTest, TableFilter) {
 }
 
 TEST_P(DBIteratorTest, UpperBoundWithPrevReseek) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.max_sequential_skip_in_iterations = 3;
   DestroyAndReopen(options);
@@ -2560,6 +2615,7 @@ TEST_P(DBIteratorTest, UpperBoundWithPrevReseek) {
 }
 
 TEST_P(DBIteratorTest, SkipStatistics) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
   DestroyAndReopen(options);
@@ -2619,6 +2675,7 @@ TEST_P(DBIteratorTest, SkipStatistics) {
   iter = NewIterator(ro);
   count = 0;
   for(iter->Seek("aa"); iter->Valid(); iter->Next()) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_OK(iter->status());
     count++;
   }
@@ -2630,6 +2687,7 @@ TEST_P(DBIteratorTest, SkipStatistics) {
   iter = NewIterator(ro);
   count = 0;
   for(iter->SeekToLast(); iter->Valid(); iter->Prev()) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_OK(iter->status());
     count++;
   }
@@ -2641,6 +2699,7 @@ TEST_P(DBIteratorTest, SkipStatistics) {
 }
 
 TEST_P(DBIteratorTest, SeekAfterHittingManyInternalKeys) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   DestroyAndReopen(options);
   ReadOptions ropts;
@@ -2685,6 +2744,7 @@ TEST_P(DBIteratorTest, SeekAfterHittingManyInternalKeys) {
 // Reproduces a former bug where iterator would skip some records when DBIter
 // re-seeks subiterator with Incomplete status.
 TEST_P(DBIteratorTest, NonBlockingIterationBugRepro) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   BlockBasedTableOptions table_options;
   // Make sure the sst file has more than one block.
@@ -2723,6 +2783,7 @@ TEST_P(DBIteratorTest, NonBlockingIterationBugRepro) {
 }
 
 TEST_P(DBIteratorTest, SeekBackwardAfterOutOfUpperBound) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(Put("a", ""));
   ASSERT_OK(Put("b", ""));
   ASSERT_OK(Flush());
@@ -2747,6 +2808,7 @@ TEST_P(DBIteratorTest, SeekBackwardAfterOutOfUpperBound) {
 }
 
 TEST_P(DBIteratorTest, AvoidReseekLevelIterator) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.compression = CompressionType::kNoCompression;
   BlockBasedTableOptions table_options;
@@ -2847,6 +2909,7 @@ TEST_P(DBIteratorTest, AvoidReseekLevelIterator) {
 // MyRocks may change iterate bounds before seek. Simply test to make sure such
 // usage doesn't break iterator.
 TEST_P(DBIteratorTest, IterateBoundChangedBeforeSeek) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.compression = CompressionType::kNoCompression;
   BlockBasedTableOptions table_options;
@@ -2907,6 +2970,7 @@ TEST_P(DBIteratorTest, IterateBoundChangedBeforeSeek) {
 }
 
 TEST_P(DBIteratorTest, IterateWithLowerBoundAcrossFileBoundary) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(Put("aaa", "v"));
   ASSERT_OK(Put("bbb", "v"));
   ASSERT_OK(Flush());
@@ -2933,6 +2997,7 @@ TEST_P(DBIteratorTest, IterateWithLowerBoundAcrossFileBoundary) {
 }
 
 TEST_P(DBIteratorTest, Blob) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.enable_blob_files = true;
   options.max_sequential_skip_in_iterations = 2;
@@ -3060,6 +3125,7 @@ INSTANTIATE_TEST_CASE_P(DBIteratorTestInstance, DBIteratorTest,
 class DBIteratorWithReadCallbackTest : public DBIteratorTest {};
 
 TEST_F(DBIteratorWithReadCallbackTest, ReadCallback) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   class TestReadCallback : public ReadCallback {
    public:
     explicit TestReadCallback(SequenceNumber _max_visible_seq)
@@ -3192,6 +3258,7 @@ TEST_F(DBIteratorWithReadCallbackTest, ReadCallback) {
 }
 
 TEST_F(DBIteratorTest, BackwardIterationOnInplaceUpdateMemtable) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.create_if_missing = true;
   options.inplace_update_support = false;
@@ -3232,6 +3299,7 @@ TEST_F(DBIteratorTest, BackwardIterationOnInplaceUpdateMemtable) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

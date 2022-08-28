@@ -25,6 +25,7 @@ namespace log {
 // Construct a string of the specified length made out of the supplied
 // partial string.
 static std::string BigString(const std::string& partial_string, size_t n) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string result;
   while (result.size() < n) {
     result.append(partial_string);
@@ -35,6 +36,7 @@ static std::string BigString(const std::string& partial_string, size_t n) {
 
 // Construct a string from a number
 static std::string NumberString(int n) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   char buf[50];
   snprintf(buf, sizeof(buf), "%d.", n);
   return std::string(buf);
@@ -42,6 +44,7 @@ static std::string NumberString(int n) {
 
 // Return a skewed potentially long string
 static std::string RandomSkewedString(int i, Random* rnd) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return BigString(NumberString(i), rnd->Skewed(17));
 }
 
@@ -159,6 +162,7 @@ class LogTest
         source_(new StringSource(reader_contents_, !std::get<1>(GetParam()))),
         allow_retry_read_(std::get<1>(GetParam())),
         compression_type_(std::get<2>(GetParam())) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::unique_ptr<FSWritableFile> sink_holder(sink_);
     std::unique_ptr<WritableFileWriter> file_writer(new WritableFileWriter(
         std::move(sink_holder), "" /* don't care */, FileOptions()));
@@ -182,6 +186,7 @@ class LogTest
   Slice* get_reader_contents() { return &reader_contents_; }
 
   void Write(const std::string& msg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_OK(writer_->AddRecord(Slice(msg)));
   }
 
@@ -191,6 +196,7 @@ class LogTest
 
   std::string Read(const WALRecoveryMode wal_recovery_mode =
                        WALRecoveryMode::kTolerateCorruptedTailRecords) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::string scratch;
     Slice record;
     bool ret = false;
@@ -203,16 +209,19 @@ class LogTest
   }
 
   void IncrementByte(int offset, char delta) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     dest_contents()[offset] += delta;
   }
 
   void SetByte(int offset, char new_byte) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     dest_contents()[offset] = new_byte;
   }
 
   void ShrinkSize(int bytes) { sink_->Drop(bytes); }
 
   void FixChecksum(int header_offset, int len, bool recyclable) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // Compute crc of type/len/data
     int header_size = recyclable ? kRecyclableHeaderSize : kHeaderSize;
     uint32_t crc = crc32c::Value(&dest_contents()[header_offset + 6],
@@ -222,6 +231,7 @@ class LogTest
   }
 
   void ForceError(size_t position = 0) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     source_->force_error_ = true;
     source_->force_error_position_ = position;
   }
@@ -235,11 +245,13 @@ class LogTest
   }
 
   void ForceEOF(size_t position = 0) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     source_->force_eof_ = true;
     source_->force_eof_position_ = position;
   }
 
   void UnmarkEOF() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     source_->returned_partial_ = false;
     reader_->UnmarkEOF();
   }
@@ -259,6 +271,7 @@ class LogTest
 TEST_P(LogTest, Empty) { ASSERT_EQ("EOF", Read()); }
 
 TEST_P(LogTest, ReadWrite) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Write("foo");
   Write("bar");
   Write("");
@@ -272,6 +285,7 @@ TEST_P(LogTest, ReadWrite) {
 }
 
 TEST_P(LogTest, ManyBlocks) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (int i = 0; i < 100000; i++) {
     Write(NumberString(i));
   }
@@ -282,6 +296,7 @@ TEST_P(LogTest, ManyBlocks) {
 }
 
 TEST_P(LogTest, Fragmentation) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Write("small");
   Write(BigString("medium", 50000));
   Write(BigString("large", 100000));
@@ -292,6 +307,7 @@ TEST_P(LogTest, Fragmentation) {
 }
 
 TEST_P(LogTest, MarginalTrailer) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Make a trailer that is exactly the same length as an empty record.
   int header_size =
       std::get<0>(GetParam()) ? kRecyclableHeaderSize : kHeaderSize;
@@ -307,6 +323,7 @@ TEST_P(LogTest, MarginalTrailer) {
 }
 
 TEST_P(LogTest, MarginalTrailer2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Make a trailer that is exactly the same length as an empty record.
   int header_size =
       std::get<0>(GetParam()) ? kRecyclableHeaderSize : kHeaderSize;
@@ -322,6 +339,7 @@ TEST_P(LogTest, MarginalTrailer2) {
 }
 
 TEST_P(LogTest, ShortTrailer) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   int header_size =
       std::get<0>(GetParam()) ? kRecyclableHeaderSize : kHeaderSize;
   const int n = kBlockSize - 2 * header_size + 4;
@@ -336,6 +354,7 @@ TEST_P(LogTest, ShortTrailer) {
 }
 
 TEST_P(LogTest, AlignedEof) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   int header_size =
       std::get<0>(GetParam()) ? kRecyclableHeaderSize : kHeaderSize;
   const int n = kBlockSize - 2 * header_size + 4;
@@ -346,6 +365,7 @@ TEST_P(LogTest, AlignedEof) {
 }
 
 TEST_P(LogTest, RandomRead) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int N = 500;
   Random write_rnd(301);
   for (int i = 0; i < N; i++) {
@@ -361,6 +381,7 @@ TEST_P(LogTest, RandomRead) {
 // Tests of all the error paths in log_reader.cc follow:
 
 TEST_P(LogTest, ReadError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Write("foo");
   ForceError();
   ASSERT_EQ("EOF", Read());
@@ -369,6 +390,7 @@ TEST_P(LogTest, ReadError) {
 }
 
 TEST_P(LogTest, BadRecordType) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Write("foo");
   // Type is stored in header[6]
   IncrementByte(6, 100);
@@ -379,6 +401,7 @@ TEST_P(LogTest, BadRecordType) {
 }
 
 TEST_P(LogTest, TruncatedTrailingRecordIsIgnored) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Write("foo");
   ShrinkSize(4);   // Drop all payload as well as a header byte
   ASSERT_EQ("EOF", Read());
@@ -388,6 +411,7 @@ TEST_P(LogTest, TruncatedTrailingRecordIsIgnored) {
 }
 
 TEST_P(LogTest, TruncatedTrailingRecordIsNotIgnored) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (allow_retry_read_) {
     // If read retry is allowed, then truncated trailing record should not
     // raise an error.
@@ -402,6 +426,7 @@ TEST_P(LogTest, TruncatedTrailingRecordIsNotIgnored) {
 }
 
 TEST_P(LogTest, BadLength) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (allow_retry_read_) {
     // If read retry is allowed, then we should not raise an error when the
     // record length specified in header is longer than data currently
@@ -425,6 +450,7 @@ TEST_P(LogTest, BadLength) {
 }
 
 TEST_P(LogTest, BadLengthAtEndIsIgnored) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (allow_retry_read_) {
     // If read retry is allowed, then we should not raise an error when the
     // record length specified in header is longer than data currently
@@ -439,6 +465,7 @@ TEST_P(LogTest, BadLengthAtEndIsIgnored) {
 }
 
 TEST_P(LogTest, BadLengthAtEndIsNotIgnored) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (allow_retry_read_) {
     // If read retry is allowed, then we should not raise an error when the
     // record length specified in header is longer than data currently
@@ -453,6 +480,7 @@ TEST_P(LogTest, BadLengthAtEndIsNotIgnored) {
 }
 
 TEST_P(LogTest, ChecksumMismatch) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Write("foooooo");
   IncrementByte(0, 14);
   ASSERT_EQ("EOF", Read());
@@ -467,6 +495,7 @@ TEST_P(LogTest, ChecksumMismatch) {
 }
 
 TEST_P(LogTest, UnexpectedMiddleType) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Write("foo");
   bool recyclable_log = (std::get<0>(GetParam()) != 0);
   SetByte(6, static_cast<char>(recyclable_log ? kRecyclableMiddleType
@@ -478,6 +507,7 @@ TEST_P(LogTest, UnexpectedMiddleType) {
 }
 
 TEST_P(LogTest, UnexpectedLastType) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Write("foo");
   bool recyclable_log = (std::get<0>(GetParam()) != 0);
   SetByte(6,
@@ -489,6 +519,7 @@ TEST_P(LogTest, UnexpectedLastType) {
 }
 
 TEST_P(LogTest, UnexpectedFullType) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Write("foo");
   Write("bar");
   bool recyclable_log = (std::get<0>(GetParam()) != 0);
@@ -502,6 +533,7 @@ TEST_P(LogTest, UnexpectedFullType) {
 }
 
 TEST_P(LogTest, UnexpectedFirstType) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Write("foo");
   Write(BigString("bar", 100000));
   bool recyclable_log = (std::get<0>(GetParam()) != 0);
@@ -515,6 +547,7 @@ TEST_P(LogTest, UnexpectedFirstType) {
 }
 
 TEST_P(LogTest, MissingLastIsIgnored) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Write(BigString("bar", kBlockSize));
   // Remove the LAST block, including header.
   ShrinkSize(14);
@@ -524,6 +557,7 @@ TEST_P(LogTest, MissingLastIsIgnored) {
 }
 
 TEST_P(LogTest, MissingLastIsNotIgnored) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (allow_retry_read_) {
     // If read retry is allowed, then truncated trailing record should not
     // raise an error.
@@ -538,6 +572,7 @@ TEST_P(LogTest, MissingLastIsNotIgnored) {
 }
 
 TEST_P(LogTest, PartialLastIsIgnored) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Write(BigString("bar", kBlockSize));
   // Cause a bad record length in the LAST block.
   ShrinkSize(1);
@@ -547,6 +582,7 @@ TEST_P(LogTest, PartialLastIsIgnored) {
 }
 
 TEST_P(LogTest, PartialLastIsNotIgnored) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (allow_retry_read_) {
     // If read retry is allowed, then truncated trailing record should not
     // raise an error.
@@ -561,6 +597,7 @@ TEST_P(LogTest, PartialLastIsNotIgnored) {
 }
 
 TEST_P(LogTest, ErrorJoinsRecords) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Consider two fragmented records:
   //    first(R1) last(R1) first(R2) last(R2)
   // where the middle two fragments disappear.  We do not want
@@ -589,6 +626,7 @@ TEST_P(LogTest, ErrorJoinsRecords) {
 }
 
 TEST_P(LogTest, ClearEofSingleBlock) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Write("foo");
   Write("bar");
   bool recyclable_log = (std::get<0>(GetParam()) != 0);
@@ -606,6 +644,7 @@ TEST_P(LogTest, ClearEofSingleBlock) {
 }
 
 TEST_P(LogTest, ClearEofMultiBlock) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   size_t num_full_blocks = 5;
   bool recyclable_log = (std::get<0>(GetParam()) != 0);
   int header_size = recyclable_log ? kRecyclableHeaderSize : kHeaderSize;
@@ -625,6 +664,7 @@ TEST_P(LogTest, ClearEofMultiBlock) {
 }
 
 TEST_P(LogTest, ClearEofError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // If an error occurs during Read() in UnmarkEOF(), the records contained
   // in the buffer should be returned on subsequent calls of ReadRecord()
   // until no more full records are left, whereafter ReadRecord() should return
@@ -643,6 +683,7 @@ TEST_P(LogTest, ClearEofError) {
 }
 
 TEST_P(LogTest, ClearEofError2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Write("foo");
   Write("bar");
   UnmarkEOF();
@@ -657,6 +698,7 @@ TEST_P(LogTest, ClearEofError2) {
 }
 
 TEST_P(LogTest, Recycle) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   bool recyclable_log = (std::get<0>(GetParam()) != 0);
   if (!recyclable_log) {
     return;  // test is only valid for recycled logs
@@ -724,6 +766,7 @@ class RetriableLogTest : public ::testing::TestWithParam<int> {
         writer_(nullptr),
         reader_(nullptr),
         log_reader_(nullptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::unique_ptr<FSWritableFile> sink_holder(sink_);
     std::unique_ptr<WritableFileWriter> wfw(new WritableFileWriter(
         std::move(sink_holder), "" /* file name */, FileOptions()));
@@ -731,6 +774,7 @@ class RetriableLogTest : public ::testing::TestWithParam<int> {
   }
 
   Status SetupTestEnv() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Status s;
     FileOptions fopts;
     auto fs = env_->GetFileSystem();
@@ -762,15 +806,18 @@ class RetriableLogTest : public ::testing::TestWithParam<int> {
   std::string contents() { return sink_->contents_; }
 
   void Encode(const std::string& msg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_OK(log_writer_->AddRecord(Slice(msg)));
   }
 
   void Write(const Slice& data) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_OK(writer_->Append(data));
     ASSERT_OK(writer_->Sync(true));
   }
 
   bool TryRead(std::string* result) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(result != nullptr);
     result->clear();
     std::string scratch;
@@ -786,6 +833,7 @@ class RetriableLogTest : public ::testing::TestWithParam<int> {
 };
 
 TEST_P(RetriableLogTest, TailLog_PartialHeader) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(SetupTestEnv());
   std::vector<int> remaining_bytes_in_last_record;
   size_t header_size = GetParam() ? kRecyclableHeaderSize : kHeaderSize;
@@ -829,6 +877,7 @@ TEST_P(RetriableLogTest, TailLog_PartialHeader) {
 }
 
 TEST_P(RetriableLogTest, TailLog_FullHeader) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(SetupTestEnv());
   std::vector<int> remaining_bytes_in_last_record;
   size_t header_size = GetParam() ? kRecyclableHeaderSize : kHeaderSize;
@@ -872,6 +921,7 @@ TEST_P(RetriableLogTest, TailLog_FullHeader) {
 }
 
 TEST_P(RetriableLogTest, NonBlockingReadFullRecord) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Clear all sync point callbacks even if this test does not use sync point.
   // It is necessary, otherwise the execute of this test may hit a sync point
   // with which a callback is registered. The registered callback may access
@@ -904,6 +954,7 @@ class CompressionLogTest : public LogTest {
 };
 
 TEST_P(CompressionLogTest, Empty) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   CompressionType compression_type = std::get<2>(GetParam());
   if (!StreamingCompressionTypeSupported(compression_type)) {
     ROCKSDB_GTEST_SKIP("Test requires support for compression type");
@@ -919,6 +970,7 @@ TEST_P(CompressionLogTest, Empty) {
 }
 
 TEST_P(CompressionLogTest, ReadWrite) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   CompressionType compression_type = std::get<2>(GetParam());
   if (!StreamingCompressionTypeSupported(compression_type)) {
     ROCKSDB_GTEST_SKIP("Test requires support for compression type");
@@ -938,6 +990,7 @@ TEST_P(CompressionLogTest, ReadWrite) {
 }
 
 TEST_P(CompressionLogTest, ManyBlocks) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   CompressionType compression_type = std::get<2>(GetParam());
   if (!StreamingCompressionTypeSupported(compression_type)) {
     ROCKSDB_GTEST_SKIP("Test requires support for compression type");
@@ -954,6 +1007,7 @@ TEST_P(CompressionLogTest, ManyBlocks) {
 }
 
 TEST_P(CompressionLogTest, Fragmentation) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   CompressionType compression_type = std::get<2>(GetParam());
   if (!StreamingCompressionTypeSupported(compression_type)) {
     ROCKSDB_GTEST_SKIP("Test requires support for compression type");
@@ -979,6 +1033,7 @@ class StreamingCompressionTest
     : public ::testing::TestWithParam<std::tuple<int, CompressionType>> {};
 
 TEST_P(StreamingCompressionTest, Basic) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   size_t input_size = std::get<0>(GetParam());
   CompressionType compression_type = std::get<1>(GetParam());
   if (!StreamingCompressionTypeSupported(compression_type)) {
@@ -1046,6 +1101,7 @@ INSTANTIATE_TEST_CASE_P(
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

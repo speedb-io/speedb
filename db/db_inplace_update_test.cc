@@ -18,6 +18,7 @@ class DBTestInPlaceUpdate : public DBTestBase {
 };
 
 TEST_F(DBTestInPlaceUpdate, InPlaceUpdate) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     Options options = CurrentOptions();
     options.create_if_missing = true;
@@ -42,6 +43,7 @@ TEST_F(DBTestInPlaceUpdate, InPlaceUpdate) {
 }
 
 TEST_F(DBTestInPlaceUpdate, InPlaceUpdateLargeNewValue) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     Options options = CurrentOptions();
     options.create_if_missing = true;
@@ -66,6 +68,7 @@ TEST_F(DBTestInPlaceUpdate, InPlaceUpdateLargeNewValue) {
 }
 
 TEST_F(DBTestInPlaceUpdate, InPlaceUpdateCallbackSmallerSize) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     Options options = CurrentOptions();
     options.create_if_missing = true;
@@ -95,6 +98,7 @@ TEST_F(DBTestInPlaceUpdate, InPlaceUpdateCallbackSmallerSize) {
 }
 
 TEST_F(DBTestInPlaceUpdate, InPlaceUpdateCallbackSmallerVarintSize) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     Options options = CurrentOptions();
     options.create_if_missing = true;
@@ -124,6 +128,7 @@ TEST_F(DBTestInPlaceUpdate, InPlaceUpdateCallbackSmallerVarintSize) {
 }
 
 TEST_F(DBTestInPlaceUpdate, InPlaceUpdateCallbackLargeNewValue) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     Options options = CurrentOptions();
     options.create_if_missing = true;
@@ -151,6 +156,7 @@ TEST_F(DBTestInPlaceUpdate, InPlaceUpdateCallbackLargeNewValue) {
 }
 
 TEST_F(DBTestInPlaceUpdate, InPlaceUpdateCallbackNoAction) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     Options options = CurrentOptions();
     options.create_if_missing = true;
@@ -171,6 +177,7 @@ TEST_F(DBTestInPlaceUpdate, InPlaceUpdateCallbackNoAction) {
 }
 
 TEST_F(DBTestInPlaceUpdate, InPlaceUpdateAndSnapshot) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     Options options = CurrentOptions();
     options.create_if_missing = true;
@@ -202,6 +209,7 @@ TEST_F(DBTestInPlaceUpdate, InPlaceUpdateAndSnapshot) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

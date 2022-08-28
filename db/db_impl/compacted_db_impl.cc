@@ -27,9 +27,11 @@ CompactedDBImpl::CompactedDBImpl(const DBOptions& options,
       user_comparator_(nullptr) {}
 
 CompactedDBImpl::~CompactedDBImpl() {
+PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 size_t CompactedDBImpl::FindFile(const Slice& key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   size_t right = files_.num_files - 1;
   auto cmp = [&](const FdWithKeyRange& f, const Slice& k) -> bool {
     return user_comparator_->Compare(ExtractUserKey(f.largest_key), k) < 0;
@@ -40,6 +42,7 @@ size_t CompactedDBImpl::FindFile(const Slice& key) {
 
 Status CompactedDBImpl::Get(const ReadOptions& options, ColumnFamilyHandle*,
                             const Slice& key, PinnableSlice* value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(user_comparator_);
   if (options.timestamp || user_comparator_->timestamp_size()) {
     // TODO: support timestamp
@@ -63,6 +66,7 @@ Status CompactedDBImpl::Get(const ReadOptions& options, ColumnFamilyHandle*,
 std::vector<Status> CompactedDBImpl::MultiGet(const ReadOptions& options,
     const std::vector<ColumnFamilyHandle*>&,
     const std::vector<Slice>& keys, std::vector<std::string>* values) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(user_comparator_);
   if (user_comparator_->timestamp_size() || options.timestamp) {
     // TODO: support timestamp
@@ -108,6 +112,7 @@ std::vector<Status> CompactedDBImpl::MultiGet(const ReadOptions& options,
 }
 
 Status CompactedDBImpl::Init(const Options& options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   SuperVersionContext sv_context(/* create_superversion */ true);
   mutex_.Lock();
   ColumnFamilyDescriptor cf(kDefaultColumnFamilyName,
@@ -159,6 +164,7 @@ Status CompactedDBImpl::Init(const Options& options) {
 
 Status CompactedDBImpl::Open(const Options& options,
                              const std::string& dbname, DB** dbptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   *dbptr = nullptr;
 
   if (options.max_open_files != -1) {

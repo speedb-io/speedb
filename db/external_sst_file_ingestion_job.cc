@@ -33,6 +33,7 @@ Status ExternalSstFileIngestionJob::Prepare(
     const std::vector<std::string>& files_checksum_func_names,
     const Temperature& file_temperature, uint64_t next_file_number,
     SuperVersion* sv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Status status;
 
   // Read the information of files we are ingesting
@@ -334,6 +335,7 @@ Status ExternalSstFileIngestionJob::Prepare(
 
 Status ExternalSstFileIngestionJob::NeedsFlush(bool* flush_needed,
                                                SuperVersion* super_version) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   autovector<Range> ranges;
   for (const IngestedFileInfo& file_to_ingest : files_to_ingest_) {
     ranges.emplace_back(file_to_ingest.smallest_internal_key.user_key(),
@@ -351,6 +353,7 @@ Status ExternalSstFileIngestionJob::NeedsFlush(bool* flush_needed,
 // REQUIRES: we have become the only writer by entering both write_thread_ and
 // nonmem_write_thread_
 Status ExternalSstFileIngestionJob::Run() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Status status;
   SuperVersion* super_version = cfd_->GetSuperVersion();
 #ifndef NDEBUG
@@ -455,6 +458,7 @@ Status ExternalSstFileIngestionJob::Run() {
 }
 
 void ExternalSstFileIngestionJob::UpdateStats() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Update internal stats for new ingested files
   uint64_t total_keys = 0;
   uint64_t total_l0_files = 0;
@@ -514,6 +518,7 @@ void ExternalSstFileIngestionJob::UpdateStats() {
 }
 
 void ExternalSstFileIngestionJob::Cleanup(const Status& status) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   IOOptions io_opts;
   if (!status.ok()) {
     // We failed to add the files to the database
@@ -549,6 +554,7 @@ void ExternalSstFileIngestionJob::Cleanup(const Status& status) {
 Status ExternalSstFileIngestionJob::GetIngestedFileInfo(
     const std::string& external_file, uint64_t new_file_number,
     IngestedFileInfo* file_to_ingest, SuperVersion* sv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   file_to_ingest->external_file_path = external_file;
 
   // Get external file size
@@ -734,6 +740,7 @@ Status ExternalSstFileIngestionJob::AssignLevelAndSeqnoForIngestedFile(
     SuperVersion* sv, bool force_global_seqno, CompactionStyle compaction_style,
     SequenceNumber last_seqno, IngestedFileInfo* file_to_ingest,
     SequenceNumber* assigned_seqno) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Status status;
   *assigned_seqno = 0;
   if (force_global_seqno) {
@@ -835,6 +842,7 @@ Status ExternalSstFileIngestionJob::AssignLevelAndSeqnoForIngestedFile(
 
 Status ExternalSstFileIngestionJob::CheckLevelForIngestedBehindFile(
     IngestedFileInfo* file_to_ingest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto* vstorage = cfd_->current()->storage_info();
   // first check if new files fit in the bottommost level
   int bottom_lvl = cfd_->NumberLevels() - 1;
@@ -862,6 +870,7 @@ Status ExternalSstFileIngestionJob::CheckLevelForIngestedBehindFile(
 
 Status ExternalSstFileIngestionJob::AssignGlobalSeqnoForIngestedFile(
     IngestedFileInfo* file_to_ingest, SequenceNumber seqno) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (file_to_ingest->original_seqno == seqno) {
     // This file already have the correct global seqno
     return Status::OK();
@@ -916,6 +925,7 @@ Status ExternalSstFileIngestionJob::AssignGlobalSeqnoForIngestedFile(
 
 IOStatus ExternalSstFileIngestionJob::GenerateChecksumForIngestedFile(
     IngestedFileInfo* file_to_ingest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (db_options_.file_checksum_gen_factory == nullptr ||
       need_generate_file_checksum_ == false ||
       ingestion_options_.write_global_seqno == false) {
@@ -945,6 +955,7 @@ IOStatus ExternalSstFileIngestionJob::GenerateChecksumForIngestedFile(
 
 bool ExternalSstFileIngestionJob::IngestedFileFitInLevel(
     const IngestedFileInfo* file_to_ingest, int level) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (level == 0) {
     // Files can always fit in L0
     return true;
@@ -974,6 +985,7 @@ bool ExternalSstFileIngestionJob::IngestedFileFitInLevel(
 
 template <typename TWritableFile>
 Status ExternalSstFileIngestionJob::SyncIngestedFile(TWritableFile* file) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(file != nullptr);
   if (db_options_.use_fsync) {
     return file->Fsync(IOOptions(), nullptr);

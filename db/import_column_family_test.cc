@@ -15,6 +15,7 @@ class ImportColumnFamilyTest : public DBTestBase {
  public:
   ImportColumnFamilyTest()
       : DBTestBase("import_column_family_test", /*env_do_fsync=*/true) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     sst_files_dir_ = dbname_ + "/sst_files/";
     export_files_dir_ = test::PerThreadDBPath(env_, "export");
     DestroyAndRecreateExternalSSTFilesDir();
@@ -24,6 +25,7 @@ class ImportColumnFamilyTest : public DBTestBase {
   }
 
   ~ImportColumnFamilyTest() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (import_cfh_) {
       EXPECT_OK(db_->DropColumnFamily(import_cfh_));
       EXPECT_OK(db_->DestroyColumnFamilyHandle(import_cfh_));
@@ -43,6 +45,7 @@ class ImportColumnFamilyTest : public DBTestBase {
   }
 
   void DestroyAndRecreateExternalSSTFilesDir() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     EXPECT_OK(DestroyDir(env_, sst_files_dir_));
     EXPECT_OK(env_->CreateDir(sst_files_dir_));
     EXPECT_OK(DestroyDir(env_, export_files_dir_));
@@ -52,6 +55,7 @@ class ImportColumnFamilyTest : public DBTestBase {
                                         int level,
                                         SequenceNumber smallest_seqno,
                                         SequenceNumber largest_seqno) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     LiveFileMetaData metadata;
     metadata.name = name;
     metadata.db_path = path;
@@ -70,6 +74,7 @@ class ImportColumnFamilyTest : public DBTestBase {
 };
 
 TEST_F(ImportColumnFamilyTest, ImportSSTFileWriterFiles) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   CreateAndReopenWithCF({"koko"}, options);
 
@@ -133,6 +138,7 @@ TEST_F(ImportColumnFamilyTest, ImportSSTFileWriterFiles) {
 }
 
 TEST_F(ImportColumnFamilyTest, ImportSSTFileWriterFilesWithOverlap) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   CreateAndReopenWithCF({"koko"}, options);
 
@@ -270,6 +276,7 @@ TEST_F(ImportColumnFamilyTest, ImportSSTFileWriterFilesWithOverlap) {
 }
 
 TEST_F(ImportColumnFamilyTest, ImportExportedSSTFromAnotherCF) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   CreateAndReopenWithCF({"koko"}, options);
 
@@ -378,6 +385,7 @@ TEST_F(ImportColumnFamilyTest, ImportExportedSSTFromAnotherCF) {
 }
 
 TEST_F(ImportColumnFamilyTest, ImportExportedSSTFromAnotherDB) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   CreateAndReopenWithCF({"koko"}, options);
 
@@ -434,6 +442,7 @@ TEST_F(ImportColumnFamilyTest, ImportExportedSSTFromAnotherDB) {
 }
 
 TEST_F(ImportColumnFamilyTest, LevelFilesOverlappingAtEndpoints) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Imports a column family containing a level where two files overlap at their
   // endpoints. "Overlap" means the largest user key in one file is the same as
   // the smallest user key in the second file.
@@ -496,6 +505,7 @@ TEST_F(ImportColumnFamilyTest, LevelFilesOverlappingAtEndpoints) {
 }
 
 TEST_F(ImportColumnFamilyTest, ImportColumnFamilyNegativeTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   CreateAndReopenWithCF({"koko"}, options);
 
@@ -631,6 +641,7 @@ TEST_F(ImportColumnFamilyTest, ImportColumnFamilyNegativeTest) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
@@ -640,6 +651,7 @@ int main(int argc, char** argv) {
 #include <stdio.h>
 
 int main(int /*argc*/, char** /*argv*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   fprintf(stderr,
           "SKIPPED as External SST File Writer and Import are not supported "
           "in ROCKSDB_LITE\n");

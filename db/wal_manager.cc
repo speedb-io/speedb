@@ -37,6 +37,7 @@ namespace ROCKSDB_NAMESPACE {
 #ifndef ROCKSDB_LITE
 
 Status WalManager::DeleteFile(const std::string& fname, uint64_t number) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto s = env_->DeleteFile(wal_dir_ + "/" + fname);
   if (s.ok()) {
     MutexLock l(&read_first_record_cache_mutex_);
@@ -46,6 +47,7 @@ Status WalManager::DeleteFile(const std::string& fname, uint64_t number) {
 }
 
 Status WalManager::GetSortedWalFiles(VectorLogPtr& files) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // First get sorted files in db dir, then get sorted files from archived
   // dir, to avoid a race condition where a log file is moved to archived
   // dir in between.
@@ -105,6 +107,7 @@ Status WalManager::GetUpdatesSince(
     SequenceNumber seq, std::unique_ptr<TransactionLogIterator>* iter,
     const TransactionLogIterator::ReadOptions& read_options,
     VersionSet* version_set) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (seq_per_batch_) {
     return Status::NotSupported();
   }
@@ -139,6 +142,7 @@ Status WalManager::GetUpdatesSince(
 //    b. get sorted non-empty archived logs
 //    c. delete what should be deleted
 void WalManager::PurgeObsoleteWALFiles() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   bool const ttl_enabled = db_options_.WAL_ttl_seconds > 0;
   bool const size_limit_enabled = db_options_.WAL_size_limit_MB > 0;
   if (!ttl_enabled && !size_limit_enabled) {
@@ -276,6 +280,7 @@ void WalManager::PurgeObsoleteWALFiles() {
 }
 
 void WalManager::ArchiveWALFile(const std::string& fname, uint64_t number) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto archived_log_name = ArchivedLogFileName(wal_dir_, number);
   // The sync point below is used in (DBTest,TransactionLogIteratorRace)
   TEST_SYNC_POINT("WalManager::PurgeObsoleteFiles:1");
@@ -290,6 +295,7 @@ void WalManager::ArchiveWALFile(const std::string& fname, uint64_t number) {
 Status WalManager::GetSortedWalsOfType(const std::string& path,
                                        VectorLogPtr& log_files,
                                        WalFileType log_type) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::vector<std::string> all_files;
   const Status status = env_->GetChildren(path, &all_files);
   if (!status.ok()) {
@@ -350,6 +356,7 @@ Status WalManager::GetSortedWalsOfType(const std::string& path,
 
 Status WalManager::RetainProbableWalFiles(VectorLogPtr& all_logs,
                                           const SequenceNumber target) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   int64_t start = 0;  // signed to avoid overflow when target is < first file.
   int64_t end = static_cast<int64_t>(all_logs.size()) - 1;
   // Binary Search. avoid opening all files.
@@ -375,6 +382,7 @@ Status WalManager::RetainProbableWalFiles(VectorLogPtr& all_logs,
 Status WalManager::ReadFirstRecord(const WalFileType type,
                                    const uint64_t number,
                                    SequenceNumber* sequence) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   *sequence = 0;
   if (type != kAliveLogFile && type != kArchivedLogFile) {
     ROCKS_LOG_ERROR(db_options_.info_log, "[WalManger] Unknown file type %s",
@@ -421,6 +429,7 @@ Status WalManager::ReadFirstRecord(const WalFileType type,
 
 Status WalManager::GetLiveWalFile(uint64_t number,
                                   std::unique_ptr<LogFile>* log_file) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!log_file) {
     return Status::InvalidArgument("log_file not preallocated.");
   }
@@ -450,6 +459,7 @@ Status WalManager::GetLiveWalFile(uint64_t number,
 Status WalManager::ReadFirstLine(const std::string& fname,
                                  const uint64_t number,
                                  SequenceNumber* sequence) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   struct LogReporter : public log::Reader::Reporter {
     Env* env;
     Logger* info_log;

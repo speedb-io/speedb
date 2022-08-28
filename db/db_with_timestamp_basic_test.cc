@@ -27,6 +27,7 @@ class DBBasicTestWithTimestampBase : public DBTestBase {
 
  protected:
   static std::string Key1(uint64_t k) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::string ret;
     PutFixed64(&ret, k);
     std::reverse(ret.begin(), ret.end());
@@ -34,6 +35,7 @@ class DBBasicTestWithTimestampBase : public DBTestBase {
   }
 
   static std::string KeyWithPrefix(std::string prefix, uint64_t k) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::string ret;
     PutFixed64(&ret, k);
     std::reverse(ret.begin(), ret.end());
@@ -42,6 +44,7 @@ class DBBasicTestWithTimestampBase : public DBTestBase {
 
   static std::vector<Slice> ConvertStrToSlice(
       std::vector<std::string>& strings) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::vector<Slice> ret;
     for (const auto& s : strings) {
       ret.emplace_back(s);
@@ -56,6 +59,7 @@ class DBBasicTestWithTimestampBase : public DBTestBase {
    public:
     explicit TestComparator(size_t ts_sz)
         : Comparator(ts_sz), cmp_without_ts_(nullptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
       cmp_without_ts_ = BytewiseComparator();
     }
 
@@ -130,6 +134,7 @@ class DBBasicTestWithTimestampBase : public DBTestBase {
   };
 
   std::string Timestamp(uint64_t low, uint64_t high) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::string ts;
     PutFixed64(&ts, low);
     PutFixed64(&ts, high);
@@ -152,6 +157,7 @@ class DBBasicTestWithTimestampBase : public DBTestBase {
   void CheckIterEntry(const Iterator* it, const Slice& expected_ukey,
                       SequenceNumber expected_seq, ValueType expected_val_type,
                       const Slice& expected_value, const Slice& expected_ts) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_TRUE(it->Valid());
     ASSERT_OK(it->status());
     std::string ukey_and_ts;
@@ -172,6 +178,7 @@ class DBBasicTestWithTimestampBase : public DBTestBase {
   void CheckIterEntry(const Iterator* it, const Slice& expected_ukey,
                       ValueType expected_val_type, const Slice& expected_value,
                       const Slice& expected_ts) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_TRUE(it->Valid());
     ASSERT_OK(it->status());
     std::string ukey_and_ts;
@@ -197,6 +204,7 @@ class DBBasicTestWithTimestamp : public DBBasicTestWithTimestampBase {
 };
 
 TEST_F(DBBasicTestWithTimestamp, SanityChecks) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.env = env_;
   options.create_if_missing = true;
@@ -274,6 +282,7 @@ TEST_F(DBBasicTestWithTimestamp, SanityChecks) {
 }
 
 TEST_F(DBBasicTestWithTimestamp, MixedCfs) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.env = env_;
   options.create_if_missing = true;
@@ -339,6 +348,7 @@ TEST_F(DBBasicTestWithTimestamp, MixedCfs) {
 }
 
 TEST_F(DBBasicTestWithTimestamp, CompactRangeWithSpecifiedRange) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.env = env_;
   options.create_if_missing = true;
@@ -365,6 +375,7 @@ TEST_F(DBBasicTestWithTimestamp, CompactRangeWithSpecifiedRange) {
 }
 
 TEST_F(DBBasicTestWithTimestamp, GcPreserveLatestVersionBelowFullHistoryLow) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.env = env_;
   options.create_if_missing = true;
@@ -404,6 +415,7 @@ TEST_F(DBBasicTestWithTimestamp, GcPreserveLatestVersionBelowFullHistoryLow) {
 }
 
 TEST_F(DBBasicTestWithTimestamp, UpdateFullHistoryTsLow) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.env = env_;
   options.create_if_missing = true;
@@ -503,6 +515,7 @@ TEST_F(DBBasicTestWithTimestamp, UpdateFullHistoryTsLow) {
 }
 
 TEST_F(DBBasicTestWithTimestamp, UpdateFullHistoryTsLowWithPublicAPI) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.env = env_;
   options.create_if_missing = true;
@@ -548,6 +561,7 @@ TEST_F(DBBasicTestWithTimestamp, UpdateFullHistoryTsLowWithPublicAPI) {
 }
 
 TEST_F(DBBasicTestWithTimestamp, GetApproximateSizes) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.write_buffer_size = 100000000;  // Large write buffer
   options.compression = kNoCompression;
@@ -624,6 +638,7 @@ TEST_F(DBBasicTestWithTimestamp, GetApproximateSizes) {
 }
 
 TEST_F(DBBasicTestWithTimestamp, SimpleIterate) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kNumKeysPerFile = 128;
   const uint64_t kMaxKey = 1024;
   Options options = CurrentOptions();
@@ -705,6 +720,7 @@ TEST_F(DBBasicTestWithTimestamp, SimpleIterate) {
 }
 
 TEST_F(DBBasicTestWithTimestamp, TrimHistoryTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.env = env_;
   options.create_if_missing = true;
@@ -754,6 +770,7 @@ TEST_F(DBBasicTestWithTimestamp, TrimHistoryTest) {
 }
 
 TEST_F(DBBasicTestWithTimestamp, OpenAndTrimHistoryInvalidOptionTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Destroy(last_options_);
 
   Options options = CurrentOptions();
@@ -778,6 +795,7 @@ TEST_F(DBBasicTestWithTimestamp, OpenAndTrimHistoryInvalidOptionTest) {
 
 #ifndef ROCKSDB_LITE
 TEST_F(DBBasicTestWithTimestamp, GetTimestampTableProperties) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   const size_t kTimestampSize = Timestamp(0, 0).size();
   TestComparator test_cmp(kTimestampSize);
@@ -826,6 +844,7 @@ INSTANTIATE_TEST_CASE_P(
         BlockBasedTableOptions::IndexType::kBinarySearchWithFirstKey));
 
 TEST_P(DBBasicTestWithTimestampTableOptions, GetAndMultiGet) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = GetDefaultOptions();
   options.create_if_missing = true;
   options.prefix_extractor.reset(NewFixedPrefixTransform(3));
@@ -893,6 +912,7 @@ TEST_P(DBBasicTestWithTimestampTableOptions, GetAndMultiGet) {
 }
 
 TEST_P(DBBasicTestWithTimestampTableOptions, SeekWithPrefixLessThanKey) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.env = env_;
   options.create_if_missing = true;
@@ -946,6 +966,7 @@ TEST_P(DBBasicTestWithTimestampTableOptions, SeekWithPrefixLessThanKey) {
 }
 
 TEST_P(DBBasicTestWithTimestampTableOptions, SeekWithCappedPrefix) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.env = env_;
   options.create_if_missing = true;
@@ -1000,6 +1021,7 @@ TEST_P(DBBasicTestWithTimestampTableOptions, SeekWithCappedPrefix) {
 }
 
 TEST_P(DBBasicTestWithTimestampTableOptions, SeekWithBound) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.env = env_;
   options.create_if_missing = true;
@@ -1064,6 +1086,7 @@ TEST_P(DBBasicTestWithTimestampTableOptions, SeekWithBound) {
 }
 
 TEST_F(DBBasicTestWithTimestamp, ChangeIterationDirection) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = GetDefaultOptions();
   options.create_if_missing = true;
   options.env = env_;
@@ -1149,6 +1172,7 @@ TEST_F(DBBasicTestWithTimestamp, ChangeIterationDirection) {
 }
 
 TEST_F(DBBasicTestWithTimestamp, SimpleForwardIterateLowerTsBound) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr int kNumKeysPerFile = 128;
   constexpr uint64_t kMaxKey = 1024;
   Options options = CurrentOptions();
@@ -1227,6 +1251,7 @@ TEST_F(DBBasicTestWithTimestamp, SimpleForwardIterateLowerTsBound) {
 }
 
 TEST_F(DBBasicTestWithTimestamp, ReseekToTargetTimestamp) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.env = env_;
   options.create_if_missing = true;
@@ -1270,6 +1295,7 @@ TEST_F(DBBasicTestWithTimestamp, ReseekToTargetTimestamp) {
 }
 
 TEST_F(DBBasicTestWithTimestamp, ReseekToNextUserKey) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.env = env_;
   options.create_if_missing = true;
@@ -1315,6 +1341,7 @@ TEST_F(DBBasicTestWithTimestamp, ReseekToNextUserKey) {
 }
 
 TEST_F(DBBasicTestWithTimestamp, ReseekToUserKeyBeforeSavedKey) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = GetDefaultOptions();
   options.env = env_;
   options.create_if_missing = true;
@@ -1352,6 +1379,7 @@ TEST_F(DBBasicTestWithTimestamp, ReseekToUserKeyBeforeSavedKey) {
 }
 
 TEST_F(DBBasicTestWithTimestamp, MultiGetWithFastLocalBloom) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.env = env_;
   options.create_if_missing = true;
@@ -1391,6 +1419,7 @@ TEST_F(DBBasicTestWithTimestamp, MultiGetWithFastLocalBloom) {
 }
 
 TEST_P(DBBasicTestWithTimestampTableOptions, MultiGetWithPrefix) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.env = env_;
   options.create_if_missing = true;
@@ -1432,6 +1461,7 @@ TEST_P(DBBasicTestWithTimestampTableOptions, MultiGetWithPrefix) {
 }
 
 TEST_P(DBBasicTestWithTimestampTableOptions, MultiGetWithMemBloomFilter) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.env = env_;
   options.create_if_missing = true;
@@ -1473,6 +1503,7 @@ TEST_P(DBBasicTestWithTimestampTableOptions, MultiGetWithMemBloomFilter) {
 }
 
 TEST_F(DBBasicTestWithTimestamp, MultiGetRangeFiltering) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.env = env_;
   options.create_if_missing = true;
@@ -1527,6 +1558,7 @@ TEST_F(DBBasicTestWithTimestamp, MultiGetRangeFiltering) {
 }
 
 TEST_P(DBBasicTestWithTimestampTableOptions, MultiGetPrefixFilter) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.env = env_;
   options.create_if_missing = true;
@@ -1569,6 +1601,7 @@ TEST_P(DBBasicTestWithTimestampTableOptions, MultiGetPrefixFilter) {
 }
 
 TEST_F(DBBasicTestWithTimestamp, MaxKeysSkippedDuringNext) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.env = env_;
   options.create_if_missing = true;
@@ -1604,6 +1637,7 @@ TEST_F(DBBasicTestWithTimestamp, MaxKeysSkippedDuringNext) {
 }
 
 TEST_F(DBBasicTestWithTimestamp, MaxKeysSkippedDuringPrev) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = GetDefaultOptions();
   options.env = env_;
   options.create_if_missing = true;
@@ -1645,6 +1679,7 @@ TEST_F(DBBasicTestWithTimestamp, MaxKeysSkippedDuringPrev) {
 // Since f2.smallest < f1.largest < f2.largest
 // f1 and f2 will be the inputs of a real compaction instead of trivial move.
 TEST_F(DBBasicTestWithTimestamp, CompactDeletionWithTimestampMarkerToBottom) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.env = env_;
   options.create_if_missing = true;
@@ -1705,6 +1740,7 @@ class DBBasicTestWithTimestampFilterPrefixSettings
 };
 
 TEST_P(DBBasicTestWithTimestampFilterPrefixSettings, GetAndMultiGet) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.env = env_;
   options.create_if_missing = true;
@@ -1823,6 +1859,7 @@ INSTANTIATE_TEST_CASE_P(
 class DataVisibilityTest : public DBBasicTestWithTimestampBase {
  public:
   DataVisibilityTest() : DBBasicTestWithTimestampBase("data_visibility_test") {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // Initialize test data
     for (int i = 0; i < kTestDataSize; i++) {
       test_data_[i].key = "key" + ToString(i);
@@ -1846,6 +1883,7 @@ class DataVisibilityTest : public DBBasicTestWithTimestampBase {
   TestData test_data_[kTestDataSize];
 
   void PutTestData(int index, ColumnFamilyHandle* cfh = nullptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_LE(index, kTestDataSize);
     WriteOptions write_opts;
 
@@ -1866,6 +1904,7 @@ class DataVisibilityTest : public DBBasicTestWithTimestampBase {
 
   void AssertVisibility(int ts, SequenceNumber seq,
                         std::vector<Status> statuses) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_EQ(kTestDataSize, statuses.size());
     for (int i = 0; i < kTestDataSize; i++) {
       if (test_data_[i].seq_num <= seq && test_data_[i].ts <= ts) {
@@ -1877,6 +1916,7 @@ class DataVisibilityTest : public DBBasicTestWithTimestampBase {
   }
 
   std::vector<Slice> GetKeys() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::vector<Slice> ret(kTestDataSize);
     for (int i = 0; i < kTestDataSize; i++) {
       ret[i] = test_data_[i].key;
@@ -1885,6 +1925,7 @@ class DataVisibilityTest : public DBBasicTestWithTimestampBase {
   }
 
   void VerifyDefaultCF(int ts, const Snapshot* snap = nullptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ReadOptions read_opts;
     std::string read_ts = Timestamp(ts, 0);
     Slice read_ts_slice = read_ts;
@@ -1940,6 +1981,7 @@ class DataVisibilityTest : public DBBasicTestWithTimestampBase {
   }
 
   void VerifyDefaultCF(const Snapshot* snap = nullptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     for (int i = 0; i <= kTestDataSize; i++) {
       VerifyDefaultCF(i, snap);
     }
@@ -1958,6 +2000,7 @@ constexpr int DataVisibilityTest::kTestDataSize;
 // It is OK to return <k, t1, s1> if ts>=t1 AND seq>=s1. If ts>=1t1 but seq<s1,
 // the key should not be returned.
 TEST_F(DataVisibilityTest, PointLookupWithoutSnapshot1) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   const size_t kTimestampSize = Timestamp(0, 0).size();
   TestComparator test_cmp(kTimestampSize);
@@ -2004,6 +2047,7 @@ TEST_F(DataVisibilityTest, PointLookupWithoutSnapshot1) {
 // It is OK to return <k, t1, s1> if ts>=t1 AND seq>=s1. If ts>=t1 but seq<s1,
 // the key should not be returned.
 TEST_F(DataVisibilityTest, PointLookupWithoutSnapshot2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   const size_t kTimestampSize = Timestamp(0, 0).size();
   TestComparator test_cmp(kTimestampSize);
@@ -2054,6 +2098,7 @@ TEST_F(DataVisibilityTest, PointLookupWithoutSnapshot2) {
 // to see data that visible in BOTH timestamp and sequence number. Therefore,
 // <k, t1, s1> can be returned only if t1<=ts AND s1<=seq.
 TEST_F(DataVisibilityTest, PointLookupWithSnapshot1) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   const size_t kTimestampSize = Timestamp(0, 0).size();
   TestComparator test_cmp(kTimestampSize);
@@ -2106,6 +2151,7 @@ TEST_F(DataVisibilityTest, PointLookupWithSnapshot1) {
 // to see data that visible in BOTH timestamp and sequence number. Therefore,
 // <k, t1, s1> can be returned only if t1<=ts AND s1<=seq.
 TEST_F(DataVisibilityTest, PointLookupWithSnapshot2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   const size_t kTimestampSize = Timestamp(0, 0).size();
   TestComparator test_cmp(kTimestampSize);
@@ -2156,6 +2202,7 @@ TEST_F(DataVisibilityTest, PointLookupWithSnapshot2) {
 // <k, t1, s1> can be seen in scan as long as ts>=t1 AND seq>=s1. If ts>=t1 but
 // seq<s1, then the key should not be returned.
 TEST_F(DataVisibilityTest, RangeScanWithoutSnapshot) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   const size_t kTimestampSize = Timestamp(0, 0).size();
   TestComparator test_cmp(kTimestampSize);
@@ -2201,6 +2248,7 @@ TEST_F(DataVisibilityTest, RangeScanWithoutSnapshot) {
 // <k, t1, s1> can be seen by the scan only if t1<=ts AND s1<=seq. If t1<=ts
 // but s1>seq, then the key should not be returned.
 TEST_F(DataVisibilityTest, RangeScanWithSnapshot) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   const size_t kTimestampSize = Timestamp(0, 0).size();
   TestComparator test_cmp(kTimestampSize);
@@ -2248,6 +2296,7 @@ TEST_F(DataVisibilityTest, RangeScanWithSnapshot) {
 // Query each combination and make sure for MultiGet key <k, t1, s1>, only
 // return keys that ts>=t1 AND seq>=s1.
 TEST_F(DataVisibilityTest, MultiGetWithTimestamp) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   const size_t kTimestampSize = Timestamp(0, 0).size();
   TestComparator test_cmp(kTimestampSize);
@@ -2291,6 +2340,7 @@ TEST_F(DataVisibilityTest, MultiGetWithTimestamp) {
 //         MultiGet(ts,seq)
 // For MultiGet <k, t1, s1>, only return keys that ts>=t1 AND seq>=s1.
 TEST_F(DataVisibilityTest, MultiGetWithoutSnapshot) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   const size_t kTimestampSize = Timestamp(0, 0).size();
   TestComparator test_cmp(kTimestampSize);
@@ -2329,6 +2379,7 @@ TEST_F(DataVisibilityTest, MultiGetWithoutSnapshot) {
 }
 
 TEST_F(DataVisibilityTest, MultiGetCrossCF) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   const size_t kTimestampSize = Timestamp(0, 0).size();
   TestComparator test_cmp(kTimestampSize);
@@ -2404,6 +2455,7 @@ class DBBasicTestWithTimestampCompressionSettings
 };
 
 TEST_P(DBBasicTestWithTimestampCompressionSettings, PutAndGet) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kNumKeysPerFile = 1024;
   const size_t kNumTimestamps = 4;
   Options options = CurrentOptions();
@@ -2480,6 +2532,7 @@ TEST_P(DBBasicTestWithTimestampCompressionSettings, PutAndGet) {
 }
 
 TEST_P(DBBasicTestWithTimestampCompressionSettings, PutDeleteGet) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.env = env_;
   options.create_if_missing = true;
@@ -2595,6 +2648,7 @@ class FlushedFileCollector : public EventListener {
   }
 
   std::vector<std::string> GetFlushedFiles() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::vector<std::string> result;
     {
       InstrumentedMutexLock lock(&mutex_);
@@ -2604,6 +2658,7 @@ class FlushedFileCollector : public EventListener {
   }
 
   void ClearFlushedFiles() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     InstrumentedMutexLock lock(&mutex_);
     flushed_files_.clear();
   }
@@ -2614,6 +2669,7 @@ class FlushedFileCollector : public EventListener {
 };
 
 TEST_P(DBBasicTestWithTimestampCompressionSettings, PutAndGetWithCompaction) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kNumKeysPerFile = 1024;
   const size_t kNumTimestamps = 2;
   const size_t kNumKeysPerTimestamp = (kNumKeysPerFile - 1) / kNumTimestamps;
@@ -2733,6 +2789,7 @@ TEST_P(DBBasicTestWithTimestampCompressionSettings, PutAndGetWithCompaction) {
 }
 
 TEST_F(DBBasicTestWithTimestamp, BatchWriteAndMultiGet) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kNumKeysPerFile = 8192;
   const size_t kNumTimestamps = 2;
   const size_t kNumKeysPerTimestamp = (kNumKeysPerFile - 1) / kNumTimestamps;
@@ -2829,6 +2886,7 @@ TEST_F(DBBasicTestWithTimestamp, BatchWriteAndMultiGet) {
 }
 
 TEST_F(DBBasicTestWithTimestamp, MultiGetNoReturnTs) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.env = env_;
   const size_t kTimestampSize = Timestamp(0, 0).size();
@@ -2900,6 +2958,7 @@ class DBBasicTestWithTimestampPrefixSeek
 };
 
 TEST_P(DBBasicTestWithTimestampPrefixSeek, IterateWithPrefix) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const size_t kNumKeysPerFile = 128;
   Options options = CurrentOptions();
   options.env = env_;
@@ -3055,6 +3114,7 @@ class DBBasicTestWithTsIterTombstones
 };
 
 TEST_P(DBBasicTestWithTsIterTombstones, IterWithDelete) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr size_t kNumKeysPerFile = 128;
   Options options = CurrentOptions();
   options.env = env_;
@@ -3145,6 +3205,7 @@ INSTANTIATE_TEST_CASE_P(
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   RegisterCustomObjects(argc, argv);

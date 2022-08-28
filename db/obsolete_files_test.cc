@@ -38,6 +38,7 @@ class ObsoleteFilesTest : public DBTestBase {
         wal_dir_(dbname_ + "/wal_files") {}
 
   void AddKeys(int numkeys, int startkey) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     WriteOptions options;
     options.sync = false;
     for (int i = startkey; i < (numkeys + startkey) ; i++) {
@@ -49,6 +50,7 @@ class ObsoleteFilesTest : public DBTestBase {
   }
 
   void createLevel0Files(int numFiles, int numKeysPerFile) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     int startKey = 0;
     for (int i = 0; i < numFiles; i++) {
       AddKeys(numKeysPerFile, startKey);
@@ -62,6 +64,7 @@ class ObsoleteFilesTest : public DBTestBase {
 
   void CheckFileTypeCounts(const std::string& dir, int required_log,
                            int required_sst, int required_manifest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::vector<std::string> filenames;
     ASSERT_OK(env_->GetChildren(dir, &filenames));
 
@@ -83,6 +86,7 @@ class ObsoleteFilesTest : public DBTestBase {
   }
 
   void ReopenDB() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Options options = CurrentOptions();
     // Trigger compaction when the number of level 0 files reaches 2.
     options.create_if_missing = true;
@@ -110,6 +114,7 @@ class ObsoleteFilesTest : public DBTestBase {
 };
 
 TEST_F(ObsoleteFilesTest, RaceForObsoleteFileDeletion) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ReopenDB();
   SyncPoint::GetInstance()->DisableProcessing();
   SyncPoint::GetInstance()->LoadDependency({
@@ -120,11 +125,13 @@ TEST_F(ObsoleteFilesTest, RaceForObsoleteFileDeletion) {
       });
   SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::DeleteObsoleteFileImpl:AfterDeletion", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         Status* p_status = reinterpret_cast<Status*>(arg);
         ASSERT_OK(*p_status);
       });
   SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::CloseHelper:PendingPurgeFinished", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         std::unordered_set<uint64_t>* files_grabbed_for_purge_ptr =
             reinterpret_cast<std::unordered_set<uint64_t>*>(arg);
         ASSERT_TRUE(files_grabbed_for_purge_ptr->empty());
@@ -150,6 +157,7 @@ TEST_F(ObsoleteFilesTest, RaceForObsoleteFileDeletion) {
 }
 
 TEST_F(ObsoleteFilesTest, DeleteObsoleteOptionsFile) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ReopenDB();
 
   createLevel0Files(2, 50000);
@@ -187,6 +195,7 @@ TEST_F(ObsoleteFilesTest, DeleteObsoleteOptionsFile) {
 }
 
 TEST_F(ObsoleteFilesTest, BlobFiles) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ReopenDB();
 
   VersionSet* const versions = dbfull()->GetVersionSet();
@@ -309,6 +318,7 @@ TEST_F(ObsoleteFilesTest, BlobFiles) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   RegisterCustomObjects(argc, argv);
@@ -319,6 +329,7 @@ int main(int argc, char** argv) {
 #include <stdio.h>
 
 int main(int /*argc*/, char** /*argv*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   fprintf(stderr,
           "SKIPPED as DBImpl::DeleteFile is not supported in ROCKSDB_LITE\n");
   return 0;

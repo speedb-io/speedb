@@ -25,6 +25,7 @@ class DBSecondaryTest : public DBTestBase {
         secondary_path_(),
         handles_secondary_(),
         db_secondary_(nullptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     secondary_path_ =
         test::PerThreadDBPath(env_, "/db_secondary_test_secondary");
   }
@@ -42,6 +43,7 @@ class DBSecondaryTest : public DBTestBase {
 
  protected:
   Status ReopenAsSecondary(const Options& options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return DB::OpenAsSecondary(options, dbname_, secondary_path_, &db_);
   }
 
@@ -53,6 +55,7 @@ class DBSecondaryTest : public DBTestBase {
       const std::vector<std::string>& column_families, const Options& options);
 
   void CloseSecondary() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     for (auto h : handles_secondary_) {
       ASSERT_OK(db_secondary_->DestroyColumnFamilyHandle(h));
     }
@@ -62,6 +65,7 @@ class DBSecondaryTest : public DBTestBase {
   }
 
   DBImplSecondary* db_secondary_full() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return static_cast<DBImplSecondary*>(db_secondary_);
   }
 
@@ -74,10 +78,12 @@ class DBSecondaryTest : public DBTestBase {
 };
 
 void DBSecondaryTest::OpenSecondary(const Options& options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(TryOpenSecondary(options));
 }
 
 Status DBSecondaryTest::TryOpenSecondary(const Options& options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Status s =
       DB::OpenAsSecondary(options, dbname_, secondary_path_, &db_secondary_);
   return s;
@@ -85,6 +91,7 @@ Status DBSecondaryTest::TryOpenSecondary(const Options& options) {
 
 void DBSecondaryTest::OpenSecondaryWithColumnFamilies(
     const std::vector<std::string>& column_families, const Options& options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::vector<ColumnFamilyDescriptor> cf_descs;
   cf_descs.emplace_back(kDefaultColumnFamilyName, options);
   for (const auto& cf_name : column_families) {
@@ -117,6 +124,7 @@ void DBSecondaryTest::CheckFileTypeCounts(const std::string& dir,
 }
 
 TEST_F(DBSecondaryTest, NonExistingDb) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Destroy(last_options_);
 
   Options options = GetDefaultOptions();
@@ -129,6 +137,7 @@ TEST_F(DBSecondaryTest, NonExistingDb) {
 }
 
 TEST_F(DBSecondaryTest, ReopenAsSecondary) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = env_;
   Reopen(options);
@@ -162,6 +171,7 @@ TEST_F(DBSecondaryTest, ReopenAsSecondary) {
 }
 
 TEST_F(DBSecondaryTest, SimpleInternalCompaction) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = env_;
   Reopen(options);
@@ -205,6 +215,7 @@ TEST_F(DBSecondaryTest, SimpleInternalCompaction) {
 }
 
 TEST_F(DBSecondaryTest, InternalCompactionMultiLevels) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = env_;
   options.disable_auto_compactions = true;
@@ -285,6 +296,7 @@ TEST_F(DBSecondaryTest, InternalCompactionMultiLevels) {
 }
 
 TEST_F(DBSecondaryTest, InternalCompactionCompactedFiles) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = env_;
   options.level0_file_num_compaction_trigger = 4;
@@ -326,6 +338,7 @@ TEST_F(DBSecondaryTest, InternalCompactionCompactedFiles) {
 }
 
 TEST_F(DBSecondaryTest, InternalCompactionMissingFiles) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = env_;
   options.level0_file_num_compaction_trigger = 4;
@@ -369,6 +382,7 @@ TEST_F(DBSecondaryTest, InternalCompactionMissingFiles) {
 }
 
 TEST_F(DBSecondaryTest, OpenAsSecondary) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = env_;
   options.level0_file_num_compaction_trigger = 4;
@@ -466,6 +480,7 @@ class TraceFileEnv : public EnvWrapper {
 }  // namespace
 
 TEST_F(DBSecondaryTest, SecondaryCloseFiles) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = env_;
   options.max_open_files = 1;
@@ -510,6 +525,7 @@ TEST_F(DBSecondaryTest, SecondaryCloseFiles) {
 }
 
 TEST_F(DBSecondaryTest, OpenAsSecondaryWALTailing) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = env_;
   options.level0_file_num_compaction_trigger = 4;
@@ -565,6 +581,7 @@ TEST_F(DBSecondaryTest, OpenAsSecondaryWALTailing) {
 }
 
 TEST_F(DBSecondaryTest, SecondaryTailingBug_ISSUE_8467) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = env_;
   Reopen(options);
@@ -598,6 +615,7 @@ TEST_F(DBSecondaryTest, SecondaryTailingBug_ISSUE_8467) {
 }
 
 TEST_F(DBSecondaryTest, RefreshIterator) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = env_;
   Reopen(options);
@@ -643,6 +661,7 @@ TEST_F(DBSecondaryTest, RefreshIterator) {
 }
 
 TEST_F(DBSecondaryTest, OpenWithNonExistColumnFamily) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = env_;
   CreateAndReopenWithCF({"pikachu"}, options);
@@ -660,6 +679,7 @@ TEST_F(DBSecondaryTest, OpenWithNonExistColumnFamily) {
 }
 
 TEST_F(DBSecondaryTest, OpenWithSubsetOfColumnFamilies) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = env_;
   CreateAndReopenWithCF({"pikachu"}, options);
@@ -683,6 +703,7 @@ TEST_F(DBSecondaryTest, OpenWithSubsetOfColumnFamilies) {
 }
 
 TEST_F(DBSecondaryTest, SwitchToNewManifestDuringOpen) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = env_;
   Reopen(options);
@@ -714,6 +735,7 @@ TEST_F(DBSecondaryTest, SwitchToNewManifestDuringOpen) {
 }
 
 TEST_F(DBSecondaryTest, MissingTableFileDuringOpen) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = env_;
   options.level0_file_num_compaction_trigger = 4;
@@ -763,6 +785,7 @@ TEST_F(DBSecondaryTest, MissingTableFileDuringOpen) {
 }
 
 TEST_F(DBSecondaryTest, MissingTableFile) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = env_;
   options.level0_file_num_compaction_trigger = 4;
@@ -820,6 +843,7 @@ TEST_F(DBSecondaryTest, MissingTableFile) {
 }
 
 TEST_F(DBSecondaryTest, PrimaryDropColumnFamily) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = env_;
   const std::string kCfName1 = "pikachu";
@@ -851,6 +875,7 @@ TEST_F(DBSecondaryTest, PrimaryDropColumnFamily) {
 }
 
 TEST_F(DBSecondaryTest, SwitchManifest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = env_;
   options.level0_file_num_compaction_trigger = 4;
@@ -907,6 +932,7 @@ TEST_F(DBSecondaryTest, SwitchManifest) {
 }
 
 TEST_F(DBSecondaryTest, SwitchManifestTwice) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = env_;
   options.disable_auto_compactions = true;
@@ -939,6 +965,7 @@ TEST_F(DBSecondaryTest, SwitchManifestTwice) {
 }
 
 TEST_F(DBSecondaryTest, DISABLED_SwitchWAL) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kNumKeysPerMemtable = 1;
   Options options;
   options.env = env_;
@@ -988,6 +1015,7 @@ TEST_F(DBSecondaryTest, DISABLED_SwitchWAL) {
 }
 
 TEST_F(DBSecondaryTest, DISABLED_SwitchWALMultiColumnFamilies) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kNumKeysPerMemtable = 1;
   SyncPoint::GetInstance()->DisableProcessing();
   SyncPoint::GetInstance()->LoadDependency(
@@ -1058,6 +1086,7 @@ TEST_F(DBSecondaryTest, DISABLED_SwitchWALMultiColumnFamilies) {
 }
 
 TEST_F(DBSecondaryTest, CatchUpAfterFlush) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kNumKeysPerMemtable = 16;
   Options options;
   options.env = env_;
@@ -1126,6 +1155,7 @@ TEST_F(DBSecondaryTest, CatchUpAfterFlush) {
 }
 
 TEST_F(DBSecondaryTest, CheckConsistencyWhenOpen) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   bool called = false;
   Options options;
   options.env = env_;
@@ -1166,6 +1196,7 @@ TEST_F(DBSecondaryTest, CheckConsistencyWhenOpen) {
 }
 
 TEST_F(DBSecondaryTest, StartFromInconsistent) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   DestroyAndReopen(options);
   ASSERT_OK(Put("foo", "value"));
@@ -1174,6 +1205,7 @@ TEST_F(DBSecondaryTest, StartFromInconsistent) {
   SyncPoint::GetInstance()->ClearAllCallBacks();
   SyncPoint::GetInstance()->SetCallBack(
       "VersionBuilder::CheckConsistencyBeforeReturn", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         ASSERT_NE(nullptr, arg);
         *(reinterpret_cast<Status*>(arg)) =
             Status::Corruption("Inject corruption");
@@ -1186,6 +1218,7 @@ TEST_F(DBSecondaryTest, StartFromInconsistent) {
 }
 
 TEST_F(DBSecondaryTest, InconsistencyDuringCatchUp) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   DestroyAndReopen(options);
   ASSERT_OK(Put("foo", "value"));
@@ -1208,6 +1241,7 @@ TEST_F(DBSecondaryTest, InconsistencyDuringCatchUp) {
   SyncPoint::GetInstance()->ClearAllCallBacks();
   SyncPoint::GetInstance()->SetCallBack(
       "VersionBuilder::CheckConsistencyBeforeReturn", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         ASSERT_NE(nullptr, arg);
         *(reinterpret_cast<Status*>(arg)) =
             Status::Corruption("Inject corruption");
@@ -1218,6 +1252,7 @@ TEST_F(DBSecondaryTest, InconsistencyDuringCatchUp) {
 }
 
 TEST_F(DBSecondaryTest, OpenWithTransactionDB) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.create_if_missing = true;
 
@@ -1254,6 +1289,7 @@ TEST_F(DBSecondaryTest, OpenWithTransactionDB) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

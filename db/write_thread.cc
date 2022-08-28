@@ -32,6 +32,7 @@ WriteThread::WriteThread(const ImmutableDBOptions& db_options)
       stall_cv_(&stall_mu_) {}
 
 uint8_t WriteThread::BlockingAwaitState(Writer* w, uint8_t goal_mask) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // We're going to block.  Lazily create the mutex.  We guarantee
   // propagation of this construction to the waker via the
   // STATE_LOCKED_WAITING state.  The waker won't try to touch the mutex
@@ -61,6 +62,7 @@ uint8_t WriteThread::BlockingAwaitState(Writer* w, uint8_t goal_mask) {
 
 uint8_t WriteThread::AwaitState(Writer* w, uint8_t goal_mask,
                                 AdaptationContext* ctx) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint8_t state = 0;
 
   // 1. Busy loop using "pause" for 1 micro sec
@@ -208,6 +210,7 @@ uint8_t WriteThread::AwaitState(Writer* w, uint8_t goal_mask,
 }
 
 void WriteThread::SetState(Writer* w, uint8_t new_state) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(w);
   auto state = w->state.load(std::memory_order_acquire);
   if (state == STATE_LOCKED_WAITING ||
@@ -222,6 +225,7 @@ void WriteThread::SetState(Writer* w, uint8_t new_state) {
 }
 
 bool WriteThread::LinkOne(Writer* w, std::atomic<Writer*>* newest_writer) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(newest_writer != nullptr);
   assert(w->state == STATE_INIT);
   Writer* writers = newest_writer->load(std::memory_order_relaxed);
@@ -258,6 +262,7 @@ bool WriteThread::LinkOne(Writer* w, std::atomic<Writer*>* newest_writer) {
 
 bool WriteThread::LinkGroup(WriteGroup& write_group,
                             std::atomic<Writer*>* newest_writer) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(newest_writer != nullptr);
   Writer* leader = write_group.leader;
   Writer* last_writer = write_group.last_writer;
@@ -282,6 +287,7 @@ bool WriteThread::LinkGroup(WriteGroup& write_group,
 }
 
 void WriteThread::CreateMissingNewerLinks(Writer* head) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   while (true) {
     Writer* next = head->link_older;
     if (next == nullptr || next->link_newer != nullptr) {
@@ -295,6 +301,7 @@ void WriteThread::CreateMissingNewerLinks(Writer* head) {
 
 WriteThread::Writer* WriteThread::FindNextLeader(Writer* from,
                                                  Writer* boundary) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(from != nullptr && from != boundary);
   Writer* current = from;
   while (current->link_older != boundary) {
@@ -305,6 +312,7 @@ WriteThread::Writer* WriteThread::FindNextLeader(Writer* from,
 }
 
 void WriteThread::CompleteLeader(WriteGroup& write_group) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(write_group.size > 0);
   Writer* leader = write_group.leader;
   if (write_group.size == 1) {
@@ -320,6 +328,7 @@ void WriteThread::CompleteLeader(WriteGroup& write_group) {
 }
 
 void WriteThread::CompleteFollower(Writer* w, WriteGroup& write_group) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(write_group.size > 1);
   assert(w != write_group.leader);
   if (w == write_group.last_writer) {
@@ -334,6 +343,7 @@ void WriteThread::CompleteFollower(Writer* w, WriteGroup& write_group) {
 }
 
 void WriteThread::BeginWriteStall() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   LinkOne(&write_stall_dummy_, &newest_writer_);
 
   // Walk writer list until w->write_group != nullptr. The current write group
@@ -364,6 +374,7 @@ void WriteThread::BeginWriteStall() {
 }
 
 void WriteThread::EndWriteStall() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   MutexLock lock(&stall_mu_);
 
   // Unlink write_stall_dummy_ from the write queue. This will unblock
@@ -379,6 +390,7 @@ void WriteThread::EndWriteStall() {
 
 static WriteThread::AdaptationContext jbg_ctx("JoinBatchGroup");
 void WriteThread::JoinBatchGroup(Writer* w) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   TEST_SYNC_POINT_CALLBACK("WriteThread::JoinBatchGroup:Start", w);
   assert(w->batch != nullptr);
 
@@ -414,6 +426,7 @@ void WriteThread::JoinBatchGroup(Writer* w) {
 
 size_t WriteThread::EnterAsBatchGroupLeader(Writer* leader,
                                             WriteGroup* write_group) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(leader->link_older == nullptr);
   assert(leader->batch != nullptr);
   assert(write_group != nullptr);
@@ -504,6 +517,7 @@ size_t WriteThread::EnterAsBatchGroupLeader(Writer* leader,
 
 void WriteThread::EnterAsMemTableWriter(Writer* leader,
                                         WriteGroup* write_group) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(leader != nullptr);
   assert(leader->link_older == nullptr);
   assert(leader->batch != nullptr);
@@ -564,6 +578,7 @@ void WriteThread::EnterAsMemTableWriter(Writer* leader,
 
 void WriteThread::ExitAsMemTableWriter(Writer* /*self*/,
                                        WriteGroup& write_group) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Writer* leader = write_group.leader;
   Writer* last_writer = write_group.last_writer;
 
@@ -596,6 +611,7 @@ void WriteThread::ExitAsMemTableWriter(Writer* /*self*/,
 }
 
 void WriteThread::LaunchParallelMemTableWriters(WriteGroup* write_group) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(write_group != nullptr);
   write_group->running.store(write_group->size);
   for (auto w : *write_group) {
@@ -606,6 +622,7 @@ void WriteThread::LaunchParallelMemTableWriters(WriteGroup* write_group) {
 static WriteThread::AdaptationContext cpmtw_ctx("CompleteParallelMemTableWriter");
 // This method is called by both the leader and parallel followers
 bool WriteThread::CompleteParallelMemTableWriter(Writer* w) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 
   auto* write_group = w->write_group;
   if (!w->status.ok()) {
@@ -626,6 +643,7 @@ bool WriteThread::CompleteParallelMemTableWriter(Writer* w) {
 }
 
 void WriteThread::ExitAsBatchGroupFollower(Writer* w) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto* write_group = w->write_group;
 
   assert(w->state == STATE_PARALLEL_MEMTABLE_WRITER);
@@ -639,6 +657,7 @@ void WriteThread::ExitAsBatchGroupFollower(Writer* w) {
 static WriteThread::AdaptationContext eabgl_ctx("ExitAsBatchGroupLeader");
 void WriteThread::ExitAsBatchGroupLeader(WriteGroup& write_group,
                                          Status& status) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Writer* leader = write_group.leader;
   Writer* last_writer = write_group.last_writer;
   assert(leader->link_older == nullptr);
@@ -765,6 +784,7 @@ void WriteThread::ExitAsBatchGroupLeader(WriteGroup& write_group,
 
 static WriteThread::AdaptationContext eu_ctx("EnterUnbatched");
 void WriteThread::EnterUnbatched(Writer* w, InstrumentedMutex* mu) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(w != nullptr && w->batch == nullptr);
   mu->Unlock();
   bool linked_as_leader = LinkOne(w, &newest_writer_);
@@ -780,6 +800,7 @@ void WriteThread::EnterUnbatched(Writer* w, InstrumentedMutex* mu) {
 }
 
 void WriteThread::ExitUnbatched(Writer* w) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(w != nullptr);
   Writer* newest_writer = w;
   if (!newest_writer_.compare_exchange_strong(newest_writer, nullptr)) {
@@ -793,6 +814,7 @@ void WriteThread::ExitUnbatched(Writer* w) {
 
 static WriteThread::AdaptationContext wfmw_ctx("WaitForMemTableWriters");
 void WriteThread::WaitForMemTableWriters() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(enable_pipelined_write_);
   if (newest_memtable_writer_.load() == nullptr) {
     return;

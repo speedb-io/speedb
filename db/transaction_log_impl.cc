@@ -35,6 +35,7 @@ TransactionLogIteratorImpl::TransactionLogIteratorImpl(
       current_file_index_(0),
       current_batch_seq_(0),
       current_last_seq_(0) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(files_ != nullptr);
   assert(versions_ != nullptr);
   assert(!seq_per_batch_);
@@ -47,6 +48,7 @@ TransactionLogIteratorImpl::TransactionLogIteratorImpl(
 Status TransactionLogIteratorImpl::OpenLogFile(
     const LogFile* log_file,
     std::unique_ptr<SequentialFileReader>* file_reader) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   FileSystemPtr fs(options_->fs, io_tracer_);
   std::unique_ptr<FSSequentialFile> file;
   std::string fname;
@@ -86,6 +88,7 @@ Status TransactionLogIteratorImpl::status() { return current_status_; }
 bool TransactionLogIteratorImpl::Valid() { return started_ && is_valid_; }
 
 bool TransactionLogIteratorImpl::RestrictedRead(Slice* record) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Don't read if no more complete entries to read from logs
   if (current_last_seq_ >= versions_->LastSequence()) {
     return false;
@@ -95,6 +98,7 @@ bool TransactionLogIteratorImpl::RestrictedRead(Slice* record) {
 
 void TransactionLogIteratorImpl::SeekToStartSequence(uint64_t start_file_index,
                                                      bool strict) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Slice record;
   started_ = false;
   is_valid_ = false;
@@ -168,6 +172,7 @@ void TransactionLogIteratorImpl::SeekToStartSequence(uint64_t start_file_index,
 }
 
 void TransactionLogIteratorImpl::Next() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!current_status_.ok()) {
     return;
   }
@@ -175,6 +180,7 @@ void TransactionLogIteratorImpl::Next() {
 }
 
 void TransactionLogIteratorImpl::NextImpl(bool internal) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Slice record;
   is_valid_ = false;
   if (!internal && !started_) {
@@ -228,6 +234,7 @@ void TransactionLogIteratorImpl::NextImpl(bool internal) {
 
 bool TransactionLogIteratorImpl::IsBatchExpected(
     const WriteBatch* batch, const SequenceNumber expected_seq) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(batch);
   SequenceNumber batchSeq = WriteBatchInternal::Sequence(batch);
   if (batchSeq != expected_seq) {
@@ -244,6 +251,7 @@ bool TransactionLogIteratorImpl::IsBatchExpected(
 }
 
 void TransactionLogIteratorImpl::UpdateCurrentWriteBatch(const Slice& record) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<WriteBatch> batch(new WriteBatch());
   Status s = WriteBatchInternal::SetContents(batch.get(), record);
   s.PermitUncheckedError();  // TODO: What should we do with this error?
@@ -282,6 +290,7 @@ void TransactionLogIteratorImpl::UpdateCurrentWriteBatch(const Slice& record) {
 }
 
 Status TransactionLogIteratorImpl::OpenLogReader(const LogFile* log_file) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<SequentialFileReader> file;
   Status s = OpenLogFile(log_file, &file);
   if (!s.ok()) {

@@ -36,6 +36,7 @@ class FlushedFileCollector : public EventListener {
   }
 
   std::vector<std::string> GetFlushedFiles() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::lock_guard<std::mutex> lock(mutex_);
     std::vector<std::string> result;
     for (auto fname : flushed_files_) {
@@ -44,6 +45,7 @@ class FlushedFileCollector : public EventListener {
     return result;
   }
   void ClearFlushedFiles() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::lock_guard<std::mutex> lock(mutex_);
     flushed_files_.clear();
   }
@@ -55,6 +57,7 @@ class FlushedFileCollector : public EventListener {
 #endif  // ROCKSDB_LITE
 
 TEST_F(DBSSTTest, DontDeletePendingOutputs) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = env_;
   options.create_if_missing = true;
@@ -90,6 +93,7 @@ TEST_F(DBSSTTest, DontDeletePendingOutputs) {
 // 2 Close DB and change suffix from ".sst" to ".ldb" for every other SST file
 // 3 Open DB and check if all key can be read
 TEST_F(DBSSTTest, SSTsWithLdbSuffixHandling) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.write_buffer_size = 110 << 10;  // 110KB
   options.num_levels = 4;
@@ -138,6 +142,7 @@ TEST_F(DBSSTTest, SSTsWithLdbSuffixHandling) {
 // Check that we don't crash when opening DB with
 // DBOptions::skip_checking_sst_file_sizes_on_db_open = true.
 TEST_F(DBSSTTest, SkipCheckingSSTFileSizesOnDBOpen) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(Put("pika", "choo"));
   ASSERT_OK(Flush());
 
@@ -152,6 +157,7 @@ TEST_F(DBSSTTest, SkipCheckingSSTFileSizesOnDBOpen) {
 
 #ifndef ROCKSDB_LITE
 TEST_F(DBSSTTest, DontDeleteMovedFile) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // This test triggers move compaction and verifies that the file is not
   // deleted when it's part of move compaction
   Options options = CurrentOptions();
@@ -196,6 +202,7 @@ TEST_F(DBSSTTest, DontDeleteMovedFile) {
 // pending outputs since compaction (1) is still running. It is not deleted and
 // it is not present in obsolete_files_ anymore. Therefore, we never delete it.
 TEST_F(DBSSTTest, DeleteObsoleteFilesPendingOutputs) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.env = env_;
   options.write_buffer_size = 2 * 1024 * 1024;     // 2 MB
@@ -281,6 +288,7 @@ TEST_F(DBSSTTest, DeleteObsoleteFilesPendingOutputs) {
 }
 
 TEST_F(DBSSTTest, DBWithSstFileManager) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<SstFileManager> sst_file_manager(NewSstFileManager(env_));
   auto sfm = static_cast<SstFileManagerImpl*>(sst_file_manager.get());
 
@@ -350,6 +358,7 @@ TEST_F(DBSSTTest, DBWithSstFileManager) {
 }
 
 TEST_F(DBSSTTest, DBWithSstFileManagerForBlobFiles) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<SstFileManager> sst_file_manager(NewSstFileManager(env_));
   auto sfm = static_cast<SstFileManagerImpl*>(sst_file_manager.get());
 
@@ -369,6 +378,7 @@ TEST_F(DBSSTTest, DBWithSstFileManagerForBlobFiles) {
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "SstFileManagerImpl::OnDeleteFile", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         const std::string* const file_path =
             static_cast<const std::string*>(arg);
         if (file_path->find(".blob") != std::string::npos) {
@@ -378,6 +388,7 @@ TEST_F(DBSSTTest, DBWithSstFileManagerForBlobFiles) {
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "SstFileManagerImpl::ScheduleFileDeletion", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         assert(arg);
         const std::string* const file_path =
             static_cast<const std::string*>(arg);
@@ -465,6 +476,7 @@ TEST_F(DBSSTTest, DBWithSstFileManagerForBlobFiles) {
 }
 
 TEST_F(DBSSTTest, DBWithSstFileManagerForBlobFilesWithGC) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<SstFileManager> sst_file_manager(NewSstFileManager(env_));
   auto sfm = static_cast<SstFileManagerImpl*>(sst_file_manager.get());
   Options options = CurrentOptions();
@@ -491,6 +503,7 @@ TEST_F(DBSSTTest, DBWithSstFileManagerForBlobFilesWithGC) {
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "SstFileManagerImpl::OnDeleteFile", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         const std::string* const file_path =
             static_cast<const std::string*>(arg);
         if (file_path->find(".blob") != std::string::npos) {
@@ -500,6 +513,7 @@ TEST_F(DBSSTTest, DBWithSstFileManagerForBlobFilesWithGC) {
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "SstFileManagerImpl::ScheduleFileDeletion", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         assert(arg);
         const std::string* const file_path =
             static_cast<const std::string*>(arg);
@@ -615,6 +629,7 @@ class DBSSTTestRateLimit : public DBSSTTest,
 };
 
 TEST_P(DBSSTTestRateLimit, RateLimitedDelete) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Destroy(last_options_);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->LoadDependency({
       {"DBSSTTest::RateLimitedDelete:1",
@@ -627,6 +642,7 @@ TEST_P(DBSSTTestRateLimit, RateLimitedDelete) {
       [&](void* arg) { penalties.push_back(*(static_cast<uint64_t*>(arg))); });
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "InstrumentedCondVar::TimedWaitInternal", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         // Turn timed wait into a simulated sleep
         uint64_t* abs_time_us = static_cast<uint64_t*>(arg);
         uint64_t cur_time = env_->NowMicros();
@@ -646,6 +662,7 @@ TEST_P(DBSSTTestRateLimit, RateLimitedDelete) {
   // the simulated sleep time
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::StartPeriodicWorkScheduler:DisableScheduler", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         bool* disable_scheduler = static_cast<bool*>(arg);
         *disable_scheduler = true;
       });
@@ -723,6 +740,7 @@ INSTANTIATE_TEST_CASE_P(RateLimitedDelete, DBSSTTestRateLimit,
                         ::testing::Bool());
 
 TEST_F(DBSSTTest, RateLimitedWALDelete) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Destroy(last_options_);
 
   std::vector<uint64_t> penalties;
@@ -779,6 +797,7 @@ class DBWALTestWithParam
  public:
   explicit DBWALTestWithParam()
       : DBTestBase("db_wal_test_with_params", /*env_do_fsync=*/true) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     wal_dir_ = std::get<0>(GetParam());
     wal_dir_same_as_dbname_ = std::get<1>(GetParam());
   }
@@ -788,6 +807,7 @@ class DBWALTestWithParam
 };
 
 TEST_P(DBWALTestWithParam, WALTrashCleanupOnOpen) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   class MyEnv : public EnvWrapper {
    public:
     MyEnv(Env* t) : EnvWrapper(t), fake_log_delete(false) {}
@@ -887,6 +907,7 @@ INSTANTIATE_TEST_CASE_P(DBWALTestWithParam, DBWALTestWithParam,
                                           std::make_tuple("_wal_dir", false)));
 
 TEST_F(DBSSTTest, OpenDBWithExistingTrash) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
 
   options.sst_file_manager.reset(
@@ -915,6 +936,7 @@ TEST_F(DBSSTTest, OpenDBWithExistingTrash) {
 // deleted from first db_path were deleted using DeleteScheduler and
 // files in the second path were not.
 TEST_F(DBSSTTest, DeleteSchedulerMultipleDBPaths) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::atomic<int> bg_delete_file(0);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DeleteScheduler::DeleteTrashFile:DeleteFile",
@@ -992,6 +1014,7 @@ TEST_F(DBSSTTest, DeleteSchedulerMultipleDBPaths) {
 }
 
 TEST_F(DBSSTTest, DestroyDBWithRateLimitedDelete) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   int bg_delete_file = 0;
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DeleteScheduler::DeleteTrashFile:DeleteFile",
@@ -1044,6 +1067,7 @@ TEST_F(DBSSTTest, DestroyDBWithRateLimitedDelete) {
 }
 
 TEST_F(DBSSTTest, DBWithMaxSpaceAllowed) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<SstFileManager> sst_file_manager(NewSstFileManager(env_));
   auto sfm = static_cast<SstFileManagerImpl*>(sst_file_manager.get());
 
@@ -1074,6 +1098,7 @@ TEST_F(DBSSTTest, DBWithMaxSpaceAllowed) {
 }
 
 TEST_F(DBSSTTest, DBWithMaxSpaceAllowedWithBlobFiles) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<SstFileManager> sst_file_manager(NewSstFileManager(env_));
   auto sfm = static_cast<SstFileManagerImpl*>(sst_file_manager.get());
 
@@ -1136,6 +1161,7 @@ TEST_F(DBSSTTest, DBWithMaxSpaceAllowedWithBlobFiles) {
 }
 
 TEST_F(DBSSTTest, CancellingCompactionsWorks) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<SstFileManager> sst_file_manager(NewSstFileManager(env_));
   auto sfm = static_cast<SstFileManagerImpl*>(sst_file_manager.get());
 
@@ -1192,6 +1218,7 @@ TEST_F(DBSSTTest, CancellingCompactionsWorks) {
 }
 
 TEST_F(DBSSTTest, CancellingManualCompactionsWorks) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<SstFileManager> sst_file_manager(NewSstFileManager(env_));
   auto sfm = static_cast<SstFileManagerImpl*>(sst_file_manager.get());
 
@@ -1271,6 +1298,7 @@ TEST_F(DBSSTTest, CancellingManualCompactionsWorks) {
 }
 
 TEST_F(DBSSTTest, DBWithMaxSpaceAllowedRandomized) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // This test will set a maximum allowed space for the DB, then it will
   // keep filling the DB until the limit is reached and bg_error_ is set.
   // When bg_error_ is set we will verify that the DB size is greater
@@ -1284,6 +1312,7 @@ TEST_F(DBSSTTest, DBWithMaxSpaceAllowedRandomized) {
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::FlushMemTableToOutputFile:MaxAllowedSpaceReached",
       [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         Status* bg_error = static_cast<Status*>(arg);
         bg_error_set = true;
         reached_max_space_on_flush++;
@@ -1293,6 +1322,7 @@ TEST_F(DBSSTTest, DBWithMaxSpaceAllowedRandomized) {
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::BackgroundCompaction():CancelledCompaction", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         bool* enough_room = static_cast<bool*>(arg);
         *enough_room = true;
       });
@@ -1300,6 +1330,7 @@ TEST_F(DBSSTTest, DBWithMaxSpaceAllowedRandomized) {
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "CompactionJob::FinishCompactionOutputFile:MaxAllowedSpaceReached",
       [&](void* /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         bg_error_set = true;
         reached_max_space_on_compaction++;
       });
@@ -1340,6 +1371,7 @@ TEST_F(DBSSTTest, DBWithMaxSpaceAllowedRandomized) {
 }
 
 TEST_F(DBSSTTest, OpenDBWithInfiniteMaxOpenFiles) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Open DB with infinite max open files
   //  - First iteration use 1 thread to open files
   //  - Second iteration use 5 threads to open files
@@ -1396,7 +1428,9 @@ TEST_F(DBSSTTest, OpenDBWithInfiniteMaxOpenFiles) {
 }
 
 TEST_F(DBSSTTest, OpenDBWithInfiniteMaxOpenFilesSubjectToMemoryLimit) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (bool reserve_table_builder_memory : {true, false}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // Open DB with infinite max open files
     //  - First iteration use 1 thread to open files
     //  - Second iteration use 5 threads to open files
@@ -1459,6 +1493,7 @@ TEST_F(DBSSTTest, OpenDBWithInfiniteMaxOpenFilesSubjectToMemoryLimit) {
 }
 
 TEST_F(DBSSTTest, GetTotalSstFilesSize) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // We don't propagate oldest-key-time table property on compaction and
   // just write 0 as default value. This affect the exact table size, since
   // we encode table properties as varint64. Force time to be 0 to work around
@@ -1466,6 +1501,7 @@ TEST_F(DBSSTTest, GetTotalSstFilesSize) {
   // compaction.
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "FlushJob::WriteLevel0Table:oldest_ancester_time", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         uint64_t* current_time = static_cast<uint64_t*>(arg);
         *current_time = 0;
       });
@@ -1569,6 +1605,7 @@ TEST_F(DBSSTTest, GetTotalSstFilesSize) {
 }
 
 TEST_F(DBSSTTest, GetTotalSstFilesSizeVersionsFilesShared) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.disable_auto_compactions = true;
   options.compression = kNoCompression;
@@ -1660,6 +1697,7 @@ TEST_F(DBSSTTest, GetTotalSstFilesSizeVersionsFilesShared) {
 // This test if blob files are recorded by SST File Manager when Compaction job
 // creates/delete them and in case of AtomicFlush.
 TEST_F(DBSSTTest, DBWithSFMForBlobFilesAtomicFlush) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<SstFileManager> sst_file_manager(NewSstFileManager(env_));
   auto sfm = static_cast<SstFileManagerImpl*>(sst_file_manager.get());
   Options options = CurrentOptions();
@@ -1686,6 +1724,7 @@ TEST_F(DBSSTTest, DBWithSFMForBlobFilesAtomicFlush) {
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "SstFileManagerImpl::OnDeleteFile", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         const std::string* const file_path =
             static_cast<const std::string*>(arg);
         if (EndsWith(*file_path, ".blob")) {
@@ -1695,6 +1734,7 @@ TEST_F(DBSSTTest, DBWithSFMForBlobFilesAtomicFlush) {
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "SstFileManagerImpl::ScheduleFileDeletion", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         assert(arg);
         const std::string* const file_path =
             static_cast<const std::string*>(arg);
@@ -1759,6 +1799,7 @@ TEST_F(DBSSTTest, DBWithSFMForBlobFilesAtomicFlush) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   RegisterCustomObjects(argc, argv);

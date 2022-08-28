@@ -22,6 +22,7 @@ namespace ROCKSDB_NAMESPACE {
 
 namespace {
 int64_t MaybeCurrentTime(Env* env) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   int64_t time = 1337346000;  // arbitrary fallback default
   env->GetCurrentTime(&time).PermitUncheckedError();
   return time;
@@ -37,6 +38,7 @@ SpecialEnv::SpecialEnv(Env* base, bool time_elapse_only_sleep)
       sleep_counter_(this),
       time_elapse_only_sleep_(time_elapse_only_sleep),
       no_slowdown_(time_elapse_only_sleep) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   delay_sstable_sync_.store(false, std::memory_order_release);
   drop_writes_.store(false, std::memory_order_release);
   no_space_.store(false, std::memory_order_release);
@@ -60,6 +62,7 @@ SpecialEnv::SpecialEnv(Env* base, bool time_elapse_only_sleep)
 }
 DBTestBase::DBTestBase(const std::string path, bool env_do_fsync)
     : mem_env_(nullptr), encrypted_env_(nullptr), option_config_(kDefault) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Env* base_env = Env::Default();
   ConfigOptions config_options;
   EXPECT_OK(test::CreateEnvFromSystem(config_options, &base_env, &env_guard_));
@@ -101,6 +104,7 @@ DBTestBase::DBTestBase(const std::string path, bool env_do_fsync)
 }
 
 DBTestBase::~DBTestBase() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->DisableProcessing();
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->LoadDependency({});
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->ClearAllCallBacks();
@@ -121,6 +125,7 @@ DBTestBase::~DBTestBase() {
 }
 
 bool DBTestBase::ShouldSkipOptions(int option_config, int skip_mask) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifdef ROCKSDB_LITE
     // These options are not supported in ROCKSDB_LITE
     if (option_config == kHashSkipList ||
@@ -175,6 +180,7 @@ bool DBTestBase::ShouldSkipOptions(int option_config, int skip_mask) {
 // Switch to a fresh database with the next option configuration to
 // test.  Return false if there are no more configurations to test.
 bool DBTestBase::ChangeOptions(int skip_mask) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (option_config_++; option_config_ < kEnd; option_config_++) {
     if (ShouldSkipOptions(option_config_, skip_mask)) {
       continue;
@@ -195,6 +201,7 @@ bool DBTestBase::ChangeOptions(int skip_mask) {
 
 // Switch between different compaction styles.
 bool DBTestBase::ChangeCompactOptions() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (option_config_ == kDefault) {
     option_config_ = kUniversalCompaction;
     Destroy(last_options_);
@@ -230,6 +237,7 @@ bool DBTestBase::ChangeCompactOptions() {
 
 // Switch between different WAL settings
 bool DBTestBase::ChangeWalOptions() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (option_config_ == kDefault) {
     option_config_ = kDBLogDir;
     Destroy(last_options_);
@@ -261,6 +269,7 @@ bool DBTestBase::ChangeWalOptions() {
 // Switch between different filter policy
 // Jump from kDefault to kFilter to kFullFilter
 bool DBTestBase::ChangeFilterOptions() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (option_config_ == kDefault) {
     option_config_ = kFilter;
   } else if (option_config_ == kFilter) {
@@ -280,6 +289,7 @@ bool DBTestBase::ChangeFilterOptions() {
 
 // Switch between different DB options for file ingestion tests.
 bool DBTestBase::ChangeOptionsForFileIngestionTest() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (option_config_ == kDefault) {
     option_config_ = kUniversalCompaction;
     Destroy(last_options_);
@@ -585,6 +595,7 @@ Options DBTestBase::GetOptions(
 
 void DBTestBase::CreateColumnFamilies(const std::vector<std::string>& cfs,
                                       const Options& options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ColumnFamilyOptions cf_opts(options);
   size_t cfi = handles_.size();
   handles_.resize(cfi + cfs.size());
@@ -596,6 +607,7 @@ void DBTestBase::CreateColumnFamilies(const std::vector<std::string>& cfs,
 
 void DBTestBase::CreateAndReopenWithCF(const std::vector<std::string>& cfs,
                                        const Options& options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   CreateColumnFamilies(cfs, options);
   std::vector<std::string> cfs_plus_default = cfs;
   cfs_plus_default.insert(cfs_plus_default.begin(), kDefaultColumnFamilyName);
@@ -604,15 +616,18 @@ void DBTestBase::CreateAndReopenWithCF(const std::vector<std::string>& cfs,
 
 void DBTestBase::ReopenWithColumnFamilies(const std::vector<std::string>& cfs,
                                           const std::vector<Options>& options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(TryReopenWithColumnFamilies(cfs, options));
 }
 
 void DBTestBase::ReopenWithColumnFamilies(const std::vector<std::string>& cfs,
                                           const Options& options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(TryReopenWithColumnFamilies(cfs, options));
 }
 
 void DBTestBase::SetTimeElapseOnlySleepOnReopen(DBOptions* options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   time_elapse_only_sleep_on_reopen_ = true;
 
   // Need to disable stats dumping and persisting which also use
@@ -628,6 +643,7 @@ void DBTestBase::SetTimeElapseOnlySleepOnReopen(DBOptions* options) {
 }
 
 void DBTestBase::MaybeInstallTimeElapseOnlySleep(const DBOptions& options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (time_elapse_only_sleep_on_reopen_) {
     assert(options.env == env_ ||
            static_cast_with_check<CompositeEnvWrapper>(options.env)
@@ -647,6 +663,7 @@ void DBTestBase::MaybeInstallTimeElapseOnlySleep(const DBOptions& options) {
 
 Status DBTestBase::TryReopenWithColumnFamilies(
     const std::vector<std::string>& cfs, const std::vector<Options>& options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Close();
   EXPECT_EQ(cfs.size(), options.size());
   std::vector<ColumnFamilyDescriptor> column_families;
@@ -661,16 +678,19 @@ Status DBTestBase::TryReopenWithColumnFamilies(
 
 Status DBTestBase::TryReopenWithColumnFamilies(
     const std::vector<std::string>& cfs, const Options& options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Close();
   std::vector<Options> v_opts(cfs.size(), options);
   return TryReopenWithColumnFamilies(cfs, v_opts);
 }
 
 void DBTestBase::Reopen(const Options& options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(TryReopen(options));
 }
 
 void DBTestBase::Close() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (auto h : handles_) {
     EXPECT_OK(db_->DestroyColumnFamilyHandle(h));
   }
@@ -680,12 +700,14 @@ void DBTestBase::Close() {
 }
 
 void DBTestBase::DestroyAndReopen(const Options& options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Destroy using last options
   Destroy(last_options_);
   Reopen(options);
 }
 
 void DBTestBase::Destroy(const Options& options, bool delete_cf_paths) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::vector<ColumnFamilyDescriptor> column_families;
   if (delete_cf_paths) {
     for (size_t i = 0; i < handles_.size(); ++i) {
@@ -700,11 +722,13 @@ void DBTestBase::Destroy(const Options& options, bool delete_cf_paths) {
 }
 
 Status DBTestBase::ReadOnlyReopen(const Options& options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   MaybeInstallTimeElapseOnlySleep(options);
   return DB::OpenForReadOnly(options, dbname_, &db_);
 }
 
 Status DBTestBase::TryReopen(const Options& options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Close();
   last_options_.table_factory.reset();
   // Note: operator= is an unsafe approach here since it destructs
@@ -720,6 +744,7 @@ Status DBTestBase::TryReopen(const Options& options) {
 }
 
 bool DBTestBase::IsDirectIOSupported() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return test::IsDirectIOSupported(env_, dbname_);
 }
 
@@ -728,6 +753,7 @@ bool DBTestBase::IsMemoryMappedAccessSupported() const {
 }
 
 Status DBTestBase::Flush(int cf) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (cf == 0) {
     return db_->Flush(FlushOptions());
   } else {
@@ -736,6 +762,7 @@ Status DBTestBase::Flush(int cf) {
 }
 
 Status DBTestBase::Flush(const std::vector<int>& cf_ids) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::vector<ColumnFamilyHandle*> cfhs;
   std::for_each(cf_ids.begin(), cf_ids.end(),
                 [&cfhs, this](int id) { cfhs.emplace_back(handles_[id]); });
@@ -743,6 +770,7 @@ Status DBTestBase::Flush(const std::vector<int>& cf_ids) {
 }
 
 Status DBTestBase::Put(const Slice& k, const Slice& v, WriteOptions wo) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (kMergePut == option_config_) {
     return db_->Merge(wo, k, v);
   } else {
@@ -752,6 +780,7 @@ Status DBTestBase::Put(const Slice& k, const Slice& v, WriteOptions wo) {
 
 Status DBTestBase::Put(int cf, const Slice& k, const Slice& v,
                        WriteOptions wo) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (kMergePut == option_config_) {
     return db_->Merge(wo, handles_[cf], k, v);
   } else {
@@ -760,31 +789,38 @@ Status DBTestBase::Put(int cf, const Slice& k, const Slice& v,
 }
 
 Status DBTestBase::Merge(const Slice& k, const Slice& v, WriteOptions wo) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return db_->Merge(wo, k, v);
 }
 
 Status DBTestBase::Merge(int cf, const Slice& k, const Slice& v,
                          WriteOptions wo) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return db_->Merge(wo, handles_[cf], k, v);
 }
 
 Status DBTestBase::Delete(const std::string& k) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return db_->Delete(WriteOptions(), k);
 }
 
 Status DBTestBase::Delete(int cf, const std::string& k) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return db_->Delete(WriteOptions(), handles_[cf], k);
 }
 
 Status DBTestBase::SingleDelete(const std::string& k) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return db_->SingleDelete(WriteOptions(), k);
 }
 
 Status DBTestBase::SingleDelete(int cf, const std::string& k) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return db_->SingleDelete(WriteOptions(), handles_[cf], k);
 }
 
 std::string DBTestBase::Get(const std::string& k, const Snapshot* snapshot) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ReadOptions options;
   options.verify_checksums = true;
   options.snapshot = snapshot;
@@ -800,6 +836,7 @@ std::string DBTestBase::Get(const std::string& k, const Snapshot* snapshot) {
 
 std::string DBTestBase::Get(int cf, const std::string& k,
                             const Snapshot* snapshot) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ReadOptions options;
   options.verify_checksums = true;
   options.snapshot = snapshot;
@@ -817,6 +854,7 @@ std::vector<std::string> DBTestBase::MultiGet(std::vector<int> cfs,
                                               const std::vector<std::string>& k,
                                               const Snapshot* snapshot,
                                               const bool batched) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ReadOptions options;
   options.verify_checksums = true;
   options.snapshot = snapshot;
@@ -859,6 +897,7 @@ std::vector<std::string> DBTestBase::MultiGet(std::vector<int> cfs,
 
 std::vector<std::string> DBTestBase::MultiGet(const std::vector<std::string>& k,
                                               const Snapshot* snapshot) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ReadOptions options;
   options.verify_checksums = true;
   options.snapshot = snapshot;
@@ -886,6 +925,7 @@ std::vector<std::string> DBTestBase::MultiGet(const std::vector<std::string>& k,
 }
 
 Status DBTestBase::Get(const std::string& k, PinnableSlice* v) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ReadOptions options;
   options.verify_checksums = true;
   Status s = dbfull()->Get(options, dbfull()->DefaultColumnFamily(), k, v);
@@ -893,12 +933,14 @@ Status DBTestBase::Get(const std::string& k, PinnableSlice* v) {
 }
 
 uint64_t DBTestBase::GetNumSnapshots() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t int_num;
   EXPECT_TRUE(dbfull()->GetIntProperty("rocksdb.num-snapshots", &int_num));
   return int_num;
 }
 
 uint64_t DBTestBase::GetTimeOldestSnapshots() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t int_num;
   EXPECT_TRUE(
       dbfull()->GetIntProperty("rocksdb.oldest-snapshot-time", &int_num));
@@ -906,6 +948,7 @@ uint64_t DBTestBase::GetTimeOldestSnapshots() {
 }
 
 uint64_t DBTestBase::GetSequenceOldestSnapshots() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t int_num;
   EXPECT_TRUE(
       dbfull()->GetIntProperty("rocksdb.oldest-snapshot-sequence", &int_num));
@@ -915,6 +958,7 @@ uint64_t DBTestBase::GetSequenceOldestSnapshots() {
 // Return a string that contains all key,value pairs in order,
 // formatted like "(k1->v1)(k2->v2)".
 std::string DBTestBase::Contents(int cf) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::vector<std::string> forward;
   std::string result;
   Iterator* iter = (cf == 0) ? db_->NewIterator(ReadOptions())
@@ -941,6 +985,7 @@ std::string DBTestBase::Contents(int cf) {
 }
 
 std::string DBTestBase::AllEntriesFor(const Slice& user_key, int cf) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Arena arena;
   auto options = CurrentOptions();
   InternalKeyComparator icmp(options.comparator);
@@ -1006,6 +1051,7 @@ std::string DBTestBase::AllEntriesFor(const Slice& user_key, int cf) {
 
 #ifndef ROCKSDB_LITE
 int DBTestBase::NumSortedRuns(int cf) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ColumnFamilyMetaData cf_meta;
   if (cf == 0) {
     db_->GetColumnFamilyMetaData(&cf_meta);
@@ -1022,6 +1068,7 @@ int DBTestBase::NumSortedRuns(int cf) {
 }
 
 uint64_t DBTestBase::TotalSize(int cf) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ColumnFamilyMetaData cf_meta;
   if (cf == 0) {
     db_->GetColumnFamilyMetaData(&cf_meta);
@@ -1032,6 +1079,7 @@ uint64_t DBTestBase::TotalSize(int cf) {
 }
 
 uint64_t DBTestBase::SizeAtLevel(int level) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::vector<LiveFileMetaData> metadata;
   db_->GetLiveFilesMetaData(&metadata);
   uint64_t sum = 0;
@@ -1044,6 +1092,7 @@ uint64_t DBTestBase::SizeAtLevel(int level) {
 }
 
 size_t DBTestBase::TotalLiveFiles(int cf) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ColumnFamilyMetaData cf_meta;
   if (cf == 0) {
     db_->GetColumnFamilyMetaData(&cf_meta);
@@ -1058,12 +1107,14 @@ size_t DBTestBase::TotalLiveFiles(int cf) {
 }
 
 size_t DBTestBase::CountLiveFiles() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::vector<LiveFileMetaData> metadata;
   db_->GetLiveFilesMetaData(&metadata);
   return metadata.size();
 }
 
 int DBTestBase::NumTableFilesAtLevel(int level, int cf) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string property;
   if (cf == 0) {
     // default cfd
@@ -1078,6 +1129,7 @@ int DBTestBase::NumTableFilesAtLevel(int level, int cf) {
 }
 
 double DBTestBase::CompressionRatioAtLevel(int level, int cf) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string property;
   if (cf == 0) {
     // default cfd
@@ -1092,6 +1144,7 @@ double DBTestBase::CompressionRatioAtLevel(int level, int cf) {
 }
 
 int DBTestBase::TotalTableFiles(int cf, int levels) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (levels == -1) {
     levels = (cf == 0) ? db_->NumberLevels() : db_->NumberLevels(handles_[1]);
   }
@@ -1104,6 +1157,7 @@ int DBTestBase::TotalTableFiles(int cf, int levels) {
 
 // Return spread of files per level
 std::string DBTestBase::FilesPerLevel(int cf) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   int num_levels =
       (cf == 0) ? db_->NumberLevels() : db_->NumberLevels(handles_[1]);
   std::string result;
@@ -1124,6 +1178,7 @@ std::string DBTestBase::FilesPerLevel(int cf) {
 #endif  // !ROCKSDB_LITE
 
 std::vector<uint64_t> DBTestBase::GetBlobFileNumbers() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   VersionSet* const versions = dbfull()->GetVersionSet();
   assert(versions);
 
@@ -1150,6 +1205,7 @@ std::vector<uint64_t> DBTestBase::GetBlobFileNumbers() {
 }
 
 size_t DBTestBase::CountFiles() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   size_t count = 0;
   std::vector<std::string> files;
   if (env_->GetChildren(dbname_, &files).ok()) {
@@ -1166,6 +1222,7 @@ size_t DBTestBase::CountFiles() {
 };
 
 Status DBTestBase::CountFiles(size_t* count) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::vector<std::string> files;
   Status s = env_->GetChildren(dbname_, &files);
   if (!s.ok()) {
@@ -1186,6 +1243,7 @@ Status DBTestBase::CountFiles(size_t* count) {
 
 Status DBTestBase::Size(const Slice& start, const Slice& limit, int cf,
                         uint64_t* size) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Range r(start, limit);
   if (cf == 0) {
     return db_->GetApproximateSizes(&r, 1, size);
@@ -1196,17 +1254,20 @@ Status DBTestBase::Size(const Slice& start, const Slice& limit, int cf,
 
 void DBTestBase::Compact(int cf, const Slice& start, const Slice& limit,
                          uint32_t target_path_id) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   CompactRangeOptions compact_options;
   compact_options.target_path_id = target_path_id;
   ASSERT_OK(db_->CompactRange(compact_options, handles_[cf], &start, &limit));
 }
 
 void DBTestBase::Compact(int cf, const Slice& start, const Slice& limit) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(
       db_->CompactRange(CompactRangeOptions(), handles_[cf], &start, &limit));
 }
 
 void DBTestBase::Compact(const Slice& start, const Slice& limit) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(db_->CompactRange(CompactRangeOptions(), &start, &limit));
 }
 
@@ -1214,6 +1275,7 @@ void DBTestBase::Compact(const Slice& start, const Slice& limit) {
 // covering the range [small,large].
 void DBTestBase::MakeTables(int n, const std::string& small,
                             const std::string& large, int cf) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (int i = 0; i < n; i++) {
     ASSERT_OK(Put(cf, small, "begin"));
     ASSERT_OK(Put(cf, large, "end"));
@@ -1226,10 +1288,12 @@ void DBTestBase::MakeTables(int n, const std::string& small,
 // tables that cover a specified range to all levels.
 void DBTestBase::FillLevels(const std::string& smallest,
                             const std::string& largest, int cf) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   MakeTables(db_->NumberLevels(handles_[cf]), smallest, largest, cf);
 }
 
 void DBTestBase::MoveFilesToLevel(int level, int cf) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (int l = 0; l < level; ++l) {
     if (cf > 0) {
       EXPECT_OK(dbfull()->TEST_CompactRange(l, nullptr, nullptr, handles_[cf]));
@@ -1241,6 +1305,7 @@ void DBTestBase::MoveFilesToLevel(int level, int cf) {
 
 #ifndef ROCKSDB_LITE
 void DBTestBase::DumpFileCounts(const char* label) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   fprintf(stderr, "---\n%s:\n", label);
   fprintf(stderr, "maxoverlap: %" PRIu64 "\n",
           dbfull()->TEST_MaxNextLevelOverlappingBytes());
@@ -1254,6 +1319,7 @@ void DBTestBase::DumpFileCounts(const char* label) {
 #endif  // !ROCKSDB_LITE
 
 std::string DBTestBase::DumpSSTableList() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string property;
   db_->GetProperty("rocksdb.sstables", &property);
   return property;
@@ -1261,6 +1327,7 @@ std::string DBTestBase::DumpSSTableList() {
 
 void DBTestBase::GetSstFiles(Env* env, std::string path,
                              std::vector<std::string>* files) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   EXPECT_OK(env->GetChildren(path, files));
 
   files->erase(
@@ -1272,6 +1339,7 @@ void DBTestBase::GetSstFiles(Env* env, std::string path,
 }
 
 int DBTestBase::GetSstFileCount(std::string path) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::vector<std::string> files;
   DBTestBase::GetSstFiles(env_, path, &files);
   return static_cast<int>(files.size());
@@ -1280,6 +1348,7 @@ int DBTestBase::GetSstFileCount(std::string path) {
 // this will generate non-overlapping files since it keeps increasing key_idx
 void DBTestBase::GenerateNewFile(int cf, Random* rnd, int* key_idx,
                                  bool nowait) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (int i = 0; i < KNumKeysByGenerateNewFile; i++) {
     ASSERT_OK(Put(cf, Key(*key_idx), rnd->RandomString((i == 99) ? 1 : 990)));
     (*key_idx)++;
@@ -1292,6 +1361,7 @@ void DBTestBase::GenerateNewFile(int cf, Random* rnd, int* key_idx,
 
 // this will generate non-overlapping files since it keeps increasing key_idx
 void DBTestBase::GenerateNewFile(Random* rnd, int* key_idx, bool nowait) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (int i = 0; i < KNumKeysByGenerateNewFile; i++) {
     ASSERT_OK(Put(Key(*key_idx), rnd->RandomString((i == 99) ? 1 : 990)));
     (*key_idx)++;
@@ -1305,6 +1375,7 @@ void DBTestBase::GenerateNewFile(Random* rnd, int* key_idx, bool nowait) {
 const int DBTestBase::kNumKeysByGenerateNewRandomFile = 51;
 
 void DBTestBase::GenerateNewRandomFile(Random* rnd, bool nowait) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (int i = 0; i < kNumKeysByGenerateNewRandomFile; i++) {
     ASSERT_OK(Put("key" + rnd->RandomString(7), rnd->RandomString(2000)));
   }
@@ -1316,6 +1387,7 @@ void DBTestBase::GenerateNewRandomFile(Random* rnd, bool nowait) {
 }
 
 std::string DBTestBase::IterStatus(Iterator* iter) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string result;
   if (iter->Valid()) {
     result = iter->key().ToString() + "->" + iter->value().ToString();
@@ -1326,6 +1398,7 @@ std::string DBTestBase::IterStatus(Iterator* iter) {
 }
 
 Options DBTestBase::OptionsForLogIterTest() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.create_if_missing = true;
   options.WAL_ttl_seconds = 1000;
@@ -1333,10 +1406,12 @@ Options DBTestBase::OptionsForLogIterTest() {
 }
 
 std::string DBTestBase::DummyString(size_t len, char c) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return std::string(len, c);
 }
 
 void DBTestBase::VerifyIterLast(std::string expected_key, int cf) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Iterator* iter;
   ReadOptions ro;
   if (cf == 0) {
@@ -1359,6 +1434,7 @@ UpdateStatus DBTestBase::updateInPlaceSmallerSize(char* prevValue,
                                                   uint32_t* prevSize,
                                                   Slice delta,
                                                   std::string* newValue) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (prevValue == nullptr) {
     *newValue = std::string(delta.size(), 'c');
     return UpdateStatus::UPDATED;
@@ -1374,6 +1450,7 @@ UpdateStatus DBTestBase::updateInPlaceSmallerVarintSize(char* prevValue,
                                                         uint32_t* prevSize,
                                                         Slice delta,
                                                         std::string* newValue) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (prevValue == nullptr) {
     *newValue = std::string(delta.size(), 'c');
     return UpdateStatus::UPDATED;
@@ -1389,6 +1466,7 @@ UpdateStatus DBTestBase::updateInPlaceLargerSize(char* /*prevValue*/,
                                                  uint32_t* /*prevSize*/,
                                                  Slice delta,
                                                  std::string* newValue) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   *newValue = std::string(delta.size(), 'c');
   return UpdateStatus::UPDATED;
 }
@@ -1397,11 +1475,13 @@ UpdateStatus DBTestBase::updateInPlaceNoAction(char* /*prevValue*/,
                                                uint32_t* /*prevSize*/,
                                                Slice /*delta*/,
                                                std::string* /*newValue*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return UpdateStatus::UPDATE_FAILED;
 }
 
 // Utility method to test InplaceUpdate
 void DBTestBase::validateNumberOfEntries(int numValues, int cf) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Arena arena;
   auto options = CurrentOptions();
   InternalKeyComparator icmp(options.comparator);
@@ -1435,6 +1515,7 @@ void DBTestBase::validateNumberOfEntries(int numValues, int cf) {
 
 void DBTestBase::CopyFile(const std::string& source,
                           const std::string& destination, uint64_t size) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const EnvOptions soptions;
   std::unique_ptr<SequentialFile> srcfile;
   ASSERT_OK(env_->NewSequentialFile(source, &srcfile, soptions));
@@ -1460,6 +1541,7 @@ void DBTestBase::CopyFile(const std::string& source,
 Status DBTestBase::GetAllDataFiles(
     const FileType file_type, std::unordered_map<std::string, uint64_t>* files,
     uint64_t* total_size /* = nullptr */) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (total_size) {
     *total_size = 0;
   }
@@ -1488,6 +1570,7 @@ Status DBTestBase::GetAllDataFiles(
 
 std::vector<std::uint64_t> DBTestBase::ListTableFiles(Env* env,
                                                       const std::string& path) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::vector<std::string> files;
   std::vector<uint64_t> file_numbers;
   EXPECT_OK(env->GetChildren(path, &files));
@@ -1506,6 +1589,7 @@ std::vector<std::uint64_t> DBTestBase::ListTableFiles(Env* env,
 void DBTestBase::VerifyDBFromMap(std::map<std::string, std::string> true_data,
                                  size_t* total_reads_res, bool tailing_iter,
                                  std::map<std::string, Status> status) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   size_t total_reads = 0;
 
   for (auto& kv : true_data) {
@@ -1622,6 +1706,7 @@ void DBTestBase::VerifyDBFromMap(std::map<std::string, std::string> true_data,
 
 void DBTestBase::VerifyDBInternal(
     std::vector<std::pair<std::string, std::string>> true_data) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Arena arena;
   InternalKeyComparator icmp(last_options_.comparator);
   ReadRangeDelAggregator range_del_agg(&icmp,
@@ -1646,6 +1731,7 @@ void DBTestBase::VerifyDBInternal(
 
 uint64_t DBTestBase::GetNumberOfSstFilesForColumnFamily(
     DB* db, std::string column_family_name) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::vector<LiveFileMetaData> metadata;
   db->GetLiveFilesMetaData(&metadata);
   uint64_t result = 0;
@@ -1657,6 +1743,7 @@ uint64_t DBTestBase::GetNumberOfSstFilesForColumnFamily(
 #endif  // ROCKSDB_LITE
 
 void VerifySstUniqueIds(const TablePropertiesCollection& props) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_FALSE(props.empty());  // suspicious test if empty
   std::unordered_set<std::string> seen;
   for (auto& pair : props) {

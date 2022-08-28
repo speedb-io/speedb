@@ -47,11 +47,13 @@ class ExternalSSTFileTestBase : public DBTestBase {
  public:
   ExternalSSTFileTestBase()
       : DBTestBase("external_sst_file_test", /*env_do_fsync=*/true) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     sst_files_dir_ = dbname_ + "/sst_files/";
     DestroyAndRecreateExternalSSTFilesDir();
   }
 
   void DestroyAndRecreateExternalSSTFilesDir() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_OK(DestroyDir(env_, sst_files_dir_));
     ASSERT_OK(env_->CreateDir(sst_files_dir_));
   }
@@ -70,6 +72,7 @@ class ExternSSTFileLinkFailFallbackTest
  public:
   ExternSSTFileLinkFailFallbackTest()
       : test_env_(new ExternalSSTTestEnv(env_, true)) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     options_ = CurrentOptions();
     options_.disable_auto_compactions = true;
     options_.env = test_env_;
@@ -99,6 +102,7 @@ class ExternalSSTFileTest
       std::vector<std::pair<std::string, std::string>>& data, int file_id,
       bool sort_data, std::string* external_file_path,
       std::map<std::string, std::string>* true_data) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // Generate a file id if not provided
     if (-1 == file_id) {
       file_id = (++last_file_id_);
@@ -151,6 +155,7 @@ class ExternalSSTFileTest
       bool sort_data = false,
       std::map<std::string, std::string>* true_data = nullptr,
       ColumnFamilyHandle* cfh = nullptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // Generate a file id if not provided
     if (file_id == -1) {
       file_id = last_file_id_ + 1;
@@ -217,6 +222,7 @@ class ExternalSSTFileTest
       std::vector<std::vector<std::pair<std::string, std::string>>>& data,
       int file_id, bool sort_data,
       std::vector<std::map<std::string, std::string>>& true_data) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (-1 == file_id) {
       file_id = (++last_file_id_);
     }
@@ -251,6 +257,7 @@ class ExternalSSTFileTest
       bool sort_data = false,
       std::map<std::string, std::string>* true_data = nullptr,
       ColumnFamilyHandle* cfh = nullptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::vector<std::pair<std::string, std::string>> file_data;
     for (auto& entry : data) {
       file_data.emplace_back(Key(entry.first), entry.second);
@@ -268,6 +275,7 @@ class ExternalSSTFileTest
       bool sort_data = false,
       std::map<std::string, std::string>* true_data = nullptr,
       ColumnFamilyHandle* cfh = nullptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::vector<std::pair<std::string, std::string>> file_data;
     for (auto& k : keys) {
       file_data.emplace_back(Key(k), Key(k) + ToString(file_id));
@@ -282,6 +290,7 @@ class ExternalSSTFileTest
                            bool move_files = false,
                            bool skip_snapshot_check = false,
                            bool skip_write_global_seqno = false) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     IngestExternalFileOptions opts;
     opts.move_files = move_files;
     opts.snapshot_consistency = !skip_snapshot_check;
@@ -296,6 +305,7 @@ class ExternalSSTFileTest
 };
 
 TEST_F(ExternalSSTFileTest, Basic) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     Options options = CurrentOptions();
 
@@ -540,6 +550,7 @@ TEST_F(ExternalSSTFileTest, Basic) {
 class SstFileWriterCollector : public TablePropertiesCollector {
  public:
   explicit SstFileWriterCollector(const std::string prefix) : prefix_(prefix) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     name_ = prefix_ + "_SstFileWriterCollector";
   }
 
@@ -587,6 +598,7 @@ class SstFileWriterCollectorFactory : public TablePropertiesCollectorFactory {
 };
 
 TEST_F(ExternalSSTFileTest, AddList) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     Options options = CurrentOptions();
 
@@ -806,6 +818,7 @@ TEST_F(ExternalSSTFileTest, AddList) {
 }
 
 TEST_F(ExternalSSTFileTest, AddListAtomicity) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     Options options = CurrentOptions();
 
@@ -848,6 +861,7 @@ TEST_F(ExternalSSTFileTest, AddListAtomicity) {
 // purging obsolete files when we are adding an external sst file.
 // This situation may result in deleting the file while it's being added.
 TEST_F(ExternalSSTFileTest, PurgeObsoleteFilesBug) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   SstFileWriter sst_file_writer(EnvOptions(), options);
 
@@ -888,6 +902,7 @@ TEST_F(ExternalSSTFileTest, PurgeObsoleteFilesBug) {
 }
 
 TEST_F(ExternalSSTFileTest, SkipSnapshot) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
 
   SstFileWriter sst_file_writer(EnvOptions(), options);
@@ -958,6 +973,7 @@ TEST_F(ExternalSSTFileTest, SkipSnapshot) {
 }
 
 TEST_F(ExternalSSTFileTest, MultiThreaded) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   env_->skip_fsync_ = true;
   // Bulk load 10 files every file contain 1000 keys
   int num_files = 10;
@@ -1069,17 +1085,20 @@ TEST_F(ExternalSSTFileTest, MultiThreaded) {
 }
 
 TEST_F(ExternalSSTFileTest, OverlappingRanges) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   env_->skip_fsync_ = true;
   Random rnd(301);
   SequenceNumber assigned_seqno = 0;
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "ExternalSstFileIngestionJob::Run", [&assigned_seqno](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         ASSERT_TRUE(arg != nullptr);
         assigned_seqno = *(static_cast<SequenceNumber*>(arg));
       });
   bool need_flush = false;
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::IngestExternalFile:NeedFlush", [&need_flush](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         ASSERT_TRUE(arg != nullptr);
         need_flush = *(static_cast<bool*>(arg));
       });
@@ -1087,6 +1106,7 @@ TEST_F(ExternalSSTFileTest, OverlappingRanges) {
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "ExternalSstFileIngestionJob::AssignLevelAndSeqnoForIngestedFile",
       [&overlap_with_db](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         ASSERT_TRUE(arg != nullptr);
         overlap_with_db = *(static_cast<bool*>(arg));
       });
@@ -1203,6 +1223,7 @@ TEST_F(ExternalSSTFileTest, OverlappingRanges) {
 }
 
 TEST_P(ExternalSSTFileTest, PickedLevel) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   env_->skip_fsync_ = true;
   Options options = CurrentOptions();
   options.disable_auto_compactions = false;
@@ -1270,6 +1291,7 @@ TEST_P(ExternalSSTFileTest, PickedLevel) {
 }
 
 TEST_F(ExternalSSTFileTest, PickedLevelBug) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   env_->skip_fsync_ = true;
   Options options = CurrentOptions();
   options.disable_auto_compactions = false;
@@ -1370,6 +1392,7 @@ TEST_F(ExternalSSTFileTest, PickedLevelBug) {
 }
 
 TEST_F(ExternalSSTFileTest, IngestNonExistingFile) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   DestroyAndReopen(options);
 
@@ -1405,6 +1428,7 @@ TEST_F(ExternalSSTFileTest, IngestNonExistingFile) {
 
 #if !defined(ROCKSDB_VALGRIND_RUN) || defined(ROCKSDB_FULL_VALGRIND_RUN)
 TEST_F(ExternalSSTFileTest, CompactDuringAddFileRandom) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   env_->skip_fsync_ = true;
   Options options = CurrentOptions();
   options.disable_auto_compactions = false;
@@ -1464,6 +1488,7 @@ TEST_F(ExternalSSTFileTest, CompactDuringAddFileRandom) {
 #endif  // !defined(ROCKSDB_VALGRIND_RUN) || defined(ROCKSDB_FULL_VALGRIND_RUN)
 
 TEST_F(ExternalSSTFileTest, PickedLevelDynamic) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   env_->skip_fsync_ = true;
   Options options = CurrentOptions();
   options.disable_auto_compactions = false;
@@ -1569,6 +1594,7 @@ TEST_F(ExternalSSTFileTest, PickedLevelDynamic) {
 }
 
 TEST_F(ExternalSSTFileTest, AddExternalSstFileWithCustomCompartor) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.comparator = ReverseBytewiseComparator();
   DestroyAndReopen(options);
@@ -1625,6 +1651,7 @@ TEST_F(ExternalSSTFileTest, AddExternalSstFileWithCustomCompartor) {
 }
 
 TEST_F(ExternalSSTFileTest, AddFileTrivialMoveBug) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.num_levels = 3;
   options.IncreaseParallelism(20);
@@ -1641,6 +1668,7 @@ TEST_F(ExternalSSTFileTest, AddFileTrivialMoveBug) {
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "CompactionJob::Run():Start", [&](void* /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         // fit in L3 but will overlap with compaction so will be added
         // to L2 but a compaction will trivially move it to L3
         // and break LSM consistency
@@ -1663,6 +1691,7 @@ TEST_F(ExternalSSTFileTest, AddFileTrivialMoveBug) {
 }
 
 TEST_F(ExternalSSTFileTest, CompactAddedFiles) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.num_levels = 3;
   DestroyAndReopen(options);
@@ -1676,6 +1705,7 @@ TEST_F(ExternalSSTFileTest, CompactAddedFiles) {
 }
 
 TEST_F(ExternalSSTFileTest, SstFileWriterNonSharedKeys) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   DestroyAndReopen(options);
   std::string file_path = sst_files_dir_ + "/not_shared";
@@ -1695,6 +1725,7 @@ TEST_F(ExternalSSTFileTest, SstFileWriterNonSharedKeys) {
 }
 
 TEST_F(ExternalSSTFileTest, WithUnorderedWrite) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   SyncPoint::GetInstance()->DisableProcessing();
   SyncPoint::GetInstance()->LoadDependency(
       {{"DBImpl::WriteImpl:UnorderedWriteAfterWriteWAL",
@@ -1703,6 +1734,7 @@ TEST_F(ExternalSSTFileTest, WithUnorderedWrite) {
         "DBImpl::WriteImpl:BeforeUnorderedWriteMemtable"}});
   SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::IngestExternalFile:NeedFlush", [&](void* need_flush) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         ASSERT_TRUE(*reinterpret_cast<bool*>(need_flush));
       });
 
@@ -1725,6 +1757,7 @@ TEST_F(ExternalSSTFileTest, WithUnorderedWrite) {
 
 #if !defined(ROCKSDB_VALGRIND_RUN) || defined(ROCKSDB_FULL_VALGRIND_RUN)
 TEST_P(ExternalSSTFileTest, IngestFileWithGlobalSeqnoRandomized) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   env_->skip_fsync_ = true;
   Options options = CurrentOptions();
   options.IncreaseParallelism(20);
@@ -1768,6 +1801,7 @@ TEST_P(ExternalSSTFileTest, IngestFileWithGlobalSeqnoRandomized) {
 #endif  // !defined(ROCKSDB_VALGRIND_RUN) || defined(ROCKSDB_FULL_VALGRIND_RUN)
 
 TEST_P(ExternalSSTFileTest, IngestFileWithGlobalSeqnoAssignedLevel) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.num_levels = 5;
   options.disable_auto_compactions = true;
@@ -1837,12 +1871,14 @@ TEST_P(ExternalSSTFileTest, IngestFileWithGlobalSeqnoAssignedLevel) {
 }
 
 TEST_P(ExternalSSTFileTest, IngestFileWithGlobalSeqnoMemtableFlush) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   DestroyAndReopen(options);
   uint64_t entries_in_memtable;
   std::map<std::string, std::string> true_data;
 
   for (int k : {10, 20, 40, 80}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_OK(Put(Key(k), "memtable"));
     true_data[Key(k)] = "memtable";
   }
@@ -1869,6 +1905,7 @@ TEST_P(ExternalSSTFileTest, IngestFileWithGlobalSeqnoMemtableFlush) {
   ASSERT_EQ(entries_in_memtable, 0);
 
   for (int k : {200, 201, 205, 206}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_OK(Put(Key(k), "memtable"));
     true_data[Key(k)] = "memtable";
   }
@@ -1897,6 +1934,7 @@ TEST_P(ExternalSSTFileTest, IngestFileWithGlobalSeqnoMemtableFlush) {
 }
 
 TEST_P(ExternalSSTFileTest, L0SortingIssue) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.num_levels = 2;
   DestroyAndReopen(options);
@@ -1933,6 +1971,7 @@ TEST_P(ExternalSSTFileTest, L0SortingIssue) {
 }
 
 TEST_F(ExternalSSTFileTest, CompactionDeadlock) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.num_levels = 2;
   options.level0_file_num_compaction_trigger = 4;
@@ -2007,6 +2046,7 @@ TEST_F(ExternalSSTFileTest, CompactionDeadlock) {
 }
 
 TEST_F(ExternalSSTFileTest, DirtyExit) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   DestroyAndReopen(options);
   std::string file_path = sst_files_dir_ + "/dirty_exit";
@@ -2024,6 +2064,7 @@ TEST_F(ExternalSSTFileTest, DirtyExit) {
 }
 
 TEST_F(ExternalSSTFileTest, FileWithCFInfo) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   CreateAndReopenWithCF({"koko", "toto"}, options);
 
@@ -2089,6 +2130,7 @@ TEST_F(ExternalSSTFileTest, FileWithCFInfo) {
  * ingestion_options.failed_move_fall_back_to_copy
  */
 TEST_P(ExternSSTFileLinkFailFallbackTest, LinkFailFallBackExternalSst) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const bool fail_link = std::get<0>(GetParam());
   const bool failed_move_fall_back_to_copy = std::get<1>(GetParam());
   test_env_->set_fail_link(fail_link);
@@ -2166,6 +2208,7 @@ class TestIngestExternalFileListener : public EventListener {
 };
 
 TEST_P(ExternalSSTFileTest, IngestionListener) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   TestIngestExternalFileListener* listener =
       new TestIngestExternalFileListener();
@@ -2212,6 +2255,7 @@ TEST_P(ExternalSSTFileTest, IngestionListener) {
 }
 
 TEST_F(ExternalSSTFileTest, SnapshotInconsistencyBug) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   DestroyAndReopen(options);
   const int kNumKeys = 10000;
@@ -2244,6 +2288,7 @@ TEST_F(ExternalSSTFileTest, SnapshotInconsistencyBug) {
 }
 
 TEST_P(ExternalSSTFileTest, IngestBehind) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.compaction_style = kCompactionStyleUniversal;
   options.num_levels = 3;
@@ -2311,6 +2356,7 @@ TEST_P(ExternalSSTFileTest, IngestBehind) {
 }
 
 TEST_F(ExternalSSTFileTest, SkipBloomFilter) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
 
   BlockBasedTableOptions table_options;
@@ -2359,6 +2405,7 @@ TEST_F(ExternalSSTFileTest, SkipBloomFilter) {
 }
 
 TEST_F(ExternalSSTFileTest, IngestFileWrittenWithCompressionDictionary) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!ZSTD_Supported()) {
     return;
   }
@@ -2395,6 +2442,7 @@ INSTANTIATE_TEST_CASE_P(FormatVersions, ExternalSSTBlockChecksumTest,
 
 // Very slow, not worth the cost to run regularly
 TEST_P(ExternalSSTBlockChecksumTest, DISABLED_HugeBlockChecksum) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   BlockBasedTableOptions table_options;
   table_options.format_version = GetParam();
   for (auto t : GetSupportedChecksums()) {
@@ -2429,6 +2477,7 @@ TEST_P(ExternalSSTBlockChecksumTest, DISABLED_HugeBlockChecksum) {
 }
 
 TEST_P(ExternalSSTFileTest, IngestFilesIntoMultipleColumnFamilies_Success) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<FaultInjectionTestEnv> fault_injection_env(
       new FaultInjectionTestEnv(env_));
   Options options = CurrentOptions();
@@ -2484,6 +2533,7 @@ TEST_P(ExternalSSTFileTest, IngestFilesIntoMultipleColumnFamilies_Success) {
 
 TEST_P(ExternalSSTFileTest,
        IngestFilesIntoMultipleColumnFamilies_NoMixedStateWithSnapshot) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<FaultInjectionTestEnv> fault_injection_env(
       new FaultInjectionTestEnv(env_));
   SyncPoint::GetInstance()->DisableProcessing();
@@ -2605,6 +2655,7 @@ TEST_P(ExternalSSTFileTest,
 }
 
 TEST_P(ExternalSSTFileTest, IngestFilesIntoMultipleColumnFamilies_PrepareFail) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<FaultInjectionTestEnv> fault_injection_env(
       new FaultInjectionTestEnv(env_));
   Options options = CurrentOptions();
@@ -2675,6 +2726,7 @@ TEST_P(ExternalSSTFileTest, IngestFilesIntoMultipleColumnFamilies_PrepareFail) {
 }
 
 TEST_P(ExternalSSTFileTest, IngestFilesIntoMultipleColumnFamilies_CommitFail) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<FaultInjectionTestEnv> fault_injection_env(
       new FaultInjectionTestEnv(env_));
   Options options = CurrentOptions();
@@ -2745,6 +2797,7 @@ TEST_P(ExternalSSTFileTest, IngestFilesIntoMultipleColumnFamilies_CommitFail) {
 
 TEST_P(ExternalSSTFileTest,
        IngestFilesIntoMultipleColumnFamilies_PartialManifestWriteFail) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<FaultInjectionTestEnv> fault_injection_env(
       new FaultInjectionTestEnv(env_));
   Options options = CurrentOptions();
@@ -2819,6 +2872,7 @@ TEST_P(ExternalSSTFileTest,
 }
 
 TEST_P(ExternalSSTFileTest, IngestFilesTriggerFlushingWithTwoWriteQueue) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   // Use large buffer to avoid memtable flush
   options.write_buffer_size = 1024 * 1024;
@@ -2839,6 +2893,7 @@ TEST_P(ExternalSSTFileTest, IngestFilesTriggerFlushingWithTwoWriteQueue) {
 }
 
 TEST_P(ExternalSSTFileTest, DeltaEncodingWhileGlobalSeqnoPresent) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   DestroyAndReopen(options);
   constexpr size_t kValueSize = 8;
@@ -2881,6 +2936,7 @@ TEST_P(ExternalSSTFileTest, DeltaEncodingWhileGlobalSeqnoPresent) {
 
 TEST_P(ExternalSSTFileTest,
        DeltaEncodingWhileGlobalSeqnoPresentIteratorSwitch) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Regression test for bug where global seqno corrupted the shared bytes
   // buffer when switching from reverse iteration to forward iteration.
   constexpr size_t kValueSize = 8;
@@ -2949,6 +3005,7 @@ INSTANTIATE_TEST_CASE_P(ExternSSTFileLinkFailFallbackTest,
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
@@ -2958,6 +3015,7 @@ int main(int argc, char** argv) {
 #include <stdio.h>
 
 int main(int /*argc*/, char** /*argv*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   fprintf(stderr,
           "SKIPPED as External SST File Writer and Ingestion are not supported "
           "in ROCKSDB_LITE\n");

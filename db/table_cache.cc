@@ -37,17 +37,20 @@ namespace {
 
 template <class T>
 static void DeleteEntry(const Slice& /*key*/, void* value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   T* typed_value = reinterpret_cast<T*>(value);
   delete typed_value;
 }
 
 static void UnrefEntry(void* arg1, void* arg2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Cache* cache = reinterpret_cast<Cache*>(arg1);
   Cache::Handle* h = reinterpret_cast<Cache::Handle*>(arg2);
   cache->Release(h);
 }
 
 static Slice GetSliceForFileNumber(const uint64_t* file_number) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return Slice(reinterpret_cast<const char*>(file_number),
                sizeof(*file_number));
 }
@@ -55,6 +58,7 @@ static Slice GetSliceForFileNumber(const uint64_t* file_number) {
 #ifndef ROCKSDB_LITE
 
 void AppendVarint64(IterKey* key, uint64_t v) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   char buf[10];
   auto ptr = EncodeVarint64(buf, v);
   key->TrimAppend(key->Size(), buf, ptr - buf);
@@ -79,6 +83,7 @@ TableCache::TableCache(const ImmutableOptions& ioptions,
       loader_mutex_(kLoadConcurency, kGetSliceNPHash64UnseededFnPtr),
       io_tracer_(io_tracer),
       db_session_id_(db_session_id) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (ioptions_.row_cache) {
     // If the same cache is shared by multiple instances, we need to
     // disambiguate its entries.
@@ -87,13 +92,16 @@ TableCache::TableCache(const ImmutableOptions& ioptions,
 }
 
 TableCache::~TableCache() {
+PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 TableReader* TableCache::GetTableReaderFromHandle(Cache::Handle* handle) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return reinterpret_cast<TableReader*>(cache_->Value(handle));
 }
 
 void TableCache::ReleaseHandle(Cache::Handle* handle) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   cache_->Release(handle);
 }
 
@@ -105,6 +113,7 @@ Status TableCache::GetTableReader(
     const std::shared_ptr<const SliceTransform>& prefix_extractor,
     bool skip_filters, int level, bool prefetch_index_and_filter_in_cache,
     size_t max_file_size_for_l0_meta_pin, Temperature file_temperature) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string fname =
       TableFileName(ioptions_.cf_paths, fd.GetNumber(), fd.GetPathId());
   std::unique_ptr<FSRandomAccessFile> file;
@@ -154,6 +163,7 @@ Status TableCache::GetTableReader(
 }
 
 void TableCache::EraseHandle(const FileDescriptor& fd, Cache::Handle* handle) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ReleaseHandle(handle);
   uint64_t number = fd.GetNumber();
   Slice key = GetSliceForFileNumber(&number);
@@ -168,6 +178,7 @@ Status TableCache::FindTable(
     const bool no_io, bool record_read_stats, HistogramImpl* file_read_hist,
     bool skip_filters, int level, bool prefetch_index_and_filter_in_cache,
     size_t max_file_size_for_l0_meta_pin, Temperature file_temperature) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   PERF_TIMER_GUARD_WITH_CLOCK(find_table_nanos, ioptions_.clock);
   uint64_t number = fd.GetNumber();
   Slice key = GetSliceForFileNumber(&number);
@@ -220,6 +231,7 @@ InternalIterator* TableCache::NewIterator(
     size_t max_file_size_for_l0_meta_pin,
     const InternalKey* smallest_compaction_key,
     const InternalKey* largest_compaction_key, bool allow_unprepared_value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   PERF_TIMER_GUARD(new_table_iterator_nanos);
 
   Status s;
@@ -302,6 +314,7 @@ Status TableCache::GetRangeTombstoneIterator(
     const InternalKeyComparator& internal_comparator,
     const FileMetaData& file_meta,
     std::unique_ptr<FragmentedRangeTombstoneIterator>* out_iter) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(out_iter);
   const FileDescriptor& fd = file_meta.fd;
   Status s;
@@ -333,6 +346,7 @@ void TableCache::CreateRowCacheKeyPrefix(const ReadOptions& options,
                                          const Slice& internal_key,
                                          GetContext* get_context,
                                          IterKey& row_cache_key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t fd_number = fd.GetNumber();
   // We use the user key as cache key instead of the internal key,
   // otherwise the whole cache would be invalidated every time the
@@ -365,6 +379,7 @@ void TableCache::CreateRowCacheKeyPrefix(const ReadOptions& options,
 
 bool TableCache::GetFromRowCache(const Slice& user_key, IterKey& row_cache_key,
                                  size_t prefix_size, GetContext* get_context) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   bool found = false;
 
   row_cache_key.TrimAppend(prefix_size, user_key.data(), user_key.size());
@@ -406,6 +421,7 @@ Status TableCache::Get(
     const std::shared_ptr<const SliceTransform>& prefix_extractor,
     HistogramImpl* file_read_hist, bool skip_filters, int level,
     size_t max_file_size_for_l0_meta_pin) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto& fd = file_meta.fd;
   std::string* row_cache_entry = nullptr;
   bool done = false;
@@ -492,6 +508,7 @@ Status TableCache::MultiGet(
     const FileMetaData& file_meta, const MultiGetContext::Range* mget_range,
     const std::shared_ptr<const SliceTransform>& prefix_extractor,
     HistogramImpl* file_read_hist, bool skip_filters, int level) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto& fd = file_meta.fd;
   Status s;
   TableReader* t = fd.table_reader;
@@ -616,6 +633,7 @@ Status TableCache::GetTableProperties(
     const InternalKeyComparator& internal_comparator, const FileDescriptor& fd,
     std::shared_ptr<const TableProperties>* properties,
     const std::shared_ptr<const SliceTransform>& prefix_extractor, bool no_io) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto table_reader = fd.table_reader;
   // table already been pre-loaded?
   if (table_reader) {
@@ -641,6 +659,7 @@ size_t TableCache::GetMemoryUsageByTableReader(
     const FileOptions& file_options,
     const InternalKeyComparator& internal_comparator, const FileDescriptor& fd,
     const std::shared_ptr<const SliceTransform>& prefix_extractor) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto table_reader = fd.table_reader;
   // table already been pre-loaded?
   if (table_reader) {
@@ -661,6 +680,7 @@ size_t TableCache::GetMemoryUsageByTableReader(
 }
 
 bool TableCache::HasEntry(Cache* cache, uint64_t file_number) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Cache::Handle* handle = cache->Lookup(GetSliceForFileNumber(&file_number));
   if (handle) {
     cache->Release(handle);
@@ -671,6 +691,7 @@ bool TableCache::HasEntry(Cache* cache, uint64_t file_number) {
 }
 
 void TableCache::Evict(Cache* cache, uint64_t file_number) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   cache->Erase(GetSliceForFileNumber(&file_number));
 }
 
@@ -678,6 +699,7 @@ uint64_t TableCache::ApproximateOffsetOf(
     const Slice& key, const FileDescriptor& fd, TableReaderCaller caller,
     const InternalKeyComparator& internal_comparator,
     const std::shared_ptr<const SliceTransform>& prefix_extractor) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t result = 0;
   TableReader* table_reader = fd.table_reader;
   Cache::Handle* table_handle = nullptr;
@@ -705,6 +727,7 @@ uint64_t TableCache::ApproximateSize(
     const Slice& start, const Slice& end, const FileDescriptor& fd,
     TableReaderCaller caller, const InternalKeyComparator& internal_comparator,
     const std::shared_ptr<const SliceTransform>& prefix_extractor) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t result = 0;
   TableReader* table_reader = fd.table_reader;
   Cache::Handle* table_handle = nullptr;

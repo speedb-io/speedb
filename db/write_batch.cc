@@ -154,6 +154,7 @@ struct SavePoints {
 
 WriteBatch::WriteBatch(size_t reserved_bytes, size_t max_bytes)
     : content_flags_(0), max_bytes_(max_bytes), rep_() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   rep_.reserve((reserved_bytes > WriteBatchInternal::kHeader)
                    ? reserved_bytes
                    : WriteBatchInternal::kHeader);
@@ -166,6 +167,7 @@ WriteBatch::WriteBatch(size_t reserved_bytes, size_t max_bytes,
       max_bytes_(max_bytes),
       default_cf_ts_sz_(default_cf_ts_sz),
       rep_() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Currently `protection_bytes_per_key` can only be enabled at 8 bytes per
   // entry.
   assert(protection_bytes_per_key == 0 || protection_bytes_per_key == 8);
@@ -192,6 +194,7 @@ WriteBatch::WriteBatch(const WriteBatch& src)
       max_bytes_(src.max_bytes_),
       default_cf_ts_sz_(src.default_cf_ts_sz_),
       rep_(src.rep_) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (src.save_points_ != nullptr) {
     save_points_.reset(new SavePoints());
     save_points_->stack = src.save_points_->stack;
@@ -212,6 +215,7 @@ WriteBatch::WriteBatch(WriteBatch&& src) noexcept
       rep_(std::move(src.rep_)) {}
 
 WriteBatch& WriteBatch::operator=(const WriteBatch& src) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (&src != this) {
     this->~WriteBatch();
     new (this) WriteBatch(src);
@@ -220,6 +224,7 @@ WriteBatch& WriteBatch::operator=(const WriteBatch& src) {
 }
 
 WriteBatch& WriteBatch::operator=(WriteBatch&& src) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (&src != this) {
     this->~WriteBatch();
     new (this) WriteBatch(std::move(src));
@@ -232,15 +237,18 @@ WriteBatch::~WriteBatch() { }
 WriteBatch::Handler::~Handler() { }
 
 void WriteBatch::Handler::LogData(const Slice& /*blob*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // If the user has not specified something to do with blobs, then we ignore
   // them.
 }
 
 bool WriteBatch::Handler::Continue() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return true;
 }
 
 void WriteBatch::Clear() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   rep_.clear();
   rep_.resize(WriteBatchInternal::kHeader);
 
@@ -279,6 +287,7 @@ uint32_t WriteBatch::ComputeContentFlags() const {
 }
 
 void WriteBatch::MarkWalTerminationPoint() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   wal_term_point_.size = GetDataSize();
   wal_term_point_.count = Count();
   wal_term_point_.content_flags = content_flags_;
@@ -312,6 +321,7 @@ bool WriteBatch::HasMerge() const {
 }
 
 bool ReadKeyFromWriteBatchEntry(Slice* input, Slice* key, bool cf_record) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(input != nullptr && key != nullptr);
   // Skip tag byte
   input->remove_prefix(1);
@@ -347,6 +357,7 @@ bool WriteBatch::HasRollback() const {
 Status ReadRecordFromWriteBatch(Slice* input, char* tag,
                                 uint32_t* column_family, Slice* key,
                                 Slice* value, Slice* blob, Slice* xid) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(key != nullptr && value != nullptr);
   *tag = (*input)[0];
   input->remove_prefix(1);
@@ -461,6 +472,7 @@ Status WriteBatch::Iterate(Handler* handler) const {
 Status WriteBatchInternal::Iterate(const WriteBatch* wb,
                                    WriteBatch::Handler* handler, size_t begin,
                                    size_t end) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (begin > wb->rep_.size() || end > wb->rep_.size() || end < begin) {
     return Status::Corruption("Invalid start/end bounds for Iterate");
   }
@@ -680,36 +692,44 @@ Status WriteBatchInternal::Iterate(const WriteBatch* wb,
 }
 
 bool WriteBatchInternal::IsLatestPersistentState(const WriteBatch* b) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return b->is_latest_persistent_state_;
 }
 
 void WriteBatchInternal::SetAsLatestPersistentState(WriteBatch* b) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   b->is_latest_persistent_state_ = true;
 }
 
 uint32_t WriteBatchInternal::Count(const WriteBatch* b) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return DecodeFixed32(b->rep_.data() + 8);
 }
 
 void WriteBatchInternal::SetCount(WriteBatch* b, uint32_t n) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   EncodeFixed32(&b->rep_[8], n);
 }
 
 SequenceNumber WriteBatchInternal::Sequence(const WriteBatch* b) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return SequenceNumber(DecodeFixed64(b->rep_.data()));
 }
 
 void WriteBatchInternal::SetSequence(WriteBatch* b, SequenceNumber seq) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   EncodeFixed64(&b->rep_[0], seq);
 }
 
 size_t WriteBatchInternal::GetFirstOffset(WriteBatch* /*b*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return WriteBatchInternal::kHeader;
 }
 
 std::tuple<Status, uint32_t, size_t>
 WriteBatchInternal::GetColumnFamilyIdAndTimestampSize(
     WriteBatch* b, ColumnFamilyHandle* column_family) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint32_t cf_id = GetColumnFamilyID(column_family);
   size_t ts_sz = 0;
   Status s;
@@ -730,6 +750,7 @@ WriteBatchInternal::GetColumnFamilyIdAndTimestampSize(
 namespace {
 Status CheckColumnFamilyTimestampSize(ColumnFamilyHandle* column_family,
                                       const Slice& ts) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!column_family) {
     return Status::InvalidArgument("column family handle cannot be null");
   }
@@ -748,6 +769,7 @@ Status CheckColumnFamilyTimestampSize(ColumnFamilyHandle* column_family,
 
 Status WriteBatchInternal::Put(WriteBatch* b, uint32_t column_family_id,
                                const Slice& key, const Slice& value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (key.size() > size_t{port::kMaxUint32}) {
     return Status::InvalidArgument("key is too large");
   }
@@ -784,6 +806,7 @@ Status WriteBatchInternal::Put(WriteBatch* b, uint32_t column_family_id,
 
 Status WriteBatch::Put(ColumnFamilyHandle* column_family, const Slice& key,
                        const Slice& value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   size_t ts_sz = 0;
   uint32_t cf_id = 0;
   Status s;
@@ -810,6 +833,7 @@ Status WriteBatch::Put(ColumnFamilyHandle* column_family, const Slice& key,
 
 Status WriteBatch::Put(ColumnFamilyHandle* column_family, const Slice& key,
                        const Slice& ts, const Slice& value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const Status s = CheckColumnFamilyTimestampSize(column_family, ts);
   if (!s.ok()) {
     return s;
@@ -824,6 +848,7 @@ Status WriteBatch::Put(ColumnFamilyHandle* column_family, const Slice& key,
 
 Status WriteBatchInternal::CheckSlicePartsLength(const SliceParts& key,
                                                  const SliceParts& value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   size_t total_key_bytes = 0;
   for (int i = 0; i < key.num_parts; ++i) {
     total_key_bytes += key.parts[i].size();
@@ -844,6 +869,7 @@ Status WriteBatchInternal::CheckSlicePartsLength(const SliceParts& key,
 
 Status WriteBatchInternal::Put(WriteBatch* b, uint32_t column_family_id,
                                const SliceParts& key, const SliceParts& value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Status s = CheckSlicePartsLength(key, value);
   if (!s.ok()) {
     return s;
@@ -874,6 +900,7 @@ Status WriteBatchInternal::Put(WriteBatch* b, uint32_t column_family_id,
 
 Status WriteBatch::Put(ColumnFamilyHandle* column_family, const SliceParts& key,
                        const SliceParts& value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   size_t ts_sz = 0;
   uint32_t cf_id = 0;
   Status s;
@@ -895,6 +922,7 @@ Status WriteBatch::Put(ColumnFamilyHandle* column_family, const SliceParts& key,
 }
 
 Status WriteBatchInternal::InsertNoop(WriteBatch* b) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   b->rep_.push_back(static_cast<char>(kTypeNoop));
   return Status::OK();
 }
@@ -902,6 +930,7 @@ Status WriteBatchInternal::InsertNoop(WriteBatch* b) {
 Status WriteBatchInternal::MarkEndPrepare(WriteBatch* b, const Slice& xid,
                                           bool write_after_commit,
                                           bool unprepared_batch) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // a manually constructed batch can only contain one prepare section
   assert(b->rep_[12] == static_cast<char>(kTypeNoop));
 
@@ -932,6 +961,7 @@ Status WriteBatchInternal::MarkEndPrepare(WriteBatch* b, const Slice& xid,
 }
 
 Status WriteBatchInternal::MarkCommit(WriteBatch* b, const Slice& xid) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   b->rep_.push_back(static_cast<char>(kTypeCommitXID));
   PutLengthPrefixedSlice(&b->rep_, xid);
   b->content_flags_.store(b->content_flags_.load(std::memory_order_relaxed) |
@@ -943,6 +973,7 @@ Status WriteBatchInternal::MarkCommit(WriteBatch* b, const Slice& xid) {
 Status WriteBatchInternal::MarkCommitWithTimestamp(WriteBatch* b,
                                                    const Slice& xid,
                                                    const Slice& commit_ts) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(!commit_ts.empty());
   b->rep_.push_back(static_cast<char>(kTypeCommitXIDAndTimestamp));
   PutLengthPrefixedSlice(&b->rep_, commit_ts);
@@ -954,6 +985,7 @@ Status WriteBatchInternal::MarkCommitWithTimestamp(WriteBatch* b,
 }
 
 Status WriteBatchInternal::MarkRollback(WriteBatch* b, const Slice& xid) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   b->rep_.push_back(static_cast<char>(kTypeRollbackXID));
   PutLengthPrefixedSlice(&b->rep_, xid);
   b->content_flags_.store(b->content_flags_.load(std::memory_order_relaxed) |
@@ -964,6 +996,7 @@ Status WriteBatchInternal::MarkRollback(WriteBatch* b, const Slice& xid) {
 
 Status WriteBatchInternal::Delete(WriteBatch* b, uint32_t column_family_id,
                                   const Slice& key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   LocalSavePoint save(b);
   WriteBatchInternal::SetCount(b, WriteBatchInternal::Count(b) + 1);
   if (column_family_id == 0) {
@@ -988,6 +1021,7 @@ Status WriteBatchInternal::Delete(WriteBatch* b, uint32_t column_family_id,
 }
 
 Status WriteBatch::Delete(ColumnFamilyHandle* column_family, const Slice& key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   size_t ts_sz = 0;
   uint32_t cf_id = 0;
   Status s;
@@ -1014,6 +1048,7 @@ Status WriteBatch::Delete(ColumnFamilyHandle* column_family, const Slice& key) {
 
 Status WriteBatch::Delete(ColumnFamilyHandle* column_family, const Slice& key,
                           const Slice& ts) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const Status s = CheckColumnFamilyTimestampSize(column_family, ts);
   if (!s.ok()) {
     return s;
@@ -1028,6 +1063,7 @@ Status WriteBatch::Delete(ColumnFamilyHandle* column_family, const Slice& key,
 
 Status WriteBatchInternal::Delete(WriteBatch* b, uint32_t column_family_id,
                                   const SliceParts& key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   LocalSavePoint save(b);
   WriteBatchInternal::SetCount(b, WriteBatchInternal::Count(b) + 1);
   if (column_family_id == 0) {
@@ -1055,6 +1091,7 @@ Status WriteBatchInternal::Delete(WriteBatch* b, uint32_t column_family_id,
 
 Status WriteBatch::Delete(ColumnFamilyHandle* column_family,
                           const SliceParts& key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   size_t ts_sz = 0;
   uint32_t cf_id = 0;
   Status s;
@@ -1078,6 +1115,7 @@ Status WriteBatch::Delete(ColumnFamilyHandle* column_family,
 Status WriteBatchInternal::SingleDelete(WriteBatch* b,
                                         uint32_t column_family_id,
                                         const Slice& key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   LocalSavePoint save(b);
   WriteBatchInternal::SetCount(b, WriteBatchInternal::Count(b) + 1);
   if (column_family_id == 0) {
@@ -1103,6 +1141,7 @@ Status WriteBatchInternal::SingleDelete(WriteBatch* b,
 
 Status WriteBatch::SingleDelete(ColumnFamilyHandle* column_family,
                                 const Slice& key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   size_t ts_sz = 0;
   uint32_t cf_id = 0;
   Status s;
@@ -1129,6 +1168,7 @@ Status WriteBatch::SingleDelete(ColumnFamilyHandle* column_family,
 
 Status WriteBatch::SingleDelete(ColumnFamilyHandle* column_family,
                                 const Slice& key, const Slice& ts) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const Status s = CheckColumnFamilyTimestampSize(column_family, ts);
   if (!s.ok()) {
     return s;
@@ -1144,6 +1184,7 @@ Status WriteBatch::SingleDelete(ColumnFamilyHandle* column_family,
 Status WriteBatchInternal::SingleDelete(WriteBatch* b,
                                         uint32_t column_family_id,
                                         const SliceParts& key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   LocalSavePoint save(b);
   WriteBatchInternal::SetCount(b, WriteBatchInternal::Count(b) + 1);
   if (column_family_id == 0) {
@@ -1172,6 +1213,7 @@ Status WriteBatchInternal::SingleDelete(WriteBatch* b,
 
 Status WriteBatch::SingleDelete(ColumnFamilyHandle* column_family,
                                 const SliceParts& key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   size_t ts_sz = 0;
   uint32_t cf_id = 0;
   Status s;
@@ -1195,6 +1237,7 @@ Status WriteBatch::SingleDelete(ColumnFamilyHandle* column_family,
 Status WriteBatchInternal::DeleteRange(WriteBatch* b, uint32_t column_family_id,
                                        const Slice& begin_key,
                                        const Slice& end_key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   LocalSavePoint save(b);
   WriteBatchInternal::SetCount(b, WriteBatchInternal::Count(b) + 1);
   if (column_family_id == 0) {
@@ -1222,6 +1265,7 @@ Status WriteBatchInternal::DeleteRange(WriteBatch* b, uint32_t column_family_id,
 
 Status WriteBatch::DeleteRange(ColumnFamilyHandle* column_family,
                                const Slice& begin_key, const Slice& end_key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   size_t ts_sz = 0;
   uint32_t cf_id = 0;
   Status s;
@@ -1245,6 +1289,7 @@ Status WriteBatch::DeleteRange(ColumnFamilyHandle* column_family,
 Status WriteBatchInternal::DeleteRange(WriteBatch* b, uint32_t column_family_id,
                                        const SliceParts& begin_key,
                                        const SliceParts& end_key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   LocalSavePoint save(b);
   WriteBatchInternal::SetCount(b, WriteBatchInternal::Count(b) + 1);
   if (column_family_id == 0) {
@@ -1273,6 +1318,7 @@ Status WriteBatchInternal::DeleteRange(WriteBatch* b, uint32_t column_family_id,
 Status WriteBatch::DeleteRange(ColumnFamilyHandle* column_family,
                                const SliceParts& begin_key,
                                const SliceParts& end_key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   size_t ts_sz = 0;
   uint32_t cf_id = 0;
   Status s;
@@ -1295,6 +1341,7 @@ Status WriteBatch::DeleteRange(ColumnFamilyHandle* column_family,
 
 Status WriteBatchInternal::Merge(WriteBatch* b, uint32_t column_family_id,
                                  const Slice& key, const Slice& value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (key.size() > size_t{port::kMaxUint32}) {
     return Status::InvalidArgument("key is too large");
   }
@@ -1327,6 +1374,7 @@ Status WriteBatchInternal::Merge(WriteBatch* b, uint32_t column_family_id,
 
 Status WriteBatch::Merge(ColumnFamilyHandle* column_family, const Slice& key,
                          const Slice& value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   size_t ts_sz = 0;
   uint32_t cf_id = 0;
   Status s;
@@ -1350,6 +1398,7 @@ Status WriteBatch::Merge(ColumnFamilyHandle* column_family, const Slice& key,
 Status WriteBatchInternal::Merge(WriteBatch* b, uint32_t column_family_id,
                                  const SliceParts& key,
                                  const SliceParts& value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Status s = CheckSlicePartsLength(key, value);
   if (!s.ok()) {
     return s;
@@ -1380,6 +1429,7 @@ Status WriteBatchInternal::Merge(WriteBatch* b, uint32_t column_family_id,
 
 Status WriteBatch::Merge(ColumnFamilyHandle* column_family,
                          const SliceParts& key, const SliceParts& value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   size_t ts_sz = 0;
   uint32_t cf_id = 0;
   Status s;
@@ -1403,6 +1453,7 @@ Status WriteBatch::Merge(ColumnFamilyHandle* column_family,
 Status WriteBatchInternal::PutBlobIndex(WriteBatch* b,
                                         uint32_t column_family_id,
                                         const Slice& key, const Slice& value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   LocalSavePoint save(b);
   WriteBatchInternal::SetCount(b, WriteBatchInternal::Count(b) + 1);
   if (column_family_id == 0) {
@@ -1428,6 +1479,7 @@ Status WriteBatchInternal::PutBlobIndex(WriteBatch* b,
 }
 
 Status WriteBatch::PutLogData(const Slice& blob) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   LocalSavePoint save(this);
   rep_.push_back(static_cast<char>(kTypeLogData));
   PutLengthPrefixedSlice(&rep_, blob);
@@ -1435,6 +1487,7 @@ Status WriteBatch::PutLogData(const Slice& blob) {
 }
 
 void WriteBatch::SetSavePoint() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (save_points_ == nullptr) {
     save_points_.reset(new SavePoints());
   }
@@ -1444,6 +1497,7 @@ void WriteBatch::SetSavePoint() {
 }
 
 Status WriteBatch::RollbackToSavePoint() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (save_points_ == nullptr || save_points_->stack.size() == 0) {
     return Status::NotFound();
   }
@@ -1473,6 +1527,7 @@ Status WriteBatch::RollbackToSavePoint() {
 }
 
 Status WriteBatch::PopSavePoint() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (save_points_ == nullptr || save_points_->stack.size() == 0) {
     return Status::NotFound();
   }
@@ -1485,6 +1540,7 @@ Status WriteBatch::PopSavePoint() {
 
 Status WriteBatch::UpdateTimestamps(
     const Slice& ts, std::function<size_t(uint32_t)> ts_sz_func) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   TimestampUpdater<decltype(ts_sz_func)> ts_updater(prot_info_.get(),
                                                     std::move(ts_sz_func), ts);
   const Status s = Iterate(&ts_updater);
@@ -1543,6 +1599,7 @@ class MemTableInserter : public WriteBatch::Handler {
   HintMapType hint_;
 
   HintMap& GetHintMap() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(hint_per_batch_);
     if (!hint_created_) {
       new (&hint_) HintMap();
@@ -1552,6 +1609,7 @@ class MemTableInserter : public WriteBatch::Handler {
   }
 
   MemPostInfoMap& GetPostMap() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(concurrent_memtable_writes_);
     if(!post_info_created_) {
       new (&mem_post_info_map_) MemPostInfoMap();
@@ -1561,6 +1619,7 @@ class MemTableInserter : public WriteBatch::Handler {
   }
 
   bool IsDuplicateKeySeq(uint32_t column_family_id, const Slice& key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(!write_after_commit_);
     assert(rebuilding_trx_ != nullptr);
     if (!dup_dectector_on_) {
@@ -1572,6 +1631,7 @@ class MemTableInserter : public WriteBatch::Handler {
   }
 
   const ProtectionInfoKVOC64* NextProtectionInfo() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     const ProtectionInfoKVOC64* res = nullptr;
     if (prot_info_ != nullptr) {
       assert(prot_info_idx_ < prot_info_->entries_.size());
@@ -1624,6 +1684,7 @@ class MemTableInserter : public WriteBatch::Handler {
         dup_dectector_on_(false),
         hint_per_batch_(hint_per_batch),
         hint_created_(false) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(cf_mems_);
   }
 
@@ -1659,6 +1720,7 @@ class MemTableInserter : public WriteBatch::Handler {
   // kTypeRollbackXID) 2) Terminate a batch with kTypeNoop in the absence of a
   // natural boundary marker.
   void MaybeAdvanceSeq(bool batch_boundry = false) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (batch_boundry == seq_per_batch_) {
       sequence_++;
     }
@@ -1666,6 +1728,7 @@ class MemTableInserter : public WriteBatch::Handler {
 
   void set_log_number_ref(uint64_t log) { log_number_ref_ = log; }
   void set_prot_info(const WriteBatch::ProtectionInfo* prot_info) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     prot_info_ = prot_info;
     prot_info_idx_ = 0;
   }
@@ -1673,6 +1736,7 @@ class MemTableInserter : public WriteBatch::Handler {
   SequenceNumber sequence() const { return sequence_; }
 
   void PostProcess() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(concurrent_memtable_writes_);
     // If post info was not created there is nothing
     // to process and no need to create on demand
@@ -1684,6 +1748,7 @@ class MemTableInserter : public WriteBatch::Handler {
   }
 
   bool SeekToColumnFamily(uint32_t column_family_id, Status* s) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // If we are in a concurrent mode, it is the caller's responsibility
     // to clone the original ColumnFamilyMemTables so that each thread
     // has its own instance.  Otherwise, it must be guaranteed that there
@@ -1726,6 +1791,7 @@ class MemTableInserter : public WriteBatch::Handler {
   Status PutCFImpl(uint32_t column_family_id, const Slice& key,
                    const Slice& value, ValueType value_type,
                    const ProtectionInfoKVOS64* kv_prot_info) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // optimize for non-recovery mode
     if (UNLIKELY(write_after_commit_ && rebuilding_trx_ != nullptr)) {
       // TODO(ajkr): propagate `ProtectionInfoKVOS64`.
@@ -1885,6 +1951,7 @@ class MemTableInserter : public WriteBatch::Handler {
   Status DeleteImpl(uint32_t /*column_family_id*/, const Slice& key,
                     const Slice& value, ValueType delete_type,
                     const ProtectionInfoKVOS64* kv_prot_info) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Status ret_status;
     MemTable* mem = cf_mems_->GetMemTable();
     ret_status =
@@ -2262,6 +2329,7 @@ class MemTableInserter : public WriteBatch::Handler {
   }
 
   void CheckMemtableFull() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (flush_scheduler_ != nullptr) {
       auto* cfd = cf_mems_->current();
       assert(cfd != nullptr);
@@ -2515,6 +2583,7 @@ class MemTableInserter : public WriteBatch::Handler {
 
  private:
   MemTablePostProcessInfo* get_post_process_info(MemTable* mem) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (!concurrent_memtable_writes_) {
       // No need to batch counters locally if we don't use concurrent mode.
       return nullptr;
@@ -2534,6 +2603,7 @@ Status WriteBatchInternal::InsertInto(
     TrimHistoryScheduler* trim_history_scheduler,
     bool ignore_missing_column_families, uint64_t recovery_log_number, DB* db,
     bool concurrent_memtable_writes, bool seq_per_batch, bool batch_per_txn) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   MemTableInserter inserter(
       sequence, memtables, flush_scheduler, trim_history_scheduler,
       ignore_missing_column_families, recovery_log_number, db,
@@ -2569,6 +2639,7 @@ Status WriteBatchInternal::InsertInto(
     bool ignore_missing_column_families, uint64_t log_number, DB* db,
     bool concurrent_memtable_writes, bool seq_per_batch, size_t batch_cnt,
     bool batch_per_txn, bool hint_per_batch) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifdef NDEBUG
   (void)batch_cnt;
 #endif
@@ -2598,6 +2669,7 @@ Status WriteBatchInternal::InsertInto(
     bool ignore_missing_column_families, uint64_t log_number, DB* db,
     bool concurrent_memtable_writes, SequenceNumber* next_seq,
     bool* has_valid_writes, bool seq_per_batch, bool batch_per_txn) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   MemTableInserter inserter(Sequence(batch), memtables, flush_scheduler,
                             trim_history_scheduler,
                             ignore_missing_column_families, log_number, db,
@@ -2614,6 +2686,7 @@ Status WriteBatchInternal::InsertInto(
 }
 
 Status WriteBatchInternal::SetContents(WriteBatch* b, const Slice& contents) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(contents.size() >= WriteBatchInternal::kHeader);
   assert(b->prot_info_ == nullptr);
   b->rep_.assign(contents.data(), contents.size());
@@ -2623,6 +2696,7 @@ Status WriteBatchInternal::SetContents(WriteBatch* b, const Slice& contents) {
 
 Status WriteBatchInternal::Append(WriteBatch* dst, const WriteBatch* src,
                                   const bool wal_only) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(dst->Count() == 0 ||
          (dst->prot_info_ == nullptr) == (src->prot_info_ == nullptr));
   size_t src_len;
@@ -2659,6 +2733,7 @@ Status WriteBatchInternal::Append(WriteBatch* dst, const WriteBatch* src,
 
 size_t WriteBatchInternal::AppendedByteSize(size_t leftByteSize,
                                             size_t rightByteSize) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (leftByteSize == 0 || rightByteSize == 0) {
     return leftByteSize + rightByteSize;
   } else {

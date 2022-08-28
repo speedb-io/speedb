@@ -16,6 +16,7 @@ namespace {
 uint64_t GetUint64Property(const UserCollectedProperties& props,
                            const std::string& property_name,
                            bool* property_present) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto pos = props.find(property_name);
   if (pos == props.end()) {
     *property_present = false;
@@ -32,6 +33,7 @@ uint64_t GetUint64Property(const UserCollectedProperties& props,
 Status UserKeyTablePropertiesCollector::InternalAdd(const Slice& key,
                                                     const Slice& value,
                                                     uint64_t file_size) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ParsedInternalKey ikey;
   Status s = ParseInternalKey(key, &ikey, false /* log_err_key */);  // TODO
   if (!s.ok()) {
@@ -45,12 +47,14 @@ Status UserKeyTablePropertiesCollector::InternalAdd(const Slice& key,
 void UserKeyTablePropertiesCollector::BlockAdd(
     uint64_t block_raw_bytes, uint64_t block_compressed_bytes_fast,
     uint64_t block_compressed_bytes_slow) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return collector_->BlockAdd(block_raw_bytes, block_compressed_bytes_fast,
                               block_compressed_bytes_slow);
 }
 
 Status UserKeyTablePropertiesCollector::Finish(
     UserCollectedProperties* properties) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return collector_->Finish(properties);
 }
 
@@ -61,6 +65,7 @@ UserKeyTablePropertiesCollector::GetReadableProperties() const {
 
 uint64_t GetDeletedKeys(
     const UserCollectedProperties& props) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   bool property_present_ignored;
   return GetUint64Property(props, TablePropertiesNames::kDeletedKeys,
                            &property_present_ignored);
@@ -68,6 +73,7 @@ uint64_t GetDeletedKeys(
 
 uint64_t GetMergeOperands(const UserCollectedProperties& props,
                           bool* property_present) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return GetUint64Property(
       props, TablePropertiesNames::kMergeOperands, property_present);
 }

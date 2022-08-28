@@ -125,6 +125,7 @@ class Repairer {
         next_file_number_(1),
         db_lock_(nullptr),
         closed_(false) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     for (const auto& cfd : column_families) {
       cf_name_to_opts_[cfd.name] = cfd.options;
     }
@@ -132,6 +133,7 @@ class Repairer {
 
   const ColumnFamilyOptions* GetColumnFamilyOptions(
       const std::string& cf_name) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (cf_name_to_opts_.find(cf_name) == cf_name_to_opts_.end()) {
       if (create_unknown_cfs_) {
         return &unknown_cf_opts_;
@@ -144,6 +146,7 @@ class Repairer {
   // Adds a column family to the VersionSet with cf_options_ and updates
   // manifest.
   Status AddColumnFamily(const std::string& cf_name, uint32_t cf_id) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     const auto* cf_opts = GetColumnFamilyOptions(cf_name);
     if (cf_opts == nullptr) {
       return Status::Corruption("Encountered unknown column family with name=" +
@@ -169,6 +172,7 @@ class Repairer {
   }
 
   Status Close() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Status s = Status::OK();
     if (!closed_) {
       if (db_lock_ != nullptr) {
@@ -183,6 +187,7 @@ class Repairer {
   ~Repairer() { Close().PermitUncheckedError(); }
 
   Status Run() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Status status = env_->LockFile(LockFileName(dbname_), &db_lock_);
     if (!status.ok()) {
       return status;
@@ -271,6 +276,7 @@ class Repairer {
   bool closed_;
 
   Status FindFiles() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::vector<std::string> filenames;
     bool found_file = false;
     std::vector<std::string> to_search_paths;
@@ -325,6 +331,7 @@ class Repairer {
   }
 
   void ConvertLogFilesToTables() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     const auto& wal_dir = immutable_db_options_.GetWalDir();
     for (size_t i = 0; i < logs_.size(); i++) {
       // we should use LogFileName(wal_dir, logs_[i]) here. user might uses wal_dir option.
@@ -340,6 +347,7 @@ class Repairer {
   }
 
   Status ConvertLogToTable(const std::string& wal_dir, uint64_t log) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     struct LogReporter : public log::Reader::Reporter {
       Env* env;
       std::shared_ptr<Logger> info_log;
@@ -472,6 +480,7 @@ class Repairer {
   }
 
   void ExtractMetaData() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     for (size_t i = 0; i < table_fds_.size(); i++) {
       TableInfo t;
       t.meta.fd = table_fds_[i];
@@ -492,6 +501,7 @@ class Repairer {
   }
 
   Status ScanTable(TableInfo* t) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::string fname = TableFileName(
         db_options_.db_paths, t->meta.fd.GetNumber(), t->meta.fd.GetPathId());
     int counter = 0;
@@ -608,6 +618,7 @@ class Repairer {
   }
 
   Status AddTables() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::unordered_map<uint32_t, std::vector<const TableInfo*>> cf_id_to_tables;
     SequenceNumber max_sequence = 0;
     for (size_t i = 0; i < tables_.size(); i++) {
@@ -656,6 +667,7 @@ class Repairer {
   }
 
   void ArchiveFile(const std::string& fname) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // Move into another directory.  E.g., for
     //    dir/foo
     // rename to
@@ -679,6 +691,7 @@ class Repairer {
 Status GetDefaultCFOptions(
     const std::vector<ColumnFamilyDescriptor>& column_families,
     ColumnFamilyOptions* res) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(res != nullptr);
   auto iter = std::find_if(column_families.begin(), column_families.end(),
                            [](const ColumnFamilyDescriptor& cfd) {
@@ -696,6 +709,7 @@ Status GetDefaultCFOptions(
 Status RepairDB(const std::string& dbname, const DBOptions& db_options,
                 const std::vector<ColumnFamilyDescriptor>& column_families
                 ) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ColumnFamilyOptions default_cf_opts;
   Status status = GetDefaultCFOptions(column_families, &default_cf_opts);
   if (!status.ok()) {
@@ -715,6 +729,7 @@ Status RepairDB(const std::string& dbname, const DBOptions& db_options,
 Status RepairDB(const std::string& dbname, const DBOptions& db_options,
                 const std::vector<ColumnFamilyDescriptor>& column_families,
                 const ColumnFamilyOptions& unknown_cf_opts) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ColumnFamilyOptions default_cf_opts;
   Status status = GetDefaultCFOptions(column_families, &default_cf_opts);
   if (!status.ok()) {
@@ -731,6 +746,7 @@ Status RepairDB(const std::string& dbname, const DBOptions& db_options,
 }
 
 Status RepairDB(const std::string& dbname, const Options& options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options opts(options);
   DBOptions db_options(opts);
   ColumnFamilyOptions cf_options(opts);

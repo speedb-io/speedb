@@ -20,6 +20,7 @@
 namespace ROCKSDB_NAMESPACE {
 
 static void TestEncodeDecode(const VersionEdit& edit) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string encoded, encoded2;
   edit.EncodeTo(&encoded);
   VersionEdit parsed;
@@ -32,6 +33,7 @@ static void TestEncodeDecode(const VersionEdit& edit) {
 class VersionEditTest : public testing::Test {};
 
 TEST_F(VersionEditTest, EncodeDecode) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   static const uint64_t kBig = 1ull << 50;
   static const uint32_t kBig32Bit = 1ull << 30;
 
@@ -55,6 +57,7 @@ TEST_F(VersionEditTest, EncodeDecode) {
 }
 
 TEST_F(VersionEditTest, EncodeDecodeNewFile4) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   static const uint64_t kBig = 1ull << 50;
 
   VersionEdit edit;
@@ -123,6 +126,7 @@ TEST_F(VersionEditTest, EncodeDecodeNewFile4) {
 }
 
 TEST_F(VersionEditTest, ForwardCompatibleNewFile4) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   static const uint64_t kBig = 1ull << 50;
   VersionEdit edit;
   edit.AddFile(3, 300, 3, 100, InternalKey("foo", kBig + 500, kTypeValue),
@@ -149,6 +153,7 @@ TEST_F(VersionEditTest, ForwardCompatibleNewFile4) {
   bool first = true;
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "VersionEdit::EncodeTo:NewFile4:CustomizeFields", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         std::string* str = reinterpret_cast<std::string*>(arg);
         PutVarint32(str, 33);
         const std::string str1 = "random_string";
@@ -181,6 +186,7 @@ TEST_F(VersionEditTest, ForwardCompatibleNewFile4) {
 }
 
 TEST_F(VersionEditTest, NewFile4NotSupportedField) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   static const uint64_t kBig = 1ull << 50;
   VersionEdit edit;
   edit.AddFile(3, 300, 3, 100, InternalKey("foo", kBig + 500, kTypeValue),
@@ -200,6 +206,7 @@ TEST_F(VersionEditTest, NewFile4NotSupportedField) {
   // Call back function to add extra customized builds.
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "VersionEdit::EncodeTo:NewFile4:CustomizeFields", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         std::string* str = reinterpret_cast<std::string*>(arg);
         const std::string str1 = "s";
         PutLengthPrefixedSlice(str, str1);
@@ -214,6 +221,7 @@ TEST_F(VersionEditTest, NewFile4NotSupportedField) {
 }
 
 TEST_F(VersionEditTest, EncodeEmptyFile) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   VersionEdit edit;
   edit.AddFile(0, 0, 0, 0, InternalKey(), InternalKey(), 0, 0, false,
                Temperature::kUnknown, kInvalidBlobFileNumber,
@@ -225,6 +233,7 @@ TEST_F(VersionEditTest, EncodeEmptyFile) {
 }
 
 TEST_F(VersionEditTest, ColumnFamilyTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   VersionEdit edit;
   edit.SetColumnFamily(2);
   edit.AddColumnFamily("column_family");
@@ -238,6 +247,7 @@ TEST_F(VersionEditTest, ColumnFamilyTest) {
 }
 
 TEST_F(VersionEditTest, MinLogNumberToKeep) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   VersionEdit edit;
   edit.SetMinLogNumberToKeep(13);
   TestEncodeDecode(edit);
@@ -248,12 +258,14 @@ TEST_F(VersionEditTest, MinLogNumberToKeep) {
 }
 
 TEST_F(VersionEditTest, AtomicGroupTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   VersionEdit edit;
   edit.MarkAtomicGroup(1);
   TestEncodeDecode(edit);
 }
 
 TEST_F(VersionEditTest, IgnorableField) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   VersionEdit ve;
   std::string encoded;
 
@@ -295,6 +307,7 @@ TEST_F(VersionEditTest, IgnorableField) {
 }
 
 TEST_F(VersionEditTest, DbId) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   VersionEdit edit;
   edit.SetDBId("ab34-cd12-435f-er00");
   TestEncodeDecode(edit);
@@ -305,6 +318,7 @@ TEST_F(VersionEditTest, DbId) {
 }
 
 TEST_F(VersionEditTest, BlobFileAdditionAndGarbage) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   VersionEdit edit;
 
   const std::string checksum_method_prefix = "Hash";
@@ -335,6 +349,7 @@ TEST_F(VersionEditTest, BlobFileAdditionAndGarbage) {
 }
 
 TEST_F(VersionEditTest, AddWalEncodeDecode) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   VersionEdit edit;
   for (uint64_t log_number = 1; log_number <= 20; log_number++) {
     WalMetadata meta;
@@ -349,6 +364,7 @@ TEST_F(VersionEditTest, AddWalEncodeDecode) {
 
 static std::string PrefixEncodedWalAdditionWithLength(
     const std::string& encoded) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string ret;
   PutVarint32(&ret, Tag::kWalAddition2);
   PutLengthPrefixedSlice(&ret, encoded);
@@ -356,6 +372,7 @@ static std::string PrefixEncodedWalAdditionWithLength(
 }
 
 TEST_F(VersionEditTest, AddWalDecodeBadLogNumber) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string encoded;
 
   {
@@ -388,6 +405,7 @@ TEST_F(VersionEditTest, AddWalDecodeBadLogNumber) {
 }
 
 TEST_F(VersionEditTest, AddWalDecodeBadTag) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr WalNumber kLogNumber = 100;
   constexpr uint64_t kSizeInBytes = 100;
 
@@ -437,6 +455,7 @@ TEST_F(VersionEditTest, AddWalDecodeBadTag) {
 }
 
 TEST_F(VersionEditTest, AddWalDecodeNoSize) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr WalNumber kLogNumber = 100;
 
   std::string encoded;
@@ -470,6 +489,7 @@ TEST_F(VersionEditTest, AddWalDecodeNoSize) {
 }
 
 TEST_F(VersionEditTest, AddWalDebug) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr int n = 2;
   constexpr std::array<uint64_t, n> kLogNumbers{{10, 20}};
   constexpr std::array<uint64_t, n> kSizeInBytes{{100, 200}};
@@ -512,12 +532,14 @@ TEST_F(VersionEditTest, AddWalDebug) {
 }
 
 TEST_F(VersionEditTest, DeleteWalEncodeDecode) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   VersionEdit edit;
   edit.DeleteWalsBefore(rand() % 100);
   TestEncodeDecode(edit);
 }
 
 TEST_F(VersionEditTest, DeleteWalDebug) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr int n = 2;
   constexpr std::array<uint64_t, n> kLogNumbers{{10, 20}};
 
@@ -549,6 +571,7 @@ TEST_F(VersionEditTest, DeleteWalDebug) {
 }
 
 TEST_F(VersionEditTest, FullHistoryTsLow) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   VersionEdit edit;
   ASSERT_FALSE(edit.HasFullHistoryTsLow());
   std::string ts = test::EncodeInt(0);
@@ -559,8 +582,10 @@ TEST_F(VersionEditTest, FullHistoryTsLow) {
 // Tests that if RocksDB is downgraded, the new types of VersionEdits
 // that have a tag larger than kTagSafeIgnoreMask can be safely ignored.
 TEST_F(VersionEditTest, IgnorableTags) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   SyncPoint::GetInstance()->SetCallBack(
       "VersionEdit::EncodeTo:IgnoreIgnorableTags", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         bool* ignore = static_cast<bool*>(arg);
         *ignore = true;
       });
@@ -613,6 +638,7 @@ TEST_F(VersionEditTest, IgnorableTags) {
 }
 
 TEST(FileMetaDataTest, UpdateBoundariesBlobIndex) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   FileMetaData meta;
 
   {
@@ -737,6 +763,7 @@ TEST(FileMetaDataTest, UpdateBoundariesBlobIndex) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

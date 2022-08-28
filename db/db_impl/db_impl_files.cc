@@ -27,6 +27,7 @@ uint64_t DBImpl::MinLogNumberToKeep() {
 }
 
 uint64_t DBImpl::MinObsoleteSstNumberToKeep() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   mutex_.AssertHeld();
   if (!pending_outputs_.empty()) {
     return *pending_outputs_.begin();
@@ -35,6 +36,7 @@ uint64_t DBImpl::MinObsoleteSstNumberToKeep() {
 }
 
 Status DBImpl::DisableFileDeletions() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Status s;
   int my_disable_delete_obsolete_files;
   {
@@ -55,12 +57,14 @@ Status DBImpl::DisableFileDeletions() {
 // FIXME: can be inconsistent with DisableFileDeletions in cases like
 // DBImplReadOnly
 Status DBImpl::DisableFileDeletionsWithLock() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   mutex_.AssertHeld();
   ++disable_delete_obsolete_files_;
   return Status::OK();
 }
 
 Status DBImpl::EnableFileDeletions(bool force) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Job id == 0 means that this is not our background process, but rather
   // user thread
   JobContext job_context(0);
@@ -109,6 +113,7 @@ bool DBImpl::IsFileDeletionsEnabled() const {
 // force = true -- force the full scan
 void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
                                bool no_full_scan) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   mutex_.AssertHeld();
 
   // if deletion is disabled, do nothing
@@ -309,6 +314,7 @@ void DBImpl::FindObsoleteFiles(JobContext* job_context, bool force,
 namespace {
 bool CompareCandidateFile(const JobContext::CandidateFileInfo& first,
                           const JobContext::CandidateFileInfo& second) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (first.file_name > second.file_name) {
     return true;
   } else if (first.file_name < second.file_name) {
@@ -323,6 +329,7 @@ bool CompareCandidateFile(const JobContext::CandidateFileInfo& first,
 void DBImpl::DeleteObsoleteFileImpl(int job_id, const std::string& fname,
                                     const std::string& path_to_sync,
                                     FileType type, uint64_t number) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   TEST_SYNC_POINT_CALLBACK("DBImpl::DeleteObsoleteFileImpl::BeforeDeletion",
                            const_cast<std::string*>(&fname));
 
@@ -373,6 +380,7 @@ void DBImpl::DeleteObsoleteFileImpl(int job_id, const std::string& fname,
 // files in sst_delete_files and log_delete_files.
 // It is not necessary to hold the mutex when invoking this method.
 void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   TEST_SYNC_POINT("DBImpl::PurgeObsoleteFiles:Begin");
   // we'd better have sth to delete
   assert(state.HaveSomethingToDelete());
@@ -652,6 +660,7 @@ void DBImpl::PurgeObsoleteFiles(JobContext& state, bool schedule_only) {
 }
 
 void DBImpl::DeleteObsoleteFiles() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   mutex_.AssertHeld();
   JobContext job_context(next_job_id_.fetch_add(1));
   FindObsoleteFiles(&job_context, true);
@@ -864,6 +873,7 @@ uint64_t PrecomputeMinLogNumberToKeep2PC(
 }
 
 Status DBImpl::SetDBId(bool read_only) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Status s;
   // Happens when immutable_db_options_.write_dbid_to_manifest is set to true
   // the very first time.
@@ -906,6 +916,7 @@ Status DBImpl::SetDBId(bool read_only) {
 }
 
 Status DBImpl::DeleteUnreferencedSstFiles() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   mutex_.AssertHeld();
   std::vector<std::string> paths;
   paths.push_back(NormalizePath(dbname_ + std::string(1, kFilePathSeparator)));

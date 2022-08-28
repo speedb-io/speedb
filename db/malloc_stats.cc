@@ -25,6 +25,7 @@ struct MallocStatus {
 };
 
 static void GetJemallocStatus(void* mstat_arg, const char* status) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   MallocStatus* mstat = reinterpret_cast<MallocStatus*>(mstat_arg);
   size_t status_len = status ? strlen(status) : 0;
   size_t buf_size = (size_t)(mstat->end - mstat->cur);
@@ -36,6 +37,7 @@ static void GetJemallocStatus(void* mstat_arg, const char* status) {
   mstat->cur += status_len;
 }
 void DumpMallocStats(std::string* stats) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!HasJemalloc()) {
     return;
   }

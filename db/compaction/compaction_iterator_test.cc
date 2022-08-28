@@ -61,6 +61,7 @@ class StallingFilter : public CompactionFilter {
   // Wait until the filter sees a key >= k and stalls at that key.
   // If `exact`, asserts that the seen key is equal to k.
   void WaitForStall(int k, bool exact = true) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     stall_at.store(k);
     while (last_seen.load() < k) {
       std::this_thread::yield();
@@ -111,6 +112,7 @@ class LoggingForwardVectorIterator : public VectorIterator {
   LoggingForwardVectorIterator(const std::vector<std::string>& keys,
                                const std::vector<std::string>& values)
       : VectorIterator(keys, values) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     current_ = keys_.size();
   }
 
@@ -237,6 +239,7 @@ class CompactionIteratorTest : public testing::TestWithParam<bool> {
       SequenceNumber earliest_write_conflict_snapshot = kMaxSequenceNumber,
       bool key_not_exists_beyond_output_level = false,
       const std::string* full_history_ts_low = nullptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::unique_ptr<InternalIterator> unfragmented_range_del_iter(
         new VectorIterator(range_del_ks, range_del_vs, &icmp_));
     auto tombstone_list = std::make_shared<FragmentedRangeTombstoneList>(
@@ -287,6 +290,7 @@ class CompactionIteratorTest : public testing::TestWithParam<bool> {
 
   void AddSnapshot(SequenceNumber snapshot,
                    SequenceNumber last_visible_seq = kMaxSequenceNumber) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     snapshots_.push_back(snapshot);
     snapshot_map_[snapshot] = last_visible_seq;
   }
@@ -307,6 +311,7 @@ class CompactionIteratorTest : public testing::TestWithParam<bool> {
       SequenceNumber earliest_write_conflict_snapshot = kMaxSequenceNumber,
       bool key_not_exists_beyond_output_level = false,
       const std::string* full_history_ts_low = nullptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     InitIterators(input_keys, input_values, {}, {}, kMaxSequenceNumber,
                   last_committed_seq, merge_operator, compaction_filter,
                   bottommost_level, earliest_write_conflict_snapshot,
@@ -325,6 +330,7 @@ class CompactionIteratorTest : public testing::TestWithParam<bool> {
   }
 
   void ClearSnapshots() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     snapshots_.clear();
     snapshot_map_.clear();
   }
@@ -346,6 +352,7 @@ class CompactionIteratorTest : public testing::TestWithParam<bool> {
 // It is possible that the output of the compaction iterator is empty even if
 // the input is not.
 TEST_P(CompactionIteratorTest, EmptyResult) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   InitIterators({test::KeyStr("a", 5, kTypeSingleDeletion),
                  test::KeyStr("a", 3, kTypeValue)},
                 {"", "val"}, {}, {}, 5);
@@ -357,6 +364,7 @@ TEST_P(CompactionIteratorTest, EmptyResult) {
 // If there is a corruption after a single deletion, the corrupted key should
 // be preserved.
 TEST_P(CompactionIteratorTest, CorruptionAfterSingleDeletion) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   InitIterators({test::KeyStr("a", 5, kTypeSingleDeletion),
                  test::KeyStr("a", 3, kTypeValue, true),
                  test::KeyStr("b", 10, kTypeValue)},
@@ -377,6 +385,7 @@ TEST_P(CompactionIteratorTest, CorruptionAfterSingleDeletion) {
 }
 
 TEST_P(CompactionIteratorTest, SimpleRangeDeletion) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   InitIterators({test::KeyStr("morning", 5, kTypeValue),
                  test::KeyStr("morning", 2, kTypeValue),
                  test::KeyStr("night", 3, kTypeValue)},
@@ -394,6 +403,7 @@ TEST_P(CompactionIteratorTest, SimpleRangeDeletion) {
 }
 
 TEST_P(CompactionIteratorTest, RangeDeletionWithSnapshots) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   AddSnapshot(10);
   std::vector<std::string> ks1;
   ks1.push_back(test::KeyStr("ma", 28, kTypeRangeDeletion));
@@ -416,6 +426,7 @@ TEST_P(CompactionIteratorTest, RangeDeletionWithSnapshots) {
 }
 
 TEST_P(CompactionIteratorTest, CompactionFilterSkipUntil) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   class Filter : public CompactionFilter {
     Decision FilterV2(int /*level*/, const Slice& key, ValueType t,
                       const Slice& existing_value, std::string* /*new_value*/,
@@ -526,6 +537,7 @@ TEST_P(CompactionIteratorTest, CompactionFilterSkipUntil) {
 }
 
 TEST_P(CompactionIteratorTest, ShuttingDownInFilter) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NoMergingMergeOp merge_op;
   StallingFilter filter;
   InitIterators(
@@ -564,6 +576,7 @@ TEST_P(CompactionIteratorTest, ShuttingDownInFilter) {
 // Same as ShuttingDownInFilter, but shutdown happens during filter call for
 // a merge operand, not for a value.
 TEST_P(CompactionIteratorTest, ShuttingDownInMerge) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   NoMergingMergeOp merge_op;
   StallingFilter filter;
   InitIterators(
@@ -599,6 +612,7 @@ TEST_P(CompactionIteratorTest, ShuttingDownInMerge) {
 }
 
 TEST_P(CompactionIteratorTest, SingleMergeOperand) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   class Filter : public CompactionFilter {
     Decision FilterV2(int /*level*/, const Slice& key, ValueType t,
                       const Slice& existing_value, std::string* /*new_value*/,
@@ -706,6 +720,7 @@ TEST_P(CompactionIteratorTest, SingleMergeOperand) {
 // In bottommost level, values earlier than earliest snapshot can be output
 // with sequence = 0.
 TEST_P(CompactionIteratorTest, ZeroOutSequenceAtBottomLevel) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   AddSnapshot(1);
   RunTest({test::KeyStr("a", 1, kTypeValue), test::KeyStr("b", 2, kTypeValue)},
           {"v1", "v2"},
@@ -718,6 +733,7 @@ TEST_P(CompactionIteratorTest, ZeroOutSequenceAtBottomLevel) {
 // In bottommost level, deletions earlier than earliest snapshot can be removed
 // permanently.
 TEST_P(CompactionIteratorTest, RemoveDeletionAtBottomLevel) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   AddSnapshot(1);
   RunTest(
       {test::KeyStr("a", 1, kTypeDeletion), test::KeyStr("b", 3, kTypeDeletion),
@@ -732,6 +748,7 @@ TEST_P(CompactionIteratorTest, RemoveDeletionAtBottomLevel) {
 // In bottommost level, single deletions earlier than earliest snapshot can be
 // removed permanently.
 TEST_P(CompactionIteratorTest, RemoveSingleDeletionAtBottomLevel) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   AddSnapshot(1);
   RunTest({test::KeyStr("a", 1, kTypeSingleDeletion),
            test::KeyStr("b", 2, kTypeSingleDeletion)},
@@ -741,6 +758,7 @@ TEST_P(CompactionIteratorTest, RemoveSingleDeletionAtBottomLevel) {
 }
 
 TEST_P(CompactionIteratorTest, ConvertToPutAtBottom) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<MergeOperator> merge_op =
       MergeOperators::CreateStringAppendOperator();
   RunTest({test::KeyStr("a", 4, kTypeMerge), test::KeyStr("a", 3, kTypeMerge),
@@ -767,6 +785,7 @@ class CompactionIteratorWithSnapshotCheckerTest
 
 TEST_F(CompactionIteratorWithSnapshotCheckerTest,
        PreserveUncommittedKeys_Value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   RunTest(
       {test::KeyStr("foo", 3, kTypeValue), test::KeyStr("foo", 2, kTypeValue),
        test::KeyStr("foo", 1, kTypeValue)},
@@ -777,6 +796,7 @@ TEST_F(CompactionIteratorWithSnapshotCheckerTest,
 
 TEST_F(CompactionIteratorWithSnapshotCheckerTest,
        PreserveUncommittedKeys_Deletion) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   RunTest({test::KeyStr("foo", 2, kTypeDeletion),
            test::KeyStr("foo", 1, kTypeValue)},
           {"", "v1"},
@@ -787,6 +807,7 @@ TEST_F(CompactionIteratorWithSnapshotCheckerTest,
 
 TEST_F(CompactionIteratorWithSnapshotCheckerTest,
        PreserveUncommittedKeys_Merge) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto merge_op = MergeOperators::CreateStringAppendOperator();
   RunTest(
       {test::KeyStr("foo", 3, kTypeMerge), test::KeyStr("foo", 2, kTypeMerge),
@@ -798,6 +819,7 @@ TEST_F(CompactionIteratorWithSnapshotCheckerTest,
 
 TEST_F(CompactionIteratorWithSnapshotCheckerTest,
        PreserveUncommittedKeys_SingleDelete) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   RunTest({test::KeyStr("foo", 2, kTypeSingleDeletion),
            test::KeyStr("foo", 1, kTypeValue)},
           {"", "v1"},
@@ -808,6 +830,7 @@ TEST_F(CompactionIteratorWithSnapshotCheckerTest,
 
 TEST_F(CompactionIteratorWithSnapshotCheckerTest,
        PreserveUncommittedKeys_BlobIndex) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   RunTest({test::KeyStr("foo", 3, kTypeBlobIndex),
            test::KeyStr("foo", 2, kTypeBlobIndex),
            test::KeyStr("foo", 1, kTypeBlobIndex)},
@@ -820,6 +843,7 @@ TEST_F(CompactionIteratorWithSnapshotCheckerTest,
 // Test compaction iterator dedup keys visible to the same snapshot.
 
 TEST_F(CompactionIteratorWithSnapshotCheckerTest, DedupSameSnapshot_Value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   AddSnapshot(2, 1);
   RunTest(
       {test::KeyStr("foo", 4, kTypeValue), test::KeyStr("foo", 3, kTypeValue),
@@ -831,6 +855,7 @@ TEST_F(CompactionIteratorWithSnapshotCheckerTest, DedupSameSnapshot_Value) {
 }
 
 TEST_F(CompactionIteratorWithSnapshotCheckerTest, DedupSameSnapshot_Deletion) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   AddSnapshot(2, 1);
   RunTest(
       {test::KeyStr("foo", 4, kTypeValue),
@@ -844,6 +869,7 @@ TEST_F(CompactionIteratorWithSnapshotCheckerTest, DedupSameSnapshot_Deletion) {
 }
 
 TEST_F(CompactionIteratorWithSnapshotCheckerTest, DedupSameSnapshot_Merge) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   AddSnapshot(2, 1);
   AddSnapshot(4, 3);
   auto merge_op = MergeOperators::CreateStringAppendOperator();
@@ -859,6 +885,7 @@ TEST_F(CompactionIteratorWithSnapshotCheckerTest, DedupSameSnapshot_Merge) {
 
 TEST_F(CompactionIteratorWithSnapshotCheckerTest,
        DedupSameSnapshot_SingleDeletion) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   AddSnapshot(2, 1);
   RunTest(
       {test::KeyStr("foo", 4, kTypeValue),
@@ -870,6 +897,7 @@ TEST_F(CompactionIteratorWithSnapshotCheckerTest,
 }
 
 TEST_F(CompactionIteratorWithSnapshotCheckerTest, DedupSameSnapshot_BlobIndex) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   AddSnapshot(2, 1);
   RunTest({test::KeyStr("foo", 4, kTypeBlobIndex),
            test::KeyStr("foo", 3, kTypeBlobIndex),
@@ -887,6 +915,7 @@ TEST_F(CompactionIteratorWithSnapshotCheckerTest, DedupSameSnapshot_BlobIndex) {
 
 TEST_F(CompactionIteratorWithSnapshotCheckerTest,
        NotZeroOutSequenceIfNotVisibleToEarliestSnapshot) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   AddSnapshot(2, 1);
   RunTest({test::KeyStr("a", 1, kTypeValue), test::KeyStr("b", 2, kTypeValue),
            test::KeyStr("c", 3, kTypeValue)},
@@ -900,6 +929,7 @@ TEST_F(CompactionIteratorWithSnapshotCheckerTest,
 
 TEST_F(CompactionIteratorWithSnapshotCheckerTest,
        NotRemoveDeletionIfNotVisibleToEarliestSnapshot) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   AddSnapshot(2, 1);
   RunTest(
       {test::KeyStr("a", 1, kTypeDeletion), test::KeyStr("b", 2, kTypeDeletion),
@@ -911,6 +941,7 @@ TEST_F(CompactionIteratorWithSnapshotCheckerTest,
 
 TEST_F(CompactionIteratorWithSnapshotCheckerTest,
        NotRemoveDeletionIfValuePresentToEarlierSnapshot) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   AddSnapshot(2,1);
   RunTest({test::KeyStr("a", 4, kTypeDeletion),
            test::KeyStr("a", 1, kTypeValue), test::KeyStr("b", 3, kTypeValue)},
@@ -924,6 +955,7 @@ TEST_F(CompactionIteratorWithSnapshotCheckerTest,
 
 TEST_F(CompactionIteratorWithSnapshotCheckerTest,
        NotRemoveSingleDeletionIfNotVisibleToEarliestSnapshot) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   AddSnapshot(2, 1);
   RunTest({test::KeyStr("a", 1, kTypeSingleDeletion),
            test::KeyStr("b", 2, kTypeSingleDeletion),
@@ -940,6 +972,7 @@ TEST_F(CompactionIteratorWithSnapshotCheckerTest,
 // same set of snapshots
 TEST_F(CompactionIteratorWithSnapshotCheckerTest,
        SingleDeleteAcrossSnapshotBoundary) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   AddSnapshot(2, 1);
   RunTest({test::KeyStr("a", 2, kTypeSingleDeletion),
            test::KeyStr("a", 1, kTypeValue)},
@@ -954,6 +987,7 @@ TEST_F(CompactionIteratorWithSnapshotCheckerTest,
 // corresponding value can be trimmed to save space.
 TEST_F(CompactionIteratorWithSnapshotCheckerTest,
        KeepSingleDeletionForWriteConflictChecking) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   AddSnapshot(2, 0);
   RunTest({test::KeyStr("a", 2, kTypeSingleDeletion),
            test::KeyStr("a", 1, kTypeValue)},
@@ -969,6 +1003,7 @@ TEST_F(CompactionIteratorWithSnapshotCheckerTest,
 // trimmed, the type of the KV is changed to kTypeValue.
 TEST_F(CompactionIteratorWithSnapshotCheckerTest,
        KeepSingleDeletionForWriteConflictChecking_BlobIndex) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   AddSnapshot(2, 0);
   RunTest({test::KeyStr("a", 2, kTypeSingleDeletion),
            test::KeyStr("a", 1, kTypeBlobIndex)},
@@ -985,6 +1020,7 @@ TEST_F(CompactionIteratorWithSnapshotCheckerTest,
 //   * if latest value is a merge, apply filter to all subsequent merges.
 
 TEST_F(CompactionIteratorWithSnapshotCheckerTest, CompactionFilter_Value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<CompactionFilter> compaction_filter(
       new FilterAllKeysCompactionFilter());
   RunTest(
@@ -998,6 +1034,7 @@ TEST_F(CompactionIteratorWithSnapshotCheckerTest, CompactionFilter_Value) {
 }
 
 TEST_F(CompactionIteratorWithSnapshotCheckerTest, CompactionFilter_Deletion) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<CompactionFilter> compaction_filter(
       new FilterAllKeysCompactionFilter());
   RunTest(
@@ -1011,6 +1048,7 @@ TEST_F(CompactionIteratorWithSnapshotCheckerTest, CompactionFilter_Deletion) {
 
 TEST_F(CompactionIteratorWithSnapshotCheckerTest,
        CompactionFilter_PartialMerge) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<MergeOperator> merge_op =
       MergeOperators::CreateStringAppendOperator();
   std::unique_ptr<CompactionFilter> compaction_filter(
@@ -1022,6 +1060,7 @@ TEST_F(CompactionIteratorWithSnapshotCheckerTest,
 }
 
 TEST_F(CompactionIteratorWithSnapshotCheckerTest, CompactionFilter_FullMerge) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<MergeOperator> merge_op =
       MergeOperators::CreateStringAppendOperator();
   std::unique_ptr<CompactionFilter> compaction_filter(
@@ -1046,6 +1085,7 @@ class CompactionIteratorWithAllowIngestBehindTest
 // the bottommost level since there is no guarantee there won't be further
 // data ingested under the compaction output in future.
 TEST_P(CompactionIteratorWithAllowIngestBehindTest, NoConvertToPutAtBottom) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<MergeOperator> merge_op =
       MergeOperators::CreateStringAppendOperator();
   RunTest({test::KeyStr("a", 4, kTypeMerge), test::KeyStr("a", 3, kTypeMerge),
@@ -1059,6 +1099,7 @@ TEST_P(CompactionIteratorWithAllowIngestBehindTest, NoConvertToPutAtBottom) {
 
 TEST_P(CompactionIteratorWithAllowIngestBehindTest,
        MergeToPutIfEncounteredPutAtBottom) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<MergeOperator> merge_op =
       MergeOperators::CreateStringAppendOperator();
   RunTest({test::KeyStr("a", 4, kTypeMerge), test::KeyStr("a", 3, kTypeMerge),
@@ -1081,6 +1122,7 @@ class CompactionIteratorTsGcTest : public CompactionIteratorTest {
 };
 
 TEST_P(CompactionIteratorTsGcTest, NoKeyEligibleForGC) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr char user_key[][2] = {{'a', '\0'}, {'b', '\0'}};
   const std::vector<std::string> input_keys = {
       test::KeyStr(/*ts=*/103, user_key[0], /*seq=*/4, kTypeValue),
@@ -1109,6 +1151,7 @@ TEST_P(CompactionIteratorTsGcTest, NoKeyEligibleForGC) {
 }
 
 TEST_P(CompactionIteratorTsGcTest, AllKeysOlderThanThreshold) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr char user_key[][2] = {{'a', '\0'}, {'b', '\0'}};
   const std::vector<std::string> input_keys = {
       test::KeyStr(/*ts=*/103, user_key[0], /*seq=*/4,
@@ -1162,6 +1205,7 @@ TEST_P(CompactionIteratorTsGcTest, AllKeysOlderThanThreshold) {
 }
 
 TEST_P(CompactionIteratorTsGcTest, NewHidesOldSameSnapshot) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr char user_key[] = "a";
   const std::vector<std::string> input_keys = {
       test::KeyStr(/*ts=*/103, user_key, /*seq=*/4, kTypeDeletionWithTimestamp),
@@ -1187,6 +1231,7 @@ TEST_P(CompactionIteratorTsGcTest, NewHidesOldSameSnapshot) {
 }
 
 TEST_P(CompactionIteratorTsGcTest, DropTombstones) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr char user_key[] = "a";
   const std::vector<std::string> input_keys = {
       test::KeyStr(/*ts=*/103, user_key, /*seq=*/4, kTypeDeletionWithTimestamp),
@@ -1225,6 +1270,7 @@ TEST_P(CompactionIteratorTsGcTest, DropTombstones) {
 }
 
 TEST_P(CompactionIteratorTsGcTest, RewriteTs) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr char user_key[] = "a";
   const std::vector<std::string> input_keys = {
       test::KeyStr(/*ts=*/103, user_key, /*seq=*/4, kTypeDeletionWithTimestamp),
@@ -1254,6 +1300,7 @@ TEST_P(CompactionIteratorTsGcTest, RewriteTs) {
 }
 
 TEST_P(CompactionIteratorTsGcTest, SingleDeleteNoKeyEligibleForGC) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr char user_key[][2] = {{'a', '\0'}, {'b', '\0'}};
   const std::vector<std::string> input_keys = {
       test::KeyStr(/*ts=*/104, user_key[0], /*seq=*/4, kTypeSingleDeletion),
@@ -1281,6 +1328,7 @@ TEST_P(CompactionIteratorTsGcTest, SingleDeleteNoKeyEligibleForGC) {
 }
 
 TEST_P(CompactionIteratorTsGcTest, SingleDeleteDropTombstones) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr char user_key[] = "a";
   const std::vector<std::string> input_keys = {
       test::KeyStr(/*ts=*/103, user_key, /*seq=*/4, kTypeSingleDeletion),
@@ -1312,6 +1360,7 @@ TEST_P(CompactionIteratorTsGcTest, SingleDeleteDropTombstones) {
 }
 
 TEST_P(CompactionIteratorTsGcTest, SingleDeleteAllKeysOlderThanThreshold) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr char user_key[][2] = {{'a', '\0'}, {'b', '\0'}};
   const std::vector<std::string> input_keys = {
       test::KeyStr(/*ts=*/103, user_key[0], /*seq=*/4, kTypeSingleDeletion),
@@ -1355,6 +1404,7 @@ INSTANTIATE_TEST_CASE_P(CompactionIteratorTsGcTestInstance,
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

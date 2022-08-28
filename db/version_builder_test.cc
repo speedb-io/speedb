@@ -38,6 +38,7 @@ class VersionBuilderTest : public testing::Test {
         vstorage_(&icmp_, ucmp_, options_.num_levels, kCompactionStyleLevel,
                   nullptr, false),
         file_num_(1) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     mutable_cf_options_.RefreshDerivedOptions(ioptions_);
     size_being_compacted_.resize(options_.num_levels);
   }
@@ -54,6 +55,7 @@ class VersionBuilderTest : public testing::Test {
 
   InternalKey GetInternalKey(const char* ukey,
                              SequenceNumber smallest_seq = 100) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return InternalKey(ukey, smallest_seq, kTypeValue);
   }
 
@@ -64,6 +66,7 @@ class VersionBuilderTest : public testing::Test {
            bool sampled = false, SequenceNumber smallest_seqno = 0,
            SequenceNumber largest_seqno = 0,
            uint64_t oldest_blob_file_number = kInvalidBlobFileNumber) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(level < vstorage_.num_levels());
     FileMetaData* f = new FileMetaData(
         file_number, path_id, file_size, GetInternalKey(smallest, smallest_seq),
@@ -88,6 +91,7 @@ class VersionBuilderTest : public testing::Test {
                std::string checksum_value,
                BlobFileMetaData::LinkedSsts linked_ssts,
                uint64_t garbage_blob_count, uint64_t garbage_blob_bytes) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     auto shared_meta = SharedBlobFileMetaData::Create(
         blob_file_number, total_blob_count, total_blob_bytes,
         std::move(checksum_method), std::move(checksum_value));
@@ -99,6 +103,7 @@ class VersionBuilderTest : public testing::Test {
   }
 
   void AddDummyFile(uint64_t table_file_number, uint64_t blob_file_number) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     constexpr int level = 0;
     constexpr char smallest[] = "bar";
     constexpr char largest[] = "foo";
@@ -117,6 +122,7 @@ class VersionBuilderTest : public testing::Test {
 
   void AddDummyFileToEdit(VersionEdit* edit, uint64_t table_file_number,
                           uint64_t blob_file_number) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(edit);
 
     constexpr int level = 0;
@@ -138,6 +144,7 @@ class VersionBuilderTest : public testing::Test {
   }
 
   void UpdateVersionStorageInfo(VersionStorageInfo* vstorage) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(vstorage);
 
     vstorage->PrepareForVersionAppend(ioptions_, mutable_cf_options_);
@@ -148,6 +155,7 @@ class VersionBuilderTest : public testing::Test {
 };
 
 void UnrefFilesInVersion(VersionStorageInfo* new_vstorage) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (int i = 0; i < new_vstorage->num_levels(); i++) {
     for (auto* f : new_vstorage->LevelFiles(i)) {
       if (--f->refs == 0) {
@@ -158,6 +166,7 @@ void UnrefFilesInVersion(VersionStorageInfo* new_vstorage) {
 }
 
 TEST_F(VersionBuilderTest, ApplyAndSaveTo) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Add(0, 1U, "150", "200", 100U);
 
   Add(1, 66U, "150", "200", 100U);
@@ -204,6 +213,7 @@ TEST_F(VersionBuilderTest, ApplyAndSaveTo) {
 }
 
 TEST_F(VersionBuilderTest, ApplyAndSaveToDynamic) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ioptions_.level_compaction_dynamic_level_bytes = true;
 
   Add(0, 1U, "150", "200", 100U, 0, 200U, 200U, 0, 0, false, 200U, 200U);
@@ -251,6 +261,7 @@ TEST_F(VersionBuilderTest, ApplyAndSaveToDynamic) {
 }
 
 TEST_F(VersionBuilderTest, ApplyAndSaveToDynamic2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ioptions_.level_compaction_dynamic_level_bytes = true;
 
   Add(0, 1U, "150", "200", 100U, 0, 200U, 200U, 0, 0, false, 200U, 200U);
@@ -300,6 +311,7 @@ TEST_F(VersionBuilderTest, ApplyAndSaveToDynamic2) {
 }
 
 TEST_F(VersionBuilderTest, ApplyMultipleAndSaveTo) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   UpdateVersionStorageInfo();
 
   VersionEdit version_edit;
@@ -354,6 +366,7 @@ TEST_F(VersionBuilderTest, ApplyMultipleAndSaveTo) {
 }
 
 TEST_F(VersionBuilderTest, ApplyDeleteAndSaveTo) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   UpdateVersionStorageInfo();
 
   EnvOptions env_options;
@@ -426,6 +439,7 @@ TEST_F(VersionBuilderTest, ApplyDeleteAndSaveTo) {
 }
 
 TEST_F(VersionBuilderTest, ApplyFileDeletionIncorrectLevel) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr int level = 1;
   constexpr uint64_t file_number = 2345;
   constexpr char smallest[] = "bar";
@@ -457,6 +471,7 @@ TEST_F(VersionBuilderTest, ApplyFileDeletionIncorrectLevel) {
 }
 
 TEST_F(VersionBuilderTest, ApplyFileDeletionNotInLSMTree) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   UpdateVersionStorageInfo();
 
   EnvOptions env_options;
@@ -481,6 +496,7 @@ TEST_F(VersionBuilderTest, ApplyFileDeletionNotInLSMTree) {
 }
 
 TEST_F(VersionBuilderTest, ApplyFileDeletionAndAddition) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr int level = 1;
   constexpr uint64_t file_number = 2345;
   constexpr char smallest[] = "bar";
@@ -544,6 +560,7 @@ TEST_F(VersionBuilderTest, ApplyFileDeletionAndAddition) {
 }
 
 TEST_F(VersionBuilderTest, ApplyFileAdditionAlreadyInBase) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr int level = 1;
   constexpr uint64_t file_number = 2345;
   constexpr char smallest[] = "bar";
@@ -585,6 +602,7 @@ TEST_F(VersionBuilderTest, ApplyFileAdditionAlreadyInBase) {
 }
 
 TEST_F(VersionBuilderTest, ApplyFileAdditionAlreadyApplied) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   UpdateVersionStorageInfo();
 
   EnvOptions env_options;
@@ -636,6 +654,7 @@ TEST_F(VersionBuilderTest, ApplyFileAdditionAlreadyApplied) {
 }
 
 TEST_F(VersionBuilderTest, ApplyFileAdditionAndDeletion) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   UpdateVersionStorageInfo();
 
   constexpr int level = 1;
@@ -688,6 +707,7 @@ TEST_F(VersionBuilderTest, ApplyFileAdditionAndDeletion) {
 }
 
 TEST_F(VersionBuilderTest, ApplyBlobFileAddition) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   UpdateVersionStorageInfo();
 
   EnvOptions env_options;
@@ -745,6 +765,7 @@ TEST_F(VersionBuilderTest, ApplyBlobFileAddition) {
 }
 
 TEST_F(VersionBuilderTest, ApplyBlobFileAdditionAlreadyInBase) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Attempt to add a blob file that is already present in the base version.
 
   constexpr uint64_t blob_file_number = 1234;
@@ -781,6 +802,7 @@ TEST_F(VersionBuilderTest, ApplyBlobFileAdditionAlreadyInBase) {
 }
 
 TEST_F(VersionBuilderTest, ApplyBlobFileAdditionAlreadyApplied) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Attempt to add the same blob file twice using version edits.
 
   UpdateVersionStorageInfo();
@@ -813,6 +835,7 @@ TEST_F(VersionBuilderTest, ApplyBlobFileAdditionAlreadyApplied) {
 }
 
 TEST_F(VersionBuilderTest, ApplyBlobFileGarbageFileInBase) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Increase the amount of garbage for a blob file present in the base version.
 
   constexpr uint64_t table_file_number = 1;
@@ -887,6 +910,7 @@ TEST_F(VersionBuilderTest, ApplyBlobFileGarbageFileInBase) {
 }
 
 TEST_F(VersionBuilderTest, ApplyBlobFileGarbageFileAdditionApplied) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Increase the amount of garbage for a blob file added using a version edit.
 
   UpdateVersionStorageInfo();
@@ -956,6 +980,7 @@ TEST_F(VersionBuilderTest, ApplyBlobFileGarbageFileAdditionApplied) {
 }
 
 TEST_F(VersionBuilderTest, ApplyBlobFileGarbageFileNotFound) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Attempt to increase the amount of garbage for a blob file that is
   // neither in the base version, nor was it added using a version edit.
 
@@ -983,6 +1008,7 @@ TEST_F(VersionBuilderTest, ApplyBlobFileGarbageFileNotFound) {
 }
 
 TEST_F(VersionBuilderTest, BlobFileGarbageOverflow) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Test that VersionEdits that would result in the count/total size of garbage
   // exceeding the count/total size of all blobs are rejected.
 
@@ -1048,6 +1074,7 @@ TEST_F(VersionBuilderTest, BlobFileGarbageOverflow) {
 }
 
 TEST_F(VersionBuilderTest, SaveBlobFilesTo) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Add three blob files to base version.
   for (uint64_t i = 1; i <= 3; ++i) {
     const uint64_t table_file_number = 2 * i;
@@ -1176,6 +1203,7 @@ TEST_F(VersionBuilderTest, SaveBlobFilesTo) {
 }
 
 TEST_F(VersionBuilderTest, SaveBlobFilesToConcurrentJobs) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // When multiple background jobs (flushes/compactions) are executing in
   // parallel, it is possible for the VersionEdit adding blob file K to be
   // applied *after* the VersionEdit adding blob file N (for N > K). This test
@@ -1277,6 +1305,7 @@ TEST_F(VersionBuilderTest, SaveBlobFilesToConcurrentJobs) {
 }
 
 TEST_F(VersionBuilderTest, CheckConsistencyForBlobFiles) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Initialize base version. The first table file points to a valid blob file
   // in this version; the second one does not refer to any blob files.
 
@@ -1352,6 +1381,7 @@ TEST_F(VersionBuilderTest, CheckConsistencyForBlobFiles) {
 }
 
 TEST_F(VersionBuilderTest, CheckConsistencyForBlobFilesInconsistentLinks) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Initialize base version. Links between the table file and the blob file
   // are inconsistent.
 
@@ -1393,6 +1423,7 @@ TEST_F(VersionBuilderTest, CheckConsistencyForBlobFilesInconsistentLinks) {
 }
 
 TEST_F(VersionBuilderTest, CheckConsistencyForBlobFilesAllGarbage) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Initialize base version. The table file points to a blob file that is
   // all garbage.
 
@@ -1433,6 +1464,7 @@ TEST_F(VersionBuilderTest, CheckConsistencyForBlobFilesAllGarbage) {
 }
 
 TEST_F(VersionBuilderTest, CheckConsistencyForBlobFilesAllGarbageLinkedSsts) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Initialize base version, with a table file pointing to a blob file
   // that has no garbage at this point.
 
@@ -1482,6 +1514,7 @@ TEST_F(VersionBuilderTest, CheckConsistencyForBlobFilesAllGarbageLinkedSsts) {
 }
 
 TEST_F(VersionBuilderTest, MaintainLinkedSstsForBlobFiles) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Initialize base version. Table files 1..10 are linked to blob files 1..5,
   // while table files 11..20 are not linked to any blob files.
 
@@ -1661,6 +1694,7 @@ TEST_F(VersionBuilderTest, MaintainLinkedSstsForBlobFiles) {
 }
 
 TEST_F(VersionBuilderTest, CheckConsistencyForFileDeletedTwice) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Add(0, 1U, "150", "200", 100U);
 
   UpdateVersionStorageInfo();
@@ -1694,6 +1728,7 @@ TEST_F(VersionBuilderTest, CheckConsistencyForFileDeletedTwice) {
 }
 
 TEST_F(VersionBuilderTest, EstimatedActiveKeys) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const uint32_t kTotalSamples = 20;
   const uint32_t kNumLevels = 5;
   const uint32_t kFilesPerLevel = 8;
@@ -1718,6 +1753,7 @@ TEST_F(VersionBuilderTest, EstimatedActiveKeys) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

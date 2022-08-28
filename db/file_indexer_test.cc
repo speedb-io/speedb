@@ -53,6 +53,7 @@ class FileIndexerTest : public testing::Test {
   }
 
   void AddFile(int level, int64_t smallest, int64_t largest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     auto* f = new FileMetaData();
     f->smallest = IntKey(smallest);
     f->largest = IntKey(largest);
@@ -60,10 +61,12 @@ class FileIndexerTest : public testing::Test {
   }
 
   InternalKey IntKey(int64_t v) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return InternalKey(Slice(reinterpret_cast<char*>(&v), 8), 0, kTypeValue);
   }
 
   void ClearFiles() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     for (uint32_t i = 0; i < kNumLevels; ++i) {
       for (auto* f : files[i]) {
         delete f;
@@ -75,6 +78,7 @@ class FileIndexerTest : public testing::Test {
   void GetNextLevelIndex(const uint32_t level, const uint32_t file_index,
       const int cmp_smallest, const int cmp_largest, int32_t* left_index,
       int32_t* right_index) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     *left_index = 100;
     *right_index = 100;
     indexer->GetNextLevelIndex(level, file_index, cmp_smallest, cmp_largest,
@@ -92,6 +96,7 @@ class FileIndexerTest : public testing::Test {
 
 // Case 0: Empty
 TEST_F(FileIndexerTest, Empty) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Arena arena;
   indexer = new FileIndexer(&ucmp);
   indexer->UpdateIndex(&arena, 0, files);
@@ -100,6 +105,7 @@ TEST_F(FileIndexerTest, Empty) {
 
 // Case 1: no overlap, files are on the left of next level files
 TEST_F(FileIndexerTest, no_overlap_left) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Arena arena;
   indexer = new FileIndexer(&ucmp);
   // level 1
@@ -140,6 +146,7 @@ TEST_F(FileIndexerTest, no_overlap_left) {
 
 // Case 2: no overlap, files are on the right of next level files
 TEST_F(FileIndexerTest, no_overlap_right) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Arena arena;
   indexer = new FileIndexer(&ucmp);
   // level 1
@@ -182,6 +189,7 @@ TEST_F(FileIndexerTest, no_overlap_right) {
 
 // Case 3: empty L2
 TEST_F(FileIndexerTest, empty_L2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Arena arena;
   indexer = new FileIndexer(&ucmp);
   for (uint32_t i = 1; i < kNumLevels; ++i) {
@@ -222,6 +230,7 @@ TEST_F(FileIndexerTest, empty_L2) {
 
 // Case 4: mixed
 TEST_F(FileIndexerTest, mixed) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Arena arena;
   indexer = new FileIndexer(&ucmp);
   // level 1
@@ -344,6 +353,7 @@ TEST_F(FileIndexerTest, mixed) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

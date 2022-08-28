@@ -49,6 +49,7 @@ void MakeBuilder(
     const IntTblPropCollectorFactories* int_tbl_prop_collector_factories,
     std::unique_ptr<WritableFileWriter>* writable,
     std::unique_ptr<TableBuilder>* builder) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<FSWritableFile> wf(new test::StringSink);
   writable->reset(
       new WritableFileWriter(std::move(wf), "" /* don't care */, EnvOptions()));
@@ -246,6 +247,7 @@ namespace {
 void TestCustomizedTablePropertiesCollector(
     bool backward_mode, uint64_t magic_number, bool test_int_tbl_prop_collector,
     const Options& options, const InternalKeyComparator& internal_comparator) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // make sure the entries will be inserted with order.
   std::map<std::pair<std::string, ValueType>, std::string> kvs = {
       {{"About   ", kTypeValue}, "val5"},  // starts with 'A'
@@ -336,9 +338,11 @@ void TestCustomizedTablePropertiesCollector(
 }  // namespace
 
 TEST_P(TablePropertiesTest, CustomizedTablePropertiesCollector) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Test properties collectors with internal keys or regular keys
   // for block based table
   for (bool encode_as_internal : { true, false }) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Options options;
     BlockBasedTableOptions table_options;
     table_options.flush_block_policy_factory =
@@ -375,6 +379,7 @@ namespace {
 void TestInternalKeyPropertiesCollector(
     bool backward_mode, uint64_t magic_number, bool sanitized,
     std::shared_ptr<TableFactory> table_factory) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   InternalKey keys[] = {
       InternalKey("A       ", 0, ValueType::kTypeValue),
       InternalKey("B       ", 1, ValueType::kTypeValue),
@@ -477,6 +482,7 @@ void TestInternalKeyPropertiesCollector(
 }  // namespace
 
 TEST_P(TablePropertiesTest, InternalKeyPropertiesCollector) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   TestInternalKeyPropertiesCollector(
       backward_mode_, kBlockBasedTableMagicNumber, true /* sanitize */,
       std::make_shared<BlockBasedTableFactory>());
@@ -507,6 +513,7 @@ INSTANTIATE_TEST_CASE_P(CustomizedTablePropertiesCollector, TablePropertiesTest,
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

@@ -31,6 +31,7 @@ const ValueType kValueTypeForSeekForPrev = kTypeDeletion;
 const std::string kDisableUserTimestamp("");
 
 EntryType GetEntryType(ValueType value_type) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   switch (value_type) {
     case kTypeValue:
       return kEntryPut;
@@ -52,6 +53,7 @@ EntryType GetEntryType(ValueType value_type) {
 }
 
 void AppendInternalKey(std::string* result, const ParsedInternalKey& key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   result->append(key.user_key.data(), key.user_key.size());
   PutFixed64(result, PackSequenceAndType(key.sequence, key.type));
 }
@@ -59,6 +61,7 @@ void AppendInternalKey(std::string* result, const ParsedInternalKey& key) {
 void AppendInternalKeyWithDifferentTimestamp(std::string* result,
                                              const ParsedInternalKey& key,
                                              const Slice& ts) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(key.user_key.size() >= ts.size());
   result->append(key.user_key.data(), key.user_key.size() - ts.size());
   result->append(ts.data(), ts.size());
@@ -67,11 +70,13 @@ void AppendInternalKeyWithDifferentTimestamp(std::string* result,
 
 void AppendInternalKeyFooter(std::string* result, SequenceNumber s,
                              ValueType t) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   PutFixed64(result, PackSequenceAndType(s, t));
 }
 
 void AppendKeyWithMinTimestamp(std::string* result, const Slice& key,
                                size_t ts_sz) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(ts_sz > 0);
   const std::string kTsMin(ts_sz, static_cast<unsigned char>(0));
   result->append(key.data(), key.size());
@@ -80,6 +85,7 @@ void AppendKeyWithMinTimestamp(std::string* result, const Slice& key,
 
 void AppendKeyWithMaxTimestamp(std::string* result, const Slice& key,
                                size_t ts_sz) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(ts_sz > 0);
   const std::string kTsMax(ts_sz, static_cast<unsigned char>(0xff));
   result->append(key.data(), key.size());
@@ -178,6 +184,7 @@ void InternalKeyComparator::FindShortSuccessor(std::string* key) const {
 
 LookupKey::LookupKey(const Slice& _user_key, SequenceNumber s,
                      const Slice* ts) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   size_t usize = _user_key.size();
   size_t ts_sz = (nullptr == ts) ? 0 : ts->size();
   size_t needed = usize + ts_sz + 13;  // A conservative estimate
@@ -203,6 +210,7 @@ LookupKey::LookupKey(const Slice& _user_key, SequenceNumber s,
 }
 
 void IterKey::EnlargeBuffer(size_t key_size) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // If size is smaller than buffer size, continue using current buffer,
   // or the static allocated one, as default
   assert(key_size > buf_size_);

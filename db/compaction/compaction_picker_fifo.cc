@@ -22,6 +22,7 @@
 namespace ROCKSDB_NAMESPACE {
 namespace {
 uint64_t GetTotalFilesSize(const std::vector<FileMetaData*>& files) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t total_size = 0;
   for (const auto& f : files) {
     total_size += f->fd.file_size;
@@ -40,6 +41,7 @@ Compaction* FIFOCompactionPicker::PickTTLCompaction(
     const std::string& cf_name, const MutableCFOptions& mutable_cf_options,
     const MutableDBOptions& mutable_db_options, VersionStorageInfo* vstorage,
     LogBuffer* log_buffer) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(mutable_cf_options.ttl > 0);
 
   const int kLevel0 = 0;
@@ -124,6 +126,7 @@ Compaction* FIFOCompactionPicker::PickSizeCompaction(
     const std::string& cf_name, const MutableCFOptions& mutable_cf_options,
     const MutableDBOptions& mutable_db_options, VersionStorageInfo* vstorage,
     LogBuffer* log_buffer) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kLevel0 = 0;
   const std::vector<FileMetaData*>& level_files = vstorage->LevelFiles(kLevel0);
   uint64_t total_size = GetTotalFilesSize(level_files);
@@ -217,6 +220,7 @@ Compaction* FIFOCompactionPicker::PickCompactionToWarm(
     const std::string& cf_name, const MutableCFOptions& mutable_cf_options,
     const MutableDBOptions& mutable_db_options, VersionStorageInfo* vstorage,
     LogBuffer* log_buffer) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (mutable_cf_options.compaction_options_fifo.age_for_warm == 0) {
     return nullptr;
   }
@@ -323,6 +327,7 @@ Compaction* FIFOCompactionPicker::PickCompaction(
     const std::string& cf_name, const MutableCFOptions& mutable_cf_options,
     const MutableDBOptions& mutable_db_options, VersionStorageInfo* vstorage,
     LogBuffer* log_buffer, SequenceNumber /*earliest_memtable_seqno*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(vstorage->num_levels() == 1);
 
   Compaction* c = nullptr;
@@ -350,6 +355,7 @@ Compaction* FIFOCompactionPicker::CompactRange(
     const InternalKey* /*begin*/, const InternalKey* /*end*/,
     InternalKey** compaction_end, bool* /*manual_conflict*/,
     uint64_t /*max_file_num_to_ignore*/, const std::string& /*trim_ts*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifdef NDEBUG
   (void)input_level;
   (void)output_level;

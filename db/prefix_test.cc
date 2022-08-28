@@ -8,6 +8,7 @@
 #ifndef GFLAGS
 #include <cstdio>
 int main() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   fprintf(stderr, "Please install gflags to run this test... Skipping...\n");
   return 0;
 }
@@ -70,6 +71,7 @@ struct TestKey {
 
 // return a slice backed by test_key
 inline Slice TestKeyToSlice(std::string &s, const TestKey& test_key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   s.clear();
   PutFixed64(&s, test_key.prefix);
   PutFixed64(&s, test_key.sorted);
@@ -77,6 +79,7 @@ inline Slice TestKeyToSlice(std::string &s, const TestKey& test_key) {
 }
 
 inline const TestKey SliceToTestKey(const Slice& slice) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return TestKey(DecodeFixed64(slice.data()),
     DecodeFixed64(slice.data() + 8));
 }
@@ -136,6 +139,7 @@ class TestKeyComparator : public Comparator {
 namespace {
 void PutKey(DB* db, WriteOptions write_options, uint64_t prefix,
             uint64_t suffix, const Slice& value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   TestKey test_key(prefix, suffix);
   std::string s;
   Slice key = TestKeyToSlice(s, test_key);
@@ -144,6 +148,7 @@ void PutKey(DB* db, WriteOptions write_options, uint64_t prefix,
 
 void PutKey(DB* db, WriteOptions write_options, const TestKey& test_key,
             const Slice& value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string s;
   Slice key = TestKeyToSlice(s, test_key);
   ASSERT_OK(db->Put(write_options, key, value));
@@ -151,18 +156,21 @@ void PutKey(DB* db, WriteOptions write_options, const TestKey& test_key,
 
 void MergeKey(DB* db, WriteOptions write_options, const TestKey& test_key,
               const Slice& value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string s;
   Slice key = TestKeyToSlice(s, test_key);
   ASSERT_OK(db->Merge(write_options, key, value));
 }
 
 void DeleteKey(DB* db, WriteOptions write_options, const TestKey& test_key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string s;
   Slice key = TestKeyToSlice(s, test_key);
   ASSERT_OK(db->Delete(write_options, key));
 }
 
 void SeekIterator(Iterator* iter, uint64_t prefix, uint64_t suffix) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   TestKey test_key(prefix, suffix);
   std::string s;
   Slice key = TestKeyToSlice(s, test_key);
@@ -173,6 +181,7 @@ const std::string kNotFoundResult = "NOT_FOUND";
 
 std::string Get(DB* db, const ReadOptions& read_options, uint64_t prefix,
                 uint64_t suffix) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   TestKey test_key(prefix, suffix);
   std::string s2;
   Slice key = TestKeyToSlice(s2, test_key);
@@ -220,6 +229,7 @@ class SamePrefixTransform : public SliceTransform {
 class PrefixTest : public testing::Test {
  public:
   std::shared_ptr<DB> OpenDb() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     DB* db;
 
     options.create_if_missing = true;
@@ -245,10 +255,12 @@ class PrefixTest : public testing::Test {
   }
 
   void FirstOption() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     option_config_ = kBegin;
   }
 
   bool NextOptions(int bucket_count) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // skip some options
     option_config_++;
     if (option_config_ < kEnd) {
@@ -278,6 +290,7 @@ class PrefixTest : public testing::Test {
   }
 
   PrefixTest() : option_config_(kBegin) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     options.comparator = new TestKeyComparator();
   }
   ~PrefixTest() override { delete options.comparator; }
@@ -296,6 +309,7 @@ class PrefixTest : public testing::Test {
 };
 
 TEST(SamePrefixTest, InDomainTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   DB* db;
   Options options;
   options.create_if_missing = true;
@@ -346,6 +360,7 @@ TEST(SamePrefixTest, InDomainTest) {
 }
 
 TEST_F(PrefixTest, TestResult) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (int num_buckets = 1; num_buckets <= 2; num_buckets++) {
     FirstOption();
     while (NextOptions(num_buckets)) {
@@ -524,6 +539,7 @@ TEST_F(PrefixTest, TestResult) {
 
 // Show results in prefix
 TEST_F(PrefixTest, PrefixValid) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (int num_buckets = 1; num_buckets <= 2; num_buckets++) {
     FirstOption();
     while (NextOptions(num_buckets)) {
@@ -579,6 +595,7 @@ TEST_F(PrefixTest, PrefixValid) {
 }
 
 TEST_F(PrefixTest, DynamicPrefixIterator) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   while (NextOptions(FLAGS_bucket_count)) {
     std::cout << "*** Mem table: " << options.memtable_factory->Name()
         << std::endl;
@@ -681,6 +698,7 @@ TEST_F(PrefixTest, DynamicPrefixIterator) {
 }
 
 TEST_F(PrefixTest, PrefixSeekModePrev) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Only for SkipListFactory
   options.memtable_factory.reset(new SkipListFactory);
   options.merge_operator = MergeOperators::CreatePutOperator();
@@ -792,6 +810,7 @@ TEST_F(PrefixTest, PrefixSeekModePrev) {
 }
 
 TEST_F(PrefixTest, PrefixSeekModePrev2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Only for SkipListFactory
   // test the case
   //        iter1                iter2
@@ -832,6 +851,7 @@ TEST_F(PrefixTest, PrefixSeekModePrev2) {
 }
 
 TEST_F(PrefixTest, PrefixSeekModePrev3) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Only for SkipListFactory
   // test SeekToLast() with iterate_upper_bound_ in prefix_seek_mode
   options.memtable_factory.reset(new SkipListFactory);
@@ -890,6 +910,7 @@ TEST_F(PrefixTest, PrefixSeekModePrev3) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   ParseCommandLineFlags(&argc, &argv, true);
   return RUN_ALL_TESTS();
@@ -901,6 +922,7 @@ int main(int argc, char** argv) {
 #include <stdio.h>
 
 int main(int /*argc*/, char** /*argv*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   fprintf(stderr,
           "SKIPPED as HashSkipList and HashLinkList are not supported in "
           "ROCKSDB_LITE\n");

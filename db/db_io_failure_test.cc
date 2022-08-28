@@ -22,6 +22,7 @@ class DBIOFailureTest : public DBTestBase {
 #ifndef ROCKSDB_LITE
 // Check that number of files does not grow when writes are dropped
 TEST_F(DBIOFailureTest, DropWrites) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     Options options = CurrentOptions();
     options.env = env_;
@@ -72,6 +73,7 @@ TEST_F(DBIOFailureTest, DropWrites) {
 
 // Check background error counter bumped on flush failures.
 TEST_F(DBIOFailureTest, DropWritesFlush) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     Options options = CurrentOptions();
     options.env = env_;
@@ -100,6 +102,7 @@ TEST_F(DBIOFailureTest, DropWritesFlush) {
 // Check that CompactRange() returns failure if there is not enough space left
 // on device
 TEST_F(DBIOFailureTest, NoSpaceCompactRange) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     Options options = CurrentOptions();
     options.env = env_;
@@ -126,6 +129,7 @@ TEST_F(DBIOFailureTest, NoSpaceCompactRange) {
 #endif  // ROCKSDB_LITE
 
 TEST_F(DBIOFailureTest, NonWritableFileSystem) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     Options options = CurrentOptions();
     options.write_buffer_size = 4096;
@@ -149,6 +153,7 @@ TEST_F(DBIOFailureTest, NonWritableFileSystem) {
 
 #ifndef ROCKSDB_LITE
 TEST_F(DBIOFailureTest, ManifestWriteError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Test for the following problem:
   // (a) Compaction produces file F
   // (b) Log record containing F is written to MANIFEST file, but Sync() fails
@@ -221,6 +226,7 @@ TEST_F(DBIOFailureTest, ManifestWriteError) {
 }
 
 TEST_F(DBIOFailureTest, PutFailsParanoid) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Test the following:
   // (a) A random put fails in paranoid mode (simulate by sync fail)
   // (b) All other puts have to fail, even if writes would succeed
@@ -261,6 +267,7 @@ TEST_F(DBIOFailureTest, PutFailsParanoid) {
 }
 #if !(defined NDEBUG) || !defined(OS_WIN)
 TEST_F(DBIOFailureTest, FlushSstRangeSyncError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.env = env_;
   options.create_if_missing = true;
@@ -282,6 +289,7 @@ TEST_F(DBIOFailureTest, FlushSstRangeSyncError) {
   std::atomic<int> range_sync_called(0);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "SpecialEnv::SStableFile::RangeSync", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         if (range_sync_called.fetch_add(1) == 0) {
           Status* st = static_cast<Status*>(arg);
           *st = Status::IOError(io_error_msg);
@@ -322,6 +330,7 @@ TEST_F(DBIOFailureTest, FlushSstRangeSyncError) {
 }
 
 TEST_F(DBIOFailureTest, CompactSstRangeSyncError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.env = env_;
   options.create_if_missing = true;
@@ -364,6 +373,7 @@ TEST_F(DBIOFailureTest, CompactSstRangeSyncError) {
   std::atomic<int> range_sync_called(0);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "SpecialEnv::SStableFile::RangeSync", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         if (range_sync_called.fetch_add(1) == 0) {
           Status* st = static_cast<Status*>(arg);
           *st = Status::IOError(io_error_msg);
@@ -391,6 +401,7 @@ TEST_F(DBIOFailureTest, CompactSstRangeSyncError) {
 }
 
 TEST_F(DBIOFailureTest, FlushSstCloseError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.env = env_;
   options.create_if_missing = true;
@@ -406,6 +417,7 @@ TEST_F(DBIOFailureTest, FlushSstCloseError) {
   std::atomic<int> close_called(0);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "SpecialEnv::SStableFile::Close", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         if (close_called.fetch_add(1) == 0) {
           Status* st = static_cast<Status*>(arg);
           *st = Status::IOError(io_error_msg);
@@ -434,6 +446,7 @@ TEST_F(DBIOFailureTest, FlushSstCloseError) {
 }
 
 TEST_F(DBIOFailureTest, CompactionSstCloseError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.env = env_;
   options.create_if_missing = true;
@@ -460,6 +473,7 @@ TEST_F(DBIOFailureTest, CompactionSstCloseError) {
   std::atomic<int> close_called(0);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "SpecialEnv::SStableFile::Close", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         if (close_called.fetch_add(1) == 0) {
           Status* st = static_cast<Status*>(arg);
           *st = Status::IOError(io_error_msg);
@@ -486,6 +500,7 @@ TEST_F(DBIOFailureTest, CompactionSstCloseError) {
 }
 
 TEST_F(DBIOFailureTest, FlushSstSyncError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.env = env_;
   options.create_if_missing = true;
@@ -502,6 +517,7 @@ TEST_F(DBIOFailureTest, FlushSstSyncError) {
   std::atomic<int> sync_called(0);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "SpecialEnv::SStableFile::Sync", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         if (sync_called.fetch_add(1) == 0) {
           Status* st = static_cast<Status*>(arg);
           *st = Status::IOError(io_error_msg);
@@ -530,6 +546,7 @@ TEST_F(DBIOFailureTest, FlushSstSyncError) {
 }
 
 TEST_F(DBIOFailureTest, CompactionSstSyncError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.env = env_;
   options.create_if_missing = true;
@@ -557,6 +574,7 @@ TEST_F(DBIOFailureTest, CompactionSstSyncError) {
   std::atomic<int> sync_called(0);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "SpecialEnv::SStableFile::Sync", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         if (sync_called.fetch_add(1) == 0) {
           Status* st = static_cast<Status*>(arg);
           *st = Status::IOError(io_error_msg);
@@ -586,6 +604,7 @@ TEST_F(DBIOFailureTest, CompactionSstSyncError) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   RegisterCustomObjects(argc, argv);

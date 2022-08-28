@@ -28,6 +28,7 @@
 namespace ROCKSDB_NAMESPACE {
 Options SanitizeOptions(const std::string& dbname, const Options& src,
                         bool read_only) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto db_options = SanitizeOptions(dbname, DBOptions(src), read_only);
   ImmutableDBOptions immutable_db_options(db_options);
   auto cf_options =
@@ -37,6 +38,7 @@ Options SanitizeOptions(const std::string& dbname, const Options& src,
 
 DBOptions SanitizeOptions(const std::string& dbname, const DBOptions& src,
                           bool read_only) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   DBOptions result(src);
 
   if (result.env == nullptr) {
@@ -210,6 +212,7 @@ namespace {
 Status ValidateOptionsByTable(
     const DBOptions& db_opts,
     const std::vector<ColumnFamilyDescriptor>& column_families) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Status s;
   for (auto cf : column_families) {
     s = ValidateOptions(db_opts, cf.options);
@@ -224,6 +227,7 @@ Status ValidateOptionsByTable(
 Status DBImpl::ValidateOptions(
     const DBOptions& db_options,
     const std::vector<ColumnFamilyDescriptor>& column_families) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Status s;
   for (auto& cfd : column_families) {
     s = ColumnFamilyData::ValidateOptions(db_options, cfd.options);
@@ -236,6 +240,7 @@ Status DBImpl::ValidateOptions(
 }
 
 Status DBImpl::ValidateOptions(const DBOptions& db_options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (db_options.db_paths.size() > 4) {
     return Status::NotSupported(
         "More than four DB paths are not supported yet. ");
@@ -292,6 +297,7 @@ Status DBImpl::ValidateOptions(const DBOptions& db_options) {
 }
 
 Status DBImpl::NewDB(std::vector<std::string>* new_filenames) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   VersionEdit new_db;
   Status s = SetIdentityFile(env_, dbname_);
   if (!s.ok()) {
@@ -350,6 +356,7 @@ Status DBImpl::NewDB(std::vector<std::string>* new_filenames) {
 IOStatus DBImpl::CreateAndNewDirectory(
     FileSystem* fs, const std::string& dirname,
     std::unique_ptr<FSDirectory>* directory) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // We call CreateDirIfMissing() as the directory may already exist (if we
   // are reopening a DB), when this happens we don't want creating the
   // directory to cause an error. However, we need to check if creating the
@@ -367,6 +374,7 @@ IOStatus DBImpl::CreateAndNewDirectory(
 IOStatus Directories::SetDirectories(FileSystem* fs, const std::string& dbname,
                                      const std::string& wal_dir,
                                      const std::vector<DbPath>& data_paths) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   IOStatus io_s = DBImpl::CreateAndNewDirectory(fs, dbname, &db_dir_);
   if (!io_s.ok()) {
     return io_s;
@@ -400,6 +408,7 @@ Status DBImpl::Recover(
     const std::vector<ColumnFamilyDescriptor>& column_families, bool read_only,
     bool error_if_wal_file_exists, bool error_if_data_exists_in_wals,
     uint64_t* recovered_seq) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   mutex_.AssertHeld();
 
   bool is_new_db = false;
@@ -699,6 +708,7 @@ Status DBImpl::Recover(
 }
 
 Status DBImpl::PersistentStatsProcessFormatVersion() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   mutex_.AssertHeld();
   Status s;
   // persist version when stats CF doesn't exist
@@ -779,6 +789,7 @@ Status DBImpl::PersistentStatsProcessFormatVersion() {
 }
 
 Status DBImpl::InitPersistStatsColumnFamily() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   mutex_.AssertHeld();
   assert(!persist_stats_cf_handle_);
   ColumnFamilyData* persistent_stats_cfd =
@@ -809,6 +820,7 @@ Status DBImpl::InitPersistStatsColumnFamily() {
 Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& wal_numbers,
                                SequenceNumber* next_sequence, bool read_only,
                                bool* corrupted_wal_found) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   struct LogReporter : public log::Reader::Reporter {
     Env* env;
     Logger* info_log;
@@ -1316,6 +1328,7 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& wal_numbers,
 
 Status DBImpl::GetLogSizeAndMaybeTruncate(uint64_t wal_number, bool truncate,
                                           LogFileNumberSize* log_ptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   LogFileNumberSize log(wal_number);
   std::string fname =
       LogFileName(immutable_db_options_.GetWalDir(), wal_number);
@@ -1350,6 +1363,7 @@ Status DBImpl::GetLogSizeAndMaybeTruncate(uint64_t wal_number, bool truncate,
 }
 
 Status DBImpl::RestoreAliveLogFiles(const std::vector<uint64_t>& wal_numbers) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (wal_numbers.empty()) {
     return Status::OK();
   }
@@ -1392,6 +1406,7 @@ Status DBImpl::RestoreAliveLogFiles(const std::vector<uint64_t>& wal_numbers) {
 
 Status DBImpl::WriteLevel0TableForRecovery(int job_id, ColumnFamilyData* cfd,
                                            MemTable* mem, VersionEdit* edit) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   mutex_.AssertHeld();
   assert(cfd);
   assert(cfd->imm());
@@ -1530,6 +1545,7 @@ Status DBImpl::WriteLevel0TableForRecovery(int job_id, ColumnFamilyData* cfd,
 }
 
 Status DB::Open(const Options& options, const std::string& dbname, DB** dbptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   DBOptions db_options(options);
   ColumnFamilyOptions cf_options(options);
   std::vector<ColumnFamilyDescriptor> column_families;
@@ -1560,6 +1576,7 @@ Status DB::Open(const Options& options, const std::string& dbname, DB** dbptr) {
 Status DB::Open(const DBOptions& db_options, const std::string& dbname,
                 const std::vector<ColumnFamilyDescriptor>& column_families,
                 std::vector<ColumnFamilyHandle*>* handles, DB** dbptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const bool kSeqPerBatch = true;
   const bool kBatchPerTxn = true;
   return DBImpl::Open(db_options, dbname, column_families, handles, dbptr,
@@ -1575,6 +1592,7 @@ Status DB::OpenAndTrimHistory(
     const std::vector<ColumnFamilyDescriptor>& column_families,
     std::vector<ColumnFamilyHandle*>* handles, DB** dbptr,
     std::string trim_ts) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(dbptr != nullptr);
   assert(handles != nullptr);
   auto validate_options = [&db_options] {
@@ -1635,6 +1653,7 @@ Status DB::OpenAndTrimHistory(
 IOStatus DBImpl::CreateWAL(uint64_t log_file_num, uint64_t recycle_log_number,
                            size_t preallocate_block_size,
                            log::Writer** new_log) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   IOStatus io_s;
   std::unique_ptr<FSWritableFile> lfile;
 
@@ -1682,6 +1701,7 @@ Status DBImpl::Open(const DBOptions& db_options, const std::string& dbname,
                     const std::vector<ColumnFamilyDescriptor>& column_families,
                     std::vector<ColumnFamilyHandle*>* handles, DB** dbptr,
                     const bool seq_per_batch, const bool batch_per_txn) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Status s = ValidateOptionsByTable(db_options, column_families);
   if (!s.ok()) {
     return s;

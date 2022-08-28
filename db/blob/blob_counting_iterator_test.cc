@@ -20,6 +20,7 @@ namespace ROCKSDB_NAMESPACE {
 
 void CheckInFlow(const BlobGarbageMeter& blob_garbage_meter,
                  uint64_t blob_file_number, uint64_t count, uint64_t bytes) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const auto& flows = blob_garbage_meter.flows();
 
   const auto it = flows.find(blob_file_number);
@@ -36,6 +37,7 @@ void CheckInFlow(const BlobGarbageMeter& blob_garbage_meter,
 }
 
 TEST(BlobCountingIteratorTest, CountBlobs) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Note: the input consists of three key-values: two are blob references to
   // different blob files, while the third one is a plain value.
   constexpr char user_key0[] = "key0";
@@ -302,6 +304,7 @@ TEST(BlobCountingIteratorTest, CountBlobs) {
 }
 
 TEST(BlobCountingIteratorTest, CorruptBlobIndex) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const std::vector<std::string> keys{
       test::KeyStr("user_key", 1, kTypeBlobIndex)};
   const std::vector<std::string> values{"i_am_not_a_blob_index"};
@@ -321,6 +324,7 @@ TEST(BlobCountingIteratorTest, CorruptBlobIndex) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

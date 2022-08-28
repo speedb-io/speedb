@@ -33,6 +33,7 @@ class DBWriteTest : public DBTestBase, public testing::WithParamInterface<int> {
 
 // It is invalid to do sync write while disabling WAL.
 TEST_P(DBWriteTest, SyncAndDisableWAL) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   WriteOptions write_options;
   write_options.sync = true;
   write_options.disableWAL = true;
@@ -43,6 +44,7 @@ TEST_P(DBWriteTest, SyncAndDisableWAL) {
 }
 
 TEST_P(DBWriteTest, WriteStallRemoveNoSlowdownWrite) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = GetOptions();
   options.level0_stop_writes_trigger = options.level0_slowdown_writes_trigger =
       4;
@@ -71,6 +73,7 @@ TEST_P(DBWriteTest, WriteStallRemoveNoSlowdownWrite) {
     ASSERT_TRUE(s.ok() || s.IsIncomplete());
   };
   std::function<void(void*)> unblock_main_thread_func = [&](void*) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     mutex.Lock();
     ++writers;
     cv.SignalAll();
@@ -163,6 +166,7 @@ TEST_P(DBWriteTest, WriteStallRemoveNoSlowdownWrite) {
 }
 
 TEST_P(DBWriteTest, WriteThreadHangOnWriteStall) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = GetOptions();
   options.level0_stop_writes_trigger = options.level0_slowdown_writes_trigger = 4;
   std::vector<port::Thread> threads;
@@ -190,6 +194,7 @@ TEST_P(DBWriteTest, WriteThreadHangOnWriteStall) {
     ASSERT_TRUE(s.ok() || s.IsIncomplete());
   };
   std::function<void(void *)> unblock_main_thread_func = [&](void *) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     mutex.Lock();
     ++writers;
     cv.SignalAll();
@@ -260,6 +265,7 @@ TEST_P(DBWriteTest, WriteThreadHangOnWriteStall) {
 }
 
 TEST_P(DBWriteTest, IOErrorOnWALWritePropagateToWriteThreadFollower) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr int kNumThreads = 5;
   std::unique_ptr<FaultInjectionTestEnv> mock_env(
       new FaultInjectionTestEnv(env_));
@@ -275,6 +281,7 @@ TEST_P(DBWriteTest, IOErrorOnWALWritePropagateToWriteThreadFollower) {
   // all threads join the same batch group.
   SyncPoint::GetInstance()->SetCallBack(
       "WriteThread::JoinBatchGroup:Wait", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         ready_count++;
         auto* w = reinterpret_cast<WriteThread::Writer*>(arg);
         if (w->state == WriteThread::STATE_GROUP_LEADER) {
@@ -319,6 +326,7 @@ TEST_P(DBWriteTest, IOErrorOnWALWritePropagateToWriteThreadFollower) {
 }
 
 TEST_P(DBWriteTest, ManualWalFlushInEffect) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = GetOptions();
   Reopen(options);
   // try the 1st WAL created during open
@@ -335,6 +343,7 @@ TEST_P(DBWriteTest, ManualWalFlushInEffect) {
 }
 
 TEST_P(DBWriteTest, IOErrorOnWALWriteTriggersReadOnlyMode) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<FaultInjectionTestEnv> mock_env(
       new FaultInjectionTestEnv(env_));
   Options options = GetOptions();
@@ -368,6 +377,7 @@ TEST_P(DBWriteTest, IOErrorOnWALWriteTriggersReadOnlyMode) {
 }
 
 TEST_P(DBWriteTest, IOErrorOnSwitchMemtable) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Random rnd(301);
   std::unique_ptr<FaultInjectionTestEnv> mock_env(
       new FaultInjectionTestEnv(env_));
@@ -395,6 +405,7 @@ TEST_P(DBWriteTest, IOErrorOnSwitchMemtable) {
 
 // Test that db->LockWAL() flushes the WAL after locking.
 TEST_P(DBWriteTest, LockWalInEffect) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = GetOptions();
   Reopen(options);
   // try the 1st WAL created during open
@@ -413,6 +424,7 @@ TEST_P(DBWriteTest, LockWalInEffect) {
 }
 
 TEST_P(DBWriteTest, ConcurrentlyDisabledWAL) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Options options = GetOptions();
     options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
     options.statistics->set_stats_level(StatsLevel::kAll);
@@ -459,6 +471,7 @@ INSTANTIATE_TEST_CASE_P(DBWriteTestInstance, DBWriteTest,
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   RegisterCustomObjects(argc, argv);

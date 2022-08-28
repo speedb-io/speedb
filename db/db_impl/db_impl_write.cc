@@ -21,6 +21,7 @@ namespace ROCKSDB_NAMESPACE {
 // Convenience methods
 Status DBImpl::Put(const WriteOptions& o, ColumnFamilyHandle* column_family,
                    const Slice& key, const Slice& val) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const Status s = FailIfCfHasTs(column_family);
   if (!s.ok()) {
     return s;
@@ -30,6 +31,7 @@ Status DBImpl::Put(const WriteOptions& o, ColumnFamilyHandle* column_family,
 
 Status DBImpl::Put(const WriteOptions& o, ColumnFamilyHandle* column_family,
                    const Slice& key, const Slice& ts, const Slice& val) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const Status s = FailIfTsSizesMismatch(column_family, ts);
   if (!s.ok()) {
     return s;
@@ -39,6 +41,7 @@ Status DBImpl::Put(const WriteOptions& o, ColumnFamilyHandle* column_family,
 
 Status DBImpl::Merge(const WriteOptions& o, ColumnFamilyHandle* column_family,
                      const Slice& key, const Slice& val) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const Status s = FailIfCfHasTs(column_family);
   if (!s.ok()) {
     return s;
@@ -53,6 +56,7 @@ Status DBImpl::Merge(const WriteOptions& o, ColumnFamilyHandle* column_family,
 
 Status DBImpl::Delete(const WriteOptions& write_options,
                       ColumnFamilyHandle* column_family, const Slice& key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const Status s = FailIfCfHasTs(column_family);
   if (!s.ok()) {
     return s;
@@ -63,6 +67,7 @@ Status DBImpl::Delete(const WriteOptions& write_options,
 Status DBImpl::Delete(const WriteOptions& write_options,
                       ColumnFamilyHandle* column_family, const Slice& key,
                       const Slice& ts) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const Status s = FailIfTsSizesMismatch(column_family, ts);
   if (!s.ok()) {
     return s;
@@ -73,6 +78,7 @@ Status DBImpl::Delete(const WriteOptions& write_options,
 Status DBImpl::SingleDelete(const WriteOptions& write_options,
                             ColumnFamilyHandle* column_family,
                             const Slice& key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const Status s = FailIfCfHasTs(column_family);
   if (!s.ok()) {
     return s;
@@ -83,6 +89,7 @@ Status DBImpl::SingleDelete(const WriteOptions& write_options,
 Status DBImpl::SingleDelete(const WriteOptions& write_options,
                             ColumnFamilyHandle* column_family, const Slice& key,
                             const Slice& ts) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const Status s = FailIfTsSizesMismatch(column_family, ts);
   if (!s.ok()) {
     return s;
@@ -93,6 +100,7 @@ Status DBImpl::SingleDelete(const WriteOptions& write_options,
 Status DBImpl::DeleteRange(const WriteOptions& write_options,
                            ColumnFamilyHandle* column_family,
                            const Slice& begin_key, const Slice& end_key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const Status s = FailIfCfHasTs(column_family);
   if (!s.ok()) {
     return s;
@@ -102,10 +110,12 @@ Status DBImpl::DeleteRange(const WriteOptions& write_options,
 
 void DBImpl::SetRecoverableStatePreReleaseCallback(
     PreReleaseCallback* callback) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   recoverable_state_pre_release_callback_.reset(callback);
 }
 
 Status DBImpl::Write(const WriteOptions& write_options, WriteBatch* my_batch) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return WriteImpl(write_options, my_batch, /*callback=*/nullptr,
                    /*log_used=*/nullptr);
 }
@@ -114,6 +124,7 @@ Status DBImpl::Write(const WriteOptions& write_options, WriteBatch* my_batch) {
 Status DBImpl::WriteWithCallback(const WriteOptions& write_options,
                                  WriteBatch* my_batch,
                                  WriteCallback* callback) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return WriteImpl(write_options, my_batch, callback, nullptr);
 }
 #endif  // ROCKSDB_LITE
@@ -127,6 +138,7 @@ Status DBImpl::WriteImpl(const WriteOptions& write_options,
                          bool disable_memtable, uint64_t* seq_used,
                          size_t batch_cnt,
                          PreReleaseCallback* pre_release_callback) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(!seq_per_batch_ || batch_cnt != 0);
   if (my_batch == nullptr) {
     return Status::InvalidArgument("Batch is nullptr!");
@@ -563,6 +575,7 @@ Status DBImpl::PipelinedWriteImpl(const WriteOptions& write_options,
                                   WriteBatch* my_batch, WriteCallback* callback,
                                   uint64_t* log_used, uint64_t log_ref,
                                   bool disable_memtable, uint64_t* seq_used) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   PERF_TIMER_GUARD(write_pre_and_post_process_time);
   StopWatch write_sw(immutable_db_options_.clock, stats_, DB_WRITE);
 
@@ -732,6 +745,7 @@ Status DBImpl::UnorderedWriteMemtable(const WriteOptions& write_options,
                                       WriteCallback* callback, uint64_t log_ref,
                                       SequenceNumber seq,
                                       const size_t sub_batch_cnt) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   PERF_TIMER_GUARD(write_pre_and_post_process_time);
   StopWatch write_sw(immutable_db_options_.clock, stats_, DB_WRITE);
 
@@ -784,6 +798,7 @@ Status DBImpl::WriteImplWALOnly(
     const uint64_t log_ref, uint64_t* seq_used, const size_t sub_batch_cnt,
     PreReleaseCallback* pre_release_callback, const AssignOrder assign_order,
     const PublishLastSeq publish_last_seq, const bool disable_memtable) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   PERF_TIMER_GUARD(write_pre_and_post_process_time);
   WriteThread::Writer w(write_options, my_batch, callback, log_ref,
                         disable_memtable, sub_batch_cnt, pre_release_callback);
@@ -974,6 +989,7 @@ Status DBImpl::WriteImplWALOnly(
 }
 
 void DBImpl::WriteStatusCheckOnLocked(const Status& status) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Is setting bg_error_ enough here?  This will at least stop
   // compaction and fail any further writes.
   // Caller must hold mutex_.
@@ -987,6 +1003,7 @@ void DBImpl::WriteStatusCheckOnLocked(const Status& status) {
 }
 
 void DBImpl::WriteStatusCheck(const Status& status) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Is setting bg_error_ enough here?  This will at least stop
   // compaction and fail any further writes.
   assert(!status.IsIOFenced() || !error_handler_.GetBGError().ok());
@@ -1000,6 +1017,7 @@ void DBImpl::WriteStatusCheck(const Status& status) {
 }
 
 void DBImpl::IOStatusCheck(const IOStatus& io_status) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Is setting bg_error_ enough here?  This will at least stop
   // compaction and fail any further writes.
   if ((immutable_db_options_.paranoid_checks && !io_status.ok() &&
@@ -1013,6 +1031,7 @@ void DBImpl::IOStatusCheck(const IOStatus& io_status) {
 }
 
 void DBImpl::MemTableInsertStatusCheck(const Status& status) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // A non-OK status here indicates that the state implied by the
   // WAL has diverged from the in-memory state.  This could be
   // because of a corrupt write_batch (very bad), or because the
@@ -1031,6 +1050,7 @@ void DBImpl::MemTableInsertStatusCheck(const Status& status) {
 Status DBImpl::PreprocessWrite(const WriteOptions& write_options,
                                bool* need_log_sync,
                                WriteContext* write_context) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   mutex_.AssertHeld();
   assert(write_context != nullptr && need_log_sync != nullptr);
   Status status;
@@ -1127,6 +1147,7 @@ Status DBImpl::PreprocessWrite(const WriteOptions& write_options,
 WriteBatch* DBImpl::MergeBatch(const WriteThread::WriteGroup& write_group,
                                WriteBatch* tmp_batch, size_t* write_with_wal,
                                WriteBatch** to_be_cached_state) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(write_with_wal != nullptr);
   assert(tmp_batch != nullptr);
   assert(*to_be_cached_state == nullptr);
@@ -1173,6 +1194,7 @@ IOStatus DBImpl::WriteToWAL(const WriteBatch& merged_batch,
                             uint64_t* log_size,
                             Env::IOPriority rate_limiter_priority,
                             bool with_db_mutex, bool with_log_mutex) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(log_size != nullptr);
 
   // Assert mutex explicitly.
@@ -1219,6 +1241,7 @@ IOStatus DBImpl::WriteToWAL(const WriteThread::WriteGroup& write_group,
                             log::Writer* log_writer, uint64_t* log_used,
                             bool need_log_sync, bool need_log_dir_sync,
                             SequenceNumber sequence) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   IOStatus io_s;
   assert(!two_write_queues_);
   assert(!write_group.leader->disable_wal);
@@ -1307,6 +1330,7 @@ IOStatus DBImpl::WriteToWAL(const WriteThread::WriteGroup& write_group,
 IOStatus DBImpl::ConcurrentWriteToWAL(
     const WriteThread::WriteGroup& write_group, uint64_t* log_used,
     SequenceNumber* last_sequence, size_t seq_inc) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   IOStatus io_s;
 
   assert(two_write_queues_ || immutable_db_options_.unordered_write);
@@ -1357,6 +1381,7 @@ IOStatus DBImpl::ConcurrentWriteToWAL(
 }
 
 Status DBImpl::WriteRecoverableState() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   mutex_.AssertHeld();
   if (!cached_recoverable_state_empty_) {
     bool dont_care_bool;
@@ -1430,6 +1455,7 @@ void DBImpl::AssignAtomicFlushSeq(const autovector<ColumnFamilyData*>& cfds) {
 }
 
 Status DBImpl::SwitchWAL(WriteContext* write_context) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   mutex_.AssertHeld();
   assert(write_context != nullptr);
   Status status;
@@ -1532,6 +1558,7 @@ Status DBImpl::SwitchWAL(WriteContext* write_context) {
 }
 
 Status DBImpl::HandleWriteBufferManagerFlush(WriteContext* write_context) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   mutex_.AssertHeld();
   assert(write_context != nullptr);
   Status status;
@@ -1628,6 +1655,7 @@ uint64_t DBImpl::GetMaxTotalWalSize() const {
 // REQUIRES: this thread is currently at the front of the writer queue
 Status DBImpl::DelayWrite(uint64_t num_bytes,
                           const WriteOptions& write_options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t time_delayed = 0;
   bool delayed = false;
   {
@@ -1709,6 +1737,7 @@ Status DBImpl::DelayWrite(uint64_t num_bytes,
 // REQUIRES: mutex_ is held
 // REQUIRES: this thread is currently at the front of the writer queue
 void DBImpl::WriteBufferManagerStallWrites() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   mutex_.AssertHeld();
   // First block future writer threads who want to add themselves to the queue
   // of WriteThread.
@@ -1731,6 +1760,7 @@ void DBImpl::WriteBufferManagerStallWrites() {
 
 Status DBImpl::ThrottleLowPriWritesIfNeeded(const WriteOptions& write_options,
                                             WriteBatch* my_batch) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(write_options.low_pri);
   // This is called outside the DB mutex. Although it is safe to make the call,
   // the consistency condition is not guaranteed to hold. It's OK to live with
@@ -1794,6 +1824,7 @@ void DBImpl::MaybeFlushStatsCF(autovector<ColumnFamilyData*>* cfds) {
 }
 
 Status DBImpl::TrimMemtableHistory(WriteContext* context) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   autovector<ColumnFamilyData*> cfds;
   ColumnFamilyData* tmp_cfd;
   while ((tmp_cfd = trim_history_scheduler_.TakeNextColumnFamily()) !=
@@ -1818,6 +1849,7 @@ Status DBImpl::TrimMemtableHistory(WriteContext* context) {
 }
 
 Status DBImpl::ScheduleFlushes(WriteContext* context) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   autovector<ColumnFamilyData*> cfds;
   if (immutable_db_options_.atomic_flush) {
     SelectColumnFamiliesForAtomicFlush(&cfds);
@@ -1875,6 +1907,7 @@ Status DBImpl::ScheduleFlushes(WriteContext* context) {
 #ifndef ROCKSDB_LITE
 void DBImpl::NotifyOnMemTableSealed(ColumnFamilyData* /*cfd*/,
                                     const MemTableInfo& mem_table_info) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (immutable_db_options_.listeners.size() == 0U) {
     return;
   }
@@ -1895,6 +1928,7 @@ void DBImpl::NotifyOnMemTableSealed(ColumnFamilyData* /*cfd*/,
 // REQUIRES: this thread is currently at the front of the 2nd writer queue if
 // two_write_queues_ is true (This is to simplify the reasoning.)
 Status DBImpl::SwitchMemtable(ColumnFamilyData* cfd, WriteContext* context) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   mutex_.AssertHeld();
   log::Writer* new_log = nullptr;
   MemTable* new_mem = nullptr;
@@ -2124,6 +2158,7 @@ size_t DBImpl::GetWalPreallocateBlockSize(uint64_t write_buffer_size) const {
 // can call if they wish
 Status DB::Put(const WriteOptions& opt, ColumnFamilyHandle* column_family,
                const Slice& key, const Slice& value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Pre-allocate size of write batch conservatively.
   // 8 bytes are taken by header, 4 bytes for count, 1 byte for type,
   // and we allocate 11 extra bytes for key length, as well as value length.
@@ -2137,6 +2172,7 @@ Status DB::Put(const WriteOptions& opt, ColumnFamilyHandle* column_family,
 
 Status DB::Put(const WriteOptions& opt, ColumnFamilyHandle* column_family,
                const Slice& key, const Slice& ts, const Slice& value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ColumnFamilyHandle* default_cf = DefaultColumnFamily();
   assert(default_cf);
   const Comparator* const default_cf_ucmp = default_cf->GetComparator();
@@ -2151,6 +2187,7 @@ Status DB::Put(const WriteOptions& opt, ColumnFamilyHandle* column_family,
 
 Status DB::Delete(const WriteOptions& opt, ColumnFamilyHandle* column_family,
                   const Slice& key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   WriteBatch batch;
   Status s = batch.Delete(column_family, key);
   if (!s.ok()) {
@@ -2161,6 +2198,7 @@ Status DB::Delete(const WriteOptions& opt, ColumnFamilyHandle* column_family,
 
 Status DB::Delete(const WriteOptions& opt, ColumnFamilyHandle* column_family,
                   const Slice& key, const Slice& ts) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ColumnFamilyHandle* default_cf = DefaultColumnFamily();
   assert(default_cf);
   const Comparator* const default_cf_ucmp = default_cf->GetComparator();
@@ -2175,6 +2213,7 @@ Status DB::Delete(const WriteOptions& opt, ColumnFamilyHandle* column_family,
 
 Status DB::SingleDelete(const WriteOptions& opt,
                         ColumnFamilyHandle* column_family, const Slice& key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   WriteBatch batch;
   Status s = batch.SingleDelete(column_family, key);
   if (!s.ok()) {
@@ -2186,6 +2225,7 @@ Status DB::SingleDelete(const WriteOptions& opt,
 Status DB::SingleDelete(const WriteOptions& opt,
                         ColumnFamilyHandle* column_family, const Slice& key,
                         const Slice& ts) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ColumnFamilyHandle* default_cf = DefaultColumnFamily();
   assert(default_cf);
   const Comparator* const default_cf_ucmp = default_cf->GetComparator();
@@ -2201,6 +2241,7 @@ Status DB::SingleDelete(const WriteOptions& opt,
 Status DB::DeleteRange(const WriteOptions& opt,
                        ColumnFamilyHandle* column_family,
                        const Slice& begin_key, const Slice& end_key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   WriteBatch batch;
   Status s = batch.DeleteRange(column_family, begin_key, end_key);
   if (!s.ok()) {
@@ -2211,6 +2252,7 @@ Status DB::DeleteRange(const WriteOptions& opt,
 
 Status DB::Merge(const WriteOptions& opt, ColumnFamilyHandle* column_family,
                  const Slice& key, const Slice& value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   WriteBatch batch;
   Status s = batch.Merge(column_family, key, value);
   if (!s.ok()) {

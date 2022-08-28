@@ -26,6 +26,7 @@ class DBTestDynamicLevel : public DBTestBase {
 };
 
 TEST_F(DBTestDynamicLevel, DynamicLevelMaxBytesBase) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!Snappy_Supported() || !LZ4_Supported()) {
     return;
   }
@@ -124,6 +125,7 @@ TEST_F(DBTestDynamicLevel, DynamicLevelMaxBytesBase) {
 
 // Test specific cases in dynamic max bytes
 TEST_F(DBTestDynamicLevel, DynamicLevelMaxBytesBase2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Random rnd(301);
   int kMaxKey = 1000000;
 
@@ -278,6 +280,7 @@ TEST_F(DBTestDynamicLevel, DynamicLevelMaxBytesBase2) {
 
 // Test specific cases in dynamic max bytes
 TEST_F(DBTestDynamicLevel, DynamicLevelMaxBytesCompactRange) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Random rnd(301);
   int kMaxKey = 1000000;
 
@@ -339,6 +342,7 @@ TEST_F(DBTestDynamicLevel, DynamicLevelMaxBytesCompactRange) {
   std::set<int> output_levels;
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "CompactionPicker::CompactRange:Return", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         Compaction* compaction = reinterpret_cast<Compaction*>(arg);
         output_levels.insert(compaction->output_level());
       });
@@ -358,6 +362,7 @@ TEST_F(DBTestDynamicLevel, DynamicLevelMaxBytesCompactRange) {
 }
 
 TEST_F(DBTestDynamicLevel, DynamicLevelMaxBytesBaseInc) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.create_if_missing = true;
   options.write_buffer_size = 2048;
@@ -406,6 +411,7 @@ TEST_F(DBTestDynamicLevel, DynamicLevelMaxBytesBaseInc) {
 }
 
 TEST_F(DBTestDynamicLevel, DISABLED_MigrateToDynamicLevelMaxBytesBase) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Random rnd(301);
   const int kMaxKey = 2000;
 
@@ -495,6 +501,7 @@ TEST_F(DBTestDynamicLevel, DISABLED_MigrateToDynamicLevelMaxBytesBase) {
 #endif  // !defined(ROCKSDB_LITE)
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #if !defined(ROCKSDB_LITE)
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);

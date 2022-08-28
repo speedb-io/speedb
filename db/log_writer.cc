@@ -29,6 +29,7 @@ Writer::Writer(std::unique_ptr<WritableFileWriter>&& dest, uint64_t log_number,
       manual_flush_(manual_flush),
       compression_type_(compression_type),
       compress_(nullptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (int i = 0; i <= kMaxRecordType; i++) {
     char t = static_cast<char>(i);
     type_crc_[i] = crc32c::Value(&t, 1);
@@ -36,6 +37,7 @@ Writer::Writer(std::unique_ptr<WritableFileWriter>&& dest, uint64_t log_number,
 }
 
 Writer::~Writer() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (dest_) {
     WriteBuffer().PermitUncheckedError();
   }
@@ -47,6 +49,7 @@ Writer::~Writer() {
 IOStatus Writer::WriteBuffer() { return dest_->Flush(); }
 
 IOStatus Writer::Close() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   IOStatus s;
   if (dest_) {
     s = dest_->Close();
@@ -57,6 +60,7 @@ IOStatus Writer::Close() {
 
 IOStatus Writer::AddRecord(const Slice& slice,
                            Env::IOPriority rate_limiter_priority) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const char* ptr = slice.data();
   size_t left = slice.size();
 
@@ -152,6 +156,7 @@ IOStatus Writer::AddRecord(const Slice& slice,
 }
 
 IOStatus Writer::AddCompressionTypeRecord() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Should be the first record
   assert(block_offset_ == 0);
 
@@ -192,6 +197,7 @@ bool Writer::TEST_BufferIsEmpty() { return dest_->TEST_BufferIsEmpty(); }
 
 IOStatus Writer::EmitPhysicalRecord(RecordType t, const char* ptr, size_t n,
                                     Env::IOPriority rate_limiter_priority) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(n <= 0xffff);  // Must fit in two bytes
 
   size_t header_size;

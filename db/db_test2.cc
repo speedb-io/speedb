@@ -37,6 +37,7 @@ class DBTest2 : public DBTestBase {
  protected:
 #ifndef ROCKSDB_LITE
   uint64_t GetSstSizeHelper(Temperature temperature) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::string prop;
     EXPECT_TRUE(
         dbfull()->GetProperty(DB::Properties::kLiveSstFilesSizeAtTemperature +
@@ -49,6 +50,7 @@ class DBTest2 : public DBTestBase {
 
 #ifndef ROCKSDB_LITE
 TEST_F(DBTest2, OpenForReadOnly) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   DB* db_ptr = nullptr;
   std::string dbname = test::PerThreadDBPath("db_readonly");
   Options options = CurrentOptions();
@@ -73,6 +75,7 @@ TEST_F(DBTest2, OpenForReadOnly) {
 }
 
 TEST_F(DBTest2, OpenForReadOnlyWithColumnFamilies) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   DB* db_ptr = nullptr;
   std::string dbname = test::PerThreadDBPath("db_readonly");
   Options options = CurrentOptions();
@@ -112,6 +115,7 @@ class TestReadOnlyWithCompressedCache
   TestReadOnlyWithCompressedCache()
       : DBTestBase("test_readonly_with_compressed_cache",
                    /*env_do_fsync=*/true) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     max_open_files_ = std::get<0>(GetParam());
     use_mmap_ = std::get<1>(GetParam());
   }
@@ -120,6 +124,7 @@ class TestReadOnlyWithCompressedCache
 };
 
 TEST_P(TestReadOnlyWithCompressedCache, ReadOnlyWithCompressedCache) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (use_mmap_ && !IsMemoryMappedAccessSupported()) {
     ROCKSDB_GTEST_SKIP("Test requires MMAP support");
     return;
@@ -174,6 +179,7 @@ class PartitionedIndexTestListener : public EventListener {
 };
 
 TEST_F(DBTest2, PartitionedIndexUserToInternalKey) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kValueSize = 10500;
   const int kNumEntriesPerFile = 1000;
   const int kNumFiles = 3;
@@ -219,6 +225,7 @@ class PrefixFullBloomWithReverseComparator
 
 TEST_P(PrefixFullBloomWithReverseComparator,
        PrefixFullBloomWithReverseComparator) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = last_options_;
   options.comparator = ReverseBytewiseComparator();
   options.prefix_extractor.reset(NewCappedPrefixTransform(3));
@@ -270,6 +277,7 @@ INSTANTIATE_TEST_CASE_P(PrefixFullBloomWithReverseComparator,
                         PrefixFullBloomWithReverseComparator, testing::Bool());
 
 TEST_F(DBTest2, IteratorPropertyVersionNumber) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(Put("", ""));
   Iterator* iter1 = db_->NewIterator(ReadOptions());
   ASSERT_OK(iter1->status());
@@ -315,6 +323,7 @@ TEST_F(DBTest2, IteratorPropertyVersionNumber) {
 }
 
 TEST_F(DBTest2, CacheIndexAndFilterWithDBRestart) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.create_if_missing = true;
   options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
@@ -334,6 +343,7 @@ TEST_F(DBTest2, CacheIndexAndFilterWithDBRestart) {
 }
 
 TEST_F(DBTest2, MaxSuccessiveMergesChangeWithDBRecovery) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.create_if_missing = true;
   options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
@@ -365,6 +375,7 @@ class DBTestSharedWriteBufferAcrossCFs
 };
 
 TEST_P(DBTestSharedWriteBufferAcrossCFs, SharedWriteBufferAcrossCFs) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.arena_block_size = 4096;
   auto flush_listener = std::make_shared<FlushCounterListener>();
@@ -382,6 +393,7 @@ TEST_P(DBTestSharedWriteBufferAcrossCFs, SharedWriteBufferAcrossCFs) {
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "Arena::AllocateNewBlock:0", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         std::pair<size_t*, size_t*>* pair =
             static_cast<std::pair<size_t*, size_t*>*>(arg);
         *std::get<0>(*pair) = *std::get<1>(*pair);
@@ -550,6 +562,7 @@ INSTANTIATE_TEST_CASE_P(DBTestSharedWriteBufferAcrossCFs,
                                           std::make_tuple(false, true)));
 
 TEST_F(DBTest2, SharedWriteBufferLimitAcrossDB) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string dbname2 = test::PerThreadDBPath("db_shared_wb_db2");
   Options options = CurrentOptions();
   options.arena_block_size = 4096;
@@ -567,6 +580,7 @@ TEST_F(DBTest2, SharedWriteBufferLimitAcrossDB) {
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "Arena::AllocateNewBlock:0", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         std::pair<size_t*, size_t*>* pair =
             static_cast<std::pair<size_t*, size_t*>*>(arg);
         *std::get<0>(*pair) = *std::get<1>(*pair);
@@ -661,6 +675,7 @@ TEST_F(DBTest2, SharedWriteBufferLimitAcrossDB) {
 }
 
 TEST_F(DBTest2, TestWriteBufferNoLimitWithCache) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.arena_block_size = 4096;
   std::shared_ptr<Cache> cache =
@@ -679,6 +694,7 @@ TEST_F(DBTest2, TestWriteBufferNoLimitWithCache) {
 namespace {
   void ValidateKeyExistence(DB* db, const std::vector<Slice>& keys_must_exist,
     const std::vector<Slice>& keys_must_not_exist) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // Ensure that expected keys exist
     std::vector<std::string> values;
     if (keys_must_exist.size() > 0) {
@@ -702,6 +718,7 @@ namespace {
 }  // namespace
 
 TEST_F(DBTest2, WalFilterTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   class TestWalFilter : public WalFilter {
   private:
     // Processing option that is requested to be applied at the given index
@@ -877,6 +894,7 @@ TEST_F(DBTest2, WalFilterTest) {
 }
 
 TEST_F(DBTest2, WalFilterTestWithChangeBatch) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   class ChangeBatchHandler : public WriteBatch::Handler {
   private:
     // Batch to insert keys in
@@ -1014,6 +1032,7 @@ TEST_F(DBTest2, WalFilterTestWithChangeBatch) {
 }
 
 TEST_F(DBTest2, WalFilterTestWithChangeBatchExtraKeys) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   class TestWalFilterWithChangeBatchAddExtraKeys : public WalFilter {
   public:
    WalProcessingOption LogRecord(const WriteBatch& batch, WriteBatch* new_batch,
@@ -1082,6 +1101,7 @@ TEST_F(DBTest2, WalFilterTestWithChangeBatchExtraKeys) {
 }
 
 TEST_F(DBTest2, WalFilterTestWithColumnFamilies) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   class TestWalFilterWithColumnFamilies : public WalFilter {
   private:
     // column_family_id -> log_number map (provided to WALFilter)
@@ -1149,10 +1169,12 @@ TEST_F(DBTest2, WalFilterTestWithColumnFamilies) {
    }
 
     const std::map<uint32_t, std::vector<std::string>>& GetColumnFamilyKeys() {
+PERF_MARKER(__PRETTY_FUNCTION__);
       return cf_wal_keys_;
     }
 
     const std::map<std::string, uint32_t> & GetColumnFamilyNameIdMap() {
+PERF_MARKER(__PRETTY_FUNCTION__);
       return cf_name_id_map_;
     }
   };
@@ -1258,6 +1280,7 @@ TEST_F(DBTest2, WalFilterTestWithColumnFamilies) {
 }
 
 TEST_F(DBTest2, PresetCompressionDict) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Verifies that compression ratio improves when dictionary is enabled, and
   // improves even further when the dictionary is trained by ZSTD.
   const size_t kBlockSizeBytes = 4 << 10;
@@ -1391,6 +1414,7 @@ TEST_F(DBTest2, PresetCompressionDict) {
 }
 
 TEST_F(DBTest2, PresetCompressionDictLocality) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!ZSTD_Supported()) {
     return;
   }
@@ -1428,6 +1452,7 @@ TEST_F(DBTest2, PresetCompressionDictLocality) {
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "BlockBasedTableBuilder::WriteCompressionDictBlock:RawDict",
       [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         compression_dicts.emplace_back(static_cast<Slice*>(arg)->ToString());
       });
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->EnableProcessing();
@@ -1474,6 +1499,7 @@ INSTANTIATE_TEST_CASE_P(
                        ::testing::Bool()));
 
 TEST_P(PresetCompressionDictTest, Flush) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Verifies that dictionary is generated and written during flush only when
   // `ColumnFamilyOptions::compression` enables dictionary. Also verifies the
   // size of the dictionary is within expectations according to the limit on
@@ -1538,6 +1564,7 @@ TEST_P(PresetCompressionDictTest, Flush) {
 }
 
 TEST_P(PresetCompressionDictTest, CompactNonBottommost) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Verifies that dictionary is generated and written during compaction to
   // non-bottommost level only when `ColumnFamilyOptions::compression` enables
   // dictionary. Also verifies the size of the dictionary is within expectations
@@ -1620,6 +1647,7 @@ TEST_P(PresetCompressionDictTest, CompactNonBottommost) {
 }
 
 TEST_P(PresetCompressionDictTest, CompactBottommost) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Verifies that dictionary is generated and written during compaction to
   // non-bottommost level only when either `ColumnFamilyOptions::compression` or
   // `ColumnFamilyOptions::bottommost_compression` enables dictionary. Also
@@ -1730,6 +1758,7 @@ class CompressionFailuresTest
           CompressionFailureType, CompressionType, uint32_t, uint32_t>> {
  public:
   CompressionFailuresTest() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::tie(compression_failure_type_, compression_type_,
              compression_max_dict_bytes_, compression_parallel_threads_) =
         GetParam();
@@ -1750,6 +1779,7 @@ INSTANTIATE_TEST_CASE_P(
                        ::testing::Values(0, 10), ::testing::Values(1, 4)));
 
 TEST_P(CompressionFailuresTest, CompressionFailures) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (compression_type_ == kNoCompression) {
     return;
   }
@@ -1864,6 +1894,7 @@ TEST_P(CompressionFailuresTest, CompressionFailures) {
 }
 
 TEST_F(DBTest2, CompressionOptions) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!Zlib_Supported() || !Snappy_Supported()) {
     return;
   }
@@ -1969,6 +2000,7 @@ class CompactionStallTestListener : public EventListener {
 };
 
 TEST_F(DBTest2, CompactionStall) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->LoadDependency(
       {{"DBImpl::BGWorkCompaction", "DBTest2::CompactionStall:0"},
        {"DBImpl::BGWorkCompaction", "DBTest2::CompactionStall:1"},
@@ -2035,6 +2067,7 @@ TEST_F(DBTest2, CompactionStall) {
 #endif  // ROCKSDB_LITE
 
 TEST_F(DBTest2, FirstSnapshotTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.write_buffer_size = 100000;  // Small write buffer
   options = CurrentOptions(options);
@@ -2051,6 +2084,7 @@ TEST_F(DBTest2, FirstSnapshotTest) {
 
 #ifndef ROCKSDB_LITE
 TEST_F(DBTest2, DuplicateSnapshot) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options = CurrentOptions(options);
   std::vector<const Snapshot*> snapshots;
@@ -2095,6 +2129,7 @@ class PinL0IndexAndFilterBlocksTest
   }
 
   void CreateTwoLevels(Options* options, bool close_afterwards) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (infinite_max_files_) {
       options->max_open_files = -1;
     }
@@ -2134,6 +2169,7 @@ class PinL0IndexAndFilterBlocksTest
 
 TEST_P(PinL0IndexAndFilterBlocksTest,
        IndexAndFilterBlocksOfNewTableAddedToCacheWithPinning) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   if (infinite_max_files_) {
     options.max_open_files = -1;
@@ -2179,6 +2215,7 @@ TEST_P(PinL0IndexAndFilterBlocksTest,
 
 TEST_P(PinL0IndexAndFilterBlocksTest,
        MultiLevelIndexAndFilterBlocksCachedWithPinning) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   PinL0IndexAndFilterBlocksTest::CreateTwoLevels(&options, false);
   // get base cache values
@@ -2208,6 +2245,7 @@ TEST_P(PinL0IndexAndFilterBlocksTest,
 }
 
 TEST_P(PinL0IndexAndFilterBlocksTest, DisablePrefetchingNonL0IndexAndFilter) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   // This ensures that db does not ref anything in the block cache, so
   // EraseUnRefEntries could clear them up.
@@ -2328,6 +2366,7 @@ INSTANTIATE_TEST_CASE_P(PinL0IndexAndFilterBlocksTest,
 
 #ifndef ROCKSDB_LITE
 TEST_F(DBTest2, MaxCompactionBytesTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.memtable_factory.reset(test::NewSpecialSkipListFactory(
       DBTestBase::kNumKeysByGenerateNewRandomFile));
@@ -2373,6 +2412,7 @@ TEST_F(DBTest2, MaxCompactionBytesTest) {
 }
 
 static void UniqueIdCallback(void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   int* result = reinterpret_cast<int*>(arg);
   if (*result == -1) {
     *result = 0;
@@ -2387,6 +2427,7 @@ class MockPersistentCache : public PersistentCache {
  public:
   explicit MockPersistentCache(const bool is_compressed, const size_t max_size)
       : is_compressed_(is_compressed), max_size_(max_size) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->EnableProcessing();
     ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
         "GetUniqueIdFromFile:FS_IOC_GETVERSION", UniqueIdCallback);
@@ -2449,6 +2490,7 @@ class MockPersistentCache : public PersistentCache {
 // Make sure that in CPU time perf context counters, Env::NowCPUNanos()
 // is used, rather than Env::CPUNanos();
 TEST_F(DBTest2, TestPerfContextGetCpuTime) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // force resizing table cache so table handle is not preloaded so that
   // we can measure find_table_nanos during Get().
   dbfull()->TEST_table_cache()->SetCapacity(0);
@@ -2485,6 +2527,7 @@ TEST_F(DBTest2, TestPerfContextGetCpuTime) {
 }
 
 TEST_F(DBTest2, TestPerfContextIterCpuTime) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   DestroyAndReopen(CurrentOptions());
   // force resizing table cache so table handle is not preloaded so that
   // we can measure find_table_nanos during iteration
@@ -2578,6 +2621,7 @@ TEST_F(DBTest2, TestPerfContextIterCpuTime) {
 
 #if !defined OS_SOLARIS
 TEST_F(DBTest2, PersistentCache) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   int num_iter = 80;
 
   Options options;
@@ -2644,11 +2688,13 @@ TEST_F(DBTest2, PersistentCache) {
 
 namespace {
 void CountSyncPoint() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   TEST_SYNC_POINT_CALLBACK("DBTest2::MarkedPoint", nullptr /* arg */);
 }
 }  // namespace
 
 TEST_F(DBTest2, SyncPointMarker) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::atomic<int> sync_point_called(0);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBTest2::MarkedPoint",
@@ -2690,6 +2736,7 @@ TEST_F(DBTest2, SyncPointMarker) {
 #endif
 
 size_t GetEncodedEntrySize(size_t key_size, size_t value_size) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string buffer;
 
   PutVarint32(&buffer, static_cast<uint32_t>(0));
@@ -2700,6 +2747,7 @@ size_t GetEncodedEntrySize(size_t key_size, size_t value_size) {
 }
 
 TEST_F(DBTest2, ReadAmpBitmap) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   BlockBasedTableOptions bbto;
   uint32_t bytes_per_bit[2] = {1, 16};
@@ -2781,6 +2829,7 @@ TEST_F(DBTest2, ReadAmpBitmap) {
 
 #ifndef OS_SOLARIS // GetUniqueIdFromFile is not implemented
 TEST_F(DBTest2, ReadAmpBitmapLiveInCacheAfterDBClose) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   {
     const int kIdBufLen = 100;
     char id_buf[kIdBufLen];
@@ -2897,6 +2946,7 @@ TEST_F(DBTest2, ReadAmpBitmapLiveInCacheAfterDBClose) {
 
 #ifndef ROCKSDB_LITE
 TEST_F(DBTest2, AutomaticCompactionOverlapManualCompaction) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.num_levels = 3;
   options.IncreaseParallelism(20);
@@ -2941,6 +2991,7 @@ TEST_F(DBTest2, AutomaticCompactionOverlapManualCompaction) {
   // the running compaction and break the LSM consistency.
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "CompactionJob::Run():Start", [&](void* /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         ASSERT_OK(
             dbfull()->SetOptions({{"level0_file_num_compaction_trigger", "2"},
                                   {"max_bytes_for_level_base", "1"}}));
@@ -2971,6 +3022,7 @@ TEST_F(DBTest2, AutomaticCompactionOverlapManualCompaction) {
 }
 
 TEST_F(DBTest2, ManualCompactionOverlapManualCompaction) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.num_levels = 2;
   options.IncreaseParallelism(20);
@@ -3007,6 +3059,7 @@ TEST_F(DBTest2, ManualCompactionOverlapManualCompaction) {
   std::atomic<bool> flag(false);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "CompactionJob::Run():Start", [&](void* /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         if (flag.exchange(true)) {
           // We want to make sure to call this callback only once
           return;
@@ -3039,6 +3092,7 @@ TEST_F(DBTest2, ManualCompactionOverlapManualCompaction) {
 }
 
 TEST_F(DBTest2, PausingManualCompaction1) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.disable_auto_compactions = true;
   options.num_levels = 7;
@@ -3060,6 +3114,7 @@ TEST_F(DBTest2, PausingManualCompaction1) {
   int manual_compactions_paused = 0;
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "CompactionJob::Run():PausingManualCompaction:1", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         auto paused = static_cast<std::atomic<int>*>(arg);
         ASSERT_EQ(0, paused->load(std::memory_order_acquire));
         paused->fetch_add(1, std::memory_order_release);
@@ -3142,6 +3197,7 @@ TEST_F(DBTest2, PausingManualCompaction2) {
 }
 
 TEST_F(DBTest2, PausingManualCompaction3) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   CompactRangeOptions compact_options;
   Options options = CurrentOptions();
   options.disable_auto_compactions = true;
@@ -3198,6 +3254,7 @@ TEST_F(DBTest2, PausingManualCompaction3) {
 }
 
 TEST_F(DBTest2, PausingManualCompaction4) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   CompactRangeOptions compact_options;
   Options options = CurrentOptions();
   options.disable_auto_compactions = true;
@@ -3227,6 +3284,7 @@ TEST_F(DBTest2, PausingManualCompaction4) {
   int run_manual_compactions = 0;
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "CompactionJob::Run():PausingManualCompaction:2", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         auto paused = static_cast<std::atomic<int>*>(arg);
         ASSERT_EQ(0, paused->load(std::memory_order_acquire));
         paused->fetch_add(1, std::memory_order_release);
@@ -3256,6 +3314,7 @@ TEST_F(DBTest2, PausingManualCompaction4) {
 }
 
 TEST_F(DBTest2, CancelManualCompaction1) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   CompactRangeOptions compact_options;
   auto canceledPtr =
       std::unique_ptr<std::atomic<bool>>(new std::atomic<bool>{true});
@@ -3318,6 +3377,7 @@ TEST_F(DBTest2, CancelManualCompaction1) {
       "DBImpl::RunManualCompaction()::1");
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::RunManualCompaction()::1", [&](void* /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         ++compactions_run;
         // After 3 compactions disable
         if (compactions_run == 3) {
@@ -3350,6 +3410,7 @@ TEST_F(DBTest2, CancelManualCompaction1) {
 }
 
 TEST_F(DBTest2, CancelManualCompaction2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   CompactRangeOptions compact_options;
   auto canceledPtr =
       std::unique_ptr<std::atomic<bool>>(new std::atomic<bool>{true});
@@ -3390,12 +3451,14 @@ TEST_F(DBTest2, CancelManualCompaction2) {
   int kv_compactions_stopped_at = 0;
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::RunManualCompaction()::1", [&](void* /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         ++compactions_run;
         // After 3 compactions disable
       });
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "CompactionIterator:ProcessKV", [&](void* /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         int kv_compactions_run =
             kv_compactions.fetch_add(1, std::memory_order_release);
         if (kv_compactions_run == 5) {
@@ -3461,6 +3524,7 @@ class CancelCompactionListener : public EventListener {
 };
 
 TEST_F(DBTest2, CancelManualCompactionWithListener) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   CompactRangeOptions compact_options;
   auto canceledPtr =
       std::unique_ptr<std::atomic<bool>>(new std::atomic<bool>{true});
@@ -3486,6 +3550,7 @@ TEST_F(DBTest2, CancelManualCompactionWithListener) {
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "CompactionIterator:ProcessKV", [&](void* /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         compact_options.canceled->store(true, std::memory_order_release);
       });
 
@@ -3531,6 +3596,7 @@ TEST_F(DBTest2, CancelManualCompactionWithListener) {
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "CompactionJob::Run:BeforeVerify", [&](void* /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         compact_options.canceled->store(true, std::memory_order_release);
       });
 
@@ -3552,6 +3618,7 @@ TEST_F(DBTest2, CancelManualCompactionWithListener) {
 }
 
 TEST_F(DBTest2, CompactionOnBottomPriorityWithListener) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   int num_levels = 3;
   const int kNumFilesTrigger = 4;
 
@@ -3610,6 +3677,7 @@ TEST_F(DBTest2, CompactionOnBottomPriorityWithListener) {
 }
 
 TEST_F(DBTest2, OptimizeForPointLookup) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   Close();
   options.OptimizeForPointLookup(2);
@@ -3622,6 +3690,7 @@ TEST_F(DBTest2, OptimizeForPointLookup) {
 }
 
 TEST_F(DBTest2, OptimizeForSmallDB) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   Close();
   options.OptimizeForSmallDb();
@@ -3659,6 +3728,7 @@ TEST_F(DBTest2, OptimizeForSmallDB) {
 #endif  // ROCKSDB_LITE
 
 TEST_F(DBTest2, IterRaceFlush1) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(Put("foo", "v1"));
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->LoadDependency(
@@ -3690,6 +3760,7 @@ TEST_F(DBTest2, IterRaceFlush1) {
 }
 
 TEST_F(DBTest2, IterRaceFlush2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(Put("foo", "v1"));
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->LoadDependency(
@@ -3721,6 +3792,7 @@ TEST_F(DBTest2, IterRaceFlush2) {
 }
 
 TEST_F(DBTest2, IterRefreshRaceFlush) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(Put("foo", "v1"));
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->LoadDependency(
@@ -3754,6 +3826,7 @@ TEST_F(DBTest2, IterRefreshRaceFlush) {
 }
 
 TEST_F(DBTest2, GetRaceFlush1) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(Put("foo", "v1"));
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->LoadDependency(
@@ -3777,6 +3850,7 @@ TEST_F(DBTest2, GetRaceFlush1) {
 }
 
 TEST_F(DBTest2, GetRaceFlush2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(Put("foo", "v1"));
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->LoadDependency(
@@ -3800,6 +3874,7 @@ TEST_F(DBTest2, GetRaceFlush2) {
 }
 
 TEST_F(DBTest2, DirectIO) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!IsDirectIOSupported()) {
     return;
   }
@@ -3822,6 +3897,7 @@ TEST_F(DBTest2, DirectIO) {
 }
 
 TEST_F(DBTest2, MemtableOnlyIterator) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   CreateAndReopenWithCF({"pikachu"}, options);
 
@@ -3890,6 +3966,7 @@ TEST_F(DBTest2, MemtableOnlyIterator) {
 }
 
 TEST_F(DBTest2, LowPriWrite) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   // Compaction pressure should trigger since 6 files
   options.level0_file_num_compaction_trigger = 4;
@@ -3902,6 +3979,7 @@ TEST_F(DBTest2, LowPriWrite) {
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "GenericRateLimiter::Request:1", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         rate_limit_count.fetch_add(1);
         int64_t* rate_bytes_per_sec = static_cast<int64_t*>(arg);
         ASSERT_EQ(1024 * 1024, *rate_bytes_per_sec);
@@ -3941,13 +4019,16 @@ TEST_F(DBTest2, LowPriWrite) {
 
 #ifndef ROCKSDB_LITE
 TEST_F(DBTest2, RateLimitedCompactionReads) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // compaction input has 512KB data
   const int kNumKeysPerFile = 128;
   const int kBytesPerKey = 1024;
   const int kNumL0Files = 4;
 
   for (int compaction_readahead_size : {0, 32 << 10}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     for (auto use_direct_io : {false, true}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
       if (use_direct_io && !IsDirectIOSupported()) {
         continue;
       }
@@ -4021,6 +4102,7 @@ TEST_F(DBTest2, RateLimitedCompactionReads) {
 // Make sure DB can be reopen with reduced number of levels, given no file
 // is on levels higher than the new num_levels.
 TEST_F(DBTest2, ReduceLevel) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = env_;
   options.disable_auto_compactions = true;
@@ -4048,6 +4130,7 @@ TEST_F(DBTest2, ReduceLevel) {
 
 // Test that ReadCallback is actually used in both memtbale and sst tables
 TEST_F(DBTest2, ReadCallbackTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.disable_auto_compactions = true;
   options.num_levels = 7;
@@ -4134,6 +4217,7 @@ TEST_F(DBTest2, ReadCallbackTest) {
 #ifndef ROCKSDB_LITE
 
 TEST_F(DBTest2, LiveFilesOmitObsoleteFiles) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Regression test for race condition where an obsolete file is returned to
   // user as a "live file" but then deleted, all while file deletions are
   // disabled.
@@ -4184,6 +4268,7 @@ TEST_F(DBTest2, LiveFilesOmitObsoleteFiles) {
 }
 
 TEST_F(DBTest2, TestNumPread) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   bool prefetch_supported =
       test::IsPrefetchSupported(env_->GetFileSystem(), dbname_);
@@ -4338,6 +4423,7 @@ class TraceExecutionResultHandler : public TraceRecordResult::Handler {
   }
 
   void Reset() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     total_latency_ = 0;
     cnt_ = 0;
     writes_ = 0;
@@ -4368,6 +4454,7 @@ class TraceExecutionResultHandler : public TraceRecordResult::Handler {
 };
 
 TEST_F(DBTest2, TraceAndReplay) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.merge_operator = MergeOperators::CreatePutOperator();
   ReadOptions ro;
@@ -4465,6 +4552,7 @@ TEST_F(DBTest2, TraceAndReplay) {
   TraceExecutionResultHandler res_handler;
   std::function<void(Status, std::unique_ptr<TraceRecordResult> &&)> res_cb =
       [&res_handler](Status exec_s, std::unique_ptr<TraceRecordResult>&& res) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         ASSERT_TRUE(exec_s.ok() || exec_s.IsNotSupported());
         if (res != nullptr) {
           ASSERT_OK(res->Accept(&res_handler));
@@ -4532,6 +4620,7 @@ TEST_F(DBTest2, TraceAndReplay) {
 }
 
 TEST_F(DBTest2, TraceAndManualReplay) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.merge_operator = MergeOperators::CreatePutOperator();
   ReadOptions ro;
@@ -4783,6 +4872,7 @@ TEST_F(DBTest2, TraceAndManualReplay) {
   for (IteratorSeekQueryTraceRecord::SeekType seekType :
        {IteratorSeekQueryTraceRecord::kSeek,
         IteratorSeekQueryTraceRecord::kSeekForPrev}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // Seek to an existing key.
     record.reset(new IteratorSeekQueryTraceRecord(
         seekType, handles[0]->GetID(), "trace-record-write1", fake_ts++));
@@ -4873,6 +4963,7 @@ TEST_F(DBTest2, TraceAndManualReplay) {
 }
 
 TEST_F(DBTest2, TraceWithLimit) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.merge_operator = MergeOperators::CreatePutOperator();
   ReadOptions ro;
@@ -4947,6 +5038,7 @@ TEST_F(DBTest2, TraceWithLimit) {
 }
 
 TEST_F(DBTest2, TraceWithSampling) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   ReadOptions ro;
   WriteOptions wo;
@@ -5024,6 +5116,7 @@ TEST_F(DBTest2, TraceWithSampling) {
 }
 
 TEST_F(DBTest2, TraceWithFilter) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.merge_operator = MergeOperators::CreatePutOperator();
   ReadOptions ro;
@@ -5203,6 +5296,7 @@ TEST_F(DBTest2, TraceWithFilter) {
 #endif  // ROCKSDB_LITE
 
 TEST_F(DBTest2, PinnableSliceAndMmapReads) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.env = env_;
   if (!IsMemoryMappedAccessSupported()) {
@@ -5253,6 +5347,7 @@ TEST_F(DBTest2, PinnableSliceAndMmapReads) {
 }
 
 TEST_F(DBTest2, DISABLED_IteratorPinnedMemory) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.create_if_missing = true;
   options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
@@ -5326,6 +5421,7 @@ TEST_F(DBTest2, DISABLED_IteratorPinnedMemory) {
   std::atomic<int> block_destroyed(0);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "Block::Block:0", [&](void* /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         if (finished) {
           return;
         }
@@ -5336,6 +5432,7 @@ TEST_F(DBTest2, DISABLED_IteratorPinnedMemory) {
       });
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "Block::~Block", [&](void* /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         if (finished) {
           return;
         }
@@ -5359,11 +5456,13 @@ TEST_F(DBTest2, DISABLED_IteratorPinnedMemory) {
 }
 
 TEST_F(DBTest2, TestBBTTailPrefetch) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::atomic<bool> called(false);
   size_t expected_lower_bound = 512 * 1024;
   size_t expected_higher_bound = 512 * 1024;
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "BlockBasedTable::Open::TailPrefetchLen", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         size_t* prefetch_size = static_cast<size_t*>(arg);
         EXPECT_LE(expected_lower_bound, *prefetch_size);
         EXPECT_GE(expected_higher_bound, *prefetch_size);
@@ -5398,6 +5497,7 @@ TEST_F(DBTest2, TestBBTTailPrefetch) {
   std::atomic<bool> first_call(true);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "BlockBasedTable::Open::TailPrefetchLen", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         size_t* prefetch_size = static_cast<size_t*>(arg);
         if (first_call) {
           EXPECT_EQ(4 * 1024, *prefetch_size);
@@ -5441,6 +5541,7 @@ TEST_F(DBTest2, TestBBTTailPrefetch) {
 }
 
 TEST_F(DBTest2, TestGetColumnFamilyHandleUnlocked) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Setup sync point dependency to reproduce the race condition of
   // DBImpl::GetColumnFamilyHandleUnlocked
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->LoadDependency({
@@ -5480,6 +5581,7 @@ TEST_F(DBTest2, TestGetColumnFamilyHandleUnlocked) {
 
 #ifndef ROCKSDB_LITE
 TEST_F(DBTest2, TestCompactFiles) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Setup sync point dependency to reproduce the race condition of
   // DBImpl::GetColumnFamilyHandleUnlocked
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->LoadDependency({
@@ -5549,6 +5651,7 @@ TEST_F(DBTest2, TestCompactFiles) {
 #endif  // ROCKSDB_LITE
 
 TEST_F(DBTest2, MultiDBParallelOpenTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kNumDbs = 2;
   Options options = CurrentOptions();
   std::vector<std::string> dbnames;
@@ -5624,6 +5727,7 @@ class DummyOldStats : public Statistics {
 }  // namespace
 
 TEST_F(DBTest2, OldStatsInterface) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   DummyOldStats* dos = new DummyOldStats();
   std::shared_ptr<Statistics> stats(dos);
   Options options = CurrentOptions();
@@ -5641,6 +5745,7 @@ TEST_F(DBTest2, OldStatsInterface) {
 }
 
 TEST_F(DBTest2, CloseWithUnreleasedSnapshot) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const Snapshot* ss = db_->GetSnapshot();
 
   for (auto h : handles_) {
@@ -5656,6 +5761,7 @@ TEST_F(DBTest2, CloseWithUnreleasedSnapshot) {
 }
 
 TEST_F(DBTest2, PrefixBloomReseek) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.create_if_missing = true;
   options.prefix_extractor.reset(NewCappedPrefixTransform(3));
@@ -5697,6 +5803,7 @@ TEST_F(DBTest2, PrefixBloomReseek) {
 }
 
 TEST_F(DBTest2, PrefixBloomFilteredOut) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.create_if_missing = true;
   options.prefix_extractor.reset(NewCappedPrefixTransform(3));
@@ -5734,6 +5841,7 @@ TEST_F(DBTest2, PrefixBloomFilteredOut) {
 
 #ifndef ROCKSDB_LITE
 TEST_F(DBTest2, RowCacheSnapshot) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
   options.row_cache = NewLRUCache(8 * 8192);
@@ -5785,6 +5893,7 @@ TEST_F(DBTest2, RowCacheSnapshot) {
 // to be corrupted, and triggering a corruption report.
 // We need to fix the bug and enable the test.
 TEST_F(DBTest2, CrashInRecoveryMultipleCF) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const std::vector<std::string> sync_points = {
       "DBImpl::RecoverLogFiles:BeforeFlushFinalMemtable",
       "VersionSet::ProcessManifestWrites:BeforeWriteLastVersionEdit:0"};
@@ -5848,6 +5957,7 @@ TEST_F(DBTest2, CrashInRecoveryMultipleCF) {
 }
 
 TEST_F(DBTest2, SeekFileRangeDeleteTail) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.prefix_extractor.reset(NewCappedPrefixTransform(1));
   options.num_levels = 3;
@@ -5882,6 +5992,7 @@ TEST_F(DBTest2, SeekFileRangeDeleteTail) {
 }
 
 TEST_F(DBTest2, BackgroundPurgeTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.write_buffer_manager =
       std::make_shared<ROCKSDB_NAMESPACE::WriteBufferManager>(1 << 20);
@@ -5920,6 +6031,7 @@ TEST_F(DBTest2, BackgroundPurgeTest) {
 }
 
 TEST_F(DBTest2, SwitchMemtableRaceWithNewManifest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   DestroyAndReopen(options);
   options.max_manifest_file_size = 10;
@@ -5940,6 +6052,7 @@ TEST_F(DBTest2, SwitchMemtableRaceWithNewManifest) {
 }
 
 TEST_F(DBTest2, SameSmallestInSameLevel) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // This test validates fractional casacading logic when several files at one
   // one level only contains the same user key.
   Options options = CurrentOptions();
@@ -5974,11 +6087,13 @@ TEST_F(DBTest2, SameSmallestInSameLevel) {
 }
 
 TEST_F(DBTest2, FileConsistencyCheckInOpen) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(Put("foo", "bar"));
   ASSERT_OK(Flush());
 
   SyncPoint::GetInstance()->SetCallBack(
       "VersionBuilder::CheckConsistencyBeforeReturn", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         Status* ret_s = static_cast<Status*>(arg);
         *ret_s = Status::Corruption("fcc");
       });
@@ -5992,6 +6107,7 @@ TEST_F(DBTest2, FileConsistencyCheckInOpen) {
 }
 
 TEST_F(DBTest2, BlockBasedTablePrefixIndexSeekForPrev) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // create a DB with block prefix index
   BlockBasedTableOptions table_options;
   Options options = CurrentOptions();
@@ -6054,6 +6170,7 @@ TEST_F(DBTest2, BlockBasedTablePrefixIndexSeekForPrev) {
 }
 
 TEST_F(DBTest2, PartitionedIndexPrefetchFailure) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = last_options_;
   options.env = env_;
   options.max_open_files = 20;
@@ -6094,7 +6211,9 @@ TEST_F(DBTest2, PartitionedIndexPrefetchFailure) {
 }
 
 TEST_F(DBTest2, ChangePrefixExtractor) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (bool use_partitioned_filter : {true, false}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // create a DB with block prefix index
     BlockBasedTableOptions table_options;
     Options options = CurrentOptions();
@@ -6262,6 +6381,7 @@ TEST_F(DBTest2, ChangePrefixExtractor) {
 }
 
 TEST_F(DBTest2, BlockBasedTablePrefixGetIndexNotFound) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // create a DB with block prefix index
   BlockBasedTableOptions table_options;
   Options options = CurrentOptions();
@@ -6305,6 +6425,7 @@ TEST_F(DBTest2, BlockBasedTablePrefixGetIndexNotFound) {
 
 #ifndef ROCKSDB_LITE
 TEST_F(DBTest2, AutoPrefixMode1) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // create a DB with block prefix index
   BlockBasedTableOptions table_options;
   Options options = CurrentOptions();
@@ -6434,8 +6555,10 @@ class RenameCurrentTest : public DBTestBase,
   }
 
   void SetupSyncPoints() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     SyncPoint::GetInstance()->DisableProcessing();
     SyncPoint::GetInstance()->SetCallBack(sync_point_, [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
       Status* s = reinterpret_cast<Status*>(arg);
       assert(s);
       *s = Status::IOError("Injected IO error.");
@@ -6450,6 +6573,7 @@ INSTANTIATE_TEST_CASE_P(DistributedFS, RenameCurrentTest,
                                           "SetCurrentFile:AfterRename"));
 
 TEST_P(RenameCurrentTest, Open) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Destroy(last_options_);
   Options options = GetDefaultOptions();
   options.create_if_missing = true;
@@ -6463,6 +6587,7 @@ TEST_P(RenameCurrentTest, Open) {
 }
 
 TEST_P(RenameCurrentTest, Flush) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Destroy(last_options_);
   Options options = GetDefaultOptions();
   options.max_manifest_file_size = 1;
@@ -6482,6 +6607,7 @@ TEST_P(RenameCurrentTest, Flush) {
 }
 
 TEST_P(RenameCurrentTest, Compaction) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Destroy(last_options_);
   Options options = GetDefaultOptions();
   options.max_manifest_file_size = 1;
@@ -6509,6 +6635,7 @@ TEST_P(RenameCurrentTest, Compaction) {
 }
 
 TEST_F(DBTest2, BottommostTemperature) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   class TestListener : public EventListener {
    public:
     void OnFileReadFinish(const FileOperationInfo& info) override {
@@ -6537,6 +6664,7 @@ TEST_F(DBTest2, BottommostTemperature) {
 
    private:
     void UpdateFileTemperature(const FileOperationInfo& info) {
+PERF_MARKER(__PRETTY_FUNCTION__);
       auto filename = GetFileName(info.path);
       uint64_t number;
       FileType type;
@@ -6552,6 +6680,7 @@ TEST_F(DBTest2, BottommostTemperature) {
     }
 
     std::string GetFileName(const std::string& fname) {
+PERF_MARKER(__PRETTY_FUNCTION__);
       auto filename = fname.substr(fname.find_last_of(kFilePathSeparator) + 1);
       // workaround only for Windows that the file path could contain both
       // Windows FilePathSeparator and '/'
@@ -6704,6 +6833,7 @@ TEST_F(DBTest2, BottommostTemperature) {
 }
 
 TEST_F(DBTest2, BottommostTemperatureUniversal) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kTriggerNum = 3;
   const int kNumLevels = 5;
   const int kBottommostLevel = kNumLevels - 1;
@@ -6858,6 +6988,7 @@ TEST_F(DBTest2, BottommostTemperatureUniversal) {
 }
 
 TEST_F(DBTest2, LastLevelStatistics) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.bottommost_temperature = Temperature::kWarm;
   options.level0_file_num_compaction_trigger = 2;
@@ -6910,6 +7041,7 @@ TEST_F(DBTest2, LastLevelStatistics) {
 }
 
 TEST_F(DBTest2, CheckpointFileTemperature) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   class NoLinkTestFS : public FileTemperatureTestFS {
     using FileTemperatureTestFS::FileTemperatureTestFS;
 
@@ -6976,6 +7108,7 @@ TEST_F(DBTest2, CheckpointFileTemperature) {
 }
 
 TEST_F(DBTest2, FileTemperatureManifestFixup) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto test_fs = std::make_shared<FileTemperatureTestFS>(env_->GetFileSystem());
   std::unique_ptr<Env> env(new CompositeEnvWrapper(env_, test_fs));
   Options options = CurrentOptions();
@@ -7077,6 +7210,7 @@ TEST_F(DBTest2, FileTemperatureManifestFixup) {
 
 // WAL recovery mode is WALRecoveryMode::kPointInTimeRecovery.
 TEST_F(DBTest2, PointInTimeRecoveryWithIOErrorWhileReadingWal) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   DestroyAndReopen(options);
   ASSERT_OK(Put("foo", "value0"));
@@ -7089,6 +7223,7 @@ TEST_F(DBTest2, PointInTimeRecoveryWithIOErrorWhileReadingWal) {
       [&](void* /*arg*/) { should_inject_error = true; });
   SyncPoint::GetInstance()->SetCallBack(
       "LogReader::ReadMore:AfterReadFile", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         if (should_inject_error) {
           ASSERT_NE(nullptr, arg);
           *reinterpret_cast<Status*>(arg) = Status::IOError("Injected IOError");
@@ -7102,6 +7237,7 @@ TEST_F(DBTest2, PointInTimeRecoveryWithIOErrorWhileReadingWal) {
 }
 
 TEST_F(DBTest2, PointInTimeRecoveryWithSyncFailureInCFCreation) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->LoadDependency(
       {{"DBImpl::BackgroundCallFlush:Start:1",
         "PointInTimeRecoveryWithSyncFailureInCFCreation:1"},
@@ -7130,6 +7266,7 @@ TEST_F(DBTest2, PointInTimeRecoveryWithSyncFailureInCFCreation) {
 }
 
 TEST_F(DBTest2, RenameDirectory) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   DestroyAndReopen(options);
   ASSERT_OK(Put("foo", "value0"));
@@ -7147,6 +7284,7 @@ TEST_F(DBTest2, RenameDirectory) {
 
 #ifndef ROCKSDB_LITE
 TEST_F(DBTest2, GetLatestSeqAndTsForKey) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Destroy(last_options_);
 
   Options options = CurrentOptions();
@@ -7207,6 +7345,7 @@ TEST_F(DBTest2, GetLatestSeqAndTsForKey) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   RegisterCustomObjects(argc, argv);

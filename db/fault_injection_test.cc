@@ -85,6 +85,7 @@ class FaultInjectionTest
         base_env_(nullptr),
         env_(nullptr),
         db_(nullptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     EXPECT_OK(
         test::CreateEnvFromSystem(ConfigOptions(), &system_env_, &env_guard_));
     EXPECT_NE(system_env_, nullptr);
@@ -96,6 +97,7 @@ class FaultInjectionTest
   }
 
   bool ChangeOptions() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     option_config_++;
     if (option_config_ >= non_inclusive_end_range_) {
       return false;
@@ -109,6 +111,7 @@ class FaultInjectionTest
 
   // Return the current option configuration.
   Options CurrentOptions() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     sync_use_wal_ = false;
     sync_use_compact_ = true;
     Options options;
@@ -149,6 +152,7 @@ class FaultInjectionTest
   }
 
   Status NewDB() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(db_ == nullptr);
     assert(tiny_cache_ == nullptr);
     assert(env_ == nullptr);
@@ -193,6 +197,7 @@ class FaultInjectionTest
   }
 
   void Build(const WriteOptions& write_options, int start_idx, int num_vals) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::string key_space, value_space;
     WriteBatch batch;
     for (int i = start_idx; i < start_idx + num_vals; i++) {
@@ -260,11 +265,13 @@ class FaultInjectionTest
   }
 
   void CloseDB() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     delete db_;
     db_ = nullptr;
   }
 
   Status OpenDB() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     CloseDB();
     env_->ResetState();
     Status s = DB::Open(options_, dbname_, &db_);
@@ -273,6 +280,7 @@ class FaultInjectionTest
   }
 
   void DeleteAllData() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Iterator* iter = db_->NewIterator(ReadOptions());
     WriteOptions options;
     for (iter->SeekToFirst(); iter->Valid(); iter->Next()) {
@@ -288,6 +296,7 @@ class FaultInjectionTest
 
   // rnd cannot be null for kResetDropRandomUnsyncedData
   void ResetDBState(ResetMethod reset_method, Random* rnd = nullptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     env_->AssertNoOpenFile();
     switch (reset_method) {
       case kResetDropUnsyncedData:
@@ -309,6 +318,7 @@ class FaultInjectionTest
   }
 
   void PartialCompactTestPreFault(int num_pre_sync, int num_post_sync) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     DeleteAllData();
 
     WriteOptions write_options;
@@ -325,6 +335,7 @@ class FaultInjectionTest
   void PartialCompactTestReopenWithFault(ResetMethod reset_method,
                                          int num_pre_sync, int num_post_sync,
                                          Random* rnd = nullptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     env_->SetFilesystemActive(false);
     CloseDB();
     ResetDBState(reset_method, rnd);
@@ -339,15 +350,18 @@ class FaultInjectionTest
   }
 
   void NoWriteTestPreFault() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   }
 
   void NoWriteTestReopenWithFault(ResetMethod reset_method) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     CloseDB();
     ResetDBState(reset_method);
     ASSERT_OK(OpenDB());
   }
 
   void WaitCompactionFinish() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_OK(static_cast<DBImpl*>(db_->GetRootDB())->TEST_WaitForCompact());
     ASSERT_OK(db_->Put(WriteOptions(), "", ""));
   }
@@ -360,6 +374,7 @@ class FaultInjectionTest
 class FaultInjectionTestSplitted : public FaultInjectionTest {};
 
 TEST_P(FaultInjectionTestSplitted, FaultTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     Random rnd(301);
 
@@ -400,6 +415,7 @@ TEST_P(FaultInjectionTestSplitted, FaultTest) {
 
 // Previous log file is not fsynced if sync is forced after log rolling.
 TEST_P(FaultInjectionTest, WriteOptionSyncTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   test::SleepingBackgroundTask sleeping_task_low;
   env_->SetBackgroundThreads(1, Env::HIGH);
   // Block the job queue to prevent flush job from running.
@@ -438,6 +454,7 @@ TEST_P(FaultInjectionTest, WriteOptionSyncTest) {
 }
 
 TEST_P(FaultInjectionTest, UninstalledCompaction) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   options_.target_file_size_base = 32 * 1024;
   options_.write_buffer_size = 100 << 10;  // 100KB
   options_.level0_file_num_compaction_trigger = 6;
@@ -486,6 +503,7 @@ TEST_P(FaultInjectionTest, UninstalledCompaction) {
 }
 
 TEST_P(FaultInjectionTest, ManualLogSyncTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   test::SleepingBackgroundTask sleeping_task_low;
   env_->SetBackgroundThreads(1, Env::HIGH);
   // Block the job queue to prevent flush job from running.
@@ -523,6 +541,7 @@ TEST_P(FaultInjectionTest, ManualLogSyncTest) {
 }
 
 TEST_P(FaultInjectionTest, WriteBatchWalTerminationTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ReadOptions ro;
   Options options = CurrentOptions();
   options.env = env_;
@@ -547,6 +566,7 @@ TEST_P(FaultInjectionTest, WriteBatchWalTerminationTest) {
 }
 
 TEST_P(FaultInjectionTest, NoDuplicateTrailingEntries) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto fault_fs = std::make_shared<FaultInjectionTestFS>(FileSystem::Default());
   fault_fs->EnableWriteErrorInjection();
   fault_fs->SetFilesystemDirectWritable(false);
@@ -631,6 +651,7 @@ INSTANTIATE_TEST_CASE_P(
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   RegisterCustomObjects(argc, argv);
   return RUN_ALL_TESTS();

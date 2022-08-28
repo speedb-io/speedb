@@ -23,6 +23,7 @@ namespace ROCKSDB_NAMESPACE {
 #ifndef ROCKSDB_LITE
 Status DBImpl::SuggestCompactRange(ColumnFamilyHandle* column_family,
                                    const Slice* begin, const Slice* end) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto cfh = static_cast_with_check<ColumnFamilyHandleImpl>(column_family);
   auto cfd = cfh->cfd();
   InternalKey start_key, end_key;
@@ -55,6 +56,7 @@ Status DBImpl::SuggestCompactRange(ColumnFamilyHandle* column_family,
 }
 
 Status DBImpl::PromoteL0(ColumnFamilyHandle* column_family, int target_level) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(column_family);
 
   if (target_level < 1) {

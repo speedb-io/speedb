@@ -14,6 +14,7 @@
 namespace ROCKSDB_NAMESPACE {
 
 void CancelAllBackgroundWork(DB* db, bool wait) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   (static_cast_with_check<DBImpl>(db->GetRootDB()))
       ->CancelAllBackgroundWork(wait);
 }
@@ -21,6 +22,7 @@ void CancelAllBackgroundWork(DB* db, bool wait) {
 Status DeleteFilesInRange(DB* db, ColumnFamilyHandle* column_family,
                           const Slice* begin, const Slice* end,
                           bool include_end) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   RangePtr range(begin, end);
   return DeleteFilesInRanges(db, column_family, &range, 1, include_end);
 }
@@ -28,6 +30,7 @@ Status DeleteFilesInRange(DB* db, ColumnFamilyHandle* column_family,
 Status DeleteFilesInRanges(DB* db, ColumnFamilyHandle* column_family,
                            const RangePtr* ranges, size_t n,
                            bool include_end) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return (static_cast_with_check<DBImpl>(db->GetRootDB()))
       ->DeleteFilesInRanges(column_family, ranges, n, include_end);
 }
@@ -35,12 +38,14 @@ Status DeleteFilesInRanges(DB* db, ColumnFamilyHandle* column_family,
 Status VerifySstFileChecksum(const Options& options,
                              const EnvOptions& env_options,
                              const std::string& file_path) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return VerifySstFileChecksum(options, env_options, ReadOptions(), file_path);
 }
 Status VerifySstFileChecksum(const Options& options,
                              const EnvOptions& env_options,
                              const ReadOptions& read_options,
                              const std::string& file_path) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<FSRandomAccessFile> file;
   uint64_t file_size;
   InternalKeyComparator internal_comparator(options.comparator);

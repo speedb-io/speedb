@@ -30,6 +30,7 @@ TruncatedRangeDelIterator::TruncatedRangeDelIterator(
       icmp_(icmp),
       smallest_ikey_(smallest),
       largest_ikey_(largest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (smallest != nullptr) {
     pinned_bounds_.emplace_back();
     auto& parsed_smallest = pinned_bounds_.back();
@@ -90,6 +91,7 @@ void TruncatedRangeDelIterator::InternalNext() { iter_->Next(); }
 
 // NOTE: target is a user key
 void TruncatedRangeDelIterator::Seek(const Slice& target) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (largest_ != nullptr &&
       icmp_->Compare(*largest_, ParsedInternalKey(target, kMaxSequenceNumber,
                                                   kTypeRangeDeletion)) <= 0) {
@@ -106,6 +108,7 @@ void TruncatedRangeDelIterator::Seek(const Slice& target) {
 
 // NOTE: target is a user key
 void TruncatedRangeDelIterator::SeekForPrev(const Slice& target) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (smallest_ != nullptr &&
       icmp_->Compare(ParsedInternalKey(target, 0, kTypeRangeDeletion),
                      *smallest_) < 0) {
@@ -121,6 +124,7 @@ void TruncatedRangeDelIterator::SeekForPrev(const Slice& target) {
 }
 
 void TruncatedRangeDelIterator::SeekToFirst() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (smallest_ != nullptr) {
     iter_->Seek(smallest_->user_key);
     return;
@@ -129,6 +133,7 @@ void TruncatedRangeDelIterator::SeekToFirst() {
 }
 
 void TruncatedRangeDelIterator::SeekToLast() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (largest_ != nullptr) {
     iter_->SeekForPrev(largest_->user_key);
     return;
@@ -139,6 +144,7 @@ void TruncatedRangeDelIterator::SeekToLast() {
 std::map<SequenceNumber, std::unique_ptr<TruncatedRangeDelIterator>>
 TruncatedRangeDelIterator::SplitBySnapshot(
     const std::vector<SequenceNumber>& snapshots) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   using FragmentedIterPair =
       std::pair<const SequenceNumber,
                 std::unique_ptr<FragmentedRangeTombstoneIterator>>;
@@ -167,6 +173,7 @@ ForwardRangeDelIterator::ForwardRangeDelIterator(
       inactive_iters_(StartKeyMinComparator(icmp)) {}
 
 bool ForwardRangeDelIterator::ShouldDelete(const ParsedInternalKey& parsed) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Move active iterators that end before parsed.
   while (!active_iters_.empty() &&
          icmp_->Compare((*active_iters_.top())->end_key(), parsed) <= 0) {
@@ -195,6 +202,7 @@ bool ForwardRangeDelIterator::ShouldDelete(const ParsedInternalKey& parsed) {
 }
 
 void ForwardRangeDelIterator::Invalidate() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   unused_idx_ = 0;
   active_iters_.clear();
   active_seqnums_.clear();
@@ -210,6 +218,7 @@ ReverseRangeDelIterator::ReverseRangeDelIterator(
       inactive_iters_(EndKeyMaxComparator(icmp)) {}
 
 bool ReverseRangeDelIterator::ShouldDelete(const ParsedInternalKey& parsed) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Move active iterators that start after parsed.
   while (!active_iters_.empty() &&
          icmp_->Compare(parsed, (*active_iters_.top())->start_key()) < 0) {
@@ -238,6 +247,7 @@ bool ReverseRangeDelIterator::ShouldDelete(const ParsedInternalKey& parsed) {
 }
 
 void ReverseRangeDelIterator::Invalidate() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   unused_idx_ = 0;
   active_iters_.clear();
   active_seqnums_.clear();
@@ -246,6 +256,7 @@ void ReverseRangeDelIterator::Invalidate() {
 
 bool RangeDelAggregator::StripeRep::ShouldDelete(
     const ParsedInternalKey& parsed, RangeDelPositioningMode mode) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!InStripe(parsed.sequence) || IsEmpty()) {
     return false;
   }
@@ -280,6 +291,7 @@ bool RangeDelAggregator::StripeRep::ShouldDelete(
 
 bool RangeDelAggregator::StripeRep::IsRangeOverlapped(const Slice& start,
                                                       const Slice& end) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Invalidate();
 
   // Set the internal start/end keys so that:
@@ -319,6 +331,7 @@ bool RangeDelAggregator::StripeRep::IsRangeOverlapped(const Slice& start,
 void ReadRangeDelAggregator::AddTombstones(
     std::unique_ptr<FragmentedRangeTombstoneIterator> input_iter,
     const InternalKey* smallest, const InternalKey* largest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (input_iter == nullptr || input_iter->empty()) {
     return;
   }
@@ -329,11 +342,13 @@ void ReadRangeDelAggregator::AddTombstones(
 
 bool ReadRangeDelAggregator::ShouldDeleteImpl(const ParsedInternalKey& parsed,
                                               RangeDelPositioningMode mode) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return rep_.ShouldDelete(parsed, mode);
 }
 
 bool ReadRangeDelAggregator::IsRangeOverlapped(const Slice& start,
                                                const Slice& end) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   InvalidateRangeDelMapPositions();
   return rep_.IsRangeOverlapped(start, end);
 }
@@ -341,6 +356,7 @@ bool ReadRangeDelAggregator::IsRangeOverlapped(const Slice& start,
 void CompactionRangeDelAggregator::AddTombstones(
     std::unique_ptr<FragmentedRangeTombstoneIterator> input_iter,
     const InternalKey* smallest, const InternalKey* largest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (input_iter == nullptr || input_iter->empty()) {
     return;
   }
@@ -367,6 +383,7 @@ void CompactionRangeDelAggregator::AddTombstones(
 
 bool CompactionRangeDelAggregator::ShouldDelete(const ParsedInternalKey& parsed,
                                                 RangeDelPositioningMode mode) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto it = reps_.lower_bound(parsed.sequence);
   if (it == reps_.end()) {
     return false;
@@ -387,6 +404,7 @@ class TruncatedRangeDelMergingIter : public InternalIterator {
         upper_bound_(upper_bound),
         upper_bound_inclusive_(upper_bound_inclusive),
         heap_(StartKeyMinComparator(icmp)) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     for (auto& child : children) {
       if (child != nullptr) {
         assert(child->lower_bound() == 0);
@@ -470,6 +488,7 @@ std::unique_ptr<FragmentedRangeTombstoneIterator>
 CompactionRangeDelAggregator::NewIterator(const Slice* lower_bound,
                                           const Slice* upper_bound,
                                           bool upper_bound_inclusive) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   InvalidateRangeDelMapPositions();
   std::unique_ptr<TruncatedRangeDelMergingIter> merging_iter(
       new TruncatedRangeDelMergingIter(icmp_, lower_bound, upper_bound,

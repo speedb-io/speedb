@@ -31,6 +31,7 @@ class DBTestCompactionFilterWithCompactParam
       public ::testing::WithParamInterface<DBTestBase::OptionConfig> {
  public:
   DBTestCompactionFilterWithCompactParam() : DBTestCompactionFilter() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     option_config_ = GetParam();
     Destroy(last_options_);
     auto options = CurrentOptions();
@@ -287,6 +288,7 @@ class ChangeFilterFactory : public CompactionFilterFactory {
 
 #ifndef ROCKSDB_LITE
 TEST_F(DBTestCompactionFilter, CompactionFilter) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.max_open_files = -1;
   options.num_levels = 3;
@@ -444,6 +446,7 @@ TEST_F(DBTestCompactionFilter, CompactionFilter) {
 // entries are deleted. The compaction should create bunch of 'DeleteFile'
 // entries in VersionEdit, but none of the 'AddFile's.
 TEST_F(DBTestCompactionFilter, CompactionFilterDeletesAll) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.compaction_filter_factory = std::make_shared<DeleteFilterFactory>(
       TableFileCreationReason::kCompaction);
@@ -476,6 +479,7 @@ TEST_F(DBTestCompactionFilter, CompactionFilterDeletesAll) {
 #endif  // ROCKSDB_LITE
 
 TEST_F(DBTestCompactionFilter, CompactionFilterFlush) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Tests a `CompactionFilterFactory` that filters when table file is created
   // by flush.
   Options options = CurrentOptions();
@@ -505,6 +509,7 @@ TEST_F(DBTestCompactionFilter, CompactionFilterFlush) {
 }
 
 TEST_F(DBTestCompactionFilter, CompactionFilterRecovery) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Tests a `CompactionFilterFactory` that filters when table file is created
   // by recovery.
   Options options = CurrentOptions();
@@ -535,6 +540,7 @@ TEST_F(DBTestCompactionFilter, CompactionFilterRecovery) {
 
 TEST_P(DBTestCompactionFilterWithCompactParam,
        CompactionFilterWithValueChange) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.num_levels = 3;
   options.compaction_filter_factory = std::make_shared<ChangeFilterFactory>();
@@ -593,6 +599,7 @@ TEST_P(DBTestCompactionFilterWithCompactParam,
 }
 
 TEST_F(DBTestCompactionFilter, CompactionFilterWithMergeOperator) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string one, two, three, four;
   PutFixed64(&one, 1);
   PutFixed64(&two, 2);
@@ -661,6 +668,7 @@ TEST_F(DBTestCompactionFilter, CompactionFilterWithMergeOperator) {
 
 #ifndef ROCKSDB_LITE
 TEST_F(DBTestCompactionFilter, CompactionFilterContextManual) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   KeepFilterFactory* filter = new KeepFilterFactory(true, true);
 
   Options options = CurrentOptions();
@@ -724,6 +732,7 @@ TEST_F(DBTestCompactionFilter, CompactionFilterContextManual) {
 #endif  // ROCKSDB_LITE
 
 TEST_F(DBTestCompactionFilter, CompactionFilterContextCfId) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   KeepFilterFactory* filter = new KeepFilterFactory(false, true);
   filter->expect_cf_id_.store(1);
 
@@ -755,6 +764,7 @@ TEST_F(DBTestCompactionFilter, CompactionFilterContextCfId) {
 #ifndef ROCKSDB_LITE
 // Compaction filters aplies to all records, regardless snapshots.
 TEST_F(DBTestCompactionFilter, CompactionFilterIgnoreSnapshot) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string five = ToString(5);
   Options options = CurrentOptions();
   options.compaction_filter_factory = std::make_shared<DeleteISFilterFactory>();
@@ -816,6 +826,7 @@ TEST_F(DBTestCompactionFilter, CompactionFilterIgnoreSnapshot) {
 #endif  // ROCKSDB_LITE
 
 TEST_F(DBTestCompactionFilter, SkipUntil) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.compaction_filter_factory = std::make_shared<SkipEvenFilterFactory>();
   options.disable_auto_compactions = true;
@@ -857,6 +868,7 @@ TEST_F(DBTestCompactionFilter, SkipUntil) {
 }
 
 TEST_F(DBTestCompactionFilter, SkipUntilWithBloomFilter) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   BlockBasedTableOptions table_options;
   table_options.whole_key_filtering = false;
   table_options.filter_policy.reset(NewBloomFilterPolicy(100, false));
@@ -906,6 +918,7 @@ class TestNotSupportedFilter : public CompactionFilter {
 };
 
 TEST_F(DBTestCompactionFilter, IgnoreSnapshotsFalse) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.compaction_filter = new TestNotSupportedFilter();
   DestroyAndReopen(options);
@@ -947,6 +960,7 @@ class TestNotSupportedFilterFactory : public CompactionFilterFactory {
 };
 
 TEST_F(DBTestCompactionFilter, IgnoreSnapshotsFalseDuringFlush) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.compaction_filter_factory =
       std::make_shared<TestNotSupportedFilterFactory>(
@@ -958,6 +972,7 @@ TEST_F(DBTestCompactionFilter, IgnoreSnapshotsFalseDuringFlush) {
 }
 
 TEST_F(DBTestCompactionFilter, IgnoreSnapshotsFalseRecovery) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.compaction_filter_factory =
       std::make_shared<TestNotSupportedFilterFactory>(
@@ -971,6 +986,7 @@ TEST_F(DBTestCompactionFilter, IgnoreSnapshotsFalseRecovery) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

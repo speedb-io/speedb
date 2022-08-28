@@ -16,6 +16,7 @@ ManagedSnapshot::ManagedSnapshot(DB* db, const Snapshot* _snapshot)
     : db_(db), snapshot_(_snapshot) {}
 
 ManagedSnapshot::~ManagedSnapshot() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (snapshot_) {
     db_->ReleaseSnapshot(snapshot_);
   }

@@ -40,6 +40,7 @@ class TestFileNumberGenerator {
 class BlobFileBuilderTest : public testing::Test {
  protected:
   BlobFileBuilderTest() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     mock_env_.reset(MockEnv::Create(Env::Default()));
     fs_ = mock_env_->GetFileSystem().get();
     clock_ = mock_env_->GetSystemClock().get();
@@ -52,6 +53,7 @@ class BlobFileBuilderTest : public testing::Test {
                       const std::vector<std::pair<std::string, std::string>>&
                           expected_key_value_pairs,
                       const std::vector<std::string>& blob_indexes) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(expected_key_value_pairs.size() == blob_indexes.size());
 
     std::unique_ptr<FSRandomAccessFile> file;
@@ -116,6 +118,7 @@ class BlobFileBuilderTest : public testing::Test {
 };
 
 TEST_F(BlobFileBuilderTest, BuildAndCheckOneFile) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Build a single blob file
   constexpr size_t number_of_blobs = 10;
   constexpr size_t key_size = 1;
@@ -198,6 +201,7 @@ TEST_F(BlobFileBuilderTest, BuildAndCheckOneFile) {
 }
 
 TEST_F(BlobFileBuilderTest, BuildAndCheckMultipleFiles) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Build multiple blob files: file size limit is set to the size of a single
   // value, so each blob ends up in a file of its own
   constexpr size_t number_of_blobs = 10;
@@ -286,6 +290,7 @@ TEST_F(BlobFileBuilderTest, BuildAndCheckMultipleFiles) {
 }
 
 TEST_F(BlobFileBuilderTest, InlinedValues) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // All values are below the min_blob_size threshold; no blob files get written
   constexpr size_t number_of_blobs = 10;
   constexpr size_t key_size = 1;
@@ -339,6 +344,7 @@ TEST_F(BlobFileBuilderTest, InlinedValues) {
 }
 
 TEST_F(BlobFileBuilderTest, Compression) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Build a blob file with a compressed blob
   if (!Snappy_Supported()) {
     return;
@@ -425,6 +431,7 @@ TEST_F(BlobFileBuilderTest, Compression) {
 }
 
 TEST_F(BlobFileBuilderTest, CompressionError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Simulate an error during compression
   if (!Snappy_Supported()) {
     return;
@@ -458,6 +465,7 @@ TEST_F(BlobFileBuilderTest, CompressionError) {
 
   SyncPoint::GetInstance()->SetCallBack("CompressData:TamperWithReturnValue",
                                         [](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
                                           bool* ret = static_cast<bool*>(arg);
                                           *ret = false;
                                         });
@@ -484,6 +492,7 @@ TEST_F(BlobFileBuilderTest, CompressionError) {
 }
 
 TEST_F(BlobFileBuilderTest, Checksum) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Build a blob file with checksum
 
   class DummyFileChecksumGenerator : public FileChecksumGenerator {
@@ -581,6 +590,7 @@ class BlobFileBuilderIOErrorTest
       public testing::WithParamInterface<std::string> {
  protected:
   BlobFileBuilderIOErrorTest() : sync_point_(GetParam()) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     mock_env_.reset(MockEnv::Create(Env::Default()));
     fs_ = mock_env_->GetFileSystem().get();
   }
@@ -600,6 +610,7 @@ INSTANTIATE_TEST_CASE_P(
         "BlobFileBuilder::WriteBlobToFile:AppendFooter"}));
 
 TEST_P(BlobFileBuilderIOErrorTest, IOError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Simulate an I/O error during the specified step of Add()
   // Note: blob_file_size will be set to value_size in order for the first blob
   // to trigger close
@@ -633,6 +644,7 @@ TEST_P(BlobFileBuilderIOErrorTest, IOError) {
       BlobFileCreationReason::kFlush, &blob_file_paths, &blob_file_additions);
 
   SyncPoint::GetInstance()->SetCallBack(sync_point_, [this](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Status* const s = static_cast<Status*>(arg);
     assert(s);
 
@@ -667,6 +679,7 @@ TEST_P(BlobFileBuilderIOErrorTest, IOError) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

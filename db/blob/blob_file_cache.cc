@@ -31,6 +31,7 @@ BlobFileCache::BlobFileCache(Cache* cache,
       column_family_id_(column_family_id),
       blob_file_read_hist_(blob_file_read_hist),
       io_tracer_(io_tracer) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(cache_);
   assert(immutable_options_);
   assert(file_options_);
@@ -39,6 +40,7 @@ BlobFileCache::BlobFileCache(Cache* cache,
 Status BlobFileCache::GetBlobFileReader(
     uint64_t blob_file_number,
     CacheHandleGuard<BlobFileReader>* blob_file_reader) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(blob_file_reader);
   assert(blob_file_reader->IsEmpty());
 

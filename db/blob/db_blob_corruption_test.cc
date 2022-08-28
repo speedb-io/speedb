@@ -15,6 +15,7 @@ class DBBlobCorruptionTest : public DBTestBase {
       : DBTestBase("db_blob_corruption_test", /* env_do_fsync */ false) {}
 
   void Corrupt(FileType filetype, int offset, int bytes_to_corrupt) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // Pick file to corrupt
     std::vector<std::string> filenames;
     ASSERT_OK(env_->GetChildren(dbname_, &filenames));
@@ -36,6 +37,7 @@ class DBBlobCorruptionTest : public DBTestBase {
 
 #ifndef ROCKSDB_LITE
 TEST_F(DBBlobCorruptionTest, VerifyWholeBlobFileChecksum) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = GetDefaultOptions();
   options.enable_blob_files = true;
   options.min_blob_size = 0;
@@ -58,6 +60,7 @@ TEST_F(DBBlobCorruptionTest, VerifyWholeBlobFileChecksum) {
   int count{0};
   SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::VerifyFullFileChecksum:mismatch", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         const Status* s = static_cast<Status*>(arg);
         ASSERT_NE(s, nullptr);
         ++count;
@@ -75,6 +78,7 @@ TEST_F(DBBlobCorruptionTest, VerifyWholeBlobFileChecksum) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   RegisterCustomObjects(argc, argv);

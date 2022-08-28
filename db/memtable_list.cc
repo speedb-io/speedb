@@ -32,6 +32,7 @@ class Mutex;
 class VersionSet;
 
 void MemTableListVersion::AddMemTable(MemTable* m) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   memlist_.push_front(m);
   *parent_memtable_list_memory_usage_ += m->ApproximateMemoryUsage();
 }
@@ -52,6 +53,7 @@ MemTableListVersion::MemTableListVersion(
       max_write_buffer_size_to_maintain_(
           old.max_write_buffer_size_to_maintain_),
       parent_memtable_list_memory_usage_(parent_memtable_list_memory_usage) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   memlist_ = old.memlist_;
   for (auto& m : memlist_) {
     m->Ref();
@@ -110,6 +112,7 @@ bool MemTableListVersion::Get(const LookupKey& key, std::string* value,
                               SequenceNumber* max_covering_tombstone_seq,
                               SequenceNumber* seq, const ReadOptions& read_opts,
                               ReadCallback* callback, bool* is_blob_index) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return GetFromList(&memlist_, key, value, timestamp, s, merge_context,
                      max_covering_tombstone_seq, seq, read_opts, callback,
                      is_blob_index);
@@ -118,6 +121,7 @@ bool MemTableListVersion::Get(const LookupKey& key, std::string* value,
 void MemTableListVersion::MultiGet(const ReadOptions& read_options,
                                    MultiGetRange* range,
                                    ReadCallback* callback) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (auto memtable : memlist_) {
     memtable->MultiGet(read_options, range, callback);
     if (range->empty()) {
@@ -129,6 +133,7 @@ void MemTableListVersion::MultiGet(const ReadOptions& read_options,
 bool MemTableListVersion::GetMergeOperands(
     const LookupKey& key, Status* s, MergeContext* merge_context,
     SequenceNumber* max_covering_tombstone_seq, const ReadOptions& read_opts) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (MemTable* memtable : memlist_) {
     bool done = memtable->Get(key, /*value*/ nullptr, /*timestamp*/ nullptr, s,
                               merge_context, max_covering_tombstone_seq,
@@ -144,6 +149,7 @@ bool MemTableListVersion::GetFromHistory(
     const LookupKey& key, std::string* value, std::string* timestamp, Status* s,
     MergeContext* merge_context, SequenceNumber* max_covering_tombstone_seq,
     SequenceNumber* seq, const ReadOptions& read_opts, bool* is_blob_index) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return GetFromList(&memlist_history_, key, value, timestamp, s, merge_context,
                      max_covering_tombstone_seq, seq, read_opts,
                      nullptr /*read_callback*/, is_blob_index);
@@ -154,6 +160,7 @@ bool MemTableListVersion::GetFromList(
     std::string* timestamp, Status* s, MergeContext* merge_context,
     SequenceNumber* max_covering_tombstone_seq, SequenceNumber* seq,
     const ReadOptions& read_opts, ReadCallback* callback, bool* is_blob_index) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   *seq = kMaxSequenceNumber;
 
   for (auto& memtable : *list) {
@@ -187,6 +194,7 @@ bool MemTableListVersion::GetFromList(
 Status MemTableListVersion::AddRangeTombstoneIterators(
     const ReadOptions& read_opts, Arena* /*arena*/,
     RangeDelAggregator* range_del_agg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(range_del_agg != nullptr);
   // Except for snapshot read, using kMaxSequenceNumber is OK because these
   // are immutable memtables.
@@ -204,6 +212,7 @@ Status MemTableListVersion::AddRangeTombstoneIterators(
 void MemTableListVersion::AddIterators(
     const ReadOptions& options, std::vector<InternalIterator*>* iterator_list,
     Arena* arena) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (auto& m : memlist_) {
     iterator_list->push_back(m->NewIterator(options, arena));
   }
@@ -211,6 +220,7 @@ void MemTableListVersion::AddIterators(
 
 void MemTableListVersion::AddIterators(
     const ReadOptions& options, MergeIteratorBuilder* merge_iter_builder) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (auto& m : memlist_) {
     merge_iter_builder->AddIterator(
         m->NewIterator(options, merge_iter_builder->GetArena()));
@@ -227,6 +237,7 @@ uint64_t MemTableListVersion::GetTotalNumEntries() const {
 
 MemTable::MemTableStats MemTableListVersion::ApproximateStats(
     const Slice& start_ikey, const Slice& end_ikey) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   MemTable::MemTableStats total_stats = {0, 0};
   for (auto& m : memlist_) {
     auto mStats = m->ApproximateStats(start_ikey, end_ikey);
@@ -297,6 +308,7 @@ size_t MemTableListVersion::MemoryAllocatedBytesExcludingLast() const {
 }
 
 bool MemTableListVersion::MemtableLimitExceeded(size_t usage) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (max_write_buffer_size_to_maintain_ > 0) {
     // calculate the total memory usage after dropping the oldest flushed
     // memtable, compare with max_write_buffer_size_to_maintain_ to decide
@@ -582,6 +594,7 @@ bool MemTableList::TrimHistory(autovector<MemTable*>* to_delete, size_t usage) {
 
 // Returns an estimate of the number of bytes of data in use.
 size_t MemTableList::ApproximateUnflushedMemTablesMemoryUsage() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   size_t total_size = 0;
   for (auto& memtable : current_->memlist_) {
     total_size += memtable->ApproximateMemoryUsage();
@@ -603,6 +616,7 @@ bool MemTableList::HasHistory() const {
 }
 
 void MemTableList::UpdateCachedValuesFromMemTableListVersion() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const size_t total_memtable_size =
       current_->MemoryAllocatedBytesExcludingLast();
   current_memory_allocted_bytes_excluding_last_.store(
@@ -620,6 +634,7 @@ uint64_t MemTableList::ApproximateOldestKeyTime() const {
 }
 
 void MemTableList::InstallNewVersion() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (current_->refs_ == 1) {
     // we're the only one using the version, just keep using it
   } else {
@@ -714,6 +729,7 @@ void MemTableList::RemoveMemTablesOrRestoreFlags(
 
 uint64_t MemTableList::PrecomputeMinLogContainingPrepSection(
     const std::unordered_set<MemTable*>* memtables_to_flush) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t min_log = 0;
 
   for (auto& m : current_->memlist_) {

@@ -15,12 +15,14 @@
 namespace ROCKSDB_NAMESPACE {
 
 std::unique_ptr<WriteControllerToken> WriteController::GetStopToken() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ++total_stopped_;
   return std::unique_ptr<WriteControllerToken>(new StopWriteToken(this));
 }
 
 std::unique_ptr<WriteControllerToken> WriteController::GetDelayToken(
     uint64_t write_rate) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (0 == total_delayed_++) {
     // Starting delay, so reset counters.
     next_refill_time_ = 0;
@@ -35,6 +37,7 @@ std::unique_ptr<WriteControllerToken> WriteController::GetDelayToken(
 
 std::unique_ptr<WriteControllerToken>
 WriteController::GetCompactionPressureToken() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ++total_compaction_pressure_;
   return std::unique_ptr<WriteControllerToken>(
       new CompactionPressureToken(this));
@@ -49,6 +52,7 @@ bool WriteController::IsStopped() const {
 // synchronization model here.
 // The function trust caller will sleep micros returned.
 uint64_t WriteController::GetDelay(SystemClock* clock, uint64_t num_bytes) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (total_stopped_.load(std::memory_order_relaxed) > 0) {
     return 0;
   }
@@ -100,20 +104,24 @@ uint64_t WriteController::GetDelay(SystemClock* clock, uint64_t num_bytes) {
 }
 
 uint64_t WriteController::NowMicrosMonotonic(SystemClock* clock) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return clock->NowNanos() / std::milli::den;
 }
 
 StopWriteToken::~StopWriteToken() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(controller_->total_stopped_ >= 1);
   --controller_->total_stopped_;
 }
 
 DelayWriteToken::~DelayWriteToken() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   controller_->total_delayed_--;
   assert(controller_->total_delayed_.load() >= 0);
 }
 
 CompactionPressureToken::~CompactionPressureToken() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   controller_->total_compaction_pressure_--;
   assert(controller_->total_compaction_pressure_ >= 0);
 }

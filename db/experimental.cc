@@ -16,6 +16,7 @@ namespace experimental {
 
 Status SuggestCompactRange(DB* db, ColumnFamilyHandle* column_family,
                            const Slice* begin, const Slice* end) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (db == nullptr) {
     return Status::InvalidArgument("DB is empty");
   }
@@ -24,6 +25,7 @@ Status SuggestCompactRange(DB* db, ColumnFamilyHandle* column_family,
 }
 
 Status PromoteL0(DB* db, ColumnFamilyHandle* column_family, int target_level) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (db == nullptr) {
     return Status::InvalidArgument("Didn't recognize DB object");
   }
@@ -34,17 +36,20 @@ Status PromoteL0(DB* db, ColumnFamilyHandle* column_family, int target_level) {
 
 Status SuggestCompactRange(DB* /*db*/, ColumnFamilyHandle* /*column_family*/,
                            const Slice* /*begin*/, const Slice* /*end*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return Status::NotSupported("Not supported in RocksDB LITE");
 }
 
 Status PromoteL0(DB* /*db*/, ColumnFamilyHandle* /*column_family*/,
                  int /*target_level*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return Status::NotSupported("Not supported in RocksDB LITE");
 }
 
 #endif  // ROCKSDB_LITE
 
 Status SuggestCompactRange(DB* db, const Slice* begin, const Slice* end) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return SuggestCompactRange(db, db->DefaultColumnFamily(), begin, end);
 }
 
@@ -52,6 +57,7 @@ Status UpdateManifestForFilesState(
     const DBOptions& db_opts, const std::string& db_name,
     const std::vector<ColumnFamilyDescriptor>& column_families,
     const UpdateManifestForFilesStateOptions& opts) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   OfflineManifestWriter w(db_opts, db_name);
   Status s = w.Recover(column_families);
 

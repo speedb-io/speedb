@@ -63,12 +63,14 @@
 namespace ROCKSDB_NAMESPACE {
 
 static std::string RandomString(Random* rnd, int len, double ratio) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string r;
   test::CompressibleString(rnd, ratio, len, &r);
   return r;
 }
 
 std::string Key(uint64_t key, int length) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kBufSize = 1000;
   char buf[kBufSize];
   if (length > kBufSize) {
@@ -91,6 +93,7 @@ class CompactionJobStatsTest : public testing::Test,
   Options last_options_;
 
   CompactionJobStatsTest() : env_(Env::Default()) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     env_->SetBackgroundThreads(1, Env::LOW);
     env_->SetBackgroundThreads(1, Env::HIGH);
     dbname_ = test::PerThreadDBPath("compaction_job_stats_test");
@@ -129,6 +132,7 @@ class CompactionJobStatsTest : public testing::Test,
 
   void CreateColumnFamilies(const std::vector<std::string>& cfs,
                             const Options& options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ColumnFamilyOptions cf_opts(options);
     size_t cfi = handles_.size();
     handles_.resize(cfi + cfs.size());
@@ -139,6 +143,7 @@ class CompactionJobStatsTest : public testing::Test,
 
   void CreateAndReopenWithCF(const std::vector<std::string>& cfs,
                              const Options& options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     CreateColumnFamilies(cfs, options);
     std::vector<std::string> cfs_plus_default = cfs;
     cfs_plus_default.insert(cfs_plus_default.begin(), kDefaultColumnFamilyName);
@@ -147,17 +152,20 @@ class CompactionJobStatsTest : public testing::Test,
 
   void ReopenWithColumnFamilies(const std::vector<std::string>& cfs,
                                 const std::vector<Options>& options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_OK(TryReopenWithColumnFamilies(cfs, options));
   }
 
   void ReopenWithColumnFamilies(const std::vector<std::string>& cfs,
                                 const Options& options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_OK(TryReopenWithColumnFamilies(cfs, options));
   }
 
   Status TryReopenWithColumnFamilies(
       const std::vector<std::string>& cfs,
       const std::vector<Options>& options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Close();
     EXPECT_EQ(cfs.size(), options.size());
     std::vector<ColumnFamilyDescriptor> column_families;
@@ -170,16 +178,19 @@ class CompactionJobStatsTest : public testing::Test,
 
   Status TryReopenWithColumnFamilies(const std::vector<std::string>& cfs,
                                      const Options& options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Close();
     std::vector<Options> v_opts(cfs.size(), options);
     return TryReopenWithColumnFamilies(cfs, v_opts);
   }
 
   void Reopen(const Options& options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_OK(TryReopen(options));
   }
 
   void Close() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     for (auto h : handles_) {
       delete h;
     }
@@ -189,27 +200,32 @@ class CompactionJobStatsTest : public testing::Test,
   }
 
   void DestroyAndReopen(const Options& options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // Destroy using last options
     Destroy(last_options_);
     ASSERT_OK(TryReopen(options));
   }
 
   void Destroy(const Options& options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Close();
     ASSERT_OK(DestroyDB(dbname_, options));
   }
 
   Status ReadOnlyReopen(const Options& options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return DB::OpenForReadOnly(options, dbname_, &db_);
   }
 
   Status TryReopen(const Options& options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Close();
     last_options_ = options;
     return DB::Open(options, dbname_, &db_);
   }
 
   Status Flush(int cf = 0) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (cf == 0) {
       return db_->Flush(FlushOptions());
     } else {
@@ -218,23 +234,28 @@ class CompactionJobStatsTest : public testing::Test,
   }
 
   Status Put(const Slice& k, const Slice& v, WriteOptions wo = WriteOptions()) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return db_->Put(wo, k, v);
   }
 
   Status Put(int cf, const Slice& k, const Slice& v,
              WriteOptions wo = WriteOptions()) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return db_->Put(wo, handles_[cf], k, v);
   }
 
   Status Delete(const std::string& k) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return db_->Delete(WriteOptions(), k);
   }
 
   Status Delete(int cf, const std::string& k) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return db_->Delete(WriteOptions(), handles_[cf], k);
   }
 
   std::string Get(const std::string& k, const Snapshot* snapshot = nullptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ReadOptions options;
     options.verify_checksums = true;
     options.snapshot = snapshot;
@@ -250,6 +271,7 @@ class CompactionJobStatsTest : public testing::Test,
 
   std::string Get(int cf, const std::string& k,
                   const Snapshot* snapshot = nullptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ReadOptions options;
     options.verify_checksums = true;
     options.snapshot = snapshot;
@@ -264,6 +286,7 @@ class CompactionJobStatsTest : public testing::Test,
   }
 
   int NumTableFilesAtLevel(int level, int cf = 0) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::string property;
     if (cf == 0) {
       // default cfd
@@ -279,6 +302,7 @@ class CompactionJobStatsTest : public testing::Test,
 
   // Return spread of files per level
   std::string FilesPerLevel(int cf = 0) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     int num_levels =
         (cf == 0) ? db_->NumberLevels() : db_->NumberLevels(handles_[1]);
     std::string result;
@@ -298,6 +322,7 @@ class CompactionJobStatsTest : public testing::Test,
 
   Status Size(uint64_t* size, const Slice& start, const Slice& limit,
               int cf = 0) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Range r(start, limit);
     if (cf == 0) {
       return db_->GetApproximateSizes(&r, 1, size);
@@ -308,21 +333,25 @@ class CompactionJobStatsTest : public testing::Test,
 
   void Compact(int cf, const Slice& start, const Slice& limit,
                uint32_t target_path_id) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     CompactRangeOptions compact_options;
     compact_options.target_path_id = target_path_id;
     ASSERT_OK(db_->CompactRange(compact_options, handles_[cf], &start, &limit));
   }
 
   void Compact(int cf, const Slice& start, const Slice& limit) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_OK(
         db_->CompactRange(CompactRangeOptions(), handles_[cf], &start, &limit));
   }
 
   void Compact(const Slice& start, const Slice& limit) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_OK(db_->CompactRange(CompactRangeOptions(), &start, &limit));
   }
 
   void TEST_Compact(int level, int cf, const Slice& start, const Slice& limit) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_OK(dbfull()->TEST_CompactRange(level, &start, &limit, handles_[cf],
                                           true /* disallow trivial move */));
   }
@@ -331,6 +360,7 @@ class CompactionJobStatsTest : public testing::Test,
   // covering the range [small,large].
   void MakeTables(int n, const std::string& small, const std::string& large,
                   int cf = 0) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     for (int i = 0; i < n; i++) {
       ASSERT_OK(Put(cf, small, "begin"));
       ASSERT_OK(Put(cf, large, "end"));
@@ -341,6 +371,7 @@ class CompactionJobStatsTest : public testing::Test,
   static void SetDeletionCompactionStats(
       CompactionJobStats *stats, uint64_t input_deletions,
       uint64_t expired_deletions, uint64_t records_replaced) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     stats->num_input_deletion_records = input_deletions;
     stats->num_expired_deletion_records = expired_deletions;
     stats->num_records_replaced = records_replaced;
@@ -350,6 +381,7 @@ class CompactionJobStatsTest : public testing::Test,
     Random* rnd, uint64_t smallest, uint64_t largest,
     int key_size, int value_size, uint64_t interval,
     double ratio, int cf = 0) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     for (auto key = smallest; key < largest; key += interval) {
       ASSERT_OK(Put(cf, Slice(Key(key, key_size)),
                         Slice(RandomString(rnd, value_size, ratio))));
@@ -363,6 +395,7 @@ class CompactionJobStatsTest : public testing::Test,
   void SelectivelyDeleteKeys(uint64_t smallest, uint64_t largest,
     uint64_t interval, int deletion_interval, int key_size,
     uint64_t cutoff_key_num, CompactionJobStats* stats, int cf = 0) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 
     // interval needs to be >= 2 so that deletion entries can be inserted
     // that are intended to not result in an actual key deletion by using
@@ -441,6 +474,7 @@ class CompactionJobStatsChecker : public EventListener {
   // 10% in uncompressed case and 20% when compression is used.
   virtual void Verify(const CompactionJobStats& current_stats,
               const CompactionJobStats& stats) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // time
     ASSERT_GT(current_stats.elapsed_micros, 0U);
 
@@ -493,11 +527,13 @@ class CompactionJobStatsChecker : public EventListener {
   // verify the CompactionJobStats returned by the OnCompactionCompleted()
   // callback.
   void AddExpectedStats(const CompactionJobStats& stats) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::lock_guard<std::mutex> lock(mutex_);
     expected_stats_.push(stats);
   }
 
   void EnableCompression(bool flag) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     compression_enabled_ = flag;
   }
 
@@ -539,6 +575,7 @@ uint64_t EstimatedFileSize(
     double compression_ratio = 1.0,
     size_t block_size = 4096,
     int bloom_bits_per_key = 10) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const size_t kPerKeyOverhead = 8;
   const size_t kFooterSize = 512;
 
@@ -556,6 +593,7 @@ namespace {
 
 void CopyPrefix(
     const Slice& src, size_t prefix_length, std::string* dst) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(prefix_length > 0);
   size_t length = src.size() > prefix_length ? prefix_length : src.size();
   dst->assign(src.data(), length);
@@ -570,6 +608,7 @@ CompactionJobStats NewManualCompactionJobStats(
     size_t num_output_files, uint64_t num_output_records,
     double compression_ratio, uint64_t num_records_replaced,
     bool is_full = false, bool is_manual = true) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   CompactionJobStats stats;
   stats.Reset();
 
@@ -609,6 +648,7 @@ CompactionJobStats NewManualCompactionJobStats(
 }
 
 CompressionType GetAnyCompression() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (Snappy_Supported()) {
     return kSnappyCompression;
   } else if (Zlib_Supported()) {
@@ -627,6 +667,7 @@ CompressionType GetAnyCompression() {
 }  // namespace
 
 TEST_P(CompactionJobStatsTest, CompactionJobStatsTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Random rnd(301);
   const int kBufSize = 100;
   char buf[kBufSize];
@@ -801,6 +842,7 @@ TEST_P(CompactionJobStatsTest, CompactionJobStatsTest) {
     std::atomic<bool> first_prepare_write(true);
     ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
         "WritableFileWriter::Append:BeforePrepareWrite", [&](void* /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
           if (first_prepare_write.load()) {
             options.env->SleepForMicroseconds(3);
             first_prepare_write.store(false);
@@ -810,6 +852,7 @@ TEST_P(CompactionJobStatsTest, CompactionJobStatsTest) {
     std::atomic<bool> first_flush(true);
     ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
         "WritableFileWriter::Flush:BeforeAppend", [&](void* /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
           if (first_flush.load()) {
             options.env->SleepForMicroseconds(3);
             first_flush.store(false);
@@ -819,6 +862,7 @@ TEST_P(CompactionJobStatsTest, CompactionJobStatsTest) {
     std::atomic<bool> first_sync(true);
     ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
         "WritableFileWriter::SyncInternal:0", [&](void* /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
           if (first_sync.load()) {
             options.env->SleepForMicroseconds(3);
             first_sync.store(false);
@@ -828,6 +872,7 @@ TEST_P(CompactionJobStatsTest, CompactionJobStatsTest) {
     std::atomic<bool> first_range_sync(true);
     ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
         "WritableFileWriter::RangeSync:0", [&](void* /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
           if (first_range_sync.load()) {
             options.env->SleepForMicroseconds(3);
             first_range_sync.store(false);
@@ -848,6 +893,7 @@ TEST_P(CompactionJobStatsTest, CompactionJobStatsTest) {
 }
 
 TEST_P(CompactionJobStatsTest, DeletionStatsTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Random rnd(301);
   uint64_t key_base = 100000l;
   // Note: key_base must be multiple of num_keys_per_L0_file
@@ -931,6 +977,7 @@ TEST_P(CompactionJobStatsTest, DeletionStatsTest) {
 
 namespace {
 int GetUniversalCompactionInputUnits(uint32_t num_flushes) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint32_t compaction_input_units;
   for (compaction_input_units = 1;
        num_flushes >= compaction_input_units;
@@ -944,6 +991,7 @@ int GetUniversalCompactionInputUnits(uint32_t num_flushes) {
 }  // namespace
 
 TEST_P(CompactionJobStatsTest, UniversalCompactionTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Random rnd(301);
   uint64_t key_base = 100000000l;
   // Note: key_base must be multiple of num_keys_per_L0_file
@@ -1015,6 +1063,7 @@ INSTANTIATE_TEST_CASE_P(CompactionJobStatsTest, CompactionJobStatsTest,
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
@@ -1024,6 +1073,7 @@ int main(int argc, char** argv) {
 #include <stdio.h>
 
 int main(int /*argc*/, char** /*argv*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   fprintf(stderr, "SKIPPED, not supported in ROCKSDB_LITE\n");
   return 0;
 }

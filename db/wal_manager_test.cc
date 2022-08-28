@@ -37,10 +37,12 @@ class WalManagerTest : public testing::Test {
         table_cache_(NewLRUCache(50000, 16)),
         write_buffer_manager_(db_options_.db_write_buffer_size),
         current_log_number_(0) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     env_.reset(MockEnv::Create(Env::Default())), DestroyDB(dbname_, Options());
   }
 
   void Init() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_OK(env_->CreateDirIfMissing(dbname_));
     ASSERT_OK(env_->CreateDirIfMissing(ArchivalDirectory(dbname_)));
     db_options_.db_paths.emplace_back(dbname_,
@@ -61,12 +63,14 @@ class WalManagerTest : public testing::Test {
   }
 
   void Reopen() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     wal_manager_.reset(
         new WalManager(db_options_, env_options_, nullptr /*IOTracer*/));
   }
 
   // NOT thread safe
   void Put(const std::string& key, const std::string& value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(current_log_writer_.get() != nullptr);
     uint64_t seq =  versions_->LastSequence() + 1;
     WriteBatch batch;
@@ -81,6 +85,7 @@ class WalManagerTest : public testing::Test {
 
   // NOT thread safe
   void RollTheLog(bool /*archived*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     current_log_number_++;
     std::string fname = ArchivedLogFileName(dbname_, current_log_number_);
     const auto& fs = env_->GetFileSystem();
@@ -91,6 +96,7 @@ class WalManagerTest : public testing::Test {
   }
 
   void CreateArchiveLogs(int num_logs, int entries_per_log) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     for (int i = 1; i <= num_logs; ++i) {
       RollTheLog(true);
       for (int k = 0; k < entries_per_log; ++k) {
@@ -101,6 +107,7 @@ class WalManagerTest : public testing::Test {
 
   std::unique_ptr<TransactionLogIterator> OpenTransactionLogIter(
       const SequenceNumber seq) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::unique_ptr<TransactionLogIterator> iter;
     Status status = wal_manager_->GetUpdatesSince(
         seq, &iter, TransactionLogIterator::ReadOptions(), versions_.get());
@@ -123,6 +130,7 @@ class WalManagerTest : public testing::Test {
 };
 
 TEST_F(WalManagerTest, ReadFirstRecordCache) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Init();
   std::string path = dbname_ + "/000001.log";
   std::unique_ptr<FSWritableFile> file;
@@ -167,6 +175,7 @@ TEST_F(WalManagerTest, ReadFirstRecordCache) {
 
 namespace {
 uint64_t GetLogDirSize(std::string dir_path, Env* env) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t dir_size = 0;
   std::vector<std::string> files;
   EXPECT_OK(env->GetChildren(dir_path, &files));
@@ -184,6 +193,7 @@ uint64_t GetLogDirSize(std::string dir_path, Env* env) {
 }
 std::vector<std::uint64_t> ListSpecificFiles(
     Env* env, const std::string& path, const FileType expected_file_type) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::vector<std::string> files;
   std::vector<uint64_t> file_numbers;
   uint64_t number;
@@ -200,6 +210,7 @@ std::vector<std::uint64_t> ListSpecificFiles(
 }
 
 int CountRecords(TransactionLogIterator* iter) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   int count = 0;
   SequenceNumber lastSequence = 0;
   BatchResult res;
@@ -217,6 +228,7 @@ int CountRecords(TransactionLogIterator* iter) {
 }  // namespace
 
 TEST_F(WalManagerTest, WALArchivalSizeLimit) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   db_options_.WAL_ttl_seconds = 0;
   db_options_.WAL_size_limit_MB = 1000;
   Init();
@@ -255,6 +267,7 @@ TEST_F(WalManagerTest, WALArchivalSizeLimit) {
 }
 
 TEST_F(WalManagerTest, WALArchivalTtl) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   db_options_.WAL_ttl_seconds = 1000;
   Init();
 
@@ -281,6 +294,7 @@ TEST_F(WalManagerTest, WALArchivalTtl) {
 }
 
 TEST_F(WalManagerTest, TransactionLogIteratorMoveOverZeroFiles) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Init();
   RollTheLog(false);
   Put("key1", std::string(1024, 'a'));
@@ -295,6 +309,7 @@ TEST_F(WalManagerTest, TransactionLogIteratorMoveOverZeroFiles) {
 }
 
 TEST_F(WalManagerTest, TransactionLogIteratorJustEmptyFile) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Init();
   RollTheLog(false);
   auto iter = OpenTransactionLogIter(0);
@@ -303,6 +318,7 @@ TEST_F(WalManagerTest, TransactionLogIteratorJustEmptyFile) {
 }
 
 TEST_F(WalManagerTest, TransactionLogIteratorNewFileWhileScanning) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Init();
   CreateArchiveLogs(2, 100);
   auto iter = OpenTransactionLogIter(0);
@@ -328,6 +344,7 @@ TEST_F(WalManagerTest, TransactionLogIteratorNewFileWhileScanning) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }
@@ -336,6 +353,7 @@ int main(int argc, char** argv) {
 #include <stdio.h>
 
 int main(int /*argc*/, char** /*argv*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   fprintf(stderr, "SKIPPED as WalManager is not supported in ROCKSDB_LITE\n");
   return 0;
 }

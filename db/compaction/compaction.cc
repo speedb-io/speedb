@@ -25,6 +25,7 @@ const uint64_t kRangeTombstoneSentinel =
 
 int sstableKeyCompare(const Comparator* user_cmp, const InternalKey& a,
                       const InternalKey& b) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto c = user_cmp->CompareWithoutTimestamp(a.user_key(), b.user_key());
   if (c != 0) {
     return c;
@@ -43,6 +44,7 @@ int sstableKeyCompare(const Comparator* user_cmp, const InternalKey& a,
 
 int sstableKeyCompare(const Comparator* user_cmp, const InternalKey* a,
                       const InternalKey& b) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (a == nullptr) {
     return -1;
   }
@@ -51,6 +53,7 @@ int sstableKeyCompare(const Comparator* user_cmp, const InternalKey* a,
 
 int sstableKeyCompare(const Comparator* user_cmp, const InternalKey& a,
                       const InternalKey* b) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (b == nullptr) {
     return -1;
   }
@@ -58,6 +61,7 @@ int sstableKeyCompare(const Comparator* user_cmp, const InternalKey& a,
 }
 
 uint64_t TotalFileSize(const std::vector<FileMetaData*>& files) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t sum = 0;
   for (size_t i = 0; i < files.size() && files[i]; i++) {
     sum += files[i]->fd.GetFileSize();
@@ -66,6 +70,7 @@ uint64_t TotalFileSize(const std::vector<FileMetaData*>& files) {
 }
 
 void Compaction::SetInputVersion(Version* _input_version) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   input_version_ = _input_version;
   cfd_ = input_version_->cfd();
 
@@ -78,6 +83,7 @@ void Compaction::GetBoundaryKeys(
     VersionStorageInfo* vstorage,
     const std::vector<CompactionInputFiles>& inputs, Slice* smallest_user_key,
     Slice* largest_user_key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   bool initialized = false;
   const Comparator* ucmp = vstorage->InternalComparator()->user_comparator();
   for (size_t i = 0; i < inputs.size(); ++i) {
@@ -117,6 +123,7 @@ void Compaction::GetBoundaryKeys(
 
 std::vector<CompactionInputFiles> Compaction::PopulateWithAtomicBoundaries(
     VersionStorageInfo* vstorage, std::vector<CompactionInputFiles> inputs) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const Comparator* ucmp = vstorage->InternalComparator()->user_comparator();
   for (size_t i = 0; i < inputs.size(); i++) {
     if (inputs[i].level == 0 || inputs[i].files.empty()) {
@@ -163,6 +170,7 @@ std::vector<CompactionInputFiles> Compaction::PopulateWithAtomicBoundaries(
 bool Compaction::IsBottommostLevel(
     int output_level, VersionStorageInfo* vstorage,
     const std::vector<CompactionInputFiles>& inputs) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   int output_l0_idx;
   if (output_level == 0) {
     output_l0_idx = 0;
@@ -187,12 +195,14 @@ bool Compaction::IsBottommostLevel(
 bool Compaction::TEST_IsBottommostLevel(
     int output_level, VersionStorageInfo* vstorage,
     const std::vector<CompactionInputFiles>& inputs) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return IsBottommostLevel(output_level, vstorage, inputs);
 }
 
 bool Compaction::IsFullCompaction(
     VersionStorageInfo* vstorage,
     const std::vector<CompactionInputFiles>& inputs) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   size_t num_files_in_compaction = 0;
   size_t total_num_files = 0;
   for (int l = 0; l < vstorage->num_levels(); l++) {
@@ -241,6 +251,7 @@ Compaction::Compaction(
       is_trivial_move_(false),
       compaction_reason_(_compaction_reason),
       notify_on_compaction_completion_(false) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   MarkFilesBeingCompacted(true);
   if (is_manual_compaction_) {
     compaction_reason_ = CompactionReason::kManualCompaction;
@@ -268,6 +279,7 @@ Compaction::Compaction(
 }
 
 Compaction::~Compaction() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (input_version_ != nullptr) {
     input_version_->Unref();
   }
@@ -359,6 +371,7 @@ bool Compaction::IsTrivialMove() const {
 }
 
 void Compaction::AddInputDeletions(VersionEdit* out_edit) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (size_t which = 0; which < num_input_levels(); which++) {
     for (size_t i = 0; i < inputs_[which].size(); i++) {
       out_edit->DeleteFile(level(which), inputs_[which][i]->fd.GetNumber());
@@ -406,6 +419,7 @@ bool Compaction::KeyNotExistsBeyondOutputLevel(
 
 // Mark (or clear) each file that is being compacted
 void Compaction::MarkFilesBeingCompacted(bool mark_as_compacted) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (size_t i = 0; i < num_input_levels(); i++) {
     for (size_t j = 0; j < inputs_[i].size(); j++) {
       assert(mark_as_compacted ? !inputs_[i][j]->being_compacted
@@ -455,11 +469,13 @@ uint64_t Compaction::CalculateTotalInputSize() const {
 }
 
 void Compaction::ReleaseCompactionFiles(Status status) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   MarkFilesBeingCompacted(false);
   cfd_->compaction_picker()->ReleaseCompactionFiles(this, status);
 }
 
 void Compaction::ResetNextCompactionIndex() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(input_version_ != nullptr);
   input_vstorage_->ResetNextCompactionIndex(start_level_);
 }
@@ -467,6 +483,7 @@ void Compaction::ResetNextCompactionIndex() {
 namespace {
 int InputSummary(const std::vector<FileMetaData*>& files, char* output,
                  int len) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   *output = '\0';
   int write = 0;
   for (size_t i = 0; i < files.size(); i++) {
@@ -485,6 +502,7 @@ int InputSummary(const std::vector<FileMetaData*>& files, char* output,
 }  // namespace
 
 void Compaction::Summary(char* output, int len) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   int write =
       snprintf(output, len, "Base version %" PRIu64 " Base level %d, inputs: [",
                input_version_->GetVersionNumber(), start_level_);

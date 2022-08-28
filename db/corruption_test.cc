@@ -75,6 +75,7 @@ class CorruptionTest : public testing::Test {
   DB* db_;
 
   CorruptionTest() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // If LRU cache shard bit is smaller than 2 (or -1 which will automatically
     // set it to 0), test SequenceNumberRecovery will fail, likely because of a
     // bug in recovery code. Keep it 4 for now to make the test passes.
@@ -116,11 +117,13 @@ class CorruptionTest : public testing::Test {
   }
 
   void CloseDb() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     delete db_;
     db_ = nullptr;
   }
 
   Status TryReopen(Options* options = nullptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     delete db_;
     db_ = nullptr;
     Options opt = (options ? *options : options_);
@@ -138,16 +141,19 @@ class CorruptionTest : public testing::Test {
   }
 
   void Reopen(Options* options = nullptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_OK(TryReopen(options));
   }
 
   void RepairDB() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     delete db_;
     db_ = nullptr;
     ASSERT_OK(::ROCKSDB_NAMESPACE::RepairDB(dbname_, options_));
   }
 
   void Build(int n, int start, int flush_every) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::string key_space, value_space;
     WriteBatch batch;
     for (int i = 0; i < n; i++) {
@@ -166,6 +172,7 @@ class CorruptionTest : public testing::Test {
   void Build(int n, int flush_every = 0) { Build(n, 0, flush_every); }
 
   void Check(int min_expected, int max_expected) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     uint64_t next_expected = 0;
     uint64_t missed = 0;
     int bad_keys = 0;
@@ -208,6 +215,7 @@ class CorruptionTest : public testing::Test {
   }
 
   void Corrupt(FileType filetype, int offset, int bytes_to_corrupt) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // Pick file to corrupt
     std::vector<std::string> filenames;
     ASSERT_OK(env_->GetChildren(dbname_, &filenames));
@@ -231,6 +239,7 @@ class CorruptionTest : public testing::Test {
   // corrupts exactly one file at level `level`. if no file found at level,
   // asserts
   void CorruptTableFileAtLevel(int level, int offset, int bytes_to_corrupt) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::vector<LiveFileMetaData> metadata;
     db_->GetLiveFilesMetaData(&metadata);
     for (const auto& m : metadata) {
@@ -245,6 +254,7 @@ class CorruptionTest : public testing::Test {
 
 
   int Property(const std::string& name) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::string property;
     int result;
     if (db_->GetProperty(name, &property) &&
@@ -257,6 +267,7 @@ class CorruptionTest : public testing::Test {
 
   // Return the ith key
   Slice Key(int i, std::string* storage) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     char buf[100];
     snprintf(buf, sizeof(buf), "%016d", i);
     storage->assign(buf, strlen(buf));
@@ -265,6 +276,7 @@ class CorruptionTest : public testing::Test {
 
   // Return the value to associate with the specified key
   Slice Value(int k, std::string* storage) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (k == 0) {
       // Ugh.  Random seed of 0 used to produce no entropy.  This code
       // preserves the implementation that was in place when all of the
@@ -278,6 +290,7 @@ class CorruptionTest : public testing::Test {
   }
 
   void GetSortedWalFiles(std::vector<uint64_t>& file_nums) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::vector<std::string> tmp_files;
     ASSERT_OK(env_->GetChildren(dbname_, &tmp_files));
     FileType type = kWalFile;
@@ -292,6 +305,7 @@ class CorruptionTest : public testing::Test {
 
   void CorruptFileWithTruncation(FileType file, uint64_t number,
                                  uint64_t bytes_to_truncate = 0) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::string path;
     switch (file) {
       case FileType::kWalFile:
@@ -315,6 +329,7 @@ class CorruptionTest : public testing::Test {
 };
 
 TEST_F(CorruptionTest, Recovery) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Build(100);
   Check(100, 100);
 #ifdef OS_WIN
@@ -338,6 +353,7 @@ TEST_F(CorruptionTest, Recovery) {
 }
 
 TEST_F(CorruptionTest, PostPITRCorruptionWALsRetained) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Repro for bug where WALs following the point-in-time recovery were not
   // retained leading to the next recovery failing.
   CloseDb();
@@ -400,12 +416,14 @@ TEST_F(CorruptionTest, PostPITRCorruptionWALsRetained) {
 }
 
 TEST_F(CorruptionTest, RecoverWriteError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   env_->writable_file_error_ = true;
   Status s = TryReopen();
   ASSERT_TRUE(!s.ok());
 }
 
 TEST_F(CorruptionTest, NewFileErrorDuringWrite) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Do enough writing to force minor compaction
   env_->writable_file_error_ = true;
   const int num =
@@ -429,6 +447,7 @@ TEST_F(CorruptionTest, NewFileErrorDuringWrite) {
 }
 
 TEST_F(CorruptionTest, TableFile) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Build(100);
   DBImpl* dbi = static_cast_with_check<DBImpl>(db_);
   ASSERT_OK(dbi->TEST_FlushMemTable());
@@ -441,6 +460,7 @@ TEST_F(CorruptionTest, TableFile) {
 }
 
 TEST_F(CorruptionTest, VerifyChecksumReadahead) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   SpecialEnv senv(env_->target());
   options.env = &senv;
@@ -494,6 +514,7 @@ TEST_F(CorruptionTest, VerifyChecksumReadahead) {
 }
 
 TEST_F(CorruptionTest, TableFileIndexData) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   // very big, we'll trigger flushes manually
   options.write_buffer_size = 100 * 1024 * 1024;
@@ -518,6 +539,7 @@ TEST_F(CorruptionTest, TableFileIndexData) {
 }
 
 TEST_F(CorruptionTest, MissingDescriptor) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Build(1000);
   RepairDB();
   Reopen();
@@ -525,6 +547,7 @@ TEST_F(CorruptionTest, MissingDescriptor) {
 }
 
 TEST_F(CorruptionTest, SequenceNumberRecovery) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(db_->Put(WriteOptions(), "foo", "v1"));
   ASSERT_OK(db_->Put(WriteOptions(), "foo", "v2"));
   ASSERT_OK(db_->Put(WriteOptions(), "foo", "v3"));
@@ -546,6 +569,7 @@ TEST_F(CorruptionTest, SequenceNumberRecovery) {
 }
 
 TEST_F(CorruptionTest, CorruptedDescriptor) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(db_->Put(WriteOptions(), "foo", "hello"));
   DBImpl* dbi = static_cast_with_check<DBImpl>(db_);
   ASSERT_OK(dbi->TEST_FlushMemTable());
@@ -563,6 +587,7 @@ TEST_F(CorruptionTest, CorruptedDescriptor) {
 }
 
 TEST_F(CorruptionTest, CompactionInputError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = env_;
   Reopen(&options);
@@ -584,6 +609,7 @@ TEST_F(CorruptionTest, CompactionInputError) {
 }
 
 TEST_F(CorruptionTest, CompactionInputErrorParanoid) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = env_;
   options.paranoid_checks = true;
@@ -631,6 +657,7 @@ TEST_F(CorruptionTest, CompactionInputErrorParanoid) {
 }
 
 TEST_F(CorruptionTest, UnrelatedKeys) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Build(10);
   DBImpl* dbi = static_cast_with_check<DBImpl>(db_);
   ASSERT_OK(dbi->TEST_FlushMemTable());
@@ -648,6 +675,7 @@ TEST_F(CorruptionTest, UnrelatedKeys) {
 }
 
 TEST_F(CorruptionTest, RangeDeletionCorrupted) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(
       db_->DeleteRange(WriteOptions(), db_->DefaultColumnFamily(), "a", "b"));
   ASSERT_OK(db_->Flush(FlushOptions()));
@@ -678,6 +706,7 @@ TEST_F(CorruptionTest, RangeDeletionCorrupted) {
 }
 
 TEST_F(CorruptionTest, FileSystemStateCorrupted) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (int iter = 0; iter < 2; ++iter) {
     Options options;
     options.env = env_;
@@ -718,6 +747,7 @@ static const auto& corruption_modes = {
     mock::MockTableFactory::kCorruptReorderKey};
 
 TEST_F(CorruptionTest, ParanoidFileChecksOnFlush) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = env_;
   options.check_flush_compaction_key_order = false;
@@ -746,6 +776,7 @@ TEST_F(CorruptionTest, ParanoidFileChecksOnFlush) {
 }
 
 TEST_F(CorruptionTest, ParanoidFileChecksOnCompact) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = env_;
   options.paranoid_file_checks = true;
@@ -776,12 +807,14 @@ TEST_F(CorruptionTest, ParanoidFileChecksOnCompact) {
 }
 
 TEST_F(CorruptionTest, ParanoidFileChecksWithDeleteRangeFirst) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = env_;
   options.check_flush_compaction_key_order = false;
   options.paranoid_file_checks = true;
   options.create_if_missing = true;
   for (bool do_flush : {true, false}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     delete db_;
     db_ = nullptr;
     ASSERT_OK(DestroyDB(dbname_, options));
@@ -809,12 +842,14 @@ TEST_F(CorruptionTest, ParanoidFileChecksWithDeleteRangeFirst) {
 }
 
 TEST_F(CorruptionTest, ParanoidFileChecksWithDeleteRange) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = env_;
   options.check_flush_compaction_key_order = false;
   options.paranoid_file_checks = true;
   options.create_if_missing = true;
   for (bool do_flush : {true, false}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     delete db_;
     db_ = nullptr;
     ASSERT_OK(DestroyDB(dbname_, options));
@@ -845,12 +880,14 @@ TEST_F(CorruptionTest, ParanoidFileChecksWithDeleteRange) {
 }
 
 TEST_F(CorruptionTest, ParanoidFileChecksWithDeleteRangeLast) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = env_;
   options.check_flush_compaction_key_order = false;
   options.paranoid_file_checks = true;
   options.create_if_missing = true;
   for (bool do_flush : {true, false}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     delete db_;
     db_ = nullptr;
     ASSERT_OK(DestroyDB(dbname_, options));
@@ -878,6 +915,7 @@ TEST_F(CorruptionTest, ParanoidFileChecksWithDeleteRangeLast) {
 }
 
 TEST_F(CorruptionTest, LogCorruptionErrorsInCompactionIterator) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = env_;
   options.create_if_missing = true;
@@ -904,6 +942,7 @@ TEST_F(CorruptionTest, LogCorruptionErrorsInCompactionIterator) {
 }
 
 TEST_F(CorruptionTest, CompactionKeyOrderCheck) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = env_;
   options.paranoid_file_checks = false;
@@ -928,6 +967,7 @@ TEST_F(CorruptionTest, CompactionKeyOrderCheck) {
 }
 
 TEST_F(CorruptionTest, FlushKeyOrderCheck) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = env_;
   options.paranoid_file_checks = false;
@@ -943,6 +983,7 @@ TEST_F(CorruptionTest, FlushKeyOrderCheck) {
   // Generate some out of order keys from the memtable
   SyncPoint::GetInstance()->SetCallBack(
       "MemTableIterator::Next:0", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         MemTableRep::Iterator* mem_iter =
             static_cast<MemTableRep::Iterator*>(arg);
         if (++cnt == 3) {
@@ -958,6 +999,7 @@ TEST_F(CorruptionTest, FlushKeyOrderCheck) {
 }
 
 TEST_F(CorruptionTest, DisableKeyOrderCheck) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(db_->SetOptions({{"check_flush_compaction_key_order", "false"}}));
   DBImpl* dbi = static_cast_with_check<DBImpl>(db_);
 
@@ -977,6 +1019,7 @@ TEST_F(CorruptionTest, DisableKeyOrderCheck) {
 }
 
 TEST_F(CorruptionTest, VerifyWholeTableChecksum) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   CloseDb();
   Options options;
   options.env = env_;
@@ -1001,6 +1044,7 @@ TEST_F(CorruptionTest, VerifyWholeTableChecksum) {
   int count{0};
   SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::VerifyFullFileChecksum:mismatch", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         auto* s = reinterpret_cast<Status*>(arg);
         ASSERT_NE(s, nullptr);
         ++count;
@@ -1055,6 +1099,7 @@ INSTANTIATE_TEST_CASE_P(CorruptionTest, CrashDuringRecoveryWithCorruptionTest,
 // sequence number recovered from previous WALs and MANIFEST because of which DB
 // will be in consistent state.
 TEST_P(CrashDuringRecoveryWithCorruptionTest, CrashDuringRecovery) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   CloseDb();
   Options options;
   options.track_and_verify_wals_in_manifest =
@@ -1193,6 +1238,7 @@ TEST_P(CrashDuringRecoveryWithCorruptionTest, CrashDuringRecovery) {
 // sequence number recovered from previous WALs and MANIFEST because of which DB
 // will be in consistent state.
 TEST_P(CrashDuringRecoveryWithCorruptionTest, TxnDbCrashDuringRecovery) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   CloseDb();
   Options options;
   options.wal_recovery_mode = WALRecoveryMode::kPointInTimeRecovery;
@@ -1321,6 +1367,7 @@ TEST_P(CrashDuringRecoveryWithCorruptionTest, TxnDbCrashDuringRecovery) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   RegisterCustomObjects(argc, argv);
@@ -1331,6 +1378,7 @@ int main(int argc, char** argv) {
 #include <stdio.h>
 
 int main(int /*argc*/, char** /*argv*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   fprintf(stderr, "SKIPPED as RepairDB() is not supported in ROCKSDB_LITE\n");
   return 0;
 }

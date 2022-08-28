@@ -24,6 +24,7 @@ namespace {
 }  // anonymous namespace
 
 uint64_t PackFileNumberAndPathId(uint64_t number, uint64_t path_id) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(number <= kFileNumberMask);
   return number | (path_id * (kFileNumberMask + 1));
 }
@@ -31,6 +32,7 @@ uint64_t PackFileNumberAndPathId(uint64_t number, uint64_t path_id) {
 Status FileMetaData::UpdateBoundaries(const Slice& key, const Slice& value,
                                       SequenceNumber seqno,
                                       ValueType value_type) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (value_type == kTypeBlobIndex) {
     BlobIndex blob_index;
     const Status s = blob_index.DecodeFrom(value);
@@ -61,6 +63,7 @@ Status FileMetaData::UpdateBoundaries(const Slice& key, const Slice& value,
 }
 
 void VersionEdit::Clear() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   max_level_ = 0;
   db_id_.clear();
   comparator_.clear();
@@ -278,6 +281,7 @@ bool VersionEdit::EncodeTo(std::string* dst) const {
 }
 
 static bool GetInternalKey(Slice* input, InternalKey* dst) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Slice str;
   if (GetLengthPrefixedSlice(input, &str)) {
     dst->DecodeFrom(str);
@@ -288,6 +292,7 @@ static bool GetInternalKey(Slice* input, InternalKey* dst) {
 }
 
 bool VersionEdit::GetLevel(Slice* input, int* level, const char** /*msg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint32_t v = 0;
   if (GetVarint32(input, &v)) {
     *level = v;
@@ -301,6 +306,7 @@ bool VersionEdit::GetLevel(Slice* input, int* level, const char** /*msg*/) {
 }
 
 const char* VersionEdit::DecodeNewFile4From(Slice* input) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const char* msg = nullptr;
   int level = 0;
   FileMetaData f;
@@ -410,6 +416,7 @@ const char* VersionEdit::DecodeNewFile4From(Slice* input) {
 }
 
 Status VersionEdit::DecodeFrom(const Slice& src) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Clear();
 #ifndef NDEBUG
   bool ignore_ignorable_tags = false;

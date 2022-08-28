@@ -37,18 +37,21 @@ namespace {
 const int kNumKeys = 1100;
 
 std::string Key1(int i) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   char buf[100];
   snprintf(buf, sizeof(buf), "my_key_%d", i);
   return buf;
 }
 
 std::string Key2(int i) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return Key1(i) + "_xxx";
 }
 
 class ManualCompactionTest : public testing::Test {
  public:
   ManualCompactionTest() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // Get rid of any state from an old run.
     dbname_ = ROCKSDB_NAMESPACE::test::PerThreadDBPath(
         "rocksdb_manual_compaction_test");
@@ -87,6 +90,7 @@ class LogCompactionFilter : public CompactionFilter {
   size_t NumKeys() const { return key_level_.size(); }
 
   int KeyLevel(const Slice& key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     auto it = key_level_.find(key.ToString());
     if (it == key_level_.end()) {
       return -1;
@@ -99,6 +103,7 @@ class LogCompactionFilter : public CompactionFilter {
 };
 
 TEST_F(ManualCompactionTest, CompactTouchesAllKeys) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (int iter = 0; iter < 2; ++iter) {
     DB* db;
     Options options;
@@ -135,6 +140,7 @@ TEST_F(ManualCompactionTest, CompactTouchesAllKeys) {
 }
 
 TEST_F(ManualCompactionTest, Test) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Open database.  Disable compression since it affects the creation
   // of layers and the code below is trying to test against a very
   // specific scenario.
@@ -190,6 +196,7 @@ TEST_F(ManualCompactionTest, Test) {
 }
 
 TEST_F(ManualCompactionTest, SkipLevel) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   DB* db;
   Options options;
   options.num_levels = 3;
@@ -304,6 +311,7 @@ TEST_F(ManualCompactionTest, SkipLevel) {
 }  // anonymous namespace
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

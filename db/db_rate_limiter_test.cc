@@ -28,6 +28,7 @@ class DBRateLimiterOnReadTest
         use_readahead_(std::get<2>(GetParam())) {}
 
   void Init() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     options_ = GetOptions();
     Reopen(options_);
     for (int i = 0; i < kNumFiles; ++i) {
@@ -40,12 +41,14 @@ class DBRateLimiterOnReadTest
   }
 
   BlockBasedTableOptions GetTableOptions() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     BlockBasedTableOptions table_options;
     table_options.no_block_cache = !use_block_cache_;
     return table_options;
   }
 
   ReadOptions GetReadOptions() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ReadOptions read_options;
     read_options.rate_limiter_priority = Env::IO_USER;
     read_options.readahead_size = use_readahead_ ? kReadaheadBytes : 0;
@@ -53,6 +56,7 @@ class DBRateLimiterOnReadTest
   }
 
   Options GetOptions() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Options options = CurrentOptions();
     options.disable_auto_compactions = true;
     options.file_checksum_gen_factory.reset(new FileChecksumGenCrc32cFactory());
@@ -77,6 +81,7 @@ class DBRateLimiterOnReadTest
 
 std::string GetTestNameSuffix(
     ::testing::TestParamInfo<std::tuple<bool, bool, bool>> info) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::ostringstream oss;
   if (std::get<0>(info.param)) {
     oss << "DirectIO";
@@ -111,6 +116,7 @@ INSTANTIATE_TEST_CASE_P(DBRateLimiterOnReadTest, DBRateLimiterOnReadTest,
 #endif  // ROCKSDB_LITE
 
 TEST_P(DBRateLimiterOnReadTest, Get) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (use_direct_io_ && !IsDirectIOSupported()) {
     return;
   }
@@ -139,6 +145,7 @@ TEST_P(DBRateLimiterOnReadTest, Get) {
 }
 
 TEST_P(DBRateLimiterOnReadTest, NewMultiGet) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // The new void-returning `MultiGet()` APIs use `MultiRead()`, which does not
   // yet support rate limiting.
   if (use_direct_io_ && !IsDirectIOSupported()) {
@@ -170,6 +177,7 @@ TEST_P(DBRateLimiterOnReadTest, NewMultiGet) {
 }
 
 TEST_P(DBRateLimiterOnReadTest, OldMultiGet) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // The old `vector<Status>`-returning `MultiGet()` APIs use `Read()`, which
   // supports rate limiting.
   if (use_direct_io_ && !IsDirectIOSupported()) {
@@ -202,6 +210,7 @@ TEST_P(DBRateLimiterOnReadTest, OldMultiGet) {
 }
 
 TEST_P(DBRateLimiterOnReadTest, Iterator) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (use_direct_io_ && !IsDirectIOSupported()) {
     return;
   }
@@ -232,6 +241,7 @@ TEST_P(DBRateLimiterOnReadTest, Iterator) {
 #if !defined(ROCKSDB_LITE)
 
 TEST_P(DBRateLimiterOnReadTest, VerifyChecksum) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (use_direct_io_ && !IsDirectIOSupported()) {
     return;
   }
@@ -246,6 +256,7 @@ TEST_P(DBRateLimiterOnReadTest, VerifyChecksum) {
 }
 
 TEST_P(DBRateLimiterOnReadTest, VerifyFileChecksums) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (use_direct_io_ && !IsDirectIOSupported()) {
     return;
   }
@@ -267,6 +278,7 @@ class DBRateLimiterOnWriteTest : public DBTestBase {
       : DBTestBase("db_rate_limiter_on_write_test", /*env_do_fsync=*/false) {}
 
   void Init() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     options_ = GetOptions();
     ASSERT_OK(TryReopenWithColumnFamilies({"default"}, options_));
     Random rnd(301);
@@ -278,6 +290,7 @@ class DBRateLimiterOnWriteTest : public DBTestBase {
   }
 
   Options GetOptions() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Options options = CurrentOptions();
     options.disable_auto_compactions = true;
     options.rate_limiter.reset(NewGenericRateLimiter(
@@ -296,6 +309,7 @@ class DBRateLimiterOnWriteTest : public DBTestBase {
 };
 
 TEST_F(DBRateLimiterOnWriteTest, Flush) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::int64_t prev_total_request = 0;
 
   Init();
@@ -310,6 +324,7 @@ TEST_F(DBRateLimiterOnWriteTest, Flush) {
 }
 
 TEST_F(DBRateLimiterOnWriteTest, Compact) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Init();
 
   // Pre-comaction:
@@ -352,6 +367,7 @@ class DBRateLimiterOnWriteWALTest
  public:
   static std::string GetTestNameSuffix(
       ::testing::TestParamInfo<std::tuple<bool, bool, Env::IOPriority>> info) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::ostringstream oss;
     if (std::get<0>(info.param)) {
       oss << "DisableWAL";
@@ -379,12 +395,14 @@ class DBRateLimiterOnWriteWALTest
         rate_limiter_priority_(std::get<2>(GetParam())) {}
 
   void Init() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     options_ = GetOptions();
     options_.manual_wal_flush = manual_wal_flush_;
     Reopen(options_);
   }
 
   WriteOptions GetWriteOptions() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     WriteOptions write_options;
     write_options.disableWAL = disable_wal_;
     write_options.rate_limiter_priority = rate_limiter_priority_;
@@ -407,6 +425,7 @@ INSTANTIATE_TEST_CASE_P(
     DBRateLimiterOnWriteWALTest::GetTestNameSuffix);
 
 TEST_P(DBRateLimiterOnWriteWALTest, AutoWalFlush) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Init();
 
   const bool no_rate_limit_auto_wal_flush =
@@ -440,6 +459,7 @@ TEST_P(DBRateLimiterOnWriteWALTest, AutoWalFlush) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

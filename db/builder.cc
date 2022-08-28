@@ -46,6 +46,7 @@ class TableFactory;
 
 TableBuilder* NewTableBuilder(const TableBuilderOptions& tboptions,
                               WritableFileWriter* file) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert((tboptions.column_family_id ==
           TablePropertiesCollectorFactory::Context::kUnknownColumnFamily) ==
          tboptions.column_family_name.empty());
@@ -71,6 +72,7 @@ Status BuildTable(
     const std::string* full_history_ts_low,
     BlobFileCompletionCallback* blob_callback, uint64_t* num_input_entries,
     uint64_t* memtable_payload_bytes, uint64_t* memtable_garbage_bytes) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert((tboptions.column_family_id ==
           TablePropertiesCollectorFactory::Context::kUnknownColumnFamily) ==
          tboptions.column_family_name.empty());

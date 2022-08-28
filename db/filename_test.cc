@@ -18,6 +18,7 @@ namespace ROCKSDB_NAMESPACE {
 class FileNameTest : public testing::Test {};
 
 TEST_F(FileNameTest, Parse) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Slice db;
   FileType type;
   uint64_t number;
@@ -52,6 +53,7 @@ TEST_F(FileNameTest, Parse) {
       {"18446744073709551615.log", 18446744073709551615ull, kWalFile, kAllMode},
   };
   for (char mode : {kDifferentInfoLogDir, kDefautInfoLogDir, kNoCheckLogDir}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     for (unsigned int i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
       InfoLogPrefix info_log_prefix(mode != kDefautInfoLogDir, "/rocksdb/dir");
       if (cases[i].mode & mode) {
@@ -105,6 +107,7 @@ TEST_F(FileNameTest, Parse) {
 }
 
 TEST_F(FileNameTest, InfoLogFileName) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string dbname = ("/data/rocksdb");
   std::string db_absolute_path;
   ASSERT_OK(Env::Default()->GetAbsolutePath(dbname, &db_absolute_path));
@@ -121,6 +124,7 @@ TEST_F(FileNameTest, InfoLogFileName) {
 }
 
 TEST_F(FileNameTest, Construction) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t number;
   FileType type;
   std::string fname;
@@ -172,6 +176,7 @@ TEST_F(FileNameTest, Construction) {
 }
 
 TEST_F(FileNameTest, NormalizePath) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // No leading slash
   const std::string sep = std::string(1, kFilePathSeparator);
 
@@ -237,6 +242,7 @@ TEST_F(FileNameTest, NormalizePath) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

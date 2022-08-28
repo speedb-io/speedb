@@ -14,6 +14,7 @@ namespace ROCKSDB_NAMESPACE {
 Status EventListener::CreateFromString(const ConfigOptions& config_options,
                                        const std::string& id,
                                        std::shared_ptr<EventListener>* result) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return LoadSharedObject<EventListener>(config_options, id, nullptr, result);
 }
 #endif  // ROCKSDB_LITE
@@ -21,11 +22,13 @@ Status EventListener::CreateFromString(const ConfigOptions& config_options,
 namespace {
 template <class T>
 inline T SafeDivide(T a, T b) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return b == 0 ? 0 : a / b;
 }
 }  // namespace
 
 void EventHelpers::AppendCurrentTime(JSONWriter* jwriter) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   *jwriter << "time_micros"
            << std::chrono::duration_cast<std::chrono::microseconds>(
                   std::chrono::system_clock::now().time_since_epoch())
@@ -37,6 +40,7 @@ void EventHelpers::NotifyTableFileCreationStarted(
     const std::vector<std::shared_ptr<EventListener>>& listeners,
     const std::string& db_name, const std::string& cf_name,
     const std::string& file_path, int job_id, TableFileCreationReason reason) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (listeners.empty()) {
     return;
   }
@@ -89,6 +93,7 @@ void EventHelpers::LogAndNotifyTableFileCreationFinished(
     TableFileCreationReason reason, const Status& s,
     const std::string& file_checksum,
     const std::string& file_checksum_func_name) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (s.ok() && event_logger) {
     JSONWriter jwriter;
     AppendCurrentTime(&jwriter);
@@ -199,6 +204,7 @@ void EventHelpers::LogAndNotifyTableFileDeletion(
     const std::string& file_path, const Status& status,
     const std::string& dbname,
     const std::vector<std::shared_ptr<EventListener>>& listeners) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   JSONWriter jwriter;
   AppendCurrentTime(&jwriter);
 
@@ -237,6 +243,7 @@ void EventHelpers::NotifyOnErrorRecoveryEnd(
     const std::vector<std::shared_ptr<EventListener>>& listeners,
     const Status& old_bg_error, const Status& new_bg_error,
     InstrumentedMutex* db_mutex) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifndef ROCKSDB_LITE
   if (!listeners.empty()) {
     db_mutex->AssertHeld();
@@ -267,6 +274,7 @@ void EventHelpers::NotifyBlobFileCreationStarted(
     const std::string& db_name, const std::string& cf_name,
     const std::string& file_path, int job_id,
     BlobFileCreationReason creation_reason) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (listeners.empty()) {
     return;
   }
@@ -287,6 +295,7 @@ void EventHelpers::LogAndNotifyBlobFileCreationFinished(
     const std::string& file_checksum,
     const std::string& file_checksum_func_name, uint64_t total_blob_count,
     uint64_t total_blob_bytes) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (s.ok() && event_logger) {
     JSONWriter jwriter;
     AppendCurrentTime(&jwriter);
@@ -325,6 +334,7 @@ void EventHelpers::LogAndNotifyBlobFileDeletion(
     const std::vector<std::shared_ptr<EventListener>>& listeners, int job_id,
     uint64_t file_number, const std::string& file_path, const Status& status,
     const std::string& dbname) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (event_logger) {
     JSONWriter jwriter;
     AppendCurrentTime(&jwriter);

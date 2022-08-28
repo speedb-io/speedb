@@ -37,6 +37,7 @@ class DBLogicalBlockSizeCacheTest : public testing::Test {
         data_path_1_(dbname_ + "/data_path_1"),
         cf_path_0_(dbname_ + "/cf_path_0"),
         cf_path_1_(dbname_ + "/cf_path_1") {
+PERF_MARKER(__PRETTY_FUNCTION__);
     auto get_fd_block_size = [&](int fd) { return fd; };
     auto get_dir_block_size = [&](const std::string& /*dir*/, size_t* size) {
       *size = 1024;
@@ -59,6 +60,7 @@ class DBLogicalBlockSizeCacheTest : public testing::Test {
 };
 
 TEST_F(DBLogicalBlockSizeCacheTest, OpenClose) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Tests that Open will cache the logical block size for data paths,
   // and Close will remove the cached sizes.
   Options options;
@@ -92,6 +94,7 @@ TEST_F(DBLogicalBlockSizeCacheTest, OpenClose) {
 }
 
 TEST_F(DBLogicalBlockSizeCacheTest, OpenDelete) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Tests that Open will cache the logical block size for data paths,
   // and delete the db pointer will remove the cached sizes.
   Options options;
@@ -121,6 +124,7 @@ TEST_F(DBLogicalBlockSizeCacheTest, OpenDelete) {
 }
 
 TEST_F(DBLogicalBlockSizeCacheTest, CreateColumnFamily) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Tests that CreateColumnFamily will cache the cf_paths,
   // drop the column family handle won't drop the cache,
   // drop and then delete the column family handle will drop the cache.
@@ -167,6 +171,7 @@ TEST_F(DBLogicalBlockSizeCacheTest, CreateColumnFamily) {
 }
 
 TEST_F(DBLogicalBlockSizeCacheTest, CreateColumnFamilies) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // To test:
   // (1) CreateColumnFamilies will cache the cf_paths in
   // DBLogicalBlockSizeCache
@@ -229,6 +234,7 @@ TEST_F(DBLogicalBlockSizeCacheTest, CreateColumnFamilies) {
 }
 
 TEST_F(DBLogicalBlockSizeCacheTest, OpenWithColumnFamilies) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Tests that Open two column families with the same cf_path will cache the
   // cf_path and have 2 references to the cached size,
   // drop the column family handle won't drop the cache,
@@ -318,6 +324,7 @@ TEST_F(DBLogicalBlockSizeCacheTest, OpenWithColumnFamilies) {
 }
 
 TEST_F(DBLogicalBlockSizeCacheTest, DestroyColumnFamilyHandle) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Tests that destroy column family without dropping won't drop the cache,
   // because compaction and flush might still need to get logical block size
   // when opening new files.
@@ -392,6 +399,7 @@ TEST_F(DBLogicalBlockSizeCacheTest, DestroyColumnFamilyHandle) {
 }
 
 TEST_F(DBLogicalBlockSizeCacheTest, MultiDBWithDifferentPaths) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Tests the cache behavior when there are multiple DBs sharing the same env
   // with different db_paths and cf_paths.
   Options options;
@@ -455,6 +463,7 @@ TEST_F(DBLogicalBlockSizeCacheTest, MultiDBWithDifferentPaths) {
 }
 
 TEST_F(DBLogicalBlockSizeCacheTest, MultiDBWithSamePaths) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Tests the cache behavior when there are multiple DBs sharing the same env
   // with the same db_paths and cf_paths.
   Options options;
@@ -515,6 +524,7 @@ TEST_F(DBLogicalBlockSizeCacheTest, MultiDBWithSamePaths) {
 #endif  // OS_LINUX
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

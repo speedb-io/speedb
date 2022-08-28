@@ -10,6 +10,7 @@
 
 namespace ROCKSDB_NAMESPACE {
 Status OutputValidator::Add(const Slice& key, const Slice& value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (enable_hash_) {
     // Generate a rolling 64-bit hash of the key and values
     paranoid_hash_ = NPHash64(key.data(), key.size(), paranoid_hash_);

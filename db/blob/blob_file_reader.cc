@@ -28,6 +28,7 @@ Status BlobFileReader::Create(
     uint32_t column_family_id, HistogramImpl* blob_file_read_hist,
     uint64_t blob_file_number, const std::shared_ptr<IOTracer>& io_tracer,
     std::unique_ptr<BlobFileReader>* blob_file_reader) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(blob_file_reader);
   assert(!*blob_file_reader);
 
@@ -76,6 +77,7 @@ Status BlobFileReader::OpenFile(
     HistogramImpl* blob_file_read_hist, uint64_t blob_file_number,
     const std::shared_ptr<IOTracer>& io_tracer, uint64_t* file_size,
     std::unique_ptr<RandomAccessFileReader>* file_reader) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(file_size);
   assert(file_reader);
 
@@ -135,6 +137,7 @@ Status BlobFileReader::ReadHeader(const RandomAccessFileReader* file_reader,
                                   uint32_t column_family_id,
                                   Statistics* statistics,
                                   CompressionType* compression_type) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(file_reader);
   assert(compression_type);
 
@@ -186,6 +189,7 @@ Status BlobFileReader::ReadHeader(const RandomAccessFileReader* file_reader,
 
 Status BlobFileReader::ReadFooter(const RandomAccessFileReader* file_reader,
                                   uint64_t file_size, Statistics* statistics) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(file_size >= BlobLogHeader::kSize + BlobLogFooter::kSize);
   assert(file_reader);
 
@@ -234,6 +238,7 @@ Status BlobFileReader::ReadFromFile(const RandomAccessFileReader* file_reader,
                                     Statistics* statistics, Slice* slice,
                                     Buffer* buf, AlignedBuf* aligned_buf,
                                     Env::IOPriority rate_limiter_priority) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(slice);
   assert(buf);
   assert(aligned_buf);
@@ -277,6 +282,7 @@ BlobFileReader::BlobFileReader(
       compression_type_(compression_type),
       clock_(clock),
       statistics_(statistics) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(file_reader_);
 }
 
@@ -493,6 +499,7 @@ void BlobFileReader::MultiGetBlob(
 
 Status BlobFileReader::VerifyBlob(const Slice& record_slice,
                                   const Slice& user_key, uint64_t value_size) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   BlobLogRecord record;
 
   const Slice header_slice(record_slice.data(), BlobLogRecord::kHeaderSize);
@@ -538,6 +545,7 @@ Status BlobFileReader::UncompressBlobIfNeeded(const Slice& value_slice,
                                               SystemClock* clock,
                                               Statistics* statistics,
                                               PinnableSlice* value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(value);
 
   if (compression_type == kNoCompression) {
@@ -576,6 +584,7 @@ Status BlobFileReader::UncompressBlobIfNeeded(const Slice& value_slice,
 }
 
 void BlobFileReader::SaveValue(const Slice& src, PinnableSlice* dst) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(dst);
 
   if (dst->IsPinned()) {

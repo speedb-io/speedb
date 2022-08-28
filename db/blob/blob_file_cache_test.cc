@@ -31,6 +31,7 @@ namespace {
 void WriteBlobFile(uint32_t column_family_id,
                    const ImmutableOptions& immutable_options,
                    uint64_t blob_file_number) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(!immutable_options.cf_paths.empty());
 
   const std::string blob_file_path =
@@ -90,6 +91,7 @@ class BlobFileCacheTest : public testing::Test {
 };
 
 TEST_F(BlobFileCacheTest, GetBlobFileReader) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = mock_env_.get();
   options.statistics = CreateDBStatistics();
@@ -135,6 +137,7 @@ TEST_F(BlobFileCacheTest, GetBlobFileReader) {
 }
 
 TEST_F(BlobFileCacheTest, GetBlobFileReader_Race) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = mock_env_.get();
   options.statistics = CreateDBStatistics();
@@ -165,6 +168,7 @@ TEST_F(BlobFileCacheTest, GetBlobFileReader_Race) {
 
   SyncPoint::GetInstance()->SetCallBack(
       "BlobFileCache::GetBlobFileReader:DoubleCheck", [&](void* /* arg */) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         // Disabling sync points to prevent infinite recursion
         SyncPoint::GetInstance()->DisableProcessing();
 
@@ -187,6 +191,7 @@ TEST_F(BlobFileCacheTest, GetBlobFileReader_Race) {
 }
 
 TEST_F(BlobFileCacheTest, GetBlobFileReader_IOError) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = mock_env_.get();
   options.statistics = CreateDBStatistics();
@@ -221,6 +226,7 @@ TEST_F(BlobFileCacheTest, GetBlobFileReader_IOError) {
 }
 
 TEST_F(BlobFileCacheTest, GetBlobFileReader_CacheFull) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.env = mock_env_.get();
   options.statistics = CreateDBStatistics();
@@ -263,6 +269,7 @@ TEST_F(BlobFileCacheTest, GetBlobFileReader_CacheFull) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

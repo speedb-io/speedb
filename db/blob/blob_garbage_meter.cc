@@ -12,6 +12,7 @@
 namespace ROCKSDB_NAMESPACE {
 
 Status BlobGarbageMeter::ProcessInFlow(const Slice& key, const Slice& value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t blob_file_number = kInvalidBlobFileNumber;
   uint64_t bytes = 0;
 
@@ -30,6 +31,7 @@ Status BlobGarbageMeter::ProcessInFlow(const Slice& key, const Slice& value) {
 }
 
 Status BlobGarbageMeter::ProcessOutFlow(const Slice& key, const Slice& value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t blob_file_number = kInvalidBlobFileNumber;
   uint64_t bytes = 0;
 
@@ -57,6 +59,7 @@ Status BlobGarbageMeter::ProcessOutFlow(const Slice& key, const Slice& value) {
 
 Status BlobGarbageMeter::Parse(const Slice& key, const Slice& value,
                                uint64_t* blob_file_number, uint64_t* bytes) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(blob_file_number);
   assert(*blob_file_number == kInvalidBlobFileNumber);
   assert(bytes);

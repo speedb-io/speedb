@@ -25,6 +25,7 @@ class DBTestXactLogIterator : public DBTestBase {
 
   std::unique_ptr<TransactionLogIterator> OpenTransactionLogIter(
       const SequenceNumber seq) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::unique_ptr<TransactionLogIterator> iter;
     Status status = dbfull()->GetUpdatesSince(seq, &iter);
     EXPECT_OK(status);
@@ -36,6 +37,7 @@ class DBTestXactLogIterator : public DBTestBase {
 namespace {
 SequenceNumber ReadRecords(std::unique_ptr<TransactionLogIterator>& iter,
                            int& count, bool expect_ok = true) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   count = 0;
   SequenceNumber lastSequence = 0;
   BatchResult res;
@@ -58,6 +60,7 @@ SequenceNumber ReadRecords(std::unique_ptr<TransactionLogIterator>& iter,
 void ExpectRecords(
     const int expected_no_records,
     std::unique_ptr<TransactionLogIterator>& iter) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   int num_records;
   ReadRecords(iter, num_records);
   ASSERT_EQ(num_records, expected_no_records);
@@ -65,6 +68,7 @@ void ExpectRecords(
 }  // namespace
 
 TEST_F(DBTestXactLogIterator, TransactionLogIterator) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     Options options = OptionsForLogIterTest();
     DestroyAndReopen(options);
@@ -93,6 +97,7 @@ TEST_F(DBTestXactLogIterator, TransactionLogIterator) {
 
 #ifndef NDEBUG  // sync point is not included with DNDEBUG build
 TEST_F(DBTestXactLogIterator, TransactionLogIteratorRace) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   static const int LOG_ITERATOR_RACE_TEST_COUNT = 2;
   static const char* sync_points[LOG_ITERATOR_RACE_TEST_COUNT][4] = {
       {"WalManager::GetSortedWalFiles:1",  "WalManager::PurgeObsoleteFiles:1",
@@ -151,6 +156,7 @@ TEST_F(DBTestXactLogIterator, TransactionLogIteratorRace) {
 #endif
 
 TEST_F(DBTestXactLogIterator, TransactionLogIteratorStallAtLastRecord) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     Options options = OptionsForLogIterTest();
     DestroyAndReopen(options);
@@ -169,6 +175,7 @@ TEST_F(DBTestXactLogIterator, TransactionLogIteratorStallAtLastRecord) {
 }
 
 TEST_F(DBTestXactLogIterator, TransactionLogIteratorCheckAfterRestart) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     Options options = OptionsForLogIterTest();
     DestroyAndReopen(options);
@@ -182,6 +189,7 @@ TEST_F(DBTestXactLogIterator, TransactionLogIteratorCheckAfterRestart) {
 }
 
 TEST_F(DBTestXactLogIterator, TransactionLogIteratorCorruptedLog) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     Options options = OptionsForLogIterTest();
     DestroyAndReopen(options);
@@ -224,6 +232,7 @@ TEST_F(DBTestXactLogIterator, TransactionLogIteratorCorruptedLog) {
 }
 
 TEST_F(DBTestXactLogIterator, TransactionLogIteratorBatchOperations) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     Options options = OptionsForLogIterTest();
     DestroyAndReopen(options);
@@ -244,6 +253,7 @@ TEST_F(DBTestXactLogIterator, TransactionLogIteratorBatchOperations) {
 }
 
 TEST_F(DBTestXactLogIterator, TransactionLogIteratorBlobs) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = OptionsForLogIterTest();
   DestroyAndReopen(options);
   CreateAndReopenWithCF({"pikachu"}, options);
@@ -295,6 +305,7 @@ TEST_F(DBTestXactLogIterator, TransactionLogIteratorBlobs) {
 #endif  // !defined(ROCKSDB_LITE)
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #if !defined(ROCKSDB_LITE)
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);

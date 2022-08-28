@@ -22,6 +22,7 @@ class DBWriteBufferManagerTest : public DBTestBase,
 };
 
 TEST_P(DBWriteBufferManagerTest, SharedBufferAcrossCFs1) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.arena_block_size = 4096;
   options.write_buffer_size = 500000;  // this is never hit
@@ -65,6 +66,7 @@ TEST_P(DBWriteBufferManagerTest, SharedBufferAcrossCFs1) {
 // WriteBufferManager execeeds buffer_size_ and flush is waiting to be
 // finished.
 TEST_P(DBWriteBufferManagerTest, SharedWriteBufferAcrossCFs2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.arena_block_size = 4096;
   options.write_buffer_size = 500000;  // this is never hit
@@ -112,12 +114,14 @@ TEST_P(DBWriteBufferManagerTest, SharedWriteBufferAcrossCFs2) {
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "WBMStallInterface::BlockDB", [&](void*) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         InstrumentedMutexLock lock(&mutex);
         wait_count_db++;
         cv.SignalAll();
       });
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "WriteThread::WriteStall::Wait", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         InstrumentedMutexLock lock(&mutex);
         WriteThread::Writer* w = reinterpret_cast<WriteThread::Writer*>(arg);
         w_set.insert(w);
@@ -132,6 +136,7 @@ TEST_P(DBWriteBufferManagerTest, SharedWriteBufferAcrossCFs2) {
   bool s = true;
 
   std::function<void(int)> writer = [&](int cf) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     int a = thread_num.fetch_add(1);
     std::string key = "foo" + std::to_string(a);
     Status tmp = Put(cf, Slice(key), DummyString(1), wo);
@@ -182,6 +187,7 @@ TEST_P(DBWriteBufferManagerTest, SharedWriteBufferAcrossCFs2) {
 // Test multiple DBs get blocked when WriteBufferManager limit exceeds and flush
 // is waiting to be finished but DBs tries to write meanwhile.
 TEST_P(DBWriteBufferManagerTest, SharedWriteBufferLimitAcrossDB) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::vector<std::string> dbnames;
   std::vector<DB*> dbs;
   int num_dbs = 3;
@@ -233,6 +239,7 @@ TEST_P(DBWriteBufferManagerTest, SharedWriteBufferLimitAcrossDB) {
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "WBMStallInterface::BlockDB", [&](void*) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         {
           InstrumentedMutexLock lock(&mutex);
           wait_count_db++;
@@ -250,6 +257,7 @@ TEST_P(DBWriteBufferManagerTest, SharedWriteBufferLimitAcrossDB) {
 
   // Write to DB.
   std::function<void(DB*)> write_db = [&](DB* db) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Status tmp = db->Put(wo, Key(3), DummyString(1));
     InstrumentedMutexLock lock(&mutex);
     s = s && tmp.ok();
@@ -299,6 +307,7 @@ TEST_P(DBWriteBufferManagerTest, SharedWriteBufferLimitAcrossDB) {
 // Test multiple threads writing across multiple DBs and multiple columns get
 // blocked when stall by WriteBufferManager is in effect.
 TEST_P(DBWriteBufferManagerTest, SharedWriteBufferLimitAcrossDB1) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::vector<std::string> dbnames;
   std::vector<DB*> dbs;
   int num_dbs = 3;
@@ -354,6 +363,7 @@ TEST_P(DBWriteBufferManagerTest, SharedWriteBufferLimitAcrossDB1) {
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "WBMStallInterface::BlockDB", [&](void*) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         {
           InstrumentedMutexLock lock(&mutex);
           wait_count_db++;
@@ -368,6 +378,7 @@ TEST_P(DBWriteBufferManagerTest, SharedWriteBufferLimitAcrossDB1) {
       });
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "WriteThread::WriteStall::Wait", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         WriteThread::Writer* w = reinterpret_cast<WriteThread::Writer*>(arg);
         {
           InstrumentedMutexLock lock(&mutex);
@@ -385,12 +396,14 @@ TEST_P(DBWriteBufferManagerTest, SharedWriteBufferLimitAcrossDB1) {
   bool s1 = true, s2 = true;
   // Write to multiple columns of db_.
   std::function<void(int)> write_cf = [&](int cf) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Status tmp = Put(cf, Key(3), DummyString(1), wo);
     InstrumentedMutexLock lock(&mutex);
     s1 = s1 && tmp.ok();
   };
   // Write to multiple DBs.
   std::function<void(DB*)> write_db = [&](DB* db) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Status tmp = db->Put(wo, Key(3), DummyString(1));
     InstrumentedMutexLock lock(&mutex);
     s2 = s2 && tmp.ok();
@@ -451,6 +464,7 @@ TEST_P(DBWriteBufferManagerTest, SharedWriteBufferLimitAcrossDB1) {
 // Test multiple threads writing across multiple columns of db_ by passing
 // different values to WriteOption.no_slown_down.
 TEST_P(DBWriteBufferManagerTest, MixedSlowDownOptionsSingleDB) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.arena_block_size = 4096;
   options.write_buffer_size = 500000;  // this is never hit
@@ -500,6 +514,7 @@ TEST_P(DBWriteBufferManagerTest, MixedSlowDownOptionsSingleDB) {
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "WBMStallInterface::BlockDB", [&](void*) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         {
           InstrumentedMutexLock lock(&mutex);
           wait_count_db++;
@@ -509,6 +524,7 @@ TEST_P(DBWriteBufferManagerTest, MixedSlowDownOptionsSingleDB) {
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "WriteThread::WriteStall::Wait", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         {
           InstrumentedMutexLock lock(&mutex);
           WriteThread::Writer* w = reinterpret_cast<WriteThread::Writer*>(arg);
@@ -527,6 +543,7 @@ TEST_P(DBWriteBufferManagerTest, MixedSlowDownOptionsSingleDB) {
   bool s1 = true, s2 = true;
 
   std::function<void(int)> write_slow_down = [&](int cf) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     int a = thread_num.fetch_add(1);
     std::string key = "foo" + std::to_string(a);
     WriteOptions write_op;
@@ -537,6 +554,7 @@ TEST_P(DBWriteBufferManagerTest, MixedSlowDownOptionsSingleDB) {
   };
 
   std::function<void(int)> write_no_slow_down = [&](int cf) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     int a = thread_num.fetch_add(1);
     std::string key = "foo" + std::to_string(a);
     WriteOptions write_op;
@@ -603,6 +621,7 @@ TEST_P(DBWriteBufferManagerTest, MixedSlowDownOptionsSingleDB) {
 // Test multiple threads writing across multiple columns of db_ and different
 // dbs by passing different values to WriteOption.no_slown_down.
 TEST_P(DBWriteBufferManagerTest, MixedSlowDownOptionsMultipleDB) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::vector<std::string> dbnames;
   std::vector<DB*> dbs;
   int num_dbs = 4;
@@ -659,6 +678,7 @@ TEST_P(DBWriteBufferManagerTest, MixedSlowDownOptionsMultipleDB) {
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "WBMStallInterface::BlockDB", [&](void*) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         InstrumentedMutexLock lock(&mutex);
         wait_count_db++;
         cv.Signal();
@@ -674,6 +694,7 @@ TEST_P(DBWriteBufferManagerTest, MixedSlowDownOptionsMultipleDB) {
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "WriteThread::WriteStall::Wait", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         WriteThread::Writer* w = reinterpret_cast<WriteThread::Writer*>(arg);
         InstrumentedMutexLock lock(&mutex);
         w_slowdown_set.insert(w);
@@ -690,6 +711,7 @@ TEST_P(DBWriteBufferManagerTest, MixedSlowDownOptionsMultipleDB) {
 
   bool s1 = true, s2 = true;
   std::function<void(DB*)> write_slow_down = [&](DB* db) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     int a = thread_num.fetch_add(1);
     std::string key = "foo" + std::to_string(a);
     WriteOptions write_op;
@@ -700,6 +722,7 @@ TEST_P(DBWriteBufferManagerTest, MixedSlowDownOptionsMultipleDB) {
   };
 
   std::function<void(DB*)> write_no_slow_down = [&](DB* db) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     int a = thread_num.fetch_add(1);
     std::string key = "foo" + std::to_string(a);
     WriteOptions write_op;
@@ -786,6 +809,7 @@ INSTANTIATE_TEST_CASE_P(DBWriteBufferManagerTest, DBWriteBufferManagerTest,
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   RegisterCustomObjects(argc, argv);

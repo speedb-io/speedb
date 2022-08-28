@@ -48,6 +48,7 @@ class DBMergeOperandTest : public DBTestBase {
 };
 
 TEST_F(DBMergeOperandTest, CacheEvictedMergeOperandReadAfterFreeBug) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // There was a bug of reading merge operands after they are mistakely freed
   // in DB::GetMergeOperands, which is surfaced by cache full.
   // See PR#9507 for more.
@@ -87,6 +88,7 @@ TEST_F(DBMergeOperandTest, CacheEvictedMergeOperandReadAfterFreeBug) {
 }
 
 TEST_F(DBMergeOperandTest, FlushedMergeOperandReadAfterFreeBug) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Repro for a bug where a memtable containing a merge operand could be
   // deleted before the merge operand was saved to the result.
   auto options = CurrentOptions();
@@ -123,6 +125,7 @@ TEST_F(DBMergeOperandTest, FlushedMergeOperandReadAfterFreeBug) {
 }
 
 TEST_F(DBMergeOperandTest, GetMergeOperandsBasic) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.create_if_missing = true;
   // Use only the latest two merge operands.
@@ -311,6 +314,7 @@ TEST_F(DBMergeOperandTest, GetMergeOperandsBasic) {
 }
 
 TEST_F(DBMergeOperandTest, BlobDBGetMergeOperandsBasic) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.create_if_missing = true;
   options.enable_blob_files = true;
@@ -400,6 +404,7 @@ TEST_F(DBMergeOperandTest, BlobDBGetMergeOperandsBasic) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

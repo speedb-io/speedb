@@ -62,6 +62,7 @@ class KVIter : public Iterator {
 };
 
 void AssertItersEqual(Iterator* iter1, Iterator* iter2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_EQ(iter1->Valid(), iter2->Valid());
   if (iter1->Valid()) {
     ASSERT_EQ(iter1->key().ToString(), iter2->key().ToString());
@@ -74,6 +75,7 @@ void AssertItersEqual(Iterator* iter1, Iterator* iter2) {
 void DoRandomIteraratorTest(DB* db, std::vector<std::string> source_strings,
                             Random* rnd, int num_writes, int num_iter_ops,
                             int num_trigger_flush) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   stl_wrappers::KVMap map((stl_wrappers::LessOfComparator(kTestComparator)));
 
   for (int i = 0; i < num_writes; i++) {
@@ -263,6 +265,7 @@ class ComparatorDBTest
 
  public:
   ComparatorDBTest() : env_(Env::Default()), db_(nullptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     kTestComparator = BytewiseComparator();
     dbname_ = test::PerThreadDBPath("comparator_db_test");
     BlockBasedTableOptions toptions;
@@ -281,6 +284,7 @@ class ComparatorDBTest
   DB* GetDB() { return db_; }
 
   void SetOwnedComparator(const Comparator* cmp, bool owner = true) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (owner) {
       comparator_guard.reset(cmp);
     } else {
@@ -294,18 +298,21 @@ class ComparatorDBTest
   Options* GetOptions() { return &last_options_; }
 
   void DestroyAndReopen() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // Destroy using last options
     Destroy();
     ASSERT_OK(TryReopen());
   }
 
   void Destroy() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     delete db_;
     db_ = nullptr;
     ASSERT_OK(DestroyDB(dbname_, last_options_));
   }
 
   Status TryReopen() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     delete db_;
     db_ = nullptr;
     last_options_.create_if_missing = true;
@@ -320,6 +327,7 @@ INSTANTIATE_TEST_CASE_P(FormatLatest, ComparatorDBTest,
                         testing::Values(kLatestFormatVersion));
 
 TEST_P(ComparatorDBTest, Bytewise) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (int rand_seed = 301; rand_seed < 306; rand_seed++) {
     DestroyAndReopen();
     Random rnd(rand_seed);
@@ -330,6 +338,7 @@ TEST_P(ComparatorDBTest, Bytewise) {
 }
 
 TEST_P(ComparatorDBTest, SimpleSuffixReverseComparator) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   SetOwnedComparator(new test::SimpleSuffixReverseComparator());
 
   for (int rnd_seed = 301; rnd_seed < 316; rnd_seed++) {
@@ -356,6 +365,7 @@ TEST_P(ComparatorDBTest, SimpleSuffixReverseComparator) {
 }
 
 TEST_P(ComparatorDBTest, Uint64Comparator) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   SetOwnedComparator(test::Uint64Comparator(), false /* owner */);
 
   for (int rnd_seed = 301; rnd_seed < 316; rnd_seed++) {
@@ -380,6 +390,7 @@ TEST_P(ComparatorDBTest, Uint64Comparator) {
 }
 
 TEST_P(ComparatorDBTest, DoubleComparator) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   SetOwnedComparator(new DoubleComparator());
 
   for (int rnd_seed = 301; rnd_seed < 316; rnd_seed++) {
@@ -405,6 +416,7 @@ TEST_P(ComparatorDBTest, DoubleComparator) {
 }
 
 TEST_P(ComparatorDBTest, HashComparator) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   SetOwnedComparator(new HashComparator());
 
   for (int rnd_seed = 301; rnd_seed < 316; rnd_seed++) {
@@ -424,6 +436,7 @@ TEST_P(ComparatorDBTest, HashComparator) {
 }
 
 TEST_P(ComparatorDBTest, TwoStrComparator) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   SetOwnedComparator(new TwoStrComparator());
 
   for (int rnd_seed = 301; rnd_seed < 316; rnd_seed++) {
@@ -450,6 +463,7 @@ TEST_P(ComparatorDBTest, TwoStrComparator) {
 }
 
 TEST_P(ComparatorDBTest, IsSameLengthImmediateSuccessor) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   {
     // different length
     Slice s("abcxy");
@@ -514,6 +528,7 @@ TEST_P(ComparatorDBTest, IsSameLengthImmediateSuccessor) {
 }
 
 TEST_P(ComparatorDBTest, FindShortestSeparator) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string s1 = "abc1xyz";
   std::string s2 = "abc3xy";
 
@@ -548,6 +563,7 @@ TEST_P(ComparatorDBTest, FindShortestSeparator) {
 }
 
 TEST_P(ComparatorDBTest, SeparatorSuccessorRandomizeTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Char list for boundary cases.
   std::array<unsigned char, 6> char_list{{0, 1, 2, 253, 254, 255}};
   Random rnd(301);
@@ -655,6 +671,7 @@ TEST_P(ComparatorDBTest, SeparatorSuccessorRandomizeTest) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

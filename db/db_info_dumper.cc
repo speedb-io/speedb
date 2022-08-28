@@ -19,6 +19,7 @@ namespace ROCKSDB_NAMESPACE {
 void DumpDBFileSummary(const ImmutableDBOptions& options,
                        const std::string& dbname,
                        const std::string& session_id) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (options.info_log == nullptr) {
     return;
   }

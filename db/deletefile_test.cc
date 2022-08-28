@@ -40,6 +40,7 @@ class DeleteFileTest : public DBTestBase {
         wal_dir_(dbname_ + "/wal_files") {}
 
   void SetOptions(Options* options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_NE(options, nullptr);
     options->delete_obsolete_files_period_micros = 0;  // always do full purge
     options->enable_thread_tracking = true;
@@ -52,6 +53,7 @@ class DeleteFileTest : public DBTestBase {
   }
 
   void AddKeys(int numkeys, int startkey = 0) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     WriteOptions options;
     options.sync = false;
     ReadOptions roptions;
@@ -66,6 +68,7 @@ class DeleteFileTest : public DBTestBase {
   int numKeysInLevels(
     std::vector<LiveFileMetaData> &metadata,
     std::vector<int> *keysperlevel = nullptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 
     if (keysperlevel != nullptr) {
       keysperlevel->resize(numlevels_);
@@ -89,6 +92,7 @@ class DeleteFileTest : public DBTestBase {
   }
 
   void CreateTwoLevels() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     AddKeys(50000, 10000);
     ASSERT_OK(dbfull()->TEST_FlushMemTable());
     ASSERT_OK(dbfull()->TEST_WaitForFlushMemTable());
@@ -104,6 +108,7 @@ class DeleteFileTest : public DBTestBase {
 
   void CheckFileTypeCounts(const std::string& dir, int required_log,
                            int required_sst, int required_manifest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::vector<std::string> filenames;
     ASSERT_OK(env_->GetChildren(dir, &filenames));
 
@@ -129,17 +134,20 @@ class DeleteFileTest : public DBTestBase {
   }
 
   static void DoSleep(void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     auto test = reinterpret_cast<DeleteFileTest*>(arg);
     test->env_->SleepForMicroseconds(2 * 1000 * 1000);
   }
 
   // An empty job to guard all jobs are processed
   static void GuardFinish(void* /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     TEST_SYNC_POINT("DeleteFileTest::GuardFinish");
   }
 };
 
 TEST_F(DeleteFileTest, AddKeysAndQueryLevels) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   SetOptions(&options);
   Destroy(options);
@@ -191,6 +199,7 @@ TEST_F(DeleteFileTest, AddKeysAndQueryLevels) {
 }
 
 TEST_F(DeleteFileTest, PurgeObsoleteFilesTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   SetOptions(&options);
   Destroy(options);
@@ -228,6 +237,7 @@ TEST_F(DeleteFileTest, PurgeObsoleteFilesTest) {
 }
 
 TEST_F(DeleteFileTest, BackgroundPurgeIteratorTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   SetOptions(&options);
   Destroy(options);
@@ -271,6 +281,7 @@ TEST_F(DeleteFileTest, BackgroundPurgeIteratorTest) {
 }
 
 TEST_F(DeleteFileTest, PurgeDuringOpen) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   CheckFileTypeCounts(dbname_, -1, 0, -1);
   Close();
@@ -306,6 +317,7 @@ TEST_F(DeleteFileTest, PurgeDuringOpen) {
 }
 
 TEST_F(DeleteFileTest, BackgroundPurgeCFDropTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   SetOptions(&options);
   Destroy(options);
@@ -372,6 +384,7 @@ TEST_F(DeleteFileTest, BackgroundPurgeCFDropTest) {
 // This test is to reproduce a bug that read invalid ReadOption in iterator
 // cleanup function
 TEST_F(DeleteFileTest, BackgroundPurgeCopyOptions) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   SetOptions(&options);
   Destroy(options);
@@ -413,6 +426,7 @@ TEST_F(DeleteFileTest, BackgroundPurgeCopyOptions) {
 }
 
 TEST_F(DeleteFileTest, BackgroundPurgeTestMultipleJobs) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   SetOptions(&options);
   Destroy(options);
@@ -458,6 +472,7 @@ TEST_F(DeleteFileTest, BackgroundPurgeTestMultipleJobs) {
 }
 
 TEST_F(DeleteFileTest, DeleteFileWithIterator) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   SetOptions(&options);
   Destroy(options);
@@ -487,6 +502,7 @@ TEST_F(DeleteFileTest, DeleteFileWithIterator) {
   it->SeekToFirst();
   int numKeysIterated = 0;
   while(it->Valid()) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     numKeysIterated++;
     it->Next();
   }
@@ -495,6 +511,7 @@ TEST_F(DeleteFileTest, DeleteFileWithIterator) {
 }
 
 TEST_F(DeleteFileTest, DeleteLogFiles) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   SetOptions(&options);
   Destroy(options);
@@ -536,6 +553,7 @@ TEST_F(DeleteFileTest, DeleteLogFiles) {
 }
 
 TEST_F(DeleteFileTest, DeleteNonDefaultColumnFamily) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   SetOptions(&options);
   Destroy(options);
@@ -597,6 +615,7 @@ TEST_F(DeleteFileTest, DeleteNonDefaultColumnFamily) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   RegisterCustomObjects(argc, argv);
@@ -607,6 +626,7 @@ int main(int argc, char** argv) {
 #include <stdio.h>
 
 int main(int /*argc*/, char** /*argv*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   fprintf(stderr,
           "SKIPPED as DBImpl::DeleteFile is not supported in ROCKSDB_LITE\n");
   return 0;

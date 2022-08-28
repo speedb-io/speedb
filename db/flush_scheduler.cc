@@ -12,6 +12,7 @@
 namespace ROCKSDB_NAMESPACE {
 
 void FlushScheduler::ScheduleWork(ColumnFamilyData* cfd) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifndef NDEBUG
   {
     std::lock_guard<std::mutex> lock(checking_mutex_);
@@ -34,6 +35,7 @@ void FlushScheduler::ScheduleWork(ColumnFamilyData* cfd) {
 }
 
 ColumnFamilyData* FlushScheduler::TakeNextColumnFamily() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   while (true) {
     if (head_.load(std::memory_order_relaxed) == nullptr) {
       return nullptr;
@@ -65,6 +67,7 @@ ColumnFamilyData* FlushScheduler::TakeNextColumnFamily() {
 }
 
 bool FlushScheduler::Empty() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto rv = head_.load(std::memory_order_relaxed) == nullptr;
 #ifndef NDEBUG
   std::lock_guard<std::mutex> lock(checking_mutex_);
@@ -76,6 +79,7 @@ bool FlushScheduler::Empty() {
 }
 
 void FlushScheduler::Clear() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ColumnFamilyData* cfd;
   while ((cfd = TakeNextColumnFamily()) != nullptr) {
     cfd->UnrefAndTryDelete();

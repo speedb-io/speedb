@@ -23,6 +23,7 @@ void WalAddition::EncodeTo(std::string* dst) const {
 }
 
 Status WalAddition::DecodeFrom(Slice* src) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr char class_name[] = "WalAddition";
 
   if (!GetVarint64(src, &number_)) {
@@ -57,12 +58,14 @@ Status WalAddition::DecodeFrom(Slice* src) {
 }
 
 JSONWriter& operator<<(JSONWriter& jw, const WalAddition& wal) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   jw << "LogNumber" << wal.GetLogNumber() << "SyncedSizeInBytes"
      << wal.GetMetadata().GetSyncedSizeInBytes();
   return jw;
 }
 
 std::ostream& operator<<(std::ostream& os, const WalAddition& wal) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   os << "log_number: " << wal.GetLogNumber()
      << " synced_size_in_bytes: " << wal.GetMetadata().GetSyncedSizeInBytes();
   return os;
@@ -79,6 +82,7 @@ void WalDeletion::EncodeTo(std::string* dst) const {
 }
 
 Status WalDeletion::DecodeFrom(Slice* src) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr char class_name[] = "WalDeletion";
 
   if (!GetVarint64(src, &number_)) {
@@ -89,11 +93,13 @@ Status WalDeletion::DecodeFrom(Slice* src) {
 }
 
 JSONWriter& operator<<(JSONWriter& jw, const WalDeletion& wal) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   jw << "LogNumber" << wal.GetLogNumber();
   return jw;
 }
 
 std::ostream& operator<<(std::ostream& os, const WalDeletion& wal) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   os << "log_number: " << wal.GetLogNumber();
   return os;
 }
@@ -105,6 +111,7 @@ std::string WalDeletion::DebugString() const {
 }
 
 Status WalSet::AddWal(const WalAddition& wal) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (wal.GetLogNumber() < min_wal_number_to_keep_) {
     // The WAL has been obsolete, ignore it.
     return Status::OK();
@@ -136,6 +143,7 @@ Status WalSet::AddWal(const WalAddition& wal) {
 }
 
 Status WalSet::AddWals(const WalAdditions& wals) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Status s;
   for (const WalAddition& wal : wals) {
     s = AddWal(wal);
@@ -147,6 +155,7 @@ Status WalSet::AddWals(const WalAdditions& wals) {
 }
 
 Status WalSet::DeleteWalsBefore(WalNumber wal) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (wal > min_wal_number_to_keep_) {
     min_wal_number_to_keep_ = wal;
     wals_.erase(wals_.begin(), wals_.lower_bound(wal));
@@ -155,6 +164,7 @@ Status WalSet::DeleteWalsBefore(WalNumber wal) {
 }
 
 void WalSet::Reset() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   wals_.clear();
   min_wal_number_to_keep_ = 0;
 }

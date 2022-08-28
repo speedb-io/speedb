@@ -27,6 +27,7 @@ class CuckooTableDBTest : public testing::Test {
 
  public:
   CuckooTableDBTest() : env_(Env::Default()) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     dbname_ = test::PerThreadDBPath("cuckoo_table_db_test");
     EXPECT_OK(DestroyDB(dbname_, Options()));
     db_ = nullptr;
@@ -39,6 +40,7 @@ class CuckooTableDBTest : public testing::Test {
   }
 
   Options CurrentOptions() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Options options;
     options.table_factory.reset(NewCuckooTableFactory());
     options.memtable_factory.reset(NewHashLinkListRepFactory(4, 0, 3, true));
@@ -52,6 +54,7 @@ class CuckooTableDBTest : public testing::Test {
 
   // The following util methods are copied from plain_table_db_test.
   void Reopen(Options* options = nullptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     delete db_;
     db_ = nullptr;
     Options opts;
@@ -65,6 +68,7 @@ class CuckooTableDBTest : public testing::Test {
   }
 
   void DestroyAndReopen(Options* options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(options);
     ASSERT_OK(db_->Close());
     delete db_;
@@ -74,14 +78,17 @@ class CuckooTableDBTest : public testing::Test {
   }
 
   Status Put(const Slice& k, const Slice& v) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return db_->Put(WriteOptions(), k, v);
   }
 
   Status Delete(const std::string& k) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return db_->Delete(WriteOptions(), k);
   }
 
   std::string Get(const std::string& k) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ReadOptions options;
     std::string result;
     Status s = db_->Get(options, k, &result);
@@ -94,6 +101,7 @@ class CuckooTableDBTest : public testing::Test {
   }
 
   int NumTableFilesAtLevel(int level) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::string property;
     EXPECT_TRUE(db_->GetProperty("rocksdb.num-files-at-level" + ToString(level),
                                  &property));
@@ -102,6 +110,7 @@ class CuckooTableDBTest : public testing::Test {
 
   // Return spread of files per level
   std::string FilesPerLevel() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::string result;
     size_t last_non_zero_offset = 0;
     for (int level = 0; level < db_->NumberLevels(); level++) {
@@ -119,6 +128,7 @@ class CuckooTableDBTest : public testing::Test {
 };
 
 TEST_F(CuckooTableDBTest, Flush) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Try with empty DB first.
   ASSERT_TRUE(dbfull() != nullptr);
   ASSERT_EQ("NOT_FOUND", Get("key2"));
@@ -185,6 +195,7 @@ TEST_F(CuckooTableDBTest, Flush) {
 }
 
 TEST_F(CuckooTableDBTest, FlushWithDuplicateKeys) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   Reopen(&options);
   ASSERT_OK(Put("key1", "v1"));
@@ -204,11 +215,13 @@ TEST_F(CuckooTableDBTest, FlushWithDuplicateKeys) {
 
 namespace {
 static std::string Key(int i) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   char buf[100];
   snprintf(buf, sizeof(buf), "key_______%06d", i);
   return std::string(buf);
 }
 static std::string Uint64Key(uint64_t i) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string str;
   str.resize(8);
   memcpy(&str[0], static_cast<void*>(&i), 8);
@@ -217,6 +230,7 @@ static std::string Uint64Key(uint64_t i) {
 }  // namespace.
 
 TEST_F(CuckooTableDBTest, Uint64Comparator) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.comparator = test::Uint64Comparator();
   DestroyAndReopen(&options);
@@ -244,6 +258,7 @@ TEST_F(CuckooTableDBTest, Uint64Comparator) {
 }
 
 TEST_F(CuckooTableDBTest, CompactionIntoMultipleFiles) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Create a big L0 file and check it compacts into multiple files in L1.
   Options options = CurrentOptions();
   options.write_buffer_size = 270 << 10;
@@ -268,6 +283,7 @@ TEST_F(CuckooTableDBTest, CompactionIntoMultipleFiles) {
 }
 
 TEST_F(CuckooTableDBTest, SameKeyInsertedInTwoDifferentFilesAndCompacted) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Insert same key twice so that they go to different SST files. Then wait for
   // compaction and check if the latest value is stored and old value removed.
   Options options = CurrentOptions();
@@ -296,6 +312,7 @@ TEST_F(CuckooTableDBTest, SameKeyInsertedInTwoDifferentFilesAndCompacted) {
 }
 
 TEST_F(CuckooTableDBTest, AdaptiveTable) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
 
   // Ensure options compatible with PlainTable
@@ -344,6 +361,7 @@ TEST_F(CuckooTableDBTest, AdaptiveTable) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (ROCKSDB_NAMESPACE::port::kLittleEndian) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
@@ -357,6 +375,7 @@ int main(int argc, char** argv) {
 #include <stdio.h>
 
 int main(int /*argc*/, char** /*argv*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   fprintf(stderr, "SKIPPED as Cuckoo table is not supported in ROCKSDB_LITE\n");
   return 0;
 }

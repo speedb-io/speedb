@@ -12,6 +12,7 @@
 namespace ROCKSDB_NAMESPACE {
 
 void BlobLogHeader::EncodeTo(std::string* dst) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(dst != nullptr);
   dst->clear();
   dst->reserve(BlobLogHeader::kSize);
@@ -26,6 +27,7 @@ void BlobLogHeader::EncodeTo(std::string* dst) {
 }
 
 Status BlobLogHeader::DecodeFrom(Slice src) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   static const std::string kErrorMessage =
       "Error while decoding blob log header";
   if (src.size() != BlobLogHeader::kSize) {
@@ -58,6 +60,7 @@ Status BlobLogHeader::DecodeFrom(Slice src) {
 }
 
 void BlobLogFooter::EncodeTo(std::string* dst) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(dst != nullptr);
   dst->clear();
   dst->reserve(BlobLogFooter::kSize);
@@ -71,6 +74,7 @@ void BlobLogFooter::EncodeTo(std::string* dst) {
 }
 
 Status BlobLogFooter::DecodeFrom(Slice src) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   static const std::string kErrorMessage =
       "Error while decoding blob log footer";
   if (src.size() != BlobLogFooter::kSize) {
@@ -96,6 +100,7 @@ Status BlobLogFooter::DecodeFrom(Slice src) {
 }
 
 void BlobLogRecord::EncodeHeaderTo(std::string* dst) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(dst != nullptr);
   dst->clear();
   dst->reserve(BlobLogRecord::kHeaderSize + key.size() + value.size());
@@ -112,6 +117,7 @@ void BlobLogRecord::EncodeHeaderTo(std::string* dst) {
 }
 
 Status BlobLogRecord::DecodeHeaderFrom(Slice src) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   static const std::string kErrorMessage = "Error while decoding blob record";
   if (src.size() != BlobLogRecord::kHeaderSize) {
     return Status::Corruption(kErrorMessage,

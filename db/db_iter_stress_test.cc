@@ -96,6 +96,7 @@ struct StressTestIterator : public InternalIterator {
   Status status() const override { return status_; }
 
   bool MaybeFail() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (rnd->Next() >=
         static_cast<double>(std::numeric_limits<uint64_t>::max()) *
             error_probability) {
@@ -114,6 +115,7 @@ struct StressTestIterator : public InternalIterator {
   }
 
   void MaybeMutate() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (rnd->Next() >=
         static_cast<double>(std::numeric_limits<uint64_t>::max()) *
             mutation_probability) {
@@ -166,11 +168,13 @@ struct StressTestIterator : public InternalIterator {
   }
 
   void SkipForward() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     while (iter < (int)data->entries.size() && !data->entries[iter].visible) {
       ++iter;
     }
   }
   void SkipBackward() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     while (iter >= 0 && !data->entries[iter].visible) {
       --iter;
     }
@@ -270,6 +274,7 @@ struct ReferenceIterator {
   // Sets `key` to the result.
   // If no such key exists, returns false. Doesn't check `visible`.
   bool FindNextKey(bool skip, bool forward) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     valid = false;
     auto it = std::partition_point(data->entries.begin(), data->entries.end(),
                                    [&](const Entry& e) {
@@ -295,6 +300,7 @@ struct ReferenceIterator {
   }
 
   bool FindValueForCurrentKey() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (data->recently_touched_keys.count(key)) {
       return false;
     }
@@ -364,29 +370,35 @@ struct ReferenceIterator {
   // `forward` defines the direction of movement.
   // If `skip` is true, we're looking for key not equal to `key`.
   void DoTheThing(bool skip, bool forward) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     while (FindNextKey(skip, forward) && !FindValueForCurrentKey()) {
       skip = true;
     }
   }
 
   void Seek(const Slice& target) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     key = target.ToString();
     DoTheThing(false, true);
   }
   void SeekForPrev(const Slice& target) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     key = target.ToString();
     DoTheThing(false, false);
   }
   void SeekToFirst() { Seek(""); }
   void SeekToLast() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     key = data->entries.back().key;
     DoTheThing(false, false);
   }
   void Next() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(Valid());
     DoTheThing(true, true);
   }
   void Prev() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(Valid());
     DoTheThing(true, false);
   }
@@ -403,6 +415,7 @@ struct ReferenceIterator {
 //   * Try different combinations of prefix_extractor, total_order_seek,
 //     prefix_same_as_start, iterate_lower_bound, iterate_upper_bound.
 TEST_F(DBIteratorStressTest, StressTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // We use a deterministic RNG, and everything happens in a single thread.
   Random64 rnd(826909345792864532ll);
 
@@ -437,12 +450,18 @@ TEST_F(DBIteratorStressTest, StressTest) {
   bool trace = FLAGS_verbose;
 
   for (int num_entries : {5, 10, 100}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     for (double key_space : {0.1, 1.0, 3.0}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
       for (ValueType prevalent_entry_type :
            {kTypeValue, kTypeDeletion, kTypeMerge}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         for (double error_probability : {0.01, 0.1}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
           for (double mutation_probability : {0.01, 0.5}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
             for (double target_hidden_fraction : {0.1, 0.5}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
               std::string trace_str =
                   "entries: " + ToString(num_entries) +
                   ", key_space: " + ToString(key_space) +
@@ -651,6 +670,7 @@ TEST_F(DBIteratorStressTest, StressTest) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   ParseCommandLineFlags(&argc, &argv, true);
   return RUN_ALL_TESTS();

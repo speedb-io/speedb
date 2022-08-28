@@ -34,6 +34,7 @@ class WriteControllerTest : public testing::Test {
 #define SECS MILLION  // in microseconds
 
 TEST_F(WriteControllerTest, BasicAPI) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   WriteController controller(40 MBPS);  // also set max delayed rate
   EXPECT_EQ(controller.delayed_write_rate(), 40 MBPS);
   EXPECT_FALSE(controller.IsStopped());
@@ -107,6 +108,7 @@ TEST_F(WriteControllerTest, BasicAPI) {
 }
 
 TEST_F(WriteControllerTest, StartFilled) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   WriteController controller(10 MBPS);
 
   // Attempt to write two things that combined would be allowed within
@@ -133,6 +135,7 @@ TEST_F(WriteControllerTest, StartFilled) {
 }
 
 TEST_F(WriteControllerTest, DebtAccumulation) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   WriteController controller(10 MBPS);
 
   std::array<std::unique_ptr<WriteControllerToken>, 10> tokens;
@@ -193,6 +196,7 @@ TEST_F(WriteControllerTest, DebtAccumulation) {
 
 // This may or may not be a "good" feature, but it's an old feature
 TEST_F(WriteControllerTest, CreditAccumulation) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   WriteController controller(10 MBPS);
 
   std::array<std::unique_ptr<WriteControllerToken>, 10> tokens;
@@ -242,6 +246,7 @@ TEST_F(WriteControllerTest, CreditAccumulation) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

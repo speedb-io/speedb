@@ -33,6 +33,7 @@ std::unique_ptr<InternalIterator> MakeRangeDelIter(
 
 void CheckIterPosition(const RangeTombstone& tombstone,
                        const FragmentedRangeTombstoneIterator* iter) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Test InternalIterator interface.
   EXPECT_EQ(tombstone.start_key_, ExtractUserKey(iter->key()));
   EXPECT_EQ(tombstone.end_key_, iter->value());
@@ -47,6 +48,7 @@ void CheckIterPosition(const RangeTombstone& tombstone,
 void VerifyFragmentedRangeDels(
     FragmentedRangeTombstoneIterator* iter,
     const std::vector<RangeTombstone>& expected_tombstones) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   iter->SeekToFirst();
   for (size_t i = 0; i < expected_tombstones.size(); i++, iter->Next()) {
     ASSERT_TRUE(iter->Valid());
@@ -58,6 +60,7 @@ void VerifyFragmentedRangeDels(
 void VerifyVisibleTombstones(
     FragmentedRangeTombstoneIterator* iter,
     const std::vector<RangeTombstone>& expected_tombstones) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   iter->SeekToTopFirst();
   for (size_t i = 0; i < expected_tombstones.size(); i++, iter->TopNext()) {
     ASSERT_TRUE(iter->Valid());
@@ -74,6 +77,7 @@ struct SeekTestCase {
 
 void VerifySeek(FragmentedRangeTombstoneIterator* iter,
                 const std::vector<SeekTestCase>& cases) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (const auto& testcase : cases) {
     iter->Seek(testcase.seek_target);
     if (testcase.out_of_range) {
@@ -87,6 +91,7 @@ void VerifySeek(FragmentedRangeTombstoneIterator* iter,
 
 void VerifySeekForPrev(FragmentedRangeTombstoneIterator* iter,
                        const std::vector<SeekTestCase>& cases) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (const auto& testcase : cases) {
     iter->SeekForPrev(testcase.seek_target);
     if (testcase.out_of_range) {
@@ -106,6 +111,7 @@ struct MaxCoveringTombstoneSeqnumTestCase {
 void VerifyMaxCoveringTombstoneSeqnum(
     FragmentedRangeTombstoneIterator* iter,
     const std::vector<MaxCoveringTombstoneSeqnumTestCase>& cases) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (const auto& testcase : cases) {
     EXPECT_EQ(testcase.result,
               iter->MaxCoveringTombstoneSeqnum(testcase.user_key));
@@ -115,6 +121,7 @@ void VerifyMaxCoveringTombstoneSeqnum(
 }  // anonymous namespace
 
 TEST_F(RangeTombstoneFragmenterTest, NonOverlappingTombstones) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto range_del_iter = MakeRangeDelIter({{"a", "b", 10}, {"c", "d", 5}});
 
   FragmentedRangeTombstoneList fragment_list(std::move(range_del_iter),
@@ -129,6 +136,7 @@ TEST_F(RangeTombstoneFragmenterTest, NonOverlappingTombstones) {
 }
 
 TEST_F(RangeTombstoneFragmenterTest, OverlappingTombstones) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto range_del_iter = MakeRangeDelIter({{"a", "e", 10}, {"c", "g", 15}});
 
   FragmentedRangeTombstoneList fragment_list(std::move(range_del_iter),
@@ -144,6 +152,7 @@ TEST_F(RangeTombstoneFragmenterTest, OverlappingTombstones) {
 }
 
 TEST_F(RangeTombstoneFragmenterTest, ContiguousTombstones) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto range_del_iter = MakeRangeDelIter(
       {{"a", "c", 10}, {"c", "e", 20}, {"c", "e", 5}, {"e", "g", 15}});
 
@@ -160,6 +169,7 @@ TEST_F(RangeTombstoneFragmenterTest, ContiguousTombstones) {
 }
 
 TEST_F(RangeTombstoneFragmenterTest, RepeatedStartAndEndKey) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto range_del_iter =
       MakeRangeDelIter({{"a", "c", 10}, {"a", "c", 7}, {"a", "c", 3}});
 
@@ -175,6 +185,7 @@ TEST_F(RangeTombstoneFragmenterTest, RepeatedStartAndEndKey) {
 }
 
 TEST_F(RangeTombstoneFragmenterTest, RepeatedStartKeyDifferentEndKeys) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto range_del_iter =
       MakeRangeDelIter({{"a", "e", 10}, {"a", "g", 7}, {"a", "c", 3}});
 
@@ -195,6 +206,7 @@ TEST_F(RangeTombstoneFragmenterTest, RepeatedStartKeyDifferentEndKeys) {
 }
 
 TEST_F(RangeTombstoneFragmenterTest, RepeatedStartKeyMixedEndKeys) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto range_del_iter = MakeRangeDelIter({{"a", "c", 30},
                                           {"a", "g", 20},
                                           {"a", "e", 10},
@@ -222,6 +234,7 @@ TEST_F(RangeTombstoneFragmenterTest, RepeatedStartKeyMixedEndKeys) {
 }
 
 TEST_F(RangeTombstoneFragmenterTest, OverlapAndRepeatedStartKey) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto range_del_iter = MakeRangeDelIter({{"a", "e", 10},
                                           {"c", "g", 8},
                                           {"c", "i", 6},
@@ -241,6 +254,7 @@ TEST_F(RangeTombstoneFragmenterTest, OverlapAndRepeatedStartKey) {
   FragmentedRangeTombstoneIterator iter5(&fragment_list, bytewise_icmp,
                                          3 /* upper_bound */);
   for (auto* iter : {&iter1, &iter2, &iter3, &iter4, &iter5}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     VerifyFragmentedRangeDels(iter, {{"a", "c", 10},
                                      {"c", "e", 10},
                                      {"c", "e", 8},
@@ -298,6 +312,7 @@ TEST_F(RangeTombstoneFragmenterTest, OverlapAndRepeatedStartKey) {
 }
 
 TEST_F(RangeTombstoneFragmenterTest, OverlapAndRepeatedStartKeyUnordered) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto range_del_iter = MakeRangeDelIter({{"a", "e", 10},
                                           {"j", "n", 4},
                                           {"c", "i", 6},
@@ -325,6 +340,7 @@ TEST_F(RangeTombstoneFragmenterTest, OverlapAndRepeatedStartKeyUnordered) {
 }
 
 TEST_F(RangeTombstoneFragmenterTest, OverlapAndRepeatedStartKeyForCompaction) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto range_del_iter = MakeRangeDelIter({{"a", "e", 10},
                                           {"j", "n", 4},
                                           {"c", "i", 6},
@@ -346,6 +362,7 @@ TEST_F(RangeTombstoneFragmenterTest, OverlapAndRepeatedStartKeyForCompaction) {
 
 TEST_F(RangeTombstoneFragmenterTest,
        OverlapAndRepeatedStartKeyForCompactionWithSnapshot) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto range_del_iter = MakeRangeDelIter({{"a", "e", 10},
                                           {"j", "n", 4},
                                           {"c", "i", 6},
@@ -367,6 +384,7 @@ TEST_F(RangeTombstoneFragmenterTest,
 }
 
 TEST_F(RangeTombstoneFragmenterTest, IteratorSplitNoSnapshots) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto range_del_iter = MakeRangeDelIter({{"a", "e", 10},
                                           {"j", "n", 4},
                                           {"c", "i", 6},
@@ -393,6 +411,7 @@ TEST_F(RangeTombstoneFragmenterTest, IteratorSplitNoSnapshots) {
 }
 
 TEST_F(RangeTombstoneFragmenterTest, IteratorSplitWithSnapshots) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto range_del_iter = MakeRangeDelIter({{"a", "e", 10},
                                           {"j", "n", 4},
                                           {"c", "i", 6},
@@ -435,6 +454,7 @@ TEST_F(RangeTombstoneFragmenterTest, IteratorSplitWithSnapshots) {
 }
 
 TEST_F(RangeTombstoneFragmenterTest, SeekStartKey) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Same tombstones as OverlapAndRepeatedStartKey.
   auto range_del_iter = MakeRangeDelIter({{"a", "e", 10},
                                           {"c", "g", 8},
@@ -465,6 +485,7 @@ TEST_F(RangeTombstoneFragmenterTest, SeekStartKey) {
 }
 
 TEST_F(RangeTombstoneFragmenterTest, SeekCovered) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Same tombstones as OverlapAndRepeatedStartKey.
   auto range_del_iter = MakeRangeDelIter({{"a", "e", 10},
                                           {"c", "g", 8},
@@ -495,6 +516,7 @@ TEST_F(RangeTombstoneFragmenterTest, SeekCovered) {
 }
 
 TEST_F(RangeTombstoneFragmenterTest, SeekEndKey) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Same tombstones as OverlapAndRepeatedStartKey.
   auto range_del_iter = MakeRangeDelIter({{"a", "e", 10},
                                           {"c", "g", 8},
@@ -529,6 +551,7 @@ TEST_F(RangeTombstoneFragmenterTest, SeekEndKey) {
 }
 
 TEST_F(RangeTombstoneFragmenterTest, SeekOutOfBounds) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Same tombstones as OverlapAndRepeatedStartKey.
   auto range_del_iter = MakeRangeDelIter({{"a", "e", 10},
                                           {"c", "g", 8},
@@ -549,6 +572,7 @@ TEST_F(RangeTombstoneFragmenterTest, SeekOutOfBounds) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

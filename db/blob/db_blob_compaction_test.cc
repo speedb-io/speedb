@@ -18,6 +18,7 @@ class DBBlobCompactionTest : public DBTestBase {
 
 #ifndef ROCKSDB_LITE
   const std::vector<InternalStats::CompactionStats>& GetCompactionStats() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     VersionSet* const versions = dbfull()->GetVersionSet();
     assert(versions);
     assert(versions->GetColumnFamilySet());
@@ -205,6 +206,7 @@ INSTANTIATE_TEST_CASE_P(
                         CompactionFilter::Decision::kIOError)));
 
 TEST_F(DBBlobCompactionTest, FilterByKeyLength) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = GetDefaultOptions();
   options.enable_blob_files = true;
   options.min_blob_size = 0;
@@ -244,6 +246,7 @@ TEST_F(DBBlobCompactionTest, FilterByKeyLength) {
 }
 
 TEST_F(DBBlobCompactionTest, BlindWriteFilter) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = GetDefaultOptions();
   options.enable_blob_files = true;
   options.min_blob_size = 0;
@@ -280,6 +283,7 @@ TEST_F(DBBlobCompactionTest, BlindWriteFilter) {
 }
 
 TEST_F(DBBlobCompactionTest, SkipUntilFilter) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = GetDefaultOptions();
   options.enable_blob_files = true;
 
@@ -323,6 +327,7 @@ TEST_F(DBBlobCompactionTest, SkipUntilFilter) {
 }
 
 TEST_P(DBBlobBadCompactionFilterTest, BadDecisionFromCompactionFilter) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = GetDefaultOptions();
   options.enable_blob_files = true;
   options.min_blob_size = 0;
@@ -347,6 +352,7 @@ TEST_P(DBBlobBadCompactionFilterTest, BadDecisionFromCompactionFilter) {
 }
 
 TEST_F(DBBlobCompactionTest, CompactionFilter_InlinedTTLIndex) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = GetDefaultOptions();
   options.create_if_missing = true;
   options.enable_blob_files = true;
@@ -372,6 +378,7 @@ TEST_F(DBBlobCompactionTest, CompactionFilter_InlinedTTLIndex) {
 }
 
 TEST_F(DBBlobCompactionTest, CompactionFilter) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = GetDefaultOptions();
   options.create_if_missing = true;
   options.enable_blob_files = true;
@@ -407,6 +414,7 @@ TEST_F(DBBlobCompactionTest, CompactionFilter) {
 }
 
 TEST_F(DBBlobCompactionTest, CorruptedBlobIndex) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = GetDefaultOptions();
   options.create_if_missing = true;
   options.enable_blob_files = true;
@@ -425,6 +433,7 @@ TEST_F(DBBlobCompactionTest, CorruptedBlobIndex) {
   SyncPoint::GetInstance()->SetCallBack(
       "CompactionIterator::InvokeFilterIfNeeded::TamperWithBlobIndex",
       [](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         Slice* const blob_index = static_cast<Slice*>(arg);
         assert(blob_index);
         assert(!blob_index->empty());
@@ -443,6 +452,7 @@ TEST_F(DBBlobCompactionTest, CorruptedBlobIndex) {
 }
 
 TEST_F(DBBlobCompactionTest, CompactionFilterReadBlobAndKeep) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = GetDefaultOptions();
   options.create_if_missing = true;
   options.enable_blob_files = true;
@@ -473,6 +483,7 @@ TEST_F(DBBlobCompactionTest, CompactionFilterReadBlobAndKeep) {
 }
 
 TEST_F(DBBlobCompactionTest, TrackGarbage) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = GetDefaultOptions();
   options.enable_blob_files = true;
 
@@ -577,6 +588,7 @@ TEST_F(DBBlobCompactionTest, TrackGarbage) {
 }
 
 TEST_F(DBBlobCompactionTest, MergeBlobWithBase) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = GetDefaultOptions();
   options.enable_blob_files = true;
   options.min_blob_size = 0;
@@ -603,6 +615,7 @@ TEST_F(DBBlobCompactionTest, MergeBlobWithBase) {
 }
 
 TEST_F(DBBlobCompactionTest, CompactionReadaheadGarbageCollection) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = GetDefaultOptions();
   options.enable_blob_files = true;
   options.min_blob_size = 0;
@@ -643,6 +656,7 @@ TEST_F(DBBlobCompactionTest, CompactionReadaheadGarbageCollection) {
 }
 
 TEST_F(DBBlobCompactionTest, CompactionReadaheadFilter) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = GetDefaultOptions();
 
   std::unique_ptr<CompactionFilter> compaction_filter_guard(
@@ -682,6 +696,7 @@ TEST_F(DBBlobCompactionTest, CompactionReadaheadFilter) {
 }
 
 TEST_F(DBBlobCompactionTest, CompactionReadaheadMerge) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = GetDefaultOptions();
   options.enable_blob_files = true;
   options.min_blob_size = 0;
@@ -723,6 +738,7 @@ TEST_F(DBBlobCompactionTest, CompactionReadaheadMerge) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   RegisterCustomObjects(argc, argv);

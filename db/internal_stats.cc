@@ -87,6 +87,7 @@ const double kMicrosInSec = 1000000.0;
 
 void PrintLevelStatsHeader(char* buf, size_t len, const std::string& cf_name,
                            const std::string& group_by) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   int written_size =
       snprintf(buf, len, "\n** Compaction Stats [%s] **\n", cf_name.c_str());
   written_size = std::min(written_size, static_cast<int>(len));
@@ -120,6 +121,7 @@ void PrepareLevelStats(std::map<LevelStatType, double>* level_stats,
                        int num_files, int being_compacted,
                        double total_file_size, double score, double w_amp,
                        const InternalStats::CompactionStats& stats) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const uint64_t bytes_read = stats.bytes_read_non_output_levels +
                               stats.bytes_read_output_level +
                               stats.bytes_read_blob;
@@ -156,6 +158,7 @@ void PrepareLevelStats(std::map<LevelStatType, double>* level_stats,
 
 void PrintLevelStats(char* buf, size_t len, const std::string& name,
                      const std::map<LevelStatType, double>& stat_value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   snprintf(
       buf, len,
       "%4s "      /*  Level */
@@ -212,6 +215,7 @@ void PrintLevelStats(char* buf, size_t len, const std::string& name,
                      int num_files, int being_compacted, double total_file_size,
                      double score, double w_amp,
                      const InternalStats::CompactionStats& stats) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::map<LevelStatType, double> level_stats;
   PrepareLevelStats(&level_stats, num_files, being_compacted, total_file_size,
                     score, w_amp, stats);
@@ -221,6 +225,7 @@ void PrintLevelStats(char* buf, size_t len, const std::string& name,
 // Assumes that trailing numbers represent an optional argument. This requires
 // property names to not end with numbers.
 std::pair<Slice, Slice> GetPropertyNameAndArg(const Slice& property) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Slice name = property, arg = property;
   size_t sfx_len = 0;
   while (sfx_len < property.size() &&
@@ -585,6 +590,7 @@ InternalStats::InternalStats(int num_levels, SystemClock* clock,
       clock_(clock),
       cfd_(cfd),
       started_at_(clock->NowMicros()) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Cache* block_cache = nullptr;
   bool ok = GetBlockCacheForStats(&block_cache);
   if (ok) {
@@ -604,6 +610,7 @@ InternalStats::InternalStats(int num_levels, SystemClock* clock,
 
 void InternalStats::TEST_GetCacheEntryRoleStats(CacheEntryRoleStats* stats,
                                                 bool foreground) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   CollectCacheEntryStats(foreground);
   if (cache_entry_stats_collector_) {
     cache_entry_stats_collector_->GetStats(stats);
@@ -611,6 +618,7 @@ void InternalStats::TEST_GetCacheEntryRoleStats(CacheEntryRoleStats* stats,
 }
 
 void InternalStats::CollectCacheEntryStats(bool foreground) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // This function is safe to call from any thread because
   // cache_entry_stats_collector_ field is const after constructor
   // and ->GetStats does its own synchronization, which also suffices for
@@ -632,6 +640,7 @@ void InternalStats::CollectCacheEntryStats(bool foreground) {
 
 std::function<void(const Slice&, void*, size_t, Cache::DeleterFn)>
 InternalStats::CacheEntryRoleStats::GetEntryCallback() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return [&](const Slice& /*key*/, void* /*value*/, size_t charge,
              Cache::DeleterFn deleter) {
     auto e = role_map_.find(deleter);
@@ -648,6 +657,7 @@ InternalStats::CacheEntryRoleStats::GetEntryCallback() {
 
 void InternalStats::CacheEntryRoleStats::BeginCollection(
     Cache* cache, SystemClock*, uint64_t start_time_micros) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Clear();
   last_start_time_micros_ = start_time_micros;
   ++collection_count;
@@ -661,10 +671,12 @@ void InternalStats::CacheEntryRoleStats::BeginCollection(
 
 void InternalStats::CacheEntryRoleStats::EndCollection(
     Cache*, SystemClock*, uint64_t end_time_micros) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   last_end_time_micros_ = end_time_micros;
 }
 
 void InternalStats::CacheEntryRoleStats::SkippedCollection() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ++copies_of_last_collection;
 }
 
@@ -723,6 +735,7 @@ void InternalStats::CacheEntryRoleStats::ToMap(
 
 bool InternalStats::HandleBlockCacheEntryStats(std::string* value,
                                                Slice /*suffix*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!cache_entry_stats_collector_) {
     return false;
   }
@@ -735,6 +748,7 @@ bool InternalStats::HandleBlockCacheEntryStats(std::string* value,
 
 bool InternalStats::HandleBlockCacheEntryStatsMap(
     std::map<std::string, std::string>* values, Slice /*suffix*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!cache_entry_stats_collector_) {
     return false;
   }
@@ -747,6 +761,7 @@ bool InternalStats::HandleBlockCacheEntryStatsMap(
 
 bool InternalStats::HandleLiveSstFilesSizeAtTemperature(std::string* value,
                                                         Slice suffix) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t temperature;
   bool ok = ConsumeDecimalNumber(&suffix, &temperature) && suffix.empty();
   if (!ok) {
@@ -769,6 +784,7 @@ bool InternalStats::HandleLiveSstFilesSizeAtTemperature(std::string* value,
 
 bool InternalStats::HandleNumBlobFiles(uint64_t* value, DBImpl* /*db*/,
                                        Version* /*version*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(value);
   assert(cfd_);
 
@@ -786,6 +802,7 @@ bool InternalStats::HandleNumBlobFiles(uint64_t* value, DBImpl* /*db*/,
 }
 
 bool InternalStats::HandleBlobStats(std::string* value, Slice /*suffix*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(value);
   assert(cfd_);
 
@@ -811,6 +828,7 @@ bool InternalStats::HandleBlobStats(std::string* value, Slice /*suffix*/) {
 
 bool InternalStats::HandleTotalBlobFileSize(uint64_t* value, DBImpl* /*db*/,
                                             Version* /*version*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(value);
   assert(cfd_);
 
@@ -821,6 +839,7 @@ bool InternalStats::HandleTotalBlobFileSize(uint64_t* value, DBImpl* /*db*/,
 
 bool InternalStats::HandleLiveBlobFileSize(uint64_t* value, DBImpl* /*db*/,
                                            Version* /*version*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(value);
   assert(cfd_);
 
@@ -838,6 +857,7 @@ bool InternalStats::HandleLiveBlobFileSize(uint64_t* value, DBImpl* /*db*/,
 bool InternalStats::HandleLiveBlobFileGarbageSize(uint64_t* value,
                                                   DBImpl* /*db*/,
                                                   Version* /*version*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(value);
   assert(cfd_);
 
@@ -853,6 +873,7 @@ bool InternalStats::HandleLiveBlobFileGarbageSize(uint64_t* value,
 }
 
 const DBPropertyInfo* GetPropertyInfo(const Slice& property) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string ppt_name = GetPropertyNameAndArg(property).first.ToString();
   auto ppt_info_iter = InternalStats::ppt_name_to_info.find(ppt_name);
   if (ppt_info_iter == InternalStats::ppt_name_to_info.end()) {
@@ -864,6 +885,7 @@ const DBPropertyInfo* GetPropertyInfo(const Slice& property) {
 bool InternalStats::GetStringProperty(const DBPropertyInfo& property_info,
                                       const Slice& property,
                                       std::string* value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(value != nullptr);
   assert(property_info.handle_string != nullptr);
   Slice arg = GetPropertyNameAndArg(property).second;
@@ -873,6 +895,7 @@ bool InternalStats::GetStringProperty(const DBPropertyInfo& property_info,
 bool InternalStats::GetMapProperty(const DBPropertyInfo& property_info,
                                    const Slice& property,
                                    std::map<std::string, std::string>* value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(value != nullptr);
   assert(property_info.handle_map != nullptr);
   Slice arg = GetPropertyNameAndArg(property).second;
@@ -881,6 +904,7 @@ bool InternalStats::GetMapProperty(const DBPropertyInfo& property_info,
 
 bool InternalStats::GetIntProperty(const DBPropertyInfo& property_info,
                                    uint64_t* value, DBImpl* db) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(value != nullptr);
   assert(property_info.handle_int != nullptr &&
          !property_info.need_out_of_mutex);
@@ -890,6 +914,7 @@ bool InternalStats::GetIntProperty(const DBPropertyInfo& property_info,
 
 bool InternalStats::GetIntPropertyOutOfMutex(
     const DBPropertyInfo& property_info, Version* version, uint64_t* value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(value != nullptr);
   assert(property_info.handle_int != nullptr &&
          property_info.need_out_of_mutex);
@@ -897,6 +922,7 @@ bool InternalStats::GetIntPropertyOutOfMutex(
 }
 
 bool InternalStats::HandleNumFilesAtLevel(std::string* value, Slice suffix) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t level;
   const auto* vstorage = cfd_->current()->storage_info();
   bool ok = ConsumeDecimalNumber(&suffix, &level) && suffix.empty();
@@ -913,6 +939,7 @@ bool InternalStats::HandleNumFilesAtLevel(std::string* value, Slice suffix) {
 
 bool InternalStats::HandleCompressionRatioAtLevelPrefix(std::string* value,
                                                         Slice suffix) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t level;
   const auto* vstorage = cfd_->current()->storage_info();
   bool ok = ConsumeDecimalNumber(&suffix, &level) && suffix.empty();
@@ -925,6 +952,7 @@ bool InternalStats::HandleCompressionRatioAtLevelPrefix(std::string* value,
 }
 
 bool InternalStats::HandleLevelStats(std::string* value, Slice /*suffix*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   char buf[1000];
   const auto* vstorage = cfd_->current()->storage_info();
   snprintf(buf, sizeof(buf),
@@ -942,6 +970,7 @@ bool InternalStats::HandleLevelStats(std::string* value, Slice /*suffix*/) {
 }
 
 bool InternalStats::HandleStats(std::string* value, Slice suffix) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!HandleCFStats(value, suffix)) {
     return false;
   }
@@ -953,39 +982,46 @@ bool InternalStats::HandleStats(std::string* value, Slice suffix) {
 
 bool InternalStats::HandleCFMapStats(
     std::map<std::string, std::string>* cf_stats, Slice /*suffix*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   DumpCFMapStats(cf_stats);
   return true;
 }
 
 bool InternalStats::HandleCFStats(std::string* value, Slice /*suffix*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   DumpCFStats(value);
   return true;
 }
 
 bool InternalStats::HandleCFStatsNoFileHistogram(std::string* value,
                                                  Slice /*suffix*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   DumpCFStatsNoFileHistogram(value);
   return true;
 }
 
 bool InternalStats::HandleCFFileHistogram(std::string* value,
                                           Slice /*suffix*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   DumpCFFileHistogram(value);
   return true;
 }
 
 bool InternalStats::HandleDBMapStats(
     std::map<std::string, std::string>* db_stats, Slice /*suffix*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   DumpDBMapStats(db_stats);
   return true;
 }
 
 bool InternalStats::HandleDBStats(std::string* value, Slice /*suffix*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   DumpDBStats(value);
   return true;
 }
 
 bool InternalStats::HandleSsTables(std::string* value, Slice /*suffix*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto* current = cfd_->current();
   *value = current->DebugString(true, true);
   return true;
@@ -993,6 +1029,7 @@ bool InternalStats::HandleSsTables(std::string* value, Slice /*suffix*/) {
 
 bool InternalStats::HandleAggregatedTableProperties(std::string* value,
                                                     Slice /*suffix*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<const TableProperties> tp;
   auto s = cfd_->current()->GetAggregatedTableProperties(&tp);
   if (!s.ok()) {
@@ -1004,6 +1041,7 @@ bool InternalStats::HandleAggregatedTableProperties(std::string* value,
 
 static std::map<std::string, std::string> MapUint64ValuesToString(
     const std::map<std::string, uint64_t>& from) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::map<std::string, std::string> to;
   for (const auto& e : from) {
     to[e.first] = ToString(e.second);
@@ -1013,6 +1051,7 @@ static std::map<std::string, std::string> MapUint64ValuesToString(
 
 bool InternalStats::HandleAggregatedTablePropertiesMap(
     std::map<std::string, std::string>* values, Slice /*suffix*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<const TableProperties> tp;
   auto s = cfd_->current()->GetAggregatedTableProperties(&tp);
   if (!s.ok()) {
@@ -1024,6 +1063,7 @@ bool InternalStats::HandleAggregatedTablePropertiesMap(
 
 bool InternalStats::HandleAggregatedTablePropertiesAtLevel(std::string* values,
                                                            Slice suffix) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t level;
   bool ok = ConsumeDecimalNumber(&suffix, &level) && suffix.empty();
   if (!ok || static_cast<int>(level) >= number_levels_) {
@@ -1041,6 +1081,7 @@ bool InternalStats::HandleAggregatedTablePropertiesAtLevel(std::string* values,
 
 bool InternalStats::HandleAggregatedTablePropertiesAtLevelMap(
     std::map<std::string, std::string>* values, Slice suffix) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t level;
   bool ok = ConsumeDecimalNumber(&suffix, &level) && suffix.empty();
   if (!ok || static_cast<int>(level) >= number_levels_) {
@@ -1058,6 +1099,7 @@ bool InternalStats::HandleAggregatedTablePropertiesAtLevelMap(
 
 bool InternalStats::HandleNumImmutableMemTable(uint64_t* value, DBImpl* /*db*/,
                                                Version* /*version*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   *value = cfd_->imm()->NumNotFlushed();
   return true;
 }
@@ -1065,24 +1107,28 @@ bool InternalStats::HandleNumImmutableMemTable(uint64_t* value, DBImpl* /*db*/,
 bool InternalStats::HandleNumImmutableMemTableFlushed(uint64_t* value,
                                                       DBImpl* /*db*/,
                                                       Version* /*version*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   *value = cfd_->imm()->NumFlushed();
   return true;
 }
 
 bool InternalStats::HandleMemTableFlushPending(uint64_t* value, DBImpl* /*db*/,
                                                Version* /*version*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   *value = (cfd_->imm()->IsFlushPending() ? 1 : 0);
   return true;
 }
 
 bool InternalStats::HandleNumRunningFlushes(uint64_t* value, DBImpl* db,
                                             Version* /*version*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   *value = db->num_running_flushes();
   return true;
 }
 
 bool InternalStats::HandleCompactionPending(uint64_t* value, DBImpl* /*db*/,
                                             Version* /*version*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // 1 if the system already determines at least one compaction is needed.
   // 0 otherwise,
   const auto* vstorage = cfd_->current()->storage_info();
@@ -1092,12 +1138,14 @@ bool InternalStats::HandleCompactionPending(uint64_t* value, DBImpl* /*db*/,
 
 bool InternalStats::HandleNumRunningCompactions(uint64_t* value, DBImpl* db,
                                                 Version* /*version*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   *value = db->num_running_compactions_;
   return true;
 }
 
 bool InternalStats::HandleBackgroundErrors(uint64_t* value, DBImpl* /*db*/,
                                            Version* /*version*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Accumulated number of  errors in background flushes or compactions.
   *value = GetBackgroundErrorCount();
   return true;
@@ -1105,6 +1153,7 @@ bool InternalStats::HandleBackgroundErrors(uint64_t* value, DBImpl* /*db*/,
 
 bool InternalStats::HandleCurSizeActiveMemTable(uint64_t* value, DBImpl* /*db*/,
                                                 Version* /*version*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Current size of the active memtable
   // Using ApproximateMemoryUsageFast to avoid the need for synchronization
   *value = cfd_->mem()->ApproximateMemoryUsageFast();
@@ -1113,6 +1162,7 @@ bool InternalStats::HandleCurSizeActiveMemTable(uint64_t* value, DBImpl* /*db*/,
 
 bool InternalStats::HandleCurSizeAllMemTables(uint64_t* value, DBImpl* /*db*/,
                                               Version* /*version*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Current size of the active memtable + immutable memtables
   // Using ApproximateMemoryUsageFast to avoid the need for synchronization
   *value = cfd_->mem()->ApproximateMemoryUsageFast() +
@@ -1122,6 +1172,7 @@ bool InternalStats::HandleCurSizeAllMemTables(uint64_t* value, DBImpl* /*db*/,
 
 bool InternalStats::HandleSizeAllMemTables(uint64_t* value, DBImpl* /*db*/,
                                            Version* /*version*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Using ApproximateMemoryUsageFast to avoid the need for synchronization
   *value = cfd_->mem()->ApproximateMemoryUsageFast() +
            cfd_->imm()->ApproximateMemoryUsage();
@@ -1131,6 +1182,7 @@ bool InternalStats::HandleSizeAllMemTables(uint64_t* value, DBImpl* /*db*/,
 bool InternalStats::HandleNumEntriesActiveMemTable(uint64_t* value,
                                                    DBImpl* /*db*/,
                                                    Version* /*version*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Current number of entires in the active memtable
   *value = cfd_->mem()->num_entries();
   return true;
@@ -1139,6 +1191,7 @@ bool InternalStats::HandleNumEntriesActiveMemTable(uint64_t* value,
 bool InternalStats::HandleNumEntriesImmMemTables(uint64_t* value,
                                                  DBImpl* /*db*/,
                                                  Version* /*version*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Current number of entries in the immutable memtables
   *value = cfd_->imm()->current()->GetTotalNumEntries();
   return true;
@@ -1147,6 +1200,7 @@ bool InternalStats::HandleNumEntriesImmMemTables(uint64_t* value,
 bool InternalStats::HandleNumDeletesActiveMemTable(uint64_t* value,
                                                    DBImpl* /*db*/,
                                                    Version* /*version*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Current number of entires in the active memtable
   *value = cfd_->mem()->num_deletes();
   return true;
@@ -1155,6 +1209,7 @@ bool InternalStats::HandleNumDeletesActiveMemTable(uint64_t* value,
 bool InternalStats::HandleNumDeletesImmMemTables(uint64_t* value,
                                                  DBImpl* /*db*/,
                                                  Version* /*version*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Current number of entries in the immutable memtables
   *value = cfd_->imm()->current()->GetTotalNumDeletes();
   return true;
@@ -1162,6 +1217,7 @@ bool InternalStats::HandleNumDeletesImmMemTables(uint64_t* value,
 
 bool InternalStats::HandleEstimateNumKeys(uint64_t* value, DBImpl* /*db*/,
                                           Version* /*version*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Estimate number of entries in the column family:
   // Use estimated entries in tables + total entries in memtables.
   const auto* vstorage = cfd_->current()->storage_info();
@@ -1178,24 +1234,28 @@ bool InternalStats::HandleEstimateNumKeys(uint64_t* value, DBImpl* /*db*/,
 
 bool InternalStats::HandleNumSnapshots(uint64_t* value, DBImpl* db,
                                        Version* /*version*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   *value = db->snapshots().count();
   return true;
 }
 
 bool InternalStats::HandleOldestSnapshotTime(uint64_t* value, DBImpl* db,
                                              Version* /*version*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   *value = static_cast<uint64_t>(db->snapshots().GetOldestSnapshotTime());
   return true;
 }
 
 bool InternalStats::HandleOldestSnapshotSequence(uint64_t* value, DBImpl* db,
                                                  Version* /*version*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   *value = static_cast<uint64_t>(db->snapshots().GetOldestSnapshotSequence());
   return true;
 }
 
 bool InternalStats::HandleNumLiveVersions(uint64_t* value, DBImpl* /*db*/,
                                           Version* /*version*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   *value = cfd_->GetNumLiveVersions();
   return true;
 }
@@ -1203,18 +1263,21 @@ bool InternalStats::HandleNumLiveVersions(uint64_t* value, DBImpl* /*db*/,
 bool InternalStats::HandleCurrentSuperVersionNumber(uint64_t* value,
                                                     DBImpl* /*db*/,
                                                     Version* /*version*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   *value = cfd_->GetSuperVersionNumber();
   return true;
 }
 
 bool InternalStats::HandleIsFileDeletionsEnabled(uint64_t* value, DBImpl* db,
                                                  Version* /*version*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   *value = db->IsFileDeletionsEnabled() ? 1 : 0;
   return true;
 }
 
 bool InternalStats::HandleBaseLevel(uint64_t* value, DBImpl* /*db*/,
                                     Version* /*version*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const auto* vstorage = cfd_->current()->storage_info();
   *value = vstorage->base_level();
   return true;
@@ -1222,12 +1285,14 @@ bool InternalStats::HandleBaseLevel(uint64_t* value, DBImpl* /*db*/,
 
 bool InternalStats::HandleTotalSstFilesSize(uint64_t* value, DBImpl* /*db*/,
                                             Version* /*version*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   *value = cfd_->GetTotalSstFilesSize();
   return true;
 }
 
 bool InternalStats::HandleLiveSstFilesSize(uint64_t* value, DBImpl* /*db*/,
                                            Version* /*version*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   *value = cfd_->GetLiveSstFilesSize();
   return true;
 }
@@ -1235,6 +1300,7 @@ bool InternalStats::HandleLiveSstFilesSize(uint64_t* value, DBImpl* /*db*/,
 bool InternalStats::HandleEstimatePendingCompactionBytes(uint64_t* value,
                                                          DBImpl* /*db*/,
                                                          Version* /*version*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const auto* vstorage = cfd_->current()->storage_info();
   *value = vstorage->estimated_compaction_needed_bytes();
   return true;
@@ -1243,12 +1309,14 @@ bool InternalStats::HandleEstimatePendingCompactionBytes(uint64_t* value,
 bool InternalStats::HandleEstimateTableReadersMem(uint64_t* value,
                                                   DBImpl* /*db*/,
                                                   Version* version) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   *value = (version == nullptr) ? 0 : version->GetMemoryUsageByTableReaders();
   return true;
 }
 
 bool InternalStats::HandleEstimateLiveDataSize(uint64_t* value, DBImpl* /*db*/,
                                                Version* version) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const auto* vstorage = version->storage_info();
   *value = vstorage->EstimateLiveDataSize();
   return true;
@@ -1256,6 +1324,7 @@ bool InternalStats::HandleEstimateLiveDataSize(uint64_t* value, DBImpl* /*db*/,
 
 bool InternalStats::HandleMinLogNumberToKeep(uint64_t* value, DBImpl* db,
                                              Version* /*version*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   *value = db->MinLogNumberToKeep();
   return true;
 }
@@ -1263,12 +1332,14 @@ bool InternalStats::HandleMinLogNumberToKeep(uint64_t* value, DBImpl* db,
 bool InternalStats::HandleMinObsoleteSstNumberToKeep(uint64_t* value,
                                                      DBImpl* db,
                                                      Version* /*version*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   *value = db->MinObsoleteSstNumberToKeep();
   return true;
 }
 
 bool InternalStats::HandleActualDelayedWriteRate(uint64_t* value, DBImpl* db,
                                                  Version* /*version*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const WriteController& wc = db->write_controller();
   if (!wc.NeedsDelay()) {
     *value = 0;
@@ -1280,12 +1351,14 @@ bool InternalStats::HandleActualDelayedWriteRate(uint64_t* value, DBImpl* db,
 
 bool InternalStats::HandleIsWriteStopped(uint64_t* value, DBImpl* db,
                                          Version* /*version*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   *value = db->write_controller().IsStopped() ? 1 : 0;
   return true;
 }
 
 bool InternalStats::HandleEstimateOldestKeyTime(uint64_t* value, DBImpl* /*db*/,
                                                 Version* /*version*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // TODO(yiwu): The property is currently available for fifo compaction
   // with allow_compaction = false. This is because we don't propagate
   // oldest_key_time on compaction.
@@ -1315,6 +1388,7 @@ bool InternalStats::HandleEstimateOldestKeyTime(uint64_t* value, DBImpl* /*db*/,
 }
 
 bool InternalStats::GetBlockCacheForStats(Cache** block_cache) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(block_cache != nullptr);
   auto* table_factory = cfd_->ioptions()->table_factory.get();
   assert(table_factory != nullptr);
@@ -1325,6 +1399,7 @@ bool InternalStats::GetBlockCacheForStats(Cache** block_cache) {
 
 bool InternalStats::HandleBlockCacheCapacity(uint64_t* value, DBImpl* /*db*/,
                                              Version* /*version*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Cache* block_cache;
   bool ok = GetBlockCacheForStats(&block_cache);
   if (!ok) {
@@ -1336,6 +1411,7 @@ bool InternalStats::HandleBlockCacheCapacity(uint64_t* value, DBImpl* /*db*/,
 
 bool InternalStats::HandleBlockCacheUsage(uint64_t* value, DBImpl* /*db*/,
                                           Version* /*version*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Cache* block_cache;
   bool ok = GetBlockCacheForStats(&block_cache);
   if (!ok) {
@@ -1347,6 +1423,7 @@ bool InternalStats::HandleBlockCacheUsage(uint64_t* value, DBImpl* /*db*/,
 
 bool InternalStats::HandleBlockCachePinnedUsage(uint64_t* value, DBImpl* /*db*/,
                                                 Version* /*version*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Cache* block_cache;
   bool ok = GetBlockCacheForStats(&block_cache);
   if (!ok) {
@@ -1358,6 +1435,7 @@ bool InternalStats::HandleBlockCachePinnedUsage(uint64_t* value, DBImpl* /*db*/,
 
 void InternalStats::DumpDBMapStats(
     std::map<std::string, std::string>* db_stats) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (int i = 0; i < static_cast<int>(kIntStatsNumMax); ++i) {
     InternalDBStatsType type = static_cast<InternalDBStatsType>(i);
     (*db_stats)[db_stats_type_to_info.at(type).property_name] =
@@ -1368,6 +1446,7 @@ void InternalStats::DumpDBMapStats(
 }
 
 void InternalStats::DumpDBStats(std::string* value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   char buf[1000];
   // DB-level stats, only available from default column family
   double seconds_up = (clock_->NowMicros() - started_at_) / kMicrosInSec;
@@ -1494,6 +1573,7 @@ void InternalStats::DumpDBStats(std::string* value) {
  */
 void InternalStats::DumpCFMapStats(
     std::map<std::string, std::string>* cf_stats) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const VersionStorageInfo* vstorage = cfd_->current()->storage_info();
   CompactionStats compaction_stats_sum;
   std::map<int, std::map<LevelStatType, double>> levels_stats;
@@ -1517,6 +1597,7 @@ void InternalStats::DumpCFMapStats(
     const VersionStorageInfo* vstorage,
     std::map<int, std::map<LevelStatType, double>>* levels_stats,
     CompactionStats* compaction_stats_sum) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(vstorage);
 
   int num_levels_to_check =
@@ -1589,6 +1670,7 @@ void InternalStats::DumpCFMapStats(
 
 void InternalStats::DumpCFMapStatsByPriority(
     std::map<int, std::map<LevelStatType, double>>* priorities_stats) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (size_t priority = 0; priority < comp_stats_by_pri_.size(); priority++) {
     if (comp_stats_by_pri_[priority].micros > 0) {
       std::map<LevelStatType, double> priority_stats;
@@ -1603,6 +1685,7 @@ void InternalStats::DumpCFMapStatsByPriority(
 
 void InternalStats::DumpCFMapStatsIOStalls(
     std::map<std::string, std::string>* cf_stats) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   (*cf_stats)["io_stalls.level0_slowdown"] =
       std::to_string(cf_stats_count_[L0_FILE_COUNT_LIMIT_SLOWDOWNS]);
   (*cf_stats)["io_stalls.level0_slowdown_with_compaction"] =
@@ -1634,11 +1717,13 @@ void InternalStats::DumpCFMapStatsIOStalls(
 }
 
 void InternalStats::DumpCFStats(std::string* value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   DumpCFStatsNoFileHistogram(value);
   DumpCFFileHistogram(value);
 }
 
 void InternalStats::DumpCFStatsNoFileHistogram(std::string* value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   char buf[2000];
   // Per-ColumnFamily stats
   PrintLevelStatsHeader(buf, sizeof(buf), cfd_->GetName(), "Level");
@@ -1849,6 +1934,7 @@ void InternalStats::DumpCFStatsNoFileHistogram(std::string* value) {
 }
 
 void InternalStats::DumpCFFileHistogram(std::string* value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(value);
   assert(cfd_);
 
@@ -1874,6 +1960,7 @@ void InternalStats::DumpCFFileHistogram(std::string* value) {
 #else
 
 const DBPropertyInfo* GetPropertyInfo(const Slice& /*property*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return nullptr;
 }
 

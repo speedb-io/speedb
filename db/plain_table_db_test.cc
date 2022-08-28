@@ -43,6 +43,7 @@ namespace ROCKSDB_NAMESPACE {
 class PlainTableKeyDecoderTest : public testing::Test {};
 
 TEST_F(PlainTableKeyDecoderTest, ReadNonMmap) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Random rnd(301);
   const uint32_t kLength = 2222;
   std::string tmp = rnd.RandomString(kLength);
@@ -124,6 +125,7 @@ class PlainTableDBTest : public testing::Test,
 
   // Return the current option configuration.
   Options CurrentOptions() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Options options;
 
     PlainTableOptions plain_table_options;
@@ -149,10 +151,12 @@ class PlainTableDBTest : public testing::Test,
   DBImpl* dbfull() { return static_cast_with_check<DBImpl>(db_); }
 
   void Reopen(Options* options = nullptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_OK(TryReopen(options));
   }
 
   void Close() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     delete db_;
     db_ = nullptr;
   }
@@ -160,28 +164,33 @@ class PlainTableDBTest : public testing::Test,
   bool mmap_mode() const { return mmap_mode_; }
 
   void DestroyAndReopen(Options* options = nullptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     //Destroy using last options
     Destroy(&last_options_);
     ASSERT_OK(TryReopen(options));
   }
 
   void Destroy(Options* options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     delete db_;
     db_ = nullptr;
     ASSERT_OK(DestroyDB(dbname_, *options));
   }
 
   Status PureReopen(Options* options, DB** db) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return DB::Open(*options, dbname_, db);
   }
 
   Status ReopenForReadOnly(Options* options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     delete db_;
     db_ = nullptr;
     return DB::OpenForReadOnly(*options, dbname_, &db_);
   }
 
   Status TryReopen(Options* options = nullptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     delete db_;
     db_ = nullptr;
     Options opts;
@@ -197,14 +206,17 @@ class PlainTableDBTest : public testing::Test,
   }
 
   Status Put(const Slice& k, const Slice& v) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return db_->Put(WriteOptions(), k, v);
   }
 
   Status Delete(const std::string& k) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return db_->Delete(WriteOptions(), k);
   }
 
   std::string Get(const std::string& k, const Snapshot* snapshot = nullptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ReadOptions options;
     options.snapshot = snapshot;
     std::string result;
@@ -219,6 +231,7 @@ class PlainTableDBTest : public testing::Test,
 
 
   int NumTableFilesAtLevel(int level) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::string property;
     EXPECT_TRUE(db_->GetProperty("rocksdb.num-files-at-level" + ToString(level),
                                  &property));
@@ -227,6 +240,7 @@ class PlainTableDBTest : public testing::Test,
 
   // Return spread of files per level
   std::string FilesPerLevel() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::string result;
     size_t last_non_zero_offset = 0;
     for (int level = 0; level < db_->NumberLevels(); level++) {
@@ -243,6 +257,7 @@ class PlainTableDBTest : public testing::Test,
   }
 
   std::string IterStatus(Iterator* iter) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::string result;
     if (iter->Valid()) {
       result = iter->key().ToString() + "->" + iter->value().ToString();
@@ -254,6 +269,7 @@ class PlainTableDBTest : public testing::Test,
 };
 
 TEST_P(PlainTableDBTest, Empty) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_TRUE(dbfull() != nullptr);
   ASSERT_EQ("NOT_FOUND", Get("0000000000000foo"));
 }
@@ -275,6 +291,7 @@ class TestPlainTableReader : public PlainTableReader {
                          encoding_type, file_size, props.get(),
                          prefix_extractor),
         expect_bloom_not_match_(expect_bloom_not_match) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Status s = MmapDataIfNeeded();
     EXPECT_TRUE(s.ok());
 
@@ -386,6 +403,7 @@ class TestPlainTableFactory : public PlainTableFactory {
 };
 
 TEST_P(PlainTableDBTest, BadOptions1) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Build with a prefix extractor
   ASSERT_OK(Put("1000000000000foo", "v1"));
   ASSERT_OK(dbfull()->TEST_FlushMemTable());
@@ -412,6 +430,7 @@ TEST_P(PlainTableDBTest, BadOptions1) {
 }
 
 TEST_P(PlainTableDBTest, BadOptions2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.prefix_extractor.reset();
   options.create_if_missing = true;
@@ -445,9 +464,11 @@ TEST_P(PlainTableDBTest, BadOptions2) {
 }
 
 TEST_P(PlainTableDBTest, Flush) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (size_t huge_page_tlb_size = 0; huge_page_tlb_size <= 2 * 1024 * 1024;
        huge_page_tlb_size += 2 * 1024 * 1024) {
     for (EncodingType encoding_type : {kPlain, kPrefix}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     for (int bloom = -1; bloom <= 117; bloom += 117) {
       const int bloom_bits = std::max(bloom, 0);
       const bool full_scan_mode = bloom < 0;
@@ -547,9 +568,11 @@ TEST_P(PlainTableDBTest, Flush) {
 }
 
 TEST_P(PlainTableDBTest, Flush2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (size_t huge_page_tlb_size = 0; huge_page_tlb_size <= 2 * 1024 * 1024;
        huge_page_tlb_size += 2 * 1024 * 1024) {
     for (EncodingType encoding_type : {kPlain, kPrefix}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     for (int bloom_bits = 0; bloom_bits <= 117; bloom_bits += 117) {
       for (int total_order = 0; total_order <= 1; total_order++) {
         for (int store_index_in_file = 0; store_index_in_file <= 1;
@@ -628,7 +651,9 @@ TEST_P(PlainTableDBTest, Flush2) {
 }
 
 TEST_P(PlainTableDBTest, Immortal) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (EncodingType encoding_type : {kPlain, kPrefix}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Options options = CurrentOptions();
     options.create_if_missing = true;
     options.max_open_files = -1;
@@ -672,9 +697,11 @@ TEST_P(PlainTableDBTest, Immortal) {
 }
 
 TEST_P(PlainTableDBTest, Iterator) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (size_t huge_page_tlb_size = 0; huge_page_tlb_size <= 2 * 1024 * 1024;
        huge_page_tlb_size += 2 * 1024 * 1024) {
     for (EncodingType encoding_type : {kPlain, kPrefix}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     for (int bloom_bits = 0; bloom_bits <= 117; bloom_bits += 117) {
       for (int total_order = 0; total_order <= 1; total_order++) {
         if (encoding_type == kPrefix && total_order == 1) {
@@ -803,6 +830,7 @@ TEST_P(PlainTableDBTest, Iterator) {
 
 namespace {
 std::string NthKey(size_t n, char filler) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string rv(16, filler);
   rv[0] = n % 10;
   rv[1] = (n / 10) % 10;
@@ -813,6 +841,7 @@ std::string NthKey(size_t n, char filler) {
 }  // anonymous namespace
 
 TEST_P(PlainTableDBTest, BloomSchema) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.create_if_missing = true;
   for (int bloom_locality = 0; bloom_locality <= 1; bloom_locality++) {
@@ -861,11 +890,13 @@ TEST_P(PlainTableDBTest, BloomSchema) {
 
 namespace {
 std::string MakeLongKey(size_t length, char c) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return std::string(length, c);
 }
 }  // namespace
 
 TEST_P(PlainTableDBTest, IteratorLargeKeys) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
 
   PlainTableOptions plain_table_options;
@@ -911,11 +942,13 @@ TEST_P(PlainTableDBTest, IteratorLargeKeys) {
 
 namespace {
 std::string MakeLongKeyWithPrefix(size_t length, char c) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return "00000000" + std::string(length - 8, c);
 }
 }  // namespace
 
 TEST_P(PlainTableDBTest, IteratorLargeKeysWithPrefix) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
 
   PlainTableOptions plain_table_options;
@@ -958,6 +991,7 @@ TEST_P(PlainTableDBTest, IteratorLargeKeysWithPrefix) {
 }
 
 TEST_P(PlainTableDBTest, IteratorReverseSuffixComparator) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.create_if_missing = true;
   // Set only one bucket to force bucket conflict.
@@ -1027,6 +1061,7 @@ TEST_P(PlainTableDBTest, IteratorReverseSuffixComparator) {
 }
 
 TEST_P(PlainTableDBTest, HashBucketConflict) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (size_t huge_page_tlb_size = 0; huge_page_tlb_size <= 2 * 1024 * 1024;
        huge_page_tlb_size += 2 * 1024 * 1024) {
     for (unsigned char i = 1; i <= 3; i++) {
@@ -1121,6 +1156,7 @@ TEST_P(PlainTableDBTest, HashBucketConflict) {
 }
 
 TEST_P(PlainTableDBTest, HashBucketConflictReverseSuffixComparator) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (size_t huge_page_tlb_size = 0; huge_page_tlb_size <= 2 * 1024 * 1024;
        huge_page_tlb_size += 2 * 1024 * 1024) {
     for (unsigned char i = 1; i <= 3; i++) {
@@ -1215,6 +1251,7 @@ TEST_P(PlainTableDBTest, HashBucketConflictReverseSuffixComparator) {
 }
 
 TEST_P(PlainTableDBTest, NonExistingKeyToNonEmptyBucket) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.create_if_missing = true;
   // Set only one bucket to force bucket conflict.
@@ -1260,12 +1297,14 @@ TEST_P(PlainTableDBTest, NonExistingKeyToNonEmptyBucket) {
 }
 
 static std::string Key(int i) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   char buf[100];
   snprintf(buf, sizeof(buf), "key_______%06d", i);
   return std::string(buf);
 }
 
 TEST_P(PlainTableDBTest, CompactionTrigger) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.write_buffer_size = 120 << 10;  // 120KB
   options.num_levels = 3;
@@ -1301,6 +1340,7 @@ TEST_P(PlainTableDBTest, CompactionTrigger) {
 }
 
 TEST_P(PlainTableDBTest, AdaptiveTable) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.create_if_missing = true;
 
@@ -1352,6 +1392,7 @@ INSTANTIATE_TEST_CASE_P(PlainTableDBTest, PlainTableDBTest, ::testing::Bool());
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }
@@ -1360,6 +1401,7 @@ int main(int argc, char** argv) {
 #include <stdio.h>
 
 int main(int /*argc*/, char** /*argv*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   fprintf(stderr, "SKIPPED as plain table is not supported in ROCKSDB_LITE\n");
   return 0;
 }

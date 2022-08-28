@@ -24,6 +24,7 @@ class ExternalSSTFileBasicTest
  public:
   ExternalSSTFileBasicTest()
       : DBTestBase("external_sst_file_basic_test", /*env_do_fsync=*/true) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     sst_files_dir_ = dbname_ + "_sst_files/";
     fault_injection_test_env_.reset(new FaultInjectionTestEnv(env_));
     DestroyAndRecreateExternalSSTFilesDir();
@@ -46,6 +47,7 @@ class ExternalSSTFileBasicTest
   }
 
   void DestroyAndRecreateExternalSSTFilesDir() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_OK(DestroyDir(env_, sst_files_dir_));
     ASSERT_OK(env_->CreateDir(sst_files_dir_));
   }
@@ -53,6 +55,7 @@ class ExternalSSTFileBasicTest
   Status DeprecatedAddFile(const std::vector<std::string>& files,
                            bool move_files = false,
                            bool skip_snapshot_check = false) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     IngestExternalFileOptions opts;
     opts.move_files = move_files;
     opts.snapshot_consistency = !skip_snapshot_check;
@@ -67,6 +70,7 @@ class ExternalSSTFileBasicTest
       const std::vector<std::string>& files_checksum_func_names,
       bool verify_file_checksum = true, bool move_files = false,
       bool skip_snapshot_check = false, bool write_global_seqno = true) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     IngestExternalFileOptions opts;
     opts.move_files = move_files;
     opts.snapshot_consistency = !skip_snapshot_check;
@@ -90,6 +94,7 @@ class ExternalSSTFileBasicTest
       std::vector<std::pair<int, int>> range_deletions, int file_id,
       bool write_global_seqno, bool verify_checksums_before_ingest,
       std::map<std::string, std::string>* true_data) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(value_types.size() == 1 || keys.size() == value_types.size());
     std::string file_path = sst_files_dir_ + ToString(file_id);
     SstFileWriter sst_file_writer(EnvOptions(), options);
@@ -165,6 +170,7 @@ class ExternalSSTFileBasicTest
       const std::vector<ValueType>& value_types, int file_id,
       bool write_global_seqno, bool verify_checksums_before_ingest,
       std::map<std::string, std::string>* true_data) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return GenerateAndAddExternalFile(
         options, keys, value_types, {}, file_id, write_global_seqno,
         verify_checksums_before_ingest, true_data);
@@ -174,6 +180,7 @@ class ExternalSSTFileBasicTest
       const Options options, std::vector<int> keys, const ValueType value_type,
       int file_id, bool write_global_seqno, bool verify_checksums_before_ingest,
       std::map<std::string, std::string>* true_data) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return GenerateAndAddExternalFile(
         options, keys, std::vector<ValueType>(1, value_type), file_id,
         write_global_seqno, verify_checksums_before_ingest, true_data);
@@ -189,6 +196,7 @@ class ExternalSSTFileBasicTest
   bool random_rwfile_supported_;
 #ifndef ROCKSDB_LITE
   uint64_t GetSstSizeHelper(Temperature temperature) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::string prop;
     EXPECT_TRUE(
         dbfull()->GetProperty(DB::Properties::kLiveSstFilesSizeAtTemperature +
@@ -200,6 +208,7 @@ class ExternalSSTFileBasicTest
 };
 
 TEST_F(ExternalSSTFileBasicTest, Basic) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
 
   SstFileWriter sst_file_writer(EnvOptions(), options);
@@ -259,6 +268,7 @@ class ChecksumVerifyHelper {
   Status GetSingleFileChecksumAndFuncName(
       const std::string& file_path, std::string* file_checksum,
       std::string* file_checksum_func_name) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Status s;
     EnvOptions soptions;
     std::unique_ptr<SequentialFile> file_reader;
@@ -298,6 +308,7 @@ class ChecksumVerifyHelper {
 };
 
 TEST_F(ExternalSSTFileBasicTest, BasicWithFileChecksumCrc32c) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.file_checksum_gen_factory = GetFileChecksumGenCrc32cFactory();
   ChecksumVerifyHelper checksum_helper(options);
@@ -352,6 +363,7 @@ TEST_F(ExternalSSTFileBasicTest, BasicWithFileChecksumCrc32c) {
 }
 
 TEST_F(ExternalSSTFileBasicTest, IngestFileWithFileChecksum) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options old_options = CurrentOptions();
   Options options = CurrentOptions();
   options.file_checksum_gen_factory = GetFileChecksumGenCrc32cFactory();
@@ -634,6 +646,7 @@ TEST_F(ExternalSSTFileBasicTest, IngestFileWithFileChecksum) {
 }
 
 TEST_F(ExternalSSTFileBasicTest, NoCopy) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   const ImmutableCFOptions ioptions(options);
 
@@ -700,6 +713,7 @@ TEST_F(ExternalSSTFileBasicTest, NoCopy) {
 }
 
 TEST_P(ExternalSSTFileBasicTest, IngestFileWithGlobalSeqnoPickedSeqno) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   bool write_global_seqno = std::get<0>(GetParam());
   bool verify_checksums_before_ingest = std::get<1>(GetParam());
   do {
@@ -806,6 +820,7 @@ TEST_P(ExternalSSTFileBasicTest, IngestFileWithGlobalSeqnoPickedSeqno) {
 }
 
 TEST_P(ExternalSSTFileBasicTest, IngestFileWithMultipleValueType) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   bool write_global_seqno = std::get<0>(GetParam());
   bool verify_checksums_before_ingest = std::get<1>(GetParam());
   do {
@@ -933,6 +948,7 @@ TEST_P(ExternalSSTFileBasicTest, IngestFileWithMultipleValueType) {
 }
 
 TEST_P(ExternalSSTFileBasicTest, IngestFileWithMixedValueType) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   bool write_global_seqno = std::get<0>(GetParam());
   bool verify_checksums_before_ingest = std::get<1>(GetParam());
   do {
@@ -1094,12 +1110,14 @@ TEST_P(ExternalSSTFileBasicTest, IngestFileWithMixedValueType) {
 }
 
 TEST_F(ExternalSSTFileBasicTest, FadviseTrigger) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   const int kNumKeys = 10000;
 
   size_t total_fadvised_bytes = 0;
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "SstFileWriter::Rep::InvalidatePageCache", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         size_t fadvise_size = *(reinterpret_cast<size_t*>(arg));
         total_fadvised_bytes += fadvise_size;
       });
@@ -1134,6 +1152,7 @@ TEST_F(ExternalSSTFileBasicTest, FadviseTrigger) {
 }
 
 TEST_F(ExternalSSTFileBasicTest, SyncFailure) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.create_if_missing = true;
   options.env = fault_injection_test_env_.get();
@@ -1152,6 +1171,7 @@ TEST_F(ExternalSSTFileBasicTest, SyncFailure) {
       fault_injection_test_env_->SetFilesystemActive(false);
     });
     SyncPoint::GetInstance()->SetCallBack(test_cases[i].second, [&](void*) {
+PERF_MARKER(__PRETTY_FUNCTION__);
       fault_injection_test_env_->SetFilesystemActive(true);
     });
     if (i == 0) {
@@ -1212,12 +1232,14 @@ TEST_F(ExternalSSTFileBasicTest, SyncFailure) {
 }
 
 TEST_F(ExternalSSTFileBasicTest, ReopenNotSupported) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.create_if_missing = true;
   options.env = env_;
 
   SyncPoint::GetInstance()->SetCallBack(
       "ExternalSstFileIngestionJob::Prepare:Reopen", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         Status* s = static_cast<Status*>(arg);
         *s = Status::NotSupported();
       });
@@ -1247,6 +1269,7 @@ TEST_F(ExternalSSTFileBasicTest, ReopenNotSupported) {
 }
 
 TEST_F(ExternalSSTFileBasicTest, VerifyChecksumReadahead) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.create_if_missing = true;
   SpecialEnv senv(env_);
@@ -1299,6 +1322,7 @@ TEST_F(ExternalSSTFileBasicTest, VerifyChecksumReadahead) {
 }
 
 TEST_F(ExternalSSTFileBasicTest, IngestRangeDeletionTombstoneWithGlobalSeqno) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (int i = 5; i < 25; i++) {
     ASSERT_OK(db_->Put(WriteOptions(), db_->DefaultColumnFamily(), Key(i),
                        Key(i) + "_val"));
@@ -1338,6 +1362,7 @@ TEST_F(ExternalSSTFileBasicTest, IngestRangeDeletionTombstoneWithGlobalSeqno) {
 }
 
 TEST_P(ExternalSSTFileBasicTest, IngestionWithRangeDeletions) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   int kNumLevels = 7;
   Options options = CurrentOptions();
   options.disable_auto_compactions = true;
@@ -1428,6 +1453,7 @@ TEST_P(ExternalSSTFileBasicTest, IngestionWithRangeDeletions) {
 }
 
 TEST_F(ExternalSSTFileBasicTest, AdjacentRangeDeletionTombstones) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   SstFileWriter sst_file_writer(EnvOptions(), options);
 
@@ -1470,6 +1496,7 @@ TEST_F(ExternalSSTFileBasicTest, AdjacentRangeDeletionTombstones) {
 }
 
 TEST_P(ExternalSSTFileBasicTest, IngestFileWithBadBlockChecksum) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   bool change_checksum_called = false;
   const auto& change_checksum = [&](void* arg) {
     if (!change_checksum_called) {
@@ -1505,6 +1532,7 @@ TEST_P(ExternalSSTFileBasicTest, IngestFileWithBadBlockChecksum) {
 }
 
 TEST_P(ExternalSSTFileBasicTest, IngestFileWithFirstByteTampered) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!random_rwfile_supported_) {
     ROCKSDB_GTEST_SKIP("Test requires NewRandomRWFile support");
     return;
@@ -1556,6 +1584,7 @@ TEST_P(ExternalSSTFileBasicTest, IngestFileWithFirstByteTampered) {
 }
 
 TEST_P(ExternalSSTFileBasicTest, IngestExternalFileWithCorruptedPropsBlock) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   bool verify_checksums_before_ingest = std::get<1>(GetParam());
   if (!verify_checksums_before_ingest) {
     ROCKSDB_GTEST_BYPASS("Bypassing test when !verify_checksums_before_ingest");
@@ -1621,6 +1650,7 @@ TEST_P(ExternalSSTFileBasicTest, IngestExternalFileWithCorruptedPropsBlock) {
 }
 
 TEST_F(ExternalSSTFileBasicTest, OverlappingFiles) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
 
   std::vector<std::string> files;
@@ -1662,6 +1692,7 @@ TEST_F(ExternalSSTFileBasicTest, OverlappingFiles) {
 }
 
 TEST_F(ExternalSSTFileBasicTest, IngestFileAfterDBPut) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Repro https://github.com/facebook/rocksdb/issues/6245.
   // Flush three files to L0. Ingest one more file to trigger L0->L1 compaction
   // via trivial move. The bug happened when L1 files were incorrectly sorted
@@ -1700,6 +1731,7 @@ TEST_F(ExternalSSTFileBasicTest, IngestFileAfterDBPut) {
 }
 
 TEST_F(ExternalSSTFileBasicTest, IngestWithTemperature) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   const ImmutableCFOptions ioptions(options);
   options.bottommost_temperature = Temperature::kWarm;
@@ -1797,6 +1829,7 @@ TEST_F(ExternalSSTFileBasicTest, IngestWithTemperature) {
 }
 
 TEST_F(ExternalSSTFileBasicTest, FailIfNotBottommostLevel) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = GetDefaultOptions();
 
   std::string file_path = sst_files_dir_ + ToString(1);
@@ -1855,6 +1888,7 @@ INSTANTIATE_TEST_CASE_P(ExternalSSTFileBasicTest, ExternalSSTFileBasicTest,
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   RegisterCustomObjects(argc, argv);

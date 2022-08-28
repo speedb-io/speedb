@@ -30,6 +30,7 @@
 namespace ROCKSDB_NAMESPACE {
 
 Status DBImpl::FlushForGetLiveFiles() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   mutex_.AssertHeld();
 
   // flush all dirty data to disk.
@@ -67,6 +68,7 @@ Status DBImpl::FlushForGetLiveFiles() {
 Status DBImpl::GetLiveFiles(std::vector<std::string>& ret,
                             uint64_t* manifest_file_size,
                             bool flush_memtable) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   *manifest_file_size = 0;
 
   mutex_.Lock();
@@ -124,6 +126,7 @@ Status DBImpl::GetLiveFiles(std::vector<std::string>& ret,
 }
 
 Status DBImpl::GetSortedWalFiles(VectorLogPtr& files) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // If caller disabled deletions, this function should return files that are
   // guaranteed not to be deleted until deletions are re-enabled. We need to
   // wait for pending purges to finish since WalManager doesn't know which
@@ -154,6 +157,7 @@ Status DBImpl::GetSortedWalFiles(VectorLogPtr& files) {
 }
 
 Status DBImpl::GetCurrentWalFile(std::unique_ptr<LogFile>* current_log_file) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t current_logfile_number;
   {
     InstrumentedMutexLock l(&mutex_);
@@ -166,6 +170,7 @@ Status DBImpl::GetCurrentWalFile(std::unique_ptr<LogFile>* current_log_file) {
 Status DBImpl::GetLiveFilesStorageInfo(
     const LiveFilesStorageInfoOptions& opts,
     std::vector<LiveFileStorageInfo>* files) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // To avoid returning partial results, only move results to files on success.
   assert(files);
   files->clear();

@@ -39,6 +39,7 @@ const std::string kDbName =
 namespace ROCKSDB_NAMESPACE {
 
 std::shared_ptr<DB> OpenDb(bool read_only = false) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     DB* db;
     Options options;
     options.create_if_missing = true;
@@ -69,6 +70,7 @@ std::shared_ptr<DB> OpenDb(bool read_only = false) {
 class PerfContextTest : public testing::Test {};
 
 TEST_F(PerfContextTest, SeekIntoDeletion) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   DestroyDB(kDbName, Options());
   auto db = OpenDb();
   WriteOptions write_options;
@@ -162,6 +164,7 @@ TEST_F(PerfContextTest, SeekIntoDeletion) {
 }
 
 TEST_F(PerfContextTest, StopWatchNanoOverhead) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // profile the timer cost by itself!
   const int kTotalIterations = 1000000;
   std::vector<uint64_t> timings(kTotalIterations);
@@ -182,6 +185,7 @@ TEST_F(PerfContextTest, StopWatchNanoOverhead) {
 }
 
 TEST_F(PerfContextTest, StopWatchOverhead) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // profile the timer cost by itself!
   const int kTotalIterations = 1000000;
   uint64_t elapsed = 0;
@@ -205,6 +209,7 @@ TEST_F(PerfContextTest, StopWatchOverhead) {
 }
 
 void ProfileQueries(bool enabled_time = false) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   DestroyDB(kDbName, Options());    // Start this test with a fresh DB
 
   auto db = OpenDb();
@@ -494,6 +499,7 @@ void ProfileQueries(bool enabled_time = false) {
 
 #ifndef ROCKSDB_LITE
 TEST_F(PerfContextTest, KeyComparisonCount) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   SetPerfLevel(kEnableCount);
   ProfileQueries();
 
@@ -518,6 +524,7 @@ TEST_F(PerfContextTest, KeyComparisonCount) {
 // starts to become linear to the input size.
 
 TEST_F(PerfContextTest, SeekKeyComparison) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   DestroyDB(kDbName, Options());
   auto db = OpenDb();
   WriteOptions write_options;
@@ -590,9 +597,11 @@ TEST_F(PerfContextTest, SeekKeyComparison) {
 }
 
 TEST_F(PerfContextTest, DBMutexLockCounter) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   int stats_code[] = {0, static_cast<int>(DB_MUTEX_WAIT_MICROS)};
   for (PerfLevel perf_level_test :
        {PerfLevel::kEnableTimeExceptForMutex, PerfLevel::kEnableTime}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     for (int c = 0; c < 2; ++c) {
       InstrumentedMutex mutex(nullptr, SystemClock::Default().get(),
                               stats_code[c]);
@@ -619,6 +628,7 @@ TEST_F(PerfContextTest, DBMutexLockCounter) {
 }
 
 TEST_F(PerfContextTest, FalseDBMutexWait) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   SetPerfLevel(kEnableTime);
   int stats_code[] = {0, static_cast<int>(DB_MUTEX_WAIT_MICROS)};
   for (int c = 0; c < 2; ++c) {
@@ -639,6 +649,7 @@ TEST_F(PerfContextTest, FalseDBMutexWait) {
 }
 
 TEST_F(PerfContextTest, ToString) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   get_perf_context()->Reset();
   get_perf_context()->block_read_count = 12345;
 
@@ -652,6 +663,7 @@ TEST_F(PerfContextTest, ToString) {
 }
 
 TEST_F(PerfContextTest, MergeOperatorTime) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   DestroyDB(kDbName, Options());
   DB* db;
   Options options;
@@ -702,6 +714,7 @@ TEST_F(PerfContextTest, MergeOperatorTime) {
 }
 
 TEST_F(PerfContextTest, CopyAndMove) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Assignment operator
   {
     get_perf_context()->Reset();
@@ -762,6 +775,7 @@ TEST_F(PerfContextTest, CopyAndMove) {
 }
 
 TEST_F(PerfContextTest, PerfContextDisableEnable) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   get_perf_context()->Reset();
   get_perf_context()->EnablePerLevelPerfContext();
   PERF_COUNTER_BY_LEVEL_ADD(bloom_filter_full_positive, 1, 0);
@@ -785,6 +799,7 @@ TEST_F(PerfContextTest, PerfContextDisableEnable) {
 }
 
 TEST_F(PerfContextTest, PerfContextByLevelGetSet) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   get_perf_context()->Reset();
   get_perf_context()->EnablePerLevelPerfContext();
   PERF_COUNTER_BY_LEVEL_ADD(bloom_filter_full_positive, 1, 0);
@@ -828,6 +843,7 @@ TEST_F(PerfContextTest, PerfContextByLevelGetSet) {
 }
 
 TEST_F(PerfContextTest, CPUTimer) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (SystemClock::Default()->CPUNanos() == 0) {
     ROCKSDB_GTEST_SKIP("Target without CPUNanos support");
     return;
@@ -959,6 +975,7 @@ TEST_F(PerfContextTest, CPUTimer) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
 
   for (int i = 1; i < argc; i++) {

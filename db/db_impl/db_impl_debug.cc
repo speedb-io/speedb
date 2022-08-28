@@ -18,11 +18,13 @@
 
 namespace ROCKSDB_NAMESPACE {
 uint64_t DBImpl::TEST_GetLevel0TotalSize() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   InstrumentedMutexLock l(&mutex_);
   return default_cf_handle_->cfd()->current()->storage_info()->NumLevelBytes(0);
 }
 
 Status DBImpl::TEST_SwitchWAL() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   WriteContext write_context;
   InstrumentedMutexLock l(&mutex_);
   void* writer = TEST_BeginWrite();
@@ -32,6 +34,7 @@ Status DBImpl::TEST_SwitchWAL() {
 }
 
 bool DBImpl::TEST_WALBufferIsEmpty(bool lock) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (lock) {
     log_write_mutex_.Lock();
   }
@@ -45,6 +48,7 @@ bool DBImpl::TEST_WALBufferIsEmpty(bool lock) {
 
 uint64_t DBImpl::TEST_MaxNextLevelOverlappingBytes(
     ColumnFamilyHandle* column_family) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ColumnFamilyData* cfd;
   if (column_family == nullptr) {
     cfd = default_cf_handle_->cfd();
@@ -60,6 +64,7 @@ void DBImpl::TEST_GetFilesMetaData(
     ColumnFamilyHandle* column_family,
     std::vector<std::vector<FileMetaData>>* metadata,
     std::vector<std::shared_ptr<BlobFileMetaData>>* blob_metadata) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(metadata);
 
   auto cfh = static_cast_with_check<ColumnFamilyHandleImpl>(column_family);
@@ -95,10 +100,12 @@ void DBImpl::TEST_GetFilesMetaData(
 }
 
 uint64_t DBImpl::TEST_Current_Manifest_FileNo() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return versions_->manifest_file_number();
 }
 
 uint64_t DBImpl::TEST_Current_Next_FileNo() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return versions_->current_next_file_number();
 }
 
@@ -106,6 +113,7 @@ Status DBImpl::TEST_CompactRange(int level, const Slice* begin,
                                  const Slice* end,
                                  ColumnFamilyHandle* column_family,
                                  bool disallow_trivial_move) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ColumnFamilyData* cfd;
   if (column_family == nullptr) {
     cfd = default_cf_handle_->cfd();
@@ -125,6 +133,7 @@ Status DBImpl::TEST_CompactRange(int level, const Slice* begin,
 }
 
 Status DBImpl::TEST_SwitchMemtable(ColumnFamilyData* cfd) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   WriteContext write_context;
   InstrumentedMutexLock l(&mutex_);
   if (cfd == nullptr) {
@@ -147,6 +156,7 @@ Status DBImpl::TEST_SwitchMemtable(ColumnFamilyData* cfd) {
 
 Status DBImpl::TEST_FlushMemTable(bool wait, bool allow_write_stall,
                                   ColumnFamilyHandle* cfh) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   FlushOptions fo;
   fo.wait = wait;
   fo.allow_write_stall = allow_write_stall;
@@ -162,6 +172,7 @@ Status DBImpl::TEST_FlushMemTable(bool wait, bool allow_write_stall,
 
 Status DBImpl::TEST_FlushMemTable(ColumnFamilyData* cfd,
                                   const FlushOptions& flush_opts) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return FlushMemTable(cfd, flush_opts, FlushReason::kTest);
 }
 
@@ -171,12 +182,14 @@ Status DBImpl::TEST_AtomicFlushMemTables(
 }
 
 Status DBImpl::TEST_WaitForBackgroundWork() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   InstrumentedMutexLock l(&mutex_);
   WaitForBackgroundWork();
   return error_handler_.GetBGError();
 }
 
 Status DBImpl::TEST_WaitForFlushMemTable(ColumnFamilyHandle* column_family) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ColumnFamilyData* cfd;
   if (column_family == nullptr) {
     cfd = default_cf_handle_->cfd();
@@ -188,11 +201,13 @@ Status DBImpl::TEST_WaitForFlushMemTable(ColumnFamilyHandle* column_family) {
 }
 
 Status DBImpl::TEST_WaitForCompact(bool wait_unscheduled) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Wait until the compaction completes
   return WaitForCompact(wait_unscheduled);
 }
 
 Status DBImpl::TEST_WaitForPurge() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   InstrumentedMutexLock l(&mutex_);
   while (bg_purge_scheduled_ && error_handler_.GetBGError().ok()) {
     bg_cv_.Wait();
@@ -201,6 +216,7 @@ Status DBImpl::TEST_WaitForPurge() {
 }
 
 Status DBImpl::TEST_GetBGError() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   InstrumentedMutexLock l(&mutex_);
   return error_handler_.GetBGError();
 }
@@ -210,29 +226,34 @@ void DBImpl::TEST_LockMutex() { mutex_.Lock(); }
 void DBImpl::TEST_UnlockMutex() { mutex_.Unlock(); }
 
 void* DBImpl::TEST_BeginWrite() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto w = new WriteThread::Writer();
   write_thread_.EnterUnbatched(w, &mutex_);
   return reinterpret_cast<void*>(w);
 }
 
 void DBImpl::TEST_EndWrite(void* w) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto writer = reinterpret_cast<WriteThread::Writer*>(w);
   write_thread_.ExitUnbatched(writer);
   delete writer;
 }
 
 size_t DBImpl::TEST_LogsToFreeSize() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   InstrumentedMutexLock l(&mutex_);
   return logs_to_free_.size();
 }
 
 uint64_t DBImpl::TEST_LogfileNumber() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   InstrumentedMutexLock l(&mutex_);
   return logfile_number_;
 }
 
 Status DBImpl::TEST_GetAllImmutableCFOptions(
     std::unordered_map<std::string, const ImmutableCFOptions*>* iopts_map) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::vector<std::string> cf_names;
   std::vector<const ImmutableCFOptions*> iopts;
   {
@@ -251,24 +272,29 @@ Status DBImpl::TEST_GetAllImmutableCFOptions(
 }
 
 uint64_t DBImpl::TEST_FindMinLogContainingOutstandingPrep() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return logs_with_prep_tracker_.FindMinLogContainingOutstandingPrep();
 }
 
 size_t DBImpl::TEST_PreparedSectionCompletedSize() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return logs_with_prep_tracker_.TEST_PreparedSectionCompletedSize();
 }
 
 size_t DBImpl::TEST_LogsWithPrepSize() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return logs_with_prep_tracker_.TEST_LogsWithPrepSize();
 }
 
 uint64_t DBImpl::TEST_FindMinPrepLogReferencedByMemTable() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   autovector<MemTable*> empty_list;
   return FindMinPrepLogReferencedByMemTable(versions_.get(), empty_list);
 }
 
 Status DBImpl::TEST_GetLatestMutableCFOptions(
     ColumnFamilyHandle* column_family, MutableCFOptions* mutable_cf_options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   InstrumentedMutexLock l(&mutex_);
 
   auto cfh = static_cast_with_check<ColumnFamilyHandleImpl>(column_family);

@@ -46,6 +46,7 @@ void BlobFileGarbage::EncodeTo(std::string* output) const {
 }
 
 Status BlobFileGarbage::DecodeFrom(Slice* input) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr char class_name[] = "BlobFileGarbage";
 
   if (!GetVarint64(input, &blob_file_number_)) {
@@ -104,17 +105,20 @@ std::string BlobFileGarbage::DebugJSON() const {
 }
 
 bool operator==(const BlobFileGarbage& lhs, const BlobFileGarbage& rhs) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return lhs.GetBlobFileNumber() == rhs.GetBlobFileNumber() &&
          lhs.GetGarbageBlobCount() == rhs.GetGarbageBlobCount() &&
          lhs.GetGarbageBlobBytes() == rhs.GetGarbageBlobBytes();
 }
 
 bool operator!=(const BlobFileGarbage& lhs, const BlobFileGarbage& rhs) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return !(lhs == rhs);
 }
 
 std::ostream& operator<<(std::ostream& os,
                          const BlobFileGarbage& blob_file_garbage) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   os << "blob_file_number: " << blob_file_garbage.GetBlobFileNumber()
      << " garbage_blob_count: " << blob_file_garbage.GetGarbageBlobCount()
      << " garbage_blob_bytes: " << blob_file_garbage.GetGarbageBlobBytes();
@@ -124,6 +128,7 @@ std::ostream& operator<<(std::ostream& os,
 
 JSONWriter& operator<<(JSONWriter& jw,
                        const BlobFileGarbage& blob_file_garbage) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   jw << "BlobFileNumber" << blob_file_garbage.GetBlobFileNumber()
      << "GarbageBlobCount" << blob_file_garbage.GetGarbageBlobCount()
      << "GarbageBlobBytes" << blob_file_garbage.GetGarbageBlobBytes();

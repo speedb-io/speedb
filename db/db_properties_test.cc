@@ -40,6 +40,7 @@ class DBPropertiesTest : public DBTestBase {
                      int expected_wal_bytes_written,
                      int expected_user_writes_by_self,
                      int expected_user_writes_with_wal) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_EQ(std::to_string(expected_uptime), db_stats.at("db.uptime"));
     ASSERT_EQ(std::to_string(expected_wal_bytes_written),
               db_stats.at("db.wal_bytes_written"));
@@ -57,6 +58,7 @@ class DBPropertiesTest : public DBTestBase {
 
 #ifndef ROCKSDB_LITE
 TEST_F(DBPropertiesTest, Empty) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     Options options;
     options.env = env_;
@@ -120,6 +122,7 @@ TEST_F(DBPropertiesTest, Empty) {
 }
 
 TEST_F(DBPropertiesTest, CurrentVersionNumber) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t v1, v2, v3;
   ASSERT_TRUE(
       dbfull()->GetIntProperty("rocksdb.current-super-version-number", &v1));
@@ -135,6 +138,7 @@ TEST_F(DBPropertiesTest, CurrentVersionNumber) {
 }
 
 TEST_F(DBPropertiesTest, GetAggregatedIntPropertyTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kKeySize = 100;
   const int kValueSize = 500;
   const int kKeyNum = 100;
@@ -189,6 +193,7 @@ TEST_F(DBPropertiesTest, GetAggregatedIntPropertyTest) {
 
 namespace {
 void ResetTableProperties(TableProperties* tp) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   tp->data_size = 0;
   tp->index_size = 0;
   tp->filter_size = 0;
@@ -202,6 +207,7 @@ void ResetTableProperties(TableProperties* tp) {
 }
 
 void ParseTablePropertiesString(std::string tp_string, TableProperties* tp) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   double dummy_double;
   std::replace(tp_string.begin(), tp_string.end(), ';', ' ');
   std::replace(tp_string.begin(), tp_string.end(), '=', ' ');
@@ -223,6 +229,7 @@ void ParseTablePropertiesString(std::string tp_string, TableProperties* tp) {
 }
 
 void VerifySimilar(uint64_t a, uint64_t b, double bias) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_EQ(a == 0U, b == 0U);
   if (a == 0) {
     return;
@@ -241,6 +248,7 @@ void VerifyTableProperties(
     double filter_size_bias = CACHE_LINE_SIZE >= 256 ? 0.18 : 0.1,
     double index_size_bias = 0.1, double data_size_bias = 0.1,
     double num_data_blocks_bias = 0.05) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   VerifySimilar(base_tp.data_size, new_tp.data_size, data_size_bias);
   VerifySimilar(base_tp.index_size, new_tp.index_size, index_size_bias);
   VerifySimilar(base_tp.filter_size, new_tp.filter_size, filter_size_bias);
@@ -264,6 +272,7 @@ void GetExpectedTableProperties(
     const int kMergeOperandsPerTable, const int kRangeDeletionsPerTable,
     const int kTableCount, const int kBloomBitsPerKey, const size_t kBlockSize,
     const bool index_key_is_user_key, const bool value_delta_encoding) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kKeysPerTable =
       kPutsPerTable + kDeletionsPerTable + kMergeOperandsPerTable;
   const int kPutCount = kTableCount * kPutsPerTable;
@@ -297,6 +306,7 @@ void GetExpectedTableProperties(
 }  // anonymous namespace
 
 TEST_F(DBPropertiesTest, ValidatePropertyInfo) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (const auto& ppt_name_and_info : InternalStats::ppt_name_to_info) {
     // If C++ gets a std::string_literal, this would be better to check at
     // compile-time using static_assert.
@@ -312,6 +322,7 @@ TEST_F(DBPropertiesTest, ValidatePropertyInfo) {
 }
 
 TEST_F(DBPropertiesTest, ValidateSampleNumber) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // When "max_open_files" is -1, we read all the files for
   // "rocksdb.estimate-num-keys" computation, which is the ground truth.
   // Otherwise, we sample 20 newest files to make an estimation.
@@ -341,6 +352,7 @@ TEST_F(DBPropertiesTest, ValidateSampleNumber) {
 }
 
 TEST_F(DBPropertiesTest, AggregatedTableProperties) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (int kTableCount = 40; kTableCount <= 100; kTableCount += 30) {
     const int kDeletionsPerTable = 0;
     const int kMergeOperandsPerTable = 15;
@@ -409,6 +421,7 @@ TEST_F(DBPropertiesTest, AggregatedTableProperties) {
 }
 
 TEST_F(DBPropertiesTest, ReadLatencyHistogramByLevel) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.write_buffer_size = 110 << 10;
   options.level0_file_num_compaction_trigger = 6;
@@ -423,6 +436,7 @@ TEST_F(DBPropertiesTest, ReadLatencyHistogramByLevel) {
   // RocksDB sanitize max open files to at least 20. Modify it back.
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "SanitizeOptions::AfterChangeMaxOpenFiles", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         int* max_open_files = static_cast<int*>(arg);
         *max_open_files = 11;
       });
@@ -533,6 +547,7 @@ TEST_F(DBPropertiesTest, ReadLatencyHistogramByLevel) {
 }
 
 TEST_F(DBPropertiesTest, AggregatedTablePropertiesAtLevel) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kTableCount = 100;
   const int kDeletionsPerTable = 0;
   const int kMergeOperandsPerTable = 2;
@@ -637,6 +652,7 @@ TEST_F(DBPropertiesTest, AggregatedTablePropertiesAtLevel) {
 }
 
 TEST_F(DBPropertiesTest, NumImmutableMemTable) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   do {
     Options options = CurrentOptions();
     WriteOptions writeOpt = WriteOptions();
@@ -756,6 +772,7 @@ TEST_F(DBPropertiesTest, NumImmutableMemTable) {
 
 // TODO(techdept) : Disabled flaky test #12863555
 TEST_F(DBPropertiesTest, DISABLED_GetProperty) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Set sizes to both background thread pool to be 1 and block them.
   env_->SetBackgroundThreads(1, Env::HIGH);
   env_->SetBackgroundThreads(1, Env::LOW);
@@ -911,6 +928,7 @@ TEST_F(DBPropertiesTest, DISABLED_GetProperty) {
 }
 
 TEST_F(DBPropertiesTest, ApproximateMemoryUsage) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kNumRounds = 10;
   // TODO(noetzli) kFlushesPerRound does not really correlate with how many
   // flushes happen.
@@ -1013,6 +1031,7 @@ TEST_F(DBPropertiesTest, ApproximateMemoryUsage) {
 }
 
 TEST_F(DBPropertiesTest, EstimatePendingCompBytes) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Set sizes to both background thread pool to be 1 and block them.
   env_->SetBackgroundThreads(1, Env::HIGH);
   env_->SetBackgroundThreads(1, Env::LOW);
@@ -1065,6 +1084,7 @@ TEST_F(DBPropertiesTest, EstimatePendingCompBytes) {
 }
 
 TEST_F(DBPropertiesTest, EstimateCompressionRatio) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!Snappy_Supported()) {
     return;
   }
@@ -1158,6 +1178,7 @@ class CountingUserTblPropCollectorFactory
     return "CountingUserTblPropCollectorFactory";
   }
   void set_expected_column_family_id(uint32_t v) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     expected_column_family_id_ = v;
   }
   uint32_t expected_column_family_id_;
@@ -1262,6 +1283,7 @@ class BlockCountingTablePropertiesCollectorFactory
 
 #ifndef ROCKSDB_LITE
 TEST_F(DBPropertiesTest, GetUserDefinedTableProperties) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.level0_file_num_compaction_trigger = (1 << 30);
   options.table_properties_collector_factories.resize(1);
@@ -1302,6 +1324,7 @@ TEST_F(DBPropertiesTest, GetUserDefinedTableProperties) {
 #endif  // ROCKSDB_LITE
 
 TEST_F(DBPropertiesTest, UserDefinedTablePropertiesContext) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   options.level0_file_num_compaction_trigger = 3;
   options.table_properties_collector_factories.resize(1);
@@ -1363,6 +1386,7 @@ TEST_F(DBPropertiesTest, UserDefinedTablePropertiesContext) {
 
 #ifndef ROCKSDB_LITE
 TEST_F(DBPropertiesTest, TablePropertiesNeedCompactTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Random rnd(301);
 
   Options options;
@@ -1442,6 +1466,7 @@ TEST_F(DBPropertiesTest, TablePropertiesNeedCompactTest) {
 }
 
 TEST_F(DBPropertiesTest, NeedCompactHintPersistentTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Random rnd(301);
 
   Options options;
@@ -1500,6 +1525,7 @@ TEST_F(DBPropertiesTest, NeedCompactHintPersistentTest) {
 
 // Excluded from RocksDB lite tests due to `GetPropertiesOfAllTables()` usage.
 TEST_F(DBPropertiesTest, BlockAddForCompressionSampling) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Sampled compression requires at least one of the following four types.
   if (!Snappy_Supported() && !Zlib_Supported() && !LZ4_Supported() &&
       !ZSTD_Supported()) {
@@ -1512,6 +1538,7 @@ TEST_F(DBPropertiesTest, BlockAddForCompressionSampling) {
       std::make_shared<BlockCountingTablePropertiesCollectorFactory>());
 
   for (bool sample_for_compression : {false, true}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // For simplicity/determinism, sample 100% when enabled, or 0% when disabled
     options.sample_for_compression = sample_for_compression ? 1 : 0;
 
@@ -1566,6 +1593,7 @@ INSTANTIATE_TEST_CASE_P(CompressionSamplingDBPropertiesTest,
 // Excluded from RocksDB lite tests due to `GetPropertiesOfAllTables()` usage.
 TEST_P(CompressionSamplingDBPropertiesTest,
        EstimateDataSizeWithCompressionSampling) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   if (fast_) {
     // One of the following light compression libraries must be present.
@@ -1625,6 +1653,7 @@ TEST_P(CompressionSamplingDBPropertiesTest,
 }
 
 TEST_F(DBPropertiesTest, EstimateNumKeysUnderflow) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = CurrentOptions();
   Reopen(options);
   ASSERT_OK(Put("foo", "bar"));
@@ -1636,6 +1665,7 @@ TEST_F(DBPropertiesTest, EstimateNumKeysUnderflow) {
 }
 
 TEST_F(DBPropertiesTest, EstimateOldestKeyTime) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t oldest_key_time = 0;
   Options options = CurrentOptions();
   SetTimeElapseOnlySleepOnReopen(&options);
@@ -1643,6 +1673,7 @@ TEST_F(DBPropertiesTest, EstimateOldestKeyTime) {
   // "rocksdb.estimate-oldest-key-time" only available to fifo compaction.
   for (auto compaction : {kCompactionStyleLevel, kCompactionStyleUniversal,
                           kCompactionStyleNone}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     options.compaction_style = compaction;
     options.create_if_missing = true;
     DestroyAndReopen(options);
@@ -1709,6 +1740,7 @@ TEST_F(DBPropertiesTest, EstimateOldestKeyTime) {
 }
 
 TEST_F(DBPropertiesTest, SstFilesSize) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   struct TestListener : public EventListener {
     void OnCompactionCompleted(DB* db,
                                const CompactionJobInfo& /*info*/) override {
@@ -1760,6 +1792,7 @@ TEST_F(DBPropertiesTest, SstFilesSize) {
 }
 
 TEST_F(DBPropertiesTest, MinObsoleteSstNumberToKeep) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   class TestListener : public EventListener {
    public:
     void OnTableFileCreated(const TableFileCreationInfo& info) override {
@@ -1818,6 +1851,7 @@ TEST_F(DBPropertiesTest, MinObsoleteSstNumberToKeep) {
 }
 
 TEST_F(DBPropertiesTest, BlockCacheProperties) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   uint64_t value;
 
@@ -1926,6 +1960,7 @@ TEST_F(DBPropertiesTest, BlockCacheProperties) {
 }
 
 TEST_F(DBPropertiesTest, GetMapPropertyDbStats) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto mock_clock = std::make_shared<MockSystemClock>(env_->GetSystemClock());
   CompositeEnvWrapper env(env_, mock_clock);
 
@@ -1998,6 +2033,7 @@ TEST_F(DBPropertiesTest, GetMapPropertyDbStats) {
 }
 
 TEST_F(DBPropertiesTest, GetMapPropertyBlockCacheEntryStats) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Currently only verifies the expected properties are present
   std::map<std::string, std::string> values;
   ASSERT_TRUE(
@@ -2030,6 +2066,7 @@ TEST_F(DBPropertiesTest, GetMapPropertyBlockCacheEntryStats) {
 
 namespace {
 std::string PopMetaIndexKey(InternalIterator* meta_iter) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Status s = meta_iter->status();
   if (!s.ok()) {
     return s.ToString();
@@ -2045,6 +2082,7 @@ std::string PopMetaIndexKey(InternalIterator* meta_iter) {
 }  // namespace
 
 TEST_F(DBPropertiesTest, TableMetaIndexKeys) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // This is to detect unexpected churn in metaindex block keys. This is more
   // of a "table test" but table_test.cc doesn't depend on db_test_util.h and
   // we need ChangeOptions() for broad coverage.
@@ -2117,6 +2155,7 @@ TEST_F(DBPropertiesTest, TableMetaIndexKeys) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

@@ -150,6 +150,7 @@ class HashSkipListRep : public MemTableRep {
 
    protected:
     void Reset(Bucket* list) {
+PERF_MARKER(__PRETTY_FUNCTION__);
       if (own_list_) {
         assert(list_ != nullptr);
         delete list_;
@@ -239,6 +240,7 @@ HashSkipListRep::HashSkipListRep(const MemTableRep::KeyComparator& compare,
       transform_(transform),
       compare_(compare),
       allocator_(allocator) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto mem = allocator->AllocateAligned(
                sizeof(std::atomic<void*>) * bucket_size);
   buckets_ = new (mem) std::atomic<Bucket*>[bucket_size];
@@ -249,10 +251,12 @@ HashSkipListRep::HashSkipListRep(const MemTableRep::KeyComparator& compare,
 }
 
 HashSkipListRep::~HashSkipListRep() {
+PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 HashSkipListRep::Bucket* HashSkipListRep::GetInitializedBucket(
     const Slice& transformed) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   size_t hash = GetHash(transformed);
   auto bucket = GetBucket(hash);
   if (bucket == nullptr) {
@@ -265,6 +269,7 @@ HashSkipListRep::Bucket* HashSkipListRep::GetInitializedBucket(
 }
 
 void HashSkipListRep::Insert(KeyHandle handle) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto* key = static_cast<char*>(handle);
   assert(!Contains(key));
   auto transformed = transform_->Transform(UserKey(key));
@@ -282,11 +287,13 @@ bool HashSkipListRep::Contains(const char* key) const {
 }
 
 size_t HashSkipListRep::ApproximateMemoryUsage() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return 0;
 }
 
 void HashSkipListRep::Get(const LookupKey& k, void* callback_args,
                           bool (*callback_func)(void* arg, const char* entry)) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto transformed = transform_->Transform(k.user_key());
   auto bucket = GetBucket(transformed);
   if (bucket != nullptr) {
@@ -299,6 +306,7 @@ void HashSkipListRep::Get(const LookupKey& k, void* callback_args,
 }
 
 MemTableRep::Iterator* HashSkipListRep::GetIterator(Arena* arena) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // allocate a new arena of similar size to the one currently in use
   Arena* new_arena = new Arena(allocator_->BlockSize());
   auto list = new Bucket(compare_, new_arena);
@@ -320,6 +328,7 @@ MemTableRep::Iterator* HashSkipListRep::GetIterator(Arena* arena) {
 }
 
 MemTableRep::Iterator* HashSkipListRep::GetDynamicPrefixIterator(Arena* arena) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (arena == nullptr) {
     return new DynamicIterator(*this);
   } else {
@@ -353,6 +362,7 @@ class HashSkipListRepFactory : public MemTableRepFactory {
  public:
   explicit HashSkipListRepFactory(size_t bucket_count, int32_t skiplist_height,
                                   int32_t skiplist_branching_factor) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     options_.bucket_count = bucket_count;
     options_.skiplist_height = skiplist_height;
     options_.skiplist_branching_factor = skiplist_branching_factor;
@@ -379,6 +389,7 @@ class HashSkipListRepFactory : public MemTableRepFactory {
 MemTableRep* HashSkipListRepFactory::CreateMemTableRep(
     const MemTableRep::KeyComparator& compare, Allocator* allocator,
     const SliceTransform* transform, Logger* /*logger*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return new HashSkipListRep(compare, allocator, transform,
                              options_.bucket_count, options_.skiplist_height,
                              options_.skiplist_branching_factor);
@@ -387,6 +398,7 @@ MemTableRep* HashSkipListRepFactory::CreateMemTableRep(
 MemTableRepFactory* NewHashSkipListRepFactory(
     size_t bucket_count, int32_t skiplist_height,
     int32_t skiplist_branching_factor) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return new HashSkipListRepFactory(bucket_count, skiplist_height,
       skiplist_branching_factor);
 }

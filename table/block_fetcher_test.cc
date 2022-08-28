@@ -62,12 +62,14 @@ class BlockFetcherTest : public testing::Test {
   void TearDown() override { EXPECT_OK(DestroyDir(env_, test_dir_)); }
 
   void AssertSameBlock(const std::string& block1, const std::string& block2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_EQ(block1, block2);
   }
 
   // Creates a table with kv pairs (i, i) where i ranges from 0 to 9, inclusive.
   void CreateTable(const std::string& table_name,
                    const CompressionType& compression_type) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::unique_ptr<WritableFileWriter> writer;
     NewFileWriter(table_name, &writer);
 
@@ -99,6 +101,7 @@ class BlockFetcherTest : public testing::Test {
                        CountedMemoryAllocator* compressed_buf_allocator,
                        MemcpyStats* memcpy_stats, BlockContents* index_block,
                        std::string* result) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     FileOptions fopt(options_);
     std::unique_ptr<RandomAccessFileReader> file;
     NewFileReader(table_name, fopt, &file);
@@ -129,6 +132,7 @@ class BlockFetcherTest : public testing::Test {
   void TestFetchDataBlock(
       const std::string& table_name_prefix, bool compressed, bool do_uncompress,
       std::array<TestStats, NumModes> expected_stats_by_mode) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     for (CompressionType compression_type : GetSupportedCompressions()) {
       bool do_compress = compression_type != kNoCompression;
       if (compressed != do_compress) continue;
@@ -199,6 +203,7 @@ class BlockFetcherTest : public testing::Test {
   }
 
   void SetMode(Mode mode) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     switch (mode) {
       case Mode::kBufferedRead:
         options_.use_direct_reads = false;
@@ -227,6 +232,7 @@ class BlockFetcherTest : public testing::Test {
   std::string Path(const std::string& fname) { return test_dir_ + "/" + fname; }
 
   void WriteToFile(const std::string& content, const std::string& filename) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::unique_ptr<FSWritableFile> f;
     ASSERT_OK(fs_->NewWritableFile(Path(filename), FileOptions(), &f, nullptr));
     ASSERT_OK(f->Append(content, IOOptions(), nullptr));
@@ -235,6 +241,7 @@ class BlockFetcherTest : public testing::Test {
 
   void NewFileWriter(const std::string& filename,
                      std::unique_ptr<WritableFileWriter>* writer) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::string path = Path(filename);
     FileOptions file_options;
     ASSERT_OK(WritableFileWriter::Create(env_->GetFileSystem(), path,
@@ -243,6 +250,7 @@ class BlockFetcherTest : public testing::Test {
 
   void NewFileReader(const std::string& filename, const FileOptions& opt,
                      std::unique_ptr<RandomAccessFileReader>* reader) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::string path = Path(filename);
     std::unique_ptr<FSRandomAccessFile> f;
     ASSERT_OK(fs_->NewRandomAccessFile(path, opt, &f, nullptr));
@@ -255,6 +263,7 @@ class BlockFetcherTest : public testing::Test {
                       const InternalKeyComparator& comparator,
                       const std::string& table_name,
                       std::unique_ptr<BlockBasedTable>* table) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::unique_ptr<RandomAccessFileReader> file;
     NewFileReader(table_name, foptions, &file);
 
@@ -274,11 +283,13 @@ class BlockFetcherTest : public testing::Test {
   }
 
   std::string ToInternalKey(const std::string& key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     InternalKey internal_key(key, 0, ValueType::kTypeValue);
     return internal_key.Encode().ToString();
   }
 
   void ReadFooter(RandomAccessFileReader* file, Footer* footer) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     uint64_t file_size = 0;
     ASSERT_OK(env_->GetFileSize(file->file_name(), &file_size));
     IOOptions opts;
@@ -296,6 +307,7 @@ class BlockFetcherTest : public testing::Test {
                   MemoryAllocator* compressed_buf_allocator,
                   BlockContents* contents, MemcpyStats* stats,
                   CompressionType* compresstion_type) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ImmutableOptions ioptions(options_);
     ReadOptions roptions;
     PersistentCacheOptions persistent_cache_options;
@@ -327,6 +339,7 @@ class BlockFetcherTest : public testing::Test {
                            MemoryAllocator* compressed_buf_allocator,
                            BlockContents* block, std::string* result,
                            MemcpyStats* memcpy_stats) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ImmutableOptions ioptions(options_);
     InternalKeyComparator comparator(options_.comparator);
     FileOptions foptions(options_);
@@ -369,6 +382,7 @@ class BlockFetcherTest : public testing::Test {
 // Expects:
 // the index block contents are the same for both read modes.
 TEST_F(BlockFetcherTest, FetchIndexBlock) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (CompressionType compression : GetSupportedCompressions()) {
     std::string table_name =
         "FetchIndexBlock" + CompressionTypeToString(compression);
@@ -397,6 +411,7 @@ TEST_F(BlockFetcherTest, FetchIndexBlock) {
 // 2. in direct IO mode, allocate a heap buffer and memcpy from the
 //    direct IO buffer to the heap buffer.
 TEST_F(BlockFetcherTest, FetchUncompressedDataBlock) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   TestStats expected_non_mmap_stats = {
       {
           0 /* num_stack_buf_memcpy */,
@@ -434,6 +449,7 @@ TEST_F(BlockFetcherTest, FetchUncompressedDataBlock) {
 // 2. in direct IO mode, allocate a compressed buffer and memcpy from the
 //    direct IO buffer to the compressed buffer.
 TEST_F(BlockFetcherTest, FetchCompressedDataBlock) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   TestStats expected_non_mmap_stats = {
       {
           0 /* num_stack_buf_memcpy */,
@@ -471,6 +487,7 @@ TEST_F(BlockFetcherTest, FetchCompressedDataBlock) {
 // 2. in direct IO mode mode, allocate a heap buffer, then directly uncompress
 //    and memcpy from the direct IO buffer to the heap buffer.
 TEST_F(BlockFetcherTest, FetchAndUncompressCompressedDataBlock) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   TestStats expected_buffered_read_stats = {
       {
           1 /* num_stack_buf_memcpy */,
@@ -515,6 +532,7 @@ TEST_F(BlockFetcherTest, FetchAndUncompressCompressedDataBlock) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

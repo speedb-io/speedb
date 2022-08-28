@@ -38,6 +38,7 @@ ConfigOptions::ConfigOptions()
 }
 
 ConfigOptions::ConfigOptions(const DBOptions& db_opts) : env(db_opts.env) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifndef ROCKSDB_LITE
   registry = ObjectRegistry::NewInstance();
 #endif
@@ -45,6 +46,7 @@ ConfigOptions::ConfigOptions(const DBOptions& db_opts) : env(db_opts.env) {
 
 Status ValidateOptions(const DBOptions& db_opts,
                        const ColumnFamilyOptions& cf_opts) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Status s;
 #ifndef ROCKSDB_LITE
   auto db_cfg = DBOptionsAsConfigurable(db_opts);
@@ -59,6 +61,7 @@ Status ValidateOptions(const DBOptions& db_opts,
 
 DBOptions BuildDBOptions(const ImmutableDBOptions& immutable_db_options,
                          const MutableDBOptions& mutable_db_options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   DBOptions options;
 
   options.create_if_missing = immutable_db_options.create_if_missing;
@@ -188,6 +191,7 @@ DBOptions BuildDBOptions(const ImmutableDBOptions& immutable_db_options,
 ColumnFamilyOptions BuildColumnFamilyOptions(
     const ColumnFamilyOptions& options,
     const MutableCFOptions& mutable_cf_options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ColumnFamilyOptions cf_opts(options);
   UpdateColumnFamilyOptions(mutable_cf_options, &cf_opts);
   // TODO(yhchiang): find some way to handle the following derived options
@@ -197,6 +201,7 @@ ColumnFamilyOptions BuildColumnFamilyOptions(
 
 void UpdateColumnFamilyOptions(const MutableCFOptions& moptions,
                                ColumnFamilyOptions* cf_opts) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Memtable related options
   cf_opts->write_buffer_size = moptions.write_buffer_size;
   cf_opts->max_write_buffer_number = moptions.max_write_buffer_number;
@@ -269,6 +274,7 @@ void UpdateColumnFamilyOptions(const MutableCFOptions& moptions,
 
 void UpdateColumnFamilyOptions(const ImmutableCFOptions& ioptions,
                                ColumnFamilyOptions* cf_opts) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   cf_opts->compaction_style = ioptions.compaction_style;
   cf_opts->compaction_pri = ioptions.compaction_pri;
   cf_opts->comparator = ioptions.user_comparator;
@@ -348,6 +354,7 @@ std::unordered_map<std::string, CompressionType>
         {"kDisableCompressionOption", kDisableCompressionOption}};
 
 std::vector<CompressionType> GetSupportedCompressions() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // std::set internally to deduplicate potential name aliases
   std::set<CompressionType> supported_compressions;
   for (const auto& comp_to_name : OptionsHelper::compression_type_string_map) {
@@ -361,6 +368,7 @@ std::vector<CompressionType> GetSupportedCompressions() {
 }
 
 std::vector<CompressionType> GetSupportedDictCompressions() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::set<CompressionType> dict_compression_types;
   for (const auto& comp_to_name : OptionsHelper::compression_type_string_map) {
     CompressionType t = comp_to_name.second;
@@ -373,6 +381,7 @@ std::vector<CompressionType> GetSupportedDictCompressions() {
 }
 
 std::vector<ChecksumType> GetSupportedChecksums() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::set<ChecksumType> checksum_types;
   for (const auto& e : OptionsHelper::checksum_type_string_map) {
     checksum_types.insert(e.second);
@@ -384,6 +393,7 @@ std::vector<ChecksumType> GetSupportedChecksums() {
 #ifndef ROCKSDB_LITE
 static bool ParseOptionHelper(void* opt_address, const OptionType& opt_type,
                               const std::string& value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   switch (opt_type) {
     case OptionType::kBoolean:
       *static_cast<bool*>(opt_address) = ParseBoolean("", value);
@@ -457,6 +467,7 @@ static bool ParseOptionHelper(void* opt_address, const OptionType& opt_type,
 bool SerializeSingleOptionHelper(const void* opt_address,
                                  const OptionType opt_type,
                                  std::string* value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(value);
   switch (opt_type) {
     case OptionType::kBoolean:
@@ -551,6 +562,7 @@ Status ConfigureFromMap(
     const ConfigOptions& config_options,
     const std::unordered_map<std::string, std::string>& opt_map,
     const std::string& option_name, Configurable* config, T* new_opts) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Status s = config->ConfigureFromMap(config_options, opt_map);
   if (s.ok()) {
     *new_opts = *(config->GetOptions<T>(option_name));
@@ -561,6 +573,7 @@ Status ConfigureFromMap(
 
 Status StringToMap(const std::string& opts_str,
                    std::unordered_map<std::string, std::string>* opts_map) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(opts_map);
   // Example:
   //   opts_str = "write_buffer_size=1024;max_write_buffer_number=2;"
@@ -606,6 +619,7 @@ Status StringToMap(const std::string& opts_str,
 Status GetStringFromDBOptions(std::string* opt_string,
                               const DBOptions& db_options,
                               const std::string& delimiter) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ConfigOptions config_options(db_options);
   config_options.delimiter = delimiter;
   return GetStringFromDBOptions(config_options, db_options, opt_string);
@@ -614,6 +628,7 @@ Status GetStringFromDBOptions(std::string* opt_string,
 Status GetStringFromDBOptions(const ConfigOptions& config_options,
                               const DBOptions& db_options,
                               std::string* opt_string) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(opt_string);
   opt_string->clear();
   auto config = DBOptionsAsConfigurable(db_options);
@@ -624,6 +639,7 @@ Status GetStringFromDBOptions(const ConfigOptions& config_options,
 Status GetStringFromColumnFamilyOptions(std::string* opt_string,
                                         const ColumnFamilyOptions& cf_options,
                                         const std::string& delimiter) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ConfigOptions config_options;
   config_options.delimiter = delimiter;
   return GetStringFromColumnFamilyOptions(config_options, cf_options,
@@ -633,12 +649,14 @@ Status GetStringFromColumnFamilyOptions(std::string* opt_string,
 Status GetStringFromColumnFamilyOptions(const ConfigOptions& config_options,
                                         const ColumnFamilyOptions& cf_options,
                                         std::string* opt_string) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const auto config = CFOptionsAsConfigurable(cf_options);
   return config->GetOptionString(config_options, opt_string);
 }
 
 Status GetStringFromCompressionType(std::string* compression_str,
                                     CompressionType compression_type) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   bool ok = SerializeEnum<CompressionType>(compression_type_string_map,
                                            compression_type, compression_str);
   if (ok) {
@@ -653,6 +671,7 @@ Status GetColumnFamilyOptionsFromMap(
     const std::unordered_map<std::string, std::string>& opts_map,
     ColumnFamilyOptions* new_options, bool input_strings_escaped,
     bool ignore_unknown_options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ConfigOptions config_options;
   config_options.ignore_unknown_options = ignore_unknown_options;
   config_options.input_strings_escaped = input_strings_escaped;
@@ -665,6 +684,7 @@ Status GetColumnFamilyOptionsFromMap(
     const ColumnFamilyOptions& base_options,
     const std::unordered_map<std::string, std::string>& opts_map,
     ColumnFamilyOptions* new_options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(new_options);
 
   *new_options = base_options;
@@ -685,6 +705,7 @@ Status GetColumnFamilyOptionsFromString(
     const ColumnFamilyOptions& base_options,
     const std::string& opts_str,
     ColumnFamilyOptions* new_options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ConfigOptions config_options;
   config_options.input_strings_escaped = false;
   config_options.ignore_unknown_options = false;
@@ -696,6 +717,7 @@ Status GetColumnFamilyOptionsFromString(const ConfigOptions& config_options,
                                         const ColumnFamilyOptions& base_options,
                                         const std::string& opts_str,
                                         ColumnFamilyOptions* new_options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unordered_map<std::string, std::string> opts_map;
   Status s = StringToMap(opts_str, &opts_map);
   if (!s.ok()) {
@@ -711,6 +733,7 @@ Status GetDBOptionsFromMap(
     const std::unordered_map<std::string, std::string>& opts_map,
     DBOptions* new_options, bool input_strings_escaped,
     bool ignore_unknown_options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ConfigOptions config_options(base_options);
   config_options.input_strings_escaped = input_strings_escaped;
   config_options.ignore_unknown_options = ignore_unknown_options;
@@ -722,6 +745,7 @@ Status GetDBOptionsFromMap(
     const ConfigOptions& config_options, const DBOptions& base_options,
     const std::unordered_map<std::string, std::string>& opts_map,
     DBOptions* new_options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(new_options);
   *new_options = base_options;
   auto config = DBOptionsAsConfigurable(base_options);
@@ -739,6 +763,7 @@ Status GetDBOptionsFromMap(
 Status GetDBOptionsFromString(const DBOptions& base_options,
                               const std::string& opts_str,
                               DBOptions* new_options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ConfigOptions config_options(base_options);
   config_options.input_strings_escaped = false;
   config_options.ignore_unknown_options = false;
@@ -751,6 +776,7 @@ Status GetDBOptionsFromString(const ConfigOptions& config_options,
                               const DBOptions& base_options,
                               const std::string& opts_str,
                               DBOptions* new_options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unordered_map<std::string, std::string> opts_map;
   Status s = StringToMap(opts_str, &opts_map);
   if (!s.ok()) {
@@ -763,6 +789,7 @@ Status GetDBOptionsFromString(const ConfigOptions& config_options,
 
 Status GetOptionsFromString(const Options& base_options,
                             const std::string& opts_str, Options* new_options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ConfigOptions config_options(base_options);
   config_options.input_strings_escaped = false;
   config_options.ignore_unknown_options = false;
@@ -774,6 +801,7 @@ Status GetOptionsFromString(const Options& base_options,
 Status GetOptionsFromString(const ConfigOptions& config_options,
                             const Options& base_options,
                             const std::string& opts_str, Options* new_options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ColumnFamilyOptions new_cf_options;
   std::unordered_map<std::string, std::string> unused_opts;
   std::unordered_map<std::string, std::string> opts_map;
@@ -840,6 +868,7 @@ std::unordered_map<std::string, Temperature>
 
 Status OptionTypeInfo::NextToken(const std::string& opts, char delimiter,
                                  size_t pos, size_t* end, std::string* token) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   while (pos < opts.size() && isspace(opts[pos])) {
     ++pos;
   }
@@ -935,6 +964,7 @@ Status OptionTypeInfo::Parse(const ConfigOptions& config_options,
       return Status::InvalidArgument("Error parsing:", opt_name);
     }
   } catch (std::exception& e) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return Status::InvalidArgument("Error parsing " + opt_name + ":" +
                                    std::string(e.what()));
   }
@@ -944,6 +974,7 @@ Status OptionTypeInfo::ParseType(
     const ConfigOptions& config_options, const std::string& opts_str,
     const std::unordered_map<std::string, OptionTypeInfo>& type_map,
     void* opt_addr, std::unordered_map<std::string, std::string>* unused) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unordered_map<std::string, std::string> opts_map;
   Status status = StringToMap(opts_str, &opts_map);
   if (!status.ok()) {
@@ -958,6 +989,7 @@ Status OptionTypeInfo::ParseType(
     const std::unordered_map<std::string, std::string>& opts_map,
     const std::unordered_map<std::string, OptionTypeInfo>& type_map,
     void* opt_addr, std::unordered_map<std::string, std::string>* unused) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (const auto& opts_iter : opts_map) {
     std::string opt_name;
     const auto* opt_info = Find(opts_iter.first, type_map, &opt_name);
@@ -980,6 +1012,7 @@ Status OptionTypeInfo::ParseStruct(
     const ConfigOptions& config_options, const std::string& struct_name,
     const std::unordered_map<std::string, OptionTypeInfo>* struct_map,
     const std::string& opt_name, const std::string& opt_value, void* opt_addr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(struct_map);
   Status status;
   if (opt_name == struct_name || EndsWith(opt_name, "." + struct_name)) {
@@ -1085,6 +1118,7 @@ Status OptionTypeInfo::SerializeType(
     const ConfigOptions& config_options,
     const std::unordered_map<std::string, OptionTypeInfo>& type_map,
     const void* opt_addr, std::string* result) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Status status;
   for (const auto& iter : type_map) {
     std::string single;
@@ -1106,6 +1140,7 @@ Status OptionTypeInfo::SerializeStruct(
     const ConfigOptions& config_options, const std::string& struct_name,
     const std::unordered_map<std::string, OptionTypeInfo>* struct_map,
     const std::string& opt_name, const void* opt_addr, std::string* value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(struct_map);
   Status status;
   if (EndsWith(opt_name, struct_name)) {
@@ -1148,15 +1183,18 @@ Status OptionTypeInfo::SerializeStruct(
 
 template <typename T>
 bool IsOptionEqual(const void* offset1, const void* offset2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return (*static_cast<const T*>(offset1) == *static_cast<const T*>(offset2));
 }
 
 static bool AreEqualDoubles(const double a, const double b) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return (fabs(a - b) < 0.00001);
 }
 
 static bool AreOptionsEqual(OptionType type, const void* this_offset,
                             const void* that_offset) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   switch (type) {
     case OptionType::kBoolean:
       return IsOptionEqual<bool>(this_offset, that_offset);
@@ -1268,6 +1306,7 @@ bool OptionTypeInfo::TypesAreEqual(
     const ConfigOptions& config_options,
     const std::unordered_map<std::string, OptionTypeInfo>& type_map,
     const void* this_addr, const void* that_addr, std::string* mismatch) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (const auto& iter : type_map) {
     const auto& opt_info = iter.second;
     if (!opt_info.AreEqual(config_options, iter.first, this_addr, that_addr,
@@ -1283,6 +1322,7 @@ bool OptionTypeInfo::StructsAreEqual(
     const std::unordered_map<std::string, OptionTypeInfo>* struct_map,
     const std::string& opt_name, const void* this_addr, const void* that_addr,
     std::string* mismatch) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(struct_map);
   bool matches = true;
   std::string result;
@@ -1330,6 +1370,7 @@ bool MatchesOptionsTypeFromMap(
     const std::unordered_map<std::string, OptionTypeInfo>& type_map,
     const void* const this_ptr, const void* const that_ptr,
     std::string* mismatch) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (auto& pair : type_map) {
     // We skip checking deprecated variables as they might
     // contain random values since they might not be initialized
@@ -1383,6 +1424,7 @@ const OptionTypeInfo* OptionTypeInfo::Find(
     const std::string& opt_name,
     const std::unordered_map<std::string, OptionTypeInfo>& opt_map,
     std::string* elem_name) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const auto iter = opt_map.find(opt_name);  // Look up the value in the map
   if (iter != opt_map.end()) {               // Found the option in the map
     *elem_name = opt_name;                   // Return the name

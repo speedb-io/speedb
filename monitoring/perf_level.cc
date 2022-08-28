@@ -16,12 +16,14 @@ PerfLevel perf_level = kEnableCount;
 #endif
 
 void SetPerfLevel(PerfLevel level) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(level > kUninitialized);
   assert(level < kOutOfBounds);
   perf_level = level;
 }
 
 PerfLevel GetPerfLevel() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return perf_level;
 }
 

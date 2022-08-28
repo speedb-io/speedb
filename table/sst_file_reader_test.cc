@@ -21,12 +21,14 @@
 namespace ROCKSDB_NAMESPACE {
 
 std::string EncodeAsString(uint64_t v) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   char buf[16];
   snprintf(buf, sizeof(buf), "%08" PRIu64, v);
   return std::string(buf);
 }
 
 std::string EncodeAsUint64(uint64_t v) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string dst;
   PutFixed64(&dst, v);
   return dst;
@@ -35,6 +37,7 @@ std::string EncodeAsUint64(uint64_t v) {
 class SstFileReaderTest : public testing::Test {
  public:
   SstFileReaderTest() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     options_.merge_operator = MergeOperators::CreateUInt64AddOperator();
     sst_name_ = test::PerThreadDBPath("sst_file");
 
@@ -47,12 +50,14 @@ class SstFileReaderTest : public testing::Test {
   }
 
   ~SstFileReaderTest() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Status s = env_->DeleteFile(sst_name_);
     EXPECT_OK(s);
   }
 
   void CreateFile(const std::string& file_name,
                   const std::vector<std::string>& keys) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     SstFileWriter writer(soptions_, options_);
     ASSERT_OK(writer.Open(file_name));
     for (size_t i = 0; i + 2 < keys.size(); i += 3) {
@@ -66,6 +71,7 @@ class SstFileReaderTest : public testing::Test {
   void CheckFile(const std::string& file_name,
                  const std::vector<std::string>& keys,
                  bool check_global_seqno = false) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ReadOptions ropts;
     SstFileReader reader(options_);
     ASSERT_OK(reader.Open(file_name));
@@ -96,6 +102,7 @@ class SstFileReaderTest : public testing::Test {
   }
 
   void CreateFileAndCheck(const std::vector<std::string>& keys) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     CreateFile(sst_name_, keys);
     CheckFile(sst_name_, keys);
   }
@@ -111,6 +118,7 @@ class SstFileReaderTest : public testing::Test {
 const uint64_t kNumKeys = 100;
 
 TEST_F(SstFileReaderTest, Basic) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::vector<std::string> keys;
   for (uint64_t i = 0; i < kNumKeys; i++) {
     keys.emplace_back(EncodeAsString(i));
@@ -119,6 +127,7 @@ TEST_F(SstFileReaderTest, Basic) {
 }
 
 TEST_F(SstFileReaderTest, Uint64Comparator) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   options_.comparator = test::Uint64Comparator();
   std::vector<std::string> keys;
   for (uint64_t i = 0; i < kNumKeys; i++) {
@@ -128,6 +137,7 @@ TEST_F(SstFileReaderTest, Uint64Comparator) {
 }
 
 TEST_F(SstFileReaderTest, ReadOptionsOutOfScope) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Repro a bug where the SstFileReader depended on its configured ReadOptions
   // outliving it.
   options_.comparator = test::Uint64Comparator();
@@ -153,6 +163,7 @@ TEST_F(SstFileReaderTest, ReadOptionsOutOfScope) {
 }
 
 TEST_F(SstFileReaderTest, ReadFileWithGlobalSeqno) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::vector<std::string> keys;
   for (uint64_t i = 0; i < kNumKeys; i++) {
     keys.emplace_back(EncodeAsString(i));
@@ -196,6 +207,7 @@ TEST_F(SstFileReaderTest, ReadFileWithGlobalSeqno) {
 }
 
 TEST_F(SstFileReaderTest, TimestampSizeMismatch) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   SstFileWriter writer(soptions_, options_);
 
   ASSERT_OK(writer.Open(sst_name_));
@@ -209,6 +221,7 @@ TEST_F(SstFileReaderTest, TimestampSizeMismatch) {
 class SstFileReaderTimestampTest : public testing::Test {
  public:
   SstFileReaderTimestampTest() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Env* env = Env::Default();
     EXPECT_OK(test::CreateEnvFromSystem(ConfigOptions(), &env, &env_guard_));
     EXPECT_NE(nullptr, env);
@@ -221,6 +234,7 @@ class SstFileReaderTimestampTest : public testing::Test {
   }
 
   ~SstFileReaderTimestampTest() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     EXPECT_OK(options_.env->DeleteFile(sst_name_));
   }
 
@@ -250,6 +264,7 @@ class SstFileReaderTimestampTest : public testing::Test {
   };
 
   void CreateFile(const std::vector<InputKeyValueDesc>& descs) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     SstFileWriter writer(soptions_, options_);
 
     ASSERT_OK(writer.Open(sst_name_));
@@ -282,6 +297,7 @@ class SstFileReaderTimestampTest : public testing::Test {
 
   void CheckFile(const std::string& timestamp,
                  const std::vector<OutputKeyValueDesc>& descs) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     SstFileReader reader(options_);
 
     ASSERT_OK(reader.Open(sst_name_));
@@ -315,6 +331,7 @@ class SstFileReaderTimestampTest : public testing::Test {
 };
 
 TEST_F(SstFileReaderTimestampTest, Basic) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::vector<InputKeyValueDesc> input_descs;
 
   for (uint64_t k = 0; k < kNumKeys; k += 4) {
@@ -386,6 +403,7 @@ TEST_F(SstFileReaderTimestampTest, Basic) {
 }
 
 TEST_F(SstFileReaderTimestampTest, TimestampsOutOfOrder) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   SstFileWriter writer(soptions_, options_);
 
   ASSERT_OK(writer.Open(sst_name_));
@@ -397,6 +415,7 @@ TEST_F(SstFileReaderTimestampTest, TimestampsOutOfOrder) {
 }
 
 TEST_F(SstFileReaderTimestampTest, TimestampSizeMismatch) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   SstFileWriter writer(soptions_, options_);
 
   ASSERT_OK(writer.Open(sst_name_));
@@ -416,6 +435,7 @@ TEST_F(SstFileReaderTimestampTest, TimestampSizeMismatch) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   RegisterCustomObjects(argc, argv);
@@ -426,6 +446,7 @@ int main(int argc, char** argv) {
 #include <stdio.h>
 
 int main(int /*argc*/, char** /*argv*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   fprintf(stderr,
           "SKIPPED as SstFileReader is not supported in ROCKSDB_LITE\n");
   return 0;

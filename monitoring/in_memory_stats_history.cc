@@ -22,6 +22,7 @@ Status InMemoryStatsHistoryIterator::status() const { return status_; }
 // call will be protected by DB Mutex so it will not return partial or
 // corrupted results.
 void InMemoryStatsHistoryIterator::Next() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // increment start_time by 1 to avoid infinite loop
   AdvanceIteratorByTime(GetStatsTime() + 1, end_time_);
 }
@@ -37,6 +38,7 @@ InMemoryStatsHistoryIterator::GetStatsMap() const {
 // if success, update time_ and stats_map_ with new_time and stats_map
 void InMemoryStatsHistoryIterator::AdvanceIteratorByTime(uint64_t start_time,
                                                          uint64_t end_time) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // try to find next entry in stats_history_ map
   if (db_impl_ != nullptr) {
     valid_ =

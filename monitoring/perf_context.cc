@@ -24,16 +24,19 @@ thread_local PerfContext perf_context;
 #endif
 
 PerfContext* get_perf_context() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return &perf_context;
 }
 
 PerfContext::~PerfContext() {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #if !defined(NPERF_CONTEXT) && defined(ROCKSDB_SUPPORT_THREAD_LOCAL) && !defined(OS_SOLARIS)
   ClearPerLevelPerfContext();
 #endif
 }
 
 PerfContext::PerfContext(const PerfContext& other) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifdef NPERF_CONTEXT
   (void)other;
 #else
@@ -232,6 +235,7 @@ PerfContext::PerfContext(PerfContext&& other) noexcept {
 // TODO(Zhongyi): reduce code duplication between copy constructor and
 // assignment operator
 PerfContext& PerfContext::operator=(const PerfContext& other) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifdef NPERF_CONTEXT
   (void)other;
 #else
@@ -331,6 +335,7 @@ PerfContext& PerfContext::operator=(const PerfContext& other) {
 }
 
 void PerfContext::Reset() {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifndef NPERF_CONTEXT
   user_key_comparison_count = 0;
   block_cache_hit_count = 0;
@@ -438,6 +443,7 @@ void PerfContext::Reset() {
   }
 
 void PerfContextByLevel::Reset() {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifndef NPERF_CONTEXT
   bloom_filter_useful = 0;
   bloom_filter_full_positive = 0;
@@ -545,6 +551,7 @@ std::string PerfContext::ToString(bool exclude_zero_counters) const {
 }
 
 void PerfContext::EnablePerLevelPerfContext() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (level_to_perf_context == nullptr) {
     level_to_perf_context = new std::map<uint32_t, PerfContextByLevel>();
   }

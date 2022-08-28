@@ -18,6 +18,7 @@ Status UncompressionDictReader::Create(
     FilePrefetchBuffer* prefetch_buffer, bool use_cache, bool prefetch,
     bool pin, BlockCacheLookupContext* lookup_context,
     std::unique_ptr<UncompressionDictReader>* uncompression_dict_reader) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(table);
   assert(table->get_rep());
   assert(!pin || prefetch);
@@ -48,6 +49,7 @@ Status UncompressionDictReader::ReadUncompressionDictionary(
     const ReadOptions& read_options, bool use_cache, GetContext* get_context,
     BlockCacheLookupContext* lookup_context,
     CachableEntry<UncompressionDict>* uncompression_dict) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // TODO: add perf counter for compression dictionary read time
 
   assert(table);

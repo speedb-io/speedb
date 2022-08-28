@@ -13,6 +13,7 @@
 namespace ROCKSDB_NAMESPACE {
 
 std::string EncodeSessionId(uint64_t upper, uint64_t lower) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string db_session_id(20U, '\0');
   char *buf = &db_session_id[0];
   // Preserving `lower` is slightly tricky. 36^12 is slightly more than
@@ -28,6 +29,7 @@ std::string EncodeSessionId(uint64_t upper, uint64_t lower) {
 
 Status DecodeSessionId(const std::string &db_session_id, uint64_t *upper,
                        uint64_t *lower) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const size_t len = db_session_id.size();
   if (len == 0) {
     return Status::NotSupported("Missing db_session_id");
@@ -59,6 +61,7 @@ Status DecodeSessionId(const std::string &db_session_id, uint64_t *upper,
 Status GetSstInternalUniqueId(const std::string &db_id,
                               const std::string &db_session_id,
                               uint64_t file_number, UniqueId64x3 *out) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (db_id.empty()) {
     return Status::NotSupported("Missing db_id");
   }
@@ -115,6 +118,7 @@ constexpr uint64_t kLoOffsetForZero = 6417269962128484497U;
 }  // namespace
 
 void InternalUniqueIdToExternal(UniqueId64x3 *in_out) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t hi, lo;
   BijectiveHash2x64((*in_out)[1] + kHiOffsetForZero,
                     (*in_out)[0] + kLoOffsetForZero, &hi, &lo);
@@ -124,6 +128,7 @@ void InternalUniqueIdToExternal(UniqueId64x3 *in_out) {
 }
 
 void ExternalUniqueIdToInternal(UniqueId64x3 *in_out) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t lo = (*in_out)[0];
   uint64_t hi = (*in_out)[1];
   (*in_out)[2] -= lo + hi;
@@ -133,6 +138,7 @@ void ExternalUniqueIdToInternal(UniqueId64x3 *in_out) {
 }
 
 std::string EncodeUniqueIdBytes(const UniqueId64x3 &in) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string ret(24U, '\0');
   EncodeFixed64(&ret[0], in[0]);
   EncodeFixed64(&ret[8], in[1]);
@@ -142,6 +148,7 @@ std::string EncodeUniqueIdBytes(const UniqueId64x3 &in) {
 
 Status GetUniqueIdFromTableProperties(const TableProperties &props,
                                       std::string *out_id) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   UniqueId64x3 tmp{};
   Status s = GetSstInternalUniqueId(props.db_id, props.db_session_id,
                                     props.orig_file_number, &tmp);
@@ -155,6 +162,7 @@ Status GetUniqueIdFromTableProperties(const TableProperties &props,
 }
 
 std::string UniqueIdToHumanString(const std::string &id) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Not so efficient, but that's OK
   std::string str = Slice(id).ToString(/*hex*/ true);
   for (size_t i = 16; i < str.size(); i += 17) {

@@ -6,6 +6,7 @@
 #ifndef GFLAGS
 #include <cstdio>
 int main() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   fprintf(stderr, "Please install gflags to run rocksdb tools\n");
   return 1;
 }
@@ -38,6 +39,7 @@ namespace {
 // Make a key that i determines the first 4 characters and j determines the
 // last 4 characters.
 static std::string MakeKey(int i, int j, bool through_db) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   char buf[100];
   snprintf(buf, sizeof(buf), "%04d__key___%04d", i, j);
   if (through_db) {
@@ -52,6 +54,7 @@ static std::string MakeKey(int i, int j, bool through_db) {
 }
 
 uint64_t Now(SystemClock* clock, bool measured_by_nanosecond) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return measured_by_nanosecond ? clock->NowNanos() : clock->NowMicros();
 }
 }  // namespace
@@ -75,6 +78,7 @@ void TableReaderBenchmark(Options& opts, EnvOptions& env_options,
                           int num_keys2, int num_iter, int /*prefix_len*/,
                           bool if_query_empty_keys, bool for_iterator,
                           bool through_db, bool measured_by_nanosecond) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::InternalKeyComparator ikc(opts.comparator);
 
   std::string file_name =
@@ -280,6 +284,7 @@ DEFINE_string(time_unit, "microsecond",
               "`microsecond` (default) or `nanosecond`");
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   SetUsageMessage(std::string("\nUSAGE:\n") + std::string(argv[0]) +
                   " [OPTIONS]...");
   ParseCommandLineFlags(&argc, &argv, true);

@@ -22,6 +22,7 @@
 namespace ROCKSDB_NAMESPACE {
 
 HistogramBucketMapper::HistogramBucketMapper() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // If you change this, you also need to change
   // size of array buckets_ in HistogramImpl
   bucketValues_ = {1, 2};
@@ -56,11 +57,13 @@ namespace {
 
 HistogramStat::HistogramStat()
   : num_buckets_(bucketMapper.BucketCount()) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(num_buckets_ == sizeof(buckets_) / sizeof(*buckets_));
   Clear();
 }
 
 void HistogramStat::Clear() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   min_.store(bucketMapper.LastValue(), std::memory_order_relaxed);
   max_.store(0, std::memory_order_relaxed);
   num_.store(0, std::memory_order_relaxed);
@@ -74,6 +77,7 @@ void HistogramStat::Clear() {
 bool HistogramStat::Empty() const { return num() == 0; }
 
 void HistogramStat::Add(uint64_t value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // This function is designed to be lock free, as it's in the critical path
   // of any operation. Each individual value is atomic and the order of updates
   // by concurrent threads is tolerable.
@@ -102,6 +106,7 @@ void HistogramStat::Add(uint64_t value) {
 }
 
 void HistogramStat::Merge(const HistogramStat& other) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // This function needs to be performned with the outer lock acquired
   // However, atomic operation on every member is still need, since Add()
   // requires no lock and value update can still happen concurrently
@@ -230,6 +235,7 @@ void HistogramStat::Data(HistogramData * const data) const {
 }
 
 void HistogramImpl::Clear() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::lock_guard<std::mutex> lock(mutex_);
   stats_.Clear();
 }
@@ -239,16 +245,19 @@ bool HistogramImpl::Empty() const {
 }
 
 void HistogramImpl::Add(uint64_t value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   stats_.Add(value);
 }
 
 void HistogramImpl::Merge(const Histogram& other) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (strcmp(Name(), other.Name()) == 0) {
     Merge(*static_cast_with_check<const HistogramImpl>(&other));
   }
 }
 
 void HistogramImpl::Merge(const HistogramImpl& other) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::lock_guard<std::mutex> lock(mutex_);
   stats_.Merge(other.stats_);
 }

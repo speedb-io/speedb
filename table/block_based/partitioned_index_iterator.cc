@@ -14,6 +14,7 @@ void PartitionedIndexIterator::Seek(const Slice& target) { SeekImpl(&target); }
 void PartitionedIndexIterator::SeekToFirst() { SeekImpl(nullptr); }
 
 void PartitionedIndexIterator::SeekImpl(const Slice* target) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   SavePrevIndexValue();
 
   if (target) {
@@ -48,6 +49,7 @@ void PartitionedIndexIterator::SeekImpl(const Slice* target) {
 }
 
 void PartitionedIndexIterator::SeekToLast() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   SavePrevIndexValue();
   index_iter_->SeekToLast();
   if (!index_iter_->Valid()) {
@@ -60,12 +62,14 @@ void PartitionedIndexIterator::SeekToLast() {
 }
 
 void PartitionedIndexIterator::Next() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(block_iter_points_to_real_block_);
   block_iter_.Next();
   FindKeyForward();
 }
 
 void PartitionedIndexIterator::Prev() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(block_iter_points_to_real_block_);
   block_iter_.Prev();
 
@@ -73,6 +77,7 @@ void PartitionedIndexIterator::Prev() {
 }
 
 void PartitionedIndexIterator::InitPartitionedIndexBlock() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   BlockHandle partitioned_index_handle = index_iter_->value().handle;
   if (!block_iter_points_to_real_block_ ||
       partitioned_index_handle.offset() != prev_block_offset_ ||
@@ -108,6 +113,7 @@ void PartitionedIndexIterator::InitPartitionedIndexBlock() {
 }
 
 void PartitionedIndexIterator::FindKeyForward() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // This method's code is kept short to make it likely to be inlined.
 
   assert(block_iter_points_to_real_block_);
@@ -124,6 +130,7 @@ void PartitionedIndexIterator::FindKeyForward() {
 }
 
 void PartitionedIndexIterator::FindBlockForward() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // TODO the while loop inherits from two-level-iterator. We don't know
   // whether a block can be empty so it can be replaced by an "if".
   do {
@@ -143,6 +150,7 @@ void PartitionedIndexIterator::FindBlockForward() {
 }
 
 void PartitionedIndexIterator::FindKeyBackward() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   while (!block_iter_.Valid()) {
     if (!block_iter_.status().ok()) {
       return;

@@ -105,6 +105,7 @@ class VectorRep : public MemTableRep {
 };
 
 void VectorRep::Insert(KeyHandle handle) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto* key = static_cast<char*>(handle);
   WriteLock l(&rwlock_);
   assert(!immutable_);
@@ -118,11 +119,13 @@ bool VectorRep::Contains(const char* key) const {
 }
 
 void VectorRep::MarkReadOnly() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   WriteLock l(&rwlock_);
   immutable_ = true;
 }
 
 size_t VectorRep::ApproximateMemoryUsage() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return
     sizeof(bucket_) + sizeof(*bucket_) +
     bucket_->size() *
@@ -138,6 +141,7 @@ VectorRep::VectorRep(const KeyComparator& compare, Allocator* allocator,
       immutable_(false),
       sorted_(false),
       compare_(compare) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   bucket_.get()->reserve(count);
 }
 
@@ -188,6 +192,7 @@ const char* VectorRep::Iterator::key() const {
 // Advances to the next position.
 // REQUIRES: Valid()
 void VectorRep::Iterator::Next() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(sorted_);
   if (cit_ == bucket_->end()) {
     return;
@@ -198,6 +203,7 @@ void VectorRep::Iterator::Next() {
 // Advances to the previous position.
 // REQUIRES: Valid()
 void VectorRep::Iterator::Prev() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(sorted_);
   if (cit_ == bucket_->begin()) {
     // If you try to go back from the first element, the iterator should be
@@ -212,6 +218,7 @@ void VectorRep::Iterator::Prev() {
 // Advance to the first entry with a key >= target
 void VectorRep::Iterator::Seek(const Slice& user_key,
                                const char* memtable_key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   DoSort();
   // Do binary search to find first value not less than the target
   const char* encoded_key =
@@ -227,12 +234,14 @@ void VectorRep::Iterator::Seek(const Slice& user_key,
 // Advance to the first entry with a key <= target
 void VectorRep::Iterator::SeekForPrev(const Slice& /*user_key*/,
                                       const char* /*memtable_key*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(false);
 }
 
 // Position at the first entry in collection.
 // Final state of iterator is Valid() iff collection is not empty.
 void VectorRep::Iterator::SeekToFirst() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   DoSort();
   cit_ = bucket_->begin();
 }
@@ -240,6 +249,7 @@ void VectorRep::Iterator::SeekToFirst() {
 // Position at the last entry in collection.
 // Final state of iterator is Valid() iff collection is not empty.
 void VectorRep::Iterator::SeekToLast() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   DoSort();
   cit_ = bucket_->end();
   if (bucket_->size() != 0) {
@@ -249,6 +259,7 @@ void VectorRep::Iterator::SeekToLast() {
 
 void VectorRep::Get(const LookupKey& k, void* callback_args,
                     bool (*callback_func)(void* arg, const char* entry)) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   rwlock_.ReadLock();
   VectorRep* vector_rep;
   std::shared_ptr<Bucket> bucket;
@@ -267,6 +278,7 @@ void VectorRep::Get(const LookupKey& k, void* callback_args,
 }
 
 MemTableRep::Iterator* VectorRep::GetIterator(Arena* arena) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   char* mem = nullptr;
   if (arena != nullptr) {
     mem = arena->AllocateAligned(sizeof(Iterator));
@@ -299,12 +311,14 @@ static std::unordered_map<std::string, OptionTypeInfo> vector_rep_table_info = {
 };
 
 VectorRepFactory::VectorRepFactory(size_t count) : count_(count) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   RegisterOptions("VectorRepFactoryOptions", &count_, &vector_rep_table_info);
 }
 
 MemTableRep* VectorRepFactory::CreateMemTableRep(
     const MemTableRep::KeyComparator& compare, Allocator* allocator,
     const SliceTransform*, Logger* /*logger*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return new VectorRep(compare, allocator, count_);
 }
 }  // namespace ROCKSDB_NAMESPACE

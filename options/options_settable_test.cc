@@ -46,6 +46,7 @@ using OffsetGap = std::vector<std::pair<size_t, size_t>>;
 void FillWithSpecialChar(char* start_ptr, size_t total_size,
                          const OffsetGap& excluded,
                          char special_char = kSpecialChar) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   size_t offset = 0;
   // The excluded vector contains pairs of bytes, (first, second).
   // The first bytes are all set to the special char (represented as 'c' below).
@@ -62,6 +63,7 @@ void FillWithSpecialChar(char* start_ptr, size_t total_size,
 
 int NumUnsetBytes(char* start_ptr, size_t total_size,
                   const OffsetGap& excluded) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   int total_unset_bytes_base = 0;
   size_t offset = 0;
   for (auto& pair : excluded) {
@@ -89,6 +91,7 @@ int NumUnsetBytes(char* start_ptr, size_t total_size,
 // Return true iff two structs are the same except excluded fields.
 bool CompareBytes(char* start_ptr1, char* start_ptr2, size_t total_size,
                   const OffsetGap& excluded) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   size_t offset = 0;
   for (auto& pair : excluded) {
     for (; offset < pair.first; offset++) {
@@ -115,6 +118,7 @@ bool CompareBytes(char* start_ptr1, char* start_ptr2, size_t total_size,
 // If it is a complicated type, you also need to add the field to
 // kBbtoExcluded, and maybe add customized verification for it.
 TEST_F(OptionsSettableTest, BlockBasedTableOptionsAllFieldsSettable) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Items in the form of <offset, size>. Need to be in ascending order
   // and not overlapping. Need to updated if new pointer-option is added.
   const OffsetGap kBbtoExcluded = {
@@ -223,6 +227,7 @@ TEST_F(OptionsSettableTest, BlockBasedTableOptionsAllFieldsSettable) {
 // If it is a complicated type, you also need to add the field to
 // kDBOptionsExcluded, and maybe add customized verification for it.
 TEST_F(OptionsSettableTest, DBOptionsAllFieldsSettable) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const OffsetGap kDBOptionsExcluded = {
       {offsetof(struct DBOptions, env), sizeof(Env*)},
       {offsetof(struct DBOptions, rate_limiter),
@@ -378,6 +383,7 @@ TEST_F(OptionsSettableTest, DBOptionsAllFieldsSettable) {
 // kColumnFamilyOptionsExcluded, and maybe add customized verification
 // for it.
 TEST_F(OptionsSettableTest, ColumnFamilyOptionsAllFieldsSettable) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // options in the excluded set need to appear in the same order as in
   // ColumnFamilyOptions.
   const OffsetGap kColumnFamilyOptionsExcluded = {
@@ -588,6 +594,7 @@ TEST_F(OptionsSettableTest, ColumnFamilyOptionsAllFieldsSettable) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
 #ifdef GFLAGS
   ParseCommandLineFlags(&argc, &argv, true);

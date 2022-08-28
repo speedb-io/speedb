@@ -14,6 +14,7 @@ void BlockBasedTableIterator::Seek(const Slice& target) { SeekImpl(&target); }
 void BlockBasedTableIterator::SeekToFirst() { SeekImpl(nullptr); }
 
 void BlockBasedTableIterator::SeekImpl(const Slice* target) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   is_out_of_bound_ = false;
   is_at_first_key_from_index_ = false;
   if (target && !CheckPrefixMayMatch(*target, IterDirection::kForward)) {
@@ -100,6 +101,7 @@ void BlockBasedTableIterator::SeekImpl(const Slice* target) {
 }
 
 void BlockBasedTableIterator::SeekForPrev(const Slice& target) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   is_out_of_bound_ = false;
   is_at_first_key_from_index_ = false;
   // For now totally disable prefix seek in auto prefix mode because we don't
@@ -160,6 +162,7 @@ void BlockBasedTableIterator::SeekForPrev(const Slice& target) {
 }
 
 void BlockBasedTableIterator::SeekToLast() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   is_out_of_bound_ = false;
   is_at_first_key_from_index_ = false;
   SavePrevIndexValue();
@@ -175,6 +178,7 @@ void BlockBasedTableIterator::SeekToLast() {
 }
 
 void BlockBasedTableIterator::Next() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (is_at_first_key_from_index_ && !MaterializeCurrentBlock()) {
     return;
   }
@@ -185,6 +189,7 @@ void BlockBasedTableIterator::Next() {
 }
 
 bool BlockBasedTableIterator::NextAndGetResult(IterateResult* result) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Next();
   bool is_valid = Valid();
   if (is_valid) {
@@ -196,6 +201,7 @@ bool BlockBasedTableIterator::NextAndGetResult(IterateResult* result) {
 }
 
 void BlockBasedTableIterator::Prev() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (is_at_first_key_from_index_) {
     is_at_first_key_from_index_ = false;
 
@@ -215,6 +221,7 @@ void BlockBasedTableIterator::Prev() {
 }
 
 void BlockBasedTableIterator::InitDataBlock() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   BlockHandle data_block_handle = index_iter_->value().handle;
   if (!block_iter_points_to_real_block_ ||
       data_block_handle.offset() != prev_block_offset_ ||
@@ -247,6 +254,7 @@ void BlockBasedTableIterator::InitDataBlock() {
 }
 
 bool BlockBasedTableIterator::MaterializeCurrentBlock() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(is_at_first_key_from_index_);
   assert(!block_iter_points_to_real_block_);
   assert(index_iter_->Valid());
@@ -273,6 +281,7 @@ bool BlockBasedTableIterator::MaterializeCurrentBlock() {
 }
 
 void BlockBasedTableIterator::FindKeyForward() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // This method's code is kept short to make it likely to be inlined.
 
   assert(!is_out_of_bound_);
@@ -290,6 +299,7 @@ void BlockBasedTableIterator::FindKeyForward() {
 }
 
 void BlockBasedTableIterator::FindBlockForward() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // TODO the while loop inherits from two-level-iterator. We don't know
   // whether a block can be empty so it can be replaced by an "if".
   do {
@@ -337,6 +347,7 @@ void BlockBasedTableIterator::FindBlockForward() {
 }
 
 void BlockBasedTableIterator::FindKeyBackward() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   while (!block_iter_.Valid()) {
     if (!block_iter_.status().ok()) {
       return;
@@ -358,6 +369,7 @@ void BlockBasedTableIterator::FindKeyBackward() {
 }
 
 void BlockBasedTableIterator::CheckOutOfBound() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (read_options_.iterate_upper_bound != nullptr &&
       block_upper_bound_check_ != BlockUpperBound::kUpperBoundBeyondCurBlock &&
       Valid()) {
@@ -369,6 +381,7 @@ void BlockBasedTableIterator::CheckOutOfBound() {
 }
 
 void BlockBasedTableIterator::CheckDataBlockWithinUpperBound() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (read_options_.iterate_upper_bound != nullptr &&
       block_iter_points_to_real_block_) {
     block_upper_bound_check_ = (user_comparator_.CompareWithoutTimestamp(

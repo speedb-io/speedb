@@ -69,6 +69,7 @@ class TwoLevelIndexIterator : public InternalIteratorBase<IndexValue> {
 
  private:
   void SaveError(const Status& s) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (status_.ok() && !s.ok()) status_ = s;
   }
   void SkipEmptyDataBlocksForward();
@@ -91,6 +92,7 @@ TwoLevelIndexIterator::TwoLevelIndexIterator(
     : state_(state), first_level_iter_(first_level_iter) {}
 
 void TwoLevelIndexIterator::Seek(const Slice& target) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   first_level_iter_.Seek(target);
 
   InitDataBlock();
@@ -101,6 +103,7 @@ void TwoLevelIndexIterator::Seek(const Slice& target) {
 }
 
 void TwoLevelIndexIterator::SeekForPrev(const Slice& target) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   first_level_iter_.Seek(target);
   InitDataBlock();
   if (second_level_iter_.iter() != nullptr) {
@@ -119,6 +122,7 @@ void TwoLevelIndexIterator::SeekForPrev(const Slice& target) {
 }
 
 void TwoLevelIndexIterator::SeekToFirst() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   first_level_iter_.SeekToFirst();
   InitDataBlock();
   if (second_level_iter_.iter() != nullptr) {
@@ -128,6 +132,7 @@ void TwoLevelIndexIterator::SeekToFirst() {
 }
 
 void TwoLevelIndexIterator::SeekToLast() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   first_level_iter_.SeekToLast();
   InitDataBlock();
   if (second_level_iter_.iter() != nullptr) {
@@ -137,18 +142,21 @@ void TwoLevelIndexIterator::SeekToLast() {
 }
 
 void TwoLevelIndexIterator::Next() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(Valid());
   second_level_iter_.Next();
   SkipEmptyDataBlocksForward();
 }
 
 void TwoLevelIndexIterator::Prev() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(Valid());
   second_level_iter_.Prev();
   SkipEmptyDataBlocksBackward();
 }
 
 void TwoLevelIndexIterator::SkipEmptyDataBlocksForward() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   while (second_level_iter_.iter() == nullptr ||
          (!second_level_iter_.Valid() && second_level_iter_.status().ok())) {
     // Move to next block
@@ -165,6 +173,7 @@ void TwoLevelIndexIterator::SkipEmptyDataBlocksForward() {
 }
 
 void TwoLevelIndexIterator::SkipEmptyDataBlocksBackward() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   while (second_level_iter_.iter() == nullptr ||
          (!second_level_iter_.Valid() && second_level_iter_.status().ok())) {
     // Move to next block
@@ -182,11 +191,13 @@ void TwoLevelIndexIterator::SkipEmptyDataBlocksBackward() {
 
 void TwoLevelIndexIterator::SetSecondLevelIterator(
     InternalIteratorBase<IndexValue>* iter) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   InternalIteratorBase<IndexValue>* old_iter = second_level_iter_.Set(iter);
   delete old_iter;
 }
 
 void TwoLevelIndexIterator::InitDataBlock() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!first_level_iter_.Valid()) {
     SetSecondLevelIterator(nullptr);
   } else {
@@ -214,6 +225,7 @@ void TwoLevelIndexIterator::InitDataBlock() {
 InternalIteratorBase<IndexValue>* NewTwoLevelIterator(
     TwoLevelIteratorState* state,
     InternalIteratorBase<IndexValue>* first_level_iter) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return new TwoLevelIndexIterator(state, first_level_iter);
 }
 }  // namespace ROCKSDB_NAMESPACE

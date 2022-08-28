@@ -29,6 +29,7 @@ class BlockBasedFilterBlockTest : public mock::MockBlockBasedTableTester,
 };
 
 TEST_F(BlockBasedFilterBlockTest, BlockBasedEmptyBuilder) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   FilterBlockBuilder* builder =
       new BlockBasedFilterBlockBuilder(nullptr, table_options_, 10);
   Slice slice(builder->Finish());
@@ -54,6 +55,7 @@ TEST_F(BlockBasedFilterBlockTest, BlockBasedEmptyBuilder) {
 }
 
 TEST_F(BlockBasedFilterBlockTest, BlockBasedSingleChunk) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   FilterBlockBuilder* builder =
       new BlockBasedFilterBlockBuilder(nullptr, table_options_, 10);
   builder->StartBlock(100);
@@ -106,6 +108,7 @@ TEST_F(BlockBasedFilterBlockTest, BlockBasedSingleChunk) {
 }
 
 TEST_F(BlockBasedFilterBlockTest, BlockBasedMultiChunk) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   FilterBlockBuilder* builder =
       new BlockBasedFilterBlockBuilder(nullptr, table_options_, 10);
 
@@ -214,6 +217,7 @@ TEST_F(BlockBasedFilterBlockTest, BlockBasedMultiChunk) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

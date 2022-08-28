@@ -29,6 +29,7 @@
 namespace ROCKSDB_NAMESPACE {
 
 inline void BlockFetcher::ProcessTrailerIfPresent() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (footer_.GetBlockTrailerSize() > 0) {
     assert(footer_.GetBlockTrailerSize() == BlockBasedTable::kBlockTrailerSize);
     if (read_options_.verify_checksums) {
@@ -46,6 +47,7 @@ inline void BlockFetcher::ProcessTrailerIfPresent() {
 }
 
 inline bool BlockFetcher::TryGetUncompressBlockFromPersistentCache() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (cache_options_.persistent_cache &&
       !cache_options_.persistent_cache->IsCompressed()) {
     Status status = PersistentCacheHelper::LookupUncompressedPage(
@@ -67,6 +69,7 @@ inline bool BlockFetcher::TryGetUncompressBlockFromPersistentCache() {
 }
 
 inline bool BlockFetcher::TryGetFromPrefetchBuffer() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (prefetch_buffer_ != nullptr) {
     IOOptions opts;
     IOStatus io_s = file_->PrepareIOOptions(read_options_, opts);
@@ -99,6 +102,7 @@ inline bool BlockFetcher::TryGetFromPrefetchBuffer() {
 }
 
 inline bool BlockFetcher::TryGetCompressedBlockFromPersistentCache() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (cache_options_.persistent_cache &&
       cache_options_.persistent_cache->IsCompressed()) {
     // lookup uncompressed cache mode p-cache
@@ -122,6 +126,7 @@ inline bool BlockFetcher::TryGetCompressedBlockFromPersistentCache() {
 }
 
 inline void BlockFetcher::PrepareBufferForBlockFromFile() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // cache miss read from device
   if ((do_uncompress_ || ioptions_.allow_mmap_reads) &&
       block_size_with_trailer_ < kDefaultStackBufferSize) {
@@ -158,6 +163,7 @@ inline void BlockFetcher::PrepareBufferForBlockFromFile() {
 }
 
 inline void BlockFetcher::InsertCompressedBlockToPersistentCacheIfNeeded() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (io_status_.ok() && read_options_.fill_cache &&
       cache_options_.persistent_cache &&
       cache_options_.persistent_cache->IsCompressed()) {
@@ -168,6 +174,7 @@ inline void BlockFetcher::InsertCompressedBlockToPersistentCacheIfNeeded() {
 }
 
 inline void BlockFetcher::InsertUncompressedBlockToPersistentCacheIfNeeded() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (io_status_.ok() && !got_from_prefetch_buffer_ &&
       read_options_.fill_cache && cache_options_.persistent_cache &&
       !cache_options_.persistent_cache->IsCompressed()) {
@@ -178,6 +185,7 @@ inline void BlockFetcher::InsertUncompressedBlockToPersistentCacheIfNeeded() {
 }
 
 inline void BlockFetcher::CopyBufferToHeapBuf() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(used_buf_ != heap_buf_.get());
   heap_buf_ = AllocateBlock(block_size_with_trailer_, memory_allocator_);
   memcpy(heap_buf_.get(), used_buf_, block_size_with_trailer_);
@@ -187,6 +195,7 @@ inline void BlockFetcher::CopyBufferToHeapBuf() {
 }
 
 inline void BlockFetcher::CopyBufferToCompressedBuf() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(used_buf_ != compressed_buf_.get());
   compressed_buf_ = AllocateBlock(block_size_with_trailer_,
                                   memory_allocator_compressed_);
@@ -207,6 +216,7 @@ inline void BlockFetcher::CopyBufferToCompressedBuf() {
 // After this method, if the block is compressed, it should be in
 // compressed_buf_, otherwise should be in heap_buf_.
 inline void BlockFetcher::GetBlockContents() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (slice_.data() != used_buf_) {
     // the slice content is not the buffer provided
     *contents_ = BlockContents(Slice(slice_.data(), block_size_));
@@ -238,6 +248,7 @@ inline void BlockFetcher::GetBlockContents() {
 }
 
 IOStatus BlockFetcher::ReadBlockContents() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (TryGetUncompressBlockFromPersistentCache()) {
     compression_type_ = kNoCompression;
 #ifndef NDEBUG

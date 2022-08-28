@@ -32,6 +32,7 @@ const size_t Arena::kMaxBlockSize = 2u << 30;
 static const int kAlignUnit = alignof(max_align_t);
 
 size_t OptimizeBlockSize(size_t block_size) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Make sure block_size is in optimal range
   block_size = std::max(Arena::kMinBlockSize, block_size);
   block_size = std::min(Arena::kMaxBlockSize, block_size);
@@ -46,6 +47,7 @@ size_t OptimizeBlockSize(size_t block_size) {
 
 Arena::Arena(size_t block_size, AllocTracker* tracker, size_t huge_page_size)
     : kBlockSize(OptimizeBlockSize(block_size)), tracker_(tracker) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(kBlockSize >= kMinBlockSize && kBlockSize <= kMaxBlockSize &&
          kBlockSize % kAlignUnit == 0);
   TEST_SYNC_POINT_CALLBACK("Arena::Arena:0", const_cast<size_t*>(&kBlockSize));
@@ -67,6 +69,7 @@ Arena::Arena(size_t block_size, AllocTracker* tracker, size_t huge_page_size)
 }
 
 Arena::~Arena() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (tracker_ != nullptr) {
     assert(tracker_->is_freed());
     tracker_->FreeMem();
@@ -89,6 +92,7 @@ Arena::~Arena() {
 }
 
 char* Arena::AllocateFallback(size_t bytes, bool aligned) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (bytes > kBlockSize / 4) {
     ++irregular_block_num;
     // Object is more than a quarter of our block size.  Allocate it separately
@@ -123,6 +127,7 @@ char* Arena::AllocateFallback(size_t bytes, bool aligned) {
 }
 
 char* Arena::AllocateFromHugePage(size_t bytes) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifdef MAP_HUGETLB
   if (hugetlb_size_ == 0) {
     return nullptr;
@@ -157,6 +162,7 @@ char* Arena::AllocateFromHugePage(size_t bytes) {
 
 char* Arena::AllocateAligned(size_t bytes, size_t huge_page_size,
                              Logger* logger) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert((kAlignUnit & (kAlignUnit - 1)) ==
          0);  // Pointer size should be a power of 2
 
@@ -201,6 +207,7 @@ char* Arena::AllocateAligned(size_t bytes, size_t huge_page_size,
 }
 
 char* Arena::AllocateNewBlock(size_t block_bytes) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Reserve space in `blocks_` before allocating memory via new.
   // Use `emplace_back()` instead of `reserve()` to let std::vector manage its
   // own memory and do fewer reallocations.

@@ -18,6 +18,7 @@ class CleanableTest : public testing::Test {};
 
 // Use this to keep track of the cleanups that were actually performed
 void Multiplier(void* arg1, void* arg2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   int* res = reinterpret_cast<int*>(arg1);
   int* num = reinterpret_cast<int*>(arg2);
   *res *= *num;
@@ -25,6 +26,7 @@ void Multiplier(void* arg1, void* arg2) {
 
 // the first Cleanup is on stack and the rest on heap, so test with both cases
 TEST_F(CleanableTest, Register) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   int n2 = 2, n3 = 3;
   int res = 1;
   { Cleanable c1; }
@@ -76,6 +78,7 @@ TEST_F(CleanableTest, Register) {
 // the first Cleanup is on stack and the rest on heap,
 // so test all the combinations of them
 TEST_F(CleanableTest, Delegation) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   int n2 = 2, n3 = 3, n5 = 5, n7 = 7;
   int res = 1;
   {
@@ -199,12 +202,14 @@ TEST_F(CleanableTest, Delegation) {
 }
 
 static void ReleaseStringHeap(void* s, void*) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   delete reinterpret_cast<const std::string*>(s);
 }
 
 class PinnableSlice4Test : public PinnableSlice {
  public:
   void TestStringIsRegistered(std::string* s) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_TRUE(cleanup_.function == ReleaseStringHeap);
     ASSERT_EQ(cleanup_.arg1, s);
     ASSERT_EQ(cleanup_.arg2, nullptr);
@@ -214,6 +219,7 @@ class PinnableSlice4Test : public PinnableSlice {
 
 // Putting the PinnableSlice tests here due to similarity to Cleanable tests
 TEST_F(CleanableTest, PinnableSlice) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   int n2 = 2;
   int res = 1;
   const std::string const_str = "123";
@@ -271,6 +277,7 @@ TEST_F(CleanableTest, PinnableSlice) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

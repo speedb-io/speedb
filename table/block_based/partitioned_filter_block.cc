@@ -36,6 +36,7 @@ PartitionedFilterBlockBuilder::PartitionedFilterBlockBuilder(
       p_index_builder_(p_index_builder),
       keys_added_to_partition_(0),
       total_added_in_built_(0) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   keys_per_partition_ = static_cast<uint32_t>(
       filter_bits_builder_->ApproximateNumEntries(partition_size));
   if (keys_per_partition_ < 1) {
@@ -61,11 +62,13 @@ PartitionedFilterBlockBuilder::PartitionedFilterBlockBuilder(
 }
 
 PartitionedFilterBlockBuilder::~PartitionedFilterBlockBuilder() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   partitioned_filters_construction_status_.PermitUncheckedError();
 }
 
 void PartitionedFilterBlockBuilder::MaybeCutAFilterBlock(
     const Slice* next_key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Use == to send the request only once
   if (keys_added_to_partition_ == keys_per_partition_) {
     // Currently only index builder is in charge of cutting a partition. We keep
@@ -107,22 +110,26 @@ void PartitionedFilterBlockBuilder::MaybeCutAFilterBlock(
 }
 
 void PartitionedFilterBlockBuilder::Add(const Slice& key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   MaybeCutAFilterBlock(&key);
   FullFilterBlockBuilder::Add(key);
 }
 
 void PartitionedFilterBlockBuilder::AddKey(const Slice& key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   FullFilterBlockBuilder::AddKey(key);
   keys_added_to_partition_++;
 }
 
 size_t PartitionedFilterBlockBuilder::EstimateEntriesAdded() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return total_added_in_built_ + filter_bits_builder_->EstimateEntriesAdded();
 }
 
 Slice PartitionedFilterBlockBuilder::Finish(
     const BlockHandle& last_partition_block_handle, Status* status,
     std::unique_ptr<const char[]>* filter_data) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (finishing_filters == true) {
     // Record the handle of the last written filter block in the index
     std::string handle_encoding;
@@ -191,6 +198,7 @@ std::unique_ptr<FilterBlockReader> PartitionedFilterBlockReader::Create(
     const BlockBasedTable* table, const ReadOptions& ro,
     FilePrefetchBuffer* prefetch_buffer, bool use_cache, bool prefetch,
     bool pin, BlockCacheLookupContext* lookup_context) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(table);
   assert(table->get_rep());
   assert(!pin || prefetch);
@@ -218,6 +226,7 @@ bool PartitionedFilterBlockReader::KeyMayMatch(
     const Slice& key, const SliceTransform* prefix_extractor,
     uint64_t block_offset, const bool no_io, const Slice* const const_ikey_ptr,
     GetContext* get_context, BlockCacheLookupContext* lookup_context) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(const_ikey_ptr != nullptr);
   assert(block_offset == kNotValid);
   if (!whole_key_filtering()) {
@@ -233,6 +242,7 @@ void PartitionedFilterBlockReader::KeysMayMatch(
     MultiGetRange* range, const SliceTransform* prefix_extractor,
     uint64_t block_offset, const bool no_io,
     BlockCacheLookupContext* lookup_context) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(block_offset == kNotValid);
   if (!whole_key_filtering()) {
     return;  // Any/all may match
@@ -246,6 +256,7 @@ bool PartitionedFilterBlockReader::PrefixMayMatch(
     const Slice& prefix, const SliceTransform* prefix_extractor,
     uint64_t block_offset, const bool no_io, const Slice* const const_ikey_ptr,
     GetContext* get_context, BlockCacheLookupContext* lookup_context) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(const_ikey_ptr != nullptr);
   assert(block_offset == kNotValid);
   if (!table_prefix_extractor() && !prefix_extractor) {
@@ -261,6 +272,7 @@ void PartitionedFilterBlockReader::PrefixesMayMatch(
     MultiGetRange* range, const SliceTransform* prefix_extractor,
     uint64_t block_offset, const bool no_io,
     BlockCacheLookupContext* lookup_context) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(block_offset == kNotValid);
   if (!table_prefix_extractor() && !prefix_extractor) {
     return;  // Any/all may match
@@ -453,6 +465,7 @@ size_t PartitionedFilterBlockReader::ApproximateMemoryUsage() const {
 // TODO(myabandeh): merge this with the same function in IndexReader
 Status PartitionedFilterBlockReader::CacheDependencies(const ReadOptions& ro,
                                                        bool pin) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(table());
 
   const BlockBasedTable::Rep* const rep = table()->get_rep();

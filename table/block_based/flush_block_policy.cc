@@ -88,12 +88,14 @@ FlushBlockPolicy* FlushBlockBySizePolicyFactory::NewFlushBlockPolicy(
 FlushBlockPolicy* FlushBlockBySizePolicyFactory::NewFlushBlockPolicy(
     const uint64_t size, const int deviation,
     const BlockBuilder& data_block_builder) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return new FlushBlockBySizePolicy(size, deviation, false, data_block_builder);
 }
 
 #ifndef ROCKSDB_LITE
 static int RegisterFlushBlockPolicyFactories(ObjectLibrary& library,
                                              const std::string& /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   library.AddFactory<FlushBlockPolicyFactory>(
       FlushBlockBySizePolicyFactory::kClassName(),
       [](const std::string& /*uri*/,
@@ -116,6 +118,7 @@ static int RegisterFlushBlockPolicyFactories(ObjectLibrary& library,
 
 static bool LoadFlushPolicyFactory(
     const std::string& id, std::shared_ptr<FlushBlockPolicyFactory>* result) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (id.empty()) {
     result->reset(new FlushBlockBySizePolicyFactory());
 #ifdef ROCKSDB_LITE
@@ -136,6 +139,7 @@ FlushBlockBySizePolicyFactory::FlushBlockBySizePolicyFactory()
 Status FlushBlockPolicyFactory::CreateFromString(
     const ConfigOptions& config_options, const std::string& value,
     std::shared_ptr<FlushBlockPolicyFactory>* factory) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifndef ROCKSDB_LITE
   static std::once_flag once;
   std::call_once(once, [&]() {

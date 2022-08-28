@@ -37,12 +37,14 @@ MetaIndexBuilder::MetaIndexBuilder()
 
 void MetaIndexBuilder::Add(const std::string& key,
                            const BlockHandle& handle) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string handle_encoding;
   handle.EncodeTo(&handle_encoding);
   meta_block_handles_.insert({key, handle_encoding});
 }
 
 Slice MetaIndexBuilder::Finish() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (const auto& metablock : meta_block_handles_) {
     meta_index_block_->Add(metablock.first, metablock.second);
   }
@@ -58,10 +60,12 @@ PropertyBlockBuilder::PropertyBlockBuilder()
 
 void PropertyBlockBuilder::Add(const std::string& name,
                                const std::string& val) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   props_.insert({name, val});
 }
 
 void PropertyBlockBuilder::Add(const std::string& name, uint64_t val) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(props_.find(name) == props_.end());
 
   std::string dst;
@@ -72,12 +76,14 @@ void PropertyBlockBuilder::Add(const std::string& name, uint64_t val) {
 
 void PropertyBlockBuilder::Add(
     const UserCollectedProperties& user_collected_properties) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (const auto& prop : user_collected_properties) {
     Add(prop.first, prop.second);
   }
 }
 
 void PropertyBlockBuilder::AddTableProperty(const TableProperties& props) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   TEST_SYNC_POINT_CALLBACK("PropertyBlockBuilder::AddTableProperty:Start",
                            const_cast<TableProperties*>(&props));
 
@@ -157,6 +163,7 @@ void PropertyBlockBuilder::AddTableProperty(const TableProperties& props) {
 }
 
 Slice PropertyBlockBuilder::Finish() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (const auto& prop : props_) {
     properties_block_->Add(prop.first, prop.second);
   }
@@ -166,6 +173,7 @@ Slice PropertyBlockBuilder::Finish() {
 
 void LogPropertiesCollectionError(Logger* info_log, const std::string& method,
                                   const std::string& name) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(method == "Add" || method == "Finish");
 
   std::string msg =
@@ -178,6 +186,7 @@ bool NotifyCollectTableCollectorsOnAdd(
     const Slice& key, const Slice& value, uint64_t file_size,
     const std::vector<std::unique_ptr<IntTblPropCollector>>& collectors,
     Logger* info_log) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   bool all_succeeded = true;
   for (auto& collector : collectors) {
     Status s = collector->InternalAdd(key, value, file_size);
@@ -194,6 +203,7 @@ void NotifyCollectTableCollectorsOnBlockAdd(
     const std::vector<std::unique_ptr<IntTblPropCollector>>& collectors,
     const uint64_t block_raw_bytes, const uint64_t block_compressed_bytes_fast,
     const uint64_t block_compressed_bytes_slow) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (auto& collector : collectors) {
     collector->BlockAdd(block_raw_bytes, block_compressed_bytes_fast,
                         block_compressed_bytes_slow);
@@ -203,6 +213,7 @@ void NotifyCollectTableCollectorsOnBlockAdd(
 bool NotifyCollectTableCollectorsOnFinish(
     const std::vector<std::unique_ptr<IntTblPropCollector>>& collectors,
     Logger* info_log, PropertyBlockBuilder* builder) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   bool all_succeeded = true;
   for (auto& collector : collectors) {
     UserCollectedProperties user_collected_properties;
@@ -228,6 +239,7 @@ Status ReadTablePropertiesHelper(
     const Footer& footer, const ImmutableOptions& ioptions,
     std::unique_ptr<TableProperties>* table_properties,
     MemoryAllocator* memory_allocator) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(table_properties);
 
   // If this is an external SST file ingested with write_global_seqno set to
@@ -408,6 +420,7 @@ Status ReadTableProperties(RandomAccessFileReader* file, uint64_t file_size,
                            std::unique_ptr<TableProperties>* properties,
                            MemoryAllocator* memory_allocator,
                            FilePrefetchBuffer* prefetch_buffer) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   BlockHandle block_handle;
   Footer footer;
   Status s = FindMetaBlockInFile(file, file_size, table_magic_number, ioptions,
@@ -430,6 +443,7 @@ Status ReadTableProperties(RandomAccessFileReader* file, uint64_t file_size,
 Status FindOptionalMetaBlock(InternalIterator* meta_index_iter,
                              const std::string& meta_block_name,
                              BlockHandle* block_handle) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(block_handle != nullptr);
   meta_index_iter->Seek(meta_block_name);
   if (meta_index_iter->status().ok()) {
@@ -454,6 +468,7 @@ Status FindOptionalMetaBlock(InternalIterator* meta_index_iter,
 Status FindMetaBlock(InternalIterator* meta_index_iter,
                      const std::string& meta_block_name,
                      BlockHandle* block_handle) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Status s =
       FindOptionalMetaBlock(meta_index_iter, meta_block_name, block_handle);
   if (s.ok() && block_handle->IsNull()) {
@@ -470,6 +485,7 @@ Status ReadMetaIndexBlockInFile(RandomAccessFileReader* file,
                                 MemoryAllocator* memory_allocator,
                                 FilePrefetchBuffer* prefetch_buffer,
                                 Footer* footer_out) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Footer footer;
   IOOptions opts;
   auto s = ReadFooterFromFile(opts, file, prefetch_buffer, file_size, &footer,
@@ -498,6 +514,7 @@ Status FindMetaBlockInFile(RandomAccessFileReader* file, uint64_t file_size,
                            MemoryAllocator* memory_allocator,
                            FilePrefetchBuffer* prefetch_buffer,
                            Footer* footer_out) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   BlockContents metaindex_contents;
   auto s = ReadMetaIndexBlockInFile(
       file, file_size, table_magic_number, ioptions, &metaindex_contents,
@@ -522,6 +539,7 @@ Status ReadMetaBlock(RandomAccessFileReader* file,
                      const std::string& meta_block_name, BlockType block_type,
                      BlockContents* contents,
                      MemoryAllocator* memory_allocator) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // TableProperties requires special handling because of checksum issues.
   // Call ReadTableProperties instead for that case.
   assert(block_type != BlockType::kProperties);

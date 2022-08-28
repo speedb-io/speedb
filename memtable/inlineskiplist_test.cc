@@ -22,10 +22,12 @@ namespace ROCKSDB_NAMESPACE {
 using Key = uint64_t;
 
 static const char* Encode(const uint64_t* key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return reinterpret_cast<const char*>(key);
 }
 
 static Key Decode(const char* key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Key rv;
   memcpy(&rv, key, sizeof(Key));
   return rv;
@@ -35,6 +37,7 @@ struct TestComparator {
   using DecodedType = Key;
 
   static DecodedType decode_key(const char* b) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return Decode(b);
   }
 
@@ -64,6 +67,7 @@ using TestInlineSkipList = InlineSkipList<TestComparator>;
 class InlineSkipTest : public testing::Test {
  public:
   void Insert(TestInlineSkipList* list, Key key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     char* buf = list->AllocateKey(sizeof(Key));
     memcpy(buf, &key, sizeof(Key));
     list->Insert(buf);
@@ -71,6 +75,7 @@ class InlineSkipTest : public testing::Test {
   }
 
   bool InsertWithHint(TestInlineSkipList* list, Key key, void** hint) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     char* buf = list->AllocateKey(sizeof(Key));
     memcpy(buf, &key, sizeof(Key));
     bool res = list->InsertWithHint(buf, hint);
@@ -79,6 +84,7 @@ class InlineSkipTest : public testing::Test {
   }
 
   void Validate(TestInlineSkipList* list) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // Check keys exist.
     for (Key key : keys_) {
       ASSERT_TRUE(list->Contains(Encode(&key)));
@@ -104,6 +110,7 @@ class InlineSkipTest : public testing::Test {
 };
 
 TEST_F(InlineSkipTest, Empty) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Arena arena;
   TestComparator cmp;
   InlineSkipList<TestComparator> list(cmp, &arena);
@@ -124,6 +131,7 @@ TEST_F(InlineSkipTest, Empty) {
 }
 
 TEST_F(InlineSkipTest, InsertAndLookup) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int N = 2000;
   const int R = 5000;
   Random rnd(1000);
@@ -213,6 +221,7 @@ TEST_F(InlineSkipTest, InsertAndLookup) {
 }
 
 TEST_F(InlineSkipTest, InsertWithHint_Sequential) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int N = 100000;
   Arena arena;
   TestComparator cmp;
@@ -226,6 +235,7 @@ TEST_F(InlineSkipTest, InsertWithHint_Sequential) {
 }
 
 TEST_F(InlineSkipTest, InsertWithHint_MultipleHints) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int N = 100000;
   const int S = 100;
   Random rnd(534);
@@ -247,6 +257,7 @@ TEST_F(InlineSkipTest, InsertWithHint_MultipleHints) {
 }
 
 TEST_F(InlineSkipTest, InsertWithHint_MultipleHintsRandom) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int N = 100000;
   const int S = 100;
   Random rnd(534);
@@ -266,6 +277,7 @@ TEST_F(InlineSkipTest, InsertWithHint_MultipleHintsRandom) {
 }
 
 TEST_F(InlineSkipTest, InsertWithHint_CompatibleWithInsertWithoutHint) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int N = 100000;
   const int S1 = 100;
   const int S2 = 100;
@@ -344,11 +356,13 @@ class ConcurrentTest {
   static uint64_t hash(Key key) { return key & 0xff; }
 
   static uint64_t HashNumbers(uint64_t k, uint64_t g) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     uint64_t data[2] = {k, g};
     return Hash(reinterpret_cast<char*>(data), sizeof(data), 0);
   }
 
   static Key MakeKey(uint64_t k, uint64_t g) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(sizeof(Key) == sizeof(uint64_t));
     assert(k <= K);  // We sometimes pass K to seek to the end of the skiplist
     assert(g <= 0xffffffffu);
@@ -356,10 +370,12 @@ class ConcurrentTest {
   }
 
   static bool IsValidKey(Key k) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return hash(k) == (HashNumbers(key(k), gen(k)) & 0xff);
   }
 
   static Key RandomTarget(Random* rnd) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     switch (rnd->Next() % 10) {
       case 0:
         // Seek to beginning
@@ -377,11 +393,13 @@ class ConcurrentTest {
   struct State {
     std::atomic<int> generation[K];
     void Set(int k, int v) {
+PERF_MARKER(__PRETTY_FUNCTION__);
       generation[k].store(v, std::memory_order_release);
     }
     int Get(int k) { return generation[k].load(std::memory_order_acquire); }
 
     State() {
+PERF_MARKER(__PRETTY_FUNCTION__);
       for (unsigned int k = 0; k < K; k++) {
         Set(k, 0);
       }
@@ -402,6 +420,7 @@ class ConcurrentTest {
 
   // REQUIRES: No concurrent calls to WriteStep or ConcurrentWriteStep
   void WriteStep(Random* rnd) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     const uint32_t k = rnd->Next() % K;
     const int g = current_.Get(k) + 1;
     const Key new_key = MakeKey(k, g);
@@ -413,6 +432,7 @@ class ConcurrentTest {
 
   // REQUIRES: No concurrent calls for the same k
   void ConcurrentWriteStep(uint32_t k, bool use_hint = false) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     const int g = current_.Get(k) + 1;
     const Key new_key = MakeKey(k, g);
     char* buf = list_.AllocateKey(sizeof(Key));
@@ -429,6 +449,7 @@ class ConcurrentTest {
   }
 
   void ReadStep(Random* rnd) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // Remember the initial committed state of the skiplist.
     State initial_state;
     for (unsigned int k = 0; k < K; k++) {
@@ -491,6 +512,7 @@ const uint32_t ConcurrentTest::K;
 // Simple test that does single-threaded testing of the ConcurrentTest
 // scaffolding.
 TEST_F(InlineSkipTest, ConcurrentReadWithoutThreads) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ConcurrentTest test;
   Random rnd(test::RandomSeed());
   for (int i = 0; i < 10000; i++) {
@@ -500,6 +522,7 @@ TEST_F(InlineSkipTest, ConcurrentReadWithoutThreads) {
 }
 
 TEST_F(InlineSkipTest, ConcurrentInsertWithoutThreads) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ConcurrentTest test;
   Random rnd(test::RandomSeed());
   for (int i = 0; i < 10000; i++) {
@@ -529,6 +552,7 @@ class TestState {
         state_cv_(&mu_) {}
 
   void Wait(ReaderState s) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     mu_.Lock();
     while (state_ != s) {
       state_cv_.Wait();
@@ -537,6 +561,7 @@ class TestState {
   }
 
   void Change(ReaderState s) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     mu_.Lock();
     state_ = s;
     state_cv_.Signal();
@@ -544,6 +569,7 @@ class TestState {
   }
 
   void AdjustPendingWriters(int delta) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     mu_.Lock();
     pending_writers_ += delta;
     if (pending_writers_ == 0) {
@@ -553,6 +579,7 @@ class TestState {
   }
 
   void WaitForPendingWriters() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     mu_.Lock();
     while (pending_writers_ != 0) {
       state_cv_.Wait();
@@ -568,6 +595,7 @@ class TestState {
 };
 
 static void ConcurrentReader(void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   TestState* state = reinterpret_cast<TestState*>(arg);
   Random rnd(state->seed_);
   int64_t reads = 0;
@@ -580,6 +608,7 @@ static void ConcurrentReader(void* arg) {
 }
 
 static void ConcurrentWriter(void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   TestState* state = reinterpret_cast<TestState*>(arg);
   uint32_t k = state->next_writer_++ % ConcurrentTest::K;
   state->t_.ConcurrentWriteStep(k, state->use_hint_);
@@ -587,6 +616,7 @@ static void ConcurrentWriter(void* arg) {
 }
 
 static void RunConcurrentRead(int run) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int seed = test::RandomSeed() + (run * 100);
   Random rnd(seed);
   const int N = 1000;
@@ -609,6 +639,7 @@ static void RunConcurrentRead(int run) {
 
 static void RunConcurrentInsert(int run, bool use_hint = false,
                                 int write_parallelism = 4) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Env::Default()->SetBackgroundThreads(1 + write_parallelism,
                                        Env::Priority::LOW);
   const int seed = test::RandomSeed() + (run * 100);
@@ -645,12 +676,15 @@ TEST_F(InlineSkipTest, ConcurrentInsert1) { RunConcurrentInsert(1); }
 TEST_F(InlineSkipTest, ConcurrentInsert2) { RunConcurrentInsert(2); }
 TEST_F(InlineSkipTest, ConcurrentInsert3) { RunConcurrentInsert(3); }
 TEST_F(InlineSkipTest, ConcurrentInsertWithHint1) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   RunConcurrentInsert(1, true);
 }
 TEST_F(InlineSkipTest, ConcurrentInsertWithHint2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   RunConcurrentInsert(2, true);
 }
 TEST_F(InlineSkipTest, ConcurrentInsertWithHint3) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   RunConcurrentInsert(3, true);
 }
 
@@ -658,6 +692,7 @@ TEST_F(InlineSkipTest, ConcurrentInsertWithHint3) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

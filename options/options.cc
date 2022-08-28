@@ -36,6 +36,7 @@
 namespace ROCKSDB_NAMESPACE {
 
 AdvancedColumnFamilyOptions::AdvancedColumnFamilyOptions() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(memtable_factory.get() != nullptr);
 }
 
@@ -101,6 +102,7 @@ AdvancedColumnFamilyOptions::AdvancedColumnFamilyOptions(const Options& options)
       blob_garbage_collection_force_threshold(
           options.blob_garbage_collection_force_threshold),
       blob_compaction_readahead_size(options.blob_compaction_readahead_size) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(memtable_factory.get() != nullptr);
   if (max_bytes_for_level_multiplier_additional.size() <
       static_cast<unsigned int>(num_levels)) {
@@ -464,6 +466,7 @@ Options::PrepareForBulkLoad()
 }
 
 Options* Options::OptimizeForSmallDb() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // 16MB block cache
   std::shared_ptr<Cache> cache = NewLRUCache(16 << 20);
 
@@ -473,6 +476,7 @@ Options* Options::OptimizeForSmallDb() {
 }
 
 Options* Options::DisableExtraChecks() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // See https://github.com/facebook/rocksdb/issues/9354
   force_consistency_checks = false;
   // Considered but no clear performance impact seen:
@@ -487,6 +491,7 @@ Options* Options::DisableExtraChecks() {
 
 Options* Options::OldDefaults(int rocksdb_major_version,
                               int rocksdb_minor_version) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ColumnFamilyOptions::OldDefaults(rocksdb_major_version,
                                    rocksdb_minor_version);
   DBOptions::OldDefaults(rocksdb_major_version, rocksdb_minor_version);
@@ -495,6 +500,7 @@ Options* Options::OldDefaults(int rocksdb_major_version,
 
 DBOptions* DBOptions::OldDefaults(int rocksdb_major_version,
                                   int rocksdb_minor_version) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (rocksdb_major_version < 4 ||
       (rocksdb_major_version == 4 && rocksdb_minor_version < 7)) {
     max_file_opening_threads = 1;
@@ -514,6 +520,7 @@ DBOptions* DBOptions::OldDefaults(int rocksdb_major_version,
 
 ColumnFamilyOptions* ColumnFamilyOptions::OldDefaults(
     int rocksdb_major_version, int rocksdb_minor_version) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (rocksdb_major_version < 5 ||
       (rocksdb_major_version == 5 && rocksdb_minor_version <= 18)) {
     compaction_pri = CompactionPri::kByCompensatedSize;
@@ -537,6 +544,7 @@ ColumnFamilyOptions* ColumnFamilyOptions::OldDefaults(
 
 // Optimization functions
 DBOptions* DBOptions::OptimizeForSmallDb(std::shared_ptr<Cache>* cache) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   max_file_opening_threads = 1;
   max_open_files = 5000;
 
@@ -551,6 +559,7 @@ DBOptions* DBOptions::OptimizeForSmallDb(std::shared_ptr<Cache>* cache) {
 
 ColumnFamilyOptions* ColumnFamilyOptions::OptimizeForSmallDb(
     std::shared_ptr<Cache>* cache) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   write_buffer_size = 2 << 20;
   target_file_size_base = 2 * 1048576;
   max_bytes_for_level_base = 10 * 1048576;
@@ -572,6 +581,7 @@ ColumnFamilyOptions* ColumnFamilyOptions::OptimizeForSmallDb(
 #ifndef ROCKSDB_LITE
 ColumnFamilyOptions* ColumnFamilyOptions::OptimizeForPointLookup(
     uint64_t block_cache_size_mb) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   BlockBasedTableOptions block_based_options;
   block_based_options.data_block_index_type =
       BlockBasedTableOptions::kDataBlockBinaryAndHash;
@@ -587,6 +597,7 @@ ColumnFamilyOptions* ColumnFamilyOptions::OptimizeForPointLookup(
 
 ColumnFamilyOptions* ColumnFamilyOptions::OptimizeLevelStyleCompaction(
     uint64_t memtable_memory_budget) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   write_buffer_size = static_cast<size_t>(memtable_memory_budget / 4);
   // merge two memtables when flushing to L0
   min_write_buffer_number_to_merge = 2;
@@ -622,6 +633,7 @@ ColumnFamilyOptions* ColumnFamilyOptions::OptimizeLevelStyleCompaction(
 
 ColumnFamilyOptions* ColumnFamilyOptions::OptimizeUniversalStyleCompaction(
     uint64_t memtable_memory_budget) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   write_buffer_size = static_cast<size_t>(memtable_memory_budget / 4);
   // merge two memtables when flushing to L0
   min_write_buffer_number_to_merge = 2;
@@ -635,6 +647,7 @@ ColumnFamilyOptions* ColumnFamilyOptions::OptimizeUniversalStyleCompaction(
 }
 
 DBOptions* DBOptions::IncreaseParallelism(int total_threads) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   max_background_jobs = total_threads;
   env->SetBackgroundThreads(total_threads, Env::LOW);
   env->SetBackgroundThreads(1, Env::HIGH);

@@ -19,6 +19,7 @@ Status HashIndexReader::Create(const BlockBasedTable* table,
                                bool use_cache, bool prefetch, bool pin,
                                BlockCacheLookupContext* lookup_context,
                                std::unique_ptr<IndexReader>* index_reader) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(table != nullptr);
   assert(index_reader != nullptr);
   assert(!pin || prefetch);
@@ -113,6 +114,7 @@ InternalIteratorBase<IndexValue>* HashIndexReader::NewIterator(
     const ReadOptions& read_options, bool disable_prefix_seek,
     IndexBlockIter* iter, GetContext* get_context,
     BlockCacheLookupContext* lookup_context) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const BlockBasedTable::Rep* rep = table()->get_rep();
   const bool no_io = (read_options.read_tier == kBlockCacheTier);
   CachableEntry<Block> index_block;

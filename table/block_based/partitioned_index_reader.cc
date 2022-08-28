@@ -18,6 +18,7 @@ Status PartitionIndexReader::Create(
     FilePrefetchBuffer* prefetch_buffer, bool use_cache, bool prefetch,
     bool pin, BlockCacheLookupContext* lookup_context,
     std::unique_ptr<IndexReader>* index_reader) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(table != nullptr);
   assert(table->get_rep());
   assert(!pin || prefetch);
@@ -46,6 +47,7 @@ InternalIteratorBase<IndexValue>* PartitionIndexReader::NewIterator(
     const ReadOptions& read_options, bool /* disable_prefix_seek */,
     IndexBlockIter* iter, GetContext* get_context,
     BlockCacheLookupContext* lookup_context) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const bool no_io = (read_options.read_tier == kBlockCacheTier);
   CachableEntry<Block> index_block;
   const Status s =
@@ -110,6 +112,7 @@ InternalIteratorBase<IndexValue>* PartitionIndexReader::NewIterator(
 }
 Status PartitionIndexReader::CacheDependencies(const ReadOptions& ro,
                                                bool pin) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Before read partitions, prefetch them to avoid lots of IOs
   BlockCacheLookupContext lookup_context{TableReaderCaller::kPrefetch};
   const BlockBasedTable::Rep* rep = table()->rep_;

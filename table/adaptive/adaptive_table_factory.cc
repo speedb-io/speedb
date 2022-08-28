@@ -21,6 +21,7 @@ AdaptiveTableFactory::AdaptiveTableFactory(
       block_based_table_factory_(block_based_table_factory),
       plain_table_factory_(plain_table_factory),
       cuckoo_table_factory_(cuckoo_table_factory) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!plain_table_factory_) {
     plain_table_factory_.reset(NewPlainTableFactory());
   }
@@ -117,6 +118,7 @@ extern TableFactory* NewAdaptiveTableFactory(
     std::shared_ptr<TableFactory> block_based_table_factory,
     std::shared_ptr<TableFactory> plain_table_factory,
     std::shared_ptr<TableFactory> cuckoo_table_factory) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return new AdaptiveTableFactory(table_factory_to_write,
       block_based_table_factory, plain_table_factory, cuckoo_table_factory);
 }

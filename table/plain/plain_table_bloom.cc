@@ -16,6 +16,7 @@ namespace ROCKSDB_NAMESPACE {
 namespace {
 
 uint32_t GetTotalBitsForLocality(uint32_t total_bits) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint32_t num_blocks =
       (total_bits + CACHE_LINE_SIZE * 8 - 1) / (CACHE_LINE_SIZE * 8);
 
@@ -34,6 +35,7 @@ PlainTableBloomV1::PlainTableBloomV1(uint32_t num_probes)
 
 void PlainTableBloomV1::SetRawData(char* raw_data, uint32_t total_bits,
                                    uint32_t num_blocks) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   data_ = raw_data;
   kTotalBits = total_bits;
   kNumBlocks = num_blocks;
@@ -43,6 +45,7 @@ void PlainTableBloomV1::SetTotalBits(Allocator* allocator, uint32_t total_bits,
                                      uint32_t locality,
                                      size_t huge_page_tlb_size,
                                      Logger* logger) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   kTotalBits = (locality > 0) ? GetTotalBitsForLocality(total_bits)
                               : (total_bits + 7) / 8 * 8;
   kNumBlocks = (locality > 0) ? (kTotalBits / (CACHE_LINE_SIZE * 8)) : 0;
@@ -67,6 +70,7 @@ void PlainTableBloomV1::SetTotalBits(Allocator* allocator, uint32_t total_bits,
 
 void BloomBlockBuilder::AddKeysHashes(
     const std::vector<uint32_t>& keys_hashes) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (auto hash : keys_hashes) {
     bloom_.AddHash(hash);
   }

@@ -14,6 +14,7 @@ const PersistentCacheOptions PersistentCacheOptions::kEmpty;
 void PersistentCacheHelper::InsertRawPage(
     const PersistentCacheOptions& cache_options, const BlockHandle& handle,
     const char* data, const size_t size) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(cache_options.persistent_cache);
   assert(cache_options.persistent_cache->IsCompressed());
 
@@ -27,6 +28,7 @@ void PersistentCacheHelper::InsertRawPage(
 void PersistentCacheHelper::InsertUncompressedPage(
     const PersistentCacheOptions& cache_options, const BlockHandle& handle,
     const BlockContents& contents) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(cache_options.persistent_cache);
   assert(!cache_options.persistent_cache->IsCompressed());
   // Precondition:
@@ -45,6 +47,7 @@ void PersistentCacheHelper::InsertUncompressedPage(
 Status PersistentCacheHelper::LookupRawPage(
     const PersistentCacheOptions& cache_options, const BlockHandle& handle,
     std::unique_ptr<char[]>* raw_data, const size_t raw_data_size) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifdef NDEBUG
   (void)raw_data_size;
 #endif
@@ -74,6 +77,7 @@ Status PersistentCacheHelper::LookupRawPage(
 Status PersistentCacheHelper::LookupUncompressedPage(
     const PersistentCacheOptions& cache_options, const BlockHandle& handle,
     BlockContents* contents) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(cache_options.persistent_cache);
   assert(!cache_options.persistent_cache->IsCompressed());
   if (!contents) {

@@ -25,6 +25,7 @@ namespace {
 
 void AppendItem(std::string* props, const std::string& key,
                 const std::string& value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   char cspace = ' ';
   std::string value_str("");
   size_t i = 0;
@@ -51,6 +52,7 @@ void AppendItem(std::string* props, const std::string& key,
 
 template <class TKey>
 void AppendItem(std::string* props, const TKey& key, const std::string& value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string key_str = ROCKSDB_NAMESPACE::ToString(key);
   AppendItem(props, key_str, value);
 }
@@ -73,6 +75,7 @@ BlockBasedFilterBlockBuilder::BlockBasedFilterBlockBuilder(
       total_added_in_built_(0) {}
 
 void BlockBasedFilterBlockBuilder::StartBlock(uint64_t block_offset) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t filter_index = (block_offset / kFilterBase);
   assert(filter_index >= filter_offsets_.size());
   while (filter_index > filter_offsets_.size()) {
@@ -81,10 +84,12 @@ void BlockBasedFilterBlockBuilder::StartBlock(uint64_t block_offset) {
 }
 
 size_t BlockBasedFilterBlockBuilder::EstimateEntriesAdded() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return total_added_in_built_ + start_.size();
 }
 
 void BlockBasedFilterBlockBuilder::Add(const Slice& key_without_ts) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (prefix_extractor_ && prefix_extractor_->InDomain(key_without_ts)) {
     AddPrefix(key_without_ts);
   }
@@ -96,12 +101,14 @@ void BlockBasedFilterBlockBuilder::Add(const Slice& key_without_ts) {
 
 // Add key to filter if needed
 inline void BlockBasedFilterBlockBuilder::AddKey(const Slice& key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   start_.push_back(entries_.size());
   entries_.append(key.data(), key.size());
 }
 
 // Add prefix to filter if needed
 inline void BlockBasedFilterBlockBuilder::AddPrefix(const Slice& key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // get slice for most recently added entry
   Slice prev;
   if (prev_prefix_size_ > 0) {
@@ -120,6 +127,7 @@ inline void BlockBasedFilterBlockBuilder::AddPrefix(const Slice& key) {
 Slice BlockBasedFilterBlockBuilder::Finish(
     const BlockHandle& /*tmp*/, Status* status,
     std::unique_ptr<const char[]>* /* filter_data */) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // In this impl we ignore BlockHandle and filter_data
   *status = Status::OK();
 
@@ -139,6 +147,7 @@ Slice BlockBasedFilterBlockBuilder::Finish(
 }
 
 void BlockBasedFilterBlockBuilder::GenerateFilter() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const size_t num_entries = start_.size();
   if (num_entries == 0) {
     // Fast path if there are no keys for this filter
@@ -172,6 +181,7 @@ void BlockBasedFilterBlockBuilder::GenerateFilter() {
 BlockBasedFilterBlockReader::BlockBasedFilterBlockReader(
     const BlockBasedTable* t, CachableEntry<BlockContents>&& filter_block)
     : FilterBlockReaderCommon(t, std::move(filter_block)) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(table());
   assert(table()->get_rep());
   assert(table()->get_rep()->filter_policy);
@@ -181,6 +191,7 @@ std::unique_ptr<FilterBlockReader> BlockBasedFilterBlockReader::Create(
     const BlockBasedTable* table, const ReadOptions& ro,
     FilePrefetchBuffer* prefetch_buffer, bool use_cache, bool prefetch,
     bool pin, BlockCacheLookupContext* lookup_context) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(table);
   assert(table->get_rep());
   assert(!pin || prefetch);
@@ -209,6 +220,7 @@ bool BlockBasedFilterBlockReader::KeyMayMatch(
     uint64_t block_offset, const bool no_io,
     const Slice* const /*const_ikey_ptr*/, GetContext* get_context,
     BlockCacheLookupContext* lookup_context) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(block_offset != kNotValid);
   if (!whole_key_filtering()) {
     return true;
@@ -221,6 +233,7 @@ bool BlockBasedFilterBlockReader::PrefixMayMatch(
     uint64_t block_offset, const bool no_io,
     const Slice* const /*const_ikey_ptr*/, GetContext* get_context,
     BlockCacheLookupContext* lookup_context) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(block_offset != kNotValid);
   return MayMatch(prefix, block_offset, no_io, get_context, lookup_context);
 }
@@ -228,6 +241,7 @@ bool BlockBasedFilterBlockReader::PrefixMayMatch(
 bool BlockBasedFilterBlockReader::ParseFieldsFromBlock(
     const BlockContents& contents, const char** data, const char** offset,
     size_t* num, size_t* base_lg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(data);
   assert(offset);
   assert(num);

@@ -26,6 +26,7 @@ namespace {
       const std::string& value,
       const std::string& prop_delim,
       const std::string& kv_delim) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     props.append(key);
     props.append(kv_delim);
     props.append(value);
@@ -39,6 +40,7 @@ namespace {
       const TValue& value,
       const std::string& prop_delim,
       const std::string& kv_delim) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     AppendProperty(
         props, key, ToString(value), prop_delim, kv_delim
     );
@@ -170,6 +172,7 @@ std::string TableProperties::ToString(
 }
 
 void TableProperties::Add(const TableProperties& tp) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   data_size += tp.data_size;
   index_size += tp.index_size;
   index_partitions += tp.index_partitions;
@@ -330,6 +333,7 @@ const std::string TablePropertiesNames::kFastCompressionEstimatedDataSize =
 //    ...
 // }
 void TEST_SetRandomTableProperties(TableProperties* props) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Random* r = Random::GetTLSInstance();
   uint64_t* pu = &props->orig_file_number;
   assert(static_cast<void*>(pu) == static_cast<void*>(props));

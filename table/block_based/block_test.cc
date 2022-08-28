@@ -34,6 +34,7 @@ namespace ROCKSDB_NAMESPACE {
 
 std::string GenerateInternalKey(int primary_key, int secondary_key,
                                 int padding_size, Random *rnd) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   char buf[50];
   char *p = &buf[0];
   snprintf(buf, sizeof(buf), "%6d%4d", primary_key, secondary_key);
@@ -54,6 +55,7 @@ void GenerateRandomKVs(std::vector<std::string> *keys,
                        const int len, const int step = 1,
                        const int padding_size = 0,
                        const int keys_share_prefix = 1) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Random rnd(302);
 
   // generate different prefix
@@ -73,6 +75,7 @@ class BlockTest : public testing::Test {};
 
 // block test
 TEST_F(BlockTest, SimpleTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Random rnd(301);
   Options options = Options();
 
@@ -132,6 +135,7 @@ BlockContents GetBlockContents(std::unique_ptr<BlockBuilder> *builder,
                                const std::vector<std::string> &keys,
                                const std::vector<std::string> &values,
                                const int /*prefix_group_size*/ = 1) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   builder->reset(new BlockBuilder(1 /* restart interval */));
 
   // Add only half of the keys
@@ -149,6 +153,7 @@ BlockContents GetBlockContents(std::unique_ptr<BlockBuilder> *builder,
 void CheckBlockContents(BlockContents contents, const int max_key,
                         const std::vector<std::string> &keys,
                         const std::vector<std::string> &values) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const size_t prefix_size = 6;
   // create block reader
   BlockContents contents_ref(contents.data);
@@ -185,6 +190,7 @@ void CheckBlockContents(BlockContents contents, const int max_key,
 
 // In this test case, no two key share same prefix.
 TEST_F(BlockTest, SimpleIndexHash) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kMaxKey = 100000;
   std::vector<std::string> keys;
   std::vector<std::string> values;
@@ -199,6 +205,7 @@ TEST_F(BlockTest, SimpleIndexHash) {
 }
 
 TEST_F(BlockTest, IndexHashWithSharedPrefix) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kMaxKey = 100000;
   // for each prefix, there will be 5 keys starts with it.
   const int kPrefixGroup = 5;
@@ -222,6 +229,7 @@ TEST_F(BlockTest, IndexHashWithSharedPrefix) {
 class BlockReadAmpBitmapSlowAndAccurate {
  public:
   void Mark(size_t start_offset, size_t end_offset) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(end_offset >= start_offset);
     marked_ranges_.emplace(end_offset, start_offset);
   }
@@ -233,6 +241,7 @@ class BlockReadAmpBitmapSlowAndAccurate {
   // multiple times, `offset` needs to be incremental to get correct results.
   // Call ResetCheckSequence() to reset it.
   bool IsPinMarked(size_t offset) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (iter_valid_) {
       // Has existing iterator, try linear search from
       // the iterator.
@@ -270,9 +279,11 @@ class BlockReadAmpBitmapSlowAndAccurate {
 };
 
 TEST_F(BlockTest, BlockReadAmpBitmap) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint32_t pin_offset = 0;
   SyncPoint::GetInstance()->SetCallBack(
       "BlockReadAmpBitmap:rnd", [&pin_offset](void *arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         pin_offset = *(static_cast<uint32_t *>(arg));
       });
   SyncPoint::GetInstance()->EnableProcessing();
@@ -353,6 +364,7 @@ TEST_F(BlockTest, BlockReadAmpBitmap) {
 }
 
 TEST_F(BlockTest, BlockWithReadAmpBitmap) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Random rnd(301);
   Options options = Options();
 
@@ -476,6 +488,7 @@ TEST_F(BlockTest, BlockWithReadAmpBitmap) {
 }
 
 TEST_F(BlockTest, ReadAmpBitmapPow2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<Statistics> stats = ROCKSDB_NAMESPACE::CreateDBStatistics();
   ASSERT_EQ(BlockReadAmpBitmap(100, 1, stats.get()).GetBytesPerBit(), 1u);
   ASSERT_EQ(BlockReadAmpBitmap(100, 2, stats.get()).GetBytesPerBit(), 2u);
@@ -507,6 +520,7 @@ void GenerateRandomIndexEntries(std::vector<std::string> *separators,
                                 std::vector<BlockHandle> *block_handles,
                                 std::vector<std::string> *first_keys,
                                 const int len) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Random rnd(42);
 
   // For each of `len` blocks, we need to generate a first and last key.
@@ -529,6 +543,7 @@ void GenerateRandomIndexEntries(std::vector<std::string> *separators,
 }
 
 TEST_P(IndexBlockTest, IndexValueEncodingTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Random rnd(301);
   Options options = Options();
 
@@ -621,6 +636,7 @@ INSTANTIATE_TEST_CASE_P(P, IndexBlockTest,
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char **argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

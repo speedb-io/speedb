@@ -16,12 +16,14 @@ namespace ROCKSDB_NAMESPACE {
 
 namespace {
 inline uint32_t GetBucketIdFromHash(uint32_t hash, uint32_t num_buckets) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(num_buckets > 0);
   return hash % num_buckets;
 }
 }
 
 Status PlainTableIndex::InitFromRawData(Slice data) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!GetVarint32(&data, &index_size_)) {
     return Status::Corruption("Couldn't read the index size!");
   }
@@ -56,6 +58,7 @@ PlainTableIndex::IndexSearchResult PlainTableIndex::GetOffset(
 
 void PlainTableIndexBuilder::IndexRecordList::AddRecord(uint32_t hash,
                                                         uint32_t offset) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (num_records_in_current_group_ == kNumRecordsPerGroup) {
     current_group_ = AllocateNewGroup();
     num_records_in_current_group_ = 0;
@@ -68,6 +71,7 @@ void PlainTableIndexBuilder::IndexRecordList::AddRecord(uint32_t hash,
 
 void PlainTableIndexBuilder::AddKeyPrefix(Slice key_prefix_slice,
                                           uint32_t key_offset) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (is_first_record_ || prev_key_prefix_ != key_prefix_slice.ToString()) {
     ++num_prefixes_;
     if (!is_first_record_) {
@@ -93,6 +97,7 @@ void PlainTableIndexBuilder::AddKeyPrefix(Slice key_prefix_slice,
 }
 
 Slice PlainTableIndexBuilder::Finish() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   AllocateIndex();
   std::vector<IndexRecord*> hash_to_offsets(index_size_, nullptr);
   std::vector<uint32_t> entries_per_bucket(index_size_, 0);
@@ -107,6 +112,7 @@ Slice PlainTableIndexBuilder::Finish() {
 }
 
 void PlainTableIndexBuilder::AllocateIndex() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (prefix_extractor_ == nullptr || hash_table_ratio_ <= 0) {
     // Fall back to pure binary search if the user fails to specify a prefix
     // extractor.
@@ -122,6 +128,7 @@ void PlainTableIndexBuilder::AllocateIndex() {
 void PlainTableIndexBuilder::BucketizeIndexes(
     std::vector<IndexRecord*>* hash_to_offsets,
     std::vector<uint32_t>* entries_per_bucket) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   bool first = true;
   uint32_t prev_hash = 0;
   size_t num_records = record_list_.GetNumRecords();
@@ -154,6 +161,7 @@ void PlainTableIndexBuilder::BucketizeIndexes(
 Slice PlainTableIndexBuilder::FillIndexes(
     const std::vector<IndexRecord*>& hash_to_offsets,
     const std::vector<uint32_t>& entries_per_bucket) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKS_LOG_DEBUG(ioptions_.logger,
                   "Reserving %" PRIu32 " bytes for plain table's sub_index",
                   sub_index_size_);

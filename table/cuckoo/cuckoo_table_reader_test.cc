@@ -8,6 +8,7 @@
 #ifndef GFLAGS
 #include <cstdio>
 int main() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   fprintf(stderr, "Please install gflags to run this test... Skipping...\n");
   return 0;
 }
@@ -49,6 +50,7 @@ std::unordered_map<std::string, std::vector<uint64_t>> hash_map;
 
 void AddHashLookups(const std::string& s, uint64_t bucket_id,
         uint32_t num_hash_fun) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::vector<uint64_t> v;
   for (uint32_t i = 0; i < num_hash_fun; i++) {
     v.push_back(bucket_id + i);
@@ -58,6 +60,7 @@ void AddHashLookups(const std::string& s, uint64_t bucket_id,
 
 uint64_t GetSliceHash(const Slice& s, uint32_t index,
                       uint64_t /*max_num_buckets*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return hash_map[s.ToString()][index];
 }
 }  // namespace
@@ -67,12 +70,14 @@ class CuckooReaderTest : public testing::Test {
   using testing::Test::SetUp;
 
   CuckooReaderTest() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     options.allow_mmap_reads = true;
     env = options.env;
     file_options = FileOptions(options);
   }
 
   void SetUp(int num) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     num_items = num;
     hash_map.clear();
     keys.clear();
@@ -84,11 +89,13 @@ class CuckooReaderTest : public testing::Test {
   }
 
   std::string NumToStr(int64_t i) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return std::string(reinterpret_cast<char*>(&i), sizeof(i));
   }
 
   void CreateCuckooFileAndCheckReader(
       const Comparator* ucomp = BytewiseComparator()) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::unique_ptr<WritableFileWriter> file_writer;
     ASSERT_OK(WritableFileWriter::Create(env->GetFileSystem(), fname,
                                          file_options, &file_writer, nullptr));
@@ -126,6 +133,7 @@ class CuckooReaderTest : public testing::Test {
     }
   }
   void UpdateKeys(bool with_zero_seqno) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     for (uint32_t i = 0; i < num_items; i++) {
       ParsedInternalKey ikey(user_keys[i],
           with_zero_seqno ? 0 : i + 1000, kTypeValue);
@@ -135,6 +143,7 @@ class CuckooReaderTest : public testing::Test {
   }
 
   void CheckIterator(const Comparator* ucomp = BytewiseComparator()) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::unique_ptr<RandomAccessFileReader> file_reader;
     ASSERT_OK(RandomAccessFileReader::Create(
         env->GetFileSystem(), fname, file_options, &file_reader, nullptr));
@@ -209,6 +218,7 @@ class CuckooReaderTest : public testing::Test {
 };
 
 TEST_F(CuckooReaderTest, FileNotMmaped) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   options.allow_mmap_reads = false;
   ImmutableOptions ioptions(options);
   CuckooTableReader reader(ioptions, nullptr, 0, nullptr, nullptr);
@@ -217,6 +227,7 @@ TEST_F(CuckooReaderTest, FileNotMmaped) {
 }
 
 TEST_F(CuckooReaderTest, WhenKeyExists) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   SetUp(kNumHashFunc);
   fname = test::PerThreadDBPath("CuckooReader_WhenKeyExists");
   for (uint64_t i = 0; i < num_items; i++) {
@@ -244,6 +255,7 @@ TEST_F(CuckooReaderTest, WhenKeyExists) {
 }
 
 TEST_F(CuckooReaderTest, WhenKeyExistsWithUint64Comparator) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   SetUp(kNumHashFunc);
   fname = test::PerThreadDBPath("CuckooReaderUint64_WhenKeyExists");
   for (uint64_t i = 0; i < num_items; i++) {
@@ -272,6 +284,7 @@ TEST_F(CuckooReaderTest, WhenKeyExistsWithUint64Comparator) {
 }
 
 TEST_F(CuckooReaderTest, CheckIterator) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   SetUp(2*kNumHashFunc);
   fname = test::PerThreadDBPath("CuckooReader_CheckIterator");
   for (uint64_t i = 0; i < num_items; i++) {
@@ -291,6 +304,7 @@ TEST_F(CuckooReaderTest, CheckIterator) {
 }
 
 TEST_F(CuckooReaderTest, CheckIteratorUint64) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   SetUp(2*kNumHashFunc);
   fname = test::PerThreadDBPath("CuckooReader_CheckIterator");
   for (uint64_t i = 0; i < num_items; i++) {
@@ -311,6 +325,7 @@ TEST_F(CuckooReaderTest, CheckIteratorUint64) {
 }
 
 TEST_F(CuckooReaderTest, WhenKeyNotFound) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Add keys with colliding hash values.
   SetUp(kNumHashFunc);
   fname = test::PerThreadDBPath("CuckooReader_WhenKeyNotFound");
@@ -382,6 +397,7 @@ TEST_F(CuckooReaderTest, WhenKeyNotFound) {
 // Performance tests
 namespace {
 void GetKeys(uint64_t num, std::vector<std::string>* keys) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   keys->clear();
   IterKey k;
   k.SetInternalKey("", 0, kTypeValue);
@@ -396,6 +412,7 @@ void GetKeys(uint64_t num, std::vector<std::string>* keys) {
 }
 
 std::string GetFileName(uint64_t num) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (FLAGS_file_dir.empty()) {
     FLAGS_file_dir = test::TmpDir();
   }
@@ -407,6 +424,7 @@ std::string GetFileName(uint64_t num) {
 // last level file only.
 void WriteFile(const std::vector<std::string>& keys,
     const uint64_t num, double hash_ratio) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.allow_mmap_reads = true;
   const auto& fs = options.env->GetFileSystem();
@@ -457,6 +475,7 @@ void WriteFile(const std::vector<std::string>& keys,
 }
 
 void ReadKeys(uint64_t num, uint32_t batch_size) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.allow_mmap_reads = true;
   Env* env = options.env;
@@ -522,6 +541,7 @@ void ReadKeys(uint64_t num, uint32_t batch_size) {
 }  // namespace.
 
 TEST_F(CuckooReaderTest, TestReadPerformance) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!FLAGS_enable_perf) {
     return;
   }
@@ -553,6 +573,7 @@ TEST_F(CuckooReaderTest, TestReadPerformance) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (ROCKSDB_NAMESPACE::port::kLittleEndian) {
     ::testing::InitGoogleTest(&argc, argv);
     ParseCommandLineFlags(&argc, &argv, true);
@@ -569,6 +590,7 @@ int main(int argc, char** argv) {
 #include <stdio.h>
 
 int main(int /*argc*/, char** /*argv*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   fprintf(stderr, "SKIPPED as Cuckoo table is not supported in ROCKSDB_LITE\n");
   return 0;
 }

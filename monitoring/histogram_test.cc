@@ -26,6 +26,7 @@ namespace {
 
 void PopulateHistogram(Histogram& histogram,
              uint64_t low, uint64_t high, uint64_t loop = 1) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Random rnd(test::RandomSeed());
   for (; loop > 0; loop--) {
     for (uint64_t i = low; i <= high; i++) {
@@ -39,6 +40,7 @@ void PopulateHistogram(Histogram& histogram,
 }
 
 void BasicOperation(Histogram& histogram) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   PopulateHistogram(histogram, 1, 110, 10); // fill up to bucket [70, 110)
 
   HistogramData data;
@@ -52,6 +54,7 @@ void BasicOperation(Histogram& histogram) {
 }
 
 void MergeHistogram(Histogram& histogram, Histogram& other) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   PopulateHistogram(histogram, 1, 100);
   PopulateHistogram(other, 101, 250);
   histogram.Merge(other);
@@ -67,6 +70,7 @@ void MergeHistogram(Histogram& histogram, Histogram& other) {
 }
 
 void EmptyHistogram(Histogram& histogram) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_EQ(histogram.min(), bucketMapper.LastValue());
   ASSERT_EQ(histogram.max(), 0);
   ASSERT_EQ(histogram.num(), 0);
@@ -77,6 +81,7 @@ void EmptyHistogram(Histogram& histogram) {
 }
 
 void ClearHistogram(Histogram& histogram) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (uint64_t i = 1; i <= 100; i++) {
     histogram.Add(i);
   }
@@ -88,6 +93,7 @@ void ClearHistogram(Histogram& histogram) {
 }
 
 TEST_F(HistogramTest, BasicOperation) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   HistogramImpl histogram;
   BasicOperation(histogram);
 
@@ -96,6 +102,7 @@ TEST_F(HistogramTest, BasicOperation) {
 }
 
 TEST_F(HistogramTest, BoundaryValue) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   HistogramImpl histogram;
   // - both should be in [0, 1] bucket because we place values on bucket
   //   boundaries in the lower bucket.
@@ -109,6 +116,7 @@ TEST_F(HistogramTest, BoundaryValue) {
 }
 
 TEST_F(HistogramTest, MergeHistogram) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   HistogramImpl histogram;
   HistogramImpl other;
   MergeHistogram(histogram, other);
@@ -119,6 +127,7 @@ TEST_F(HistogramTest, MergeHistogram) {
 }
 
 TEST_F(HistogramTest, EmptyHistogram) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   HistogramImpl histogram;
   EmptyHistogram(histogram);
 
@@ -127,6 +136,7 @@ TEST_F(HistogramTest, EmptyHistogram) {
 }
 
 TEST_F(HistogramTest, ClearHistogram) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   HistogramImpl histogram;
   ClearHistogram(histogram);
 
@@ -135,6 +145,7 @@ TEST_F(HistogramTest, ClearHistogram) {
 }
 
 TEST_F(HistogramTest, HistogramWindowingExpire) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t num_windows = 3;
   int micros_per_window = 1000000;
   uint64_t min_num_per_window = 0;
@@ -181,6 +192,7 @@ TEST_F(HistogramTest, HistogramWindowingExpire) {
 }
 
 TEST_F(HistogramTest, HistogramWindowingMerge) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t num_windows = 3;
   int micros_per_window = 1000000;
   uint64_t min_num_per_window = 0;
@@ -228,6 +240,7 @@ TEST_F(HistogramTest, HistogramWindowingMerge) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

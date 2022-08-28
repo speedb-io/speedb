@@ -14,6 +14,7 @@ namespace ROCKSDB_NAMESPACE {
 namespace {
 #ifndef NPERF_CONTEXT
 Statistics* stats_for_report(SystemClock* clock, Statistics* stats) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (clock != nullptr && stats != nullptr &&
       stats->get_stats_level() > kExceptTimeForMutex) {
     return stats;
@@ -25,6 +26,7 @@ Statistics* stats_for_report(SystemClock* clock, Statistics* stats) {
 }  // namespace
 
 void InstrumentedMutex::Lock() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   PERF_CONDITIONAL_TIMER_FOR_MUTEX_GUARD(
       db_mutex_lock_nanos, stats_code_ == DB_MUTEX_WAIT_MICROS,
       stats_for_report(clock_, stats_), stats_code_);
@@ -32,6 +34,7 @@ void InstrumentedMutex::Lock() {
 }
 
 void InstrumentedMutex::LockInternal() {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifndef NDEBUG
   ThreadStatusUtil::TEST_StateDelay(ThreadStatus::STATE_MUTEX_WAIT);
 #endif
@@ -39,6 +42,7 @@ void InstrumentedMutex::LockInternal() {
 }
 
 void InstrumentedCondVar::Wait() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   PERF_CONDITIONAL_TIMER_FOR_MUTEX_GUARD(
       db_condition_wait_nanos, stats_code_ == DB_MUTEX_WAIT_MICROS,
       stats_for_report(clock_, stats_), stats_code_);
@@ -46,6 +50,7 @@ void InstrumentedCondVar::Wait() {
 }
 
 void InstrumentedCondVar::WaitInternal() {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifndef NDEBUG
   ThreadStatusUtil::TEST_StateDelay(ThreadStatus::STATE_MUTEX_WAIT);
 #endif
@@ -53,6 +58,7 @@ void InstrumentedCondVar::WaitInternal() {
 }
 
 bool InstrumentedCondVar::TimedWait(uint64_t abs_time_us) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   PERF_CONDITIONAL_TIMER_FOR_MUTEX_GUARD(
       db_condition_wait_nanos, stats_code_ == DB_MUTEX_WAIT_MICROS,
       stats_for_report(clock_, stats_), stats_code_);
@@ -60,6 +66,7 @@ bool InstrumentedCondVar::TimedWait(uint64_t abs_time_us) {
 }
 
 bool InstrumentedCondVar::TimedWaitInternal(uint64_t abs_time_us) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifndef NDEBUG
   ThreadStatusUtil::TEST_StateDelay(ThreadStatus::STATE_MUTEX_WAIT);
 #endif

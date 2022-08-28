@@ -17,6 +17,7 @@
 
 namespace ROCKSDB_NAMESPACE {
 void ForceReleaseCachedEntry(void* arg, void* h) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Cache* cache = reinterpret_cast<Cache*>(arg);
   Cache::Handle* handle = reinterpret_cast<Cache::Handle*>(h);
   cache->Release(handle, true /* erase_if_last_ref */);
@@ -26,6 +27,7 @@ void ForceReleaseCachedEntry(void* arg, void* h) {
 Status VerifyBlockChecksum(ChecksumType type, const char* data,
                            size_t block_size, const std::string& file_name,
                            uint64_t offset) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   PERF_TIMER_GUARD(block_checksum_time);
   // After block_size bytes is compression type (1 byte), which is part of
   // the checksummed section.

@@ -89,6 +89,7 @@ CuckooTableBuilder::CuckooTableBuilder(
 }
 
 void CuckooTableBuilder::Add(const Slice& key, const Slice& value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (num_entries_ >= kMaxVectorIdx - 1) {
     status_ = Status::NotSupported("Number of keys in a file must be < 2^32-1");
     return;
@@ -194,6 +195,7 @@ Slice CuckooTableBuilder::GetValue(uint64_t idx) const {
 }
 
 Status CuckooTableBuilder::MakeHashTable(std::vector<CuckooBucket>* buckets) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   buckets->resize(static_cast<size_t>(hash_table_size_ + cuckoo_block_size_ - 1));
   uint32_t make_space_for_key_call_id = 0;
   for (uint32_t vector_idx = 0; vector_idx < num_entries_; vector_idx++) {
@@ -251,6 +253,7 @@ Status CuckooTableBuilder::MakeHashTable(std::vector<CuckooBucket>* buckets) {
 }
 
 Status CuckooTableBuilder::Finish() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(!closed_);
   closed_ = true;
   std::vector<CuckooBucket> buckets;
@@ -402,6 +405,7 @@ Status CuckooTableBuilder::Finish() {
 }
 
 void CuckooTableBuilder::Abandon() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(!closed_);
   closed_ = true;
 }

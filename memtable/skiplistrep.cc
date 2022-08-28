@@ -346,6 +346,7 @@ static std::unordered_map<std::string, OptionTypeInfo> skiplist_factory_info = {
 };
 
 SkipListFactory::SkipListFactory(size_t lookahead) : lookahead_(lookahead) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   RegisterOptions("SkipListFactoryOptions", &lookahead_,
                   &skiplist_factory_info);
 }
@@ -361,6 +362,7 @@ std::string SkipListFactory::GetId() const {
 MemTableRep* SkipListFactory::CreateMemTableRep(
     const MemTableRep::KeyComparator& compare, Allocator* allocator,
     const SliceTransform* transform, Logger* /*logger*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return new SkipListRep(compare, allocator, transform, lookahead_);
 }
 

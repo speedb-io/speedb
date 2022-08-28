@@ -290,12 +290,14 @@ const std::vector<std::pair<Histograms, std::string>> HistogramsNameMap = {
 };
 
 std::shared_ptr<Statistics> CreateDBStatistics() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return std::make_shared<StatisticsImpl>(nullptr);
 }
 
 #ifndef ROCKSDB_LITE
 static int RegisterBuiltinStatistics(ObjectLibrary& library,
                                      const std::string& /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   library.AddFactory<Statistics>(
       StatisticsImpl::kClassName(),
       [](const std::string& /*uri*/, std::unique_ptr<Statistics>* guard,
@@ -310,6 +312,7 @@ static int RegisterBuiltinStatistics(ObjectLibrary& library,
 Status Statistics::CreateFromString(const ConfigOptions& config_options,
                                     const std::string& id,
                                     std::shared_ptr<Statistics>* result) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifndef ROCKSDB_LITE
   static std::once_flag once;
   std::call_once(once, [&]() {
@@ -337,6 +340,7 @@ static std::unordered_map<std::string, OptionTypeInfo> stats_type_info = {
 
 StatisticsImpl::StatisticsImpl(std::shared_ptr<Statistics> stats)
     : stats_(std::move(stats)) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   RegisterOptions("StatisticsOptions", &stats_, &stats_type_info);
 }
 
@@ -379,6 +383,7 @@ std::string StatisticsImpl::getHistogramString(uint32_t histogramType) const {
 }
 
 void StatisticsImpl::setTickerCount(uint32_t tickerType, uint64_t count) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   {
     MutexLock lock(&aggregate_lock_);
     setTickerCountLocked(tickerType, count);
@@ -389,6 +394,7 @@ void StatisticsImpl::setTickerCount(uint32_t tickerType, uint64_t count) {
 }
 
 void StatisticsImpl::setTickerCountLocked(uint32_t tickerType, uint64_t count) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(tickerType < TICKER_ENUM_MAX);
   for (size_t core_idx = 0; core_idx < per_core_stats_.Size(); ++core_idx) {
     if (core_idx == 0) {
@@ -400,6 +406,7 @@ void StatisticsImpl::setTickerCountLocked(uint32_t tickerType, uint64_t count) {
 }
 
 uint64_t StatisticsImpl::getAndResetTickerCount(uint32_t tickerType) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t sum = 0;
   {
     MutexLock lock(&aggregate_lock_);
@@ -417,6 +424,7 @@ uint64_t StatisticsImpl::getAndResetTickerCount(uint32_t tickerType) {
 }
 
 void StatisticsImpl::recordTick(uint32_t tickerType, uint64_t count) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (get_stats_level() <= StatsLevel::kExceptTickers) {
     return;
   }
@@ -432,6 +440,7 @@ void StatisticsImpl::recordTick(uint32_t tickerType, uint64_t count) {
 }
 
 void StatisticsImpl::recordInHistogram(uint32_t histogramType, uint64_t value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(histogramType < HISTOGRAM_ENUM_MAX);
   if (get_stats_level() <= StatsLevel::kExceptHistogramOrTimers) {
     return;
@@ -443,6 +452,7 @@ void StatisticsImpl::recordInHistogram(uint32_t histogramType, uint64_t value) {
 }
 
 Status StatisticsImpl::Reset() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   MutexLock lock(&aggregate_lock_);
   for (uint32_t i = 0; i < TICKER_ENUM_MAX; ++i) {
     setTickerCountLocked(i, 0);

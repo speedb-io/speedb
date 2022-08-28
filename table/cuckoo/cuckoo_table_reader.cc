@@ -54,6 +54,7 @@ CuckooTableReader::CuckooTableReader(
       table_size_(0),
       ucomp_(comparator),
       get_slice_hash_(get_slice_hash) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!ioptions.allow_mmap_reads) {
     status_ = Status::InvalidArgument("File is not mmaped");
     return;
@@ -151,6 +152,7 @@ Status CuckooTableReader::Get(const ReadOptions& /*readOptions*/,
                               const Slice& key, GetContext* get_context,
                               const SliceTransform* /* prefix_extractor */,
                               bool /*skip_filters*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(key.size() == key_length_ + (is_last_level_ ? 8 : 0));
   Slice user_key = ExtractUserKey(key);
   for (uint32_t hash_cnt = 0; hash_cnt < num_hash_func_; ++hash_cnt) {
@@ -193,6 +195,7 @@ Status CuckooTableReader::Get(const ReadOptions& /*readOptions*/,
 }
 
 void CuckooTableReader::Prepare(const Slice& key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Prefetch the first Cuckoo Block.
   Slice user_key = ExtractUserKey(key);
   uint64_t addr = reinterpret_cast<uint64_t>(file_data_.data()) +
@@ -269,12 +272,14 @@ CuckooTableIterator::CuckooTableIterator(CuckooTableReader* reader)
     reader_(reader),
     initialized_(false),
     curr_key_idx_(kInvalidIndex) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   sorted_bucket_ids_.clear();
   curr_value_.clear();
   curr_key_.Clear();
 }
 
 void CuckooTableIterator::InitIfNeeded() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (initialized_) {
     return;
   }
@@ -297,18 +302,21 @@ void CuckooTableIterator::InitIfNeeded() {
 }
 
 void CuckooTableIterator::SeekToFirst() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   InitIfNeeded();
   curr_key_idx_ = 0;
   PrepareKVAtCurrIdx();
 }
 
 void CuckooTableIterator::SeekToLast() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   InitIfNeeded();
   curr_key_idx_ = static_cast<uint32_t>(sorted_bucket_ids_.size()) - 1;
   PrepareKVAtCurrIdx();
 }
 
 void CuckooTableIterator::Seek(const Slice& target) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   InitIfNeeded();
   const BucketComparator seek_comparator(
       reader_->file_data_, reader_->ucomp_,
@@ -324,6 +332,7 @@ void CuckooTableIterator::Seek(const Slice& target) {
 }
 
 void CuckooTableIterator::SeekForPrev(const Slice& /*target*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Not supported
   assert(false);
 }
@@ -333,6 +342,7 @@ bool CuckooTableIterator::Valid() const {
 }
 
 void CuckooTableIterator::PrepareKVAtCurrIdx() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!Valid()) {
     curr_value_.clear();
     curr_key_.Clear();
@@ -352,6 +362,7 @@ void CuckooTableIterator::PrepareKVAtCurrIdx() {
 }
 
 void CuckooTableIterator::Next() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!Valid()) {
     curr_value_.clear();
     curr_key_.Clear();
@@ -362,6 +373,7 @@ void CuckooTableIterator::Next() {
 }
 
 void CuckooTableIterator::Prev() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (curr_key_idx_ == 0) {
     curr_key_idx_ = static_cast<uint32_t>(sorted_bucket_ids_.size());
   }
@@ -390,6 +402,7 @@ InternalIterator* CuckooTableReader::NewIterator(
     bool /*skip_filters*/, TableReaderCaller /*caller*/,
     size_t /*compaction_readahead_size*/,
     bool /* allow_unprepared_value */) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!status().ok()) {
     return NewErrorInternalIterator<Slice>(
         Status::Corruption("CuckooTableReader status is not okay."), arena);

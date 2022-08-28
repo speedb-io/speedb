@@ -29,6 +29,7 @@ IndexBuilder* IndexBuilder::CreateIndexBuilder(
     const InternalKeySliceTransform* int_key_slice_transform,
     const bool use_value_delta_encoding,
     const BlockBasedTableOptions& table_opt) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   IndexBuilder* result = nullptr;
   switch (index_type) {
     case BlockBasedTableOptions::kBinarySearch: {
@@ -72,6 +73,7 @@ PartitionedIndexBuilder* PartitionedIndexBuilder::CreateIndexBuilder(
     const InternalKeyComparator* comparator,
     const bool use_value_delta_encoding,
     const BlockBasedTableOptions& table_opt) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return new PartitionedIndexBuilder(comparator, table_opt,
                                      use_value_delta_encoding);
 }
@@ -99,10 +101,12 @@ PartitionedIndexBuilder::PartitionedIndexBuilder(
       use_value_delta_encoding_(use_value_delta_encoding) {}
 
 PartitionedIndexBuilder::~PartitionedIndexBuilder() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   delete sub_index_builder_;
 }
 
 void PartitionedIndexBuilder::MakeNewSubIndexBuilder() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(sub_index_builder_ == nullptr);
   sub_index_builder_ = new ShortenedIndexBuilder(
       comparator_, table_opt_.index_block_restart_interval,
@@ -128,12 +132,14 @@ void PartitionedIndexBuilder::MakeNewSubIndexBuilder() {
 }
 
 void PartitionedIndexBuilder::RequestPartitionCut() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   partition_cut_requested_ = true;
 }
 
 void PartitionedIndexBuilder::AddIndexEntry(
     std::string* last_key_in_current_block,
     const Slice* first_key_in_next_block, const BlockHandle& block_handle) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Note: to avoid two consecuitive flush in the same method call, we do not
   // check flush policy when adding the last key
   if (UNLIKELY(first_key_in_next_block == nullptr)) {  // no more keys
@@ -195,6 +201,7 @@ void PartitionedIndexBuilder::AddIndexEntry(
 
 Status PartitionedIndexBuilder::Finish(
     IndexBlocks* index_blocks, const BlockHandle& last_partition_block_handle) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (partition_cnt_ == 0) {
     partition_cnt_ = entries_.size();
   }

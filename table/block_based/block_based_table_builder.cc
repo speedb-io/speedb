@@ -72,6 +72,7 @@ FilterBlockBuilder* CreateFilterBlockBuilder(
     const FilterBuildingContext& context,
     const bool use_delta_encoding_for_index_values,
     PartitionedIndexBuilder* const p_index_builder) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const BlockBasedTableOptions& table_opt = context.table_options;
   assert(table_opt.filter_policy);  // precondition
 
@@ -117,6 +118,7 @@ FilterBlockBuilder* CreateFilterBlockBuilder(
 }
 
 bool GoodCompressionRatio(size_t compressed_size, size_t raw_size) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Check to see if compressed less than 12.5%
   return compressed_size < raw_size - (raw_size / 8u);
 }
@@ -129,6 +131,7 @@ Slice CompressBlock(const Slice& raw, const CompressionInfo& info,
                     bool do_sample, std::string* compressed_output,
                     std::string* sampled_output_fast,
                     std::string* sampled_output_slow) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(type);
   assert(compressed_output);
   assert(compressed_output->empty());
@@ -352,6 +355,7 @@ struct BlockBasedTableBuilder::Rep {
   }
 
   Status GetStatus() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // We need to make modifications of status visible when status_ok is set
     // to false, and this is ensured by status_mutex, so no special memory
     // order for status_ok is required.
@@ -363,11 +367,13 @@ struct BlockBasedTableBuilder::Rep {
   }
 
   Status CopyStatus() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::lock_guard<std::mutex> lock(status_mutex);
     return status;
   }
 
   IOStatus GetIOStatus() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // We need to make modifications of io_status visible when status_ok is set
     // to false, and this is ensured by io_status_mutex, so no special memory
     // order for io_status_ok is required.
@@ -379,12 +385,14 @@ struct BlockBasedTableBuilder::Rep {
   }
 
   IOStatus CopyIOStatus() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::lock_guard<std::mutex> lock(io_status_mutex);
     return io_status;
   }
 
   // Never erase an existing status that is not OK.
   void SetStatus(Status s) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (!s.ok() && status_ok.load(std::memory_order_relaxed)) {
       // Locking is an overkill for non compression_opts.parallel_threads
       // case but since it's unlikely that s is not OK, we take this cost
@@ -398,6 +406,7 @@ struct BlockBasedTableBuilder::Rep {
   // Never erase an existing I/O status that is not OK.
   // Calling this will also SetStatus(ios)
   void SetIOStatus(IOStatus ios) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (!ios.ok() && io_status_ok.load(std::memory_order_relaxed)) {
       // Locking is an overkill for non compression_opts.parallel_threads
       // case but since it's unlikely that s is not OK, we take this cost
@@ -453,6 +462,7 @@ struct BlockBasedTableBuilder::Rep {
                 table_options, data_block)),
         status_ok(true),
         io_status_ok(true) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (tbo.target_file_size == 0) {
       buffer_limit = compression_opts.max_dict_buffer_bytes;
     } else if (compression_opts.max_dict_buffer_bytes == 0) {
@@ -577,6 +587,7 @@ struct BlockBasedTableBuilder::ParallelCompressionRep {
    public:
     Keys() : keys_(kKeysInitSize), size_(0) {}
     void PushBack(const Slice& key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
       if (size_ == keys_.size()) {
         keys_.emplace_back(key.data(), key.size());
       } else {
@@ -585,6 +596,7 @@ struct BlockBasedTableBuilder::ParallelCompressionRep {
       size_++;
     }
     void SwapAssign(std::vector<std::string>& keys) {
+PERF_MARKER(__PRETTY_FUNCTION__);
       size_ = keys.size();
       std::swap(keys_, keys);
     }
@@ -592,6 +604,7 @@ struct BlockBasedTableBuilder::ParallelCompressionRep {
     size_t Size() { return size_; }
     std::string& Back() { return keys_[size_ - 1]; }
     std::string& operator[](size_t idx) {
+PERF_MARKER(__PRETTY_FUNCTION__);
       assert(idx < size_);
       return keys_[idx];
     }
@@ -635,6 +648,7 @@ struct BlockBasedTableBuilder::ParallelCompressionRep {
     BlockRepSlot() : slot_(1) {}
     template <typename T>
     void Fill(T&& rep) {
+PERF_MARKER(__PRETTY_FUNCTION__);
       slot_.push(std::forward<T>(rep));
     };
     void Take(BlockRep*& rep) { slot_.pop(rep); }
@@ -679,6 +693,7 @@ struct BlockBasedTableBuilder::ParallelCompressionRep {
     // Estimate file size when a block is about to be emitted to
     // compression thread
     void EmitBlock(uint64_t raw_block_size, uint64_t curr_file_size) {
+PERF_MARKER(__PRETTY_FUNCTION__);
       uint64_t new_raw_bytes_inflight =
           raw_bytes_inflight.fetch_add(raw_block_size,
                                        std::memory_order_relaxed) +
@@ -699,6 +714,7 @@ struct BlockBasedTableBuilder::ParallelCompressionRep {
     // Estimate file size when a block is already reaped from
     // compression thread
     void ReapBlock(uint64_t compressed_block_size, uint64_t curr_file_size) {
+PERF_MARKER(__PRETTY_FUNCTION__);
       assert(raw_bytes_curr_block_set);
 
       uint64_t new_raw_bytes_compressed =
@@ -733,14 +749,17 @@ struct BlockBasedTableBuilder::ParallelCompressionRep {
     }
 
     void SetEstimatedFileSize(uint64_t size) {
+PERF_MARKER(__PRETTY_FUNCTION__);
       estimated_file_size.store(size, std::memory_order_relaxed);
     }
 
     uint64_t GetEstimatedFileSize() {
+PERF_MARKER(__PRETTY_FUNCTION__);
       return estimated_file_size.load(std::memory_order_relaxed);
     }
 
     void SetCurrBlockRawSize(uint64_t size) {
+PERF_MARKER(__PRETTY_FUNCTION__);
       raw_bytes_curr_block = size;
       raw_bytes_curr_block_set = true;
     }
@@ -778,6 +797,7 @@ struct BlockBasedTableBuilder::ParallelCompressionRep {
         compress_queue(parallel_threads),
         write_queue(parallel_threads),
         first_block_processed(false) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     for (uint32_t i = 0; i < parallel_threads; i++) {
       block_rep_buf[i].contents = Slice();
       block_rep_buf[i].compressed_contents = Slice();
@@ -799,6 +819,7 @@ struct BlockBasedTableBuilder::ParallelCompressionRep {
   BlockRep* PrepareBlock(CompressionType compression_type,
                          const Slice* first_key_in_next_block,
                          BlockBuilder* data_block) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     BlockRep* block_rep =
         PrepareBlockInternal(compression_type, first_key_in_next_block);
     assert(block_rep != nullptr);
@@ -814,6 +835,7 @@ struct BlockBasedTableBuilder::ParallelCompressionRep {
                          const Slice* first_key_in_next_block,
                          std::string* data_block,
                          std::vector<std::string>* keys) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     BlockRep* block_rep =
         PrepareBlockInternal(compression_type, first_key_in_next_block);
     assert(block_rep != nullptr);
@@ -825,6 +847,7 @@ struct BlockBasedTableBuilder::ParallelCompressionRep {
 
   // Emit a block to compression thread
   void EmitBlock(BlockRep* block_rep) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(block_rep != nullptr);
     assert(block_rep->status.ok());
     if (!write_queue.push(block_rep->slot.get())) {
@@ -844,6 +867,7 @@ struct BlockBasedTableBuilder::ParallelCompressionRep {
 
   // Reap a block from compression thread
   void ReapBlock(BlockRep* block_rep) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(block_rep != nullptr);
     block_rep->compressed_data->clear();
     block_rep_pool.push(block_rep);
@@ -858,6 +882,7 @@ struct BlockBasedTableBuilder::ParallelCompressionRep {
  private:
   BlockRep* PrepareBlockInternal(CompressionType compression_type,
                                  const Slice* first_key_in_next_block) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     BlockRep* block_rep = nullptr;
     block_rep_pool.pop(block_rep);
     assert(block_rep != nullptr);
@@ -880,6 +905,7 @@ struct BlockBasedTableBuilder::ParallelCompressionRep {
 BlockBasedTableBuilder::BlockBasedTableBuilder(
     const BlockBasedTableOptions& table_options, const TableBuilderOptions& tbo,
     WritableFileWriter* file) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   BlockBasedTableOptions sanitized_table_options(table_options);
   if (sanitized_table_options.format_version == 0 &&
       sanitized_table_options.checksum != kCRC32c) {
@@ -915,12 +941,14 @@ BlockBasedTableBuilder::BlockBasedTableBuilder(
 }
 
 BlockBasedTableBuilder::~BlockBasedTableBuilder() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Catch errors where caller forgot to call Finish()
   assert(rep_->state == Rep::State::kClosed);
   delete rep_;
 }
 
 void BlockBasedTableBuilder::Add(const Slice& key, const Slice& value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Rep* r = rep_;
   assert(rep_->state != Rep::State::kClosed);
   if (!ok()) return;
@@ -1029,6 +1057,7 @@ void BlockBasedTableBuilder::Add(const Slice& key, const Slice& value) {
 }
 
 void BlockBasedTableBuilder::Flush() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Rep* r = rep_;
   assert(rep_->state != Rep::State::kClosed);
   if (!ok()) return;
@@ -1050,6 +1079,7 @@ void BlockBasedTableBuilder::Flush() {
 void BlockBasedTableBuilder::WriteBlock(BlockBuilder* block,
                                         BlockHandle* handle,
                                         BlockType block_type) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   block->Finish();
   std::string raw_block_contents;
   raw_block_contents.reserve(rep_->table_options.block_size);
@@ -1066,6 +1096,7 @@ void BlockBasedTableBuilder::WriteBlock(BlockBuilder* block,
 void BlockBasedTableBuilder::WriteBlock(const Slice& raw_block_contents,
                                         BlockHandle* handle,
                                         BlockType block_type) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Rep* r = rep_;
   assert(r->state == Rep::State::kUnbuffered);
   Slice block_contents;
@@ -1095,6 +1126,7 @@ void BlockBasedTableBuilder::WriteBlock(const Slice& raw_block_contents,
 void BlockBasedTableBuilder::BGWorkCompression(
     const CompressionContext& compression_ctx,
     UncompressionContext* verify_ctx) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ParallelCompressionRep::BlockRep* block_rep = nullptr;
   while (rep_->pc_rep->compress_queue.pop(block_rep)) {
     assert(block_rep != nullptr);
@@ -1112,6 +1144,7 @@ void BlockBasedTableBuilder::CompressAndVerifyBlock(
     const CompressionContext& compression_ctx, UncompressionContext* verify_ctx,
     std::string* compressed_output, Slice* block_contents,
     CompressionType* type, Status* out_status) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // File format contains a sequence of blocks where each block has:
   //    block_data: uint8[n]
   //    type: uint8
@@ -1242,6 +1275,7 @@ void BlockBasedTableBuilder::WriteRawBlock(const Slice& block_contents,
                                            BlockType block_type,
                                            const Slice* raw_block_contents,
                                            bool is_top_level_filter_block) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Rep* r = rep_;
   bool is_data_block = block_type == BlockType::kData;
   StopWatch sw(r->ioptions.clock, r->ioptions.stats, WRITE_RAW_BLOCK_MICROS);
@@ -1345,6 +1379,7 @@ void BlockBasedTableBuilder::WriteRawBlock(const Slice& block_contents,
 }
 
 void BlockBasedTableBuilder::BGWorkWriteRawBlock() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Rep* r = rep_;
   ParallelCompressionRep::BlockRepSlot* slot = nullptr;
   ParallelCompressionRep::BlockRep* block_rep = nullptr;
@@ -1400,6 +1435,7 @@ void BlockBasedTableBuilder::BGWorkWriteRawBlock() {
 }
 
 void BlockBasedTableBuilder::StartParallelCompression() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   rep_->pc_rep.reset(
       new ParallelCompressionRep(rep_->compression_opts.parallel_threads));
   rep_->pc_rep->compress_thread_pool.reserve(
@@ -1415,6 +1451,7 @@ void BlockBasedTableBuilder::StartParallelCompression() {
 }
 
 void BlockBasedTableBuilder::StopParallelCompression() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   rep_->pc_rep->compress_queue.finish();
   for (auto& thread : rep_->pc_rep->compress_thread_pool) {
     thread.join();
@@ -1433,6 +1470,7 @@ namespace {
 // Delete the entry resided in the cache.
 template <class Entry>
 void DeleteEntryCached(const Slice& /*key*/, void* value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto entry = reinterpret_cast<Entry*>(value);
   delete entry;
 }
@@ -1444,6 +1482,7 @@ void DeleteEntryCached(const Slice& /*key*/, void* value) {
 Status BlockBasedTableBuilder::InsertBlockInCompressedCache(
     const Slice& block_contents, const CompressionType type,
     const BlockHandle* handle) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Rep* r = rep_;
   Cache* block_cache_compressed = r->table_options.block_cache_compressed.get();
   Status s;
@@ -1482,6 +1521,7 @@ Status BlockBasedTableBuilder::InsertBlockInCompressedCache(
 Status BlockBasedTableBuilder::InsertBlockInCacheHelper(
     const Slice& block_contents, const BlockHandle* handle,
     BlockType block_type, bool is_top_level_filter_block) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Status s;
   if (block_type == BlockType::kData || block_type == BlockType::kIndex) {
     s = InsertBlockInCache<Block>(block_contents, handle, block_type);
@@ -1508,6 +1548,7 @@ template <typename TBlocklike>
 Status BlockBasedTableBuilder::InsertBlockInCache(const Slice& block_contents,
                                                   const BlockHandle* handle,
                                                   BlockType block_type) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Uncompressed regular block cache
   Cache* block_cache = rep_->table_options.block_cache.get();
   Status s;
@@ -1553,6 +1594,7 @@ Status BlockBasedTableBuilder::InsertBlockInCache(const Slice& block_contents,
 
 void BlockBasedTableBuilder::WriteFilterBlock(
     MetaIndexBuilder* meta_index_builder) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   BlockHandle filter_block_handle;
   bool empty_filter_block =
       (rep_->filter_builder == nullptr || rep_->filter_builder->IsEmpty());
@@ -1613,6 +1655,7 @@ void BlockBasedTableBuilder::WriteFilterBlock(
 
 void BlockBasedTableBuilder::WriteIndexBlock(
     MetaIndexBuilder* meta_index_builder, BlockHandle* index_block_handle) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!ok()) {
     return;
   }
@@ -1676,6 +1719,7 @@ void BlockBasedTableBuilder::WriteIndexBlock(
 
 void BlockBasedTableBuilder::WritePropertiesBlock(
     MetaIndexBuilder* meta_index_builder) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   BlockHandle properties_block_handle;
   if (ok()) {
     PropertyBlockBuilder property_block_builder;
@@ -1782,6 +1826,7 @@ void BlockBasedTableBuilder::WritePropertiesBlock(
 
 void BlockBasedTableBuilder::WriteCompressionDictBlock(
     MetaIndexBuilder* meta_index_builder) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (rep_->compression_dict != nullptr &&
       rep_->compression_dict->GetRawDict().size()) {
     BlockHandle compression_dict_block_handle;
@@ -1805,6 +1850,7 @@ void BlockBasedTableBuilder::WriteCompressionDictBlock(
 
 void BlockBasedTableBuilder::WriteRangeDelBlock(
     MetaIndexBuilder* meta_index_builder) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (ok() && !rep_->range_del_block.empty()) {
     BlockHandle range_del_block_handle;
     WriteRawBlock(rep_->range_del_block.Finish(), kNoCompression,
@@ -1815,6 +1861,7 @@ void BlockBasedTableBuilder::WriteRangeDelBlock(
 
 void BlockBasedTableBuilder::WriteFooter(BlockHandle& metaindex_block_handle,
                                          BlockHandle& index_block_handle) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Rep* r = rep_;
   // this is guaranteed by BlockBasedTableBuilder's constructor
   assert(r->table_options.checksum == kCRC32c ||
@@ -1834,6 +1881,7 @@ void BlockBasedTableBuilder::WriteFooter(BlockHandle& metaindex_block_handle,
 }
 
 void BlockBasedTableBuilder::EnterUnbuffered() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Rep* r = rep_;
   assert(r->state == Rep::State::kBuffered);
   r->state = Rep::State::kUnbuffered;
@@ -1983,6 +2031,7 @@ void BlockBasedTableBuilder::EnterUnbuffered() {
 }
 
 Status BlockBasedTableBuilder::Finish() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Rep* r = rep_;
   assert(r->state != Rep::State::kClosed);
   bool empty_data_block = r->data_block.empty();
@@ -2038,6 +2087,7 @@ Status BlockBasedTableBuilder::Finish() {
 }
 
 void BlockBasedTableBuilder::Abandon() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(rep_->state != Rep::State::kClosed);
   if (rep_->IsParallelCompressionEnabled()) {
     StopParallelCompression();

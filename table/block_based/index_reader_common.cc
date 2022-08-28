@@ -14,6 +14,7 @@ Status BlockBasedTable::IndexReaderCommon::ReadIndexBlock(
     const ReadOptions& read_options, bool use_cache, GetContext* get_context,
     BlockCacheLookupContext* lookup_context,
     CachableEntry<Block>* index_block) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   PERF_TIMER_GUARD(read_index_block_nanos);
 
   assert(table != nullptr);

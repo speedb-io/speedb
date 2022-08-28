@@ -27,6 +27,7 @@ class MemoryAllocatorTest
       public ::testing::WithParamInterface<std::tuple<std::string, bool>> {
  public:
   MemoryAllocatorTest() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::tie(id_, supported_) = GetParam();
     Status s =
         MemoryAllocator::CreateFromString(ConfigOptions(), id_, &allocator_);
@@ -42,6 +43,7 @@ class MemoryAllocatorTest
 };
 
 TEST_P(MemoryAllocatorTest, Allocate) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!IsSupported()) {
     return;
   }
@@ -53,6 +55,7 @@ TEST_P(MemoryAllocatorTest, Allocate) {
 }
 
 TEST_P(MemoryAllocatorTest, CreateAllocator) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ConfigOptions config_options;
   config_options.ignore_unknown_options = false;
   config_options.ignore_unsupported_options = false;
@@ -72,6 +75,7 @@ TEST_P(MemoryAllocatorTest, CreateAllocator) {
 }
 
 TEST_P(MemoryAllocatorTest, DatabaseBlockCache) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!IsSupported()) {
     // Check if a memory node is available for allocation
   }
@@ -125,6 +129,7 @@ TEST_P(MemoryAllocatorTest, DatabaseBlockCache) {
 class CreateMemoryAllocatorTest : public testing::Test {
  public:
   CreateMemoryAllocatorTest() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     config_options_.ignore_unknown_options = false;
     config_options_.ignore_unsupported_options = false;
   }
@@ -132,6 +137,7 @@ class CreateMemoryAllocatorTest : public testing::Test {
 };
 
 TEST_F(CreateMemoryAllocatorTest, JemallocOptionsTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<MemoryAllocator> allocator;
   std::string id = std::string("id=") + JemallocNodumpAllocator::kClassName();
   Status s = MemoryAllocator::CreateFromString(config_options_, id, &allocator);
@@ -177,6 +183,7 @@ TEST_F(CreateMemoryAllocatorTest, JemallocOptionsTest) {
 }
 
 TEST_F(CreateMemoryAllocatorTest, NewJemallocNodumpAllocator) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   JemallocAllocatorOptions jopts;
   std::shared_ptr<MemoryAllocator> allocator;
 
@@ -234,6 +241,7 @@ INSTANTIATE_TEST_CASE_P(
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

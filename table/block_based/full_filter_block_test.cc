@@ -104,6 +104,7 @@ class PluginFullFilterBlockTest : public mock::MockBlockBasedTableTester,
 };
 
 TEST_F(PluginFullFilterBlockTest, PluginEmptyBuilder) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   FullFilterBlockBuilder builder(nullptr, true, GetBuilder());
   Slice slice = builder.Finish();
   ASSERT_EQ("", EscapeString(slice));
@@ -123,6 +124,7 @@ TEST_F(PluginFullFilterBlockTest, PluginEmptyBuilder) {
 }
 
 TEST_F(PluginFullFilterBlockTest, PluginSingleChunk) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   FullFilterBlockBuilder builder(nullptr, true, GetBuilder());
   builder.Add("foo");
   builder.Add("bar");
@@ -180,6 +182,7 @@ class FullFilterBlockTest : public mock::MockBlockBasedTableTester,
 };
 
 TEST_F(FullFilterBlockTest, EmptyBuilder) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   FullFilterBlockBuilder builder(nullptr, true, GetBuilder());
   Slice slice = builder.Finish();
   ASSERT_EQ("", EscapeString(slice));
@@ -232,6 +235,7 @@ class CountUniqueFilterBitsBuilderWrapper : public FilterBitsBuilder {
 };
 
 TEST_F(FullFilterBlockTest, DuplicateEntries) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   {  // empty prefixes
     std::unique_ptr<const SliceTransform> prefix_extractor(
         NewFixedPrefixTransform(0));
@@ -271,6 +275,7 @@ TEST_F(FullFilterBlockTest, DuplicateEntries) {
 }
 
 TEST_F(FullFilterBlockTest, SingleChunk) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   FullFilterBlockBuilder builder(nullptr, true, GetBuilder());
   ASSERT_TRUE(builder.IsEmpty());
   builder.Add("foo");
@@ -330,6 +335,7 @@ TEST_F(FullFilterBlockTest, SingleChunk) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

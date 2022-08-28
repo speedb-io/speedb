@@ -22,6 +22,7 @@ TEST_F(ArenaTest, Empty) { Arena arena0; }
 
 namespace {
 bool CheckMemoryAllocated(size_t allocated, size_t expected) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // The value returned by Arena::MemoryAllocatedBytes() may be greater than
   // the requested memory. We choose a somewhat arbitrary upper bound of
   // max_expected = expected * 1.1 to detect critical overallocation.
@@ -30,6 +31,7 @@ bool CheckMemoryAllocated(size_t allocated, size_t expected) {
 }
 
 void MemoryAllocatedBytesTest(size_t huge_page_size) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int N = 17;
   size_t req_sz;  // requested size
   size_t bsz = 32 * 1024;  // block size
@@ -84,6 +86,7 @@ void MemoryAllocatedBytesTest(size_t huge_page_size) {
 // Make sure we didn't count the allocate but not used memory space in
 // Arena::ApproximateMemoryUsage()
 static void ApproximateMemoryUsageTest(size_t huge_page_size) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const size_t kBlockSize = 4096;
   const size_t kEntrySize = kBlockSize / 8;
   const size_t kZero = 0;
@@ -135,6 +138,7 @@ static void ApproximateMemoryUsageTest(size_t huge_page_size) {
 }
 
 static void SimpleTest(size_t huge_page_size) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::vector<std::pair<size_t, char*>> allocated;
   Arena arena(Arena::kMinBlockSize, nullptr, huge_page_size);
   const int N = 100000;
@@ -183,22 +187,26 @@ static void SimpleTest(size_t huge_page_size) {
 }  // namespace
 
 TEST_F(ArenaTest, MemoryAllocatedBytes) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   MemoryAllocatedBytesTest(0);
   MemoryAllocatedBytesTest(kHugePageSize);
 }
 
 TEST_F(ArenaTest, ApproximateMemoryUsage) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ApproximateMemoryUsageTest(0);
   ApproximateMemoryUsageTest(kHugePageSize);
 }
 
 TEST_F(ArenaTest, Simple) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   SimpleTest(0);
   SimpleTest(kHugePageSize);
 }
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

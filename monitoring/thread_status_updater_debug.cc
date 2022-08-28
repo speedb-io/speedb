@@ -15,6 +15,7 @@ namespace ROCKSDB_NAMESPACE {
 #ifdef ROCKSDB_USING_THREAD_STATUS
 void ThreadStatusUpdater::TEST_VerifyColumnFamilyInfoMap(
     const std::vector<ColumnFamilyHandle*>& handles, bool check_exist) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_lock<std::mutex> lock(thread_list_mutex_);
   if (check_exist) {
     assert(cf_info_map_.size() == handles.size());
@@ -35,6 +36,7 @@ void ThreadStatusUpdater::TEST_VerifyColumnFamilyInfoMap(
 
 void ThreadStatusUpdater::TEST_VerifyColumnFamilyInfoMap(
     const std::vector<ColumnFamilyHandle*>& /*handles*/, bool /*check_exist*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 #endif  // ROCKSDB_USING_THREAD_STATUS

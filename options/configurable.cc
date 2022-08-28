@@ -20,6 +20,7 @@ namespace ROCKSDB_NAMESPACE {
 void Configurable::RegisterOptions(
     const std::string& name, void* opt_ptr,
     const std::unordered_map<std::string, OptionTypeInfo>* type_map) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   RegisteredOptions opts;
   opts.name = name;
 #ifndef ROCKSDB_LITE
@@ -38,6 +39,7 @@ void Configurable::RegisterOptions(
 //*************************************************************************
 
 Status Configurable::PrepareOptions(const ConfigOptions& opts) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // We ignore the invoke_prepare_options here intentionally,
   // as if you are here, you must have called PrepareOptions explicitly.
   Status status = Status::OK();
@@ -127,6 +129,7 @@ std::string Configurable::GetOptionName(const std::string& opt_name) const {
 const OptionTypeInfo* ConfigurableHelper::FindOption(
     const std::vector<Configurable::RegisteredOptions>& options,
     const std::string& short_name, std::string* opt_name, void** opt_ptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (auto iter : options) {
     if (iter.type_map != nullptr) {
       const auto opt_info =
@@ -150,6 +153,7 @@ const OptionTypeInfo* ConfigurableHelper::FindOption(
 Status Configurable::ConfigureFromMap(
     const ConfigOptions& config_options,
     const std::unordered_map<std::string, std::string>& opts_map) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Status s = ConfigureFromMap(config_options, opts_map, nullptr);
   return s;
 }
@@ -158,6 +162,7 @@ Status Configurable::ConfigureFromMap(
     const ConfigOptions& config_options,
     const std::unordered_map<std::string, std::string>& opts_map,
     std::unordered_map<std::string, std::string>* unused) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return ConfigureOptions(config_options, opts_map, unused);
 }
 
@@ -165,6 +170,7 @@ Status Configurable::ConfigureOptions(
     const ConfigOptions& config_options,
     const std::unordered_map<std::string, std::string>& opts_map,
     std::unordered_map<std::string, std::string>* unused) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string curr_opts;
   Status s;
   if (!opts_map.empty()) {
@@ -204,11 +210,13 @@ Status Configurable::ConfigureOptions(
 
 Status Configurable::ParseStringOptions(const ConfigOptions& /*config_options*/,
                                         const std::string& /*opts_str*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return Status::OK();
 }
 
 Status Configurable::ConfigureFromString(const ConfigOptions& config_options,
                                          const std::string& opts_str) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Status s;
   if (!opts_str.empty()) {
 #ifndef ROCKSDB_LITE
@@ -244,6 +252,7 @@ Status Configurable::ConfigureFromString(const ConfigOptions& config_options,
 Status Configurable::ConfigureOption(const ConfigOptions& config_options,
                                      const std::string& name,
                                      const std::string& value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return ConfigurableHelper::ConfigureSingleOption(config_options, *this, name,
                                                    value);
 }
@@ -259,6 +268,7 @@ Status Configurable::ParseOption(const ConfigOptions& config_options,
                                  const OptionTypeInfo& opt_info,
                                  const std::string& opt_name,
                                  const std::string& opt_value, void* opt_ptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (opt_info.IsMutable()) {
     if (config_options.mutable_options_only) {
       // This option is mutable. Treat all of its children as mutable as well
@@ -281,6 +291,7 @@ Status ConfigurableHelper::ConfigureOptions(
     const ConfigOptions& config_options, Configurable& configurable,
     const std::unordered_map<std::string, std::string>& opts_map,
     std::unordered_map<std::string, std::string>* unused) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unordered_map<std::string, std::string> remaining = opts_map;
   Status s = Status::OK();
   if (!opts_map.empty()) {
@@ -331,6 +342,7 @@ Status ConfigurableHelper::ConfigureSomeOptions(
     const ConfigOptions& config_options, Configurable& configurable,
     const std::unordered_map<std::string, OptionTypeInfo>& type_map,
     std::unordered_map<std::string, std::string>* options, void* opt_ptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Status result = Status::OK();  // The last non-OK result (if any)
   Status notsup = Status::OK();  // The last NotSupported result (if any)
   std::string elem_name;
@@ -393,6 +405,7 @@ Status ConfigurableHelper::ConfigureSomeOptions(
 Status ConfigurableHelper::ConfigureSingleOption(
     const ConfigOptions& config_options, Configurable& configurable,
     const std::string& name, const std::string& value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const std::string& opt_name = configurable.GetOptionName(name);
   std::string elem_name;
   void* opt_ptr = nullptr;
@@ -409,6 +422,7 @@ Status ConfigurableHelper::ConfigureCustomizableOption(
     const ConfigOptions& config_options, Configurable& configurable,
     const OptionTypeInfo& opt_info, const std::string& opt_name,
     const std::string& name, const std::string& value, void* opt_ptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Customizable* custom = opt_info.AsRawPointer<Customizable>(opt_ptr);
   ConfigOptions copy = config_options;
   if (opt_info.IsMutable()) {
@@ -485,6 +499,7 @@ Status ConfigurableHelper::ConfigureOption(
     const ConfigOptions& config_options, Configurable& configurable,
     const OptionTypeInfo& opt_info, const std::string& opt_name,
     const std::string& name, const std::string& value, void* opt_ptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (opt_info.IsCustomizable()) {
     return ConfigureCustomizableOption(config_options, configurable, opt_info,
                                        opt_name, name, value, opt_ptr);
@@ -550,6 +565,7 @@ Status ConfigurableHelper::GetOption(const ConfigOptions& config_options,
                                      const Configurable& configurable,
                                      const std::string& short_name,
                                      std::string* value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Look for option directly
   assert(value);
   value->clear();
@@ -579,6 +595,7 @@ Status ConfigurableHelper::SerializeOptions(const ConfigOptions& config_options,
                                             const Configurable& configurable,
                                             const std::string& prefix,
                                             std::string* result) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(result);
   for (auto const& opt_iter : configurable.options_) {
     if (opt_iter.type_map != nullptr) {
@@ -637,6 +654,7 @@ Status Configurable::GetOptionNames(
 Status ConfigurableHelper::ListOptions(
     const ConfigOptions& config_options, const Configurable& configurable,
     const std::string& prefix, std::unordered_set<std::string>* result) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Status status;
   for (auto const& opt_iter : configurable.options_) {
     if (opt_iter.type_map != nullptr) {
@@ -707,6 +725,7 @@ bool ConfigurableHelper::AreEquivalent(const ConfigOptions& config_options,
                                        const Configurable& this_one,
                                        const Configurable& that_one,
                                        std::string* mismatch) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(mismatch != nullptr);
   for (auto const& o : this_one.options_) {
     const auto this_offset = this_one.GetOptionsPtr(o.name);
@@ -745,6 +764,7 @@ bool ConfigurableHelper::AreEquivalent(const ConfigOptions& config_options,
 Status Configurable::GetOptionsMap(
     const std::string& value, const std::string& default_id, std::string* id,
     std::unordered_map<std::string, std::string>* props) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(id);
   assert(props);
   Status status;

@@ -17,10 +17,12 @@
 namespace ROCKSDB_NAMESPACE {
 
 inline uint32_t Hash(const Slice& s) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return ROCKSDB_NAMESPACE::Hash(s.data(), s.size(), 0);
 }
 
 inline uint32_t PrefixToBucket(const Slice& prefix, uint32_t num_buckets) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return Hash(prefix) % num_buckets;
 }
 
@@ -44,16 +46,19 @@ const uint32_t kBlockArrayMask = 0x80000000;
 inline bool IsNone(uint32_t block_id) { return block_id == kNoneBlock; }
 
 inline bool IsBlockId(uint32_t block_id) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return (block_id & kBlockArrayMask) == 0;
 }
 
 inline uint32_t DecodeIndex(uint32_t block_id) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint32_t index = block_id ^ kBlockArrayMask;
   assert(index < kBlockArrayMask);
   return index;
 }
 
 inline uint32_t EncodeIndex(uint32_t index) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(index < kBlockArrayMask);
   return index | kBlockArrayMask;
 }
@@ -73,6 +78,7 @@ class BlockPrefixIndex::Builder {
       : internal_prefix_extractor_(internal_prefix_extractor) {}
 
   void Add(const Slice& key_prefix, uint32_t start_block, uint32_t num_blocks) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     PrefixRecord* record = reinterpret_cast<PrefixRecord*>(
         arena_.AllocateAligned(sizeof(PrefixRecord)));
     record->prefix = key_prefix;
@@ -83,6 +89,7 @@ class BlockPrefixIndex::Builder {
   }
 
   BlockPrefixIndex* Finish() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // For now, use roughly 1:1 prefix to bucket ratio.
     uint32_t num_buckets = static_cast<uint32_t>(prefixes_.size()) + 1;
 
@@ -169,6 +176,7 @@ class BlockPrefixIndex::Builder {
 Status BlockPrefixIndex::Create(const SliceTransform* internal_prefix_extractor,
                                 const Slice& prefixes, const Slice& prefix_meta,
                                 BlockPrefixIndex** prefix_index) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t pos = 0;
   auto meta_pos = prefix_meta;
   Status s;
@@ -208,6 +216,7 @@ Status BlockPrefixIndex::Create(const SliceTransform* internal_prefix_extractor,
 }
 
 uint32_t BlockPrefixIndex::GetBlocks(const Slice& key, uint32_t** blocks) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Slice prefix = internal_prefix_extractor_->Transform(key);
 
   uint32_t bucket = PrefixToBucket(prefix, num_buckets_);

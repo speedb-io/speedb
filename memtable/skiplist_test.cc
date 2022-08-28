@@ -34,6 +34,7 @@ struct TestComparator {
 class SkipTest : public testing::Test {};
 
 TEST_F(SkipTest, Empty) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Arena arena;
   TestComparator cmp;
   SkipList<Key, TestComparator> list(cmp, &arena);
@@ -52,6 +53,7 @@ TEST_F(SkipTest, Empty) {
 }
 
 TEST_F(SkipTest, InsertAndLookup) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int N = 2000;
   const int R = 5000;
   Random rnd(1000);
@@ -169,11 +171,13 @@ class ConcurrentTest {
   static uint64_t hash(Key key) { return key & 0xff; }
 
   static uint64_t HashNumbers(uint64_t k, uint64_t g) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     uint64_t data[2] = { k, g };
     return Hash(reinterpret_cast<char*>(data), sizeof(data), 0);
   }
 
   static Key MakeKey(uint64_t k, uint64_t g) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(sizeof(Key) == sizeof(uint64_t));
     assert(k <= K);  // We sometimes pass K to seek to the end of the skiplist
     assert(g <= 0xffffffffu);
@@ -181,10 +185,12 @@ class ConcurrentTest {
   }
 
   static bool IsValidKey(Key k) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return hash(k) == (HashNumbers(key(k), gen(k)) & 0xff);
   }
 
   static Key RandomTarget(Random* rnd) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     switch (rnd->Next() % 10) {
       case 0:
         // Seek to beginning
@@ -202,11 +208,13 @@ class ConcurrentTest {
   struct State {
     std::atomic<int> generation[K];
     void Set(int k, int v) {
+PERF_MARKER(__PRETTY_FUNCTION__);
       generation[k].store(v, std::memory_order_release);
     }
     int Get(int k) { return generation[k].load(std::memory_order_acquire); }
 
     State() {
+PERF_MARKER(__PRETTY_FUNCTION__);
       for (unsigned int k = 0; k < K; k++) {
         Set(k, 0);
       }
@@ -227,6 +235,7 @@ class ConcurrentTest {
 
   // REQUIRES: External synchronization
   void WriteStep(Random* rnd) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     const uint32_t k = rnd->Next() % K;
     const int g = current_.Get(k) + 1;
     const Key new_key = MakeKey(k, g);
@@ -235,6 +244,7 @@ class ConcurrentTest {
   }
 
   void ReadStep(Random* rnd) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // Remember the initial committed state of the skiplist.
     State initial_state;
     for (unsigned int k = 0; k < K; k++) {
@@ -297,6 +307,7 @@ const uint32_t ConcurrentTest::K;
 // Simple test that does single-threaded testing of the ConcurrentTest
 // scaffolding.
 TEST_F(SkipTest, ConcurrentWithoutThreads) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ConcurrentTest test;
   Random rnd(test::RandomSeed());
   for (int i = 0; i < 10000; i++) {
@@ -321,6 +332,7 @@ class TestState {
       : seed_(s), quit_flag_(false), state_(STARTING), state_cv_(&mu_) {}
 
   void Wait(ReaderState s) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     mu_.Lock();
     while (state_ != s) {
       state_cv_.Wait();
@@ -329,6 +341,7 @@ class TestState {
   }
 
   void Change(ReaderState s) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     mu_.Lock();
     state_ = s;
     state_cv_.Signal();
@@ -342,6 +355,7 @@ class TestState {
 };
 
 static void ConcurrentReader(void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   TestState* state = reinterpret_cast<TestState*>(arg);
   Random rnd(state->seed_);
   int64_t reads = 0;
@@ -354,6 +368,7 @@ static void ConcurrentReader(void* arg) {
 }
 
 static void RunConcurrent(int run) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int seed = test::RandomSeed() + (run * 100);
   Random rnd(seed);
   const int N = 1000;
@@ -383,6 +398,7 @@ TEST_F(SkipTest, Concurrent5) { RunConcurrent(5); }
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

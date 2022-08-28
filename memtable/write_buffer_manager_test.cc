@@ -17,6 +17,7 @@ class WriteBufferManagerTest : public testing::Test {};
 const size_t kSizeDummyEntry = 256 * 1024;
 
 TEST_F(WriteBufferManagerTest, ShouldFlush) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // A write buffer manager of size 10MB
   std::unique_ptr<WriteBufferManager> wbf(
       new WriteBufferManager(10 * 1024 * 1024));
@@ -78,6 +79,7 @@ TEST_F(WriteBufferManagerTest, ShouldFlush) {
 }
 
 TEST_F(WriteBufferManagerTest, CacheCost) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr std::size_t kMetaDataChargeOverhead = 10000;
 
   LRUCacheOptions co;
@@ -198,6 +200,7 @@ TEST_F(WriteBufferManagerTest, CacheCost) {
 }
 
 TEST_F(WriteBufferManagerTest, NoCapCacheCost) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr std::size_t kMetaDataChargeOverhead = 10000;
   // 1GB cache
   std::shared_ptr<Cache> cache = NewLRUCache(1024 * 1024 * 1024, 4);
@@ -232,6 +235,7 @@ TEST_F(WriteBufferManagerTest, NoCapCacheCost) {
 }
 
 TEST_F(WriteBufferManagerTest, CacheFull) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr std::size_t kMetaDataChargeOverhead = 20000;
 
   // 12MB cache size with strict capacity
@@ -296,6 +300,7 @@ TEST_F(WriteBufferManagerTest, CacheFull) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

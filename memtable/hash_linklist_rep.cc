@@ -36,6 +36,7 @@ struct BucketHeader {
       : next(n), num_entries(count) {}
 
   bool IsSkipListBucket() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return next.load(std::memory_order_relaxed) == this;
   }
 
@@ -45,6 +46,7 @@ struct BucketHeader {
 
   // REQUIRES: called from single-threaded Insert()
   void IncNumEntries() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // Only one thread can do write at one time. No need to do atomic
     // incremental. Update it with relaxed load and store.
     num_entries.store(GetNumEntries() + 1, std::memory_order_relaxed);
@@ -67,17 +69,20 @@ struct Node {
   // Accessors/mutators for links.  Wrapped in methods so we can
   // add the appropriate barriers as necessary.
   Node* Next() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // Use an 'acquire load' so that we observe a fully initialized
     // version of the returned Node.
     return next_.load(std::memory_order_acquire);
   }
   void SetNext(Node* x) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // Use a 'release store' so that anybody who reads through this
     // pointer observes a fully initialized version of the inserted node.
     next_.store(x, std::memory_order_release);
   }
   // No-barrier variants that can be safely used in a few locations.
   Node* NoBarrier_Next() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return next_.load(std::memory_order_relaxed);
   }
 
@@ -391,6 +396,7 @@ class HashLinkListRep : public MemTableRep {
 
    protected:
     void Reset(Node* head) {
+PERF_MARKER(__PRETTY_FUNCTION__);
       head_ = head;
       node_ = nullptr;
     }
@@ -401,6 +407,7 @@ class HashLinkListRep : public MemTableRep {
     Node* node_;
 
     virtual void SeekToHead() {
+PERF_MARKER(__PRETTY_FUNCTION__);
       node_ = head_;
     }
   };
@@ -507,6 +514,7 @@ HashLinkListRep::HashLinkListRep(
       logger_(logger),
       bucket_entries_logging_threshold_(bucket_entries_logging_threshold),
       if_log_bucket_dist_when_flash_(if_log_bucket_dist_when_flash) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   char* mem = allocator_->AllocateAligned(sizeof(Pointer) * bucket_size,
                                       huge_page_tlb_size, logger);
 
@@ -518,9 +526,11 @@ HashLinkListRep::HashLinkListRep(
 }
 
 HashLinkListRep::~HashLinkListRep() {
+PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 KeyHandle HashLinkListRep::Allocate(const size_t len, char** buf) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   char* mem = allocator_->AllocateAligned(sizeof(Node) + len);
   Node* x = new (mem) Node();
   *buf = x->key;
@@ -570,6 +580,7 @@ Node* HashLinkListRep::GetLinkListFirstNode(Pointer* first_next_pointer) const {
 }
 
 void HashLinkListRep::Insert(KeyHandle handle) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Node* x = static_cast<Node*>(handle);
   assert(!Contains(x->key));
   Slice internal_key = GetLengthPrefixedSlice(x->key);
@@ -709,12 +720,14 @@ bool HashLinkListRep::Contains(const char* key) const {
 }
 
 size_t HashLinkListRep::ApproximateMemoryUsage() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Memory is always allocated from the allocator.
   return 0;
 }
 
 void HashLinkListRep::Get(const LookupKey& k, void* callback_args,
                           bool (*callback_func)(void* arg, const char* entry)) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto transformed = transform_->Transform(k.user_key());
   auto bucket = GetBucket(transformed);
 
@@ -739,6 +752,7 @@ void HashLinkListRep::Get(const LookupKey& k, void* callback_args,
 }
 
 MemTableRep::Iterator* HashLinkListRep::GetIterator(Arena* alloc_arena) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // allocate a new arena of similar size to the one currently in use
   Arena* new_arena = new Arena(allocator_->BlockSize());
   auto list = new MemtableSkipList(compare_, new_arena);
@@ -786,6 +800,7 @@ MemTableRep::Iterator* HashLinkListRep::GetIterator(Arena* alloc_arena) {
 
 MemTableRep::Iterator* HashLinkListRep::GetDynamicPrefixIterator(
     Arena* alloc_arena) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (alloc_arena == nullptr) {
     return new DynamicIterator(*this);
   } else {
@@ -859,6 +874,7 @@ class HashLinkListRepFactory : public MemTableRepFactory {
                                   size_t huge_page_tlb_size,
                                   int bucket_entries_logging_threshold,
                                   bool if_log_bucket_dist_when_flash) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     options_.bucket_count = bucket_count;
     options_.threshold_use_skiplist = threshold_use_skiplist;
     options_.huge_page_tlb_size = huge_page_tlb_size;
@@ -887,6 +903,7 @@ class HashLinkListRepFactory : public MemTableRepFactory {
 MemTableRep* HashLinkListRepFactory::CreateMemTableRep(
     const MemTableRep::KeyComparator& compare, Allocator* allocator,
     const SliceTransform* transform, Logger* logger) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return new HashLinkListRep(
       compare, allocator, transform, options_.bucket_count,
       options_.threshold_use_skiplist, options_.huge_page_tlb_size, logger,
@@ -898,6 +915,7 @@ MemTableRepFactory* NewHashLinkListRepFactory(
     size_t bucket_count, size_t huge_page_tlb_size,
     int bucket_entries_logging_threshold, bool if_log_bucket_dist_when_flash,
     uint32_t threshold_use_skiplist) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return new HashLinkListRepFactory(
       bucket_count, threshold_use_skiplist, huge_page_tlb_size,
       bucket_entries_logging_threshold, if_log_bucket_dist_when_flash);

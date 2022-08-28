@@ -40,6 +40,7 @@ namespace ROCKSDB_NAMESPACE {
 static Status ParseCompressionOptions(const std::string& value,
                                       const std::string& name,
                                       CompressionOptions& compression_opts) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const char kDelimiter = ':';
   std::istringstream field_stream(value);
   std::string field;
@@ -367,6 +368,7 @@ static std::unordered_map<std::string, OptionTypeInfo>
              OptionVerificationType::kNormal, OptionTypeFlags::kMutable,
              [](const ConfigOptions& opts, const std::string& name,
                 const std::string& value, void* addr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
                // This is to handle backward compatibility, where
                // compaction_options_fifo could be assigned a single scalar
                // value, say, like "23", which would be assigned to
@@ -454,6 +456,7 @@ static std::unordered_map<std::string, OptionTypeInfo>
              (OptionTypeFlags::kMutable | OptionTypeFlags::kCompareNever),
              [](const ConfigOptions& opts, const std::string& name,
                 const std::string& value, void* addr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
                // This is to handle backward compatibility, where
                // compression_options was a ":" separated list.
                if (name == kOptNameCompOpts &&
@@ -474,6 +477,7 @@ static std::unordered_map<std::string, OptionTypeInfo>
              (OptionTypeFlags::kMutable | OptionTypeFlags::kCompareNever),
              [](const ConfigOptions& opts, const std::string& name,
                 const std::string& value, void* addr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
                // This is to handle backward compatibility, where
                // compression_options was a ":" separated list.
                if (name == kOptNameBMCompOpts &&
@@ -560,6 +564,7 @@ static std::unordered_map<std::string, OptionTypeInfo>
              // Serializes a Comparator
              [](const ConfigOptions& opts, const std::string&, const void* addr,
                 std::string* value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
                // it's a const pointer of const Comparator*
                const auto* ptr = static_cast<const Comparator* const*>(addr);
 
@@ -591,6 +596,7 @@ static std::unordered_map<std::string, OptionTypeInfo>
           OptionTypeFlags::kShared,
           [](const ConfigOptions& opts, const std::string&,
              const std::string& value, void* addr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
             std::unique_ptr<MemTableRepFactory> factory;
             auto* shared =
                 static_cast<std::shared_ptr<MemTableRepFactory>*>(addr);
@@ -607,6 +613,7 @@ static std::unordered_map<std::string, OptionTypeInfo>
           OptionTypeFlags::kShared,
           [](const ConfigOptions& opts, const std::string&,
              const std::string& value, void* addr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
             std::unique_ptr<MemTableRepFactory> factory;
             auto* shared =
                 static_cast<std::shared_ptr<MemTableRepFactory>*>(addr);
@@ -631,6 +638,7 @@ static std::unordered_map<std::string, OptionTypeInfo>
           // Parses the input value and creates a BlockBasedTableFactory
           [](const ConfigOptions& opts, const std::string& name,
              const std::string& value, void* addr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
             BlockBasedTableOptions* old_opts = nullptr;
             auto table_factory =
                 static_cast<std::shared_ptr<TableFactory>*>(addr);
@@ -663,6 +671,7 @@ static std::unordered_map<std::string, OptionTypeInfo>
           // Parses the input value and creates a PlainTableFactory
           [](const ConfigOptions& opts, const std::string& name,
              const std::string& value, void* addr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
             PlainTableOptions* old_opts = nullptr;
             auto table_factory =
                 static_cast<std::shared_ptr<TableFactory>*>(addr);
@@ -727,6 +736,7 @@ const std::string OptionsHelper::kCFOptionsName = "ColumnFamilyOptions";
 class ConfigurableMutableCFOptions : public Configurable {
  public:
   explicit ConfigurableMutableCFOptions(const MutableCFOptions& mcf) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     mutable_ = mcf;
     RegisterOptions(&mutable_, &cf_mutable_options_type_info);
   }
@@ -743,6 +753,7 @@ class ConfigurableCFOptions : public ConfigurableMutableCFOptions {
         immutable_(opts),
         cf_options_(opts),
         opt_map_(map) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     RegisterOptions(&immutable_, &cf_immutable_options_type_info);
   }
 
@@ -815,12 +826,14 @@ class ConfigurableCFOptions : public ConfigurableMutableCFOptions {
 
 std::unique_ptr<Configurable> CFOptionsAsConfigurable(
     const MutableCFOptions& opts) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<Configurable> ptr(new ConfigurableMutableCFOptions(opts));
   return ptr;
 }
 std::unique_ptr<Configurable> CFOptionsAsConfigurable(
     const ColumnFamilyOptions& opts,
     const std::unordered_map<std::string, std::string>* opt_map) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<Configurable> ptr(new ConfigurableCFOptions(opts, opt_map));
   return ptr;
 }
@@ -883,6 +896,7 @@ ImmutableOptions::ImmutableOptions(const ImmutableDBOptions& db_options,
 
 // Multiple two operands. If they overflow, return op1.
 uint64_t MultiplyCheckOverflow(uint64_t op1, double op2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (op1 == 0 || op2 <= 0) {
     return 0;
   }
@@ -898,6 +912,7 @@ uint64_t MultiplyCheckOverflow(uint64_t op1, double op2) {
 uint64_t MaxFileSizeForLevel(const MutableCFOptions& cf_options,
     int level, CompactionStyle compaction_style, int base_level,
     bool level_compaction_dynamic_level_bytes) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!level_compaction_dynamic_level_bytes || level < base_level ||
       compaction_style != kCompactionStyleLevel) {
     assert(level >= 0);
@@ -911,6 +926,7 @@ uint64_t MaxFileSizeForLevel(const MutableCFOptions& cf_options,
 }
 
 size_t MaxFileSizeForL0MetaPin(const MutableCFOptions& cf_options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // We do not want to pin meta-blocks that almost certainly came from intra-L0
   // or a former larger `write_buffer_size` value to avoid surprising users with
   // pinned memory usage. We use a factor of 1.5 to account for overhead
@@ -923,6 +939,7 @@ size_t MaxFileSizeForL0MetaPin(const MutableCFOptions& cf_options) {
 
 void MutableCFOptions::RefreshDerivedOptions(int num_levels,
                                              CompactionStyle compaction_style) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   max_file_size.resize(num_levels);
   for (int i = 0; i < num_levels; ++i) {
     if (i == 0 && compaction_style == kCompactionStyleUniversal) {
@@ -1071,6 +1088,7 @@ Status GetMutableOptionsFromStrings(
     const MutableCFOptions& base_options,
     const std::unordered_map<std::string, std::string>& options_map,
     Logger* /*info_log*/, MutableCFOptions* new_options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(new_options);
   *new_options = base_options;
   ConfigOptions config_options;
@@ -1085,6 +1103,7 @@ Status GetMutableOptionsFromStrings(
 Status GetStringFromMutableCFOptions(const ConfigOptions& config_options,
                                      const MutableCFOptions& mutable_opts,
                                      std::string* opt_string) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(opt_string);
   opt_string->clear();
   return OptionTypeInfo::SerializeType(

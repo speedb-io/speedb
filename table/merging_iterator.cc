@@ -46,6 +46,7 @@ class MergingIterator : public InternalIterator {
         current_(nullptr),
         minHeap_(comparator_),
         pinned_iters_mgr_(nullptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     children_.resize(n);
     for (int i = 0; i < n; i++) {
       children_[i].Set(children[i]);
@@ -53,12 +54,14 @@ class MergingIterator : public InternalIterator {
   }
 
   void considerStatus(Status s) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (!s.ok() && status_.ok()) {
       status_ = s;
     }
   }
 
   virtual void AddIterator(InternalIterator* iter) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     children_.emplace_back(iter);
     if (pinned_iters_mgr_) {
       iter->SetPinnedItersMgr(pinned_iters_mgr_);
@@ -334,6 +337,7 @@ class MergingIterator : public InternalIterator {
 };
 
 void MergingIterator::AddToMinHeapOrCheckStatus(IteratorWrapper* child) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (child->Valid()) {
     assert(child->status().ok());
     minHeap_.push(child);
@@ -343,6 +347,7 @@ void MergingIterator::AddToMinHeapOrCheckStatus(IteratorWrapper* child) {
 }
 
 void MergingIterator::AddToMaxHeapOrCheckStatus(IteratorWrapper* child) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (child->Valid()) {
     assert(child->status().ok());
     maxHeap_->push(child);
@@ -352,6 +357,7 @@ void MergingIterator::AddToMaxHeapOrCheckStatus(IteratorWrapper* child) {
 }
 
 void MergingIterator::SwitchToForward() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Otherwise, advance the non-current children.  We advance current_
   // just after the if-block.
   ClearHeaps();
@@ -370,6 +376,7 @@ void MergingIterator::SwitchToForward() {
 }
 
 void MergingIterator::SwitchToBackward() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ClearHeaps();
   InitMaxHeap();
   Slice target = key();
@@ -396,6 +403,7 @@ void MergingIterator::SwitchToBackward() {
 }
 
 void MergingIterator::ClearHeaps() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   minHeap_.clear();
   if (maxHeap_) {
     maxHeap_->clear();
@@ -403,6 +411,7 @@ void MergingIterator::ClearHeaps() {
 }
 
 void MergingIterator::InitMaxHeap() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!maxHeap_) {
     maxHeap_.reset(new MergerMaxIterHeap(comparator_));
   }
@@ -411,6 +420,7 @@ void MergingIterator::InitMaxHeap() {
 InternalIterator* NewMergingIterator(const InternalKeyComparator* cmp,
                                      InternalIterator** list, int n,
                                      Arena* arena, bool prefix_seek_mode) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(n >= 0);
   if (n == 0) {
     return NewEmptyInternalIterator<Slice>(arena);
@@ -429,12 +439,14 @@ InternalIterator* NewMergingIterator(const InternalKeyComparator* cmp,
 MergeIteratorBuilder::MergeIteratorBuilder(
     const InternalKeyComparator* comparator, Arena* a, bool prefix_seek_mode)
     : first_iter(nullptr), use_merging_iter(false), arena(a) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto mem = arena->AllocateAligned(sizeof(MergingIterator));
   merge_iter =
       new (mem) MergingIterator(comparator, nullptr, 0, true, prefix_seek_mode);
 }
 
 MergeIteratorBuilder::~MergeIteratorBuilder() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (first_iter != nullptr) {
     first_iter->~InternalIterator();
   }
@@ -444,6 +456,7 @@ MergeIteratorBuilder::~MergeIteratorBuilder() {
 }
 
 void MergeIteratorBuilder::AddIterator(InternalIterator* iter) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!use_merging_iter && first_iter != nullptr) {
     merge_iter->AddIterator(first_iter);
     use_merging_iter = true;
@@ -457,6 +470,7 @@ void MergeIteratorBuilder::AddIterator(InternalIterator* iter) {
 }
 
 InternalIterator* MergeIteratorBuilder::Finish() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   InternalIterator* ret = nullptr;
   if (!use_merging_iter) {
     ret = first_iter;

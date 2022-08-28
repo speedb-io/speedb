@@ -24,15 +24,18 @@ FullFilterBlockBuilder::FullFilterBlockBuilder(
       last_prefix_recorded_(false),
       last_key_in_domain_(false),
       any_added_(false) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(filter_bits_builder != nullptr);
   filter_bits_builder_.reset(filter_bits_builder);
 }
 
 size_t FullFilterBlockBuilder::EstimateEntriesAdded() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return filter_bits_builder_->EstimateEntriesAdded();
 }
 
 void FullFilterBlockBuilder::Add(const Slice& key_without_ts) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const bool add_prefix =
       prefix_extractor_ && prefix_extractor_->InDomain(key_without_ts);
 
@@ -72,12 +75,14 @@ void FullFilterBlockBuilder::Add(const Slice& key_without_ts) {
 
 // Add key to filter if needed
 inline void FullFilterBlockBuilder::AddKey(const Slice& key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   filter_bits_builder_->AddKey(key);
   any_added_ = true;
 }
 
 // Add prefix to filter if needed
 void FullFilterBlockBuilder::AddPrefix(const Slice& key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(prefix_extractor_ && prefix_extractor_->InDomain(key));
   Slice prefix = prefix_extractor_->Transform(key);
   if (whole_key_filtering_) {
@@ -97,6 +102,7 @@ void FullFilterBlockBuilder::AddPrefix(const Slice& key) {
 }
 
 void FullFilterBlockBuilder::Reset() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   last_whole_key_recorded_ = false;
   last_prefix_recorded_ = false;
 }
@@ -104,6 +110,7 @@ void FullFilterBlockBuilder::Reset() {
 Slice FullFilterBlockBuilder::Finish(
     const BlockHandle& /*tmp*/, Status* status,
     std::unique_ptr<const char[]>* filter_data) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Reset();
   // In this impl we ignore BlockHandle
   *status = Status::OK();
@@ -120,6 +127,7 @@ FullFilterBlockReader::FullFilterBlockReader(
     const BlockBasedTable* t,
     CachableEntry<ParsedFullFilterBlock>&& filter_block)
     : FilterBlockReaderCommon(t, std::move(filter_block)) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const SliceTransform* const prefix_extractor = table_prefix_extractor();
   if (prefix_extractor) {
     full_length_enabled_ =
@@ -132,6 +140,7 @@ bool FullFilterBlockReader::KeyMayMatch(
     uint64_t block_offset, const bool no_io,
     const Slice* const /*const_ikey_ptr*/, GetContext* get_context,
     BlockCacheLookupContext* lookup_context) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifdef NDEBUG
   (void)block_offset;
 #endif
@@ -146,6 +155,7 @@ std::unique_ptr<FilterBlockReader> FullFilterBlockReader::Create(
     const BlockBasedTable* table, const ReadOptions& ro,
     FilePrefetchBuffer* prefetch_buffer, bool use_cache, bool prefetch,
     bool pin, BlockCacheLookupContext* lookup_context) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(table);
   assert(table->get_rep());
   assert(!pin || prefetch);
@@ -174,6 +184,7 @@ bool FullFilterBlockReader::PrefixMayMatch(
     uint64_t block_offset, const bool no_io,
     const Slice* const /*const_ikey_ptr*/, GetContext* get_context,
     BlockCacheLookupContext* lookup_context) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifdef NDEBUG
   (void)block_offset;
 #endif
@@ -214,6 +225,7 @@ void FullFilterBlockReader::KeysMayMatch(
     MultiGetRange* range, const SliceTransform* /*prefix_extractor*/,
     uint64_t block_offset, const bool no_io,
     BlockCacheLookupContext* lookup_context) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifdef NDEBUG
   (void)block_offset;
 #endif
@@ -230,6 +242,7 @@ void FullFilterBlockReader::PrefixesMayMatch(
     MultiGetRange* range, const SliceTransform* prefix_extractor,
     uint64_t block_offset, const bool no_io,
     BlockCacheLookupContext* lookup_context) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifdef NDEBUG
   (void)block_offset;
 #endif
@@ -312,6 +325,7 @@ bool FullFilterBlockReader::RangeMayExist(
     const Slice* const const_ikey_ptr, bool* filter_checked,
     bool need_upper_bound_check, bool no_io,
     BlockCacheLookupContext* lookup_context) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!prefix_extractor || !prefix_extractor->InDomain(user_key_without_ts)) {
     *filter_checked = false;
     return true;

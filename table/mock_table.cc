@@ -19,6 +19,7 @@ namespace mock {
 KVVector MakeMockFile(std::initializer_list<KVPair> l) { return KVVector(l); }
 
 void SortKVVector(KVVector* kv_vector, const Comparator* ucmp) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   InternalKeyComparator icmp(ucmp);
   std::sort(kv_vector->begin(), kv_vector->end(),
             [icmp](KVPair a, KVPair b) -> bool {
@@ -66,6 +67,7 @@ class MockTableReader : public TableReader {
 class MockTableIterator : public InternalIterator {
  public:
   explicit MockTableIterator(const KVVector& table) : table_(table) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     itr_ = table_.end();
   }
 
@@ -124,6 +126,7 @@ class MockTableBuilder : public TableBuilder {
                    MockTableFactory::MockCorruptionMode corrupt_mode =
                        MockTableFactory::kCorruptNone)
       : id_(id), file_system_(file_system), corrupt_mode_(corrupt_mode) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     table_ = MakeMockFile({});
   }
 
@@ -197,6 +200,7 @@ InternalIterator* MockTableReader::NewIterator(
     const ReadOptions&, const SliceTransform* /* prefix_extractor */,
     Arena* /*arena*/, bool /*skip_filters*/, TableReaderCaller /*caller*/,
     size_t /*compaction_readahead_size*/, bool /* allow_unprepared_value */) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return new MockTableIterator(table_);
 }
 
@@ -204,6 +208,7 @@ Status MockTableReader::Get(const ReadOptions&, const Slice& key,
                             GetContext* get_context,
                             const SliceTransform* /*prefix_extractor*/,
                             bool /*skip_filters*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<MockTableIterator> iter(new MockTableIterator(table_));
   for (iter->Seek(key); iter->Valid(); iter->Next()) {
     ParsedInternalKey parsed_key;
@@ -265,6 +270,7 @@ TableBuilder* MockTableFactory::NewTableBuilder(
 
 Status MockTableFactory::CreateMockTable(Env* env, const std::string& fname,
                                          KVVector file_contents) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<WritableFileWriter> file_writer;
   Status s = WritableFileWriter::Create(env->GetFileSystem(), fname,
                                         FileOptions(), &file_writer, nullptr);
@@ -299,11 +305,13 @@ Status MockTableFactory::GetIDFromFile(RandomAccessFileReader* file,
 }
 
 void MockTableFactory::AssertSingleFile(const KVVector& file_contents) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_EQ(file_system_.files.size(), 1U);
   ASSERT_EQ(file_contents, file_system_.files.begin()->second);
 }
 
 void MockTableFactory::AssertLatestFile(const KVVector& file_contents) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_GE(file_system_.files.size(), 1U);
   auto latest = file_system_.files.end();
   --latest;

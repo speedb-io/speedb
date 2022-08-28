@@ -18,6 +18,7 @@ __thread bool ThreadStatusUtil::thread_updater_initialized_ = false;
 
 void ThreadStatusUtil::RegisterThread(const Env* env,
                                       ThreadStatus::ThreadType thread_type) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!MaybeInitThreadLocalUpdater(env)) {
     return;
   }
@@ -26,6 +27,7 @@ void ThreadStatusUtil::RegisterThread(const Env* env,
 }
 
 void ThreadStatusUtil::UnregisterThread() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   thread_updater_initialized_ = false;
   if (thread_updater_local_cache_ != nullptr) {
     thread_updater_local_cache_->UnregisterThread();
@@ -36,6 +38,7 @@ void ThreadStatusUtil::UnregisterThread() {
 void ThreadStatusUtil::SetColumnFamily(const ColumnFamilyData* cfd,
                                        const Env* env,
                                        bool enable_thread_tracking) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!MaybeInitThreadLocalUpdater(env)) {
     return;
   }
@@ -51,6 +54,7 @@ void ThreadStatusUtil::SetColumnFamily(const ColumnFamilyData* cfd,
 }
 
 void ThreadStatusUtil::SetThreadOperation(ThreadStatus::OperationType op) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (thread_updater_local_cache_ == nullptr) {
     // thread_updater_local_cache_ must be set in SetColumnFamily
     // or other ThreadStatusUtil functions.
@@ -70,6 +74,7 @@ void ThreadStatusUtil::SetThreadOperation(ThreadStatus::OperationType op) {
 
 ThreadStatus::OperationStage ThreadStatusUtil::SetThreadOperationStage(
     ThreadStatus::OperationStage stage) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (thread_updater_local_cache_ == nullptr) {
     // thread_updater_local_cache_ must be set in SetColumnFamily
     // or other ThreadStatusUtil functions.
@@ -80,6 +85,7 @@ ThreadStatus::OperationStage ThreadStatusUtil::SetThreadOperationStage(
 }
 
 void ThreadStatusUtil::SetThreadOperationProperty(int code, uint64_t value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (thread_updater_local_cache_ == nullptr) {
     // thread_updater_local_cache_ must be set in SetColumnFamily
     // or other ThreadStatusUtil functions.
@@ -91,6 +97,7 @@ void ThreadStatusUtil::SetThreadOperationProperty(int code, uint64_t value) {
 
 void ThreadStatusUtil::IncreaseThreadOperationProperty(int code,
                                                        uint64_t delta) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (thread_updater_local_cache_ == nullptr) {
     // thread_updater_local_cache_ must be set in SetColumnFamily
     // or other ThreadStatusUtil functions.
@@ -101,6 +108,7 @@ void ThreadStatusUtil::IncreaseThreadOperationProperty(int code,
 }
 
 void ThreadStatusUtil::SetThreadState(ThreadStatus::StateType state) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (thread_updater_local_cache_ == nullptr) {
     // thread_updater_local_cache_ must be set in SetColumnFamily
     // or other ThreadStatusUtil functions.
@@ -111,6 +119,7 @@ void ThreadStatusUtil::SetThreadState(ThreadStatus::StateType state) {
 }
 
 void ThreadStatusUtil::ResetThreadStatus() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (thread_updater_local_cache_ == nullptr) {
     return;
   }
@@ -121,6 +130,7 @@ void ThreadStatusUtil::NewColumnFamilyInfo(const DB* db,
                                            const ColumnFamilyData* cfd,
                                            const std::string& cf_name,
                                            const Env* env) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!MaybeInitThreadLocalUpdater(env)) {
     return;
   }
@@ -132,6 +142,7 @@ void ThreadStatusUtil::NewColumnFamilyInfo(const DB* db,
 }
 
 void ThreadStatusUtil::EraseColumnFamilyInfo(const ColumnFamilyData* cfd) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (thread_updater_local_cache_ == nullptr) {
     return;
   }
@@ -139,6 +150,7 @@ void ThreadStatusUtil::EraseColumnFamilyInfo(const ColumnFamilyData* cfd) {
 }
 
 void ThreadStatusUtil::EraseDatabaseInfo(const DB* db) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ThreadStatusUpdater* thread_updater = db->GetEnv()->GetThreadStatusUpdater();
   if (thread_updater == nullptr) {
     return;
@@ -147,6 +159,7 @@ void ThreadStatusUtil::EraseDatabaseInfo(const DB* db) {
 }
 
 bool ThreadStatusUtil::MaybeInitThreadLocalUpdater(const Env* env) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!thread_updater_initialized_ && env != nullptr) {
     thread_updater_initialized_ = true;
     thread_updater_local_cache_ = env->GetThreadStatusUpdater();
@@ -156,10 +169,12 @@ bool ThreadStatusUtil::MaybeInitThreadLocalUpdater(const Env* env) {
 
 AutoThreadOperationStageUpdater::AutoThreadOperationStageUpdater(
     ThreadStatus::OperationStage stage) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   prev_stage_ = ThreadStatusUtil::SetThreadOperationStage(stage);
 }
 
 AutoThreadOperationStageUpdater::~AutoThreadOperationStageUpdater() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ThreadStatusUtil::SetThreadOperationStage(prev_stage_);
 }
 
@@ -169,6 +184,7 @@ ThreadStatusUpdater* ThreadStatusUtil::thread_updater_local_cache_ = nullptr;
 bool ThreadStatusUtil::thread_updater_initialized_ = false;
 
 bool ThreadStatusUtil::MaybeInitThreadLocalUpdater(const Env* /*env*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return false;
 }
 

@@ -65,6 +65,7 @@ struct SstFileWriter::Rep {
 
   Status AddImpl(const Slice& user_key, const Slice& value,
                  ValueType value_type) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (!builder) {
       return Status::InvalidArgument("File is not opened");
     }
@@ -100,6 +101,7 @@ struct SstFileWriter::Rep {
   }
 
   Status Add(const Slice& user_key, const Slice& value, ValueType value_type) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (internal_comparator.timestamp_size() != 0) {
       return Status::InvalidArgument("Timestamp size mismatch");
     }
@@ -109,6 +111,7 @@ struct SstFileWriter::Rep {
 
   Status Add(const Slice& user_key, const Slice& timestamp, const Slice& value,
              ValueType value_type) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     const size_t timestamp_size = timestamp.size();
 
     if (internal_comparator.timestamp_size() != timestamp_size) {
@@ -131,6 +134,7 @@ struct SstFileWriter::Rep {
   }
 
   Status DeleteRange(const Slice& begin_key, const Slice& end_key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (internal_comparator.timestamp_size() != 0) {
       return Status::InvalidArgument("Timestamp size mismatch");
     }
@@ -170,6 +174,7 @@ struct SstFileWriter::Rep {
   }
 
   Status InvalidatePageCache(bool closing) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Status s = Status::OK();
     if (invalidate_page_cache == false) {
       // Fadvise disabled
@@ -202,6 +207,7 @@ SstFileWriter::SstFileWriter(const EnvOptions& env_options,
     : rep_(new Rep(env_options, options, io_priority, user_comparator,
                    column_family, invalidate_page_cache, skip_filters,
                    DBImpl::GenerateDbSessionId(options.env))) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // SstFileWriter is used to create sst files that can be added to database
   // later. Therefore, no real db_id and db_session_id are associated with it.
   // Here we mimic the way db_session_id behaves by getting a db_session_id
@@ -212,6 +218,7 @@ SstFileWriter::SstFileWriter(const EnvOptions& env_options,
 }
 
 SstFileWriter::~SstFileWriter() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (rep_->builder) {
     // User did not call Finish() or Finish() failed, we need to
     // abandon the builder.
@@ -220,6 +227,7 @@ SstFileWriter::~SstFileWriter() {
 }
 
 Status SstFileWriter::Open(const std::string& file_path) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Rep* r = rep_.get();
   Status s;
   std::unique_ptr<FSWritableFile> sst_file;
@@ -313,37 +321,45 @@ Status SstFileWriter::Open(const std::string& file_path) {
 }
 
 Status SstFileWriter::Add(const Slice& user_key, const Slice& value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return rep_->Add(user_key, value, ValueType::kTypeValue);
 }
 
 Status SstFileWriter::Put(const Slice& user_key, const Slice& value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return rep_->Add(user_key, value, ValueType::kTypeValue);
 }
 
 Status SstFileWriter::Put(const Slice& user_key, const Slice& timestamp,
                           const Slice& value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return rep_->Add(user_key, timestamp, value, ValueType::kTypeValue);
 }
 
 Status SstFileWriter::Merge(const Slice& user_key, const Slice& value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return rep_->Add(user_key, value, ValueType::kTypeMerge);
 }
 
 Status SstFileWriter::Delete(const Slice& user_key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return rep_->Add(user_key, Slice(), ValueType::kTypeDeletion);
 }
 
 Status SstFileWriter::Delete(const Slice& user_key, const Slice& timestamp) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return rep_->Add(user_key, timestamp, Slice(),
                    ValueType::kTypeDeletionWithTimestamp);
 }
 
 Status SstFileWriter::DeleteRange(const Slice& begin_key,
                                   const Slice& end_key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return rep_->DeleteRange(begin_key, end_key);
 }
 
 Status SstFileWriter::Finish(ExternalSstFileInfo* file_info) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Rep* r = rep_.get();
   if (!r->builder) {
     return Status::InvalidArgument("File is not opened");
@@ -381,6 +397,7 @@ Status SstFileWriter::Finish(ExternalSstFileInfo* file_info) {
 }
 
 uint64_t SstFileWriter::FileSize() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return rep_->file_info.file_size;
 }
 #endif  // !ROCKSDB_LITE

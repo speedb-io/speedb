@@ -25,6 +25,7 @@ class MockedBlockBasedTable : public BlockBasedTable {
  public:
   MockedBlockBasedTable(Rep* rep, PartitionedIndexBuilder* pib)
       : BlockBasedTable(rep, /*block_cache_tracer=*/nullptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // Initialize what Open normally does as much as necessary for the test
     rep->index_key_includes_seq = pib->seperator_is_key_plus_seq();
     rep->index_value_is_full = !pib->get_use_value_delta_encoding();
@@ -36,6 +37,7 @@ class MyPartitionedFilterBlockReader : public PartitionedFilterBlockReader {
   MyPartitionedFilterBlockReader(BlockBasedTable* t,
                                  CachableEntry<Block>&& filter_block)
       : PartitionedFilterBlockReader(t, std::move(filter_block)) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     for (const auto& pair : blooms) {
       const uint64_t offset = pair.first;
       const std::string& bloom = pair.second;
@@ -71,6 +73,7 @@ class PartitionedFilterBlockTest
         env_options_(options_),
         icomp_(options_.comparator),
         bits_per_key_(10) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     table_options_.filter_policy.reset(
         NewBloomFilterPolicy(bits_per_key_, false));
     table_options_.format_version = GetParam();
@@ -83,6 +86,7 @@ class PartitionedFilterBlockTest
   const std::string missing_keys[2] = {"missing", "other"};
 
   uint64_t MaxIndexSize() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     int num_keys = sizeof(keys) / sizeof(*keys);
     uint64_t max_key_size = 0;
     for (int i = 1; i < num_keys; i++) {
@@ -93,6 +97,7 @@ class PartitionedFilterBlockTest
   }
 
   uint64_t MaxFilterSize() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     int num_keys = sizeof(keys) / sizeof(*keys);
     // General, rough over-approximation
     return num_keys * bits_per_key_ + (CACHE_LINE_SIZE * 8 + /*metadata*/ 5);
@@ -100,6 +105,7 @@ class PartitionedFilterBlockTest
 
   uint64_t last_offset = 10;
   BlockHandle Write(const Slice& slice) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     BlockHandle bh(last_offset + 1, slice.size());
     blooms[bh.offset()] = slice.ToString();
     last_offset += bh.size();
@@ -107,6 +113,7 @@ class PartitionedFilterBlockTest
   }
 
   PartitionedIndexBuilder* NewIndexBuilder() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     const bool kValueDeltaEncoded = true;
     return PartitionedIndexBuilder::CreateIndexBuilder(
         &icomp_, !kValueDeltaEncoded, table_options_);
@@ -115,6 +122,7 @@ class PartitionedFilterBlockTest
   PartitionedFilterBlockBuilder* NewBuilder(
       PartitionedIndexBuilder* const p_index_builder,
       const SliceTransform* prefix_extractor = nullptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(table_options_.block_size_deviation <= 100);
     auto partition_size = static_cast<uint32_t>(
              ((table_options_.metadata_block_size *
@@ -133,6 +141,7 @@ class PartitionedFilterBlockTest
 
   PartitionedFilterBlockReader* NewReader(
       PartitionedFilterBlockBuilder* builder, PartitionedIndexBuilder* pib) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     BlockHandle bh;
     Status status;
     Slice slice;
@@ -163,6 +172,7 @@ class PartitionedFilterBlockTest
   void VerifyReader(PartitionedFilterBlockBuilder* builder,
                     PartitionedIndexBuilder* pib, bool empty = false,
                     const SliceTransform* prefix_extractor = nullptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::unique_ptr<PartitionedFilterBlockReader> reader(
         NewReader(builder, pib));
     // Querying added keys
@@ -200,6 +210,7 @@ class PartitionedFilterBlockTest
   }
 
   int TestBlockPerKey() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::unique_ptr<PartitionedIndexBuilder> pib(NewIndexBuilder());
     std::unique_ptr<PartitionedFilterBlockBuilder> builder(
         NewBuilder(pib.get()));
@@ -222,6 +233,7 @@ class PartitionedFilterBlockTest
   }
 
   void TestBlockPerTwoKeys(const SliceTransform* prefix_extractor = nullptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::unique_ptr<PartitionedIndexBuilder> pib(NewIndexBuilder());
     std::unique_ptr<PartitionedFilterBlockBuilder> builder(
         NewBuilder(pib.get(), prefix_extractor));
@@ -241,6 +253,7 @@ class PartitionedFilterBlockTest
   }
 
   void TestBlockPerAllKeys() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::unique_ptr<PartitionedIndexBuilder> pib(NewIndexBuilder());
     std::unique_ptr<PartitionedFilterBlockBuilder> builder(
         NewBuilder(pib.get()));
@@ -260,6 +273,7 @@ class PartitionedFilterBlockTest
 
   void CutABlock(PartitionedIndexBuilder* builder,
                  const std::string& user_key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // Assuming a block is cut, add an entry to the index
     std::string key =
         std::string(*InternalKey(user_key, 0, ValueType::kTypeValue).rep());
@@ -269,6 +283,7 @@ class PartitionedFilterBlockTest
 
   void CutABlock(PartitionedIndexBuilder* builder, const std::string& user_key,
                  const std::string& next_user_key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // Assuming a block is cut, add an entry to the index
     std::string key =
         std::string(*InternalKey(user_key, 0, ValueType::kTypeValue).rep());
@@ -280,6 +295,7 @@ class PartitionedFilterBlockTest
   }
 
   int CountNumOfIndexPartitions(PartitionedIndexBuilder* builder) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     IndexBuilder::IndexBlocks dont_care_ib;
     BlockHandle dont_care_bh(10, 10);
     Status s;
@@ -299,6 +315,7 @@ INSTANTIATE_TEST_CASE_P(FormatVersions, PartitionedFilterBlockTest,
                             kLatestFormatVersion}));
 
 TEST_P(PartitionedFilterBlockTest, EmptyBuilder) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<PartitionedIndexBuilder> pib(NewIndexBuilder());
   std::unique_ptr<PartitionedFilterBlockBuilder> builder(NewBuilder(pib.get()));
   const bool empty = true;
@@ -306,6 +323,7 @@ TEST_P(PartitionedFilterBlockTest, EmptyBuilder) {
 }
 
 TEST_P(PartitionedFilterBlockTest, OneBlock) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t max_index_size = MaxIndexSize();
   for (uint64_t i = 1; i < max_index_size + 1; i++) {
     table_options_.metadata_block_size = i;
@@ -314,6 +332,7 @@ TEST_P(PartitionedFilterBlockTest, OneBlock) {
 }
 
 TEST_P(PartitionedFilterBlockTest, TwoBlocksPerKey) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t max_index_size = MaxIndexSize();
   for (uint64_t i = 1; i < max_index_size + 1; i++) {
     table_options_.metadata_block_size = i;
@@ -324,6 +343,7 @@ TEST_P(PartitionedFilterBlockTest, TwoBlocksPerKey) {
 // This reproduces the bug that a prefix is the same among multiple consecutive
 // blocks but the bug would add it only to the first block.
 TEST_P(PartitionedFilterBlockTest, SamePrefixInMultipleBlocks) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // some small number to cause partition cuts
   table_options_.metadata_block_size = 1;
   std::unique_ptr<const SliceTransform> prefix_extractor(
@@ -363,6 +383,7 @@ TEST_P(PartitionedFilterBlockTest, SamePrefixInMultipleBlocks) {
 // This reproduces the bug in format_version=3 that the seeking the prefix will
 // lead us to the partition before the one that has filter for the prefix.
 TEST_P(PartitionedFilterBlockTest, PrefixInWrongPartitionBug) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // some small number to cause partition cuts
   table_options_.metadata_block_size = 1;
   std::unique_ptr<const SliceTransform> prefix_extractor(
@@ -399,6 +420,7 @@ TEST_P(PartitionedFilterBlockTest, PrefixInWrongPartitionBug) {
 }
 
 TEST_P(PartitionedFilterBlockTest, OneBlockPerKey) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t max_index_size = MaxIndexSize();
   for (uint64_t i = 1; i < max_index_size + 1; i++) {
     table_options_.metadata_block_size = i;
@@ -407,6 +429,7 @@ TEST_P(PartitionedFilterBlockTest, OneBlockPerKey) {
 }
 
 TEST_P(PartitionedFilterBlockTest, PartitionCount) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   int num_keys = sizeof(keys) / sizeof(*keys);
   table_options_.metadata_block_size =
       std::max(MaxIndexSize(), MaxFilterSize());
@@ -421,6 +444,7 @@ TEST_P(PartitionedFilterBlockTest, PartitionCount) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

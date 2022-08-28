@@ -15,6 +15,7 @@
 namespace ROCKSDB_NAMESPACE {
 
 Cleanable::Cleanable() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   cleanup_.function = nullptr;
   cleanup_.next = nullptr;
 }
@@ -22,10 +23,12 @@ Cleanable::Cleanable() {
 Cleanable::~Cleanable() { DoCleanup(); }
 
 Cleanable::Cleanable(Cleanable&& other) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   *this = std::move(other);
 }
 
 Cleanable& Cleanable::operator=(Cleanable&& other) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (this != &other) {
     cleanup_ = other.cleanup_;
     other.cleanup_.function = nullptr;
@@ -51,6 +54,7 @@ Cleanable& Cleanable::operator=(Cleanable&& other) {
 // and have the entire list (minus the head that has to be inserted separately)
 // merged with the target linked list at once.
 void Cleanable::DelegateCleanupsTo(Cleanable* other) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(other != nullptr);
   if (cleanup_.function == nullptr) {
     return;
@@ -68,6 +72,7 @@ void Cleanable::DelegateCleanupsTo(Cleanable* other) {
 }
 
 void Cleanable::RegisterCleanup(Cleanable::Cleanup* c) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(c != nullptr);
   if (cleanup_.function == nullptr) {
     cleanup_.function = c->function;
@@ -81,6 +86,7 @@ void Cleanable::RegisterCleanup(Cleanable::Cleanup* c) {
 }
 
 void Cleanable::RegisterCleanup(CleanupFunction func, void* arg1, void* arg2) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(func != nullptr);
   Cleanup* c;
   if (cleanup_.function == nullptr) {
@@ -96,6 +102,7 @@ void Cleanable::RegisterCleanup(CleanupFunction func, void* arg1, void* arg2) {
 }
 
 Status Iterator::GetProperty(std::string prop_name, std::string* prop) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (prop == nullptr) {
     return Status::InvalidArgument("prop is nullptr");
   }
@@ -160,11 +167,13 @@ class EmptyInternalIterator : public InternalIteratorBase<TValue> {
 Iterator* NewEmptyIterator() { return new EmptyIterator(Status::OK()); }
 
 Iterator* NewErrorIterator(const Status& status) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return new EmptyIterator(status);
 }
 
 template <class TValue>
 InternalIteratorBase<TValue>* NewErrorInternalIterator(const Status& status) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return new EmptyInternalIterator<TValue>(status);
 }
 template InternalIteratorBase<IndexValue>* NewErrorInternalIterator(
@@ -175,6 +184,7 @@ template InternalIteratorBase<Slice>* NewErrorInternalIterator(
 template <class TValue>
 InternalIteratorBase<TValue>* NewErrorInternalIterator(const Status& status,
                                                        Arena* arena) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (arena == nullptr) {
     return NewErrorInternalIterator<TValue>(status);
   } else {
@@ -189,6 +199,7 @@ template InternalIteratorBase<Slice>* NewErrorInternalIterator(
 
 template <class TValue>
 InternalIteratorBase<TValue>* NewEmptyInternalIterator() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return new EmptyInternalIterator<TValue>(Status::OK());
 }
 template InternalIteratorBase<IndexValue>* NewEmptyInternalIterator();
@@ -196,6 +207,7 @@ template InternalIteratorBase<Slice>* NewEmptyInternalIterator();
 
 template <class TValue>
 InternalIteratorBase<TValue>* NewEmptyInternalIterator(Arena* arena) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (arena == nullptr) {
     return NewEmptyInternalIterator<TValue>();
   } else {

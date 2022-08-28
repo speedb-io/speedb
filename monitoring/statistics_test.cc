@@ -19,6 +19,7 @@ class StatisticsTest : public testing::Test {};
 // Sanity check to make sure that contents and order of TickersNameMap
 // match Tickers enum
 TEST_F(StatisticsTest, SanityTickers) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   EXPECT_EQ(static_cast<size_t>(Tickers::TICKER_ENUM_MAX),
             TickersNameMap.size());
 
@@ -31,6 +32,7 @@ TEST_F(StatisticsTest, SanityTickers) {
 // Sanity check to make sure that contents and order of HistogramsNameMap
 // match Tickers enum
 TEST_F(StatisticsTest, SanityHistograms) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   EXPECT_EQ(static_cast<size_t>(Histograms::HISTOGRAM_ENUM_MAX),
             HistogramsNameMap.size());
 
@@ -41,6 +43,7 @@ TEST_F(StatisticsTest, SanityHistograms) {
 }
 
 TEST_F(StatisticsTest, NoNameStats) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   static std::unordered_map<std::string, OptionTypeInfo> no_name_opt_info = {
 #ifndef ROCKSDB_LITE
       {"inner",
@@ -54,6 +57,7 @@ TEST_F(StatisticsTest, NoNameStats) {
    public:
     DefaultNameStatistics(const std::shared_ptr<Statistics>& stats = nullptr)
         : inner(stats) {
+PERF_MARKER(__PRETTY_FUNCTION__);
       RegisterOptions("", &inner, &no_name_opt_info);
     }
 
@@ -86,6 +90,7 @@ TEST_F(StatisticsTest, NoNameStats) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

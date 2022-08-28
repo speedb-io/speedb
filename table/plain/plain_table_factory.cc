@@ -53,6 +53,7 @@ static std::unordered_map<std::string, OptionTypeInfo> plain_table_type_info = {
 
 PlainTableFactory::PlainTableFactory(const PlainTableOptions& options)
     : table_options_(options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   RegisterOptions(&table_options_, &plain_table_type_info);
 }
 
@@ -126,6 +127,7 @@ std::string PlainTableFactory::GetPrintableOptions() const {
 Status GetPlainTableOptionsFromString(const PlainTableOptions& table_options,
                                       const std::string& opts_str,
                                       PlainTableOptions* new_table_options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ConfigOptions config_options;
   config_options.input_strings_escaped = false;
   config_options.ignore_unknown_options = false;
@@ -138,6 +140,7 @@ Status GetPlainTableOptionsFromString(const ConfigOptions& config_options,
                                       const PlainTableOptions& table_options,
                                       const std::string& opts_str,
                                       PlainTableOptions* new_table_options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unordered_map<std::string, std::string> opts_map;
   Status s = StringToMap(opts_str, &opts_map);
   if (!s.ok()) {
@@ -158,6 +161,7 @@ Status GetPlainTableOptionsFromString(const ConfigOptions& config_options,
 #ifndef ROCKSDB_LITE
 static int RegisterBuiltinMemTableRepFactory(ObjectLibrary& library,
                                              const std::string& /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // The MemTableRepFactory built-in classes will be either a class
   // (VectorRepFactory) or a nickname (vector), followed optionally by ":#",
   // where # is the "size" of the factory.
@@ -236,6 +240,7 @@ static int RegisterBuiltinMemTableRepFactory(ObjectLibrary& library,
 
 Status GetMemTableRepFactoryFromString(
     const std::string& opts_str, std::unique_ptr<MemTableRepFactory>* result) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ConfigOptions config_options;
   config_options.ignore_unsupported_options = false;
   config_options.ignore_unknown_options = false;
@@ -245,6 +250,7 @@ Status GetMemTableRepFactoryFromString(
 Status MemTableRepFactory::CreateFromString(
     const ConfigOptions& config_options, const std::string& value,
     std::unique_ptr<MemTableRepFactory>* result) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifndef ROCKSDB_LITE
   static std::once_flag once;
   std::call_once(once, [&]() {
@@ -299,6 +305,7 @@ Status GetPlainTableOptionsFromMap(
     const std::unordered_map<std::string, std::string>& opts_map,
     PlainTableOptions* new_table_options, bool input_strings_escaped,
     bool ignore_unknown_options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ConfigOptions config_options;
   config_options.input_strings_escaped = input_strings_escaped;
   config_options.ignore_unknown_options = ignore_unknown_options;
@@ -310,6 +317,7 @@ Status GetPlainTableOptionsFromMap(
     const ConfigOptions& config_options, const PlainTableOptions& table_options,
     const std::unordered_map<std::string, std::string>& opts_map,
     PlainTableOptions* new_table_options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(new_table_options);
   PlainTableFactory ptf(table_options);
   Status s = ptf.ConfigureFromMap(config_options, opts_map);
@@ -323,6 +331,7 @@ Status GetPlainTableOptionsFromMap(
 }
 
 extern TableFactory* NewPlainTableFactory(const PlainTableOptions& options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return new PlainTableFactory(options);
 }
 

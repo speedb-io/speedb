@@ -23,6 +23,7 @@ class MergerTest : public testing::Test {
         single_iterator_(nullptr) {}
   ~MergerTest() override = default;
   std::vector<std::string> GenerateStrings(size_t len, int string_len) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::vector<std::string> ret;
 
     for (size_t i = 0; i < len; ++i) {
@@ -34,6 +35,7 @@ class MergerTest : public testing::Test {
   }
 
   void AssertEquivalence() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     auto a = merging_iterator_.get();
     auto b = single_iterator_.get();
     if (!a->Valid()) {
@@ -46,26 +48,31 @@ class MergerTest : public testing::Test {
   }
 
   void SeekToRandom() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     InternalKey ik(rnd_.HumanReadableString(5), 0, ValueType::kTypeValue);
     Seek(ik.Encode().ToString(false));
   }
 
   void Seek(std::string target) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     merging_iterator_->Seek(target);
     single_iterator_->Seek(target);
   }
 
   void SeekToFirst() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     merging_iterator_->SeekToFirst();
     single_iterator_->SeekToFirst();
   }
 
   void SeekToLast() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     merging_iterator_->SeekToLast();
     single_iterator_->SeekToLast();
   }
 
   void Next(int times) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     for (int i = 0; i < times && merging_iterator_->Valid(); ++i) {
       AssertEquivalence();
       merging_iterator_->Next();
@@ -75,6 +82,7 @@ class MergerTest : public testing::Test {
   }
 
   void Prev(int times) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     for (int i = 0; i < times && merging_iterator_->Valid(); ++i) {
       AssertEquivalence();
       merging_iterator_->Prev();
@@ -84,6 +92,7 @@ class MergerTest : public testing::Test {
   }
 
   void NextAndPrev(int times) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     for (int i = 0; i < times && merging_iterator_->Valid(); ++i) {
       AssertEquivalence();
       if (rnd_.OneIn(2)) {
@@ -99,6 +108,7 @@ class MergerTest : public testing::Test {
 
   void Generate(size_t num_iterators, size_t strings_per_iterator,
                 int letters_per_string) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::vector<InternalIterator*> small_iterators;
     for (size_t i = 0; i < num_iterators; ++i) {
       auto strings = GenerateStrings(strings_per_iterator, letters_per_string);
@@ -120,6 +130,7 @@ class MergerTest : public testing::Test {
 };
 
 TEST_F(MergerTest, SeekToRandomNextTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Generate(1000, 50, 50);
   for (int i = 0; i < 10; ++i) {
     SeekToRandom();
@@ -129,6 +140,7 @@ TEST_F(MergerTest, SeekToRandomNextTest) {
 }
 
 TEST_F(MergerTest, SeekToRandomNextSmallStringsTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Generate(1000, 50, 2);
   for (int i = 0; i < 10; ++i) {
     SeekToRandom();
@@ -138,6 +150,7 @@ TEST_F(MergerTest, SeekToRandomNextSmallStringsTest) {
 }
 
 TEST_F(MergerTest, SeekToRandomPrevTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Generate(1000, 50, 50);
   for (int i = 0; i < 10; ++i) {
     SeekToRandom();
@@ -147,6 +160,7 @@ TEST_F(MergerTest, SeekToRandomPrevTest) {
 }
 
 TEST_F(MergerTest, SeekToRandomRandomTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Generate(200, 50, 50);
   for (int i = 0; i < 3; ++i) {
     SeekToRandom();
@@ -156,6 +170,7 @@ TEST_F(MergerTest, SeekToRandomRandomTest) {
 }
 
 TEST_F(MergerTest, SeekToFirstTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Generate(1000, 50, 50);
   for (int i = 0; i < 10; ++i) {
     SeekToFirst();
@@ -165,6 +180,7 @@ TEST_F(MergerTest, SeekToFirstTest) {
 }
 
 TEST_F(MergerTest, SeekToLastTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Generate(1000, 50, 50);
   for (int i = 0; i < 10; ++i) {
     SeekToLast();
@@ -176,6 +192,7 @@ TEST_F(MergerTest, SeekToLastTest) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

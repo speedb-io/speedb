@@ -36,6 +36,7 @@
 namespace ROCKSDB_NAMESPACE {
 
 void TailPrefetchStats::RecordEffectiveSize(size_t len) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   MutexLock l(&mutex_);
   if (num_records_ < kNumTracked) {
     num_records_++;
@@ -47,6 +48,7 @@ void TailPrefetchStats::RecordEffectiveSize(size_t len) {
 }
 
 size_t TailPrefetchStats::GetSuggestedPrefetchSize() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::vector<size_t> sorted;
   {
     MutexLock l(&mutex_);
@@ -352,6 +354,7 @@ static std::unordered_map<std::string, OptionTypeInfo>
           OptionTypeFlags::kNone,
           [](const ConfigOptions& /*opts*/, const std::string& /*name*/,
              const std::string& value, void* addr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
             // A workaround to fix a bug in 6.10, 6.11, 6.12, 6.13
             // and 6.14. The bug will write out 8 bytes to OPTIONS file from the
             // starting address of BlockBasedTableOptions.read_amp_bytes_per_bit
@@ -391,6 +394,7 @@ static std::unordered_map<std::string, OptionTypeInfo>
           // Parses the input vsalue as a Cache
           [](const ConfigOptions& opts, const std::string&,
              const std::string& value, void* addr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
             auto* cache = static_cast<std::shared_ptr<Cache>*>(addr);
             return Cache::CreateFromString(opts, value, cache);
           }}},
@@ -401,6 +405,7 @@ static std::unordered_map<std::string, OptionTypeInfo>
           // Parses the input vsalue as a Cache
           [](const ConfigOptions& opts, const std::string&,
              const std::string& value, void* addr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
             auto* cache = static_cast<std::shared_ptr<Cache>*>(addr);
             return Cache::CreateFromString(opts, value, cache);
           }}},
@@ -426,6 +431,7 @@ static std::unordered_map<std::string, OptionTypeInfo>
 BlockBasedTableFactory::BlockBasedTableFactory(
     const BlockBasedTableOptions& _table_options)
     : table_options_(_table_options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   InitializeOptions();
   RegisterOptions(&table_options_, &block_based_table_type_info);
 
@@ -439,6 +445,7 @@ BlockBasedTableFactory::BlockBasedTableFactory(
 }
 
 void BlockBasedTableFactory::InitializeOptions() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (table_options_.flush_block_policy_factory == nullptr) {
     table_options_.flush_block_policy_factory.reset(
         new FlushBlockBySizePolicyFactory());
@@ -477,6 +484,7 @@ void BlockBasedTableFactory::InitializeOptions() {
 }
 
 Status BlockBasedTableFactory::PrepareOptions(const ConfigOptions& opts) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   InitializeOptions();
   return TableFactory::PrepareOptions(opts);
 }
@@ -485,6 +493,7 @@ namespace {
 // Different cache kinds use the same keys for physically different values, so
 // they must not share an underlying key space with each other.
 Status CheckCacheOptionCompatibility(const BlockBasedTableOptions& bbto) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   int cache_count = (bbto.block_cache != nullptr) +
                     (bbto.block_cache_compressed != nullptr) +
                     (bbto.persistent_cache != nullptr);
@@ -896,6 +905,7 @@ Status BlockBasedTableFactory::ParseOption(const ConfigOptions& config_options,
                                            const std::string& opt_name,
                                            const std::string& opt_value,
                                            void* opt_ptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Status status = TableFactory::ParseOption(config_options, opt_info, opt_name,
                                             opt_value, opt_ptr);
   if (config_options.input_strings_escaped && !status.ok()) {  // Got an error
@@ -911,6 +921,7 @@ Status BlockBasedTableFactory::ParseOption(const ConfigOptions& config_options,
 Status GetBlockBasedTableOptionsFromString(
     const BlockBasedTableOptions& table_options, const std::string& opts_str,
     BlockBasedTableOptions* new_table_options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ConfigOptions config_options;
   config_options.input_strings_escaped = false;
   config_options.ignore_unknown_options = false;
@@ -924,6 +935,7 @@ Status GetBlockBasedTableOptionsFromString(
     const ConfigOptions& config_options,
     const BlockBasedTableOptions& table_options, const std::string& opts_str,
     BlockBasedTableOptions* new_table_options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unordered_map<std::string, std::string> opts_map;
   Status s = StringToMap(opts_str, &opts_map);
   if (!s.ok()) {
@@ -944,6 +956,7 @@ Status GetBlockBasedTableOptionsFromMap(
     const std::unordered_map<std::string, std::string>& opts_map,
     BlockBasedTableOptions* new_table_options, bool input_strings_escaped,
     bool ignore_unknown_options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ConfigOptions config_options;
   config_options.input_strings_escaped = input_strings_escaped;
   config_options.ignore_unknown_options = ignore_unknown_options;
@@ -958,6 +971,7 @@ Status GetBlockBasedTableOptionsFromMap(
     const BlockBasedTableOptions& table_options,
     const std::unordered_map<std::string, std::string>& opts_map,
     BlockBasedTableOptions* new_table_options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(new_table_options);
   BlockBasedTableFactory bbtf(table_options);
   Status s = bbtf.ConfigureFromMap(config_options, opts_map);
@@ -972,6 +986,7 @@ Status GetBlockBasedTableOptionsFromMap(
 
 TableFactory* NewBlockBasedTableFactory(
     const BlockBasedTableOptions& _table_options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return new BlockBasedTableFactory(_table_options);
 }
 

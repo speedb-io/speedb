@@ -24,6 +24,7 @@ static std::unordered_map<std::string, OptionTypeInfo> ma_wrapper_type_info = {
 #ifndef ROCKSDB_LITE
 static int RegisterBuiltinAllocators(ObjectLibrary& library,
                                      const std::string& /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   library.AddFactory<MemoryAllocator>(
       DefaultMemoryAllocator::kClassName(),
       [](const std::string& /*uri*/, std::unique_ptr<MemoryAllocator>* guard,
@@ -67,12 +68,14 @@ static int RegisterBuiltinAllocators(ObjectLibrary& library,
 MemoryAllocatorWrapper::MemoryAllocatorWrapper(
     const std::shared_ptr<MemoryAllocator>& t)
     : target_(t) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   RegisterOptions("", &target_, &ma_wrapper_type_info);
 }
 
 Status MemoryAllocator::CreateFromString(
     const ConfigOptions& options, const std::string& value,
     std::shared_ptr<MemoryAllocator>* result) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifndef ROCKSDB_LITE
   static std::once_flag once;
   std::call_once(once, [&]() {

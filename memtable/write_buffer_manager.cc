@@ -28,6 +28,7 @@ WriteBufferManager::WriteBufferManager(size_t _buffer_size,
       cache_res_mgr_(nullptr),
       allow_stall_(allow_stall),
       stall_active_(false) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifndef ROCKSDB_LITE
   if (cache) {
     // Memtable's memory usage tends to fluctuate frequently
@@ -43,6 +44,7 @@ WriteBufferManager::WriteBufferManager(size_t _buffer_size,
 }
 
 WriteBufferManager::~WriteBufferManager() {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifndef NDEBUG
   std::unique_lock<std::mutex> lock(mu_);
   assert(queue_.empty());
@@ -58,6 +60,7 @@ std::size_t WriteBufferManager::dummy_entries_in_cache_usage() const {
 }
 
 void WriteBufferManager::ReserveMem(size_t mem) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (cache_res_mgr_ != nullptr) {
     ReserveMemWithCache(mem);
   } else if (enabled()) {
@@ -70,6 +73,7 @@ void WriteBufferManager::ReserveMem(size_t mem) {
 
 // Should only be called from write thread
 void WriteBufferManager::ReserveMemWithCache(size_t mem) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifndef ROCKSDB_LITE
   assert(cache_res_mgr_ != nullptr);
   // Use a mutex to protect various data structures. Can be optimized to a
@@ -92,12 +96,14 @@ void WriteBufferManager::ReserveMemWithCache(size_t mem) {
 }
 
 void WriteBufferManager::ScheduleFreeMem(size_t mem) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (enabled()) {
     memory_active_.fetch_sub(mem, std::memory_order_relaxed);
   }
 }
 
 void WriteBufferManager::FreeMem(size_t mem) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (cache_res_mgr_ != nullptr) {
     FreeMemWithCache(mem);
   } else if (enabled()) {
@@ -108,6 +114,7 @@ void WriteBufferManager::FreeMem(size_t mem) {
 }
 
 void WriteBufferManager::FreeMemWithCache(size_t mem) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifndef ROCKSDB_LITE
   assert(cache_res_mgr_ != nullptr);
   // Use a mutex to protect various data structures. Can be optimized to a
@@ -128,6 +135,7 @@ void WriteBufferManager::FreeMemWithCache(size_t mem) {
 }
 
 void WriteBufferManager::BeginWriteStall(StallInterface* wbm_stall) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(wbm_stall != nullptr);
   assert(allow_stall_);
 
@@ -152,6 +160,7 @@ void WriteBufferManager::BeginWriteStall(StallInterface* wbm_stall) {
 
 // Called when memory is freed in FreeMem or the buffer size has changed.
 void WriteBufferManager::MaybeEndWriteStall() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Cannot early-exit on !enabled() because SetBufferSize(0) needs to unblock
   // the writers.
   if (!allow_stall_) {
@@ -181,6 +190,7 @@ void WriteBufferManager::MaybeEndWriteStall() {
 }
 
 void WriteBufferManager::RemoveDBFromQueue(StallInterface* wbm_stall) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(wbm_stall != nullptr);
 
   // Deallocate the removed nodes outside of the lock.

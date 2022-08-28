@@ -21,10 +21,12 @@ __thread IOStatsContext iostats_context;
 #endif
 
 IOStatsContext* get_iostats_context() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return &iostats_context;
 }
 
 void IOStatsContext::Reset() {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifndef NIOSTATS_CONTEXT
   thread_pool_id = Env::Priority::TOTAL;
   bytes_read = 0;

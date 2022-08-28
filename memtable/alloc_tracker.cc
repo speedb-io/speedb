@@ -23,6 +23,7 @@ AllocTracker::AllocTracker(WriteBufferManager* write_buffer_manager)
 AllocTracker::~AllocTracker() { FreeMem(); }
 
 void AllocTracker::Allocate(size_t bytes) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(write_buffer_manager_ != nullptr);
   if (write_buffer_manager_->enabled() ||
       write_buffer_manager_->cost_to_cache()) {
@@ -32,6 +33,7 @@ void AllocTracker::Allocate(size_t bytes) {
 }
 
 void AllocTracker::DoneAllocating() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (write_buffer_manager_ != nullptr && !done_allocating_) {
     if (write_buffer_manager_->enabled() ||
         write_buffer_manager_->cost_to_cache()) {
@@ -45,6 +47,7 @@ void AllocTracker::DoneAllocating() {
 }
 
 void AllocTracker::FreeMem() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!done_allocating_) {
     DoneAllocating();
   }

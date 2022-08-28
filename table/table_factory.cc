@@ -16,6 +16,7 @@
 namespace ROCKSDB_NAMESPACE {
 
 static void RegisterTableFactories(const std::string& /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifndef ROCKSDB_LITE
   static std::once_flag loaded;
   std::call_once(loaded, []() {
@@ -47,6 +48,7 @@ static void RegisterTableFactories(const std::string& /*arg*/) {
 
 static bool LoadFactory(const std::string& name,
                         std::shared_ptr<TableFactory>* factory) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (name == TableFactory::kBlockBasedTableName()) {
     factory->reset(new BlockBasedTableFactory());
     return true;
@@ -58,6 +60,7 @@ static bool LoadFactory(const std::string& name,
 Status TableFactory::CreateFromString(const ConfigOptions& config_options,
                                       const std::string& value,
                                       std::shared_ptr<TableFactory>* factory) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   RegisterTableFactories("");
   return LoadSharedObject<TableFactory>(config_options, value, LoadFactory,
                                         factory);

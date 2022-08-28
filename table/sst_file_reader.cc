@@ -40,6 +40,7 @@ SstFileReader::SstFileReader(const Options& options) : rep_(new Rep(options)) {}
 SstFileReader::~SstFileReader() {}
 
 Status SstFileReader::Open(const std::string& file_path) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto r = rep_.get();
   Status s;
   uint64_t file_size = 0;
@@ -67,6 +68,7 @@ Status SstFileReader::Open(const std::string& file_path) {
 }
 
 Iterator* SstFileReader::NewIterator(const ReadOptions& roptions) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto r = rep_.get();
   auto sequence = roptions.snapshot != nullptr
                       ? roptions.snapshot->GetSequenceNumber()
@@ -92,6 +94,7 @@ std::shared_ptr<const TableProperties> SstFileReader::GetTableProperties()
 }
 
 Status SstFileReader::VerifyChecksum(const ReadOptions& read_options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return rep_->table_reader->VerifyChecksum(read_options,
                                             TableReaderCaller::kSSTFileReader);
 }

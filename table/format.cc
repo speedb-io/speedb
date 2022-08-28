@@ -49,6 +49,7 @@ const uint64_t kPlainTableMagicNumber = 0;
 const char* kHostnameForDbHostId = "__hostname__";
 
 bool ShouldReportDetailedTime(Env* env, Statistics* stats) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return env != nullptr && stats != nullptr &&
          stats->get_stats_level() > kExceptDetailedTimers;
 }
@@ -70,6 +71,7 @@ char* BlockHandle::EncodeTo(char* dst) const {
 }
 
 Status BlockHandle::DecodeFrom(Slice* input) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (GetVarint64(input, &offset_) && GetVarint64(input, &size_)) {
     return Status::OK();
   } else {
@@ -81,6 +83,7 @@ Status BlockHandle::DecodeFrom(Slice* input) {
 }
 
 Status BlockHandle::DecodeSizeFrom(uint64_t _offset, Slice* input) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (GetVarint64(input, &size_)) {
     offset_ = _offset;
     return Status::OK();
@@ -125,6 +128,7 @@ void IndexValue::EncodeTo(std::string* dst, bool have_first_key,
 
 Status IndexValue::DecodeFrom(Slice* input, bool have_first_key,
                               const BlockHandle* previous_handle) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (previous_handle) {
     int64_t delta;
     if (!GetVarsignedint64(input, &delta)) {
@@ -162,10 +166,12 @@ std::string IndexValue::ToString(bool hex, bool have_first_key) const {
 
 namespace {
 inline bool IsLegacyFooterFormat(uint64_t magic_number) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return magic_number == kLegacyBlockBasedTableMagicNumber ||
          magic_number == kLegacyPlainTableMagicNumber;
 }
 inline uint64_t UpconvertLegacyFooterFormat(uint64_t magic_number) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (magic_number == kLegacyBlockBasedTableMagicNumber) {
     return kBlockBasedTableMagicNumber;
   }
@@ -176,6 +182,7 @@ inline uint64_t UpconvertLegacyFooterFormat(uint64_t magic_number) {
   return magic_number;
 }
 inline uint64_t DownconvertToLegacyFooterFormat(uint64_t magic_number) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (magic_number == kBlockBasedTableMagicNumber) {
     return kLegacyBlockBasedTableMagicNumber;
   }
@@ -186,6 +193,7 @@ inline uint64_t DownconvertToLegacyFooterFormat(uint64_t magic_number) {
   return magic_number;
 }
 inline uint8_t BlockTrailerSizeForMagicNumber(uint64_t magic_number) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (magic_number == kBlockBasedTableMagicNumber ||
       magic_number == kLegacyBlockBasedTableMagicNumber) {
     return static_cast<uint8_t>(BlockBasedTable::kBlockTrailerSize);
@@ -218,6 +226,7 @@ void FooterBuilder::Build(uint64_t magic_number, uint32_t format_version,
                           uint64_t footer_offset, ChecksumType checksum_type,
                           const BlockHandle& metaindex_handle,
                           const BlockHandle& index_handle) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   (void)footer_offset;  // Future use
 
   assert(magic_number != Footer::kNullTableMagicNumber);
@@ -265,6 +274,7 @@ void FooterBuilder::Build(uint64_t magic_number, uint32_t format_version,
 }
 
 Status Footer::DecodeFrom(Slice input, uint64_t input_offset) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   (void)input_offset;  // Future use
 
   // Only decode to unused Footer
@@ -350,6 +360,7 @@ Status ReadFooterFromFile(const IOOptions& opts, RandomAccessFileReader* file,
                           FilePrefetchBuffer* prefetch_buffer,
                           uint64_t file_size, Footer* footer,
                           uint64_t enforce_table_magic_number) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (file_size < Footer::kMinEncodedLength) {
     return Status::Corruption("file is too short (" + ToString(file_size) +
                               " bytes) to be an "
@@ -415,6 +426,7 @@ namespace {
 // API to get an effective block checksum. This function is its own inverse
 // because it uses xor.
 inline uint32_t ModifyChecksumForLastByte(uint32_t checksum, char last_byte) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // This strategy bears some resemblance to extending a CRC checksum by one
   // more byte, except we don't need to re-mix the input checksum as long as
   // we do this step only once (per checksum).
@@ -425,6 +437,7 @@ inline uint32_t ModifyChecksumForLastByte(uint32_t checksum, char last_byte) {
 
 uint32_t ComputeBuiltinChecksum(ChecksumType type, const char* data,
                                 size_t data_size) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   switch (type) {
     case kCRC32c:
       return crc32c::Mask(crc32c::Value(data, data_size));
@@ -451,6 +464,7 @@ uint32_t ComputeBuiltinChecksum(ChecksumType type, const char* data,
 
 uint32_t ComputeBuiltinChecksumWithLastByte(ChecksumType type, const char* data,
                                             size_t data_size, char last_byte) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   switch (type) {
     case kCRC32c: {
       uint32_t crc = crc32c::Value(data, data_size);
@@ -496,6 +510,7 @@ Status UncompressBlockContentsForCompressionType(
     const UncompressionInfo& uncompression_info, const char* data, size_t n,
     BlockContents* contents, uint32_t format_version,
     const ImmutableOptions& ioptions, MemoryAllocator* allocator) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Status ret = Status::OK();
 
   assert(uncompression_info.type() != kNoCompression &&
@@ -552,6 +567,7 @@ Status UncompressBlockContents(const UncompressionInfo& uncompression_info,
                                BlockContents* contents, uint32_t format_version,
                                const ImmutableOptions& ioptions,
                                MemoryAllocator* allocator) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(data[n] != kNoCompression);
   assert(data[n] == static_cast<char>(uncompression_info.type()));
   return UncompressBlockContentsForCompressionType(uncompression_info, data, n,
@@ -562,6 +578,7 @@ Status UncompressBlockContents(const UncompressionInfo& uncompression_info,
 // Replace the contents of db_host_id with the actual hostname, if db_host_id
 // matches the keyword kHostnameForDbHostId
 Status ReifyDbHostIdProperty(Env* env, std::string* db_host_id) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(db_host_id);
   if (*db_host_id == kHostnameForDbHostId) {
     Status s = env->GetHostNameString(db_host_id);

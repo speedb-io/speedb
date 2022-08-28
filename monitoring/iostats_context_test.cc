@@ -9,6 +9,7 @@
 namespace ROCKSDB_NAMESPACE {
 
 TEST(IOStatsContextTest, ToString) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   get_iostats_context()->Reset();
   get_iostats_context()->bytes_read = 12345;
 
@@ -24,6 +25,7 @@ TEST(IOStatsContextTest, ToString) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

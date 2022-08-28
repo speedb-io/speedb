@@ -69,6 +69,7 @@ class SimpleConfigurable : public TestConfigurable<Configurable> {
       int mode = TestConfigMode::kDefaultMode,
       const std::unordered_map<std::string, OptionTypeInfo>* map =
           &simple_option_info) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return new SimpleConfigurable(name, mode, map);
   }
 
@@ -76,6 +77,7 @@ class SimpleConfigurable : public TestConfigurable<Configurable> {
                      const std::unordered_map<std::string, OptionTypeInfo>*
                          map = &simple_option_info)
       : TestConfigurable(name, mode, map) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if ((mode & TestConfigMode::kUniqueMode) != 0) {
       unique_.reset(SimpleConfigurable::Create("Unique" + name_));
       RegisterOptions(name_ + "Unique", &unique_, &unique_option_info);
@@ -102,6 +104,7 @@ class ConfigurableTest : public testing::Test {
 };
 
 TEST_F(ConfigurableTest, GetOptionsPtrTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string opt_str;
   std::unique_ptr<Configurable> configurable(SimpleConfigurable::Create());
   ASSERT_NE(configurable->GetOptions<TestOptions>("simple"), nullptr);
@@ -109,6 +112,7 @@ TEST_F(ConfigurableTest, GetOptionsPtrTest) {
 }
 
 TEST_F(ConfigurableTest, ConfigureFromMapTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<Configurable> configurable(SimpleConfigurable::Create());
   auto* opts = configurable->GetOptions<TestOptions>("simple");
   ASSERT_OK(configurable->ConfigureFromMap(config_options_, {}));
@@ -124,6 +128,7 @@ TEST_F(ConfigurableTest, ConfigureFromMapTest) {
 }
 
 TEST_F(ConfigurableTest, ConfigureFromStringTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<Configurable> configurable(SimpleConfigurable::Create());
   auto* opts = configurable->GetOptions<TestOptions>("simple");
   ASSERT_OK(configurable->ConfigureFromString(config_options_, ""));
@@ -139,6 +144,7 @@ TEST_F(ConfigurableTest, ConfigureFromStringTest) {
 
 #ifndef ROCKSDB_LITE  // GetOptionsFromMap is not supported in ROCKSDB_LITE
 TEST_F(ConfigurableTest, ConfigureIgnoreTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<Configurable> configurable(SimpleConfigurable::Create());
   std::unordered_map<std::string, std::string> options_map = {{"unused", "u"}};
   ConfigOptions ignore = config_options_;
@@ -150,6 +156,7 @@ TEST_F(ConfigurableTest, ConfigureIgnoreTest) {
 }
 
 TEST_F(ConfigurableTest, ConfigureNestedOptionsTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<Configurable> base, copy;
   std::string opt_str;
   std::string mismatch;
@@ -166,12 +173,14 @@ TEST_F(ConfigurableTest, ConfigureNestedOptionsTest) {
 }
 
 TEST_F(ConfigurableTest, GetOptionsTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<Configurable> simple;
 
   simple.reset(
       SimpleConfigurable::Create("simple", TestConfigMode::kAllOptMode));
   int i = 11;
   for (auto opt : {"", "shared.", "unique.", "pointer."}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::string value;
     std::string expected = ToString(i);
     std::string opt_name = opt;
@@ -193,6 +202,7 @@ TEST_F(ConfigurableTest, GetOptionsTest) {
 }
 
 TEST_F(ConfigurableTest, ConfigureBadOptionsTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<Configurable> configurable(SimpleConfigurable::Create());
   auto* opts = configurable->GetOptions<TestOptions>("simple");
   ASSERT_NE(opts, nullptr);
@@ -206,6 +216,7 @@ TEST_F(ConfigurableTest, ConfigureBadOptionsTest) {
 }
 
 TEST_F(ConfigurableTest, InvalidOptionTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<Configurable> configurable(SimpleConfigurable::Create());
   std::unordered_map<std::string, std::string> options_map = {
       {"bad-option", "bad"}};
@@ -247,6 +258,7 @@ class ValidatedConfigurable : public SimpleConfigurable {
       : SimpleConfigurable(name, TestConfigMode::kDefaultMode),
         validated(false),
         prepared(0) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     RegisterOptions("Validated", &validated, &validated_option_info);
     RegisterOptions("Prepared", &prepared, &prepared_option_info);
     if ((mode & TestConfigMode::kUniqueMode) != 0) {
@@ -283,6 +295,7 @@ class ValidatedConfigurable : public SimpleConfigurable {
 };
 
 TEST_F(ConfigurableTest, ValidateOptionsTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<Configurable> configurable(
       new ValidatedConfigurable("validated", TestConfigMode::kDefaultMode));
   ColumnFamilyOptions cf_opts;
@@ -296,6 +309,7 @@ TEST_F(ConfigurableTest, ValidateOptionsTest) {
 }
 
 TEST_F(ConfigurableTest, PrepareOptionsTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<Configurable> c(
       new ValidatedConfigurable("Simple", TestConfigMode::kUniqueMode, false));
   auto cp = c->GetOptions<int>("Prepared");
@@ -332,6 +346,7 @@ TEST_F(ConfigurableTest, PrepareOptionsTest) {
 }
 
 TEST_F(ConfigurableTest, CopyObjectTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   class CopyConfigurable : public Configurable {
    public:
     CopyConfigurable() : prepared_(0), validated_(0) {}
@@ -366,6 +381,7 @@ TEST_F(ConfigurableTest, CopyObjectTest) {
 }
 
 TEST_F(ConfigurableTest, MutableOptionsTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   static std::unordered_map<std::string, OptionTypeInfo> imm_option_info = {
 #ifndef ROCKSDB_LITE
       {"imm", OptionTypeInfo::Struct("imm", &simple_option_info, 0,
@@ -380,6 +396,7 @@ TEST_F(ConfigurableTest, MutableOptionsTest) {
         : SimpleConfigurable("mutable", TestConfigMode::kDefaultMode |
                                             TestConfigMode::kUniqueMode |
                                             TestConfigMode::kSharedMode) {
+PERF_MARKER(__PRETTY_FUNCTION__);
       RegisterOptions("struct", &options_, &struct_option_info);
       RegisterOptions("imm", &options_, &imm_option_info);
     }
@@ -429,6 +446,7 @@ TEST_F(ConfigurableTest, MutableOptionsTest) {
 }
 
 TEST_F(ConfigurableTest, DeprecatedOptionsTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   static std::unordered_map<std::string, OptionTypeInfo>
       deprecated_option_info = {
           {"deprecated",
@@ -447,6 +465,7 @@ TEST_F(ConfigurableTest, DeprecatedOptionsTest) {
 }
 
 TEST_F(ConfigurableTest, AliasOptionsTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   static std::unordered_map<std::string, OptionTypeInfo> alias_option_info = {
       {"bool",
        {offsetof(struct TestOptions, b), OptionType::kBoolean,
@@ -474,6 +493,7 @@ TEST_F(ConfigurableTest, AliasOptionsTest) {
 }
 
 TEST_F(ConfigurableTest, NestedUniqueConfigTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<Configurable> simple;
   simple.reset(
       SimpleConfigurable::Create("Outer", TestConfigMode::kAllOptMode));
@@ -495,6 +515,7 @@ TEST_F(ConfigurableTest, NestedUniqueConfigTest) {
 }
 
 TEST_F(ConfigurableTest, NestedSharedConfigTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<Configurable> simple;
   simple.reset(SimpleConfigurable::Create(
       "Outer", TestConfigMode::kDefaultMode | TestConfigMode::kSharedMode));
@@ -516,6 +537,7 @@ TEST_F(ConfigurableTest, NestedSharedConfigTest) {
 }
 
 TEST_F(ConfigurableTest, NestedRawConfigTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<Configurable> simple;
   simple.reset(SimpleConfigurable::Create(
       "Outer", TestConfigMode::kDefaultMode | TestConfigMode::kRawPtrMode));
@@ -536,6 +558,7 @@ TEST_F(ConfigurableTest, NestedRawConfigTest) {
 }
 
 TEST_F(ConfigurableTest, MatchesTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string mismatch;
   std::unique_ptr<Configurable> base, copy;
   base.reset(SimpleConfigurable::Create(
@@ -559,11 +582,13 @@ TEST_F(ConfigurableTest, MatchesTest) {
 }
 
 static Configurable* SimpleStructFactory() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return SimpleConfigurable::Create(
       "simple-struct", TestConfigMode::kDefaultMode, &struct_option_info);
 }
 
 TEST_F(ConfigurableTest, ConfigureStructTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<Configurable> base(SimpleStructFactory());
   std::unique_ptr<Configurable> copy(SimpleStructFactory());
   std::string opt_str, value;
@@ -594,6 +619,7 @@ TEST_F(ConfigurableTest, ConfigureStructTest) {
 }
 
 TEST_F(ConfigurableTest, ConfigurableEnumTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<Configurable> base, copy;
   base.reset(SimpleConfigurable::Create("e", TestConfigMode::kEnumMode));
   copy.reset(SimpleConfigurable::Create("e", TestConfigMode::kEnumMode));
@@ -619,6 +645,7 @@ static std::unordered_map<std::string, OptionTypeInfo> noserialize_option_info =
 };
 
 TEST_F(ConfigurableTest, TestNoSerialize) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<Configurable> base;
   base.reset(SimpleConfigurable::Create("c", TestConfigMode::kDefaultMode,
                                         &noserialize_option_info));
@@ -630,6 +657,7 @@ TEST_F(ConfigurableTest, TestNoSerialize) {
 }
 
 TEST_F(ConfigurableTest, TestNoCompare) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unordered_map<std::string, OptionTypeInfo> nocomp_option_info = {
       {"int",
        {offsetof(struct TestOptions, i), OptionType::kInt,
@@ -658,6 +686,7 @@ TEST_F(ConfigurableTest, TestNoCompare) {
 }
 
 TEST_F(ConfigurableTest, NullOptionMapTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<Configurable> base;
   std::unordered_set<std::string> names;
   std::string str;
@@ -741,6 +770,7 @@ class ConfigurableParamTest : public ConfigurableTest,
                                   std::pair<std::string, std::string>> {
  public:
   ConfigurableParamTest() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     type_ = GetParam().first;
     configuration_ = GetParam().second;
     assert(TestFactories.find(type_) != TestFactories.end());
@@ -748,6 +778,7 @@ class ConfigurableParamTest : public ConfigurableTest,
   }
 
   Configurable* CreateConfigurable() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     const auto& iter = TestFactories.find(type_);
     return (iter->second)();
   }
@@ -760,6 +791,7 @@ class ConfigurableParamTest : public ConfigurableTest,
 
 void ConfigurableParamTest::TestConfigureOptions(
     const ConfigOptions& config_options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<Configurable> base, copy;
   std::unordered_set<std::string> names;
   std::string opt_str, mismatch;
@@ -809,10 +841,12 @@ void ConfigurableParamTest::TestConfigureOptions(
 }
 
 TEST_P(ConfigurableParamTest, GetDefaultOptionsTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   TestConfigureOptions(config_options_);
 }
 
 TEST_P(ConfigurableParamTest, ConfigureFromPropsTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string opt_str, mismatch;
   std::unordered_set<std::string> names;
   std::unique_ptr<Configurable> copy(CreateConfigurable());
@@ -872,6 +906,7 @@ INSTANTIATE_TEST_CASE_P(
 }  // namespace test
 }  // namespace ROCKSDB_NAMESPACE
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
 #ifdef GFLAGS
   ParseCommandLineFlags(&argc, &argv, true);

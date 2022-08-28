@@ -53,6 +53,7 @@ BlockBuilder::BlockBuilder(
       restarts_(1, 0),  // First restart point is at offset 0
       counter_(0),
       finished_(false) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   switch (index_type) {
     case BlockBasedTableOptions::kDataBlockBinarySearch:
       break;
@@ -68,6 +69,7 @@ BlockBuilder::BlockBuilder(
 }
 
 void BlockBuilder::Reset() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   buffer_.clear();
   restarts_.resize(1);  // First restart point is at offset 0
   assert(restarts_[0] == 0);
@@ -84,6 +86,7 @@ void BlockBuilder::Reset() {
 }
 
 void BlockBuilder::SwapAndReset(std::string& buffer) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::swap(buffer_, buffer);
   Reset();
 }
@@ -117,6 +120,7 @@ size_t BlockBuilder::EstimateSizeAfterKV(const Slice& key,
 }
 
 Slice BlockBuilder::Finish() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Append restart array
   for (size_t i = 0; i < restarts_.size(); i++) {
     PutFixed32(&buffer_, restarts_[i]);
@@ -141,6 +145,7 @@ Slice BlockBuilder::Finish() {
 
 void BlockBuilder::Add(const Slice& key, const Slice& value,
                        const Slice* const delta_value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Ensure no unsafe mixing of Add and AddWithLastKey
   assert(!add_with_last_key_called_);
 
@@ -156,6 +161,7 @@ void BlockBuilder::Add(const Slice& key, const Slice& value,
 void BlockBuilder::AddWithLastKey(const Slice& key, const Slice& value,
                                   const Slice& last_key_param,
                                   const Slice* const delta_value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Ensure no unsafe mixing of Add and AddWithLastKey
   assert(last_key_.empty());
 #ifndef NDEBUG
@@ -182,6 +188,7 @@ inline void BlockBuilder::AddWithLastKeyImpl(const Slice& key,
                                              const Slice& last_key,
                                              const Slice* const delta_value,
                                              size_t buffer_size) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(!finished_);
   assert(counter_ <= block_restart_interval_);
   assert(!use_value_delta_encoding_ || delta_value);

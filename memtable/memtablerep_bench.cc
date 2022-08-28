@@ -10,6 +10,7 @@
 #ifndef GFLAGS
 #include <cstdio>
 int main() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   fprintf(stderr, "Please install gflags to run rocksdb tools\n");
   return 1;
 }
@@ -141,6 +142,7 @@ class RandomGenerator {
 
  public:
   RandomGenerator() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Random rnd(301);
     auto size = (unsigned)std::max(1048576, FLAGS_item_size);
     data_ = rnd.RandomString(size);
@@ -148,6 +150,7 @@ class RandomGenerator {
   }
 
   Slice Generate(unsigned int len) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(len <= data_.size());
     if (pos_ + len > data_.size()) {
       pos_ = 0;
@@ -163,6 +166,7 @@ class KeyGenerator {
  public:
   KeyGenerator(Random64* rand, WriteMode mode, uint64_t num)
       : rand_(rand), mode_(mode), num_(num), next_(0) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (mode_ == UNIQUE_RANDOM) {
       // NOTE: if memory consumption of this approach becomes a concern,
       // we can either break it into pieces and only random shuffle a section
@@ -178,6 +182,7 @@ class KeyGenerator {
   }
 
   uint64_t Next() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     switch (mode_) {
       case SEQUENTIAL:
         return next_++;
@@ -235,6 +240,7 @@ class FillBenchmarkThread : public BenchmarkThread {
                         num_ops, read_hits) {}
 
   void FillOne() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     char* buf = nullptr;
     auto internal_key_size = 16;
     auto encoded_len =
@@ -271,6 +277,7 @@ class ConcurrentFillBenchmarkThread : public FillBenchmarkThread {
                                 std::atomic_int* threads_done)
       : FillBenchmarkThread(table, key_gen, bytes_written, bytes_read, sequence,
                             num_ops, read_hits) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     threads_done_ = threads_done;
   }
 
@@ -295,6 +302,7 @@ class ReadBenchmarkThread : public BenchmarkThread {
                         num_ops, read_hits) {}
 
   static bool callback(void* arg, const char* entry) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     CallbackVerifyArgs* callback_args = static_cast<CallbackVerifyArgs*>(arg);
     assert(callback_args != nullptr);
     uint32_t key_length;
@@ -309,6 +317,7 @@ class ReadBenchmarkThread : public BenchmarkThread {
   }
 
   void ReadOne() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::string user_key;
     auto key = key_gen_->Next();
     PutFixed64(&user_key, key);
@@ -342,6 +351,7 @@ class SeqReadBenchmarkThread : public BenchmarkThread {
                         num_ops, read_hits) {}
 
   void ReadOneSeq() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::unique_ptr<MemTableRep::Iterator> iter(table_->GetIterator());
     for (iter->SeekToFirst(); iter->Valid(); iter->Next()) {
       // pretend to read the value
@@ -366,6 +376,7 @@ class ConcurrentReadBenchmarkThread : public ReadBenchmarkThread {
                                 std::atomic_int* threads_done)
       : ReadBenchmarkThread(table, key_gen, bytes_written, bytes_read, sequence,
                             num_ops, read_hits) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     threads_done_ = threads_done;
   }
 
@@ -389,6 +400,7 @@ class SeqConcurrentReadBenchmarkThread : public SeqReadBenchmarkThread {
                                    std::atomic_int* threads_done)
       : SeqReadBenchmarkThread(table, key_gen, bytes_written, bytes_read,
                                sequence, num_ops, read_hits) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     threads_done_ = threads_done;
   }
 
@@ -414,6 +426,7 @@ class Benchmark {
 
   virtual ~Benchmark() {}
   virtual void Run() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::cout << "Number of threads: " << num_threads_ << std::endl;
     std::vector<port::Thread> threads;
     uint64_t bytes_written = 0;
@@ -464,6 +477,7 @@ class FillBenchmark : public Benchmark {
   explicit FillBenchmark(MemTableRep* table, KeyGenerator* key_gen,
                          uint64_t* sequence)
       : Benchmark(table, key_gen, sequence, 1) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     num_write_ops_per_thread_ = FLAGS_num_operations;
   }
 
@@ -480,6 +494,7 @@ class ReadBenchmark : public Benchmark {
   explicit ReadBenchmark(MemTableRep* table, KeyGenerator* key_gen,
                          uint64_t* sequence)
       : Benchmark(table, key_gen, sequence, FLAGS_num_threads) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     num_read_ops_per_thread_ = FLAGS_num_operations / FLAGS_num_threads;
   }
 
@@ -504,6 +519,7 @@ class SeqReadBenchmark : public Benchmark {
  public:
   explicit SeqReadBenchmark(MemTableRep* table, uint64_t* sequence)
       : Benchmark(table, nullptr, sequence, FLAGS_num_threads) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     num_read_ops_per_thread_ = FLAGS_num_scans;
   }
 
@@ -527,6 +543,7 @@ class ReadWriteBenchmark : public Benchmark {
   explicit ReadWriteBenchmark(MemTableRep* table, KeyGenerator* key_gen,
                               uint64_t* sequence)
       : Benchmark(table, key_gen, sequence, FLAGS_num_threads) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     num_read_ops_per_thread_ =
         FLAGS_num_threads <= 1
             ? 0
@@ -556,6 +573,7 @@ class ReadWriteBenchmark : public Benchmark {
 }  // namespace ROCKSDB_NAMESPACE
 
 void PrintWarnings() {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #if defined(__GNUC__) && !defined(__OPTIMIZE__)
   fprintf(stdout,
           "WARNING: Optimization is disabled: benchmarks unnecessarily slow\n");
@@ -567,6 +585,7 @@ void PrintWarnings() {
 }
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   SetUsageMessage(std::string("\nUSAGE:\n") + std::string(argv[0]) +
                   " [OPTIONS]...");

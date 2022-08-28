@@ -25,6 +25,7 @@ namespace ROCKSDB_NAMESPACE {
 bool SearchForOffset(DataBlockHashIndex& index, const char* data,
                      uint16_t map_offset, const Slice& key,
                      uint8_t& restart_point) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint8_t entry = index.Lookup(data, map_offset, key);
   if (entry == kCollision) {
     return true;
@@ -39,6 +40,7 @@ bool SearchForOffset(DataBlockHashIndex& index, const char* data,
 
 std::string GenerateKey(int primary_key, int secondary_key, int padding_size,
                         Random* rnd) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   char buf[50];
   char* p = &buf[0];
   snprintf(buf, sizeof(buf), "%6d%4d", primary_key, secondary_key);
@@ -58,6 +60,7 @@ void GenerateRandomKVs(std::vector<std::string>* keys,
                        const int len, const int step = 1,
                        const int padding_size = 0,
                        const int keys_share_prefix = 1) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Random rnd(302);
 
   // generate different prefix
@@ -73,6 +76,7 @@ void GenerateRandomKVs(std::vector<std::string>* keys,
 }
 
 TEST(DataBlockHashIndex, DataBlockHashTestSmall) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   DataBlockHashIndexBuilder builder;
   builder.Initialize(0.75 /*util_ratio*/);
   for (int j = 0; j < 5; j++) {
@@ -111,6 +115,7 @@ TEST(DataBlockHashIndex, DataBlockHashTestSmall) {
 }
 
 TEST(DataBlockHashIndex, DataBlockHashTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // bucket_num = 200, #keys = 100. 50% utilization
   DataBlockHashIndexBuilder builder;
   builder.Initialize(0.75 /*util_ratio*/);
@@ -148,6 +153,7 @@ TEST(DataBlockHashIndex, DataBlockHashTest) {
 }
 
 TEST(DataBlockHashIndex, DataBlockHashTestCollision) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // bucket_num = 2. There will be intense hash collisions
   DataBlockHashIndexBuilder builder;
   builder.Initialize(0.75 /*util_ratio*/);
@@ -185,6 +191,7 @@ TEST(DataBlockHashIndex, DataBlockHashTestCollision) {
 }
 
 TEST(DataBlockHashIndex, DataBlockHashTestLarge) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   DataBlockHashIndexBuilder builder;
   builder.Initialize(0.75 /*util_ratio*/);
   std::unordered_map<std::string, uint8_t> m;
@@ -233,6 +240,7 @@ TEST(DataBlockHashIndex, DataBlockHashTestLarge) {
 }
 
 TEST(DataBlockHashIndex, RestartIndexExceedMax) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   DataBlockHashIndexBuilder builder;
   builder.Initialize(0.75 /*util_ratio*/);
   std::unordered_map<std::string, uint8_t> m;
@@ -259,6 +267,7 @@ TEST(DataBlockHashIndex, RestartIndexExceedMax) {
 }
 
 TEST(DataBlockHashIndex, BlockRestartIndexExceedMax) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = Options();
 
   BlockBuilder builder(1 /* block_restart_interval */,
@@ -310,6 +319,7 @@ TEST(DataBlockHashIndex, BlockRestartIndexExceedMax) {
 }
 
 TEST(DataBlockHashIndex, BlockSizeExceedMax) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = Options();
   std::string ukey(10, 'k');
   InternalKey ikey(ukey, 0, kTypeValue);
@@ -366,6 +376,7 @@ TEST(DataBlockHashIndex, BlockSizeExceedMax) {
 }
 
 TEST(DataBlockHashIndex, BlockTestSingleKey) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options = Options();
 
   BlockBuilder builder(16 /* block_restart_interval */,
@@ -438,6 +449,7 @@ TEST(DataBlockHashIndex, BlockTestSingleKey) {
 }
 
 TEST(DataBlockHashIndex, BlockTestLarge) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Random rnd(1019);
   Options options = Options();
   std::vector<std::string> keys;
@@ -533,6 +545,7 @@ TEST(DataBlockHashIndex, BlockTestLarge) {
 void TestBoundary(InternalKey& ik1, std::string& v1, InternalKey& ik2,
                   std::string& v2, InternalKey& seek_ikey,
                   GetContext& get_context, Options& options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<WritableFileWriter> file_writer;
   std::unique_ptr<RandomAccessFileReader> file_reader;
   std::unique_ptr<TableReader> table_reader;
@@ -592,6 +605,7 @@ void TestBoundary(InternalKey& ik1, std::string& v1, InternalKey& ik2,
 }
 
 TEST(DataBlockHashIndex, BlockBoundary) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   BlockBasedTableOptions table_options;
   table_options.data_block_index_type =
       BlockBasedTableOptions::kDataBlockBinaryAndHash;
@@ -711,6 +725,7 @@ TEST(DataBlockHashIndex, BlockBoundary) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

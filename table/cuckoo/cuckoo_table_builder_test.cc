@@ -28,6 +28,7 @@ std::unordered_map<std::string, std::vector<uint64_t>> hash_map;
 
 uint64_t GetSliceHash(const Slice& s, uint32_t index,
                       uint64_t /*max_num_buckets*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return hash_map[s.ToString()][index];
 }
 }  // namespace
@@ -35,6 +36,7 @@ uint64_t GetSliceHash(const Slice& s, uint32_t index,
 class CuckooBuilderTest : public testing::Test {
  public:
   CuckooBuilderTest() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     env_ = Env::Default();
     Options options;
     options.allow_mmap_reads = true;
@@ -47,6 +49,7 @@ class CuckooBuilderTest : public testing::Test {
       std::string expected_unused_bucket, uint64_t expected_table_size,
       uint32_t expected_num_hash_func, bool expected_is_last_level,
       uint32_t expected_cuckoo_block_size = 1) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     uint64_t num_deletions = 0;
     for (const auto& key : keys) {
       ParsedInternalKey parsed;
@@ -139,12 +142,14 @@ class CuckooBuilderTest : public testing::Test {
 
   std::string GetInternalKey(Slice user_key, bool zero_seqno,
                              ValueType type = kTypeValue) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     IterKey ikey;
     ikey.SetInternalKey(user_key, zero_seqno ? 0 : 1000, type);
     return ikey.GetInternalKey().ToString();
   }
 
   uint64_t NextPowOf2(uint64_t num) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     uint64_t n = 2;
     while (n <= num) {
       n *= 2;
@@ -153,6 +158,7 @@ class CuckooBuilderTest : public testing::Test {
   }
 
   uint64_t GetExpectedTableSize(uint64_t num) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return NextPowOf2(static_cast<uint64_t>(num / kHashTableRatio));
   }
 
@@ -164,6 +170,7 @@ class CuckooBuilderTest : public testing::Test {
 };
 
 TEST_F(CuckooBuilderTest, SuccessWithEmptyFile) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<WritableFile> writable_file;
   fname = test::PerThreadDBPath("EmptyFile");
   std::unique_ptr<WritableFileWriter> file_writer;
@@ -181,7 +188,9 @@ TEST_F(CuckooBuilderTest, SuccessWithEmptyFile) {
 }
 
 TEST_F(CuckooBuilderTest, WriteSuccessNoCollisionFullKey) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (auto type : {kTypeValue, kTypeDeletion}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     uint32_t num_hash_fun = 4;
     std::vector<std::string> user_keys = {"key01", "key02", "key03", "key04"};
     std::vector<std::string> values;
@@ -234,6 +243,7 @@ TEST_F(CuckooBuilderTest, WriteSuccessNoCollisionFullKey) {
 }
 
 TEST_F(CuckooBuilderTest, WriteSuccessWithCollisionFullKey) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint32_t num_hash_fun = 4;
   std::vector<std::string> user_keys = {"key01", "key02", "key03", "key04"};
   std::vector<std::string> values = {"v01", "v02", "v03", "v04"};
@@ -281,6 +291,7 @@ TEST_F(CuckooBuilderTest, WriteSuccessWithCollisionFullKey) {
 }
 
 TEST_F(CuckooBuilderTest, WriteSuccessWithCollisionAndCuckooBlock) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint32_t num_hash_fun = 4;
   std::vector<std::string> user_keys = {"key01", "key02", "key03", "key04"};
   std::vector<std::string> values = {"v01", "v02", "v03", "v04"};
@@ -329,6 +340,7 @@ TEST_F(CuckooBuilderTest, WriteSuccessWithCollisionAndCuckooBlock) {
 }
 
 TEST_F(CuckooBuilderTest, WithCollisionPathFullKey) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Have two hash functions. Insert elements with overlapping hashes.
   // Finally insert an element with hash value somewhere in the middle
   // so that it displaces all the elements after that.
@@ -381,6 +393,7 @@ TEST_F(CuckooBuilderTest, WithCollisionPathFullKey) {
 }
 
 TEST_F(CuckooBuilderTest, WithCollisionPathFullKeyAndCuckooBlock) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint32_t num_hash_fun = 2;
   std::vector<std::string> user_keys = {"key01", "key02", "key03",
     "key04", "key05"};
@@ -430,6 +443,7 @@ TEST_F(CuckooBuilderTest, WithCollisionPathFullKeyAndCuckooBlock) {
 }
 
 TEST_F(CuckooBuilderTest, WriteSuccessNoCollisionUserKey) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint32_t num_hash_fun = 4;
   std::vector<std::string> user_keys = {"key01", "key02", "key03", "key04"};
   std::vector<std::string> values = {"v01", "v02", "v03", "v04"};
@@ -473,6 +487,7 @@ TEST_F(CuckooBuilderTest, WriteSuccessNoCollisionUserKey) {
 }
 
 TEST_F(CuckooBuilderTest, WriteSuccessWithCollisionUserKey) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint32_t num_hash_fun = 4;
   std::vector<std::string> user_keys = {"key01", "key02", "key03", "key04"};
   std::vector<std::string> values = {"v01", "v02", "v03", "v04"};
@@ -517,6 +532,7 @@ TEST_F(CuckooBuilderTest, WriteSuccessWithCollisionUserKey) {
 }
 
 TEST_F(CuckooBuilderTest, WithCollisionPathUserKey) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint32_t num_hash_fun = 2;
   std::vector<std::string> user_keys = {"key01", "key02", "key03",
     "key04", "key05"};
@@ -563,6 +579,7 @@ TEST_F(CuckooBuilderTest, WithCollisionPathUserKey) {
 }
 
 TEST_F(CuckooBuilderTest, FailWhenCollisionPathTooLong) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Have two hash functions. Insert elements with overlapping hashes.
   // Finally try inserting an element with hash value somewhere in the middle
   // and it should fail because the no. of elements to displace is too high.
@@ -599,6 +616,7 @@ TEST_F(CuckooBuilderTest, FailWhenCollisionPathTooLong) {
 }
 
 TEST_F(CuckooBuilderTest, FailWhenSameKeyInserted) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Need to have a temporary variable here as VS compiler does not currently
   // support operator= with initializer_list as a parameter
   std::unordered_map<std::string, std::vector<uint64_t>> hm = {
@@ -630,6 +648,7 @@ TEST_F(CuckooBuilderTest, FailWhenSameKeyInserted) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }
@@ -638,6 +657,7 @@ int main(int argc, char** argv) {
 #include <stdio.h>
 
 int main(int /*argc*/, char** /*argv*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   fprintf(stderr, "SKIPPED as Cuckoo table is not supported in ROCKSDB_LITE\n");
   return 0;
 }

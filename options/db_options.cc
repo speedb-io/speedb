@@ -434,6 +434,7 @@ static std::unordered_map<std::string, OptionTypeInfo>
           // Parse the input value as a RateLimiter
           [](const ConfigOptions& /*opts*/, const std::string& /*name*/,
              const std::string& value, void* addr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
             auto limiter = static_cast<std::shared_ptr<RateLimiter>*>(addr);
             limiter->reset(NewGenericRateLimiter(
                 static_cast<int64_t>(ParseUint64(value))));
@@ -446,6 +447,7 @@ static std::unordered_map<std::string, OptionTypeInfo>
           // Parse the input value as an Env
           [](const ConfigOptions& opts, const std::string& /*name*/,
              const std::string& value, void* addr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
             auto old_env = static_cast<Env**>(addr);       // Get the old value
             Env* new_env = *old_env;                       // Set new to old
             Status s = Env::CreateFromString(opts, value,
@@ -485,6 +487,7 @@ static std::unordered_map<std::string, OptionTypeInfo>
           OptionTypeFlags::kCompareNever,
           [](const ConfigOptions& opts, const std::string& /*name*/,
              const std::string& value, void* addr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
             ConfigOptions embedded = opts;
             embedded.ignore_unsupported_options = true;
             std::vector<std::shared_ptr<EventListener>> listeners;
@@ -510,6 +513,7 @@ static std::unordered_map<std::string, OptionTypeInfo>
           },
           [](const ConfigOptions& opts, const std::string& /*name*/,
              const void* addr, std::string* value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
             const auto listeners =
                 static_cast<const std::vector<std::shared_ptr<EventListener>>*>(
                     addr);
@@ -548,6 +552,7 @@ class MutableDBConfigurable : public Configurable {
       const MutableDBOptions& mdb,
       const std::unordered_map<std::string, std::string>* map = nullptr)
       : mutable_(mdb), opt_map_(map) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     RegisterOptions(&mutable_, &db_mutable_options_type_info);
   }
 
@@ -601,6 +606,7 @@ class DBOptionsConfigurable : public MutableDBConfigurable {
       const DBOptions& opts,
       const std::unordered_map<std::string, std::string>* map = nullptr)
       : MutableDBConfigurable(MutableDBOptions(opts), map), db_options_(opts) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // The ImmutableDBOptions currently requires the env to be non-null.  Make
     // sure it is
     if (opts.env != nullptr) {
@@ -641,12 +647,14 @@ class DBOptionsConfigurable : public MutableDBConfigurable {
 
 std::unique_ptr<Configurable> DBOptionsAsConfigurable(
     const MutableDBOptions& opts) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<Configurable> ptr(new MutableDBConfigurable(opts));
   return ptr;
 }
 std::unique_ptr<Configurable> DBOptionsAsConfigurable(
     const DBOptions& opts,
     const std::unordered_map<std::string, std::string>* opt_map) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<Configurable> ptr(new DBOptionsConfigurable(opts, opt_map));
   return ptr;
 }
@@ -737,6 +745,7 @@ ImmutableDBOptions::ImmutableDBOptions(const DBOptions& options)
       checksum_handoff_file_types(options.checksum_handoff_file_types),
       lowest_used_cache_tier(options.lowest_used_cache_tier),
       compaction_service(options.compaction_service) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   fs = env->GetFileSystem();
   clock = env->GetSystemClock().get();
   logger = info_log.get();
@@ -1038,6 +1047,7 @@ Status GetMutableDBOptionsFromStrings(
     const MutableDBOptions& base_options,
     const std::unordered_map<std::string, std::string>& options_map,
     MutableDBOptions* new_options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(new_options);
   *new_options = base_options;
   ConfigOptions config_options;
@@ -1051,6 +1061,7 @@ Status GetMutableDBOptionsFromStrings(
 
 bool MutableDBOptionsAreEqual(const MutableDBOptions& this_options,
                               const MutableDBOptions& that_options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ConfigOptions config_options;
   std::string mismatch;
   return OptionTypeInfo::StructsAreEqual(
@@ -1061,6 +1072,7 @@ bool MutableDBOptionsAreEqual(const MutableDBOptions& this_options,
 Status GetStringFromMutableDBOptions(const ConfigOptions& config_options,
                                      const MutableDBOptions& mutable_opts,
                                      std::string* opt_string) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return OptionTypeInfo::SerializeType(
       config_options, db_mutable_options_type_info, &mutable_opts, opt_string);
 }

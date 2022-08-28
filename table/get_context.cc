@@ -21,6 +21,7 @@ namespace ROCKSDB_NAMESPACE {
 namespace {
 
 void appendToReplayLog(std::string* replay_log, ValueType type, Slice value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifndef ROCKSDB_LITE
   if (replay_log) {
     if (replay_log->empty()) {
@@ -71,6 +72,7 @@ GetContext::GetContext(const Comparator* ucmp,
       is_blob_index_(is_blob_index),
       tracing_get_id_(tracing_get_id),
       blob_fetcher_(blob_fetcher) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (seq_) {
     *seq_ = kMaxSequenceNumber;
   }
@@ -96,6 +98,7 @@ GetContext::GetContext(
 // IO to be certain.Set the status=kFound and value_found=false to let the
 // caller know that key may exist but is not there in memory
 void GetContext::MarkKeyMayExist() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   state_ = kFound;
   if (value_found_ != nullptr) {
     *value_found_ = false;
@@ -103,6 +106,7 @@ void GetContext::MarkKeyMayExist() {
 }
 
 void GetContext::SaveValue(const Slice& value, SequenceNumber /*seq*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(state_ == kNotFound);
   appendToReplayLog(replay_log_, kTypeValue, value);
 
@@ -113,6 +117,7 @@ void GetContext::SaveValue(const Slice& value, SequenceNumber /*seq*/) {
 }
 
 void GetContext::ReportCounters() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (get_context_stats_.num_cache_hit > 0) {
     RecordTick(statistics_, BLOCK_CACHE_HIT, get_context_stats_.num_cache_hit);
   }
@@ -220,6 +225,7 @@ void GetContext::ReportCounters() {
 bool GetContext::SaveValue(const ParsedInternalKey& parsed_key,
                            const Slice& value, bool* matched,
                            Cleanable* value_pinner) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(matched);
   assert((state_ != kMerge && parsed_key.type != kTypeMerge) ||
          merge_context_ != nullptr);
@@ -367,6 +373,7 @@ bool GetContext::SaveValue(const ParsedInternalKey& parsed_key,
 }
 
 void GetContext::Merge(const Slice* value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (LIKELY(pinnable_val_ != nullptr)) {
     if (do_merge_) {
       Status merge_status = MergeHelper::TimedFullMerge(
@@ -382,6 +389,7 @@ void GetContext::Merge(const Slice* value) {
 
 bool GetContext::GetBlobValue(const Slice& blob_index,
                               PinnableSlice* blob_value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr FilePrefetchBuffer* prefetch_buffer = nullptr;
   constexpr uint64_t* bytes_read = nullptr;
 
@@ -400,6 +408,7 @@ bool GetContext::GetBlobValue(const Slice& blob_index,
 }
 
 void GetContext::push_operand(const Slice& value, Cleanable* value_pinner) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (pinned_iters_mgr() && pinned_iters_mgr()->PinningEnabled() &&
       value_pinner != nullptr) {
     value_pinner->DelegateCleanupsTo(pinned_iters_mgr());
@@ -411,6 +420,7 @@ void GetContext::push_operand(const Slice& value, Cleanable* value_pinner) {
 
 void replayGetContextLog(const Slice& replay_log, const Slice& user_key,
                          GetContext* get_context, Cleanable* value_pinner) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifndef ROCKSDB_LITE
   Slice s = replay_log;
   while (s.size()) {

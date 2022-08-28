@@ -14,6 +14,7 @@ namespace ROCKSDB_NAMESPACE {
 
 void DataBlockHashIndexBuilder::Add(const Slice& key,
                                     const size_t restart_index) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(Valid());
   if (restart_index > kMaxRestartSupportedByHashIndex) {
     valid_ = false;
@@ -27,6 +28,7 @@ void DataBlockHashIndexBuilder::Add(const Slice& key,
 }
 
 void DataBlockHashIndexBuilder::Finish(std::string& buffer) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(Valid());
   uint16_t num_buckets = static_cast<uint16_t>(estimated_num_buckets_);
 
@@ -67,6 +69,7 @@ void DataBlockHashIndexBuilder::Finish(std::string& buffer) {
 }
 
 void DataBlockHashIndexBuilder::Reset() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   estimated_num_buckets_ = 0;
   valid_ = true;
   hash_and_restart_pairs_.clear();
@@ -74,6 +77,7 @@ void DataBlockHashIndexBuilder::Reset() {
 
 void DataBlockHashIndex::Initialize(const char* data, uint16_t size,
                                     uint16_t* map_offset) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(size >= sizeof(uint16_t));  // NUM_BUCKETS
   num_buckets_ = DecodeFixed16(data + size - sizeof(uint16_t));
   assert(num_buckets_ > 0);

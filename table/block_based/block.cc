@@ -37,6 +37,7 @@ struct DecodeEntry {
   inline const char* operator()(const char* p, const char* limit,
                                 uint32_t* shared, uint32_t* non_shared,
                                 uint32_t* value_length) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // We need 2 bytes for shared and non_shared size. We also need one more
     // byte either for value size or the actual value in case of value delta
     // encoding.
@@ -68,6 +69,7 @@ struct CheckAndDecodeEntry {
   inline const char* operator()(const char* p, const char* limit,
                                 uint32_t* shared, uint32_t* non_shared,
                                 uint32_t* value_length) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // We need 2 bytes for shared and non_shared size. We also need one more
     // byte either for value size or the actual value in case of value delta
     // encoding.
@@ -98,6 +100,7 @@ struct CheckAndDecodeEntry {
 struct DecodeKey {
   inline const char* operator()(const char* p, const char* limit,
                                 uint32_t* shared, uint32_t* non_shared) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     uint32_t value_length;
     return DecodeEntry()(p, limit, shared, non_shared, &value_length);
   }
@@ -109,6 +112,7 @@ struct DecodeKey {
 struct DecodeKeyV4 {
   inline const char* operator()(const char* p, const char* limit,
                                 uint32_t* shared, uint32_t* non_shared) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // We need 2 bytes for shared and non_shared size. We also need one more
     // byte either for value size or the actual value in case of value delta
     // encoding.
@@ -130,6 +134,7 @@ struct DecodeEntryV4 {
   inline const char* operator()(const char* p, const char* limit,
                                 uint32_t* shared, uint32_t* non_shared,
                                 uint32_t* value_length) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(value_length);
 
     *value_length = 0;
@@ -137,11 +142,13 @@ struct DecodeEntryV4 {
   }
 };
 void DataBlockIter::NextImpl() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   bool is_shared = false;
   ParseNextDataKey(&is_shared);
 }
 
 void MetaBlockIter::NextImpl() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   bool is_shared = false;
   ParseNextKey<CheckAndDecodeEntry>(&is_shared);
 }
@@ -149,6 +156,7 @@ void MetaBlockIter::NextImpl() {
 void IndexBlockIter::NextImpl() { ParseNextIndexKey(); }
 
 void IndexBlockIter::PrevImpl() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(Valid());
   // Scan backwards to a restart point before current_
   const uint32_t original = current_;
@@ -168,6 +176,7 @@ void IndexBlockIter::PrevImpl() {
 }
 
 void MetaBlockIter::PrevImpl() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(Valid());
   // Scan backwards to a restart point before current_
   const uint32_t original = current_;
@@ -190,6 +199,7 @@ void MetaBlockIter::PrevImpl() {
 
 // Similar to IndexBlockIter::PrevImpl but also caches the prev entries
 void DataBlockIter::PrevImpl() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(Valid());
 
   assert(prev_entries_idx_ == -1 ||
@@ -271,6 +281,7 @@ void DataBlockIter::PrevImpl() {
 }
 
 void DataBlockIter::SeekImpl(const Slice& target) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Slice seek_key = target;
   PERF_TIMER_GUARD(block_seek_nanos);
   if (data_ == nullptr) {  // Not init yet
@@ -287,6 +298,7 @@ void DataBlockIter::SeekImpl(const Slice& target) {
 }
 
 void MetaBlockIter::SeekImpl(const Slice& target) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Slice seek_key = target;
   PERF_TIMER_GUARD(block_seek_nanos);
   if (data_ == nullptr) {  // Not init yet
@@ -326,6 +338,7 @@ void MetaBlockIter::SeekImpl(const Slice& target) {
 //    with a smaller [ type | seqno ] (i.e. a larger seqno, or the same seqno
 //    but larger type).
 bool DataBlockIter::SeekForGetImpl(const Slice& target) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Slice target_user_key = ExtractUserKey(target);
   uint32_t map_offset = restarts_ + num_restarts_ * sizeof(uint32_t);
   uint8_t entry =
@@ -420,6 +433,7 @@ bool DataBlockIter::SeekForGetImpl(const Slice& target) {
 }
 
 void IndexBlockIter::SeekImpl(const Slice& target) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   TEST_SYNC_POINT("IndexBlockIter::Seek:0");
   PERF_TIMER_GUARD(block_seek_nanos);
   if (data_ == nullptr) {  // Not init yet
@@ -459,6 +473,7 @@ void IndexBlockIter::SeekImpl(const Slice& target) {
 }
 
 void DataBlockIter::SeekForPrevImpl(const Slice& target) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   PERF_TIMER_GUARD(block_seek_nanos);
   Slice seek_key = target;
   if (data_ == nullptr) {  // Not init yet
@@ -483,6 +498,7 @@ void DataBlockIter::SeekForPrevImpl(const Slice& target) {
 }
 
 void MetaBlockIter::SeekForPrevImpl(const Slice& target) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   PERF_TIMER_GUARD(block_seek_nanos);
   Slice seek_key = target;
   if (data_ == nullptr) {  // Not init yet
@@ -507,6 +523,7 @@ void MetaBlockIter::SeekForPrevImpl(const Slice& target) {
 }
 
 void DataBlockIter::SeekToFirstImpl() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (data_ == nullptr) {  // Not init yet
     return;
   }
@@ -516,6 +533,7 @@ void DataBlockIter::SeekToFirstImpl() {
 }
 
 void MetaBlockIter::SeekToFirstImpl() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (data_ == nullptr) {  // Not init yet
     return;
   }
@@ -525,6 +543,7 @@ void MetaBlockIter::SeekToFirstImpl() {
 }
 
 void IndexBlockIter::SeekToFirstImpl() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (data_ == nullptr) {  // Not init yet
     return;
   }
@@ -534,6 +553,7 @@ void IndexBlockIter::SeekToFirstImpl() {
 }
 
 void DataBlockIter::SeekToLastImpl() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (data_ == nullptr) {  // Not init yet
     return;
   }
@@ -545,6 +565,7 @@ void DataBlockIter::SeekToLastImpl() {
 }
 
 void MetaBlockIter::SeekToLastImpl() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (data_ == nullptr) {  // Not init yet
     return;
   }
@@ -557,6 +578,7 @@ void MetaBlockIter::SeekToLastImpl() {
 }
 
 void IndexBlockIter::SeekToLastImpl() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (data_ == nullptr) {  // Not init yet
     return;
   }
@@ -569,6 +591,7 @@ void IndexBlockIter::SeekToLastImpl() {
 
 template <class TValue>
 void BlockIter<TValue>::CorruptionError() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   current_ = restarts_;
   restart_index_ = num_restarts_;
   status_ = Status::Corruption("bad entry in block");
@@ -579,6 +602,7 @@ void BlockIter<TValue>::CorruptionError() {
 template <class TValue>
 template <typename DecodeEntryFunc>
 bool BlockIter<TValue>::ParseNextKey(bool* is_shared) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   current_ = NextEntryOffset();
   const char* p = data_ + current_;
   const char* limit = data_ + restarts_;  // Restarts come right after data
@@ -620,6 +644,7 @@ bool BlockIter<TValue>::ParseNextKey(bool* is_shared) {
 }
 
 bool DataBlockIter::ParseNextDataKey(bool* is_shared) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (ParseNextKey<DecodeEntry>(is_shared)) {
 #ifndef NDEBUG
     if (global_seqno_ != kDisableGlobalSequenceNumber) {
@@ -646,6 +671,7 @@ bool DataBlockIter::ParseNextDataKey(bool* is_shared) {
 }
 
 bool IndexBlockIter::ParseNextIndexKey() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   bool is_shared = false;
   bool ok = (value_delta_encoded_) ? ParseNextKey<DecodeEntryV4>(&is_shared)
                                    : ParseNextKey<DecodeEntry>(&is_shared);
@@ -669,6 +695,7 @@ bool IndexBlockIter::ParseNextIndexKey() {
 // Otherwise the format is delta-size = block handle size - size of last block
 // handle.
 void IndexBlockIter::DecodeCurrentValue(bool is_shared) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Slice v(value_.data(), data_ + restarts_ - value_.data());
   // Delta encoding is used if `shared` != 0.
   Status decode_s __attribute__((__unused__)) = decoded_value_.DecodeFrom(
@@ -702,6 +729,7 @@ template <class TValue>
 void BlockIter<TValue>::FindKeyAfterBinarySeek(const Slice& target,
                                                uint32_t index,
                                                bool skip_linear_scan) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // SeekToRestartPoint() only does the lookup in the restart block. We need
   // to follow it up with NextImpl() to position the iterator at the restart
   // key.
@@ -748,6 +776,7 @@ template <class TValue>
 template <typename DecodeKeyFunc>
 bool BlockIter<TValue>::BinarySeek(const Slice& target, uint32_t* index,
                                    bool* skip_linear_scan) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (restarts_ == 0) {
     // SST files dedicated to range tombstones are written with index blocks
     // that have no keys while also having `num_restarts_ == 1`. This would
@@ -808,6 +837,7 @@ bool BlockIter<TValue>::BinarySeek(const Slice& target, uint32_t* index,
 // Compare target key and the block key of the block of `block_index`.
 // Return -1 if error.
 int IndexBlockIter::CompareBlockKey(uint32_t block_index, const Slice& target) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint32_t region_offset = GetRestartPoint(block_index);
   uint32_t shared, non_shared;
   const char* key_ptr =
@@ -831,6 +861,7 @@ bool IndexBlockIter::BinaryBlockIndexSeek(const Slice& target,
                                           uint32_t* block_ids, uint32_t left,
                                           uint32_t right, uint32_t* index,
                                           bool* prefix_may_exist) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(left <= right);
   assert(index);
   assert(prefix_may_exist);
@@ -911,6 +942,7 @@ bool IndexBlockIter::BinaryBlockIndexSeek(const Slice& target,
 
 bool IndexBlockIter::PrefixSeek(const Slice& target, uint32_t* index,
                                 bool* prefix_may_exist) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(index);
   assert(prefix_may_exist);
   assert(prefix_index_);
@@ -969,6 +1001,7 @@ BlockBasedTableOptions::DataBlockIndexType Block::IndexType() const {
 }
 
 Block::~Block() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // This sync point can be re-enabled if RocksDB can control the
   // initialization order of any/all static options created by the user.
   // TEST_SYNC_POINT("Block::~Block");
@@ -981,6 +1014,7 @@ Block::Block(BlockContents&& contents, size_t read_amp_bytes_per_bit,
       size_(contents_.data.size()),
       restart_offset_(0),
       num_restarts_(0) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   TEST_SYNC_POINT("Block::Block:0");
   if (size_ < sizeof(uint32_t)) {
     size_ = 0;  // Error marker
@@ -1032,6 +1066,7 @@ Block::Block(BlockContents&& contents, size_t read_amp_bytes_per_bit,
 }
 
 MetaBlockIter* Block::NewMetaIterator(bool block_contents_pinned) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   MetaBlockIter* iter = new MetaBlockIter();
   if (size_ < 2 * sizeof(uint32_t)) {
     iter->Invalidate(Status::Corruption("bad block contents"));
@@ -1050,6 +1085,7 @@ DataBlockIter* Block::NewDataIterator(const Comparator* raw_ucmp,
                                       SequenceNumber global_seqno,
                                       DataBlockIter* iter, Statistics* stats,
                                       bool block_contents_pinned) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   DataBlockIter* ret_iter;
   if (iter != nullptr) {
     ret_iter = iter;
@@ -1085,6 +1121,7 @@ IndexBlockIter* Block::NewIndexIterator(
     IndexBlockIter* iter, Statistics* /*stats*/, bool total_order_seek,
     bool have_first_key, bool key_includes_seq, bool value_is_full,
     bool block_contents_pinned, BlockPrefixIndex* prefix_index) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   IndexBlockIter* ret_iter;
   if (iter != nullptr) {
     ret_iter = iter;

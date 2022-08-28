@@ -40,6 +40,7 @@ class BlockBasedTableReaderBaseTest : public testing::Test {
   static std::map<std::string, std::string> GenerateKVMap(
       int num_block = 100,
       bool mixed_with_human_readable_string_value = false) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::map<std::string, std::string> kv;
 
     Random rnd(101);
@@ -82,6 +83,7 @@ class BlockBasedTableReaderBaseTest : public testing::Test {
   void CreateTable(const std::string& table_name,
                    const CompressionType& compression_type,
                    const std::map<std::string, std::string>& kv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::unique_ptr<WritableFileWriter> writer;
     NewFileWriter(table_name, &writer);
 
@@ -115,6 +117,7 @@ class BlockBasedTableReaderBaseTest : public testing::Test {
                                 std::unique_ptr<BlockBasedTable>* table,
                                 bool prefetch_index_and_filter_in_cache = true,
                                 Status* status = nullptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     const MutableCFOptions moptions(options_);
     TableReaderOptions table_reader_options = TableReaderOptions(
         ioptions, moptions.prefix_extractor, EnvOptions(), comparator);
@@ -148,6 +151,7 @@ class BlockBasedTableReaderBaseTest : public testing::Test {
 
  private:
   void WriteToFile(const std::string& content, const std::string& filename) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::unique_ptr<FSWritableFile> f;
     ASSERT_OK(fs_->NewWritableFile(Path(filename), FileOptions(), &f, nullptr));
     ASSERT_OK(f->Append(content, IOOptions(), nullptr));
@@ -156,6 +160,7 @@ class BlockBasedTableReaderBaseTest : public testing::Test {
 
   void NewFileWriter(const std::string& filename,
                      std::unique_ptr<WritableFileWriter>* writer) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::string path = Path(filename);
     EnvOptions env_options;
     FileOptions foptions;
@@ -166,6 +171,7 @@ class BlockBasedTableReaderBaseTest : public testing::Test {
 
   void NewFileReader(const std::string& filename, const FileOptions& opt,
                      std::unique_ptr<RandomAccessFileReader>* reader) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::string path = Path(filename);
     std::unique_ptr<FSRandomAccessFile> f;
     ASSERT_OK(fs_->NewRandomAccessFile(path, opt, &f, nullptr));
@@ -174,6 +180,7 @@ class BlockBasedTableReaderBaseTest : public testing::Test {
   }
 
   std::string ToInternalKey(const std::string& key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     InternalKey internal_key(key, 0, ValueType::kTypeValue);
     return internal_key.Encode().ToString();
   }
@@ -205,6 +212,7 @@ class BlockBasedTableReaderTest
 // Tests MultiGet in both direct IO and non-direct IO mode.
 // The keys should be in cache after MultiGet.
 TEST_P(BlockBasedTableReaderTest, MultiGet) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::map<std::string, std::string> kv =
       BlockBasedTableReaderBaseTest::GenerateKVMap(
           100 /* num_block */,
@@ -326,6 +334,7 @@ class BlockBasedTableReaderCapMemoryTest
  protected:
   static std::size_t CalculateMaxTableReaderNumBeforeCacheFull(
       std::size_t cache_capacity, std::size_t approx_table_reader_mem) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // To make calculation easier for testing
     assert(cache_capacity % CacheReservationManagerImpl<
                                 CacheEntryRole::kBlockBasedTableReader>::
@@ -401,6 +410,7 @@ class BlockBasedTableReaderCapMemoryTest
 
  private:
   std::size_t ApproximateTableReaderMem() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::size_t approx_table_reader_mem = 0;
 
     std::string table_name = "table_for_approx_table_reader_mem";
@@ -425,6 +435,7 @@ INSTANTIATE_TEST_CASE_P(CapMemoryUsageUnderCacheCapacity,
                         ::testing::Values(true, false));
 
 TEST_P(BlockBasedTableReaderCapMemoryTest, CapMemoryUsageUnderCacheCapacity) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const std::size_t max_table_reader_num_capped =
       BlockBasedTableReaderCapMemoryTest::
           CalculateMaxTableReaderNumBeforeCacheFull(
@@ -518,6 +529,7 @@ class BlockBasedTableReaderTestVerifyChecksum
 };
 
 TEST_P(BlockBasedTableReaderTestVerifyChecksum, ChecksumMismatch) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::map<std::string, std::string> kv =
       BlockBasedTableReaderBaseTest::GenerateKVMap(800 /* num_block */);
 
@@ -594,6 +606,7 @@ INSTANTIATE_TEST_CASE_P(
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

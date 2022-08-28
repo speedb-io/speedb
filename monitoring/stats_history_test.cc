@@ -33,6 +33,7 @@ namespace ROCKSDB_NAMESPACE {
 class StatsHistoryTest : public DBTestBase {
  public:
   StatsHistoryTest() : DBTestBase("stats_history_test", /*env_do_fsync=*/true) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     mock_clock_ = std::make_shared<MockSystemClock>(env_->GetSystemClock());
     mock_env_.reset(new CompositeEnvWrapper(env_, mock_clock_));
   }
@@ -45,6 +46,7 @@ class StatsHistoryTest : public DBTestBase {
     mock_clock_->InstallTimedWaitFixCallback();
     SyncPoint::GetInstance()->SetCallBack(
         "DBImpl::StartPeriodicWorkScheduler:Init", [&](void* arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
           auto* periodic_work_scheduler_ptr =
               reinterpret_cast<PeriodicWorkScheduler**>(arg);
           *periodic_work_scheduler_ptr =
@@ -54,6 +56,7 @@ class StatsHistoryTest : public DBTestBase {
 };
 
 TEST_F(StatsHistoryTest, RunStatsDumpPeriodSec) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr int kPeriodSec = 5;
   Options options;
   options.create_if_missing = true;
@@ -86,6 +89,7 @@ TEST_F(StatsHistoryTest, RunStatsDumpPeriodSec) {
 
 // Test persistent stats background thread scheduling and cancelling
 TEST_F(StatsHistoryTest, StatsPersistScheduling) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr int kPeriodSec = 5;
   Options options;
   options.create_if_missing = true;
@@ -118,6 +122,7 @@ TEST_F(StatsHistoryTest, StatsPersistScheduling) {
 
 // Test enabling persistent stats for the first time
 TEST_F(StatsHistoryTest, PersistentStatsFreshInstall) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr unsigned int kPeriodSec = 5;
   Options options;
   options.create_if_missing = true;
@@ -139,6 +144,7 @@ TEST_F(StatsHistoryTest, PersistentStatsFreshInstall) {
 
 // TODO(Zhongyi): Move persistent stats related tests to a separate file
 TEST_F(StatsHistoryTest, GetStatsHistoryInMemory) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr int kPeriodSec = 5;
   Options options;
   options.create_if_missing = true;
@@ -186,6 +192,7 @@ TEST_F(StatsHistoryTest, GetStatsHistoryInMemory) {
 }
 
 TEST_F(StatsHistoryTest, InMemoryStatsHistoryPurging) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr int kPeriodSec = 1;
   Options options;
   options.create_if_missing = true;
@@ -278,6 +285,7 @@ TEST_F(StatsHistoryTest, InMemoryStatsHistoryPurging) {
 }
 
 int countkeys(Iterator* iter) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   int count = 0;
   for (iter->SeekToFirst(); iter->Valid(); iter->Next()) {
     count++;
@@ -286,6 +294,7 @@ int countkeys(Iterator* iter) {
 }
 
 TEST_F(StatsHistoryTest, GetStatsHistoryFromDisk) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr int kPeriodSec = 5;
   Options options;
   options.create_if_missing = true;
@@ -377,6 +386,7 @@ TEST_F(StatsHistoryTest, GetStatsHistoryFromDisk) {
 // Test persisted stats matches the value found in options.statistics and
 // the stats value retains after DB reopen
 TEST_F(StatsHistoryTest, PersitentStatsVerifyValue) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr int kPeriodSec = 5;
   Options options;
   options.create_if_missing = true;
@@ -465,6 +475,7 @@ TEST_F(StatsHistoryTest, PersitentStatsVerifyValue) {
 // TODO(Zhongyi): add test for different format versions
 
 TEST_F(StatsHistoryTest, PersistentStatsCreateColumnFamilies) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr int kPeriodSec = 5;
   Options options;
   options.create_if_missing = true;
@@ -549,6 +560,7 @@ TEST_F(StatsHistoryTest, PersistentStatsCreateColumnFamilies) {
 }
 
 TEST_F(StatsHistoryTest, PersistentStatsReadOnly) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(Put("bar", "v2"));
   Close();
 
@@ -569,6 +581,7 @@ TEST_F(StatsHistoryTest, PersistentStatsReadOnly) {
 }
 
 TEST_F(StatsHistoryTest, ForceManualFlushStatsCF) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr int kPeriodSec = 5;
   Options options;
   options.create_if_missing = true;
@@ -655,6 +668,7 @@ TEST_F(StatsHistoryTest, ForceManualFlushStatsCF) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

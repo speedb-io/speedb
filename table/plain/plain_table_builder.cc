@@ -39,6 +39,7 @@ namespace {
 //   @block_handle the block handle this particular block.
 IOStatus WriteBlock(const Slice& block_contents, WritableFileWriter* file,
                     uint64_t* offset, BlockHandle* block_handle) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   block_handle->set_offset(*offset);
   block_handle->set_size(block_contents.size());
   IOStatus io_s = file->Append(block_contents);
@@ -76,6 +77,7 @@ PlainTableBuilder::PlainTableBuilder(
                index_sparseness),
       store_index_in_file_(store_index_in_file),
       prefix_extractor_(moptions.prefix_extractor.get()) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Build index block and save it in the file if hash_table_ratio > 0
   if (store_index_in_file_) {
     assert(hash_table_ratio > 0 || IsTotalOrderMode());
@@ -126,6 +128,7 @@ PlainTableBuilder::PlainTableBuilder(
 }
 
 PlainTableBuilder::~PlainTableBuilder() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // They are supposed to have been passed to users through Finish()
   // if the file succeeds.
   status_.PermitUncheckedError();
@@ -133,6 +136,7 @@ PlainTableBuilder::~PlainTableBuilder() {
 }
 
 void PlainTableBuilder::Add(const Slice& key, const Slice& value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // temp buffer for metadata bytes between key and value.
   char meta_bytes_buf[6];
   size_t meta_bytes_buf_size = 0;
@@ -204,6 +208,7 @@ void PlainTableBuilder::Add(const Slice& key, const Slice& value) {
 }
 
 Status PlainTableBuilder::Finish() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(!closed_);
   closed_ = true;
 
@@ -304,6 +309,7 @@ Status PlainTableBuilder::Finish() {
 }
 
 void PlainTableBuilder::Abandon() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   closed_ = true;
 }
 

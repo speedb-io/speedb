@@ -49,6 +49,7 @@ class OptionsTest : public testing::Test {};
 
 #ifndef ROCKSDB_LITE  // GetOptionsFromMap is not supported in ROCKSDB_LITE
 TEST_F(OptionsTest, GetOptionsFromMapTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unordered_map<std::string, std::string> cf_options_map = {
       {"write_buffer_size", "1"},
       {"max_write_buffer_number", "2"},
@@ -346,6 +347,7 @@ TEST_F(OptionsTest, GetOptionsFromMapTest) {
 #ifndef ROCKSDB_LITE  // GetColumnFamilyOptionsFromString is not supported in
                       // ROCKSDB_LITE
 TEST_F(OptionsTest, GetColumnFamilyOptionsFromStringTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ColumnFamilyOptions base_cf_opt;
   ColumnFamilyOptions new_cf_opt;
   ConfigOptions config_options;
@@ -581,6 +583,7 @@ TEST_F(OptionsTest, GetColumnFamilyOptionsFromStringTest) {
 }
 
 TEST_F(OptionsTest, CompressionOptionsFromString) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ColumnFamilyOptions base_cf_opt;
   ColumnFamilyOptions new_cf_opt;
   ConfigOptions config_options;
@@ -753,6 +756,7 @@ TEST_F(OptionsTest, CompressionOptionsFromString) {
 }
 
 TEST_F(OptionsTest, OldInterfaceTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ColumnFamilyOptions base_cf_opt;
   ColumnFamilyOptions new_cf_opt;
   ConfigOptions exact;
@@ -839,6 +843,7 @@ TEST_F(OptionsTest, OldInterfaceTest) {
 
 #ifndef ROCKSDB_LITE  // GetBlockBasedTableOptionsFromString is not supported
 TEST_F(OptionsTest, GetBlockBasedTableOptionsFromString) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   BlockBasedTableOptions table_opt;
   BlockBasedTableOptions new_opt;
   ConfigOptions config_options;
@@ -1131,6 +1136,7 @@ TEST_F(OptionsTest, GetBlockBasedTableOptionsFromString) {
 
 #ifndef ROCKSDB_LITE  // GetPlainTableOptionsFromString is not supported
 TEST_F(OptionsTest, GetPlainTableOptionsFromString) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   PlainTableOptions table_opt;
   PlainTableOptions new_opt;
   ConfigOptions config_options;
@@ -1174,6 +1180,7 @@ TEST_F(OptionsTest, GetPlainTableOptionsFromString) {
 
 #ifndef ROCKSDB_LITE  // GetMemTableRepFactoryFromString is not supported
 TEST_F(OptionsTest, GetMemTableRepFactoryFromString) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<MemTableRepFactory> new_mem_factory = nullptr;
 
   ASSERT_OK(GetMemTableRepFactoryFromString("skip_list", &new_mem_factory));
@@ -1212,6 +1219,7 @@ TEST_F(OptionsTest, GetMemTableRepFactoryFromString) {
 #endif  // !ROCKSDB_LITE
 
 TEST_F(OptionsTest, MemTableRepFactoryCreateFromString) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<MemTableRepFactory> new_mem_factory = nullptr;
   ConfigOptions config_options;
   config_options.ignore_unsupported_options = false;
@@ -1313,6 +1321,7 @@ class CustomEnv : public EnvWrapper {
 };
 
 TEST_F(OptionsTest, GetOptionsFromStringTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options base_options, new_options;
   ConfigOptions config_options;
   config_options.input_strings_escaped = false;
@@ -1330,6 +1339,7 @@ TEST_F(OptionsTest, GetOptionsFromStringTest) {
       CustomEnv::kClassName(),
       [](const std::string& /*name*/, std::unique_ptr<Env>* /*env_guard*/,
          std::string* /* errmsg */) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         static CustomEnv env(Env::Default());
         return &env;
       });
@@ -1428,6 +1438,7 @@ TEST_F(OptionsTest, GetOptionsFromStringTest) {
 }
 
 TEST_F(OptionsTest, DBOptionsSerialization) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options base_options, new_options;
   Random rnd(301);
   ConfigOptions config_options;
@@ -1451,6 +1462,7 @@ TEST_F(OptionsTest, DBOptionsSerialization) {
 }
 
 TEST_F(OptionsTest, OptionsComposeDecompose) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // build an Options from DBOptions + CFOptions, then decompose it to verify
   // we get same constituent options.
   DBOptions base_db_opts;
@@ -1475,6 +1487,7 @@ TEST_F(OptionsTest, OptionsComposeDecompose) {
 }
 
 TEST_F(OptionsTest, DBOptionsComposeImmutable) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Build a DBOptions from an Immutable/Mutable one and verify that
   // we get same constituent options.
   ConfigOptions config_options;
@@ -1489,6 +1502,7 @@ TEST_F(OptionsTest, DBOptionsComposeImmutable) {
 }
 
 TEST_F(OptionsTest, GetMutableDBOptions) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Random rnd(228);
   DBOptions base_opts;
   std::string opts_str;
@@ -1507,6 +1521,7 @@ TEST_F(OptionsTest, GetMutableDBOptions) {
 }
 
 TEST_F(OptionsTest, CFOptionsComposeImmutable) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Build a DBOptions from an Immutable/Mutable one and verify that
   // we get same constituent options.
   ConfigOptions config_options;
@@ -1524,6 +1539,7 @@ TEST_F(OptionsTest, CFOptionsComposeImmutable) {
 }
 
 TEST_F(OptionsTest, GetMutableCFOptions) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Random rnd(228);
   ColumnFamilyOptions base, copy;
   std::string opts_str;
@@ -1546,6 +1562,7 @@ TEST_F(OptionsTest, GetMutableCFOptions) {
 }
 
 TEST_F(OptionsTest, ColumnFamilyOptionsSerialization) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   ColumnFamilyOptions base_opt, new_opt;
   Random rnd(302);
@@ -1574,6 +1591,7 @@ TEST_F(OptionsTest, ColumnFamilyOptionsSerialization) {
 }
 
 TEST_F(OptionsTest, CheckBlockBasedTableOptions) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ColumnFamilyOptions cf_opts;
   DBOptions db_opts;
   ConfigOptions config_opts;
@@ -1612,6 +1630,7 @@ TEST_F(OptionsTest, CheckBlockBasedTableOptions) {
 }
 
 TEST_F(OptionsTest, MutableTableOptions) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ConfigOptions config_options;
   std::shared_ptr<TableFactory> bbtf;
   bbtf.reset(NewBlockBasedTableFactory());
@@ -1643,6 +1662,7 @@ TEST_F(OptionsTest, MutableTableOptions) {
 }
 
 TEST_F(OptionsTest, MutableCFOptions) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ConfigOptions config_options;
   ColumnFamilyOptions cf_opts;
 
@@ -1723,6 +1743,7 @@ Status StringToMap(
 
 #ifndef ROCKSDB_LITE  // StringToMap is not supported in ROCKSDB_LITE
 TEST_F(OptionsTest, StringToMapTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unordered_map<std::string, std::string> opts_map;
   // Regular options
   ASSERT_OK(StringToMap("k1=v1;k2=v2;k3=v3", &opts_map));
@@ -1842,6 +1863,7 @@ TEST_F(OptionsTest, StringToMapTest) {
 
 #ifndef ROCKSDB_LITE  // StringToMap is not supported in ROCKSDB_LITE
 TEST_F(OptionsTest, StringToMapRandomTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unordered_map<std::string, std::string> opts_map;
   // Make sure segfault is not hit by semi-random strings
 
@@ -1887,6 +1909,7 @@ TEST_F(OptionsTest, StringToMapRandomTest) {
 }
 
 TEST_F(OptionsTest, GetStringFromCompressionType) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string res;
 
   ASSERT_OK(GetStringFromCompressionType(&res, kNoCompression));
@@ -1909,6 +1932,7 @@ TEST_F(OptionsTest, GetStringFromCompressionType) {
 }
 
 TEST_F(OptionsTest, OnlyMutableDBOptions) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string opt_str;
   Random rnd(302);
   ConfigOptions cfg_opts;
@@ -1954,6 +1978,7 @@ TEST_F(OptionsTest, OnlyMutableDBOptions) {
 }
 
 TEST_F(OptionsTest, OnlyMutableCFOptions) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string opt_str;
   Random rnd(302);
   ConfigOptions cfg_opts;
@@ -2005,6 +2030,7 @@ TEST_F(OptionsTest, OnlyMutableCFOptions) {
 }
 
 TEST_F(OptionsTest, SstPartitionerTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ConfigOptions cfg_opts;
   ColumnFamilyOptions cf_opts, new_opt;
   std::string opts_str, mismatch;
@@ -2040,6 +2066,7 @@ TEST_F(OptionsTest, SstPartitionerTest) {
 }
 
 TEST_F(OptionsTest, FileChecksumGenFactoryTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ConfigOptions cfg_opts;
   DBOptions db_opts, new_opt;
   std::string opts_str, mismatch;
@@ -2094,6 +2121,7 @@ class TestTablePropertiesCollectorFactory
 };
 
 TEST_F(OptionsTest, OptionTablePropertiesTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ConfigOptions cfg_opts;
   ColumnFamilyOptions orig, copy;
   orig.table_properties_collector_factories.push_back(
@@ -2121,6 +2149,7 @@ TEST_F(OptionsTest, OptionTablePropertiesTest) {
           [](const std::string& name,
              std::unique_ptr<TablePropertiesCollectorFactory>* guard,
              std::string* /* errmsg */) {
+PERF_MARKER(__PRETTY_FUNCTION__);
             std::string id = name.substr(
                 strlen(TestTablePropertiesCollectorFactory::kClassName()) + 1);
             guard->reset(new TestTablePropertiesCollectorFactory(id));
@@ -2134,6 +2163,7 @@ TEST_F(OptionsTest, OptionTablePropertiesTest) {
 #endif  // !ROCKSDB_LITE
 
 TEST_F(OptionsTest, ConvertOptionsTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   LevelDBOptions leveldb_opt;
   Options converted_opt = ConvertOptions(leveldb_opt);
 
@@ -2181,6 +2211,7 @@ class TestConfigEventListener : public TestEventListener {
  public:
   explicit TestConfigEventListener(const std::string& id)
       : TestEventListener("Config" + id) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     s_ = id;
     RegisterOptions("Test", &s_, &test_listener_option_info);
   }
@@ -2188,10 +2219,12 @@ class TestConfigEventListener : public TestEventListener {
 
 static int RegisterTestEventListener(ObjectLibrary& library,
                                      const std::string& arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   library.AddFactory<EventListener>(
       "Test" + arg,
       [](const std::string& name, std::unique_ptr<EventListener>* guard,
          std::string* /* errmsg */) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         guard->reset(new TestEventListener(name.substr(4)));
         return guard->get();
       });
@@ -2199,12 +2232,14 @@ static int RegisterTestEventListener(ObjectLibrary& library,
       "TestConfig" + arg,
       [](const std::string& name, std::unique_ptr<EventListener>* guard,
          std::string* /* errmsg */) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         guard->reset(new TestConfigEventListener(name.substr(10)));
         return guard->get();
       });
   return 1;
 }
 TEST_F(OptionsTest, OptionsListenerTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   DBOptions orig, copy;
   orig.listeners.push_back(std::make_shared<TestEventListener>("1"));
   orig.listeners.push_back(std::make_shared<TestEventListener>("2"));
@@ -2230,9 +2265,11 @@ const static std::string kCustomEnvName = "Custom";
 const static std::string kCustomEnvProp = "env=" + kCustomEnvName;
 
 static int RegisterCustomEnv(ObjectLibrary& library, const std::string& arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   library.AddFactory<Env>(
       arg, [](const std::string& /*name*/, std::unique_ptr<Env>* /*env_guard*/,
               std::string* /* errmsg */) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         static CustomEnv env(Env::Default());
         return &env;
       });
@@ -2244,6 +2281,7 @@ static int RegisterCustomEnv(ObjectLibrary& library, const std::string& arg) {
 class OptionsOldApiTest : public testing::Test {};
 
 TEST_F(OptionsOldApiTest, GetOptionsFromMapTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unordered_map<std::string, std::string> cf_options_map = {
       {"write_buffer_size", "1"},
       {"max_write_buffer_number", "2"},
@@ -2525,6 +2563,7 @@ TEST_F(OptionsOldApiTest, GetOptionsFromMapTest) {
 }
 
 TEST_F(OptionsOldApiTest, GetColumnFamilyOptionsFromStringTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ColumnFamilyOptions base_cf_opt;
   ColumnFamilyOptions new_cf_opt;
   base_cf_opt.table_factory.reset();
@@ -2721,6 +2760,7 @@ TEST_F(OptionsOldApiTest, GetColumnFamilyOptionsFromStringTest) {
 }
 
 TEST_F(OptionsTest, SliceTransformCreateFromString) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<const SliceTransform> transform = nullptr;
   ConfigOptions config_options;
   config_options.ignore_unsupported_options = false;
@@ -2809,6 +2849,7 @@ TEST_F(OptionsTest, SliceTransformCreateFromString) {
 }
 
 TEST_F(OptionsOldApiTest, GetBlockBasedTableOptionsFromString) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   BlockBasedTableOptions table_opt;
   BlockBasedTableOptions new_opt;
   // make sure default values are overwritten by something else
@@ -2981,6 +3022,7 @@ TEST_F(OptionsOldApiTest, GetBlockBasedTableOptionsFromString) {
 }
 
 TEST_F(OptionsOldApiTest, GetPlainTableOptionsFromString) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   PlainTableOptions table_opt;
   PlainTableOptions new_opt;
   // make sure default values are overwritten by something else
@@ -3020,6 +3062,7 @@ TEST_F(OptionsOldApiTest, GetPlainTableOptionsFromString) {
 }
 
 TEST_F(OptionsOldApiTest, GetOptionsFromStringTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options base_options, new_options;
   base_options.write_buffer_size = 20;
   base_options.min_write_buffer_number_to_merge = 15;
@@ -3033,6 +3076,7 @@ TEST_F(OptionsOldApiTest, GetOptionsFromStringTest) {
       "CustomEnvDefault",
       [](const std::string& /*name*/, std::unique_ptr<Env>* /*env_guard*/,
          std::string* /* errmsg */) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         static CustomEnv env(Env::Default());
         return &env;
       });
@@ -3083,6 +3127,7 @@ TEST_F(OptionsOldApiTest, GetOptionsFromStringTest) {
 }
 
 TEST_F(OptionsOldApiTest, DBOptionsSerialization) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options base_options, new_options;
   Random rnd(301);
 
@@ -3102,6 +3147,7 @@ TEST_F(OptionsOldApiTest, DBOptionsSerialization) {
 }
 
 TEST_F(OptionsOldApiTest, ColumnFamilyOptionsSerialization) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   ColumnFamilyOptions base_opt, new_opt;
   Random rnd(302);
@@ -3136,6 +3182,7 @@ class OptionsParserTest : public testing::Test {
 };
 
 TEST_F(OptionsParserTest, Comment) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   DBOptions db_opt;
   db_opt.max_open_files = 12345;
   db_opt.max_background_flushes = 301;
@@ -3177,6 +3224,7 @@ TEST_F(OptionsParserTest, Comment) {
 }
 
 TEST_F(OptionsParserTest, ExtraSpace) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string options_file_content =
       "# This is a testing option string.\n"
       "# Currently we only support \"#\" styled comment.\n"
@@ -3199,6 +3247,7 @@ TEST_F(OptionsParserTest, ExtraSpace) {
 }
 
 TEST_F(OptionsParserTest, MissingDBOptions) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string options_file_content =
       "# This is a testing option string.\n"
       "# Currently we only support \"#\" styled comment.\n"
@@ -3218,6 +3267,7 @@ TEST_F(OptionsParserTest, MissingDBOptions) {
 }
 
 TEST_F(OptionsParserTest, DoubleDBOptions) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   DBOptions db_opt;
   db_opt.max_open_files = 12345;
   db_opt.max_background_flushes = 301;
@@ -3247,6 +3297,7 @@ TEST_F(OptionsParserTest, DoubleDBOptions) {
 }
 
 TEST_F(OptionsParserTest, NoDefaultCFOptions) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   DBOptions db_opt;
   db_opt.max_open_files = 12345;
   db_opt.max_background_flushes = 301;
@@ -3275,6 +3326,7 @@ TEST_F(OptionsParserTest, NoDefaultCFOptions) {
 }
 
 TEST_F(OptionsParserTest, DefaultCFOptionsMustBeTheFirst) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   DBOptions db_opt;
   db_opt.max_open_files = 12345;
   db_opt.max_background_flushes = 301;
@@ -3305,6 +3357,7 @@ TEST_F(OptionsParserTest, DefaultCFOptionsMustBeTheFirst) {
 }
 
 TEST_F(OptionsParserTest, DuplicateCFOptions) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   DBOptions db_opt;
   db_opt.max_open_files = 12345;
   db_opt.max_background_flushes = 301;
@@ -3334,6 +3387,7 @@ TEST_F(OptionsParserTest, DuplicateCFOptions) {
 }
 
 TEST_F(OptionsParserTest, IgnoreUnknownOptions) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (int case_id = 0; case_id < 5; case_id++) {
     DBOptions db_opt;
     db_opt.max_open_files = 12345;
@@ -3417,6 +3471,7 @@ TEST_F(OptionsParserTest, IgnoreUnknownOptions) {
 }
 
 TEST_F(OptionsParserTest, ParseVersion) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   DBOptions db_opt;
   db_opt.max_open_files = 12345;
   db_opt.max_background_flushes = 301;
@@ -3465,6 +3520,7 @@ TEST_F(OptionsParserTest, ParseVersion) {
 void VerifyCFPointerTypedOptions(
     ColumnFamilyOptions* base_cf_opt, const ColumnFamilyOptions* new_cf_opt,
     const std::unordered_map<std::string, std::string>* new_cf_opt_map) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string name_buffer;
   ConfigOptions config_options;
   config_options.input_strings_escaped = false;
@@ -3553,6 +3609,7 @@ void VerifyCFPointerTypedOptions(
 }
 
 TEST_F(OptionsParserTest, Readahead) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   DBOptions base_db_opt;
   std::vector<ColumnFamilyOptions> base_cf_opts;
   base_cf_opts.emplace_back();
@@ -3600,6 +3657,7 @@ TEST_F(OptionsParserTest, Readahead) {
 }
 
 TEST_F(OptionsParserTest, DumpAndParse) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   DBOptions base_db_opt;
   std::vector<ColumnFamilyOptions> base_cf_opts;
   std::vector<std::string> cf_names = {"default", "cf1", "cf2", "cf3",
@@ -3685,6 +3743,7 @@ TEST_F(OptionsParserTest, DumpAndParse) {
 }
 
 TEST_F(OptionsParserTest, DifferentDefault) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const std::string kOptionsFileName = "test-persisted-options.ini";
 
   ColumnFamilyOptions cf_level_opts;
@@ -3782,6 +3841,7 @@ class OptionsSanityCheckTest : public OptionsParserTest,
 
  public:
   OptionsSanityCheckTest() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     config_options_.ignore_unknown_options = false;
     config_options_.ignore_unsupported_options = GetParam();
     config_options_.input_strings_escaped = true;
@@ -3791,6 +3851,7 @@ class OptionsSanityCheckTest : public OptionsParserTest,
   Status SanityCheckOptions(const DBOptions& db_opts,
                             const ColumnFamilyOptions& cf_opts,
                             ConfigOptions::SanityLevel level) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     config_options_.sanity_level = level;
     return RocksDBOptionsParser::VerifyRocksDBOptionsFromFile(
         config_options_, db_opts, {"default"}, {cf_opts}, kOptionsFileName,
@@ -3799,10 +3860,12 @@ class OptionsSanityCheckTest : public OptionsParserTest,
 
   Status SanityCheckCFOptions(const ColumnFamilyOptions& cf_opts,
                               ConfigOptions::SanityLevel level) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return SanityCheckOptions(DBOptions(), cf_opts, level);
   }
 
   void SanityCheckCFOptions(const ColumnFamilyOptions& opts, bool exact) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_OK(SanityCheckCFOptions(
         opts, ConfigOptions::kSanityLevelLooselyCompatible));
     ASSERT_OK(SanityCheckCFOptions(opts, ConfigOptions::kSanityLevelNone));
@@ -3817,10 +3880,12 @@ class OptionsSanityCheckTest : public OptionsParserTest,
 
   Status SanityCheckDBOptions(const DBOptions& db_opts,
                               ConfigOptions::SanityLevel level) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return SanityCheckOptions(db_opts, ColumnFamilyOptions(), level);
   }
 
   void SanityCheckDBOptions(const DBOptions& opts, bool exact) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_OK(SanityCheckDBOptions(
         opts, ConfigOptions::kSanityLevelLooselyCompatible));
     ASSERT_OK(SanityCheckDBOptions(opts, ConfigOptions::kSanityLevelNone));
@@ -3835,6 +3900,7 @@ class OptionsSanityCheckTest : public OptionsParserTest,
 
   Status PersistOptions(const DBOptions& db_opts,
                         const ColumnFamilyOptions& cf_opts) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Status s = fs_->DeleteFile(kOptionsFileName, IOOptions(), nullptr);
     if (!s.ok()) {
       return s;
@@ -3844,10 +3910,12 @@ class OptionsSanityCheckTest : public OptionsParserTest,
   }
 
   Status PersistCFOptions(const ColumnFamilyOptions& cf_opts) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return PersistOptions(DBOptions(), cf_opts);
   }
 
   Status PersistDBOptions(const DBOptions& db_opts) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return PersistOptions(db_opts, ColumnFamilyOptions());
   }
 
@@ -3855,6 +3923,7 @@ class OptionsSanityCheckTest : public OptionsParserTest,
 };
 
 TEST_P(OptionsSanityCheckTest, CFOptionsSanityCheck) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ColumnFamilyOptions opts;
   Random rnd(301);
 
@@ -4002,6 +4071,7 @@ TEST_P(OptionsSanityCheckTest, CFOptionsSanityCheck) {
 }
 
 TEST_P(OptionsSanityCheckTest, DBOptionsSanityCheck) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   DBOptions opts;
   Random rnd(301);
 
@@ -4045,6 +4115,7 @@ TEST_P(OptionsSanityCheckTest, DBOptionsSanityCheck) {
 
 namespace {
 bool IsEscapedString(const std::string& str) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (size_t i = 0; i < str.size(); ++i) {
     if (str[i] == '\\') {
       // since we already handle those two consecutive '\'s in
@@ -4078,6 +4149,7 @@ bool IsEscapedString(const std::string& str) {
 }  // namespace
 
 TEST_F(OptionsParserTest, IntegerParsing) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_EQ(ParseUint64("18446744073709551615"), 18446744073709551615U);
   ASSERT_EQ(ParseUint32("4294967295"), 4294967295U);
   ASSERT_EQ(ParseSizeT("18446744073709551615"), 18446744073709551615U);
@@ -4090,6 +4162,7 @@ TEST_F(OptionsParserTest, IntegerParsing) {
 }
 
 TEST_F(OptionsParserTest, EscapeOptionString) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_EQ(UnescapeOptionString(
                 "This is a test string with \\# \\: and \\\\ escape chars."),
             "This is a test string with # : and \\ escape chars.");
@@ -4134,6 +4207,7 @@ static void TestAndCompareOption(const ConfigOptions& config_options,
                                  const OptionTypeInfo& opt_info,
                                  const std::string& opt_name, void* base_ptr,
                                  void* comp_ptr, bool strip = false) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string result, mismatch;
   ASSERT_OK(opt_info.Serialize(config_options, opt_name, base_ptr, &result));
   if (strip) {
@@ -4152,6 +4226,7 @@ static void TestParseAndCompareOption(const ConfigOptions& config_options,
                                       const std::string& opt_value,
                                       void* base_ptr, void* comp_ptr,
                                       bool strip = false) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(opt_info.Parse(config_options, opt_name, opt_value, base_ptr));
   TestAndCompareOption(config_options, opt_info, opt_name, base_ptr, comp_ptr,
                        strip);
@@ -4160,6 +4235,7 @@ static void TestParseAndCompareOption(const ConfigOptions& config_options,
 template <typename T>
 void TestOptInfo(const ConfigOptions& config_options, OptionType opt_type,
                  T* base, T* comp) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string result;
   OptionTypeInfo opt_info(0, opt_type);
   ASSERT_FALSE(opt_info.AreEqual(config_options, "base", base, comp, &result));
@@ -4172,6 +4248,7 @@ void TestOptInfo(const ConfigOptions& config_options, OptionType opt_type,
 class OptionTypeInfoTest : public testing::Test {};
 
 TEST_F(OptionTypeInfoTest, BasicTypes) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ConfigOptions config_options;
   {
     bool a = true, b = false;
@@ -4216,6 +4293,7 @@ TEST_F(OptionTypeInfoTest, BasicTypes) {
 }
 
 TEST_F(OptionTypeInfoTest, TestInvalidArgs) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ConfigOptions config_options;
   bool b;
   int i;
@@ -4256,6 +4334,7 @@ TEST_F(OptionTypeInfoTest, TestInvalidArgs) {
                            OptionTypeFlags::kNone,
                            [](const ConfigOptions&, const std::string&,
                               const std::string& value, void* addr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
                              auto ptr = static_cast<int*>(addr);
                              *ptr = ParseInt(value);
                              return Status::OK();
@@ -4265,11 +4344,13 @@ TEST_F(OptionTypeInfoTest, TestInvalidArgs) {
 }
 
 TEST_F(OptionTypeInfoTest, TestParseFunc) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   OptionTypeInfo opt_info(
       0, OptionType::kUnknown, OptionVerificationType::kNormal,
       OptionTypeFlags::kNone,
       [](const ConfigOptions& /*opts*/, const std::string& name,
          const std::string& value, void* addr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         auto ptr = static_cast<std::string*>(addr);
         if (name == "Oops") {
           return Status::InvalidArgument(value);
@@ -4286,11 +4367,13 @@ TEST_F(OptionTypeInfoTest, TestParseFunc) {
 }
 
 TEST_F(OptionTypeInfoTest, TestSerializeFunc) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   OptionTypeInfo opt_info(
       0, OptionType::kString, OptionVerificationType::kNormal,
       OptionTypeFlags::kNone, nullptr,
       [](const ConfigOptions& /*opts*/, const std::string& name,
          const void* /*addr*/, std::string* value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         if (name == "Oops") {
           return Status::InvalidArgument(name);
         } else {
@@ -4308,11 +4391,13 @@ TEST_F(OptionTypeInfoTest, TestSerializeFunc) {
 }
 
 TEST_F(OptionTypeInfoTest, TestEqualsFunc) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   OptionTypeInfo opt_info(
       0, OptionType::kInt, OptionVerificationType::kNormal,
       OptionTypeFlags::kNone, nullptr, nullptr,
       [](const ConfigOptions& /*opts*/, const std::string& name,
          const void* addr1, const void* addr2, std::string* mismatch) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         auto i1 = *(static_cast<const int*>(addr1));
         auto i2 = *(static_cast<const int*>(addr2));
         if (name == "LT") {
@@ -4342,6 +4427,7 @@ TEST_F(OptionTypeInfoTest, TestEqualsFunc) {
 }
 
 TEST_F(OptionTypeInfoTest, TestOptionFlags) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   OptionTypeInfo opt_none(0, OptionType::kString,
                           OptionVerificationType::kNormal,
                           OptionTypeFlags::kDontSerialize);
@@ -4385,6 +4471,7 @@ TEST_F(OptionTypeInfoTest, TestOptionFlags) {
 }
 
 TEST_F(OptionTypeInfoTest, TestCustomEnum) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   enum TestEnum { kA, kB, kC };
   std::unordered_map<std::string, TestEnum> enum_map = {
       {"A", TestEnum::kA},
@@ -4414,6 +4501,7 @@ TEST_F(OptionTypeInfoTest, TestCustomEnum) {
 }
 
 TEST_F(OptionTypeInfoTest, TestBuiltinEnum) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ConfigOptions config_options;
   for (auto iter : OptionsHelper::compaction_style_string_map) {
     CompactionStyle e1, e2;
@@ -4460,6 +4548,7 @@ TEST_F(OptionTypeInfoTest, TestBuiltinEnum) {
 }
 
 TEST_F(OptionTypeInfoTest, TestStruct) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   struct Basic {
     int i = 42;
     std::string s = "Hello";
@@ -4544,6 +4633,7 @@ TEST_F(OptionTypeInfoTest, TestStruct) {
 }
 
 TEST_F(OptionTypeInfoTest, TestVectorType) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   OptionTypeInfo vec_info = OptionTypeInfo::Vector<std::string>(
       0, OptionVerificationType::kNormal, OptionTypeFlags::kNone,
       {0, OptionType::kString});
@@ -4604,6 +4694,7 @@ TEST_F(OptionTypeInfoTest, TestVectorType) {
 }
 
 TEST_F(OptionTypeInfoTest, TestStaticType) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   struct SimpleOptions {
     size_t size = 0;
     bool verify = true;
@@ -4633,6 +4724,7 @@ TEST_F(OptionTypeInfoTest, TestStaticType) {
 class ConfigOptionsTest : public testing::Test {};
 
 TEST_F(ConfigOptionsTest, EnvFromConfigOptions) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ConfigOptions config_options;
   DBOptions db_opts;
   Options opts;
@@ -4670,6 +4762,7 @@ TEST_F(ConfigOptionsTest, EnvFromConfigOptions) {
   delete mem_env;
 }
 TEST_F(ConfigOptionsTest, MergeOperatorFromString) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ConfigOptions config_options;
   std::shared_ptr<MergeOperator> merge_op;
 
@@ -4761,6 +4854,7 @@ INSTANTIATE_TEST_CASE_P(OptionsSanityCheckTest, OptionsSanityCheckTest,
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
 #ifdef GFLAGS
   ParseCommandLineFlags(&argc, &argv, true);

@@ -78,6 +78,7 @@ class TestCustomizable : public Customizable {
   TestCustomizable(const std::string& name) : name_(name) {}
   // Method to allow CheckedCast to work for this class
   static const char* kClassName() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return "TestCustomizable";
   }
 
@@ -127,6 +128,7 @@ class ACustomizable : public TestCustomizable {
  public:
   explicit ACustomizable(const std::string& id)
       : TestCustomizable("A"), id_(id) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     RegisterOptions(&opts_, &a_option_info);
   }
   std::string GetId() const override { return id_; }
@@ -157,6 +159,7 @@ class BCustomizable : public TestCustomizable {
  private:
  public:
   explicit BCustomizable(const std::string& name) : TestCustomizable(name) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     RegisterOptions(name, &opts_, &b_option_info);
   }
   static const char* kClassName() { return "B"; }
@@ -168,6 +171,7 @@ class BCustomizable : public TestCustomizable {
 #ifndef ROCKSDB_LITE
 static bool LoadSharedB(const std::string& id,
                         std::shared_ptr<TestCustomizable>* result) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (id == "B") {
     result->reset(new BCustomizable(id));
     return true;
@@ -182,10 +186,12 @@ static bool LoadSharedB(const std::string& id,
 static int A_count = 0;
 static int RegisterCustomTestObjects(ObjectLibrary& library,
                                      const std::string& /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   library.AddFactory<TestCustomizable>(
       ObjectLibrary::PatternEntry("A", true).AddSeparator("_"),
       [](const std::string& name, std::unique_ptr<TestCustomizable>* guard,
          std::string* /* msg */) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         guard->reset(new ACustomizable(name));
         A_count++;
         return guard->get();
@@ -237,6 +243,7 @@ class SimpleConfigurable : public Configurable {
 
   explicit SimpleConfigurable(
       const std::unordered_map<std::string, OptionTypeInfo>* map) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     RegisterOptions(&simple_, map);
   }
 };
@@ -245,6 +252,7 @@ class SimpleConfigurable : public Configurable {
 static void GetMapFromProperties(
     const std::string& props,
     std::unordered_map<std::string, std::string>* map) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::istringstream iss(props);
   std::unordered_map<std::string, std::string> copy_map;
   std::string line;
@@ -264,6 +272,7 @@ static void GetMapFromProperties(
 Status TestCustomizable::CreateFromString(
     const ConfigOptions& config_options, const std::string& value,
     std::shared_ptr<TestCustomizable>* result) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return LoadSharedObject<TestCustomizable>(config_options, value, LoadSharedB,
                                             result);
 }
@@ -271,9 +280,11 @@ Status TestCustomizable::CreateFromString(
 Status TestCustomizable::CreateFromString(
     const ConfigOptions& config_options, const std::string& value,
     std::unique_ptr<TestCustomizable>* result) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return LoadUniqueObject<TestCustomizable>(
       config_options, value,
       [](const std::string& id, std::unique_ptr<TestCustomizable>* u) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         if (id == "B") {
           u->reset(new BCustomizable(id));
           return true;
@@ -290,9 +301,11 @@ Status TestCustomizable::CreateFromString(
 Status TestCustomizable::CreateFromString(const ConfigOptions& config_options,
                                           const std::string& value,
                                           TestCustomizable** result) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return LoadStaticObject<TestCustomizable>(
       config_options, value,
       [](const std::string& id, TestCustomizable** ptr) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         if (id == "B") {
           *ptr = new BCustomizable(id);
           return true;
@@ -310,6 +323,7 @@ Status TestCustomizable::CreateFromString(const ConfigOptions& config_options,
 class CustomizableTest : public testing::Test {
  public:
   CustomizableTest() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     config_options_.invoke_prepare_options = false;
 #ifndef ROCKSDB_LITE
     // GetOptionsFromMap is not supported in ROCKSDB_LITE
@@ -327,10 +341,12 @@ class CustomizableTest : public testing::Test {
 //    - a XXX.id option
 //    - a property with a name
 TEST_F(CustomizableTest, CreateByNameTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ObjectLibrary::Default()->AddFactory<TestCustomizable>(
       ObjectLibrary::PatternEntry("TEST", false).AddSeparator("_"),
       [](const std::string& name, std::unique_ptr<TestCustomizable>* guard,
          std::string* /* msg */) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         guard->reset(new TestCustomizable(name));
         return guard->get();
       });
@@ -352,11 +368,13 @@ TEST_F(CustomizableTest, CreateByNameTest) {
 }
 
 TEST_F(CustomizableTest, ToStringTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<TestCustomizable> custom(new TestCustomizable("test"));
   ASSERT_EQ(custom->ToString(config_options_), "test");
 }
 
 TEST_F(CustomizableTest, SimpleConfigureTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unordered_map<std::string, std::string> opt_map = {
       {"unique", "id=A;int=1;bool=true"},
       {"shared", "id=B;string=s"},
@@ -377,6 +395,7 @@ TEST_F(CustomizableTest, SimpleConfigureTest) {
 }
 
 TEST_F(CustomizableTest, ConfigureFromPropsTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unordered_map<std::string, std::string> opt_map = {
       {"unique.id", "A"}, {"unique.A.int", "1"},    {"unique.A.bool", "true"},
       {"shared.id", "B"}, {"shared.B.string", "s"},
@@ -400,6 +419,7 @@ TEST_F(CustomizableTest, ConfigureFromPropsTest) {
 }
 
 TEST_F(CustomizableTest, ConfigureFromShortTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unordered_map<std::string, std::string> opt_map = {
       {"unique.id", "A"}, {"unique.A.int", "1"},    {"unique.A.bool", "true"},
       {"shared.id", "B"}, {"shared.B.string", "s"},
@@ -413,6 +433,7 @@ TEST_F(CustomizableTest, ConfigureFromShortTest) {
 }
 
 TEST_F(CustomizableTest, AreEquivalentOptionsTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unordered_map<std::string, std::string> opt_map = {
       {"unique", "id=A;int=1;bool=true"},
       {"shared", "id=A;int=1;bool=true"},
@@ -447,6 +468,7 @@ TEST_F(CustomizableTest, AreEquivalentOptionsTest) {
 
 // Tests that we can initialize a customizable from its options
 TEST_F(CustomizableTest, ConfigureStandaloneCustomTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<TestCustomizable> base, copy;
   const auto& registry = config_options_.registry;
   ASSERT_OK(registry->NewUniqueObject<TestCustomizable>("A", &base));
@@ -461,6 +483,7 @@ TEST_F(CustomizableTest, ConfigureStandaloneCustomTest) {
 
 // Tests that we fail appropriately if the pattern is not registered
 TEST_F(CustomizableTest, BadNameTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   config_options_.ignore_unsupported_options = false;
   std::unique_ptr<Configurable> c1(new SimpleConfigurable());
   ASSERT_NOK(
@@ -473,6 +496,7 @@ TEST_F(CustomizableTest, BadNameTest) {
 // Tests that we fail appropriately if a bad option is passed to the underlying
 // configurable
 TEST_F(CustomizableTest, BadOptionTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<Configurable> c1(new SimpleConfigurable());
   ConfigOptions ignore = config_options_;
   ignore.ignore_unknown_options = true;
@@ -491,6 +515,7 @@ TEST_F(CustomizableTest, BadOptionTest) {
 }
 
 TEST_F(CustomizableTest, FailingFactoryTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<ObjectRegistry> registry = ObjectRegistry::NewInstance();
   std::unique_ptr<Configurable> c1(new SimpleConfigurable());
   ConfigOptions ignore = config_options_;
@@ -500,6 +525,7 @@ TEST_F(CustomizableTest, FailingFactoryTest) {
       "failing",
       [](const std::string& /*uri*/,
          std::unique_ptr<TestCustomizable>* /*guard */, std::string* errmsg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         *errmsg = "Bad Factory";
         return nullptr;
       });
@@ -541,6 +567,7 @@ TEST_F(CustomizableTest, FailingFactoryTest) {
 
 // Tests that different IDs lead to different objects
 TEST_F(CustomizableTest, UniqueIdTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<Configurable> base(new SimpleConfigurable());
   ASSERT_OK(base->ConfigureFromString(config_options_,
                                       "unique={id=A_1;int=1;bool=true}"));
@@ -561,6 +588,7 @@ TEST_F(CustomizableTest, UniqueIdTest) {
 }
 
 TEST_F(CustomizableTest, IsInstanceOfTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<TestCustomizable> tc = std::make_shared<ACustomizable>("A_1");
 
   ASSERT_EQ(tc->GetId(), std::string("A_1"));
@@ -582,6 +610,7 @@ TEST_F(CustomizableTest, IsInstanceOfTest) {
 }
 
 TEST_F(CustomizableTest, PrepareOptionsTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   static std::unordered_map<std::string, OptionTypeInfo> p_option_info = {
 #ifndef ROCKSDB_LITE
       {"can_prepare",
@@ -595,6 +624,7 @@ TEST_F(CustomizableTest, PrepareOptionsTest) {
     bool can_prepare_ = true;
 
     PrepareCustomizable() : TestCustomizable("P") {
+PERF_MARKER(__PRETTY_FUNCTION__);
       RegisterOptions("Prepare", &can_prepare_, &p_option_info);
     }
 
@@ -611,6 +641,7 @@ TEST_F(CustomizableTest, PrepareOptionsTest) {
       "P",
       [](const std::string& /*name*/, std::unique_ptr<TestCustomizable>* guard,
          std::string* /* msg */) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         guard->reset(new PrepareCustomizable());
         return guard->get();
       });
@@ -679,6 +710,7 @@ struct InnerOptions {
 class InnerCustomizable : public Customizable {
  public:
   explicit InnerCustomizable(const std::shared_ptr<Customizable>& w) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     iopts_.inner = w;
     RegisterOptions(&iopts_, &inner_option_info);
   }
@@ -709,6 +741,7 @@ class WrappedCustomizable1 : public InnerCustomizable {
  public:
   explicit WrappedCustomizable1(const std::shared_ptr<Customizable>& w)
       : InnerCustomizable(w) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     RegisterOptions(&wopts_, nullptr);
   }
   const char* Name() const override { return kClassName(); }
@@ -743,6 +776,7 @@ class WrappedCustomizable2 : public InnerCustomizable {
 }  // namespace
 
 TEST_F(CustomizableTest, WrappedInnerTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<TestCustomizable> ac =
       std::make_shared<TestCustomizable>("A");
 
@@ -771,6 +805,7 @@ TEST_F(CustomizableTest, WrappedInnerTest) {
 }
 
 TEST_F(CustomizableTest, CustomizableInnerTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<Customizable> c =
       std::make_shared<InnerCustomizable>(std::make_shared<ACustomizable>("a"));
   std::shared_ptr<Customizable> wc1 = std::make_shared<WrappedCustomizable1>(c);
@@ -794,6 +829,7 @@ TEST_F(CustomizableTest, CustomizableInnerTest) {
 }
 
 TEST_F(CustomizableTest, CopyObjectTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   class CopyCustomizable : public Customizable {
    public:
     CopyCustomizable() : prepared_(0), validated_(0) {}
@@ -830,6 +866,7 @@ TEST_F(CustomizableTest, CopyObjectTest) {
 }
 
 TEST_F(CustomizableTest, TestStringDepth) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ConfigOptions shallow = config_options_;
   std::unique_ptr<Configurable> c(
       new InnerCustomizable(std::make_shared<ACustomizable>("a")));
@@ -844,6 +881,7 @@ TEST_F(CustomizableTest, TestStringDepth) {
 
 // Tests that we only get a new customizable when it changes
 TEST_F(CustomizableTest, NewUniqueCustomizableTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<Configurable> base(new SimpleConfigurable());
   A_count = 0;
   ASSERT_OK(base->ConfigureFromString(config_options_,
@@ -871,6 +909,7 @@ TEST_F(CustomizableTest, NewUniqueCustomizableTest) {
 }
 
 TEST_F(CustomizableTest, NewEmptyUniqueTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<Configurable> base(new SimpleConfigurable());
   SimpleOptions* simple = base->GetOptions<SimpleOptions>();
   ASSERT_EQ(simple->cu, nullptr);
@@ -897,6 +936,7 @@ TEST_F(CustomizableTest, NewEmptyUniqueTest) {
 }
 
 TEST_F(CustomizableTest, NewEmptySharedTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<Configurable> base(new SimpleConfigurable());
 
   SimpleOptions* simple = base->GetOptions<SimpleOptions>();
@@ -926,6 +966,7 @@ TEST_F(CustomizableTest, NewEmptySharedTest) {
 }
 
 TEST_F(CustomizableTest, NewEmptyStaticTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<Configurable> base(new SimpleConfigurable());
   ASSERT_OK(base->ConfigureFromString(config_options_, "pointer={id=}"));
   SimpleOptions* simple = base->GetOptions<SimpleOptions>();
@@ -965,6 +1006,7 @@ class VectorConfigurable : public SimpleConfigurable {
 }  // namespace
 
 TEST_F(CustomizableTest, VectorConfigTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   VectorConfigurable orig, copy;
   std::shared_ptr<TestCustomizable> c1, c2;
   ASSERT_OK(TestCustomizable::CreateFromString(config_options_, "A", &c1));
@@ -979,6 +1021,7 @@ TEST_F(CustomizableTest, VectorConfigTest) {
 }
 
 TEST_F(CustomizableTest, NoNameTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // If Customizables are created without names, they are not
   // part of the serialization (since they cannot be recreated)
   VectorConfigurable orig, copy;
@@ -998,6 +1041,7 @@ TEST_F(CustomizableTest, NoNameTest) {
 #endif  // ROCKSDB_LITE
 
 TEST_F(CustomizableTest, IgnoreUnknownObjects) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ConfigOptions ignore = config_options_;
   std::shared_ptr<TestCustomizable> shared;
   std::unique_ptr<TestCustomizable> unique;
@@ -1043,6 +1087,7 @@ TEST_F(CustomizableTest, IgnoreUnknownObjects) {
 }
 
 TEST_F(CustomizableTest, FactoryFunctionTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<TestCustomizable> shared;
   std::unique_ptr<TestCustomizable> unique;
   TestCustomizable* pointer = nullptr;
@@ -1070,11 +1115,13 @@ TEST_F(CustomizableTest, FactoryFunctionTest) {
 }
 
 TEST_F(CustomizableTest, URLFactoryTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<TestCustomizable> unique;
   config_options_.registry->AddLibrary("URL")->AddFactory<TestCustomizable>(
       ObjectLibrary::PatternEntry("Z", false).AddSeparator(""),
       [](const std::string& name, std::unique_ptr<TestCustomizable>* guard,
          std::string* /* msg */) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         guard->reset(new TestCustomizable(name));
         return guard->get();
       });
@@ -1095,6 +1142,7 @@ TEST_F(CustomizableTest, URLFactoryTest) {
 }
 
 TEST_F(CustomizableTest, MutableOptionsTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   static std::unordered_map<std::string, OptionTypeInfo> mutable_option_info = {
       {"mutable",
        OptionTypeInfo::AsCustomSharedPtr<TestCustomizable>(
@@ -1111,6 +1159,7 @@ TEST_F(CustomizableTest, MutableOptionsTest) {
 
    public:
     MutableCustomizable() {
+PERF_MARKER(__PRETTY_FUNCTION__);
       RegisterOptions("mutable", &mutable_, &mutable_option_info);
       RegisterOptions("immutable", &immutable_, &immutable_option_info);
     }
@@ -1186,6 +1235,7 @@ TEST_F(CustomizableTest, MutableOptionsTest) {
 }
 
 TEST_F(CustomizableTest, CustomManagedObjects) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<TestCustomizable> object1, object2;
   ASSERT_OK(LoadManagedObject<TestCustomizable>(
       config_options_, "id=A_1;int=1;bool=true", &object1));
@@ -1210,6 +1260,7 @@ TEST_F(CustomizableTest, CustomManagedObjects) {
 }
 
 TEST_F(CustomizableTest, CreateManagedObjects) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   class ManagedCustomizable : public Customizable {
    public:
     static const char* Type() { return "ManagedCustomizable"; }
@@ -1220,6 +1271,7 @@ TEST_F(CustomizableTest, CreateManagedObjects) {
     static Status CreateFromString(
         const ConfigOptions& opts, const std::string& value,
         std::shared_ptr<ManagedCustomizable>* result) {
+PERF_MARKER(__PRETTY_FUNCTION__);
       return LoadManagedObject<ManagedCustomizable>(opts, value, result);
     }
 
@@ -1234,6 +1286,7 @@ TEST_F(CustomizableTest, CreateManagedObjects) {
           [](const std::string& /*name*/,
              std::unique_ptr<ManagedCustomizable>* guard,
              std::string* /* msg */) {
+PERF_MARKER(__PRETTY_FUNCTION__);
             guard->reset(new ManagedCustomizable());
             return guard->get();
           });
@@ -1502,11 +1555,13 @@ class MockFilterPolicy : public FilterPolicy {
 #ifndef ROCKSDB_LITE
 static int RegisterLocalObjects(ObjectLibrary& library,
                                 const std::string& /*arg*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   size_t num_types;
   library.AddFactory<TableFactory>(
       mock::MockTableFactory::kClassName(),
       [](const std::string& /*uri*/, std::unique_ptr<TableFactory>* guard,
          std::string* /* errmsg */) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         guard->reset(new mock::MockTableFactory());
         return guard->get();
       });
@@ -1514,6 +1569,7 @@ static int RegisterLocalObjects(ObjectLibrary& library,
       OnFileDeletionListener::kClassName(),
       [](const std::string& /*uri*/, std::unique_ptr<EventListener>* guard,
          std::string* /* errmsg */) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         guard->reset(new OnFileDeletionListener());
         return guard->get();
       });
@@ -1521,6 +1577,7 @@ static int RegisterLocalObjects(ObjectLibrary& library,
       FlushCounterListener::kClassName(),
       [](const std::string& /*uri*/, std::unique_ptr<EventListener>* guard,
          std::string* /* errmsg */) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         guard->reset(new FlushCounterListener());
         return guard->get();
       });
@@ -1530,6 +1587,7 @@ static int RegisterLocalObjects(ObjectLibrary& library,
       [](const std::string& /*uri*/,
          std::unique_ptr<const SliceTransform>* guard,
          std::string* /* errmsg */) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         guard->reset(new MockSliceTransform());
         return guard->get();
       });
@@ -1537,6 +1595,7 @@ static int RegisterLocalObjects(ObjectLibrary& library,
       TestStatistics::kClassName(),
       [](const std::string& /*uri*/, std::unique_ptr<Statistics>* guard,
          std::string* /* errmsg */) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         guard->reset(new TestStatistics());
         return guard->get();
       });
@@ -1546,6 +1605,7 @@ static int RegisterLocalObjects(ObjectLibrary& library,
           .AddSuffix("://test"),
       [](const std::string& uri, std::unique_ptr<EncryptionProvider>* guard,
          std::string* /* errmsg */) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         guard->reset(new MockEncryptionProvider(uri));
         return guard->get();
       });
@@ -1553,6 +1613,7 @@ static int RegisterLocalObjects(ObjectLibrary& library,
       "Mock",
       [](const std::string& /*uri*/, std::unique_ptr<BlockCipher>* guard,
          std::string* /* errmsg */) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         guard->reset(new MockCipher());
         return guard->get();
       });
@@ -1560,6 +1621,7 @@ static int RegisterLocalObjects(ObjectLibrary& library,
       MockMemoryAllocator::kClassName(),
       [](const std::string& /*uri*/, std::unique_ptr<MemoryAllocator>* guard,
          std::string* /* errmsg */) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         guard->reset(new MockMemoryAllocator());
         return guard->get();
       });
@@ -1568,6 +1630,7 @@ static int RegisterLocalObjects(ObjectLibrary& library,
       [](const std::string& /*uri*/,
          std::unique_ptr<FlushBlockPolicyFactory>* guard,
          std::string* /* errmsg */) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         guard->reset(new TestFlushBlockPolicyFactory());
         return guard->get();
       });
@@ -1576,6 +1639,7 @@ static int RegisterLocalObjects(ObjectLibrary& library,
       TestSecondaryCache::kClassName(),
       [](const std::string& /*uri*/, std::unique_ptr<SecondaryCache>* guard,
          std::string* /* errmsg */) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         guard->reset(new TestSecondaryCache());
         return guard->get();
       });
@@ -1584,6 +1648,7 @@ static int RegisterLocalObjects(ObjectLibrary& library,
       DummyFileSystem::kClassName(),
       [](const std::string& /*uri*/, std::unique_ptr<FileSystem>* guard,
          std::string* /* errmsg */) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         guard->reset(new DummyFileSystem(nullptr));
         return guard->get();
       });
@@ -1593,6 +1658,7 @@ static int RegisterLocalObjects(ObjectLibrary& library,
       [](const std::string& /*uri*/,
          std::unique_ptr<SstPartitionerFactory>* guard,
          std::string* /* errmsg */) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         guard->reset(new MockSstPartitionerFactory());
         return guard->get();
       });
@@ -1602,6 +1668,7 @@ static int RegisterLocalObjects(ObjectLibrary& library,
       [](const std::string& /*uri*/,
          std::unique_ptr<FileChecksumGenFactory>* guard,
          std::string* /* errmsg */) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         guard->reset(new MockFileChecksumGenFactory());
         return guard->get();
       });
@@ -1611,6 +1678,7 @@ static int RegisterLocalObjects(ObjectLibrary& library,
       [](const std::string& /*uri*/,
          std::unique_ptr<TablePropertiesCollectorFactory>* guard,
          std::string* /* errmsg */) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         guard->reset(new MockTablePropertiesCollectorFactory());
         return guard->get();
       });
@@ -1619,6 +1687,7 @@ static int RegisterLocalObjects(ObjectLibrary& library,
       MockRateLimiter::kClassName(),
       [](const std::string& /*uri*/, std::unique_ptr<RateLimiter>* guard,
          std::string* /* errmsg */) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         guard->reset(new MockRateLimiter());
         return guard->get();
       });
@@ -1627,6 +1696,7 @@ static int RegisterLocalObjects(ObjectLibrary& library,
       MockFilterPolicy::kClassName(),
       [](const std::string& /*uri*/, std::unique_ptr<const FilterPolicy>* guard,
          std::string* /* errmsg */) {
+PERF_MARKER(__PRETTY_FUNCTION__);
         guard->reset(new MockFilterPolicy());
         return guard->get();
       });
@@ -1639,10 +1709,12 @@ static int RegisterLocalObjects(ObjectLibrary& library,
 class LoadCustomizableTest : public testing::Test {
  public:
   LoadCustomizableTest() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     config_options_.ignore_unsupported_options = false;
     config_options_.invoke_prepare_options = false;
   }
   bool RegisterTests(const std::string& arg) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifndef ROCKSDB_LITE
     config_options_.registry->AddLibrary("custom-tests",
                                          test::RegisterTestObjects, arg);
@@ -1662,6 +1734,7 @@ class LoadCustomizableTest : public testing::Test {
 };
 
 TEST_F(LoadCustomizableTest, LoadTableFactoryTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<TableFactory> factory;
   ASSERT_NOK(TableFactory::CreateFromString(
       config_options_, mock::MockTableFactory::kClassName(), &factory));
@@ -1695,6 +1768,7 @@ TEST_F(LoadCustomizableTest, LoadTableFactoryTest) {
 }
 
 TEST_F(LoadCustomizableTest, LoadFileSystemTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ColumnFamilyOptions cf_opts;
   std::shared_ptr<FileSystem> result;
   ASSERT_NOK(FileSystem::CreateFromString(
@@ -1713,6 +1787,7 @@ TEST_F(LoadCustomizableTest, LoadFileSystemTest) {
 }
 
 TEST_F(LoadCustomizableTest, LoadSecondaryCacheTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<SecondaryCache> result;
   ASSERT_NOK(SecondaryCache::CreateFromString(
       config_options_, TestSecondaryCache::kClassName(), &result));
@@ -1726,6 +1801,7 @@ TEST_F(LoadCustomizableTest, LoadSecondaryCacheTest) {
 
 #ifndef ROCKSDB_LITE
 TEST_F(LoadCustomizableTest, LoadSstPartitionerFactoryTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<SstPartitionerFactory> factory;
   ASSERT_NOK(SstPartitionerFactory::CreateFromString(config_options_, "Mock",
                                                      &factory));
@@ -1745,6 +1821,7 @@ TEST_F(LoadCustomizableTest, LoadSstPartitionerFactoryTest) {
 #endif  // ROCKSDB_LITE
 
 TEST_F(LoadCustomizableTest, LoadChecksumGenFactoryTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<FileChecksumGenFactory> factory;
   ASSERT_NOK(FileChecksumGenFactory::CreateFromString(config_options_, "Mock",
                                                       &factory));
@@ -1762,6 +1839,7 @@ TEST_F(LoadCustomizableTest, LoadChecksumGenFactoryTest) {
 }
 
 TEST_F(LoadCustomizableTest, LoadTablePropertiesCollectorFactoryTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<TablePropertiesCollectorFactory> factory;
   ASSERT_NOK(TablePropertiesCollectorFactory::CreateFromString(
       config_options_, MockTablePropertiesCollectorFactory::kClassName(),
@@ -1777,6 +1855,7 @@ TEST_F(LoadCustomizableTest, LoadTablePropertiesCollectorFactoryTest) {
 }
 
 TEST_F(LoadCustomizableTest, LoadComparatorTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const Comparator* bytewise = BytewiseComparator();
   const Comparator* reverse = ReverseBytewiseComparator();
 
@@ -1802,6 +1881,7 @@ TEST_F(LoadCustomizableTest, LoadComparatorTest) {
 }
 
 TEST_F(LoadCustomizableTest, LoadSliceTransformFactoryTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<const SliceTransform> result;
   ASSERT_NOK(
       SliceTransform::CreateFromString(config_options_, "Mock", &result));
@@ -1833,6 +1913,7 @@ TEST_F(LoadCustomizableTest, LoadSliceTransformFactoryTest) {
 }
 
 TEST_F(LoadCustomizableTest, LoadStatisticsTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<Statistics> stats;
   ASSERT_NOK(Statistics::CreateFromString(
       config_options_, TestStatistics::kClassName(), &stats));
@@ -1883,6 +1964,7 @@ TEST_F(LoadCustomizableTest, LoadStatisticsTest) {
 }
 
 TEST_F(LoadCustomizableTest, LoadMemTableRepFactoryTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<MemTableRepFactory> result;
   ASSERT_NOK(MemTableRepFactory::CreateFromString(
       config_options_, "SpecialSkipListFactory", &result));
@@ -1900,6 +1982,7 @@ TEST_F(LoadCustomizableTest, LoadMemTableRepFactoryTest) {
 }
 
 TEST_F(LoadCustomizableTest, LoadMergeOperatorTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<MergeOperator> result;
 
   ASSERT_NOK(
@@ -1981,6 +2064,7 @@ TEST_F(LoadCustomizableTest, LoadMergeOperatorTest) {
 }
 
 TEST_F(LoadCustomizableTest, LoadCompactionFilterFactoryTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<CompactionFilterFactory> result;
 
   ASSERT_NOK(CompactionFilterFactory::CreateFromString(config_options_,
@@ -1994,6 +2078,7 @@ TEST_F(LoadCustomizableTest, LoadCompactionFilterFactoryTest) {
 }
 
 TEST_F(LoadCustomizableTest, LoadCompactionFilterTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const CompactionFilter* result = nullptr;
 
   ASSERT_NOK(CompactionFilter::CreateFromString(config_options_, "Changling",
@@ -2018,6 +2103,7 @@ TEST_F(LoadCustomizableTest, LoadCompactionFilterTest) {
 
 #ifndef ROCKSDB_LITE
 TEST_F(LoadCustomizableTest, LoadEventListenerTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<EventListener> result;
 
   ASSERT_NOK(EventListener::CreateFromString(
@@ -2037,6 +2123,7 @@ TEST_F(LoadCustomizableTest, LoadEventListenerTest) {
 }
 
 TEST_F(LoadCustomizableTest, LoadEncryptionProviderTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<EncryptionProvider> result;
   ASSERT_NOK(
       EncryptionProvider::CreateFromString(config_options_, "Mock", &result));
@@ -2065,6 +2152,7 @@ TEST_F(LoadCustomizableTest, LoadEncryptionProviderTest) {
 }
 
 TEST_F(LoadCustomizableTest, LoadEncryptionCipherTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<BlockCipher> result;
   ASSERT_NOK(BlockCipher::CreateFromString(config_options_, "Mock", &result));
   ASSERT_OK(BlockCipher::CreateFromString(config_options_, "ROT13", &result));
@@ -2079,6 +2167,7 @@ TEST_F(LoadCustomizableTest, LoadEncryptionCipherTest) {
 #endif  // !ROCKSDB_LITE
 
 TEST_F(LoadCustomizableTest, LoadSystemClockTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<SystemClock> result;
   ASSERT_NOK(SystemClock::CreateFromString(
       config_options_, MockSystemClock::kClassName(), &result));
@@ -2095,6 +2184,7 @@ TEST_F(LoadCustomizableTest, LoadSystemClockTest) {
 }
 
 TEST_F(LoadCustomizableTest, LoadMemoryAllocatorTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<MemoryAllocator> result;
   ASSERT_NOK(MemoryAllocator::CreateFromString(
       config_options_, MockMemoryAllocator::kClassName(), &result));
@@ -2111,6 +2201,7 @@ TEST_F(LoadCustomizableTest, LoadMemoryAllocatorTest) {
 }
 
 TEST_F(LoadCustomizableTest, LoadRateLimiterTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<RateLimiter> result;
   ASSERT_NOK(RateLimiter::CreateFromString(
       config_options_, MockRateLimiter::kClassName(), &result));
@@ -2141,6 +2232,7 @@ TEST_F(LoadCustomizableTest, LoadRateLimiterTest) {
 }
 
 TEST_F(LoadCustomizableTest, LoadFilterPolicyTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<TableFactory> table;
   std::shared_ptr<const FilterPolicy> result;
   ASSERT_NOK(FilterPolicy::CreateFromString(
@@ -2190,6 +2282,7 @@ TEST_F(LoadCustomizableTest, LoadFilterPolicyTest) {
 }
 
 TEST_F(LoadCustomizableTest, LoadFlushBlockPolicyFactoryTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<TableFactory> table;
   std::shared_ptr<FlushBlockPolicyFactory> result;
   ASSERT_NOK(FlushBlockPolicyFactory::CreateFromString(
@@ -2238,6 +2331,7 @@ TEST_F(LoadCustomizableTest, LoadFlushBlockPolicyFactoryTest) {
 
 }  // namespace ROCKSDB_NAMESPACE
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
 #ifdef GFLAGS

@@ -18,6 +18,7 @@
 namespace ROCKSDB_NAMESPACE {
 
 HistogramWindowingImpl::HistogramWindowingImpl() {
+
   clock_ = SystemClock::Default();
   window_stats_.reset(new HistogramStat[static_cast<size_t>(num_windows_)]);
   Clear();
@@ -30,15 +31,18 @@ HistogramWindowingImpl::HistogramWindowingImpl(
       num_windows_(num_windows),
       micros_per_window_(micros_per_window),
       min_num_per_window_(min_num_per_window) {
+
   clock_ = SystemClock::Default();
   window_stats_.reset(new HistogramStat[static_cast<size_t>(num_windows_)]);
   Clear();
 }
 
 HistogramWindowingImpl::~HistogramWindowingImpl() {
+
 }
 
 void HistogramWindowingImpl::Clear() {
+
   std::lock_guard<std::mutex> lock(mutex_);
 
   stats_.Clear();
@@ -66,12 +70,14 @@ void HistogramWindowingImpl::Add(uint64_t value){
 }
 
 void HistogramWindowingImpl::Merge(const Histogram& other) {
+
   if (strcmp(Name(), other.Name()) == 0) {
     Merge(*static_cast_with_check<const HistogramWindowingImpl>(&other));
   }
 }
 
 void HistogramWindowingImpl::Merge(const HistogramWindowingImpl& other) {
+
   std::lock_guard<std::mutex> lock(mutex_);
   stats_.Merge(other.stats_);
 
@@ -131,6 +137,7 @@ void HistogramWindowingImpl::Data(HistogramData * const data) const {
 }
 
 void HistogramWindowingImpl::TimerTick() {
+
   uint64_t curr_time = clock_->NowMicros();
   size_t curr_window_ = static_cast<size_t>(current_window());
   if (curr_time - last_swap_time() > micros_per_window_ &&
@@ -140,6 +147,7 @@ void HistogramWindowingImpl::TimerTick() {
 }
 
 void HistogramWindowingImpl::SwapHistoryBucket() {
+
   // Threads executing Add() would be competing for this mutex, the first one
   // who got the metex would take care of the bucket swap, other threads
   // can skip this.

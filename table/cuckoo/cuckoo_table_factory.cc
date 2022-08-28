@@ -93,10 +93,12 @@ static std::unordered_map<std::string, OptionTypeInfo> cuckoo_table_type_info =
 
 CuckooTableFactory::CuckooTableFactory(const CuckooTableOptions& table_options)
     : table_options_(table_options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   RegisterOptions(&table_options_, &cuckoo_table_type_info);
 }
 
 TableFactory* NewCuckooTableFactory(const CuckooTableOptions& table_options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return new CuckooTableFactory(table_options);
 }
 

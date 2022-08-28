@@ -24,6 +24,7 @@ const uint32_t kNumRestartsMask = (1u << kDataBlockIndexTypeBitShift) - 1u;
 uint32_t PackIndexTypeAndNumRestarts(
     BlockBasedTableOptions::DataBlockIndexType index_type,
     uint32_t num_restarts) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (num_restarts > kMaxNumRestarts) {
     assert(0);  // mute travis "unused" warning
   }
@@ -42,6 +43,7 @@ void UnPackIndexTypeAndNumRestarts(
     uint32_t block_footer,
     BlockBasedTableOptions::DataBlockIndexType* index_type,
     uint32_t* num_restarts) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (index_type) {
     if (block_footer & 1u << kDataBlockIndexTypeBitShift) {
       *index_type = BlockBasedTableOptions::kDataBlockBinaryAndHash;

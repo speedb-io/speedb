@@ -20,6 +20,7 @@ __thread ThreadStatusData* ThreadStatusUpdater::thread_status_data_ = nullptr;
 
 void ThreadStatusUpdater::RegisterThread(ThreadStatus::ThreadType ttype,
                                          uint64_t thread_id) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (UNLIKELY(thread_status_data_ == nullptr)) {
     thread_status_data_ = new ThreadStatusData();
     thread_status_data_->thread_type = ttype;
@@ -32,6 +33,7 @@ void ThreadStatusUpdater::RegisterThread(ThreadStatus::ThreadType ttype,
 }
 
 void ThreadStatusUpdater::UnregisterThread() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (thread_status_data_ != nullptr) {
     std::lock_guard<std::mutex> lck(thread_list_mutex_);
     thread_data_set_.erase(thread_status_data_);
@@ -41,12 +43,14 @@ void ThreadStatusUpdater::UnregisterThread() {
 }
 
 void ThreadStatusUpdater::ResetThreadStatus() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ClearThreadState();
   ClearThreadOperation();
   SetColumnFamilyInfoKey(nullptr);
 }
 
 void ThreadStatusUpdater::SetColumnFamilyInfoKey(const void* cf_key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto* data = Get();
   if (data == nullptr) {
     return;
@@ -59,6 +63,7 @@ void ThreadStatusUpdater::SetColumnFamilyInfoKey(const void* cf_key) {
 }
 
 const void* ThreadStatusUpdater::GetColumnFamilyInfoKey() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto* data = GetLocalThreadStatus();
   if (data == nullptr) {
     return nullptr;
@@ -68,6 +73,7 @@ const void* ThreadStatusUpdater::GetColumnFamilyInfoKey() {
 
 void ThreadStatusUpdater::SetThreadOperation(
     const ThreadStatus::OperationType type) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto* data = GetLocalThreadStatus();
   if (data == nullptr) {
     return;
@@ -86,6 +92,7 @@ void ThreadStatusUpdater::SetThreadOperation(
 }
 
 void ThreadStatusUpdater::SetThreadOperationProperty(int i, uint64_t value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto* data = GetLocalThreadStatus();
   if (data == nullptr) {
     return;
@@ -95,6 +102,7 @@ void ThreadStatusUpdater::SetThreadOperationProperty(int i, uint64_t value) {
 
 void ThreadStatusUpdater::IncreaseThreadOperationProperty(int i,
                                                           uint64_t delta) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto* data = GetLocalThreadStatus();
   if (data == nullptr) {
     return;
@@ -103,6 +111,7 @@ void ThreadStatusUpdater::IncreaseThreadOperationProperty(int i,
 }
 
 void ThreadStatusUpdater::SetOperationStartTime(const uint64_t start_time) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto* data = GetLocalThreadStatus();
   if (data == nullptr) {
     return;
@@ -111,6 +120,7 @@ void ThreadStatusUpdater::SetOperationStartTime(const uint64_t start_time) {
 }
 
 void ThreadStatusUpdater::ClearThreadOperation() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto* data = GetLocalThreadStatus();
   if (data == nullptr) {
     return;
@@ -123,6 +133,7 @@ void ThreadStatusUpdater::ClearThreadOperation() {
 }
 
 void ThreadStatusUpdater::ClearThreadOperationProperties() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto* data = GetLocalThreadStatus();
   if (data == nullptr) {
     return;
@@ -134,6 +145,7 @@ void ThreadStatusUpdater::ClearThreadOperationProperties() {
 
 ThreadStatus::OperationStage ThreadStatusUpdater::SetThreadOperationStage(
     ThreadStatus::OperationStage stage) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto* data = GetLocalThreadStatus();
   if (data == nullptr) {
     return ThreadStatus::STAGE_UNKNOWN;
@@ -142,6 +154,7 @@ ThreadStatus::OperationStage ThreadStatusUpdater::SetThreadOperationStage(
 }
 
 void ThreadStatusUpdater::SetThreadState(const ThreadStatus::StateType type) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto* data = GetLocalThreadStatus();
   if (data == nullptr) {
     return;
@@ -150,6 +163,7 @@ void ThreadStatusUpdater::SetThreadState(const ThreadStatus::StateType type) {
 }
 
 void ThreadStatusUpdater::ClearThreadState() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto* data = GetLocalThreadStatus();
   if (data == nullptr) {
     return;
@@ -160,6 +174,7 @@ void ThreadStatusUpdater::ClearThreadState() {
 
 Status ThreadStatusUpdater::GetThreadList(
     std::vector<ThreadStatus>* thread_list) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   thread_list->clear();
   std::vector<std::shared_ptr<ThreadStatusData>> valid_list;
   uint64_t now_micros = SystemClock::Default()->NowMicros();
@@ -207,6 +222,7 @@ Status ThreadStatusUpdater::GetThreadList(
 }
 
 ThreadStatusData* ThreadStatusUpdater::GetLocalThreadStatus() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (thread_status_data_ == nullptr) {
     return nullptr;
   }
@@ -222,6 +238,7 @@ void ThreadStatusUpdater::NewColumnFamilyInfo(const void* db_key,
                                               const std::string& db_name,
                                               const void* cf_key,
                                               const std::string& cf_name) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Acquiring same lock as GetThreadList() to guarantee
   // a consistent view of global column family table (cf_info_map).
   std::lock_guard<std::mutex> lck(thread_list_mutex_);
@@ -232,6 +249,7 @@ void ThreadStatusUpdater::NewColumnFamilyInfo(const void* db_key,
 }
 
 void ThreadStatusUpdater::EraseColumnFamilyInfo(const void* cf_key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Acquiring same lock as GetThreadList() to guarantee
   // a consistent view of global column family table (cf_info_map).
   std::lock_guard<std::mutex> lck(thread_list_mutex_);
@@ -252,6 +270,7 @@ void ThreadStatusUpdater::EraseColumnFamilyInfo(const void* cf_key) {
 }
 
 void ThreadStatusUpdater::EraseDatabaseInfo(const void* db_key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Acquiring same lock as GetThreadList() to guarantee
   // a consistent view of global column family table (cf_info_map).
   std::lock_guard<std::mutex> lck(thread_list_mutex_);
@@ -294,6 +313,7 @@ void ThreadStatusUpdater::ClearThreadState() {}
 
 Status ThreadStatusUpdater::GetThreadList(
     std::vector<ThreadStatus>* /*thread_list*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return Status::NotSupported(
       "GetThreadList is not supported in the current running environment.");
 }

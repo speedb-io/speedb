@@ -1,13 +1,19 @@
-<img src="speedb-logo.gif" />
+<div align="center">
+  <img src="speedb-logo.gif" width="480px" />
+
+</div>
+<div align="center">
+
+![GitHub](https://img.shields.io/github/license/speedb-io/speedb)
+![GitHub contributors](https://img.shields.io/github/contributors/speedb-io/speedb)
+![GitHub pull requests](https://img.shields.io/github/issues-pr/speedb-io/speedb)
+![GitHub closed pull requests](https://img.shields.io/github/issues-pr-closed/speedb-io/speedb)
+</div>
 
 # Speedb
-
-![GitHub contributors](https://img.shields.io/github/contributors/speedb-io/speedb)
-
-
+<img src="bee.gif" width="90px" style="float:right" />
 Speedb is a library that provides persistent key-value stores. Keys and values are arbitrary byte arrays. The keys are ordered within the key value store according to a user-specified comparator function.
 It is maintained by Speedb and is forked from Rocksdb, developed by Facebook.
-
 
 ## Usage
 * If speedb is in your default library path:
@@ -80,4 +86,4 @@ See the [contributing guide](CONTRIBUTING.md).
 ## License
 Speedb is open-source and licensed under the [Apache 2.0 License](LICENSE.Apache).
 
-<img src="speedb-b.gif" />
+<img src="speedb-b.gif" width="200px" />

@@ -42,7 +42,13 @@ DBOptions SanitizeOptions(const std::string& dbname, const DBOptions& src,
   if (result.env == nullptr) {
     result.env = Env::Default();
   }
-
+  if (read_only) {
+    // read only DBs should not be doing compactions, so there is no
+    // reason for this option, that schedules background jobs for operations
+    // like deleting obsolete files etc, to be set to true, as it's used
+    // to improve compaction latency.
+    result.avoid_unnecessary_blocking_io = false;
+  }
   // result.max_open_files means an "infinite" open files.
   if (result.max_open_files != -1) {
     int max_max_open_files = port::GetMaxOpenFiles();

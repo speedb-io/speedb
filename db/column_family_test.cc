@@ -1100,6 +1100,189 @@ TEST_P(ColumnFamilyTest, CrashAfterFlush) {
   db_options_.env = env_;
 }
 
+TEST_P(ColumnFamilyTest, DropBeforeInstallResults) {
+  Open();
+  CreateColumnFamilies({"one"});
+
+  // The memtables in the following vector are simply pointers to memtables that
+  // are managed by the CF that is about to be dropped and are collected during
+  // the flush through the sync point callback below. The vector isn't owning
+  // them and access to them is performed only after making sure that they are
+  // still alive (asserting that the amount of immutable memtables that the CF
+  // reports is the same as the amount of memtables that we collected). The
+  // vector is also cleared right after the checks are done in order to avoid
+  // leaking the pointers after they are freed.
+  std::vector<MemTable*> mems;
+
+  SyncPoint::GetInstance()->DisableProcessing();
+  SyncPoint::GetInstance()->ClearAllCallBacks();
+  SyncPoint::GetInstance()->LoadDependency(
+      {{"DBImpl::FlushMemTableToOutputFile:Finish",
+        "ColumnFamilyTest::DropBeforeInstallResults"}});
+  SyncPoint::GetInstance()->SetCallBack(
+      "FlushJob::WriteLevel0Table", [&](void* arg) {
+        auto* memtables = static_cast<autovector<MemTable*>*>(arg);
+        ASSERT_NE(memtables, nullptr);
+        ASSERT_EQ(memtables->size(), 1);
+        for (auto& picked_mem : *memtables) {
+          mems.push_back(picked_mem);
+        }
+        ASSERT_OK(db_->DropColumnFamily(handles_[1]));
+      });
+  SyncPoint::GetInstance()->EnableProcessing();
+
+  ASSERT_OK(Put(1, "foo", "bar"));
+
+  uint64_t num_immutable = 0;
+  ASSERT_TRUE(db_->GetIntProperty(
+      handles_[1], "rocksdb.num-immutable-mem-table", &num_immutable));
+  ASSERT_EQ(num_immutable, 0);
+
+  ASSERT_TRUE(Flush(1).IsColumnFamilyDropped());
+
+  TEST_SYNC_POINT("ColumnFamilyTest::DropBeforeInstallResults");
+
+  SyncPoint::GetInstance()->DisableProcessing();
+  SyncPoint::GetInstance()->ClearAllCallBacks();
+
+  // Make sure we can still read the key that we inserted
+  std::unique_ptr<Iterator> dropped_cf_iter{db_->NewIterator({}, handles_[1])};
+  dropped_cf_iter->Seek("foo");
+  ASSERT_TRUE(dropped_cf_iter->Valid());
+  ASSERT_EQ(dropped_cf_iter->key(), "foo");
+  ASSERT_EQ(dropped_cf_iter->value(), "bar");
+  dropped_cf_iter.reset();
+
+  // Ensure that the memtable still exists and is marked as immutable
+  ASSERT_TRUE(db_->GetIntProperty(
+      handles_[1], "rocksdb.num-immutable-mem-table", &num_immutable));
+  ASSERT_EQ(num_immutable, 1);
+
+  // Make sure that the memtable was not rolled back
+  ASSERT_EQ(mems.size(), 1);
+  for (auto& mem : mems) {
+    ASSERT_GT(mem->GetEdits()->NumEntries(), 0);
+  }
+  mems.clear();
+
+  std::vector<ColumnFamilyDescriptor> descs;
+  for (auto h : handles_) {
+    if (h) {
+      ColumnFamilyDescriptor desc;
+      ASSERT_OK(h->GetDescriptor(&desc));
+      descs.push_back(desc);
+      ASSERT_OK(db_->DestroyColumnFamilyHandle(h));
+    }
+  }
+  handles_.clear();
+  names_.clear();
+
+  // Ensure the DB closes successfully after this
+  ASSERT_OK(db_->Close());
+  Destroy(descs);
+}
+
+#ifndef ROCKSDB_LITE  // EventListener is not supported
+TEST_P(ColumnFamilyTest, DropAfterPickMemtable) {
+  class FlushBeginListener : public EventListener {
+   public:
+    void OnFlushBegin(DB* db, const FlushJobInfo& flush_job_info) override {
+      if (flush_job_info.cf_name == "one" && handle != nullptr) {
+        ASSERT_OK(db->DropColumnFamily(handle));
+        handle = nullptr;
+      }
+    }
+
+    ColumnFamilyHandle* handle = nullptr;
+  };
+
+  std::shared_ptr<FlushBeginListener> listener =
+      std::make_shared<FlushBeginListener>();
+  db_options_.listeners.push_back(listener);
+
+  Open();
+  CreateColumnFamilies({"one"});
+
+  listener->handle = handles_[1];
+
+  // The memtables in the following vector are simply pointers to memtables that
+  // are managed by the CF that is about to be dropped and are collected during
+  // the flush through the sync point callback below. The vector isn't owning
+  // them and access to them is performed only after making sure that they are
+  // still alive (asserting that the amount of immutable memtables that the CF
+  // reports is the same as the amount of memtables that we collected). The
+  // vector is also cleared right after the checks are done in order to avoid
+  // leaking the pointers after they are freed.
+  std::vector<MemTable*> mems;
+
+  SyncPoint::GetInstance()->DisableProcessing();
+  SyncPoint::GetInstance()->ClearAllCallBacks();
+  SyncPoint::GetInstance()->LoadDependency(
+      {{"DBImpl::FlushMemTableToOutputFile:Finish",
+        "ColumnFamilyTest::DropAfterPickMemtable"}});
+  SyncPoint::GetInstance()->SetCallBack(
+      "DBImpl::FlushMemTableToOutputFile:AfterPickMemtables", [&](void* arg) {
+        auto* job = reinterpret_cast<FlushJob*>(arg);
+        ASSERT_NE(job, nullptr);
+        ASSERT_EQ(job->GetMemTables().size(), 1);
+        for (auto& picked_mem : job->GetMemTables()) {
+          mems.push_back(picked_mem);
+        }
+      });
+  SyncPoint::GetInstance()->EnableProcessing();
+
+  ASSERT_OK(Put(1, "foo", "bar"));
+
+  uint64_t num_immutable = 0;
+  ASSERT_TRUE(db_->GetIntProperty(
+      handles_[1], "rocksdb.num-immutable-mem-table", &num_immutable));
+  ASSERT_EQ(num_immutable, 0);
+
+  ASSERT_TRUE(Flush(1).IsColumnFamilyDropped());
+
+  TEST_SYNC_POINT("ColumnFamilyTest::DropAfterPickMemtable");
+
+  SyncPoint::GetInstance()->DisableProcessing();
+  SyncPoint::GetInstance()->ClearAllCallBacks();
+
+  // Make sure we can still read the key that we inserted
+  std::unique_ptr<Iterator> dropped_cf_iter{db_->NewIterator({}, handles_[1])};
+  dropped_cf_iter->Seek("foo");
+  ASSERT_TRUE(dropped_cf_iter->Valid());
+  ASSERT_EQ(dropped_cf_iter->key(), "foo");
+  ASSERT_EQ(dropped_cf_iter->value(), "bar");
+  dropped_cf_iter.reset();
+
+  // Ensure that the memtable still exists and is marked as immutable
+  ASSERT_TRUE(db_->GetIntProperty(
+      handles_[1], "rocksdb.num-immutable-mem-table", &num_immutable));
+  ASSERT_EQ(num_immutable, 1);
+
+  // Make sure that the memtable was not rolled back
+  ASSERT_EQ(mems.size(), 1);
+  for (auto& mem : mems) {
+    ASSERT_GT(mem->GetEdits()->NumEntries(), 0);
+  }
+  mems.clear();
+
+  std::vector<ColumnFamilyDescriptor> descs;
+  for (auto h : handles_) {
+    if (h) {
+      ColumnFamilyDescriptor desc;
+      ASSERT_OK(h->GetDescriptor(&desc));
+      descs.push_back(desc);
+      ASSERT_OK(db_->DestroyColumnFamilyHandle(h));
+    }
+  }
+  handles_.clear();
+  names_.clear();
+
+  // Ensure the DB closes successfully after this
+  ASSERT_OK(db_->Close());
+  Destroy(descs);
+}
+#endif  // !ROCKSDB_LITE
+
 TEST_P(ColumnFamilyTest, OpenNonexistentColumnFamily) {
   ASSERT_OK(TryOpen({"default"}));
   Close();

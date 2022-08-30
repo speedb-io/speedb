@@ -8,8 +8,6 @@ on:
     types: [submitted]
 
   
-permissions: write-all
-
 jobs:
   #Sanity:
     #uses: speedb-io/speedb/.github/workflows/sanity_check.yml@main

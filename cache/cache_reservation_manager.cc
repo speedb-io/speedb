@@ -27,6 +27,7 @@ CacheReservationManagerImpl<R>::CacheReservationHandle::CacheReservationHandle(
     std::size_t incremental_memory_used,
     std::shared_ptr<CacheReservationManagerImpl> cache_res_mgr)
     : incremental_memory_used_(incremental_memory_used) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(cache_res_mgr);
   cache_res_mgr_ = cache_res_mgr;
 }
@@ -34,6 +35,7 @@ CacheReservationManagerImpl<R>::CacheReservationHandle::CacheReservationHandle(
 template <CacheEntryRole R>
 CacheReservationManagerImpl<
     R>::CacheReservationHandle::~CacheReservationHandle() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Status s = cache_res_mgr_->ReleaseCacheReservation(incremental_memory_used_);
   s.PermitUncheckedError();
 }
@@ -44,12 +46,14 @@ CacheReservationManagerImpl<R>::CacheReservationManagerImpl(
     : delayed_decrease_(delayed_decrease),
       cache_allocated_size_(0),
       memory_used_(0) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(cache != nullptr);
   cache_ = cache;
 }
 
 template <CacheEntryRole R>
 CacheReservationManagerImpl<R>::~CacheReservationManagerImpl() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (auto* handle : dummy_handles_) {
     cache_->Release(handle, true);
   }
@@ -58,6 +62,7 @@ CacheReservationManagerImpl<R>::~CacheReservationManagerImpl() {
 template <CacheEntryRole R>
 Status CacheReservationManagerImpl<R>::UpdateCacheReservation(
     std::size_t new_mem_used) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   memory_used_ = new_mem_used;
   std::size_t cur_cache_allocated_size =
       cache_allocated_size_.load(std::memory_order_relaxed);
@@ -89,6 +94,7 @@ template <CacheEntryRole R>
 Status CacheReservationManagerImpl<R>::MakeCacheReservation(
     std::size_t incremental_memory_used,
     std::unique_ptr<CacheReservationManager::CacheReservationHandle>* handle) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(handle);
   Status s =
       UpdateCacheReservation(GetTotalMemoryUsed() + incremental_memory_used);
@@ -102,6 +108,7 @@ Status CacheReservationManagerImpl<R>::MakeCacheReservation(
 template <CacheEntryRole R>
 Status CacheReservationManagerImpl<R>::ReleaseCacheReservation(
     std::size_t incremental_memory_used) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(GetTotalMemoryUsed() >= incremental_memory_used);
   std::size_t updated_total_mem_used =
       GetTotalMemoryUsed() - incremental_memory_used;
@@ -112,6 +119,7 @@ Status CacheReservationManagerImpl<R>::ReleaseCacheReservation(
 template <CacheEntryRole R>
 Status CacheReservationManagerImpl<R>::IncreaseCacheReservation(
     std::size_t new_mem_used) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Status return_status = Status::OK();
   while (new_mem_used > cache_allocated_size_.load(std::memory_order_relaxed)) {
     Cache::Handle* handle = nullptr;
@@ -131,6 +139,7 @@ Status CacheReservationManagerImpl<R>::IncreaseCacheReservation(
 template <CacheEntryRole R>
 Status CacheReservationManagerImpl<R>::DecreaseCacheReservation(
     std::size_t new_mem_used) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Status return_status = Status::OK();
 
   // Decrease to the smallest multiple of kSizeDummyEntry that is greater than
@@ -150,16 +159,19 @@ Status CacheReservationManagerImpl<R>::DecreaseCacheReservation(
 
 template <CacheEntryRole R>
 std::size_t CacheReservationManagerImpl<R>::GetTotalReservedCacheSize() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return cache_allocated_size_.load(std::memory_order_relaxed);
 }
 
 template <CacheEntryRole R>
 std::size_t CacheReservationManagerImpl<R>::GetTotalMemoryUsed() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return memory_used_;
 }
 
 template <CacheEntryRole R>
 Slice CacheReservationManagerImpl<R>::GetNextCacheKey() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Calling this function will have the side-effect of changing the
   // underlying cache_key_ that is shared among other keys generated from this
   // fucntion. Therefore please make sure the previous keys are saved/copied
@@ -170,6 +182,7 @@ Slice CacheReservationManagerImpl<R>::GetNextCacheKey() {
 
 template <CacheEntryRole R>
 Cache::DeleterFn CacheReservationManagerImpl<R>::TEST_GetNoopDeleterForRole() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return GetNoopDeleterForRole<R>();
 }
 

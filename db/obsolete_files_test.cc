@@ -125,13 +125,11 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       });
   SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::DeleteObsoleteFileImpl:AfterDeletion", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         Status* p_status = reinterpret_cast<Status*>(arg);
         ASSERT_OK(*p_status);
       });
   SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::CloseHelper:PendingPurgeFinished", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         std::unordered_set<uint64_t>* files_grabbed_for_purge_ptr =
             reinterpret_cast<std::unordered_set<uint64_t>*>(arg);
         ASSERT_TRUE(files_grabbed_for_purge_ptr->empty());

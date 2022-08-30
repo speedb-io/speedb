@@ -21,6 +21,7 @@ FileIndexer::FileIndexer(const Comparator* ucmp)
 size_t FileIndexer::NumLevelIndex() const { return next_level_index_.size(); }
 
 size_t FileIndexer::LevelIndexSize(size_t level) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (level >= next_level_index_.size()) {
     return 0;
   }
@@ -31,6 +32,7 @@ void FileIndexer::GetNextLevelIndex(const size_t level, const size_t file_index,
                                     const int cmp_smallest,
                                     const int cmp_largest, int32_t* left_bound,
                                     int32_t* right_bound) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(level > 0);
 
   // Last level, no hint

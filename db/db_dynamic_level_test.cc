@@ -342,7 +342,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   std::set<int> output_levels;
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "CompactionPicker::CompactRange:Return", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         Compaction* compaction = reinterpret_cast<Compaction*>(arg);
         output_levels.insert(compaction->output_level());
       });

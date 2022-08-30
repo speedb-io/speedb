@@ -29,6 +29,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
     bool has_out_flow;
 
     uint64_t GetExpectedBytes() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
       return size +
              BlobLogRecord::CalculateAdjustmentForRecordHeader(user_key.size());
     }

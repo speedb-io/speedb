@@ -29,7 +29,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
     mock_clock_->InstallTimedWaitFixCallback();
     SyncPoint::GetInstance()->SetCallBack(
         "DBImpl::StartPeriodicWorkScheduler:Init", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
           auto* periodic_work_scheduler_ptr =
               reinterpret_cast<PeriodicWorkScheduler**>(arg);
           *periodic_work_scheduler_ptr =

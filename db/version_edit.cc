@@ -97,6 +97,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 bool VersionEdit::EncodeTo(std::string* dst) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (has_db_id_) {
     PutVarint32(dst, kDbId);
     PutLengthPrefixedSlice(dst, db_id_);
@@ -749,6 +750,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 std::string VersionEdit::DebugString(bool hex_key) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string r;
   r.append("VersionEdit {");
   if (has_db_id_) {
@@ -871,6 +873,7 @@ std::string VersionEdit::DebugString(bool hex_key) const {
 }
 
 std::string VersionEdit::DebugJSON(int edit_num, bool hex_key) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   JSONWriter jw;
   jw << "EditNumber" << edit_num;
 

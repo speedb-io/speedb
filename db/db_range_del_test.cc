@@ -1661,7 +1661,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   }
   std::sort(l1_metadata.begin(), l1_metadata.end(),
             [&](const LiveFileMetaData& a, const LiveFileMetaData& b) {
-PERF_MARKER(__PRETTY_FUNCTION__);
               return options.comparator->Compare(a.smallestkey, b.smallestkey) <
                      0;
             });

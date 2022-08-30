@@ -8,11 +8,13 @@
  */
 
 #include "rocksdb/merge_operator.h"
+#include "rocksdb/env.h"
 
 namespace ROCKSDB_NAMESPACE {
 
 bool MergeOperator::FullMergeV2(const MergeOperationInput& merge_in,
                                 MergeOperationOutput* merge_out) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // If FullMergeV2 is not implemented, we convert the operand_list to
   // std::deque<std::string> and pass it to FullMerge
   std::deque<std::string> operand_list_str;
@@ -30,6 +32,7 @@ bool MergeOperator::PartialMergeMulti(const Slice& key,
                                       const std::deque<Slice>& operand_list,
                                       std::string* new_value,
                                       Logger* logger) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(operand_list.size() >= 2);
   // Simply loop through the operands
   Slice temp_slice(operand_list[0]);
@@ -54,6 +57,7 @@ bool MergeOperator::PartialMergeMulti(const Slice& key,
 bool AssociativeMergeOperator::FullMergeV2(
     const MergeOperationInput& merge_in,
     MergeOperationOutput* merge_out) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Simply loop through the operands
   Slice temp_existing;
   const Slice* existing_value = merge_in.existing_value;
@@ -80,6 +84,7 @@ bool AssociativeMergeOperator::PartialMerge(
     const Slice& right_operand,
     std::string* new_value,
     Logger* logger) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return Merge(key, &left_operand, right_operand, new_value, logger);
 }
 

@@ -64,13 +64,16 @@ class HashSkipListRep : public MemTableRep {
   Allocator* const allocator_;
 
   inline size_t GetHash(const Slice& slice) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return MurmurHash(slice.data(), static_cast<int>(slice.size()), 0) %
            bucket_size_;
   }
   inline Bucket* GetBucket(size_t i) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return buckets_[i].load(std::memory_order_acquire);
   }
   inline Bucket* GetBucket(const Slice& slice) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return GetBucket(GetHash(slice));
   }
   // Get a bucket from buckets_. If the bucket hasn't been initialized yet,
@@ -278,6 +281,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 bool HashSkipListRep::Contains(const char* key) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto transformed = transform_->Transform(UserKey(key));
   auto bucket = GetBucket(transformed);
   if (bucket == nullptr) {

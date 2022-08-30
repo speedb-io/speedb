@@ -12,6 +12,7 @@
 namespace ROCKSDB_NAMESPACE {
 
 void WalAddition::EncodeTo(std::string* dst) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   PutVarint64(dst, number_);
 
   if (metadata_.HasSyncedSize()) {
@@ -72,12 +73,14 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 std::string WalAddition::DebugString() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::ostringstream oss;
   oss << *this;
   return oss.str();
 }
 
 void WalDeletion::EncodeTo(std::string* dst) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   PutVarint64(dst, number_);
 }
 
@@ -105,6 +108,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 std::string WalDeletion::DebugString() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::ostringstream oss;
   oss << *this;
   return oss.str();
@@ -172,6 +176,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 Status WalSet::CheckWals(
     Env* env,
     const std::unordered_map<WalNumber, std::string>& logs_on_disk) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(env != nullptr);
 
   Status s;

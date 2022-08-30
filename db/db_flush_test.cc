@@ -152,7 +152,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   int num_flushes = 0, num_compactions = 0;
   SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::BGWorkFlush", [&](void* /*arg*/) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         if (tid == std::thread::id()) {
           tid = std::this_thread::get_id();
         } else {
@@ -162,7 +161,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       });
   SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::BGWorkCompaction", [&](void* /*arg*/) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         ASSERT_EQ(tid, std::this_thread::get_id());
         ++num_compactions;
       });
@@ -200,7 +198,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   int num_low_flush_unscheduled = 0;
   SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::UnscheduleLowFlushCallback", [&](void* /*arg*/) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         num_low_flush_unscheduled++;
         // There should be one flush job in low pool that needs to be
         // unscheduled
@@ -210,7 +207,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   int num_high_flush_unscheduled = 0;
   SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::UnscheduleHighFlushCallback", [&](void* /*arg*/) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         num_high_flush_unscheduled++;
         // There should be no flush job in high pool
         ASSERT_EQ(num_high_flush_unscheduled, 0);
@@ -286,7 +282,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   int called = 0;
   SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::MaybeScheduleFlushOrCompaction:AfterSchedule:0", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         ASSERT_NE(nullptr, arg);
         auto unscheduled_flushes = *reinterpret_cast<int*>(arg);
         ASSERT_EQ(0, unscheduled_flushes);
@@ -1445,7 +1440,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   std::atomic<uint64_t> num_memtable_at_first_flush(0);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "FlushJob::WriteLevel0Table:num_memtables", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         uint64_t* mems_size = reinterpret_cast<uint64_t*>(arg);
         // atomic_compare_exchange_strong sometimes updates the value
         // of ZERO (the "expected" object), so we make sure ZERO is indeed...
@@ -1701,7 +1695,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
         "DBFlushTest::FireOnFlushCompletedAfterCommittedResult:WaitSecond"}});
   SyncPoint::GetInstance()->SetCallBack(
       "FlushJob::WriteLevel0Table", [&listener](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         // Wait for the second flush finished, out of mutex.
         auto* mems = reinterpret_cast<autovector<MemTable*>*>(arg);
         if (mems->front()->GetEarliestSequenceNumber() == listener->seq1 - 1) {
@@ -1880,7 +1873,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   // unrecoverable error.
   fault_fs->SetChecksumHandoffFuncType(ChecksumType::kCRC32c);
   SyncPoint::GetInstance()->SetCallBack("FlushJob::Start", [&](void*) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     fault_fs->IngestDataCorruptionBeforeWrite();
   });
   ASSERT_OK(Put("key7", "value7"));
@@ -1938,7 +1930,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   // options is not set, the checksum handoff will not be triggered
   fault_fs->SetChecksumHandoffFuncType(ChecksumType::kCRC32c);
   SyncPoint::GetInstance()->SetCallBack("FlushJob::Start", [&](void*) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     fault_fs->IngestDataCorruptionBeforeWrite();
   });
   ASSERT_OK(Put("key7", "value7"));
@@ -2054,7 +2045,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   SyncPoint::GetInstance()->ClearAllCallBacks();
   SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::SyncClosedLogs:BeforeReLock", [&](void* /*arg*/) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         ASSERT_OK(db_->Put(WriteOptions(), handles_[1], "what", "v"));
         auto* cfhi =
             static_cast_with_check<ColumnFamilyHandleImpl>(handles_[1]);
@@ -2063,7 +2053,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       });
   SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::FlushMemTableToOutputFile:AfterPickMemtables", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         auto* job = reinterpret_cast<FlushJob*>(arg);
         assert(job);
         const auto& mems = job->GetMemTables();
@@ -2781,7 +2770,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   std::thread::id bg_flush_thr1, bg_flush_thr2;
   SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::BackgroundCallFlush:start", [&](void*) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         if (bg_flush_thr1 == std::thread::id()) {
           bg_flush_thr1 = std::this_thread::get_id();
         } else if (bg_flush_thr2 == std::thread::id()) {
@@ -2792,7 +2780,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   int called = 0;
   SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::AtomicFlushMemTablesToOutputFiles:WaitToCommit", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         if (std::this_thread::get_id() == bg_flush_thr2) {
           const auto* ptr = reinterpret_cast<std::pair<Status, bool>*>(arg);
           assert(ptr);
@@ -2813,7 +2800,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   SyncPoint::GetInstance()->SetCallBack(
       "VersionSet::ProcessManifestWrites:BeforeWriteLastVersionEdit:0",
       [&](void*) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         if (std::this_thread::get_id() == bg_flush_thr1) {
           TEST_SYNC_POINT("BgFlushThr1:BeforeWriteManifest");
         }
@@ -2821,7 +2807,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   SyncPoint::GetInstance()->SetCallBack(
       "VersionSet::LogAndApply:WriteManifest", [&](void*) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         if (std::this_thread::get_id() != bg_flush_thr1) {
           return;
         }
@@ -2835,7 +2820,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   SyncPoint::GetInstance()->SetCallBack(
       "VersionSet::ProcessManifestWrites:AfterSyncManifest", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         auto* ptr = reinterpret_cast<IOStatus*>(arg);
         assert(ptr);
         *ptr = IOStatus::IOError("Injected failure");

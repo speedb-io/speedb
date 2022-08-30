@@ -15,6 +15,7 @@ Status BinarySearchIndexReader::Create(
     bool pin, BlockCacheLookupContext* lookup_context,
     std::unique_ptr<IndexReader>* index_reader) {
 PERF_MARKER(__PRETTY_FUNCTION__);
+printf("use_cache == %d , pin == %d \n", use_cache ? 1 : 0, pin?1:0);
   assert(table != nullptr);
   assert(table->get_rep());
   assert(!pin || prefetch);
@@ -30,7 +31,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
     }
 
     if (use_cache && !pin) {
-      index_block.Reset();
+      index_block.Reset(); // OLEG: not pinned 
     }
   }
 

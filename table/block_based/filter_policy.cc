@@ -50,13 +50,11 @@ namespace {
 static constexpr uint32_t kMetadataLen = 5;
 
 Slice FinishAlwaysFalse(std::unique_ptr<const char[]>* /*buf*/) {
-PERF_MARKER(__PRETTY_FUNCTION__);
   // Missing metadata, treated as zero entries
   return Slice(nullptr, 0);
 }
 
 Slice FinishAlwaysTrue(std::unique_ptr<const char[]>* /*buf*/) {
-PERF_MARKER(__PRETTY_FUNCTION__);
   return Slice("\0\0\0\0\0\0", 6);
 }
 
@@ -132,7 +130,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   size_t AllocateMaybeRounding(size_t target_len_with_metadata,
                                size_t num_entries,
                                std::unique_ptr<char[]>* buf) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     // Return value set to a default; overwritten in some cases
     size_t rv = target_len_with_metadata;
 #ifdef ROCKSDB_MALLOC_USABLE_SIZE
@@ -172,6 +169,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
         for (uint64_t maybe_len_rough :
              {uint64_t{3} * target_len / 4, uint64_t{13} * target_len / 16,
               uint64_t{7} * target_len / 8, uint64_t{15} * target_len / 16}) {
+PERF_MARKER(__PRETTY_FUNCTION__);
           size_t maybe_len_with_metadata =
               RoundDownUsableSpace(maybe_len_rough + kMetadataLen);
           double maybe_fp_rate =
@@ -1097,7 +1095,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 Slice LegacyBloomBitsBuilder::Finish(std::unique_ptr<const char[]>* buf) {
-PERF_MARKER(__PRETTY_FUNCTION__);
   uint32_t total_bits, num_lines;
   size_t num_entries = hash_entries_.size();
   char* data =
@@ -1334,6 +1331,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 bool BuiltinFilterPolicy::IsInstanceOf(const std::string& name) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (name == kClassName()) {
     return true;
   } else {
@@ -1349,6 +1347,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 const char* BuiltinFilterPolicy::CompatibilityName() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return kBuiltinFilterMetadataName;
 }
 
@@ -1393,6 +1392,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 bool BloomLikeFilterPolicy::IsInstanceOf(const std::string& name) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (name == kClassName()) {
     return true;
   } else {
@@ -1411,6 +1411,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 std::string BloomLikeFilterPolicy::GetId() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return Name() + GetBitsPerKeySuffix();
 }
 
@@ -1420,6 +1421,7 @@ DeprecatedBlockBasedBloomFilterPolicy::DeprecatedBlockBasedBloomFilterPolicy(
 
 FilterBitsBuilder* DeprecatedBlockBasedBloomFilterPolicy::GetBuilderWithContext(
     const FilterBuildingContext&) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (GetWholeBitsPerKey() == 0) {
     // "No filter" special case
     return nullptr;
@@ -1494,6 +1496,7 @@ BloomFilterPolicy::BloomFilterPolicy(double bits_per_key)
 
 FilterBitsBuilder* BloomFilterPolicy::GetBuilderWithContext(
     const FilterBuildingContext& context) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (GetMillibitsPerKey() == 0) {
     // "No filter" special case
     return nullptr;
@@ -1508,6 +1511,7 @@ const char* BloomFilterPolicy::kClassName() { return "bloomfilter"; }
 const char* BloomFilterPolicy::kNickName() { return "rocksdb.BloomFilter"; }
 
 std::string BloomFilterPolicy::GetId() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Including ":false" for better forward-compatibility with 6.29 and earlier
   // which required a boolean `use_block_based_builder` parameter
   return BloomLikeFilterPolicy::GetId() + ":false";
@@ -1515,6 +1519,7 @@ std::string BloomFilterPolicy::GetId() const {
 
 FilterBitsBuilder* BloomLikeFilterPolicy::GetFastLocalBloomBuilderWithContext(
     const FilterBuildingContext& context) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   bool offm = context.table_options.optimize_filters_for_memory;
   bool reserve_filter_construction_mem =
       (context.table_options.reserve_table_builder_memory &&
@@ -1533,6 +1538,7 @@ FilterBitsBuilder* BloomLikeFilterPolicy::GetFastLocalBloomBuilderWithContext(
 
 FilterBitsBuilder* BloomLikeFilterPolicy::GetLegacyBloomBuilderWithContext(
     const FilterBuildingContext& context) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (whole_bits_per_key_ >= 14 && context.info_log &&
       !warned_.load(std::memory_order_relaxed)) {
     warned_ = true;
@@ -1556,6 +1562,7 @@ FilterBitsBuilder* BloomLikeFilterPolicy::GetLegacyBloomBuilderWithContext(
 FilterBitsBuilder*
 BloomLikeFilterPolicy::GetStandard128RibbonBuilderWithContext(
     const FilterBuildingContext& context) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // FIXME: code duplication with GetFastLocalBloomBuilderWithContext
   bool offm = context.table_options.optimize_filters_for_memory;
   bool reserve_filter_construction_mem =
@@ -1575,6 +1582,7 @@ BloomLikeFilterPolicy::GetStandard128RibbonBuilderWithContext(
 }
 
 std::string BloomLikeFilterPolicy::GetBitsPerKeySuffix() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string rv = ":" + ROCKSDB_NAMESPACE::ToString(millibits_per_key_ / 1000);
   int frac = millibits_per_key_ % 1000;
   if (frac > 0) {
@@ -1612,6 +1620,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
 FilterBitsBuilder* LegacyBloomFilterPolicy::GetBuilderWithContext(
     const FilterBuildingContext& context) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (GetMillibitsPerKey() == 0) {
     // "No filter" special case
     return nullptr;
@@ -1626,6 +1635,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
 FilterBitsBuilder* FastLocalBloomFilterPolicy::GetBuilderWithContext(
     const FilterBuildingContext& context) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (GetMillibitsPerKey() == 0) {
     // "No filter" special case
     return nullptr;
@@ -1640,6 +1650,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
 FilterBitsBuilder* Standard128RibbonFilterPolicy::GetBuilderWithContext(
     const FilterBuildingContext& context) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (GetMillibitsPerKey() == 0) {
     // "No filter" special case
     return nullptr;
@@ -1735,6 +1746,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 // and return a new one.
 FilterBitsReader* BuiltinFilterPolicy::GetFilterBitsReader(
     const Slice& contents) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return BuiltinFilterPolicy::GetBuiltinFilterBitsReader(contents);
 }
 
@@ -1838,6 +1850,7 @@ RibbonFilterPolicy::RibbonFilterPolicy(double bloom_equivalent_bits_per_key,
 
 FilterBitsBuilder* RibbonFilterPolicy::GetBuilderWithContext(
     const FilterBuildingContext& context) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (GetMillibitsPerKey() == 0) {
     // "No filter" special case
     return nullptr;
@@ -1877,6 +1890,7 @@ const char* RibbonFilterPolicy::kClassName() { return "ribbonfilter"; }
 const char* RibbonFilterPolicy::kNickName() { return "rocksdb.RibbonFilter"; }
 
 std::string RibbonFilterPolicy::GetId() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return BloomLikeFilterPolicy::GetId() + ":" +
          ROCKSDB_NAMESPACE::ToString(bloom_before_level_);
 }

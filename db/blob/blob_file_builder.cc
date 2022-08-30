@@ -238,6 +238,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
 Status BlobFileBuilder::CompressBlobIfNeeded(
     Slice* blob, std::string* compressed_blob) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(blob);
   assert(compressed_blob);
   assert(compressed_blob->empty());

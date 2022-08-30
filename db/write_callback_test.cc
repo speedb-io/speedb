@@ -218,7 +218,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
     // Verification once writers call JoinBatchGroup.
     ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
         "WriteThread::JoinBatchGroup:Wait", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
           uint64_t cur_threads_linked = threads_linked.fetch_add(1);
           bool is_leader = false;
           bool is_last = false;
@@ -257,7 +256,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
     ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
         "WriteThread::JoinBatchGroup:DoneWaiting", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
           // check my state
           auto* writer = reinterpret_cast<WriteThread::Writer*>(arg);
 

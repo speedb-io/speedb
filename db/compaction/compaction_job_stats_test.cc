@@ -360,7 +360,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   // covering the range [small,large].
   void MakeTables(int n, const std::string& small, const std::string& large,
                   int cf = 0) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     for (int i = 0; i < n; i++) {
       ASSERT_OK(Put(cf, small, "begin"));
       ASSERT_OK(Put(cf, large, "end"));
@@ -842,7 +841,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
     std::atomic<bool> first_prepare_write(true);
     ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
         "WritableFileWriter::Append:BeforePrepareWrite", [&](void* /*arg*/) {
-PERF_MARKER(__PRETTY_FUNCTION__);
           if (first_prepare_write.load()) {
             options.env->SleepForMicroseconds(3);
             first_prepare_write.store(false);
@@ -852,7 +850,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
     std::atomic<bool> first_flush(true);
     ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
         "WritableFileWriter::Flush:BeforeAppend", [&](void* /*arg*/) {
-PERF_MARKER(__PRETTY_FUNCTION__);
           if (first_flush.load()) {
             options.env->SleepForMicroseconds(3);
             first_flush.store(false);
@@ -862,7 +859,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
     std::atomic<bool> first_sync(true);
     ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
         "WritableFileWriter::SyncInternal:0", [&](void* /*arg*/) {
-PERF_MARKER(__PRETTY_FUNCTION__);
           if (first_sync.load()) {
             options.env->SleepForMicroseconds(3);
             first_sync.store(false);
@@ -872,7 +868,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
     std::atomic<bool> first_range_sync(true);
     ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
         "WritableFileWriter::RangeSync:0", [&](void* /*arg*/) {
-PERF_MARKER(__PRETTY_FUNCTION__);
           if (first_range_sync.load()) {
             options.env->SleepForMicroseconds(3);
             first_range_sync.store(false);

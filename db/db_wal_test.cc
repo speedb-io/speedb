@@ -646,7 +646,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   // Reopen with blob files enabled but make blob file writing fail during
   // recovery.
   SyncPoint::GetInstance()->SetCallBack(sync_point_, [this](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     Status* const s = static_cast<Status*>(arg);
     assert(s);
 
@@ -790,7 +789,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   std::atomic<int> called(0);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBTestWalFile.GetPreallocationStatus", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         ASSERT_TRUE(arg != nullptr);
         size_t preallocation_size = *(static_cast<size_t*>(arg));
         ASSERT_EQ(expected_preallocation_size, preallocation_size);
@@ -810,7 +808,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   called.store(0);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBTestWalFile.GetPreallocationStatus", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         ASSERT_TRUE(arg != nullptr);
         size_t preallocation_size = *(static_cast<size_t*>(arg));
         ASSERT_EQ(expected_preallocation_size, preallocation_size);
@@ -831,7 +828,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   called.store(0);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBTestWalFile.GetPreallocationStatus", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         ASSERT_TRUE(arg != nullptr);
         size_t preallocation_size = *(static_cast<size_t*>(arg));
         ASSERT_EQ(expected_preallocation_size, preallocation_size);
@@ -853,7 +849,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   called.store(0);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBTestWalFile.GetPreallocationStatus", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         ASSERT_TRUE(arg != nullptr);
         size_t preallocation_size = *(static_cast<size_t*>(arg));
         ASSERT_EQ(expected_preallocation_size, preallocation_size);
@@ -1570,7 +1565,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   SyncPoint::GetInstance()->SetCallBack(
       "MemTableList::TryInstallMemtableFlushResults:AfterComputeMinWalToKeep",
       [&](void* /*arg*/) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         dbfull()->mutex()->AssertHeld();
         if (!called) {
           // We are the first bg flush thread in the MANIFEST write queue.
@@ -2180,7 +2174,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   SyncPoint::GetInstance()->SetCallBack(
       "PosixWritableFile::Close", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         if (!enable_truncate) {
           *(reinterpret_cast<size_t*>(arg)) = 0;
         }

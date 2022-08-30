@@ -42,6 +42,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
 PlainTableIndex::IndexSearchResult PlainTableIndex::GetOffset(
     uint32_t prefix_hash, uint32_t* bucket_value) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   int bucket = GetBucketIdFromHash(prefix_hash, index_size_);
   GetUnaligned(index_ + bucket, bucket_value);
   if ((*bucket_value & kSubIndexMask) == kSubIndexMask) {

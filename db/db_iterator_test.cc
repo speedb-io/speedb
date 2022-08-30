@@ -2454,7 +2454,6 @@ TEST_P(DBIteratorTest, CreationFailure) {
 PERF_MARKER(__PRETTY_FUNCTION__);
   SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::NewInternalIterator:StatusCallback", [](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         *(reinterpret_cast<Status*>(arg)) = Status::Corruption("test status");
       });
   SyncPoint::GetInstance()->EnableProcessing();
@@ -2520,7 +2519,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
     std::set<uint64_t> unseen{1, 2, 3};
     ReadOptions opts;
     opts.table_filter = [&](const TableProperties& props) {
-PERF_MARKER(__PRETTY_FUNCTION__);
       auto it = unseen.find(props.num_entries);
       if (it == unseen.end()) {
         ADD_FAILURE() << "saw table properties with an unexpected "
@@ -2554,7 +2552,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   {
     ReadOptions opts;
     opts.table_filter = [](const TableProperties& props) {
-PERF_MARKER(__PRETTY_FUNCTION__);
       return props.num_entries != 2;
     };
     auto iter = NewIterator(opts);

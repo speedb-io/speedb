@@ -162,6 +162,7 @@ struct SmallestKeyHeapComparator {
   explicit SmallestKeyHeapComparator(const Comparator* ucmp) { ucmp_ = ucmp; }
 
   bool operator()(InputFileInfo i1, InputFileInfo i2) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return (ucmp_->Compare(i1.f->smallest.user_key(),
                            i2.f->smallest.user_key()) > 0);
   }
@@ -278,6 +279,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
 bool UniversalCompactionPicker::NeedsCompaction(
     const VersionStorageInfo* vstorage) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kLevel0 = 0;
   if (vstorage->CompactionScore(kLevel0) >= 1) {
     return true;
@@ -305,6 +307,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 void UniversalCompactionBuilder::SortedRun::Dump(char* out_buf,
                                                  size_t out_buf_size,
                                                  bool print_path) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (level == 0) {
     assert(file != nullptr);
     if (file->fd.GetPathId() == 0 || !print_path) {
@@ -322,6 +325,7 @@ void UniversalCompactionBuilder::SortedRun::Dump(char* out_buf,
 
 void UniversalCompactionBuilder::SortedRun::DumpSizeInfo(
     char* out_buf, size_t out_buf_size, size_t sorted_run_count) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (level == 0) {
     assert(file != nullptr);
     snprintf(out_buf, out_buf_size,
@@ -1384,6 +1388,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 uint64_t UniversalCompactionBuilder::GetMaxOverlappingBytes() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!mutable_cf_options_.compaction_options_universal.incremental) {
     return port::kMaxUint64;
   } else {

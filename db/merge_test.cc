@@ -347,7 +347,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   SyncPoint::GetInstance()->ClearAllCallBacks();
   SyncPoint::GetInstance()->SetCallBack(
       "VersionSet::LogAndApply:BeforeWriterWaiting", [&](void* /*arg*/) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         int thread_id = get_thread_id();
         if (1 == thread_id) {
           TEST_SYNC_POINT(
@@ -359,7 +358,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       });
   SyncPoint::GetInstance()->SetCallBack(
       "VersionSet::LogAndApply:WriteManifest", [&](void* /*arg*/) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         int thread_id = get_thread_id();
         if (0 == thread_id) {
           TEST_SYNC_POINT(
@@ -370,7 +368,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       });
   SyncPoint::GetInstance()->SetCallBack(
       "VersionSet::LogAndApply:WakeUpAndDone", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         auto* mutex = reinterpret_cast<InstrumentedMutex*>(arg);
         mutex->AssertHeld();
         int thread_id = get_thread_id();

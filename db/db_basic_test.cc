@@ -1240,7 +1240,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::DBImpl* db = static_cast_with_check<DBImpl>(db_);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::MultiGet::AfterRefSV", [&](void* /*arg*/) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         if (++get_sv_count == 2) {
           // After MultiGet refs a couple of CFs, flush all CFs so MultiGet
           // is forced to repeat the process
@@ -1333,13 +1332,11 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   bool last_try = false;
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::MultiGet::LastTry", [&](void* /*arg*/) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         last_try = true;
         ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->DisableProcessing();
       });
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::MultiGet::AfterRefSV", [&](void* /*arg*/) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         if (last_try) {
           return;
         }
@@ -1397,7 +1394,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::DBImpl* db = static_cast_with_check<DBImpl>(db_);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::MultiGet::AfterRefSV", [&](void* /*arg*/) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         if (++get_sv_count == 2) {
           for (int i = 0; i < 8; ++i) {
             ASSERT_OK(Flush(i));
@@ -2372,7 +2368,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   SyncPoint::GetInstance()->ClearAllCallBacks();
   SyncPoint::GetInstance()->SetCallBack(
       "VersionBuilder::CheckConsistencyBeforeReturn", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         ASSERT_NE(nullptr, arg);
         *(reinterpret_cast<Status*>(arg)) =
             Status::Corruption("Inject corruption");
@@ -2681,7 +2676,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   SyncPoint::GetInstance()->ClearAllCallBacks();
   SyncPoint::GetInstance()->SetCallBack(
       "LogWriter::EmitPhysicalRecord:BeforeEncodeChecksum", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         auto* crc = reinterpret_cast<uint32_t*>(arg);
         *crc = *crc + 1;
       });
@@ -3290,7 +3284,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   SyncPoint::GetInstance()->SetCallBack(
       "RetrieveMultipleBlocks:VerifyChecksum", [&](void* status) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         Status* s = static_cast<Status*>(status);
         read_count++;
         if (read_count == 2) {
@@ -3329,7 +3322,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   SyncPoint::GetInstance()->SetCallBack(
       "TableCache::MultiGet:FindTable", [&](void* status) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         Status* s = static_cast<Status*>(status);
         *s = Status::IOError();
       });
@@ -3342,7 +3334,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   // during MultiGet
   SyncPoint::GetInstance()->SetCallBack(
       "SanitizeOptions::AfterChangeMaxOpenFiles", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         int* max_open_files = (int*)arg;
         *max_open_files = 11;
       });
@@ -3480,6 +3471,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   void AssertDeadline(const std::chrono::microseconds deadline,
                       const std::chrono::microseconds io_timeout,
                       const IOOptions& opts) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // Give a leeway of +- 10us as it can take some time for the Get/
     // MultiGet call to reach here, in order to avoid false alarms
     std::chrono::microseconds now =
@@ -3520,6 +3512,7 @@ IOStatus DeadlineRandomAccessFile::Read(uint64_t offset, size_t len,
                                         const IOOptions& opts, Slice* result,
                                         char* scratch,
                                         IODebugContext* dbg) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const std::chrono::microseconds deadline = fs_.GetDeadline();
   const std::chrono::microseconds io_timeout = fs_.GetIOTimeout();
   IOStatus s;
@@ -3861,7 +3854,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
     // during MultiGet
     SyncPoint::GetInstance()->SetCallBack(
         "SanitizeOptions::AfterChangeMaxOpenFiles", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
           int* max_open_files = (int*)arg;
           *max_open_files = 11;
         });

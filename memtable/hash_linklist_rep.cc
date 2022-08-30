@@ -41,6 +41,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   }
 
   uint32_t GetNumEntries() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return num_entries.load(std::memory_order_relaxed);
   }
 
@@ -224,39 +225,47 @@ class HashLinkListRep : public MemTableRep {
   }
 
   size_t GetHash(const Slice& slice) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return GetSliceRangedNPHash(slice, bucket_size_);
   }
 
   Pointer* GetBucket(size_t i) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return static_cast<Pointer*>(buckets_[i].load(std::memory_order_acquire));
   }
 
   Pointer* GetBucket(const Slice& slice) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return GetBucket(GetHash(slice));
   }
 
   bool Equal(const Slice& a, const Key& b) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return (compare_(b, a) == 0);
   }
 
   bool Equal(const Key& a, const Key& b) const { return (compare_(a, b) == 0); }
 
   bool KeyIsAfterNode(const Slice& internal_key, const Node* n) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // nullptr n is considered infinite
     return (n != nullptr) && (compare_(n->key, internal_key) < 0);
   }
 
   bool KeyIsAfterNode(const Key& key, const Node* n) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // nullptr n is considered infinite
     return (n != nullptr) && (compare_(n->key, key) < 0);
   }
 
   bool KeyIsAfterOrAtNode(const Slice& internal_key, const Node* n) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // nullptr n is considered infinite
     return (n != nullptr) && (compare_(n->key, internal_key) <= 0);
   }
 
   bool KeyIsAfterOrAtNode(const Key& key, const Node* n) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // nullptr n is considered infinite
     return (n != nullptr) && (compare_(n->key, key) <= 0);
   }
@@ -539,6 +548,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
 SkipListBucketHeader* HashLinkListRep::GetSkipListBucketHeader(
     Pointer* first_next_pointer) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (first_next_pointer == nullptr) {
     return nullptr;
   }
@@ -561,6 +571,7 @@ SkipListBucketHeader* HashLinkListRep::GetSkipListBucketHeader(
 }
 
 Node* HashLinkListRep::GetLinkListFirstNode(Pointer* first_next_pointer) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (first_next_pointer == nullptr) {
     return nullptr;
   }
@@ -703,6 +714,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 bool HashLinkListRep::Contains(const char* key) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Slice internal_key = GetLengthPrefixedSlice(key);
 
   auto transformed = GetPrefix(internal_key);
@@ -811,12 +823,14 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
 bool HashLinkListRep::LinkListContains(Node* head,
                                        const Slice& user_key) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Node* x = FindGreaterOrEqualInBucket(head, user_key);
   return (x != nullptr && Equal(user_key, x->key));
 }
 
 Node* HashLinkListRep::FindGreaterOrEqualInBucket(Node* head,
                                                   const Slice& key) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Node* x = head;
   while (true) {
     if (x == nullptr) {

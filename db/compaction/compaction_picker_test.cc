@@ -2527,7 +2527,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   size_t random_index = 0;
   SyncPoint::GetInstance()->SetCallBack(
       "CompactionPicker::PickFilesMarkedForCompaction", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         size_t* index = static_cast<size_t*>(arg);
         *index = random_index;
       });

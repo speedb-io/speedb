@@ -52,6 +52,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 std::size_t WriteBufferManager::dummy_entries_in_cache_usage() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (cache_res_mgr_ != nullptr) {
     return cache_res_mgr_->GetTotalReservedCacheSize();
   } else {
@@ -210,6 +211,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 std::string WriteBufferManager::GetPrintableOptions() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string ret;
   const int kBufferSize = 200;
   char buffer[kBufferSize];

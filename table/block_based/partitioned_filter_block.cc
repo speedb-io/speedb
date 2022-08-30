@@ -129,7 +129,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 Slice PartitionedFilterBlockBuilder::Finish(
     const BlockHandle& last_partition_block_handle, Status* status,
     std::unique_ptr<const char[]>* filter_data) {
-PERF_MARKER(__PRETTY_FUNCTION__);
   if (finishing_filters == true) {
     // Record the handle of the last written filter block in the index
     std::string handle_encoding;
@@ -284,6 +283,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
 BlockHandle PartitionedFilterBlockReader::GetFilterPartitionHandle(
     const CachableEntry<Block>& filter_block, const Slice& entry) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   IndexBlockIter iter;
   const InternalKeyComparator* const comparator = internal_comparator();
   Statistics* kNullStats = nullptr;
@@ -311,6 +311,7 @@ Status PartitionedFilterBlockReader::GetFilterPartitionBlock(
     bool no_io, GetContext* get_context,
     BlockCacheLookupContext* lookup_context,
     CachableEntry<ParsedFullFilterBlock>* filter_block) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(table());
   assert(filter_block);
   assert(filter_block->IsEmpty());
@@ -345,6 +346,7 @@ bool PartitionedFilterBlockReader::MayMatch(
     uint64_t block_offset, bool no_io, const Slice* const_ikey_ptr,
     GetContext* get_context, BlockCacheLookupContext* lookup_context,
     FilterFunction filter_function) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   CachableEntry<Block> filter_block;
   Status s =
       GetOrReadFilterBlock(no_io, get_context, lookup_context, &filter_block);
@@ -382,6 +384,7 @@ void PartitionedFilterBlockReader::MayMatch(
     MultiGetRange* range, const SliceTransform* prefix_extractor,
     uint64_t block_offset, bool no_io, BlockCacheLookupContext* lookup_context,
     FilterManyFunction filter_function) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   CachableEntry<Block> filter_block;
   Status s = GetOrReadFilterBlock(no_io, range->begin()->get_context,
                                   lookup_context, &filter_block);
@@ -436,6 +439,7 @@ void PartitionedFilterBlockReader::MayMatchPartition(
     uint64_t block_offset, BlockHandle filter_handle, bool no_io,
     BlockCacheLookupContext* lookup_context,
     FilterManyFunction filter_function) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   CachableEntry<ParsedFullFilterBlock> filter_partition_block;
   Status s = GetFilterPartitionBlock(
       nullptr /* prefetch_buffer */, filter_handle, no_io,
@@ -452,6 +456,7 @@ void PartitionedFilterBlockReader::MayMatchPartition(
 }
 
 size_t PartitionedFilterBlockReader::ApproximateMemoryUsage() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   size_t usage = ApproximateFilterBlockMemoryUsage();
 #ifdef ROCKSDB_MALLOC_USABLE_SIZE
   usage += malloc_usable_size(const_cast<PartitionedFilterBlockReader*>(this));
@@ -560,6 +565,7 @@ const InternalKeyComparator* PartitionedFilterBlockReader::internal_comparator()
 }
 
 bool PartitionedFilterBlockReader::index_key_includes_seq() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(table());
   assert(table()->get_rep());
 
@@ -567,6 +573,7 @@ bool PartitionedFilterBlockReader::index_key_includes_seq() const {
 }
 
 bool PartitionedFilterBlockReader::index_value_is_full() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(table());
   assert(table()->get_rep());
 

@@ -145,6 +145,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
                           ValueType expected_value_type,
                           const Slice& expected_value,
                           const Slice& expected_ts) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_TRUE(it->Valid());
     ASSERT_OK(it->status());
     ASSERT_EQ(expected_key, it->key());
@@ -1883,7 +1884,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   TestData test_data_[kTestDataSize];
 
   void PutTestData(int index, ColumnFamilyHandle* cfh = nullptr) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_LE(index, kTestDataSize);
     WriteOptions write_opts;
 

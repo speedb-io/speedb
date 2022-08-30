@@ -378,7 +378,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "SstFileManagerImpl::OnDeleteFile", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         const std::string* const file_path =
             static_cast<const std::string*>(arg);
         if (file_path->find(".blob") != std::string::npos) {
@@ -388,7 +387,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "SstFileManagerImpl::ScheduleFileDeletion", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         assert(arg);
         const std::string* const file_path =
             static_cast<const std::string*>(arg);
@@ -503,7 +501,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "SstFileManagerImpl::OnDeleteFile", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         const std::string* const file_path =
             static_cast<const std::string*>(arg);
         if (file_path->find(".blob") != std::string::npos) {
@@ -513,7 +510,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "SstFileManagerImpl::ScheduleFileDeletion", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         assert(arg);
         const std::string* const file_path =
             static_cast<const std::string*>(arg);
@@ -642,7 +638,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       [&](void* arg) { penalties.push_back(*(static_cast<uint64_t*>(arg))); });
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "InstrumentedCondVar::TimedWaitInternal", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         // Turn timed wait into a simulated sleep
         uint64_t* abs_time_us = static_cast<uint64_t*>(arg);
         uint64_t cur_time = env_->NowMicros();
@@ -662,7 +657,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   // the simulated sleep time
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::StartPeriodicWorkScheduler:DisableScheduler", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         bool* disable_scheduler = static_cast<bool*>(arg);
         *disable_scheduler = true;
       });
@@ -1312,7 +1306,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::FlushMemTableToOutputFile:MaxAllowedSpaceReached",
       [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         Status* bg_error = static_cast<Status*>(arg);
         bg_error_set = true;
         reached_max_space_on_flush++;
@@ -1322,7 +1315,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::BackgroundCompaction():CancelledCompaction", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         bool* enough_room = static_cast<bool*>(arg);
         *enough_room = true;
       });
@@ -1330,7 +1322,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "CompactionJob::FinishCompactionOutputFile:MaxAllowedSpaceReached",
       [&](void* /*arg*/) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         bg_error_set = true;
         reached_max_space_on_compaction++;
       });
@@ -1501,7 +1492,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   // compaction.
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "FlushJob::WriteLevel0Table:oldest_ancester_time", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         uint64_t* current_time = static_cast<uint64_t*>(arg);
         *current_time = 0;
       });
@@ -1724,7 +1714,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "SstFileManagerImpl::OnDeleteFile", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         const std::string* const file_path =
             static_cast<const std::string*>(arg);
         if (EndsWith(*file_path, ".blob")) {
@@ -1734,7 +1723,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "SstFileManagerImpl::ScheduleFileDeletion", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         assert(arg);
         const std::string* const file_path =
             static_cast<const std::string*>(arg);

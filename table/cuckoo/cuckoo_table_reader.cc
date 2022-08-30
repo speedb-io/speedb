@@ -237,6 +237,7 @@ class CuckooTableIterator : public InternalIterator {
         user_key_len_(user_key_len),
         target_(target) {}
     bool operator()(const uint32_t first, const uint32_t second) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
       const char* first_bucket =
         (first == kInvalidIndex) ? target_.data() :
                                    &file_data_.data()[first * bucket_len_];
@@ -338,6 +339,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 bool CuckooTableIterator::Valid() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return curr_key_idx_ < sorted_bucket_ids_.size();
 }
 
@@ -387,11 +389,13 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 Slice CuckooTableIterator::key() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(Valid());
   return curr_key_.GetInternalKey();
 }
 
 Slice CuckooTableIterator::value() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(Valid());
   return curr_value_;
 }

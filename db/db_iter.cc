@@ -81,6 +81,7 @@ DBIter::DBIter(Env* _env, const ReadOptions& read_options,
       timestamp_ub_(read_options.timestamp),
       timestamp_lb_(read_options.iter_start_ts),
       timestamp_size_(timestamp_ub_ ? timestamp_ub_->size() : 0) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   RecordTick(statistics_, NO_ITERATOR_CREATED);
   if (pin_thru_lifetime_) {
     pinned_iters_mgr_.StartPinning();

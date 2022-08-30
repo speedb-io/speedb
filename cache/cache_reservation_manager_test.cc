@@ -31,6 +31,7 @@ class CacheReservationManagerTest : public ::testing::Test {
   std::shared_ptr<CacheReservationManager> test_cache_rev_mng;
 
   CacheReservationManagerTest() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     test_cache_rev_mng =
         std::make_shared<CacheReservationManagerImpl<CacheEntryRole::kMisc>>(
             cache);
@@ -38,6 +39,7 @@ class CacheReservationManagerTest : public ::testing::Test {
 };
 
 TEST_F(CacheReservationManagerTest, GenerateCacheKey) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::size_t new_mem_used = 1 * kSizeDummyEntry;
   Status s = test_cache_rev_mng->UpdateCacheReservation(new_mem_used);
   ASSERT_OK(s);
@@ -64,6 +66,7 @@ TEST_F(CacheReservationManagerTest, GenerateCacheKey) {
 }
 
 TEST_F(CacheReservationManagerTest, KeepCacheReservationTheSame) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::size_t new_mem_used = 1 * kSizeDummyEntry;
   Status s = test_cache_rev_mng->UpdateCacheReservation(new_mem_used);
   ASSERT_OK(s);
@@ -93,6 +96,7 @@ TEST_F(CacheReservationManagerTest, KeepCacheReservationTheSame) {
 
 TEST_F(CacheReservationManagerTest,
        IncreaseCacheReservationByMultiplesOfDummyEntrySize) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::size_t new_mem_used = 2 * kSizeDummyEntry;
   Status s = test_cache_rev_mng->UpdateCacheReservation(new_mem_used);
   EXPECT_OK(s) << "Failed to increase cache reservation correctly";
@@ -110,6 +114,7 @@ TEST_F(CacheReservationManagerTest,
 
 TEST_F(CacheReservationManagerTest,
        IncreaseCacheReservationNotByMultiplesOfDummyEntrySize) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::size_t new_mem_used = 2 * kSizeDummyEntry + kSizeDummyEntry / 2;
   Status s = test_cache_rev_mng->UpdateCacheReservation(new_mem_used);
   EXPECT_OK(s) << "Failed to increase cache reservation correctly";
@@ -127,6 +132,7 @@ TEST_F(CacheReservationManagerTest,
 
 TEST(CacheReservationManagerIncreaseReservcationOnFullCacheTest,
      IncreaseCacheReservationOnFullCache) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ;
   constexpr std::size_t kSizeDummyEntry =
       CacheReservationManagerImpl<CacheEntryRole::kMisc>::GetDummyEntrySize();
@@ -236,6 +242,7 @@ TEST(CacheReservationManagerIncreaseReservcationOnFullCacheTest,
 
 TEST_F(CacheReservationManagerTest,
        DecreaseCacheReservationByMultiplesOfDummyEntrySize) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::size_t new_mem_used = 2 * kSizeDummyEntry;
   Status s = test_cache_rev_mng->UpdateCacheReservation(new_mem_used);
   ASSERT_OK(s);
@@ -263,6 +270,7 @@ TEST_F(CacheReservationManagerTest,
 
 TEST_F(CacheReservationManagerTest,
        DecreaseCacheReservationNotByMultiplesOfDummyEntrySize) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::size_t new_mem_used = 2 * kSizeDummyEntry;
   Status s = test_cache_rev_mng->UpdateCacheReservation(new_mem_used);
   ASSERT_OK(s);
@@ -290,6 +298,7 @@ TEST_F(CacheReservationManagerTest,
 
 TEST(CacheReservationManagerWithDelayedDecreaseTest,
      DecreaseCacheReservationWithDelayedDecrease) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr std::size_t kSizeDummyEntry =
       CacheReservationManagerImpl<CacheEntryRole::kMisc>::GetDummyEntrySize();
   constexpr std::size_t kCacheCapacity = 4096 * kSizeDummyEntry;
@@ -362,6 +371,7 @@ TEST(CacheReservationManagerWithDelayedDecreaseTest,
 
 TEST(CacheReservationManagerDestructorTest,
      ReleaseRemainingDummyEntriesOnDestruction) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr std::size_t kSizeDummyEntry =
       CacheReservationManagerImpl<CacheEntryRole::kMisc>::GetDummyEntrySize();
   constexpr std::size_t kCacheCapacity = 4096 * kSizeDummyEntry;
@@ -388,6 +398,7 @@ TEST(CacheReservationManagerDestructorTest,
 }
 
 TEST(CacheReservationHandleTest, HandleTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   constexpr std::size_t kOneGigabyte = 1024 * 1024 * 1024;
   constexpr std::size_t kSizeDummyEntry = 256 * 1024;
   constexpr std::size_t kMetaDataChargeOverhead = 10000;
@@ -459,6 +470,7 @@ TEST(CacheReservationHandleTest, HandleTest) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

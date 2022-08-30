@@ -352,6 +352,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 std::string SkipListFactory::GetId() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string id = Name();
   if (lookahead_ > 0) {
     id.append(":").append(ROCKSDB_NAMESPACE::ToString(lookahead_));

@@ -90,6 +90,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
 size_t JemallocNodumpAllocator::UsableSize(void* p,
                                            size_t /*allocation_size*/) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return malloc_usable_size(static_cast<void*>(p));
 }
 

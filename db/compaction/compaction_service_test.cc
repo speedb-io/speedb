@@ -380,7 +380,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   std::atomic_bool cancel_issued{false};
   SyncPoint::GetInstance()->SetCallBack("CompactionJob::Run():Inprogress",
                                         [&](void* /*arg*/) {
-PERF_MARKER(__PRETTY_FUNCTION__);
                                           cancel_issued = true;
                                           my_cs->SetCanceled(true);
                                         });

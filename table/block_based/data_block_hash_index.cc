@@ -88,6 +88,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
 uint8_t DataBlockHashIndex::Lookup(const char* data, uint32_t map_offset,
                                    const Slice& key) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint32_t hash_value = GetSliceHash(key);
   uint16_t idx = static_cast<uint16_t>(hash_value % num_buckets_);
   const char* bucket_table = data + map_offset;

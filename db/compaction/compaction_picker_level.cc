@@ -19,6 +19,7 @@ namespace ROCKSDB_NAMESPACE {
 
 bool LevelCompactionPicker::NeedsCompaction(
     const VersionStorageInfo* vstorage) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!vstorage->ExpiredTtlFiles().empty()) {
     return true;
   }
@@ -137,6 +138,7 @@ class LevelCompactionBuilder {
 void LevelCompactionBuilder::PickFileToCompact(
     const autovector<std::pair<int, FileMetaData*>>& level_files,
     bool compact_to_next_level) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (auto& level_file : level_files) {
     // If it's being compacted it has nothing to do here.
     // If this assert() fails that means that some function marked some

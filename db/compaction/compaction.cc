@@ -251,7 +251,6 @@ Compaction::Compaction(
       is_trivial_move_(false),
       compaction_reason_(_compaction_reason),
       notify_on_compaction_completion_(false) {
-PERF_MARKER(__PRETTY_FUNCTION__);
   MarkFilesBeingCompacted(true);
   if (is_manual_compaction_) {
     compaction_reason_ = CompactionReason::kManualCompaction;
@@ -289,6 +288,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 bool Compaction::InputCompressionMatchesOutput() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   int base_level = input_vstorage_->base_level();
   bool matches =
       (GetCompressionType(input_vstorage_, mutable_cf_options_, start_level_,
@@ -302,6 +302,7 @@ bool Compaction::InputCompressionMatchesOutput() const {
 }
 
 bool Compaction::IsTrivialMove() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Avoid a move if there is lots of overlapping grandparent data.
   // Otherwise, the move could create a parent file that will require
   // a very expensive merge later on.
@@ -381,6 +382,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
 bool Compaction::KeyNotExistsBeyondOutputLevel(
     const Slice& user_key, std::vector<size_t>* level_ptrs) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(input_version_ != nullptr);
   assert(level_ptrs != nullptr);
   assert(level_ptrs->size() == static_cast<size_t>(number_levels_));
@@ -434,6 +436,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 // print: "3@0 + 2@3 + 1@4 files to L5"
 const char* Compaction::InputLevelSummary(
     InputLevelSummaryBuffer* scratch) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   int len = 0;
   bool is_first = true;
   for (auto& input_level : inputs_) {
@@ -459,6 +462,7 @@ const char* Compaction::InputLevelSummary(
 }
 
 uint64_t Compaction::CalculateTotalInputSize() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t size = 0;
   for (auto& input_level : inputs_) {
     for (auto f : input_level.files) {
@@ -528,6 +532,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 uint64_t Compaction::OutputFilePreallocationSize() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t preallocation_size = 0;
 
   for (const auto& level_files : inputs_) {
@@ -550,6 +555,7 @@ uint64_t Compaction::OutputFilePreallocationSize() const {
 }
 
 std::unique_ptr<CompactionFilter> Compaction::CreateCompactionFilter() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!cfd_->ioptions()->compaction_filter_factory) {
     return nullptr;
   }
@@ -570,6 +576,7 @@ std::unique_ptr<CompactionFilter> Compaction::CreateCompactionFilter() const {
 }
 
 std::unique_ptr<SstPartitioner> Compaction::CreateSstPartitioner() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!immutable_options_.sst_partitioner_factory) {
     return nullptr;
   }
@@ -584,10 +591,12 @@ std::unique_ptr<SstPartitioner> Compaction::CreateSstPartitioner() const {
 }
 
 bool Compaction::IsOutputLevelEmpty() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return inputs_.back().level != output_level_ || inputs_.back().empty();
 }
 
 bool Compaction::ShouldFormSubcompactions() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (max_subcompactions_ <= 1 || cfd_ == nullptr) {
     return false;
   }
@@ -610,6 +619,7 @@ bool Compaction::ShouldFormSubcompactions() const {
 }
 
 bool Compaction::DoesInputReferenceBlobFiles() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(input_version_);
 
   const VersionStorageInfo* storage_info = input_version_->storage_info();
@@ -634,6 +644,7 @@ bool Compaction::DoesInputReferenceBlobFiles() const {
 
 uint64_t Compaction::MinInputFileOldestAncesterTime(
     const InternalKey* start, const InternalKey* end) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t min_oldest_ancester_time = port::kMaxUint64;
   const InternalKeyComparator& icmp =
       column_family_data()->internal_comparator();
@@ -656,6 +667,7 @@ uint64_t Compaction::MinInputFileOldestAncesterTime(
 }
 
 int Compaction::GetInputBaseLevel() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return input_vstorage_->base_level();
 }
 

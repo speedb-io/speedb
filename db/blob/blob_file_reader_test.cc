@@ -646,7 +646,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   SyncPoint::GetInstance()->SetCallBack(
       "BlobFileReader::VerifyBlob:CheckBlobCRC", [](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         BlobLogRecord* const record = static_cast<BlobLogRecord*>(arg);
         assert(record);
 
@@ -782,7 +781,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   SyncPoint::GetInstance()->SetCallBack(
       "BlobFileReader::UncompressBlobIfNeeded:TamperWithResult", [](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         CacheAllocationPtr* const output =
             static_cast<CacheAllocationPtr*>(arg);
         assert(output);
@@ -859,7 +857,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
                 &blob_offset, &blob_size);
 
   SyncPoint::GetInstance()->SetCallBack(sync_point_, [this](void* /* arg */) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     fault_injection_env_->SetFilesystemActive(false,
                                               Status::IOError(sync_point_));
   });
@@ -943,7 +940,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
                 &blob_offset, &blob_size);
 
   SyncPoint::GetInstance()->SetCallBack(sync_point_, [](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     Slice* const slice = static_cast<Slice*>(arg);
     assert(slice);
     assert(!slice->empty());

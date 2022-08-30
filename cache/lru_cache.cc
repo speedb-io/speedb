@@ -27,6 +27,7 @@ LRUHandleTable::LRUHandleTable(int max_upper_hash_bits)
       max_length_bits_(max_upper_hash_bits) {}
 
 LRUHandleTable::~LRUHandleTable() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ApplyToEntriesRange(
       [](LRUHandle* h) {
         if (!h->HasRefs()) {
@@ -37,10 +38,12 @@ LRUHandleTable::~LRUHandleTable() {
 }
 
 LRUHandle* LRUHandleTable::Lookup(const Slice& key, uint32_t hash) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return *FindPointer(key, hash);
 }
 
 LRUHandle* LRUHandleTable::Insert(LRUHandle* h) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   LRUHandle** ptr = FindPointer(h->key(), h->hash);
   LRUHandle* old = *ptr;
   h->next_hash = (old == nullptr ? nullptr : old->next_hash);
@@ -57,6 +60,7 @@ LRUHandle* LRUHandleTable::Insert(LRUHandle* h) {
 }
 
 LRUHandle* LRUHandleTable::Remove(const Slice& key, uint32_t hash) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   LRUHandle** ptr = FindPointer(key, hash);
   LRUHandle* result = *ptr;
   if (result != nullptr) {
@@ -67,6 +71,7 @@ LRUHandle* LRUHandleTable::Remove(const Slice& key, uint32_t hash) {
 }
 
 LRUHandle** LRUHandleTable::FindPointer(const Slice& key, uint32_t hash) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   LRUHandle** ptr = &list_[hash >> (32 - length_bits_)];
   while (*ptr != nullptr && ((*ptr)->hash != hash || key != (*ptr)->key())) {
     ptr = &(*ptr)->next_hash;
@@ -75,6 +80,7 @@ LRUHandle** LRUHandleTable::FindPointer(const Slice& key, uint32_t hash) {
 }
 
 void LRUHandleTable::Resize() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (length_bits_ >= max_length_bits_) {
     // Due to reaching limit of hash information, if we made the table bigger,
     // we would allocate more addresses but only the same number would be used.
@@ -123,6 +129,7 @@ LRUCacheShard::LRUCacheShard(
       lru_usage_(0),
       mutex_(use_adaptive_mutex),
       secondary_cache_(secondary_cache) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   set_metadata_charge_policy(metadata_charge_policy);
   // Make empty circular linked list.
   lru_.next = &lru_;
@@ -132,6 +139,7 @@ LRUCacheShard::LRUCacheShard(
 }
 
 void LRUCacheShard::EraseUnRefEntries() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   autovector<LRUHandle*> last_reference_list;
   {
     MutexLock l(&mutex_);
@@ -158,6 +166,7 @@ void LRUCacheShard::ApplyToSomeEntries(
     const std::function<void(const Slice& key, void* value, size_t charge,
                              DeleterFn deleter)>& callback,
     uint32_t average_entries_per_lock, uint32_t* state) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // The state is essentially going to be the starting hash, which works
   // nicely even if we resize between calls because we use upper-most
   // hash bits for table indexes.
@@ -191,12 +200,14 @@ void LRUCacheShard::ApplyToSomeEntries(
 }
 
 void LRUCacheShard::TEST_GetLRUList(LRUHandle** lru, LRUHandle** lru_low_pri) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   MutexLock l(&mutex_);
   *lru = &lru_;
   *lru_low_pri = lru_low_pri_;
 }
 
 size_t LRUCacheShard::TEST_GetLRUSize() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   MutexLock l(&mutex_);
   LRUHandle* lru_handle = lru_.next;
   size_t lru_size = 0;
@@ -208,11 +219,13 @@ size_t LRUCacheShard::TEST_GetLRUSize() {
 }
 
 double LRUCacheShard::GetHighPriPoolRatio() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   MutexLock l(&mutex_);
   return high_pri_pool_ratio_;
 }
 
 void LRUCacheShard::LRU_Remove(LRUHandle* e) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(e->next != nullptr);
   assert(e->prev != nullptr);
   if (lru_low_pri_ == e) {
@@ -231,6 +244,7 @@ void LRUCacheShard::LRU_Remove(LRUHandle* e) {
 }
 
 void LRUCacheShard::LRU_Insert(LRUHandle* e) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(e->next == nullptr);
   assert(e->prev == nullptr);
   size_t total_charge = e->CalcTotalCharge(metadata_charge_policy_);
@@ -257,6 +271,7 @@ void LRUCacheShard::LRU_Insert(LRUHandle* e) {
 }
 
 void LRUCacheShard::MaintainPoolSize() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   while (high_pri_pool_usage_ > high_pri_pool_capacity_) {
     // Overflow last entry in high-pri pool to low-pri pool.
     lru_low_pri_ = lru_low_pri_->next;
@@ -271,6 +286,7 @@ void LRUCacheShard::MaintainPoolSize() {
 
 void LRUCacheShard::EvictFromLRU(size_t charge,
                                  autovector<LRUHandle*>* deleted) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   while ((usage_ + charge) > capacity_ && lru_.next != &lru_) {
     LRUHandle* old = lru_.next;
     // LRU list contains only elements which can be evicted.
@@ -286,6 +302,7 @@ void LRUCacheShard::EvictFromLRU(size_t charge,
 }
 
 void LRUCacheShard::SetCapacity(size_t capacity) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   autovector<LRUHandle*> last_reference_list;
   {
     MutexLock l(&mutex_);
@@ -307,12 +324,14 @@ void LRUCacheShard::SetCapacity(size_t capacity) {
 }
 
 void LRUCacheShard::SetStrictCapacityLimit(bool strict_capacity_limit) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   MutexLock l(&mutex_);
   strict_capacity_limit_ = strict_capacity_limit;
 }
 
 Status LRUCacheShard::InsertItem(LRUHandle* e, Cache::Handle** handle,
                                  bool free_handle_on_fail) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Status s = Status::OK();
   autovector<LRUHandle*> last_reference_list;
   size_t total_charge = e->CalcTotalCharge(metadata_charge_policy_);
@@ -384,6 +403,7 @@ Status LRUCacheShard::InsertItem(LRUHandle* e, Cache::Handle** handle,
 }
 
 void LRUCacheShard::Promote(LRUHandle* e) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   SecondaryCacheResultHandle* secondary_handle = e->sec_handle;
 
   assert(secondary_handle->IsReady());
@@ -419,6 +439,7 @@ Cache::Handle* LRUCacheShard::Lookup(
     const ShardedCache::CacheItemHelper* helper,
     const ShardedCache::CreateCallback& create_cb, Cache::Priority priority,
     bool wait, Statistics* stats) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   LRUHandle* e = nullptr;
   {
     MutexLock l(&mutex_);
@@ -493,6 +514,7 @@ Cache::Handle* LRUCacheShard::Lookup(
 }
 
 bool LRUCacheShard::Ref(Cache::Handle* h) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   LRUHandle* e = reinterpret_cast<LRUHandle*>(h);
   MutexLock l(&mutex_);
   // To create another reference - entry must be already externally referenced.
@@ -502,6 +524,7 @@ bool LRUCacheShard::Ref(Cache::Handle* h) {
 }
 
 void LRUCacheShard::SetHighPriorityPoolRatio(double high_pri_pool_ratio) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   MutexLock l(&mutex_);
   high_pri_pool_ratio_ = high_pri_pool_ratio;
   high_pri_pool_capacity_ = capacity_ * high_pri_pool_ratio_;
@@ -509,6 +532,7 @@ void LRUCacheShard::SetHighPriorityPoolRatio(double high_pri_pool_ratio) {
 }
 
 bool LRUCacheShard::Release(Cache::Handle* handle, bool erase_if_last_ref) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (handle == nullptr) {
     return false;
   }
@@ -555,6 +579,7 @@ Status LRUCacheShard::Insert(const Slice& key, uint32_t hash, void* value,
                              void (*deleter)(const Slice& key, void* value),
                              const Cache::CacheItemHelper* helper,
                              Cache::Handle** handle, Cache::Priority priority) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Allocate the memory here outside of the mutex.
   // If the cache is full, we'll have to release it.
   // It shouldn't happen very often though.
@@ -585,6 +610,7 @@ Status LRUCacheShard::Insert(const Slice& key, uint32_t hash, void* value,
 }
 
 void LRUCacheShard::Erase(const Slice& key, uint32_t hash) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   LRUHandle* e;
   bool last_reference = false;
   {
@@ -612,6 +638,7 @@ void LRUCacheShard::Erase(const Slice& key, uint32_t hash) {
 }
 
 bool LRUCacheShard::IsReady(Cache::Handle* handle) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   LRUHandle* e = reinterpret_cast<LRUHandle*>(handle);
   MutexLock l(&mutex_);
   bool ready = true;
@@ -624,17 +651,20 @@ bool LRUCacheShard::IsReady(Cache::Handle* handle) {
 }
 
 size_t LRUCacheShard::GetUsage() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   MutexLock l(&mutex_);
   return usage_;
 }
 
 size_t LRUCacheShard::GetPinnedUsage() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   MutexLock l(&mutex_);
   assert(usage_ >= lru_usage_);
   return usage_ - lru_usage_;
 }
 
 std::string LRUCacheShard::GetPrintableOptions() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kBufferSize = 200;
   char buffer[kBufferSize];
   {
@@ -653,6 +683,7 @@ LRUCache::LRUCache(size_t capacity, int num_shard_bits,
                    const std::shared_ptr<SecondaryCache>& secondary_cache)
     : ShardedCache(capacity, num_shard_bits, strict_capacity_limit,
                    std::move(allocator)) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   num_shards_ = 1 << num_shard_bits;
   shards_ = reinterpret_cast<LRUCacheShard*>(
       port::cacheline_aligned_alloc(sizeof(LRUCacheShard) * num_shards_));
@@ -667,6 +698,7 @@ LRUCache::LRUCache(size_t capacity, int num_shard_bits,
 }
 
 LRUCache::~LRUCache() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (shards_ != nullptr) {
     assert(num_shards_ > 0);
     for (int i = 0; i < num_shards_; i++) {
@@ -677,22 +709,27 @@ LRUCache::~LRUCache() {
 }
 
 CacheShard* LRUCache::GetShard(uint32_t shard) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return reinterpret_cast<CacheShard*>(&shards_[shard]);
 }
 
 const CacheShard* LRUCache::GetShard(uint32_t shard) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return reinterpret_cast<CacheShard*>(&shards_[shard]);
 }
 
 void* LRUCache::Value(Handle* handle) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return reinterpret_cast<const LRUHandle*>(handle)->value;
 }
 
 size_t LRUCache::GetCharge(Handle* handle) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return reinterpret_cast<const LRUHandle*>(handle)->charge;
 }
 
 Cache::DeleterFn LRUCache::GetDeleter(Handle* handle) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto h = reinterpret_cast<const LRUHandle*>(handle);
   if (h->IsSecondaryCacheCompatible()) {
     return h->info_.helper->del_cb;
@@ -702,10 +739,12 @@ Cache::DeleterFn LRUCache::GetDeleter(Handle* handle) const {
 }
 
 uint32_t LRUCache::GetHash(Handle* handle) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return reinterpret_cast<const LRUHandle*>(handle)->hash;
 }
 
 void LRUCache::DisownData() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Leak data only if that won't generate an ASAN/valgrind warning.
   if (!kMustFreeHeapAllocations) {
     shards_ = nullptr;
@@ -714,6 +753,7 @@ void LRUCache::DisownData() {
 }
 
 size_t LRUCache::TEST_GetLRUSize() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   size_t lru_size_of_all_shards = 0;
   for (int i = 0; i < num_shards_; i++) {
     lru_size_of_all_shards += shards_[i].TEST_GetLRUSize();
@@ -722,6 +762,7 @@ size_t LRUCache::TEST_GetLRUSize() {
 }
 
 double LRUCache::GetHighPriPoolRatio() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   double result = 0.0;
   if (num_shards_ > 0) {
     result = shards_[0].GetHighPriPoolRatio();
@@ -730,6 +771,7 @@ double LRUCache::GetHighPriPoolRatio() {
 }
 
 void LRUCache::WaitAll(std::vector<Handle*>& handles) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (secondary_cache_) {
     std::vector<SecondaryCacheResultHandle*> sec_handles;
     sec_handles.reserve(handles.size());
@@ -765,6 +807,7 @@ std::shared_ptr<Cache> NewLRUCache(
     std::shared_ptr<MemoryAllocator> memory_allocator, bool use_adaptive_mutex,
     CacheMetadataChargePolicy metadata_charge_policy,
     const std::shared_ptr<SecondaryCache>& secondary_cache) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (num_shard_bits >= 20) {
     return nullptr;  // The cache cannot be sharded into too many fine pieces.
   }
@@ -782,6 +825,7 @@ std::shared_ptr<Cache> NewLRUCache(
 }
 
 std::shared_ptr<Cache> NewLRUCache(const LRUCacheOptions& cache_opts) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return NewLRUCache(
       cache_opts.capacity, cache_opts.num_shard_bits,
       cache_opts.strict_capacity_limit, cache_opts.high_pri_pool_ratio,
@@ -794,6 +838,7 @@ std::shared_ptr<Cache> NewLRUCache(
     double high_pri_pool_ratio,
     std::shared_ptr<MemoryAllocator> memory_allocator, bool use_adaptive_mutex,
     CacheMetadataChargePolicy metadata_charge_policy) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return NewLRUCache(capacity, num_shard_bits, strict_capacity_limit,
                      high_pri_pool_ratio, memory_allocator, use_adaptive_mutex,
                      metadata_charge_policy, nullptr);

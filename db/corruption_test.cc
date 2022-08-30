@@ -983,7 +983,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   // Generate some out of order keys from the memtable
   SyncPoint::GetInstance()->SetCallBack(
       "MemTableIterator::Next:0", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         MemTableRep::Iterator* mem_iter =
             static_cast<MemTableRep::Iterator*>(arg);
         if (++cnt == 3) {
@@ -1044,7 +1043,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   int count{0};
   SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::VerifyFullFileChecksum:mismatch", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         auto* s = reinterpret_cast<Status*>(arg);
         ASSERT_NE(s, nullptr);
         ++count;

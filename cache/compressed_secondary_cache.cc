@@ -16,6 +16,7 @@ namespace ROCKSDB_NAMESPACE {
 namespace {
 
 void DeletionCallback(const Slice& /*key*/, void* obj) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   delete reinterpret_cast<CacheAllocationPtr*>(obj);
   obj = nullptr;
 }
@@ -32,6 +33,7 @@ CompressedSecondaryCache::CompressedSecondaryCache(
                      high_pri_pool_ratio, memory_allocator, use_adaptive_mutex,
                      metadata_charge_policy, compression_type,
                      compress_format_version) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   cache_ = NewLRUCache(capacity, num_shard_bits, strict_capacity_limit,
                        high_pri_pool_ratio, memory_allocator,
                        use_adaptive_mutex, metadata_charge_policy);
@@ -42,6 +44,7 @@ CompressedSecondaryCache::~CompressedSecondaryCache() { cache_.reset(); }
 std::unique_ptr<SecondaryCacheResultHandle> CompressedSecondaryCache::Lookup(
     const Slice& key, const Cache::CreateCallback& create_cb, bool /*wait*/,
     bool& is_in_sec_cache) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<SecondaryCacheResultHandle> handle;
   is_in_sec_cache = false;
   Cache::Handle* lru_handle = cache_->Lookup(key);
@@ -90,6 +93,7 @@ std::unique_ptr<SecondaryCacheResultHandle> CompressedSecondaryCache::Lookup(
 
 Status CompressedSecondaryCache::Insert(const Slice& key, void* value,
                                         const Cache::CacheItemHelper* helper) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   size_t size = (*helper->size_cb)(value);
   CacheAllocationPtr ptr =
       AllocateBlock(size, cache_options_.memory_allocator.get());
@@ -131,6 +135,7 @@ Status CompressedSecondaryCache::Insert(const Slice& key, void* value,
 void CompressedSecondaryCache::Erase(const Slice& key) { cache_->Erase(key); }
 
 std::string CompressedSecondaryCache::GetPrintableOptions() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string ret;
   ret.reserve(20000);
   const int kBufferSize = 200;
@@ -151,6 +156,7 @@ std::shared_ptr<SecondaryCache> NewCompressedSecondaryCache(
     std::shared_ptr<MemoryAllocator> memory_allocator, bool use_adaptive_mutex,
     CacheMetadataChargePolicy metadata_charge_policy,
     CompressionType compression_type, uint32_t compress_format_version) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return std::make_shared<CompressedSecondaryCache>(
       capacity, num_shard_bits, strict_capacity_limit, high_pri_pool_ratio,
       memory_allocator, use_adaptive_mutex, metadata_charge_policy,
@@ -159,6 +165,7 @@ std::shared_ptr<SecondaryCache> NewCompressedSecondaryCache(
 
 std::shared_ptr<SecondaryCache> NewCompressedSecondaryCache(
     const CompressedSecondaryCacheOptions& opts) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // The secondary_cache is disabled for this LRUCache instance.
   assert(opts.secondary_cache == nullptr);
   return NewCompressedSecondaryCache(

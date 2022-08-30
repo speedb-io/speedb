@@ -443,6 +443,7 @@ Status PlainTableReader::GetOffset(PlainTableKeyDecoder* decoder,
                                    const Slice& target, const Slice& prefix,
                                    uint32_t prefix_hash, bool& prefix_matched,
                                    uint32_t* offset) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   prefix_matched = false;
   uint32_t prefix_index_offset;
   auto res = index_.GetOffset(prefix_hash, &prefix_index_offset);
@@ -517,6 +518,7 @@ Status PlainTableReader::GetOffset(PlainTableKeyDecoder* decoder,
 }
 
 bool PlainTableReader::MatchBloom(uint32_t hash) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!enable_bloom_) {
     return true;
   }
@@ -534,6 +536,7 @@ Status PlainTableReader::Next(PlainTableKeyDecoder* decoder, uint32_t* offset,
                               ParsedInternalKey* parsed_key,
                               Slice* internal_key, Slice* value,
                               bool* seekable) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (*offset == file_info_.data_end_offset) {
     *offset = file_info_.data_end_offset;
     return Status::OK();
@@ -660,6 +663,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 bool PlainTableIterator::Valid() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return offset_ < table_->file_info_.data_end_offset &&
          offset_ >= table_->data_start_offset_;
 }
@@ -781,16 +785,19 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 Slice PlainTableIterator::key() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(Valid());
   return key_;
 }
 
 Slice PlainTableIterator::value() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(Valid());
   return value_;
 }
 
 Status PlainTableIterator::status() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return status_;
 }
 

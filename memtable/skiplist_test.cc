@@ -21,6 +21,7 @@ using Key = uint64_t;
 
 struct TestComparator {
   int operator()(const Key& a, const Key& b) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (a < b) {
       return -1;
     } else if (a > b) {
@@ -208,7 +209,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   struct State {
     std::atomic<int> generation[K];
     void Set(int k, int v) {
-PERF_MARKER(__PRETTY_FUNCTION__);
       generation[k].store(v, std::memory_order_release);
     }
     int Get(int k) { return generation[k].load(std::memory_order_acquire); }

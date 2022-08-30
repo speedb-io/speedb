@@ -23,6 +23,7 @@ DBImplSecondary::DBImplSecondary(const DBOptions& db_options,
                                  std::string secondary_path)
     : DBImpl(db_options, dbname, false, true, true),
       secondary_path_(std::move(secondary_path)) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKS_LOG_INFO(immutable_db_options_.info_log,
                  "Opening the db in secondary mode");
   LogFlush(immutable_db_options_.info_log);

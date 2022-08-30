@@ -76,6 +76,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 bool TruncatedRangeDelIterator::Valid() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return iter_->Valid() &&
          (smallest_ == nullptr ||
           icmp_->Compare(*smallest_, iter_->parsed_end_key()) < 0) &&
@@ -464,6 +465,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
  private:
   bool BeforeEndKey(const TruncatedRangeDelIterator* iter) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (upper_bound_ == nullptr) {
       return true;
     }

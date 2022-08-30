@@ -470,7 +470,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   // covering the range [small,large].
   void MakeTables(int cf, int n, const std::string& small,
                   const std::string& large) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     for (int i = 0; i < n; i++) {
       ASSERT_OK(Put(cf, small, "begin"));
       ASSERT_OK(Put(cf, large, "end"));
@@ -1487,7 +1486,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
        {"ColumnFamilyTest::MultiManual:2", "ColumnFamilyTest::MultiManual:3"}});
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::BackgroundCompaction:NonTrivial:AfterRun", [&](void* /*arg*/) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         if (cf_1_1) {
           TEST_SYNC_POINT("ColumnFamilyTest::MultiManual:4");
           cf_1_1 = false;
@@ -1585,7 +1583,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
        {"ColumnFamilyTest::AutoManual:2", "ColumnFamilyTest::AutoManual:3"}});
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::BackgroundCompaction:NonTrivial:AfterRun", [&](void* /*arg*/) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         if (cf_1_1) {
           cf_1_1 = false;
           TEST_SYNC_POINT("ColumnFamilyTest::AutoManual:4");
@@ -1691,7 +1688,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
        {"ColumnFamilyTest::ManualAuto:2", "ColumnFamilyTest::ManualAuto:3"}});
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::BackgroundCompaction:NonTrivial:AfterRun", [&](void* /*arg*/) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         if (cf_1_1) {
           TEST_SYNC_POINT("ColumnFamilyTest::ManualAuto:4");
           cf_1_1 = false;
@@ -1789,7 +1785,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
         "ColumnFamilyTest::ManualManual:3"}});
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::BackgroundCompaction:NonTrivial:AfterRun", [&](void* /*arg*/) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         if (cf_1_1) {
           TEST_SYNC_POINT("ColumnFamilyTest::ManualManual:4");
           cf_1_1 = false;
@@ -1892,7 +1887,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
        {"ColumnFamilyTest::ManualAuto:1", "ColumnFamilyTest::ManualAuto:3"}});
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::BackgroundCompaction:NonTrivial:AfterRun", [&](void* /*arg*/) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         if (cf_1_1) {
           TEST_SYNC_POINT("ColumnFamilyTest::ManualAuto:4");
           cf_1_1 = false;
@@ -1989,7 +1983,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
        {"ColumnFamilyTest::ManualAuto:1", "ColumnFamilyTest::ManualAuto:3"}});
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::BackgroundCompaction:NonTrivial:AfterRun", [&](void* /*arg*/) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         if (cf_1_1) {
           TEST_SYNC_POINT("ColumnFamilyTest::ManualAuto:4");
           cf_1_1 = false;
@@ -2043,6 +2036,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 // Once the conflict is hit, the automatic compaction starts and ends
 // Then the manual will run and end.
 TEST_P(ColumnFamilyTest, SameCFAutomaticManualCompactions) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Open();
   CreateColumnFamilies({"one"});
   ColumnFamilyOptions default_cf, one;
@@ -2080,7 +2074,6 @@ TEST_P(ColumnFamilyTest, SameCFAutomaticManualCompactions) {
         "ColumnFamilyTest::AutoManual:3"}});
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::BackgroundCompaction:NonTrivial:AfterRun", [&](void* /*arg*/) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         if (cf_1_1) {
           TEST_SYNC_POINT("ColumnFamilyTest::AutoManual:4");
           cf_1_1 = false;
@@ -2604,7 +2597,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "WriteThread::EnterUnbatched:Wait", [&](void* /*arg*/) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         // This means a thread doing DropColumnFamily() is waiting for
         // other thread to finish persisting options.
         // In such case, we update the test_stage to unblock the main thread.

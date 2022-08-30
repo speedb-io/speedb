@@ -338,7 +338,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 //    with a smaller [ type | seqno ] (i.e. a larger seqno, or the same seqno
 //    but larger type).
 bool DataBlockIter::SeekForGetImpl(const Slice& target) {
-PERF_MARKER(__PRETTY_FUNCTION__);
   Slice target_user_key = ExtractUserKey(target);
   uint32_t map_offset = restarts_ + num_restarts_ * sizeof(uint32_t);
   uint8_t entry =
@@ -966,6 +965,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 uint32_t Block::NumRestarts() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(size_ >= 2 * sizeof(uint32_t));
   uint32_t block_footer = DecodeFixed32(data_ + size_ - sizeof(uint32_t));
   uint32_t num_restarts = block_footer;
@@ -988,6 +988,7 @@ uint32_t Block::NumRestarts() const {
 }
 
 BlockBasedTableOptions::DataBlockIndexType Block::IndexType() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(size_ >= 2 * sizeof(uint32_t));
   if (size_ > kMaxBlockSizeSupportedByHashIndex) {
     // The check is for the same reason as that in NumRestarts()
@@ -1149,6 +1150,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 size_t Block::ApproximateMemoryUsage() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   size_t usage = usable_size();
 #ifdef ROCKSDB_MALLOC_USABLE_SIZE
   usage += malloc_usable_size((void*)this);

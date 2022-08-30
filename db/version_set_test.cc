@@ -899,11 +899,13 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   }
   ~VersionStorageInfoTimestampTest() override {}
   std::string Timestamp(uint64_t ts) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::string ret;
     PutFixed64(&ret, ts);
     return ret;
   }
   std::string PackUserKeyAndTimestamp(const Slice& ukey, uint64_t ts) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::string ret;
     ret.assign(ukey.data(), ukey.size());
     PutFixed64(&ret, ts);
@@ -1300,6 +1302,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   }
 
   void VerifyManifest(std::string* manifest_path) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(manifest_path != nullptr);
     uint64_t manifest_file_number = 0;
     Status s = versions_->GetCurrentManifestPath(
@@ -1320,6 +1323,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   Status LogAndApplyToDefaultCF(
       const autovector<std::unique_ptr<VersionEdit>>& edits) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     autovector<VersionEdit*> vedits;
     for (auto& e : edits) {
       vedits.push_back(e.get());
@@ -1422,7 +1426,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   int count = 0;
   SyncPoint::GetInstance()->SetCallBack(
       "VersionSet::ProcessManifestWrites:SameColumnFamily", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         uint32_t* cf_id = reinterpret_cast<uint32_t*>(arg);
         EXPECT_EQ(0u, *cf_id);
         ++count;
@@ -1948,7 +1951,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
     std::vector<WalAddition> wal_additions;
     SyncPoint::GetInstance()->SetCallBack(
         "VersionSet::WriteCurrentStateToManifest:SaveWal", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
           VersionEdit* edit = reinterpret_cast<VersionEdit*>(arg);
           ASSERT_TRUE(edit->IsWalAddition());
           for (auto& addition : edit->GetWalAdditions()) {
@@ -2370,7 +2372,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
     SyncPoint::GetInstance()->ClearAllCallBacks();
     SyncPoint::GetInstance()->SetCallBack(
         "AtomicGroupReadBuffer::AddEdit:FirstInAtomicGroup", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
           VersionEdit* e = reinterpret_cast<VersionEdit*>(arg);
           EXPECT_EQ(edits_.front().DebugString(),
                     e->DebugString());  // compare based on value
@@ -2378,7 +2379,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
         });
     SyncPoint::GetInstance()->SetCallBack(
         "AtomicGroupReadBuffer::AddEdit:LastInAtomicGroup", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
           VersionEdit* e = reinterpret_cast<VersionEdit*>(arg);
           EXPECT_EQ(edits_.back().DebugString(),
                     e->DebugString());  // compare based on value
@@ -2387,7 +2387,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
         });
     SyncPoint::GetInstance()->SetCallBack(
         "VersionEditHandlerBase::Iterate:Finish", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
           num_recovered_edits_ = *reinterpret_cast<size_t*>(arg);
         });
     SyncPoint::GetInstance()->SetCallBack(
@@ -2396,13 +2395,11 @@ PERF_MARKER(__PRETTY_FUNCTION__);
     SyncPoint::GetInstance()->SetCallBack(
         "AtomicGroupReadBuffer::AddEdit:AtomicGroupMixedWithNormalEdits",
         [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
           corrupted_edit_ = *reinterpret_cast<VersionEdit*>(arg);
         });
     SyncPoint::GetInstance()->SetCallBack(
         "AtomicGroupReadBuffer::AddEdit:IncorrectAtomicGroupSize",
         [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
           edit_with_incorrect_group_size_ =
               *reinterpret_cast<VersionEdit*>(arg);
         });
@@ -2781,7 +2778,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   SyncPoint::GetInstance()->ClearAllCallBacks();
   SyncPoint::GetInstance()->SetCallBack(
       "VersionSet::ProcessManifestWrites:CheckOneAtomicGroup", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         std::vector<VersionEdit*>* tmp_edits =
             reinterpret_cast<std::vector<VersionEdit*>*>(arg);
         EXPECT_EQ(kAtomicGroupSize - 1, tmp_edits->size());

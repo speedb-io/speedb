@@ -191,6 +191,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   }
 
   size_t WrittenBytes() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return dest_contents().size();
   }
 
@@ -237,10 +238,12 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   }
 
   size_t DroppedBytes() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return report_.dropped_bytes_;
   }
 
   std::string ReportMessage() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return report_.message_;
   }
 
@@ -260,6 +263,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   // Returns OK iff recorded error message contains "msg"
   std::string MatchError(const std::string& msg) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (report_.message_.find(msg) == std::string::npos) {
       return report_.message_;
     } else {

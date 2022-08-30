@@ -60,7 +60,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   int count{0};
   SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::VerifyFullFileChecksum:mismatch", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         const Status* s = static_cast<Status*>(arg);
         ASSERT_NE(s, nullptr);
         ++count;

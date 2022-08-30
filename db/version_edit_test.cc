@@ -153,7 +153,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   bool first = true;
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "VersionEdit::EncodeTo:NewFile4:CustomizeFields", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         std::string* str = reinterpret_cast<std::string*>(arg);
         PutVarint32(str, 33);
         const std::string str1 = "random_string";
@@ -206,7 +205,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   // Call back function to add extra customized builds.
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "VersionEdit::EncodeTo:NewFile4:CustomizeFields", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         std::string* str = reinterpret_cast<std::string*>(arg);
         const std::string str1 = "s";
         PutLengthPrefixedSlice(str, str1);
@@ -585,7 +583,6 @@ TEST_F(VersionEditTest, IgnorableTags) {
 PERF_MARKER(__PRETTY_FUNCTION__);
   SyncPoint::GetInstance()->SetCallBack(
       "VersionEdit::EncodeTo:IgnoreIgnorableTags", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         bool* ignore = static_cast<bool*>(arg);
         *ignore = true;
       });

@@ -53,7 +53,6 @@ BlockBuilder::BlockBuilder(
       restarts_(1, 0),  // First restart point is at offset 0
       counter_(0),
       finished_(false) {
-PERF_MARKER(__PRETTY_FUNCTION__);
   switch (index_type) {
     case BlockBasedTableOptions::kDataBlockBinarySearch:
       break;
@@ -93,6 +92,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
 size_t BlockBuilder::EstimateSizeAfterKV(const Slice& key,
                                          const Slice& value) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   size_t estimate = CurrentSizeEstimate();
   // Note: this is an imprecise estimate as it accounts for the whole key size
   // instead of non-shared key size.

@@ -145,6 +145,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   }
 
   int NumberOfCompactions(CompactionReason reason) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     int num_of_reasons = static_cast<int>(CompactionReason::kNumOfReasons);
     int k = static_cast<int>(reason);
     assert(k >= 0 && k < num_of_reasons);
@@ -264,7 +265,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
  */
 void VerifyCompactionStats(ColumnFamilyData& cfd,
     const CompactionStatsCollector& collector) {
-PERF_MARKER(__PRETTY_FUNCTION__);
 #ifndef NDEBUG
   InternalStats* internal_stats_ptr = cfd.internal_stats();
   ASSERT_NE(internal_stats_ptr, nullptr);
@@ -444,7 +444,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   int num_new_table_reader = 0;
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "TableCache::FindTable:0", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         assert(arg != nullptr);
         bool no_io = *(reinterpret_cast<bool*>(arg));
         if (!no_io) {
@@ -624,7 +623,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   int bottom_pri_count = 0;
   SyncPoint::GetInstance()->SetCallBack(
       "ThreadPoolImpl::Impl::BGThread:BeforeRun", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         Env::Priority* pri = reinterpret_cast<Env::Priority*>(arg);
         // First time is low pri pool in the test case.
         if (low_pri_count == 0 && bottom_pri_count == 0) {
@@ -1478,7 +1476,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
        {"DBCompaction::ManualPartial:5", "DBCompaction::ManualPartial:3"}});
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::BackgroundCompaction:NonTrivial:AfterRun", [&](void* /*arg*/) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         if (first) {
           first = false;
           TEST_SYNC_POINT("DBCompaction::ManualPartial:4");
@@ -1621,7 +1618,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
        {"DBCompaction::PartialFill:2", "DBCompaction::PartialFill:3"}});
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::BackgroundCompaction:NonTrivial:AfterRun", [&](void* /*arg*/) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         if (first) {
           TEST_SYNC_POINT("DBCompaction::PartialFill:4");
           first = false;
@@ -3747,7 +3743,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_EQ(kMaxSequenceNumber, dbfull()->bottommost_files_mark_threshold_);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "LevelCompactionPicker::PickCompaction:Return", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         Compaction* compaction = reinterpret_cast<Compaction*>(arg);
         ASSERT_TRUE(compaction->compaction_reason() ==
                     CompactionReason::kBottommostFiles);
@@ -3890,7 +3885,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(Flush());
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "LevelCompactionPicker::PickCompaction:Return", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         Compaction* compaction = reinterpret_cast<Compaction*>(arg);
         ASSERT_TRUE(compaction->compaction_reason() == CompactionReason::kTtl);
       });
@@ -3939,7 +3933,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "LevelCompactionPicker::PickCompaction:Return", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         Compaction* compaction = reinterpret_cast<Compaction*>(arg);
         ASSERT_TRUE(compaction->compaction_reason() == CompactionReason::kTtl);
       });
@@ -3974,7 +3967,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       // RocksDB sanitize max open files to at least 20. Modify it back.
       ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
           "SanitizeOptions::AfterChangeMaxOpenFiles", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
             int* max_open_files = static_cast<int*>(arg);
             *max_open_files = 2;
           });
@@ -3983,7 +3975,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       // simulate the case of reading from an old version.
       ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
           "VersionEdit::EncodeTo:VarintOldestAncesterTime", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
             if (if_restart && if_open_all_files) {
               std::string* encoded_fieled = static_cast<std::string*>(arg);
               *encoded_fieled = "";
@@ -4000,7 +3991,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       int ttl_compactions = 0;
       ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
           "LevelCompactionPicker::PickCompaction:Return", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
             Compaction* compaction = reinterpret_cast<Compaction*>(arg);
             auto compaction_reason = compaction->compaction_reason();
             if (compaction_reason == CompactionReason::kTtl) {
@@ -4128,7 +4118,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       // RocksDB sanitize max open files to at least 20. Modify it back.
       ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
           "SanitizeOptions::AfterChangeMaxOpenFiles", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
             int* max_open_files = static_cast<int*>(arg);
             *max_open_files = 0;
           });
@@ -4137,7 +4126,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       // simulate the case of reading from an old version.
       ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
           "VersionEdit::EncodeTo:VarintFileCreationTime", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
             if (if_restart && if_open_all_files) {
               std::string* encoded_fieled = static_cast<std::string*>(arg);
               *encoded_fieled = "";
@@ -4154,7 +4142,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       int periodic_compactions = 0;
       ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
           "LevelCompactionPicker::PickCompaction:Return", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
             Compaction* compaction = reinterpret_cast<Compaction*>(arg);
             auto compaction_reason = compaction->compaction_reason();
             if (compaction_reason == CompactionReason::kPeriodicCompaction) {
@@ -4241,7 +4228,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   bool set_creation_time_to_zero = true;
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "LevelCompactionPicker::PickCompaction:Return", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         Compaction* compaction = reinterpret_cast<Compaction*>(arg);
         auto compaction_reason = compaction->compaction_reason();
         if (compaction_reason == CompactionReason::kPeriodicCompaction) {
@@ -4250,7 +4236,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       });
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "PropertyBlockBuilder::AddTableProperty:Start", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         TableProperties* props = reinterpret_cast<TableProperties*>(arg);
         if (set_file_creation_time_to_zero) {
           props->file_creation_time = 0;
@@ -4316,7 +4301,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   int ttl_compactions = 0;
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "LevelCompactionPicker::PickCompaction:Return", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         Compaction* compaction = reinterpret_cast<Compaction*>(arg);
         auto compaction_reason = compaction->compaction_reason();
         if (compaction_reason == CompactionReason::kPeriodicCompaction) {
@@ -4496,7 +4480,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
     int periodic_compactions = 0;
     ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
         "LevelCompactionPicker::PickCompaction:Return", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
           Compaction* compaction = reinterpret_cast<Compaction*>(arg);
           auto compaction_reason = compaction->compaction_reason();
           if (compaction_reason == CompactionReason::kPeriodicCompaction) {
@@ -5102,7 +5085,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::BackgroundCompaction:BeforeCompaction", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         const auto& cf_name = static_cast<ColumnFamilyData*>(arg)->GetName();
         auto iter = cf_to_limiter.find(cf_name);
         if (iter != cf_to_limiter.end()) {
@@ -5115,7 +5097,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::BackgroundCompaction:AfterCompaction", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         const auto& cf_name = static_cast<ColumnFamilyData*>(arg)->GetName();
         auto iter = cf_to_limiter.find(cf_name);
         if (iter != cf_to_limiter.end()) {
@@ -5658,7 +5639,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "VersionBuilder::CheckConsistency0", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         auto p =
             reinterpret_cast<std::pair<FileMetaData**, FileMetaData**>*>(arg);
         // just swap the two FileMetaData so that we hit error
@@ -5698,7 +5678,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "VersionBuilder::CheckConsistency1", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         auto p =
             reinterpret_cast<std::pair<FileMetaData**, FileMetaData**>*>(arg);
         // just swap the two FileMetaData so that we hit error
@@ -5967,7 +5946,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   bool has_compaction = false;
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "LevelCompactionPicker::PickCompaction:Return", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         Compaction* compaction = reinterpret_cast<Compaction*>(arg);
         ASSERT_TRUE(compaction->max_subcompactions() == 10);
         has_compaction = true;
@@ -5992,7 +5970,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "LevelCompactionPicker::PickCompaction:Return", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         Compaction* compaction = reinterpret_cast<Compaction*>(arg);
         ASSERT_TRUE(compaction->max_subcompactions() == 2);
         has_compaction = true;
@@ -6022,7 +5999,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   bool has_compaction = false;
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "UniversalCompactionBuilder::PickCompaction:Return", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         Compaction* compaction = reinterpret_cast<Compaction*>(arg);
         ASSERT_TRUE(compaction->max_subcompactions() == 10);
         has_compaction = true;
@@ -6046,7 +6022,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "UniversalCompactionBuilder::PickCompaction:Return", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         Compaction* compaction = reinterpret_cast<Compaction*>(arg);
         ASSERT_TRUE(compaction->max_subcompactions() == 2);
         has_compaction = true;
@@ -6799,7 +6774,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
         "BackgroundCallCompaction:0"}});
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "BackgroundCallCompaction:0", [&](void*) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         fault_fs->SetChecksumHandoffFuncType(ChecksumType::kxxHash);
       });
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->EnableProcessing();
@@ -6892,7 +6866,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
         "BackgroundCallCompaction:0"}});
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "BackgroundCallCompaction:0", [&](void*) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         fault_fs->SetChecksumHandoffFuncType(ChecksumType::kxxHash);
       });
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->EnableProcessing();
@@ -6984,7 +6957,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
         "BackgroundCallCompaction:0"}});
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "BackgroundCallCompaction:0", [&](void*) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         fault_fs->SetChecksumHandoffFuncType(ChecksumType::kxxHash);
       });
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->EnableProcessing();
@@ -7071,7 +7043,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   int total_warm = 0;
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "NewWritableFile::FileOptions.temperature", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         Temperature temperature = *(static_cast<Temperature*>(arg));
         if (temperature == Temperature::kWarm) {
           total_warm++;

@@ -24,16 +24,19 @@ namespace ROCKSDB_NAMESPACE {
 
 // Conversions between numeric keys/values and the types expected by Cache.
 static std::string EncodeKey(int k) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string result;
   PutFixed32(&result, k);
   return result;
 }
 static int DecodeKey(const Slice& k) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(k.size() == 4);
   return DecodeFixed32(k.data());
 }
 static void* EncodeValue(uintptr_t v) { return reinterpret_cast<void*>(v); }
 static int DecodeValue(void* v) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return static_cast<int>(reinterpret_cast<uintptr_t>(v));
 }
 
@@ -43,6 +46,7 @@ const std::string kClock = "clock";
 void dumbDeleter(const Slice& /*key*/, void* /*value*/) {}
 
 void eraseDeleter(const Slice& /*key*/, void* value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Cache* cache = reinterpret_cast<Cache*>(value);
   cache->Erase("foo");
 }
@@ -52,6 +56,7 @@ class CacheTest : public testing::TestWithParam<std::string> {
   static CacheTest* current_;
 
   static void Deleter(const Slice& key, void* v) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     current_->deleted_keys_.push_back(DecodeKey(key));
     current_->deleted_values_.push_back(DecodeValue(v));
   }
@@ -70,12 +75,14 @@ class CacheTest : public testing::TestWithParam<std::string> {
   CacheTest()
       : cache_(NewCache(kCacheSize, kNumShardBits, false)),
         cache2_(NewCache(kCacheSize2, kNumShardBits2, false)) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     current_ = this;
   }
 
   ~CacheTest() override {}
 
   std::shared_ptr<Cache> NewCache(size_t capacity) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     auto type = GetParam();
     if (type == kLRU) {
       return NewLRUCache(capacity);
@@ -89,6 +96,7 @@ class CacheTest : public testing::TestWithParam<std::string> {
   std::shared_ptr<Cache> NewCache(
       size_t capacity, int num_shard_bits, bool strict_capacity_limit,
       CacheMetadataChargePolicy charge_policy = kDontChargeCacheMetadata) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     auto type = GetParam();
     if (type == kLRU) {
       LRUCacheOptions co;
@@ -107,6 +115,7 @@ class CacheTest : public testing::TestWithParam<std::string> {
   }
 
   int Lookup(std::shared_ptr<Cache> cache, int key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Cache::Handle* handle = cache->Lookup(EncodeKey(key));
     const int r = (handle == nullptr) ? -1 : DecodeValue(cache->Value(handle));
     if (handle != nullptr) {
@@ -117,35 +126,43 @@ class CacheTest : public testing::TestWithParam<std::string> {
 
   void Insert(std::shared_ptr<Cache> cache, int key, int value,
               int charge = 1) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     EXPECT_OK(cache->Insert(EncodeKey(key), EncodeValue(value), charge,
                             &CacheTest::Deleter));
   }
 
   void Erase(std::shared_ptr<Cache> cache, int key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     cache->Erase(EncodeKey(key));
   }
 
   int Lookup(int key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return Lookup(cache_, key);
   }
 
   void Insert(int key, int value, int charge = 1) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Insert(cache_, key, value, charge);
   }
 
   void Erase(int key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Erase(cache_, key);
   }
 
   int Lookup2(int key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return Lookup(cache2_, key);
   }
 
   void Insert2(int key, int value, int charge = 1) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Insert(cache2_, key, value, charge);
   }
 
   void Erase2(int key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Erase(cache2_, key);
   }
 };
@@ -154,6 +171,7 @@ CacheTest* CacheTest::current_;
 class LRUCacheTest : public CacheTest {};
 
 TEST_P(CacheTest, UsageTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // cache is std::shared_ptr and will be automatically cleaned up.
   const uint64_t kCapacity = 100000;
   auto cache = NewCache(kCapacity, 8, false, kDontChargeCacheMetadata);
@@ -198,6 +216,7 @@ TEST_P(CacheTest, UsageTest) {
 }
 
 TEST_P(CacheTest, PinnedUsageTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // cache is std::shared_ptr and will be automatically cleaned up.
   const uint64_t kCapacity = 200000;
   auto cache = NewCache(kCapacity, 8, false, kDontChargeCacheMetadata);
@@ -285,6 +304,7 @@ TEST_P(CacheTest, PinnedUsageTest) {
 }
 
 TEST_P(CacheTest, HitAndMiss) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_EQ(-1, Lookup(100));
 
   Insert(100, 101);
@@ -308,12 +328,14 @@ TEST_P(CacheTest, HitAndMiss) {
 }
 
 TEST_P(CacheTest, InsertSameKey) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Insert(1, 1);
   Insert(1, 2);
   ASSERT_EQ(2, Lookup(1));
 }
 
 TEST_P(CacheTest, Erase) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Erase(200);
   ASSERT_EQ(0U, deleted_keys_.size());
 
@@ -333,6 +355,7 @@ TEST_P(CacheTest, Erase) {
 }
 
 TEST_P(CacheTest, EntriesArePinned) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Insert(100, 101);
   Cache::Handle* h1 = cache_->Lookup(EncodeKey(100));
   ASSERT_EQ(101, DecodeValue(cache_->Value(h1)));
@@ -363,6 +386,7 @@ TEST_P(CacheTest, EntriesArePinned) {
 }
 
 TEST_P(CacheTest, EvictionPolicy) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Insert(100, 101);
   Insert(200, 201);
 
@@ -376,6 +400,7 @@ TEST_P(CacheTest, EvictionPolicy) {
 }
 
 TEST_P(CacheTest, ExternalRefPinsEntries) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Insert(100, 101);
   Cache::Handle* h = cache_->Lookup(EncodeKey(100));
   ASSERT_TRUE(cache_->Ref(h));
@@ -402,6 +427,7 @@ TEST_P(CacheTest, ExternalRefPinsEntries) {
 }
 
 TEST_P(CacheTest, EvictionPolicyRef) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Insert(100, 101);
   Insert(101, 102);
   Insert(102, 103);
@@ -450,12 +476,14 @@ TEST_P(CacheTest, EvictionPolicyRef) {
 }
 
 TEST_P(CacheTest, EvictEmptyCache) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Insert item large than capacity to trigger eviction on empty cache.
   auto cache = NewCache(1, 0, false);
   ASSERT_OK(cache->Insert("foo", nullptr, 10, dumbDeleter));
 }
 
 TEST_P(CacheTest, EraseFromDeleter) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Have deleter which will erase item from cache, which will re-enter
   // the cache at that point.
   std::shared_ptr<Cache> cache = NewCache(10, 0, false);
@@ -467,6 +495,7 @@ TEST_P(CacheTest, EraseFromDeleter) {
 }
 
 TEST_P(CacheTest, ErasedHandleState) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // insert a key and get two handles
   Insert(100, 1000);
   Cache::Handle* h1 = cache_->Lookup(EncodeKey(100));
@@ -489,6 +518,7 @@ TEST_P(CacheTest, ErasedHandleState) {
 }
 
 TEST_P(CacheTest, HeavyEntries) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Add a bunch of light and heavy entries and then count the combined
   // size of items still in the cache, which must be approximately the
   // same as the total capacity.
@@ -516,6 +546,7 @@ TEST_P(CacheTest, HeavyEntries) {
 }
 
 TEST_P(CacheTest, NewId) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t a = cache_->NewId();
   uint64_t b = cache_->NewId();
   ASSERT_NE(a, b);
@@ -531,11 +562,13 @@ class Value {
 
 namespace {
 void deleter(const Slice& /*key*/, void* value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   delete static_cast<Value *>(value);
 }
 }  // namespace
 
 TEST_P(CacheTest, ReleaseAndErase) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<Cache> cache = NewCache(5, 0, false);
   Cache::Handle* handle;
   Status s = cache->Insert(EncodeKey(100), EncodeValue(100), 1,
@@ -551,6 +584,7 @@ TEST_P(CacheTest, ReleaseAndErase) {
 }
 
 TEST_P(CacheTest, ReleaseWithoutErase) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::shared_ptr<Cache> cache = NewCache(5, 0, false);
   Cache::Handle* handle;
   Status s = cache->Insert(EncodeKey(100), EncodeValue(100), 1,
@@ -567,6 +601,7 @@ TEST_P(CacheTest, ReleaseWithoutErase) {
 }
 
 TEST_P(CacheTest, SetCapacity) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // test1: increase capacity
   // lets create a cache with capacity 5,
   // then, insert 5 elements, then increase capacity
@@ -615,6 +650,7 @@ TEST_P(CacheTest, SetCapacity) {
 }
 
 TEST_P(LRUCacheTest, SetStrictCapacityLimit) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // test1: set the flag to false. Insert more keys than capacity. See if they
   // all go through.
   std::shared_ptr<Cache> cache = NewCache(5, 0, false);
@@ -666,6 +702,7 @@ TEST_P(LRUCacheTest, SetStrictCapacityLimit) {
 }
 
 TEST_P(CacheTest, OverCapacity) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   size_t n = 10;
 
   // a LRUCache with n entries and one shard only
@@ -717,12 +754,14 @@ TEST_P(CacheTest, OverCapacity) {
 namespace {
 std::vector<std::pair<int, int>> legacy_callback_state;
 void legacy_callback(void* value, size_t charge) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   legacy_callback_state.push_back(
       {DecodeValue(value), static_cast<int>(charge)});
 }
 };
 
 TEST_P(CacheTest, ApplyToAllCacheEntriesTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::vector<std::pair<int, int>> inserted;
   legacy_callback_state.clear();
 
@@ -741,6 +780,7 @@ TEST_P(CacheTest, ApplyToAllCacheEntriesTest) {
 }
 
 TEST_P(CacheTest, ApplyToAllEntriesTest) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::vector<std::string> callback_state;
   const auto callback = [&](const Slice& key, void* value, size_t charge,
                             Cache::DeleterFn deleter) {
@@ -769,6 +809,7 @@ TEST_P(CacheTest, ApplyToAllEntriesTest) {
 }
 
 TEST_P(CacheTest, ApplyToAllEntriesDuringResize) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // This is a mini-stress test of ApplyToAllEntries, to ensure
   // items in the cache that are neither added nor removed
   // during ApplyToAllEntries are counted exactly once.
@@ -810,6 +851,7 @@ TEST_P(CacheTest, ApplyToAllEntriesDuringResize) {
 }
 
 TEST_P(CacheTest, DefaultShardBits) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // test1: set the flag to false. Insert more keys than capacity. See if they
   // all go through.
   std::shared_ptr<Cache> cache = NewCache(16 * 1024L * 1024L);
@@ -826,6 +868,7 @@ TEST_P(CacheTest, DefaultShardBits) {
 }
 
 TEST_P(CacheTest, GetChargeAndDeleter) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Insert(1, 2);
   Cache::Handle* h1 = cache_->Lookup(EncodeKey(1));
   ASSERT_EQ(2, DecodeValue(cache_->Value(h1)));
@@ -847,6 +890,7 @@ INSTANTIATE_TEST_CASE_P(CacheTestInstance, LRUCacheTest, testing::Values(kLRU));
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

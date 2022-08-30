@@ -81,6 +81,7 @@ Status UncompressionDictReader::GetOrReadUncompressionDictionary(
     FilePrefetchBuffer* prefetch_buffer, bool no_io, bool verify_checksums,
     GetContext* get_context, BlockCacheLookupContext* lookup_context,
     CachableEntry<UncompressionDict>* uncompression_dict) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(uncompression_dict);
 
   if (!uncompression_dict_.IsEmpty()) {
@@ -100,6 +101,7 @@ Status UncompressionDictReader::GetOrReadUncompressionDictionary(
 }
 
 size_t UncompressionDictReader::ApproximateMemoryUsage() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(!uncompression_dict_.GetOwnValue() ||
          uncompression_dict_.GetValue() != nullptr);
   size_t usage = uncompression_dict_.GetOwnValue()
@@ -116,6 +118,7 @@ size_t UncompressionDictReader::ApproximateMemoryUsage() const {
 }
 
 bool UncompressionDictReader::cache_dictionary_blocks() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(table_);
   assert(table_->get_rep());
 

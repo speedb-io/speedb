@@ -472,14 +472,12 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   bool stepped_to_next_operand = false;
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBIter::MergeValuesNewToOld:PushedFirstOperand", [&](void*) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         EXPECT_FALSE(pushed_first_operand);
         pushed_first_operand = true;
         EXPECT_OK(db_->Flush(FlushOptions()));  // Switch to SuperVersion B
       });
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBIter::MergeValuesNewToOld:SteppedToNextOperand", [&](void*) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         EXPECT_FALSE(stepped_to_next_operand);
         stepped_to_next_operand = true;
         someone_else.reset(); // Unpin SuperVersion A
@@ -515,6 +513,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
     }
 
     bool IsInSnapshot(SequenceNumber seq, SequenceNumber snapshot_seq) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
       switch (snapshot_seq) {
         case 0:
           return seq == 0;

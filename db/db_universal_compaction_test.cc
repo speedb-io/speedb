@@ -229,7 +229,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBTestWritableFile.GetPreallocationStatus", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         ASSERT_TRUE(arg != nullptr);
         size_t preallocation_size = *(static_cast<size_t*>(arg));
         if (num_levels_ > 3) {
@@ -378,7 +377,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   int total_size_amp_compactions = 0;
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "UniversalCompactionBuilder::PickCompaction:Return", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         if (arg) {
           total_picked_compactions++;
           Compaction* c = static_cast<Compaction*>(arg);
@@ -461,7 +459,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   int total_size_ratio_compactions = 0;
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "UniversalCompactionBuilder::PickCompaction:Return", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         if (arg) {
           total_picked_compactions++;
           Compaction* c = static_cast<Compaction*>(arg);
@@ -697,7 +694,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       [&](void* /*arg*/) { trivial_move++; });
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::BackgroundCompaction:NonTrivial", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         non_trivial_move++;
         ASSERT_TRUE(arg != nullptr);
         int output_level = *(static_cast<int*>(arg));
@@ -769,7 +765,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   std::atomic<bool> has_parallel(false);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "CompactionJob::Run():Start", [&](void* /*arg*/) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         if (num_compactions_running.fetch_add(1) > 0) {
           has_parallel.store(true);
           return;
@@ -838,7 +833,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   int total_picked_compactions = 0;
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "UniversalCompactionBuilder::PickCompaction:Return", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         if (arg) {
           total_picked_compactions++;
         }
@@ -1165,7 +1159,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       [&](void* /*arg*/) { trivial_move++; });
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::BackgroundCompaction:NonTrivial", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         non_trivial_move++;
         ASSERT_TRUE(arg != nullptr);
         int output_level = *(static_cast<int*>(arg));
@@ -1213,7 +1206,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       [&](void* /*arg*/) { trivial_move++; });
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::BackgroundCompaction:NonTrivial", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         ASSERT_TRUE(arg != nullptr);
         int output_level = *(static_cast<int*>(arg));
         ASSERT_EQ(output_level, 0);
@@ -1502,7 +1494,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 TEST_P(DBTestUniversalCompaction, IncreaseUniversalCompactionNumLevels) {
 PERF_MARKER(__PRETTY_FUNCTION__);
   std::function<void(int)> verify_func = [&](int num_keys_in_db) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     std::string keys_in_db;
     Iterator* iter = dbfull()->NewIterator(ReadOptions(), handles_[1]);
     for (iter->SeekToFirst(); iter->Valid(); iter->Next()) {
@@ -2224,7 +2215,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "UniversalCompactionPicker::PickPeriodicCompaction:Return",
       [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         Compaction* compaction = reinterpret_cast<Compaction*>(arg);
         ASSERT_TRUE(arg != nullptr);
         ASSERT_TRUE(compaction->compaction_reason() ==

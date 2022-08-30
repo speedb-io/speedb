@@ -348,6 +348,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 bool ForwardIterator::Valid() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // See UpdateCurrent().
   return valid_ ? !current_over_upper_bound_ : false;
 }
@@ -365,6 +366,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 bool ForwardIterator::IsOverUpperBound(const Slice& internal_key) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return !(read_options_.iterate_upper_bound == nullptr ||
            cfd_->internal_comparator().user_comparator()->Compare(
                ExtractUserKey(internal_key),
@@ -579,16 +581,19 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 Slice ForwardIterator::key() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(valid_);
   return current_->key();
 }
 
 Slice ForwardIterator::value() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(valid_);
   return current_->value();
 }
 
 Status ForwardIterator::status() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!status_.ok()) {
     return status_;
   } else if (!mutable_iter_->status().ok()) {
@@ -662,11 +667,13 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 bool ForwardIterator::IsKeyPinned() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return pinned_iters_mgr_ && pinned_iters_mgr_->PinningEnabled() &&
          current_->IsKeyPinned();
 }
 
 bool ForwardIterator::IsValuePinned() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return pinned_iters_mgr_ && pinned_iters_mgr_->PinningEnabled() &&
          current_->IsValuePinned();
 }

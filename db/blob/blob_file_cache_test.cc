@@ -168,7 +168,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   SyncPoint::GetInstance()->SetCallBack(
       "BlobFileCache::GetBlobFileReader:DoubleCheck", [&](void* /* arg */) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         // Disabling sync points to prevent infinite recursion
         SyncPoint::GetInstance()->DisableProcessing();
 

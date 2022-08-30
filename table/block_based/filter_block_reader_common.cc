@@ -40,6 +40,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 template <typename TBlocklike>
 const SliceTransform*
 FilterBlockReaderCommon<TBlocklike>::table_prefix_extractor() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(table_);
 
   const BlockBasedTable::Rep* const rep = table_->get_rep();
@@ -50,6 +51,7 @@ FilterBlockReaderCommon<TBlocklike>::table_prefix_extractor() const {
 
 template <typename TBlocklike>
 bool FilterBlockReaderCommon<TBlocklike>::whole_key_filtering() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(table_);
   assert(table_->get_rep());
 
@@ -58,6 +60,7 @@ bool FilterBlockReaderCommon<TBlocklike>::whole_key_filtering() const {
 
 template <typename TBlocklike>
 bool FilterBlockReaderCommon<TBlocklike>::cache_filter_blocks() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(table_);
   assert(table_->get_rep());
 
@@ -69,6 +72,7 @@ Status FilterBlockReaderCommon<TBlocklike>::GetOrReadFilterBlock(
     bool no_io, GetContext* get_context,
     BlockCacheLookupContext* lookup_context,
     CachableEntry<TBlocklike>* filter_block) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(filter_block);
 
   if (!filter_block_.IsEmpty()) {

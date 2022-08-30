@@ -37,6 +37,7 @@ Status BlockBasedTable::IndexReaderCommon::GetOrReadIndexBlock(
     bool no_io, GetContext* get_context,
     BlockCacheLookupContext* lookup_context,
     CachableEntry<Block>* index_block) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(index_block != nullptr);
 
   if (!index_block_.IsEmpty()) {

@@ -47,6 +47,7 @@ Status AdaptiveTableFactory::NewTableReader(
     std::unique_ptr<RandomAccessFileReader>&& file, uint64_t file_size,
     std::unique_ptr<TableReader>* table,
     bool prefetch_index_and_filter_in_cache) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Footer footer;
   IOOptions opts;
   auto s = ReadFooterFromFile(opts, file.get(), nullptr /* prefetch_buffer */,
@@ -74,10 +75,12 @@ Status AdaptiveTableFactory::NewTableReader(
 TableBuilder* AdaptiveTableFactory::NewTableBuilder(
     const TableBuilderOptions& table_builder_options,
     WritableFileWriter* file) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return table_factory_to_write_->NewTableBuilder(table_builder_options, file);
 }
 
 std::string AdaptiveTableFactory::GetPrintableOptions() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string ret;
   ret.reserve(20000);
   const int kBufferSize = 200;

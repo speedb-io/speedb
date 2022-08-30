@@ -68,7 +68,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   SyncPoint::GetInstance()->ClearAllCallBacks();
   SyncPoint::GetInstance()->SetCallBack(
       "LevelCompactionPicker::PickCompaction:Return", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         const auto* compaction = reinterpret_cast<Compaction*>(arg);
         ASSERT_NE(nullptr, compaction);
         ASSERT_EQ(0, compaction->start_level());

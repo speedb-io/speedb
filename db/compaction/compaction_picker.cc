@@ -173,6 +173,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 void CompactionPicker::GetRange(const CompactionInputFiles& inputs,
                                 InternalKey* smallest,
                                 InternalKey* largest) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int level = inputs.level;
   assert(!inputs.empty());
   smallest->Clear();
@@ -203,6 +204,7 @@ void CompactionPicker::GetRange(const CompactionInputFiles& inputs1,
                                 const CompactionInputFiles& inputs2,
                                 InternalKey* smallest,
                                 InternalKey* largest) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(!inputs1.empty() || !inputs2.empty());
   if (inputs1.empty()) {
     GetRange(inputs2, smallest, largest);
@@ -221,6 +223,7 @@ void CompactionPicker::GetRange(const CompactionInputFiles& inputs1,
 void CompactionPicker::GetRange(const std::vector<CompactionInputFiles>& inputs,
                                 InternalKey* smallest,
                                 InternalKey* largest) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   InternalKey current_smallest;
   InternalKey current_largest;
   bool initialized = false;
@@ -291,6 +294,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 bool CompactionPicker::RangeOverlapWithCompaction(
     const Slice& smallest_user_key, const Slice& largest_user_key,
     int level) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const Comparator* ucmp = icmp_->user_comparator();
   for (Compaction* c : compactions_in_progress_) {
     if (c->output_level() == level &&
@@ -306,6 +310,7 @@ bool CompactionPicker::RangeOverlapWithCompaction(
 
 bool CompactionPicker::FilesRangeOverlapWithCompaction(
     const std::vector<CompactionInputFiles>& inputs, int level) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   bool is_empty = true;
   for (auto& in : inputs) {
     if (!in.empty()) {
@@ -378,6 +383,7 @@ Status CompactionPicker::GetCompactionInputsFromFileNumbers(
     std::vector<CompactionInputFiles>* input_files,
     std::unordered_set<uint64_t>* input_set, const VersionStorageInfo* vstorage,
     const CompactionOptions& /*compact_options*/) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (input_set->size() == 0U) {
     return Status::InvalidArgument(
         "Compaction must include at least one file.");
@@ -876,6 +882,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 Status CompactionPicker::SanitizeCompactionInputFilesForAllLevels(
     std::unordered_set<uint64_t>* input_files,
     const ColumnFamilyMetaData& cf_meta, const int output_level) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto& levels = cf_meta.levels;
   auto comparator = icmp_->user_comparator();
 
@@ -1011,6 +1018,7 @@ Status CompactionPicker::SanitizeCompactionInputFilesForAllLevels(
 Status CompactionPicker::SanitizeCompactionInputFiles(
     std::unordered_set<uint64_t>* input_files,
     const ColumnFamilyMetaData& cf_meta, const int output_level) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(static_cast<int>(cf_meta.levels.size()) - 1 ==
          cf_meta.levels[cf_meta.levels.size() - 1].level);
   if (output_level >= static_cast<int>(cf_meta.levels.size())) {

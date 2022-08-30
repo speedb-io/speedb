@@ -428,6 +428,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   }
 
   uint64_t ApproximateOffsetOf(const Slice& key) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (convert_to_internal_key_) {
       InternalKey ikey(key, kMaxSequenceNumber, kTypeValue);
       const Slice skey = ikey.Encode();
@@ -3271,6 +3272,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
                    int64_t expected_index_block_cache_hit,
                    int64_t expected_data_block_cache_miss,
                    int64_t expected_data_block_cache_hit) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_EQ(expected_index_block_cache_miss, index_block_cache_miss);
     ASSERT_EQ(expected_index_block_cache_hit, index_block_cache_hit);
     ASSERT_EQ(expected_data_block_cache_miss, data_block_cache_miss);
@@ -4455,6 +4457,7 @@ class TestPrefixExtractor : public ROCKSDB_NAMESPACE::SliceTransform {
   }
 
   bool IsValid(const ROCKSDB_NAMESPACE::Slice& src) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (src.size() != 4) {
       return false;
     }
@@ -4579,7 +4582,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   // Helper function to update the value of the global seqno in the file
   std::function<void(uint64_t)> SetGlobalSeqno = [&](uint64_t val) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     std::string new_global_seqno;
     PutFixed64(&new_global_seqno, val);
 

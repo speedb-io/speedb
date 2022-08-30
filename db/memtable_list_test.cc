@@ -89,6 +89,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   Status Mock_InstallMemtableFlushResults(
       MemTableList* list, const MutableCFOptions& mutable_cf_options,
       const autovector<MemTable*>& m, autovector<MemTable*>* to_delete) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // Create a mock Logger
     test::NullLogger logger;
     LogBuffer log_buffer(DEBUG_LEVEL, &logger);
@@ -138,6 +139,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       const autovector<const MutableCFOptions*>& mutable_cf_options_list,
       const autovector<const autovector<MemTable*>*>& mems_list,
       autovector<MemTable*>* to_delete) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // Create a mock Logger
     test::NullLogger logger;
     LogBuffer log_buffer(DEBUG_LEVEL, &logger);

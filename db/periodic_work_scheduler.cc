@@ -111,12 +111,14 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
 void PeriodicWorkTestScheduler::TEST_WaitForRun(
     std::function<void()> callback) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (timer != nullptr) {
     timer->TEST_WaitForRun(callback);
   }
 }
 
 size_t PeriodicWorkTestScheduler::TEST_GetValidTaskNum() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (timer != nullptr) {
     return timer->TEST_GetPendingTaskNum();
   }

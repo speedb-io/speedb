@@ -127,7 +127,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 Slice BlockBasedFilterBlockBuilder::Finish(
     const BlockHandle& /*tmp*/, Status* status,
     std::unique_ptr<const char[]>* /* filter_data */) {
-PERF_MARKER(__PRETTY_FUNCTION__);
   // In this impl we ignore BlockHandle and filter_data
   *status = Status::OK();
 
@@ -268,6 +267,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 bool BlockBasedFilterBlockReader::MayMatch(
     const Slice& entry, uint64_t block_offset, bool no_io,
     GetContext* get_context, BlockCacheLookupContext* lookup_context) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   CachableEntry<BlockContents> filter_block;
 
   const Status s =
@@ -316,6 +316,7 @@ bool BlockBasedFilterBlockReader::MayMatch(
 }
 
 size_t BlockBasedFilterBlockReader::ApproximateMemoryUsage() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   size_t usage = ApproximateFilterBlockMemoryUsage();
 #ifdef ROCKSDB_MALLOC_USABLE_SIZE
   usage += malloc_usable_size(const_cast<BlockBasedFilterBlockReader*>(this));
@@ -326,6 +327,7 @@ size_t BlockBasedFilterBlockReader::ApproximateMemoryUsage() const {
 }
 
 std::string BlockBasedFilterBlockReader::ToString() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   CachableEntry<BlockContents> filter_block;
 
   const Status s =

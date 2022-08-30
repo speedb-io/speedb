@@ -393,7 +393,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "Arena::AllocateNewBlock:0", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         std::pair<size_t*, size_t*>* pair =
             static_cast<std::pair<size_t*, size_t*>*>(arg);
         *std::get<0>(*pair) = *std::get<1>(*pair);
@@ -580,7 +579,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "Arena::AllocateNewBlock:0", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         std::pair<size_t*, size_t*>* pair =
             static_cast<std::pair<size_t*, size_t*>*>(arg);
         *std::get<0>(*pair) = *std::get<1>(*pair);
@@ -1452,7 +1450,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "BlockBasedTableBuilder::WriteCompressionDictBlock:RawDict",
       [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         compression_dicts.emplace_back(static_cast<Slice*>(arg)->ToString());
       });
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->EnableProcessing();
@@ -2991,7 +2988,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   // the running compaction and break the LSM consistency.
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "CompactionJob::Run():Start", [&](void* /*arg*/) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         ASSERT_OK(
             dbfull()->SetOptions({{"level0_file_num_compaction_trigger", "2"},
                                   {"max_bytes_for_level_base", "1"}}));
@@ -3059,7 +3055,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   std::atomic<bool> flag(false);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "CompactionJob::Run():Start", [&](void* /*arg*/) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         if (flag.exchange(true)) {
           // We want to make sure to call this callback only once
           return;
@@ -3114,7 +3109,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   int manual_compactions_paused = 0;
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "CompactionJob::Run():PausingManualCompaction:1", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         auto paused = static_cast<std::atomic<int>*>(arg);
         ASSERT_EQ(0, paused->load(std::memory_order_acquire));
         paused->fetch_add(1, std::memory_order_release);
@@ -3284,7 +3278,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   int run_manual_compactions = 0;
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "CompactionJob::Run():PausingManualCompaction:2", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         auto paused = static_cast<std::atomic<int>*>(arg);
         ASSERT_EQ(0, paused->load(std::memory_order_acquire));
         paused->fetch_add(1, std::memory_order_release);
@@ -3377,7 +3370,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       "DBImpl::RunManualCompaction()::1");
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::RunManualCompaction()::1", [&](void* /*arg*/) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         ++compactions_run;
         // After 3 compactions disable
         if (compactions_run == 3) {
@@ -3451,14 +3443,12 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   int kv_compactions_stopped_at = 0;
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::RunManualCompaction()::1", [&](void* /*arg*/) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         ++compactions_run;
         // After 3 compactions disable
       });
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "CompactionIterator:ProcessKV", [&](void* /*arg*/) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         int kv_compactions_run =
             kv_compactions.fetch_add(1, std::memory_order_release);
         if (kv_compactions_run == 5) {
@@ -3550,7 +3540,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "CompactionIterator:ProcessKV", [&](void* /*arg*/) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         compact_options.canceled->store(true, std::memory_order_release);
       });
 
@@ -3596,7 +3585,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "CompactionJob::Run:BeforeVerify", [&](void* /*arg*/) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         compact_options.canceled->store(true, std::memory_order_release);
       });
 
@@ -3979,7 +3967,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "GenericRateLimiter::Request:1", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         rate_limit_count.fetch_add(1);
         int64_t* rate_bytes_per_sec = static_cast<int64_t*>(arg);
         ASSERT_EQ(1024 * 1024, *rate_bytes_per_sec);
@@ -4433,6 +4420,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   }
 
   double GetAvgLatency() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return cnt_ == 0 ? 0.0 : 1.0 * total_latency_ / cnt_;
   }
 
@@ -4552,7 +4540,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   TraceExecutionResultHandler res_handler;
   std::function<void(Status, std::unique_ptr<TraceRecordResult> &&)> res_cb =
       [&res_handler](Status exec_s, std::unique_ptr<TraceRecordResult>&& res) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         ASSERT_TRUE(exec_s.ok() || exec_s.IsNotSupported());
         if (res != nullptr) {
           ASSERT_OK(res->Accept(&res_handler));
@@ -5421,7 +5408,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   std::atomic<int> block_destroyed(0);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "Block::Block:0", [&](void* /*arg*/) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         if (finished) {
           return;
         }
@@ -5432,7 +5418,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       });
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "Block::~Block", [&](void* /*arg*/) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         if (finished) {
           return;
         }
@@ -5462,7 +5447,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   size_t expected_higher_bound = 512 * 1024;
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "BlockBasedTable::Open::TailPrefetchLen", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         size_t* prefetch_size = static_cast<size_t*>(arg);
         EXPECT_LE(expected_lower_bound, *prefetch_size);
         EXPECT_GE(expected_higher_bound, *prefetch_size);
@@ -5497,7 +5481,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   std::atomic<bool> first_call(true);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "BlockBasedTable::Open::TailPrefetchLen", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         size_t* prefetch_size = static_cast<size_t*>(arg);
         if (first_call) {
           EXPECT_EQ(4 * 1024, *prefetch_size);
@@ -6093,7 +6076,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   SyncPoint::GetInstance()->SetCallBack(
       "VersionBuilder::CheckConsistencyBeforeReturn", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         Status* ret_s = static_cast<Status*>(arg);
         *ret_s = Status::Corruption("fcc");
       });
@@ -6558,7 +6540,6 @@ class RenameCurrentTest : public DBTestBase,
 PERF_MARKER(__PRETTY_FUNCTION__);
     SyncPoint::GetInstance()->DisableProcessing();
     SyncPoint::GetInstance()->SetCallBack(sync_point_, [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
       Status* s = reinterpret_cast<Status*>(arg);
       assert(s);
       *s = Status::IOError("Injected IO error.");
@@ -7223,7 +7204,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       [&](void* /*arg*/) { should_inject_error = true; });
   SyncPoint::GetInstance()->SetCallBack(
       "LogReader::ReadMore:AfterReadFile", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         if (should_inject_error) {
           ASSERT_NE(nullptr, arg);
           *reinterpret_cast<Status*>(arg) = Status::IOError("Injected IOError");

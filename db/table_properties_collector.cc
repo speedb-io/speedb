@@ -60,6 +60,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
 UserCollectedProperties
 UserKeyTablePropertiesCollector::GetReadableProperties() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return collector_->GetReadableProperties();
 }
 

@@ -121,6 +121,7 @@ class TestPrefixExtractor : public SliceTransform {
 
  private:
   const char* separator(const Slice& key) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return reinterpret_cast<const char*>(memchr(key.data(), '_', key.size()));
   }
 };

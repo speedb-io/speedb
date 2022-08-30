@@ -91,7 +91,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
     std::sort(data_.begin(), data_.end(),
               [this](std::pair<std::string, std::string> a,
                      std::pair<std::string, std::string> b) {
-PERF_MARKER(__PRETTY_FUNCTION__);
       return (cmp.Compare(a.first, b.first) < 0);
     });
   }
@@ -2748,7 +2747,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   // its end and before an SeekToLast() is called.
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "MergeIterator::Prev:BeforePrev", [&](void* /*arg*/) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         internal_iter2_->Add("z", kTypeValue, "7", 12u);
         internal_iter2_->Add("z", kTypeValue, "7", 11u);
       });
@@ -2788,7 +2786,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   // its end and before an SeekToLast() is called.
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "MergeIterator::Prev:BeforePrev", [&](void* /*arg*/) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         internal_iter2_->Add("z", kTypeValue, "7", 16u, true);
         internal_iter2_->Add("z", kTypeValue, "7", 15u, true);
         internal_iter2_->Add("z", kTypeValue, "7", 14u, true);
@@ -2834,7 +2831,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   // Seek() and before calling Prev()
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "MergeIterator::Prev:BeforePrev", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         IteratorWrapper* it = reinterpret_cast<IteratorWrapper*>(arg);
         if (it->key().starts_with("z")) {
           internal_iter2_->Add("x", kTypeValue, "7", 16u, true);
@@ -2887,7 +2883,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   // Seek() and before calling Prev()
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "MergeIterator::Prev:BeforePrev", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         IteratorWrapper* it = reinterpret_cast<IteratorWrapper*>(arg);
         if (it->key().starts_with("z")) {
           internal_iter2_->Add("x", kTypeValue, "7", 16u, true);
@@ -2936,7 +2931,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   // Seek() and before calling Prev()
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "MergeIterator::Prev:BeforePrev", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         IteratorWrapper* it = reinterpret_cast<IteratorWrapper*>(arg);
         if (it->key().starts_with("z")) {
           internal_iter2_->Add("x", kTypeValue, "7", 16u, true);
@@ -2987,7 +2981,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   // Seek() and before calling Prev()
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "MergeIterator::Prev:BeforePrev", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         IteratorWrapper* it = reinterpret_cast<IteratorWrapper*>(arg);
         if (it->key().starts_with("z")) {
           internal_iter2_->Add("x", kTypeValue, "7", 16u, true);
@@ -3042,7 +3035,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   // before calling Prev()
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "MergeIterator::Prev:BeforePrev", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         IteratorWrapper* it = reinterpret_cast<IteratorWrapper*>(arg);
         if (it->key().starts_with("z")) {
           internal_iter2_->Add("x", kTypeValue, "7", 16u, true);

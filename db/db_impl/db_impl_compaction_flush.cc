@@ -362,6 +362,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 Status DBImpl::FlushMemTablesToOutputFiles(
     const autovector<BGFlushArg>& bg_flush_args, bool* made_progress,
     JobContext* job_context, LogBuffer* log_buffer, Env::Priority thread_pri) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (immutable_db_options_.atomic_flush) {
     return AtomicFlushMemTablesToOutputFiles(
         bg_flush_args, made_progress, job_context, log_buffer, thread_pri);
@@ -397,6 +398,7 @@ Status DBImpl::FlushMemTablesToOutputFiles(
 Status DBImpl::AtomicFlushMemTablesToOutputFiles(
     const autovector<BGFlushArg>& bg_flush_args, bool* made_progress,
     JobContext* job_context, LogBuffer* log_buffer, Env::Priority thread_pri) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   mutex_.AssertHeld();
 
   autovector<ColumnFamilyData*> cfds;
@@ -1982,6 +1984,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
 void DBImpl::GenerateFlushRequest(const autovector<ColumnFamilyData*>& cfds,
                                   FlushRequest* req) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(req != nullptr);
   req->reserve(cfds.size());
   for (const auto cfd : cfds) {
@@ -2138,6 +2141,7 @@ Status DBImpl::AtomicFlushMemTables(
     const autovector<ColumnFamilyData*>& column_family_datas,
     const FlushOptions& flush_options, FlushReason flush_reason,
     bool writes_stopped) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Status s;
   if (!flush_options.allow_write_stall) {
     int num_cfs_to_flush = 0;
@@ -2509,6 +2513,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 DBImpl::BGJobLimits DBImpl::GetBGJobLimits() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   mutex_.AssertHeld();
   return GetBGJobLimits(mutable_db_options_.max_background_flushes,
                         mutable_db_options_.max_background_compactions,
@@ -3651,6 +3656,7 @@ void DBImpl::BuildCompactionJobInfo(
     const ColumnFamilyData* cfd, Compaction* c, const Status& st,
     const CompactionJobStats& compaction_job_stats, const int job_id,
     const Version* current, CompactionJobInfo* compaction_job_info) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(compaction_job_info != nullptr);
   compaction_job_info->cf_id = cfd->GetID();
   compaction_job_info->cf_name = cfd->GetName();
@@ -3777,6 +3783,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 // full_scan=true can issue I/O requests to obtain list of files in
 // directories, e.g. env_->getChildren while holding db mutex.
 bool DBImpl::ShouldPurge(uint64_t file_number) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return files_grabbed_for_purge_.find(file_number) ==
              files_grabbed_for_purge_.end() &&
          purge_files_.find(file_number) == purge_files_.end();

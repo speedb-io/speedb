@@ -50,6 +50,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 std::string TableProperties::ToString(
     const std::string& prop_delim,
     const std::string& kv_delim) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string result;
   result.reserve(1024);
 
@@ -196,6 +197,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
 std::map<std::string, uint64_t>
 TableProperties::GetAggregatablePropertiesAsMap() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::map<std::string, uint64_t> rv;
   rv["data_size"] = data_size;
   rv["index_size"] = index_size;
@@ -224,6 +226,7 @@ TableProperties::GetAggregatablePropertiesAsMap() const {
 // TODO: eliminate the need of manually updating this function
 // for new string properties
 std::size_t TableProperties::ApproximateMemoryUsage() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::size_t usage = 0;
 #ifdef ROCKSDB_MALLOC_USABLE_SIZE
   usage += malloc_usable_size((void*)this);

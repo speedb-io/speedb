@@ -354,7 +354,6 @@ static std::unordered_map<std::string, OptionTypeInfo>
           OptionTypeFlags::kNone,
           [](const ConfigOptions& /*opts*/, const std::string& /*name*/,
              const std::string& value, void* addr) {
-PERF_MARKER(__PRETTY_FUNCTION__);
             // A workaround to fix a bug in 6.10, 6.11, 6.12, 6.13
             // and 6.14. The bug will write out 8 bytes to OPTIONS file from the
             // starting address of BlockBasedTableOptions.read_amp_bytes_per_bit
@@ -394,7 +393,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
           // Parses the input vsalue as a Cache
           [](const ConfigOptions& opts, const std::string&,
              const std::string& value, void* addr) {
-PERF_MARKER(__PRETTY_FUNCTION__);
             auto* cache = static_cast<std::shared_ptr<Cache>*>(addr);
             return Cache::CreateFromString(opts, value, cache);
           }}},
@@ -405,7 +403,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
           // Parses the input vsalue as a Cache
           [](const ConfigOptions& opts, const std::string&,
              const std::string& value, void* addr) {
-PERF_MARKER(__PRETTY_FUNCTION__);
             auto* cache = static_cast<std::shared_ptr<Cache>*>(addr);
             return Cache::CreateFromString(opts, value, cache);
           }}},
@@ -605,6 +602,7 @@ Status BlockBasedTableFactory::NewTableReader(
     std::unique_ptr<RandomAccessFileReader>&& file, uint64_t file_size,
     std::unique_ptr<TableReader>* table_reader,
     bool prefetch_index_and_filter_in_cache) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return BlockBasedTable::Open(
       ro, table_reader_options.ioptions, table_reader_options.env_options,
       table_options_, table_reader_options.internal_comparator, std::move(file),
@@ -622,12 +620,14 @@ Status BlockBasedTableFactory::NewTableReader(
 TableBuilder* BlockBasedTableFactory::NewTableBuilder(
     const TableBuilderOptions& table_builder_options,
     WritableFileWriter* file) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return new BlockBasedTableBuilder(table_options_, table_builder_options,
                                     file);
 }
 
 Status BlockBasedTableFactory::ValidateOptions(
     const DBOptions& db_opts, const ColumnFamilyOptions& cf_opts) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (table_options_.index_type == BlockBasedTableOptions::kHashSearch &&
       cf_opts.prefix_extractor == nullptr) {
     return Status::InvalidArgument(
@@ -702,6 +702,7 @@ Status BlockBasedTableFactory::ValidateOptions(
 }
 
 std::string BlockBasedTableFactory::GetPrintableOptions() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string ret;
   ret.reserve(20000);
   const int kBufferSize = 200;
@@ -850,6 +851,7 @@ std::string BlockBasedTableFactory::GetPrintableOptions() const {
 
 const void* BlockBasedTableFactory::GetOptionsPtr(
     const std::string& name) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (name == kBlockCacheOpts()) {
     if (table_options_.no_block_cache) {
       return nullptr;

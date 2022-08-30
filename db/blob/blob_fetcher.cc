@@ -14,6 +14,7 @@ Status BlobFetcher::FetchBlob(const Slice& user_key,
                               FilePrefetchBuffer* prefetch_buffer,
                               PinnableSlice* blob_value,
                               uint64_t* bytes_read) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(version_);
 
   return version_->GetBlob(read_options_, user_key, blob_index_slice,
@@ -25,6 +26,7 @@ Status BlobFetcher::FetchBlob(const Slice& user_key,
                               FilePrefetchBuffer* prefetch_buffer,
                               PinnableSlice* blob_value,
                               uint64_t* bytes_read) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(version_);
 
   return version_->GetBlob(read_options_, user_key, blob_index, prefetch_buffer,

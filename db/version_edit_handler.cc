@@ -328,6 +328,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
 // TODO maybe cache the computation result
 bool VersionEditHandler::HasMissingFiles() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   bool ret = false;
   for (const auto& elem : cf_to_missing_files_) {
     const auto& missing_files = elem.second;
@@ -350,6 +351,7 @@ bool VersionEditHandler::HasMissingFiles() const {
 void VersionEditHandler::CheckColumnFamilyId(const VersionEdit& edit,
                                              bool* cf_in_not_found,
                                              bool* cf_in_builders) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(cf_in_not_found != nullptr);
   assert(cf_in_builders != nullptr);
   // Not found means that user didn't supply that column

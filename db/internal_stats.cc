@@ -681,6 +681,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 uint64_t InternalStats::CacheEntryRoleStats::GetLastDurationMicros() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (last_end_time_micros_ > last_start_time_micros_) {
     return last_end_time_micros_ - last_start_time_micros_;
   } else {
@@ -690,6 +691,7 @@ uint64_t InternalStats::CacheEntryRoleStats::GetLastDurationMicros() const {
 
 std::string InternalStats::CacheEntryRoleStats::ToString(
     SystemClock* clock) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::ostringstream str;
   str << "Block cache " << cache_id
       << " capacity: " << BytesToHumanString(cache_capacity)
@@ -712,6 +714,7 @@ std::string InternalStats::CacheEntryRoleStats::ToString(
 
 void InternalStats::CacheEntryRoleStats::ToMap(
     std::map<std::string, std::string>* values, SystemClock* clock) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   values->clear();
   auto& v = *values;
   v[BlockCacheEntryStatsMapKeys::CacheId()] = cache_id;

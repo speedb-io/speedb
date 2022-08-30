@@ -178,6 +178,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
 Status DBImpl::TEST_AtomicFlushMemTables(
     const autovector<ColumnFamilyData*>& cfds, const FlushOptions& flush_opts) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return AtomicFlushMemTables(cfds, flush_opts, FlushReason::kTest);
 }
 
@@ -303,16 +304,19 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 int DBImpl::TEST_BGCompactionsAllowed() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   InstrumentedMutexLock l(&mutex_);
   return GetBGJobLimits().max_compactions;
 }
 
 int DBImpl::TEST_BGFlushesAllowed() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   InstrumentedMutexLock l(&mutex_);
   return GetBGJobLimits().max_flushes;
 }
 
 SequenceNumber DBImpl::TEST_GetLastVisibleSequence() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (last_seq_same_as_publish_seq_) {
     return versions_->LastSequence();
   } else {
@@ -322,12 +326,14 @@ SequenceNumber DBImpl::TEST_GetLastVisibleSequence() const {
 
 size_t DBImpl::TEST_GetWalPreallocateBlockSize(
     uint64_t write_buffer_size) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   InstrumentedMutexLock l(&mutex_);
   return GetWalPreallocateBlockSize(write_buffer_size);
 }
 
 #ifndef ROCKSDB_LITE
 void DBImpl::TEST_WaitForStatsDumpRun(std::function<void()> callback) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (periodic_work_scheduler_ != nullptr) {
     static_cast<PeriodicWorkTestScheduler*>(periodic_work_scheduler_)
         ->TEST_WaitForRun(callback);
@@ -335,11 +341,13 @@ void DBImpl::TEST_WaitForStatsDumpRun(std::function<void()> callback) const {
 }
 
 PeriodicWorkTestScheduler* DBImpl::TEST_GetPeriodicWorkScheduler() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return static_cast<PeriodicWorkTestScheduler*>(periodic_work_scheduler_);
 }
 #endif  // !ROCKSDB_LITE
 
 size_t DBImpl::TEST_EstimateInMemoryStatsHistorySize() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return EstimateInMemoryStatsHistorySize();
 }
 }  // namespace ROCKSDB_NAMESPACE

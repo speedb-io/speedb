@@ -1517,7 +1517,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   SyncPoint::GetInstance()->SetCallBack(
       "XXPH3FilterBitsBuilder::Finish::TamperHashEntries", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         std::deque<uint64_t>* hash_entries_to_corrupt =
             (std::deque<uint64_t>*)arg;
         assert(!hash_entries_to_corrupt->empty());
@@ -1551,7 +1550,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   SyncPoint::GetInstance()->SetCallBack(
       "XXPH3FilterBitsBuilder::Finish::TamperFilter", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         std::pair<std::unique_ptr<char[]>*, std::size_t>* TEST_arg_pair =
             (std::pair<std::unique_ptr<char[]>*, std::size_t>*)arg;
         std::size_t filter_size = TEST_arg_pair->second;
@@ -1606,7 +1604,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   SyncPoint::GetInstance()->SetCallBack(
       "XXPH3FilterBitsBuilder::Finish::TamperHashEntries", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         std::deque<uint64_t>* hash_entries_to_corrupt =
             (std::deque<uint64_t>*)arg;
         assert(!hash_entries_to_corrupt->empty());
@@ -1636,7 +1633,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   SyncPoint::GetInstance()->SetCallBack(
       "XXPH3FilterBitsBuilder::Finish::TamperHashEntries", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         std::deque<uint64_t>* hash_entries_to_corrupt =
             (std::deque<uint64_t>*)arg;
         assert(!hash_entries_to_corrupt->empty());

@@ -332,16 +332,19 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 // Return the current option configuration.
 Options DBTestBase::CurrentOptions(
     const anon::OptionsOverride& options_override) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return GetOptions(option_config_, GetDefaultOptions(), options_override);
 }
 
 Options DBTestBase::CurrentOptions(
     const Options& default_options,
     const anon::OptionsOverride& options_override) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return GetOptions(option_config_, default_options, options_override);
 }
 
 Options DBTestBase::GetDefaultOptions() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Options options;
   options.write_buffer_size = 4090 * 4096;
   options.target_file_size_base = 2 * 1024 * 1024;
@@ -359,6 +362,7 @@ Options DBTestBase::GetDefaultOptions() const {
 Options DBTestBase::GetOptions(
     int option_config, const Options& default_options,
     const anon::OptionsOverride& options_override) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // this redundant copy is to minimize code change w/o having lint error.
   Options options = default_options;
   BlockBasedTableOptions table_options;
@@ -749,6 +753,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 bool DBTestBase::IsMemoryMappedAccessSupported() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return (!encrypted_env_);
 }
 
@@ -1275,7 +1280,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 // covering the range [small,large].
 void DBTestBase::MakeTables(int n, const std::string& small,
                             const std::string& large, int cf) {
-PERF_MARKER(__PRETTY_FUNCTION__);
   for (int i = 0; i < n; i++) {
     ASSERT_OK(Put(cf, small, "begin"));
     ASSERT_OK(Put(cf, large, "end"));

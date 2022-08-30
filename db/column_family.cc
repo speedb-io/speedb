@@ -45,6 +45,7 @@ namespace ROCKSDB_NAMESPACE {
 ColumnFamilyHandleImpl::ColumnFamilyHandleImpl(
     ColumnFamilyData* column_family_data, DBImpl* db, InstrumentedMutex* mutex)
     : cfd_(column_family_data), db_(db), mutex_(mutex) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (cfd_ != nullptr) {
     cfd_->Ref();
   }
@@ -84,6 +85,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 uint32_t ColumnFamilyHandleImpl::GetID() const { return cfd()->GetID(); }
 
 const std::string& ColumnFamilyHandleImpl::GetName() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return cfd()->GetName();
 }
 
@@ -101,6 +103,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 const Comparator* ColumnFamilyHandleImpl::GetComparator() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return cfd()->user_comparator();
 }
 
@@ -506,6 +509,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }  // anonymous namespace
 
 std::vector<std::string> ColumnFamilyData::GetDbPaths() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::vector<std::string> paths;
   paths.reserve(ioptions_.cf_paths.size());
   for (const DbPath& db_path : ioptions_.cf_paths) {
@@ -727,6 +731,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 ColumnFamilyOptions ColumnFamilyData::GetLatestCFOptions() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return BuildColumnFamilyOptions(initial_cf_options_, mutable_cf_options_);
 }
 
@@ -761,6 +766,7 @@ std::unique_ptr<WriteControllerToken> SetupDelay(
     WriteController* write_controller, uint64_t compaction_needed_bytes,
     uint64_t prev_compaction_need_bytes, bool penalize_stop,
     bool auto_comapctions_disabled) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const uint64_t kMinWriteRate = 16 * 1024u;  // Minimum write rate 16KB/s.
 
   uint64_t max_write_rate = write_controller->max_delayed_write_rate();
@@ -1057,6 +1063,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 const FileOptions* ColumnFamilyData::soptions() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return &(column_family_set_->file_options_);
 }
 
@@ -1066,18 +1073,22 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 uint64_t ColumnFamilyData::GetNumLiveVersions() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return VersionSet::GetNumLiveVersions(dummy_versions_);
 }
 
 uint64_t ColumnFamilyData::GetTotalSstFilesSize() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return VersionSet::GetTotalSstFilesSize(dummy_versions_);
 }
 
 uint64_t ColumnFamilyData::GetTotalBlobFileSize() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return VersionSet::GetTotalBlobFileSize(dummy_versions_);
 }
 
 uint64_t ColumnFamilyData::GetLiveSstFilesSize() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return current_->GetSstFilesSize();
 }
 
@@ -1099,6 +1110,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 bool ColumnFamilyData::NeedsCompaction() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return !mutable_cf_options_.disable_auto_compactions &&
          compaction_picker_->NeedsCompaction(current_->storage_info());
 }
@@ -1122,6 +1134,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 bool ColumnFamilyData::RangeOverlapWithCompaction(
     const Slice& smallest_user_key, const Slice& largest_user_key,
     int level) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return compaction_picker_->RangeOverlapWithCompaction(
       smallest_user_key, largest_user_key, level);
 }
@@ -1129,6 +1142,7 @@ bool ColumnFamilyData::RangeOverlapWithCompaction(
 Status ColumnFamilyData::RangesOverlapWithMemtables(
     const autovector<Range>& ranges, SuperVersion* super_version,
     bool allow_data_in_errors, bool* overlap) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(overlap != nullptr);
   *overlap = false;
   // Create an InternalIterator over all unflushed memtables
@@ -1484,6 +1498,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 FSDirectory* ColumnFamilyData::GetDataDir(size_t path_id) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (data_dirs_.empty()) {
     return nullptr;
   }
@@ -1537,11 +1552,13 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 ColumnFamilyData* ColumnFamilySet::GetDefault() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(default_cfd_cache_ != nullptr);
   return default_cfd_cache_;
 }
 
 ColumnFamilyData* ColumnFamilySet::GetColumnFamily(uint32_t id) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto cfd_iter = column_family_data_.find(id);
   if (cfd_iter != column_family_data_.end()) {
     return cfd_iter->second;
@@ -1575,6 +1592,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 size_t ColumnFamilySet::NumberOfColumnFamilies() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return column_families_.size();
 }
 
@@ -1626,11 +1644,13 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 uint64_t ColumnFamilyMemTablesImpl::GetLogNumber() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(current_ != nullptr);
   return current_->GetLogNumber();
 }
 
 MemTable* ColumnFamilyMemTablesImpl::GetMemTable() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(current_ != nullptr);
   return current_->mem();
 }

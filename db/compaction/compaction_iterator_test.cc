@@ -105,6 +105,7 @@ class LoggingForwardVectorIterator : public VectorIterator {
         : type(_type), arg(_arg) {}
 
     bool operator==(const Action& rhs) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
       return std::tie(type, arg) == std::tie(rhs.type, rhs.arg);
     }
   };

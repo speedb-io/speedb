@@ -124,6 +124,7 @@ class TestKeyComparator : public Comparator {
   }
 
   bool operator()(const TestKey& a, const TestKey& b) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::string sa, sb;
     return Compare(TestKeyToSlice(sa, a), TestKeyToSlice(sb, b)) < 0;
   }

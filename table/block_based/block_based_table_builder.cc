@@ -351,6 +351,7 @@ struct BlockBasedTableBuilder::Rep {
   void set_offset(uint64_t o) { offset.store(o, std::memory_order_relaxed); }
 
   bool IsParallelCompressionEnabled() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return compression_opts.parallel_threads > 1;
   }
 
@@ -604,7 +605,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
     size_t Size() { return size_; }
     std::string& Back() { return keys_[size_ - 1]; }
     std::string& operator[](size_t idx) {
-PERF_MARKER(__PRETTY_FUNCTION__);
       assert(idx < size_);
       return keys_[idx];
     }
@@ -1463,6 +1463,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 Status BlockBasedTableBuilder::status() const { return rep_->GetStatus(); }
 
 IOStatus BlockBasedTableBuilder::io_status() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return rep_->GetIOStatus();
 }
 
@@ -2098,16 +2099,19 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 uint64_t BlockBasedTableBuilder::NumEntries() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return rep_->props.num_entries;
 }
 
 bool BlockBasedTableBuilder::IsEmpty() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return rep_->props.num_entries == 0 && rep_->props.num_range_deletions == 0;
 }
 
 uint64_t BlockBasedTableBuilder::FileSize() const { return rep_->offset; }
 
 uint64_t BlockBasedTableBuilder::EstimatedFileSize() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (rep_->IsParallelCompressionEnabled()) {
     // Use compression ratio so far and inflight raw bytes to estimate
     // final SST size.
@@ -2118,6 +2122,7 @@ uint64_t BlockBasedTableBuilder::EstimatedFileSize() const {
 }
 
 bool BlockBasedTableBuilder::NeedCompact() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (const auto& collector : rep_->table_properties_collectors) {
     if (collector->NeedCompact()) {
       return true;
@@ -2127,6 +2132,7 @@ bool BlockBasedTableBuilder::NeedCompact() const {
 }
 
 TableProperties BlockBasedTableBuilder::GetTableProperties() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   TableProperties ret = rep_->props;
   for (const auto& collector : rep_->table_properties_collectors) {
     for (const auto& prop : collector->GetReadableProperties()) {
@@ -2138,6 +2144,7 @@ TableProperties BlockBasedTableBuilder::GetTableProperties() const {
 }
 
 std::string BlockBasedTableBuilder::GetFileChecksum() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (rep_->file != nullptr) {
     return rep_->file->GetFileChecksum();
   } else {
@@ -2146,6 +2153,7 @@ std::string BlockBasedTableBuilder::GetFileChecksum() const {
 }
 
 const char* BlockBasedTableBuilder::GetFileChecksumFuncName() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (rep_->file != nullptr) {
     return rep_->file->GetFileChecksumFuncName();
   } else {

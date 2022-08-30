@@ -31,6 +31,7 @@ enum BlobFileAddition::CustomFieldTags : uint32_t {
 };
 
 void BlobFileAddition::EncodeTo(std::string* output) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   PutVarint64(output, blob_file_number_);
   PutVarint64(output, total_blob_count_);
   PutVarint64(output, total_blob_bytes_);
@@ -101,6 +102,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 std::string BlobFileAddition::DebugString() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::ostringstream oss;
 
   oss << *this;
@@ -109,6 +111,7 @@ std::string BlobFileAddition::DebugString() const {
 }
 
 std::string BlobFileAddition::DebugJSON() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   JSONWriter jw;
 
   jw << *this;

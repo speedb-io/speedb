@@ -8,6 +8,7 @@
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 
 #include "cache/clock_cache.h"
+#include "rocksdb/env.h"
 
 #ifndef SUPPORT_CLOCK_CACHE
 
@@ -16,6 +17,7 @@ namespace ROCKSDB_NAMESPACE {
 std::shared_ptr<Cache> NewClockCache(
     size_t /*capacity*/, int /*num_shard_bits*/, bool /*strict_capacity_limit*/,
     CacheMetadataChargePolicy /*metadata_charge_policy*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Clock cache not supported.
   return nullptr;
 }
@@ -201,6 +203,7 @@ struct CacheHandle {
       : key(k), value(v), deleter(del) {}
 
   CacheHandle& operator=(const CacheHandle& a) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // Only copy members needed for deletion.
     key = a.key;
     value = a.value;
@@ -210,6 +213,7 @@ struct CacheHandle {
 
   inline static uint32_t CalcMetadataCharge(
       Slice key, CacheMetadataChargePolicy metadata_charge_policy) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     size_t meta_charge = 0;
     if (metadata_charge_policy == kFullChargeCacheMetadata) {
       meta_charge += sizeof(CacheHandle);
@@ -235,15 +239,18 @@ struct ClockCacheKey {
   ClockCacheKey() = default;
 
   ClockCacheKey(const Slice& k, uint32_t h) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     key = k;
     hash_value = h;
   }
 
   static bool equal(const ClockCacheKey& a, const ClockCacheKey& b) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return a.hash_value == b.hash_value && a.key == b.key;
   }
 
   static size_t hash(const ClockCacheKey& a) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return static_cast<size_t>(a.hash_value);
   }
 };
@@ -407,6 +414,7 @@ ClockCacheShard::ClockCacheShard()
     : head_(0), usage_(0), pinned_usage_(0), strict_capacity_limit_(false) {}
 
 ClockCacheShard::~ClockCacheShard() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (auto& handle : list_) {
     uint32_t flags = handle.flags.load(std::memory_order_relaxed);
     if (InCache(flags) || CountRefs(flags) > 0) {
@@ -419,10 +427,12 @@ ClockCacheShard::~ClockCacheShard() {
 }
 
 size_t ClockCacheShard::GetUsage() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return usage_.load(std::memory_order_relaxed);
 }
 
 size_t ClockCacheShard::GetPinnedUsage() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return pinned_usage_.load(std::memory_order_relaxed);
 }
 
@@ -430,6 +440,7 @@ void ClockCacheShard::ApplyToSomeEntries(
     const std::function<void(const Slice& key, void* value, size_t charge,
                              DeleterFn deleter)>& callback,
     uint32_t average_entries_per_lock, uint32_t* state) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(average_entries_per_lock > 0);
   MutexLock lock(&mutex_);
 
@@ -470,6 +481,7 @@ void ClockCacheShard::ApplyToSomeEntries(
 
 void ClockCacheShard::RecycleHandle(CacheHandle* handle,
                                     CleanupContext* context) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   mutex_.AssertHeld();
   assert(!InCache(handle->flags) && CountRefs(handle->flags) == 0);
   context->to_delete_key.push_back(handle->key.data());
@@ -481,6 +493,7 @@ void ClockCacheShard::RecycleHandle(CacheHandle* handle,
 }
 
 void ClockCacheShard::Cleanup(const CleanupContext& context) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (const CacheHandle& handle : context.to_delete_value) {
     if (handle.deleter) {
       (*handle.deleter)(handle.key, handle.value);
@@ -492,6 +505,7 @@ void ClockCacheShard::Cleanup(const CleanupContext& context) {
 }
 
 bool ClockCacheShard::Ref(Cache::Handle* h) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto handle = reinterpret_cast<CacheHandle*>(h);
   // CAS loop to increase reference count.
   uint32_t flags = handle->flags.load(std::memory_order_relaxed);
@@ -514,6 +528,7 @@ bool ClockCacheShard::Ref(Cache::Handle* h) {
 
 bool ClockCacheShard::Unref(CacheHandle* handle, bool set_usage,
                             CleanupContext* context) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (set_usage) {
     handle->flags.fetch_or(kUsageBit, std::memory_order_relaxed);
   }
@@ -541,6 +556,7 @@ bool ClockCacheShard::Unref(CacheHandle* handle, bool set_usage,
 
 bool ClockCacheShard::UnsetInCache(CacheHandle* handle,
                                    CleanupContext* context) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   mutex_.AssertHeld();
   // Use acquire-release semantics as previous operations on the cache entry
   // has to be order before reference count is decreased, and potential cleanup
@@ -555,6 +571,7 @@ bool ClockCacheShard::UnsetInCache(CacheHandle* handle,
 }
 
 bool ClockCacheShard::TryEvict(CacheHandle* handle, CleanupContext* context) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   mutex_.AssertHeld();
   uint32_t flags = kInCacheBit;
   if (handle->flags.compare_exchange_strong(flags, 0, std::memory_order_acquire,
@@ -570,6 +587,7 @@ bool ClockCacheShard::TryEvict(CacheHandle* handle, CleanupContext* context) {
 }
 
 bool ClockCacheShard::EvictFromCache(size_t charge, CleanupContext* context) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   size_t usage = usage_.load(std::memory_order_relaxed);
   size_t capacity = capacity_.load(std::memory_order_relaxed);
   if (usage == 0) {
@@ -596,6 +614,7 @@ bool ClockCacheShard::EvictFromCache(size_t charge, CleanupContext* context) {
 }
 
 void ClockCacheShard::SetCapacity(size_t capacity) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   CleanupContext context;
   {
     MutexLock l(&mutex_);
@@ -606,6 +625,7 @@ void ClockCacheShard::SetCapacity(size_t capacity) {
 }
 
 void ClockCacheShard::SetStrictCapacityLimit(bool strict_capacity_limit) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   strict_capacity_limit_.store(strict_capacity_limit,
                                std::memory_order_relaxed);
 }
@@ -614,6 +634,7 @@ CacheHandle* ClockCacheShard::Insert(
     const Slice& key, uint32_t hash, void* value, size_t charge,
     void (*deleter)(const Slice& key, void* value), bool hold_reference,
     CleanupContext* context, bool* overwritten) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(overwritten != nullptr && *overwritten == false);
   uint32_t meta_charge =
       CacheHandle::CalcMetadataCharge(key, metadata_charge_policy_);
@@ -676,6 +697,7 @@ Status ClockCacheShard::Insert(const Slice& key, uint32_t hash, void* value,
                                void (*deleter)(const Slice& key, void* value),
                                Cache::Handle** out_handle,
                                Cache::Priority /*priority*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   CleanupContext context;
   HashTable::accessor accessor;
   char* key_data = new char[key.size()];
@@ -701,6 +723,7 @@ Status ClockCacheShard::Insert(const Slice& key, uint32_t hash, void* value,
 }
 
 Cache::Handle* ClockCacheShard::Lookup(const Slice& key, uint32_t hash) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   HashTable::const_accessor accessor;
   if (!table_.find(accessor, ClockCacheKey(key, hash))) {
     return nullptr;
@@ -726,6 +749,7 @@ Cache::Handle* ClockCacheShard::Lookup(const Slice& key, uint32_t hash) {
 }
 
 bool ClockCacheShard::Release(Cache::Handle* h, bool erase_if_last_ref) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   CleanupContext context;
   CacheHandle* handle = reinterpret_cast<CacheHandle*>(h);
   bool erased = Unref(handle, true, &context);
@@ -737,6 +761,7 @@ bool ClockCacheShard::Release(Cache::Handle* h, bool erase_if_last_ref) {
 }
 
 void ClockCacheShard::Erase(const Slice& key, uint32_t hash) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   CleanupContext context;
   EraseAndConfirm(key, hash, &context);
   Cleanup(context);
@@ -744,6 +769,7 @@ void ClockCacheShard::Erase(const Slice& key, uint32_t hash) {
 
 bool ClockCacheShard::EraseAndConfirm(const Slice& key, uint32_t hash,
                                       CleanupContext* context) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   MutexLock l(&mutex_);
   HashTable::accessor accessor;
   bool erased = false;
@@ -756,6 +782,7 @@ bool ClockCacheShard::EraseAndConfirm(const Slice& key, uint32_t hash,
 }
 
 void ClockCacheShard::EraseUnRefEntries() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   CleanupContext context;
   {
     MutexLock l(&mutex_);
@@ -772,6 +799,7 @@ class ClockCache final : public ShardedCache {
   ClockCache(size_t capacity, int num_shard_bits, bool strict_capacity_limit,
              CacheMetadataChargePolicy metadata_charge_policy)
       : ShardedCache(capacity, num_shard_bits, strict_capacity_limit) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     int num_shards = 1 << num_shard_bits;
     shards_ = new ClockCacheShard[num_shards];
     for (int i = 0; i < num_shards; i++) {
@@ -827,6 +855,7 @@ class ClockCache final : public ShardedCache {
 std::shared_ptr<Cache> NewClockCache(
     size_t capacity, int num_shard_bits, bool strict_capacity_limit,
     CacheMetadataChargePolicy metadata_charge_policy) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (num_shard_bits < 0) {
     num_shard_bits = GetDefaultCacheShardBits(capacity);
   }

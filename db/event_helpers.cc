@@ -60,6 +60,7 @@ void EventHelpers::NotifyOnBackgroundError(
     const std::vector<std::shared_ptr<EventListener>>& listeners,
     BackgroundErrorReason reason, Status* bg_error, InstrumentedMutex* db_mutex,
     bool* auto_recovery) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifndef ROCKSDB_LITE
   if (listeners.empty()) {
     return;

@@ -8,6 +8,7 @@
 #include <mutex>
 
 #include "port/lang.h"
+#include "rocksdb/env.h"
 
 namespace ROCKSDB_NAMESPACE {
 
@@ -40,27 +41,32 @@ std::array<std::string, kNumCacheEntryRoles> kCacheEntryRoleToHyphenString{{
 }};
 
 const std::string& GetCacheEntryRoleName(CacheEntryRole role) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return kCacheEntryRoleToHyphenString[static_cast<size_t>(role)];
 }
 
 const std::string& BlockCacheEntryStatsMapKeys::CacheId() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   static const std::string kCacheId = "id";
   return kCacheId;
 }
 
 const std::string& BlockCacheEntryStatsMapKeys::CacheCapacityBytes() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   static const std::string kCacheCapacityBytes = "capacity";
   return kCacheCapacityBytes;
 }
 
 const std::string&
 BlockCacheEntryStatsMapKeys::LastCollectionDurationSeconds() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   static const std::string kLastCollectionDurationSeconds =
       "secs_for_last_collection";
   return kLastCollectionDurationSeconds;
 }
 
 const std::string& BlockCacheEntryStatsMapKeys::LastCollectionAgeSeconds() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   static const std::string kLastCollectionAgeSeconds =
       "secs_since_last_collection";
   return kLastCollectionAgeSeconds;
@@ -70,6 +76,7 @@ namespace {
 
 std::string GetPrefixedCacheEntryRoleName(const std::string& prefix,
                                           CacheEntryRole role) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const std::string& role_name = GetCacheEntryRoleName(role);
   std::string prefixed_role_name;
   prefixed_role_name.reserve(prefix.size() + role_name.size());
@@ -81,16 +88,19 @@ std::string GetPrefixedCacheEntryRoleName(const std::string& prefix,
 }  // namespace
 
 std::string BlockCacheEntryStatsMapKeys::EntryCount(CacheEntryRole role) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const static std::string kPrefix = "count.";
   return GetPrefixedCacheEntryRoleName(kPrefix, role);
 }
 
 std::string BlockCacheEntryStatsMapKeys::UsedBytes(CacheEntryRole role) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const static std::string kPrefix = "bytes.";
   return GetPrefixedCacheEntryRoleName(kPrefix, role);
 }
 
 std::string BlockCacheEntryStatsMapKeys::UsedPercent(CacheEntryRole role) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const static std::string kPrefix = "percent.";
   return GetPrefixedCacheEntryRoleName(kPrefix, role);
 }
@@ -101,16 +111,19 @@ struct Registry {
   std::mutex mutex;
   UnorderedMap<Cache::DeleterFn, CacheEntryRole> role_map;
   void Register(Cache::DeleterFn fn, CacheEntryRole role) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::lock_guard<std::mutex> lock(mutex);
     role_map[fn] = role;
   }
   UnorderedMap<Cache::DeleterFn, CacheEntryRole> Copy() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::lock_guard<std::mutex> lock(mutex);
     return role_map;
   }
 };
 
 Registry& GetRegistry() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   STATIC_AVOID_DESTRUCTION(Registry, registry);
   return registry;
 }
@@ -118,10 +131,12 @@ Registry& GetRegistry() {
 }  // namespace
 
 void RegisterCacheDeleterRole(Cache::DeleterFn fn, CacheEntryRole role) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   GetRegistry().Register(fn, role);
 }
 
 UnorderedMap<Cache::DeleterFn, CacheEntryRole> CopyCacheDeleterRoleMap() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return GetRegistry().Copy();
 }
 

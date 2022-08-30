@@ -3596,7 +3596,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   // RocksDB sanitize max open files to at least 20. Modify it back.
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "SanitizeOptions::AfterChangeMaxOpenFiles", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         int* max_open_files = static_cast<int*>(arg);
         *max_open_files = 11;
       });
@@ -5150,7 +5149,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   std::atomic<int> num_no(0);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "LevelCompactionPicker::PickCompaction:Return", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         Compaction* compaction = reinterpret_cast<Compaction*>(arg);
         if (compaction->output_level() == 4) {
           ASSERT_TRUE(compaction->output_compression() == kLZ4Compression);
@@ -5159,7 +5157,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       });
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "FlushJob::WriteLevel0Table:output_compression", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         auto* compression = reinterpret_cast<CompressionType*>(arg);
         ASSERT_TRUE(*compression == kNoCompression);
         num_no.fetch_add(1);
@@ -5194,7 +5191,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   num_no.store(0);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "LevelCompactionPicker::PickCompaction:Return", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         Compaction* compaction = reinterpret_cast<Compaction*>(arg);
         if (compaction->output_level() == 4 && compaction->start_level() == 3) {
           ASSERT_TRUE(compaction->output_compression() == kZlibCompression);
@@ -5206,7 +5202,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       });
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "FlushJob::WriteLevel0Table:output_compression", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         auto* compression = reinterpret_cast<CompressionType*>(arg);
         ASSERT_TRUE(*compression == kNoCompression);
         num_no.fetch_add(1);
@@ -6567,7 +6562,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   std::atomic<int> callback_count(0);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::DelayWrite:Wait", [&](void* /*arg*/) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         callback_count.fetch_add(1);
         sleeping_task_low.WakeUp();
       });
@@ -6644,7 +6638,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
     }
     SyncPoint::GetInstance()->SetCallBack(
         "DBImpl::BackgroundCallFlush:ContextCleanedUp", [&](void*) {
-PERF_MARKER(__PRETTY_FUNCTION__);
           {
             MutexLock l(&flush_mutex);
             flush_finished = true;
@@ -6725,7 +6718,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   // Only allow one compactin going through.
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "BackgroundCallCompaction:0", [&](void* /*arg*/) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         // Schedule a sleeping task.
         sleeping_task_low.Reset();
         env_->Schedule(&test::SleepingBackgroundTask::DoSleepTask,
@@ -7093,7 +7085,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "PropertyBlockBuilder::AddTableProperty:Start", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         TableProperties* props = reinterpret_cast<TableProperties*>(arg);
         if (set_file_creation_time_to_zero) {
           if (idx == 0) {
@@ -7115,7 +7106,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   // Set file creation time in manifest all to 0.
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "FileMetaData::FileMetaData", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         FileMetaData* meta = static_cast<FileMetaData*>(arg);
         meta->file_creation_time = 0;
       });

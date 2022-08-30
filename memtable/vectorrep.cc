@@ -114,6 +114,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
 // Returns true iff an entry that compares equal to key is in the collection.
 bool VectorRep::Contains(const char* key) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ReadLock l(&rwlock_);
   return std::find(bucket_->begin(), bucket_->end(), key) != bucket_->end();
 }
@@ -155,6 +156,7 @@ VectorRep::Iterator::Iterator(class VectorRep* vrep,
   sorted_(false) { }
 
 void VectorRep::Iterator::DoSort() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // vrep is non-null means that we are working on an immutable memtable
   if (!sorted_ && vrep_ != nullptr) {
     WriteLock l(&vrep_->rwlock_);
@@ -178,6 +180,7 @@ void VectorRep::Iterator::DoSort() const {
 
 // Returns true iff the iterator is positioned at a valid node.
 bool VectorRep::Iterator::Valid() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   DoSort();
   return cit_ != bucket_->end();
 }
@@ -185,6 +188,7 @@ bool VectorRep::Iterator::Valid() const {
 // Returns the key at the current position.
 // REQUIRES: Valid()
 const char* VectorRep::Iterator::key() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(sorted_);
   return *cit_;
 }

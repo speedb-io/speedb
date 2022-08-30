@@ -217,6 +217,7 @@ struct KeyGen {
 };
 
 char* createValue(Random64& rnd) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   char* rv = new char[FLAGS_value_bytes];
   // Fill with some filler data, and take some CPU time
   for (uint32_t i = 0; i < FLAGS_value_bytes; i += 8) {
@@ -229,6 +230,7 @@ char* createValue(Random64& rnd) {
 size_t SizeFn(void* /*obj*/) { return FLAGS_value_bytes; }
 
 Status SaveToFn(void* obj, size_t /*offset*/, size_t size, void* out) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   memcpy(out, obj, size);
   return Status::OK();
 }
@@ -236,12 +238,15 @@ Status SaveToFn(void* obj, size_t /*offset*/, size_t size, void* out) {
 // Different deleters to simulate using deleter to gather
 // stats on the code origin and kind of cache entries.
 void deleter1(const Slice& /*key*/, void* value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   delete[] static_cast<char*>(value);
 }
 void deleter2(const Slice& /*key*/, void* value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   delete[] static_cast<char*>(value);
 }
 void deleter3(const Slice& /*key*/, void* value) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   delete[] static_cast<char*>(value);
 }
 
@@ -267,6 +272,7 @@ class CacheBench {
         erase_threshold_(lookup_threshold_ +
                          kHundredthUint64 * FLAGS_erase_percent),
         skewed_(FLAGS_skewed) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (erase_threshold_ != 100U * kHundredthUint64) {
       fprintf(stderr, "Percentages must add to 100.\n");
       exit(1);
@@ -309,6 +315,7 @@ class CacheBench {
   ~CacheBench() {}
 
   void PopulateCache() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Random64 rnd(1);
     KeyGen keygen;
     for (uint64_t i = 0; i < 2 * FLAGS_cache_size; i += FLAGS_value_bytes) {
@@ -318,6 +325,7 @@ class CacheBench {
   }
 
   bool Run() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     const auto clock = SystemClock::Default().get();
 
     PrintEnv();
@@ -410,6 +418,7 @@ class CacheBench {
   // behavior of cache_bench or the underlying Cache.
   static void StatsBody(SharedState* shared, HistogramImpl* stats_hist,
                         std::string* stats_report) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (!FLAGS_gather_stats) {
       return;
     }
@@ -473,6 +482,7 @@ class CacheBench {
   }
 
   static void ThreadBody(ThreadState* thread) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     SharedState* shared = thread->shared;
 
     {
@@ -497,6 +507,7 @@ class CacheBench {
   }
 
   void OperateCache(ThreadState* thread) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // To use looked-up values
     uint64_t result = 0;
     // To hold handles for a non-trivial amount of time
@@ -579,6 +590,7 @@ class CacheBench {
   }
 
   void PrintEnv() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     printf("RocksDB version     : %d.%d\n", kMajorVersion, kMinorVersion);
     printf("Number of threads   : %u\n", FLAGS_threads);
     printf("Ops per thread      : %" PRIu64 "\n", FLAGS_ops_per_thread);
@@ -679,6 +691,7 @@ class CacheBench {
 class StressCacheKey {
  public:
   void Run() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (FLAGS_sck_footer_unique_id) {
       // Proposed footer unique IDs are DB-independent and session-independent
       // (but process-dependent) which is most easily simulated here by
@@ -744,6 +757,7 @@ class StressCacheKey {
   }
 
   void RunOnce() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // Re-initialized simulated state
     const size_t db_count = FLAGS_sck_db_count;
     dbs_.reset(new TableProperties[db_count]{});
@@ -865,11 +879,13 @@ class StressCacheKey {
   }
 
   void ResetSession(size_t i) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     dbs_[i].db_session_id = DBImpl::GenerateDbSessionId(nullptr);
     session_count_++;
   }
 
   void ResetProcess() {
+PERF_MARKER(__PRETTY_FUNCTION__);
     process_count_++;
     DBImpl::TEST_ResetDbSessionIdGen();
     for (size_t i = 0; i < FLAGS_sck_db_count; ++i) {
@@ -894,6 +910,7 @@ class StressCacheKey {
 };
 
 int cache_bench_tool(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ParseCommandLineFlags(&argc, &argv, true);
 
   if (FLAGS_stress_cache_key) {

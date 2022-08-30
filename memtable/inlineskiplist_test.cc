@@ -42,6 +42,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   }
 
   int operator()(const char* a, const char* b) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (Decode(a) < Decode(b)) {
       return -1;
     } else if (Decode(a) > Decode(b)) {
@@ -52,6 +53,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   }
 
   int operator()(const char* a, const DecodedType b) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (Decode(a) < b) {
       return -1;
     } else if (Decode(a) > b) {
@@ -393,7 +395,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   struct State {
     std::atomic<int> generation[K];
     void Set(int k, int v) {
-PERF_MARKER(__PRETTY_FUNCTION__);
       generation[k].store(v, std::memory_order_release);
     }
     int Get(int k) { return generation[k].load(std::memory_order_acquire); }

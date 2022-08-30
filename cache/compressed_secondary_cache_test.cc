@@ -39,11 +39,13 @@ class CompressedSecondaryCacheTest : public testing::Test {
   };
 
   static size_t SizeCallback(void* obj) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return reinterpret_cast<TestItem*>(obj)->Size();
   }
 
   static Status SaveToCallback(void* from_obj, size_t from_offset,
                                size_t length, void* out) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     TestItem* item = reinterpret_cast<TestItem*>(from_obj);
     const char* buf = item->Buf();
     EXPECT_EQ(length, item->Size());
@@ -53,6 +55,7 @@ class CompressedSecondaryCacheTest : public testing::Test {
   }
 
   static void DeletionCallback(const Slice& /*key*/, void* obj) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     delete reinterpret_cast<TestItem*>(obj);
     obj = nullptr;
   }
@@ -61,6 +64,7 @@ class CompressedSecondaryCacheTest : public testing::Test {
 
   static Status SaveToCallbackFail(void* /*obj*/, size_t /*offset*/,
                                    size_t /*size*/, void* /*out*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return Status::NotSupported();
   }
 
@@ -80,6 +84,7 @@ class CompressedSecondaryCacheTest : public testing::Test {
   void SetFailCreate(bool fail) { fail_create_ = fail; }
 
   void BasicTest(bool sec_cache_is_compressed, bool use_jemalloc) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     CompressedSecondaryCacheOptions opts;
     opts.capacity = 2048;
     opts.num_shard_bits = 0;
@@ -161,6 +166,7 @@ class CompressedSecondaryCacheTest : public testing::Test {
   }
 
   void FailsTest(bool sec_cache_is_compressed) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     CompressedSecondaryCacheOptions secondary_cache_opts;
     if (sec_cache_is_compressed) {
       if (!LZ4_Supported()) {
@@ -218,6 +224,7 @@ class CompressedSecondaryCacheTest : public testing::Test {
   }
 
   void BasicIntegrationTest(bool sec_cache_is_compressed) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     CompressedSecondaryCacheOptions secondary_cache_opts;
 
     if (sec_cache_is_compressed) {
@@ -301,6 +308,7 @@ class CompressedSecondaryCacheTest : public testing::Test {
   }
 
   void BasicIntegrationFailTest(bool sec_cache_is_compressed) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     CompressedSecondaryCacheOptions secondary_cache_opts;
 
     if (sec_cache_is_compressed) {
@@ -346,6 +354,7 @@ class CompressedSecondaryCacheTest : public testing::Test {
   }
 
   void IntegrationSaveFailTest(bool sec_cache_is_compressed) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     CompressedSecondaryCacheOptions secondary_cache_opts;
 
     if (sec_cache_is_compressed) {
@@ -402,6 +411,7 @@ class CompressedSecondaryCacheTest : public testing::Test {
   }
 
   void IntegrationCreateFailTest(bool sec_cache_is_compressed) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     CompressedSecondaryCacheOptions secondary_cache_opts;
 
     if (sec_cache_is_compressed) {
@@ -458,6 +468,7 @@ class CompressedSecondaryCacheTest : public testing::Test {
   }
 
   void IntegrationFullCapacityTest(bool sec_cache_is_compressed) {
+PERF_MARKER(__PRETTY_FUNCTION__);
     CompressedSecondaryCacheOptions secondary_cache_opts;
 
     if (sec_cache_is_compressed) {
@@ -530,78 +541,95 @@ Cache::CacheItemHelper CompressedSecondaryCacheTest::helper_fail_(
     CompressedSecondaryCacheTest::DeletionCallback);
 
 TEST_F(CompressedSecondaryCacheTest, BasicTestWithNoCompression) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   BasicTest(false, false);
 }
 
 TEST_F(CompressedSecondaryCacheTest,
        BasicTestWithMemoryAllocatorAndNoCompression) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   BasicTest(false, true);
 }
 
 TEST_F(CompressedSecondaryCacheTest, BasicTestWithCompression) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   BasicTest(true, false);
 }
 
 TEST_F(CompressedSecondaryCacheTest,
        BasicTestWithMemoryAllocatorAndCompression) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   BasicTest(true, true);
 }
 
 TEST_F(CompressedSecondaryCacheTest, FailsTestWithNoCompression) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   FailsTest(false);
 }
 
 TEST_F(CompressedSecondaryCacheTest, FailsTestWithCompression) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   FailsTest(true);
 }
 
 TEST_F(CompressedSecondaryCacheTest, BasicIntegrationTestWithNoCompression) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   BasicIntegrationTest(false);
 }
 
 TEST_F(CompressedSecondaryCacheTest, BasicIntegrationTestWithCompression) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   BasicIntegrationTest(true);
 }
 
 TEST_F(CompressedSecondaryCacheTest,
        BasicIntegrationFailTestWithNoCompression) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   BasicIntegrationFailTest(false);
 }
 
 TEST_F(CompressedSecondaryCacheTest, BasicIntegrationFailTestWithCompression) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   BasicIntegrationFailTest(true);
 }
 
 TEST_F(CompressedSecondaryCacheTest, IntegrationSaveFailTestWithNoCompression) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   IntegrationSaveFailTest(false);
 }
 
 TEST_F(CompressedSecondaryCacheTest, IntegrationSaveFailTestWithCompression) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   IntegrationSaveFailTest(true);
 }
 
 TEST_F(CompressedSecondaryCacheTest,
        IntegrationCreateFailTestWithNoCompression) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   IntegrationCreateFailTest(false);
 }
 
 TEST_F(CompressedSecondaryCacheTest, IntegrationCreateFailTestWithCompression) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   IntegrationCreateFailTest(true);
 }
 
 TEST_F(CompressedSecondaryCacheTest,
        IntegrationFullCapacityTestWithNoCompression) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   IntegrationFullCapacityTest(false);
 }
 
 TEST_F(CompressedSecondaryCacheTest,
        IntegrationFullCapacityTestWithCompression) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   IntegrationFullCapacityTest(true);
 }
 
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

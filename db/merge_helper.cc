@@ -129,7 +129,6 @@ Status MergeHelper::MergeUntil(InternalIterator* iter,
                                const BlobFetcher* blob_fetcher,
                                PrefetchBufferCollection* prefetch_buffers,
                                CompactionIterationStats* c_iter_stats) {
-PERF_MARKER(__PRETTY_FUNCTION__);
   // Get a copy of the internal key, before it's invalidated by iter->Next()
   // Also maintain the list of merge operands seen.
   assert(HasOperator());

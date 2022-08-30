@@ -146,7 +146,6 @@ TEST_F(BlobFileAdditionTest, ForwardCompatibleCustomField) {
 PERF_MARKER(__PRETTY_FUNCTION__);
   SyncPoint::GetInstance()->SetCallBack(
       "BlobFileAddition::EncodeTo::CustomFields", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         std::string* output = static_cast<std::string*>(arg);
 
         constexpr uint32_t forward_compatible_tag = 2;
@@ -176,7 +175,6 @@ TEST_F(BlobFileAdditionTest, ForwardIncompatibleCustomField) {
 PERF_MARKER(__PRETTY_FUNCTION__);
   SyncPoint::GetInstance()->SetCallBack(
       "BlobFileAddition::EncodeTo::CustomFields", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         std::string* output = static_cast<std::string*>(arg);
 
         constexpr uint32_t forward_incompatible_tag = (1 << 6) + 1;

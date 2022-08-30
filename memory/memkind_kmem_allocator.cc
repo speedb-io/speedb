@@ -9,9 +9,11 @@
 #endif  // MEMKIND
 
 #include "memory/memkind_kmem_allocator.h"
+#include "rocksdb/env.h"
 
 namespace ROCKSDB_NAMESPACE {
 Status MemkindKmemAllocator::PrepareOptions(const ConfigOptions& options) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string message;
   if (!IsSupported(&message)) {
     return Status::NotSupported(message);
@@ -22,6 +24,7 @@ Status MemkindKmemAllocator::PrepareOptions(const ConfigOptions& options) {
 
 #ifdef MEMKIND
 void* MemkindKmemAllocator::Allocate(size_t size) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   void* p = memkind_malloc(MEMKIND_DAX_KMEM, size);
   if (p == NULL) {
     throw std::bad_alloc();
@@ -30,12 +33,14 @@ void* MemkindKmemAllocator::Allocate(size_t size) {
 }
 
 void MemkindKmemAllocator::Deallocate(void* p) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   memkind_free(MEMKIND_DAX_KMEM, p);
 }
 
 #ifdef ROCKSDB_MALLOC_USABLE_SIZE
 size_t MemkindKmemAllocator::UsableSize(void* p,
                                         size_t /*allocation_size*/) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return memkind_malloc_usable_size(MEMKIND_DAX_KMEM, p);
 }
 #endif  // ROCKSDB_MALLOC_USABLE_SIZE

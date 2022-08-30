@@ -39,6 +39,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
 void MemTableListVersion::UnrefMemTable(autovector<MemTable*>* to_delete,
                                         MemTable* m) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (m->Unref()) {
     to_delete->push_back(m);
     assert(*parent_memtable_list_memory_usage_ >= m->ApproximateMemoryUsage());
@@ -77,6 +78,7 @@ void MemTableListVersion::Ref() { ++refs_; }
 
 // called by superversion::clean()
 void MemTableListVersion::Unref(autovector<MemTable*>* to_delete) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(refs_ >= 1);
   --refs_;
   if (refs_ == 0) {
@@ -94,12 +96,14 @@ void MemTableListVersion::Unref(autovector<MemTable*>* to_delete) {
 }
 
 int MemTableList::NumNotFlushed() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   int size = static_cast<int>(current_->memlist_.size());
   assert(num_flush_not_started_ <= size);
   return size;
 }
 
 int MemTableList::NumFlushed() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return static_cast<int>(current_->memlist_history_.size());
 }
 
@@ -228,6 +232,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 uint64_t MemTableListVersion::GetTotalNumEntries() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t total_num = 0;
   for (auto& m : memlist_) {
     total_num += m->num_entries();
@@ -248,6 +253,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 uint64_t MemTableListVersion::GetTotalNumDeletes() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t total_num = 0;
   for (auto& m : memlist_) {
     total_num += m->num_deletes();
@@ -257,6 +263,7 @@ uint64_t MemTableListVersion::GetTotalNumDeletes() const {
 
 SequenceNumber MemTableListVersion::GetEarliestSequenceNumber(
     bool include_history) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (include_history && !memlist_history_.empty()) {
     return memlist_history_.back()->GetEarliestSequenceNumber();
   } else if (!memlist_.empty()) {
@@ -268,6 +275,7 @@ SequenceNumber MemTableListVersion::GetEarliestSequenceNumber(
 
 // caller is responsible for referencing m
 void MemTableListVersion::Add(MemTable* m, autovector<MemTable*>* to_delete) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(refs_ == 1);  // only when refs_ == 1 is MemTableListVersion mutable
   AddMemTable(m);
   // m->MemoryAllocatedBytes() is added in MemoryAllocatedBytesExcludingLast
@@ -277,6 +285,7 @@ void MemTableListVersion::Add(MemTable* m, autovector<MemTable*>* to_delete) {
 // Removes m from list of memtables not flushed.  Caller should NOT Unref m.
 void MemTableListVersion::Remove(MemTable* m,
                                  autovector<MemTable*>* to_delete) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(refs_ == 1);  // only when refs_ == 1 is MemTableListVersion mutable
   memlist_.remove(m);
 
@@ -294,6 +303,7 @@ void MemTableListVersion::Remove(MemTable* m,
 
 // return the total memory usage assuming the oldest flushed memtable is dropped
 size_t MemTableListVersion::MemoryAllocatedBytesExcludingLast() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   size_t total_memtable_size = 0;
   for (auto& memtable : memlist_) {
     total_memtable_size += memtable->MemoryAllocatedBytes();
@@ -326,6 +336,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 // Make sure we don't use up too much space in history
 bool MemTableListVersion::TrimHistory(autovector<MemTable*>* to_delete,
                                       size_t usage) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   bool ret = false;
   while (MemtableLimitExceeded(usage) && !memlist_history_.empty()) {
     MemTable* x = memlist_history_.back();
@@ -340,6 +351,7 @@ bool MemTableListVersion::TrimHistory(autovector<MemTable*>* to_delete,
 // Returns true if there is at least one memtable on which flush has
 // not yet started.
 bool MemTableList::IsFlushPending() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if ((flush_requested_ && num_flush_not_started_ > 0) ||
       (num_flush_not_started_ >= min_write_buffer_number_to_merge_)) {
     assert(imm_flush_needed.load(std::memory_order_relaxed));
@@ -352,6 +364,7 @@ bool MemTableList::IsFlushPending() const {
 void MemTableList::PickMemtablesToFlush(uint64_t max_memtable_id,
                                         autovector<MemTable*>* ret,
                                         uint64_t* max_next_log_number) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   AutoThreadOperationStageUpdater stage_updater(
       ThreadStatus::STAGE_PICK_MEMTABLES_TO_FLUSH);
   const auto& memlist = current_->memlist_;
@@ -392,6 +405,7 @@ void MemTableList::PickMemtablesToFlush(uint64_t max_memtable_id,
 
 void MemTableList::RollbackMemtableFlush(const autovector<MemTable*>& mems,
                                          uint64_t /*file_number*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   AutoThreadOperationStageUpdater stage_updater(
       ThreadStatus::STAGE_MEMTABLE_ROLLBACK);
   assert(!mems.empty());
@@ -420,6 +434,7 @@ Status MemTableList::TryInstallMemtableFlushResults(
     LogBuffer* log_buffer,
     std::list<std::unique_ptr<FlushJobInfo>>* committed_flush_jobs_info,
     bool write_edits) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   AutoThreadOperationStageUpdater stage_updater(
       ThreadStatus::STAGE_MEMTABLE_INSTALL_FLUSH_RESULTS);
   mu->AssertHeld();
@@ -567,6 +582,7 @@ Status MemTableList::TryInstallMemtableFlushResults(
 
 // New memtables are inserted at the front of the list.
 void MemTableList::Add(MemTable* m, autovector<MemTable*>* to_delete) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(static_cast<int>(current_->memlist_.size()) >= num_flush_not_started_);
   InstallNewVersion();
   // this method is used to move mutable memtable into an immutable list.
@@ -585,6 +601,7 @@ void MemTableList::Add(MemTable* m, autovector<MemTable*>* to_delete) {
 }
 
 bool MemTableList::TrimHistory(autovector<MemTable*>* to_delete, size_t usage) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   InstallNewVersion();
   bool ret = current_->TrimHistory(to_delete, usage);
   UpdateCachedValuesFromMemTableListVersion();
@@ -605,12 +622,14 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 size_t MemTableList::ApproximateMemoryUsage() { return current_memory_usage_; }
 
 size_t MemTableList::MemoryAllocatedBytesExcludingLast() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const size_t usage = current_memory_allocted_bytes_excluding_last_.load(
       std::memory_order_relaxed);
   return usage;
 }
 
 bool MemTableList::HasHistory() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const bool has_history = current_has_history_.load(std::memory_order_relaxed);
   return has_history;
 }
@@ -627,6 +646,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 uint64_t MemTableList::ApproximateOldestKeyTime() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!current_->memlist_.empty()) {
     return current_->memlist_.back()->ApproximateOldestKeyTime();
   }
@@ -650,6 +670,7 @@ void MemTableList::RemoveMemTablesOrRestoreFlags(
     const Status& s, ColumnFamilyData* cfd, size_t batch_count,
     LogBuffer* log_buffer, autovector<MemTable*>* to_delete,
     InstrumentedMutex* mu) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(mu);
   mu->AssertHeld();
   assert(to_delete);
@@ -759,6 +780,7 @@ Status InstallMemtableAtomicFlushResults(
         committed_flush_jobs_info,
     autovector<MemTable*>* to_delete, FSDirectory* db_directory,
     LogBuffer* log_buffer) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   AutoThreadOperationStageUpdater stage_updater(
       ThreadStatus::STAGE_MEMTABLE_INSTALL_FLUSH_RESULTS);
   mu->AssertHeld();
@@ -924,6 +946,7 @@ Status InstallMemtableAtomicFlushResults(
 
 void MemTableList::RemoveOldMemTables(uint64_t log_number,
                                       autovector<MemTable*>* to_delete) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(to_delete != nullptr);
   InstallNewVersion();
   auto& memlist = current_->memlist_;

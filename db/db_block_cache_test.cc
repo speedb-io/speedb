@@ -1402,7 +1402,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       SyncPoint::GetInstance()->SetCallBack(
           "CacheEntryStatsCollector::GetStats:AfterApplyToAllEntries",
           [this](void*) {
-PERF_MARKER(__PRETTY_FUNCTION__);
             // To spend no more than 0.2% of time scanning, we would need
             // interval of at least 10000s
             env_->MockSleepForSeconds(20);
@@ -1497,7 +1496,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       SyncPoint::GetInstance()->SetCallBack(
           "CacheEntryStatsCollector::GetStats:AfterApplyToAllEntries",
           [this, &scan_count](void*) {
-PERF_MARKER(__PRETTY_FUNCTION__);
             dbfull()->TEST_LockMutex();
             dbfull()->TEST_UnlockMutex();
             ++scan_count;

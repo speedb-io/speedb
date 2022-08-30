@@ -185,7 +185,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   SyncPoint::GetInstance()->SetCallBack(
       "BlockBasedTableBuilder::WritePropertiesBlock:BlockData",
       [&](void* block_data) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         *reinterpret_cast<Slice*>(block_data) = Slice("X");
       });
   SyncPoint::GetInstance()->EnableProcessing();

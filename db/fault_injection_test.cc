@@ -209,6 +209,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   }
 
   Status ReadValue(int i, std::string* val) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::string key_space, value_space;
     Slice key = Key(i, &key_space);
     Value(i, &value_space);
@@ -218,6 +219,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   Status Verify(int start_idx, int num_vals,
                 ExpectedVerifResult expected) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     std::string val;
     std::string value_space;
     Status s;
@@ -244,6 +246,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   // Return the ith key
   Slice Key(int i, std::string* storage) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     unsigned long long num = i;
     if (!sequential_order_) {
       // random transfer
@@ -259,6 +262,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   // Return the value to associate with the specified key
   Slice Value(int k, std::string* storage) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Random r(k);
     *storage = r.RandomString(kValueSize);
     return Slice(*storage);

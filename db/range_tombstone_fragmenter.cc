@@ -21,6 +21,7 @@ FragmentedRangeTombstoneList::FragmentedRangeTombstoneList(
     std::unique_ptr<InternalIterator> unfragmented_tombstones,
     const InternalKeyComparator& icmp, bool for_compaction,
     const std::vector<SequenceNumber>& snapshots) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (unfragmented_tombstones == nullptr) {
     return;
   }
@@ -217,6 +218,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
 bool FragmentedRangeTombstoneList::ContainsRange(SequenceNumber lower,
                                                  SequenceNumber upper) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto seq_it = seq_set_.lower_bound(lower);
   return seq_it != seq_set_.end() && *seq_it <= upper;
 }
@@ -426,6 +428,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 bool FragmentedRangeTombstoneIterator::Valid() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return tombstones_ != nullptr && pos_ != tombstones_->end();
 }
 

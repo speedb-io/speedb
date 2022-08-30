@@ -55,6 +55,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 void BlockHandle::EncodeTo(std::string* dst) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Sanity check that all fields have been set
   assert(offset_ != ~uint64_t{0});
   assert(size_ != ~uint64_t{0});
@@ -62,6 +63,7 @@ void BlockHandle::EncodeTo(std::string* dst) const {
 }
 
 char* BlockHandle::EncodeTo(char* dst) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Sanity check that all fields have been set
   assert(offset_ != ~uint64_t{0});
   assert(size_ != ~uint64_t{0});
@@ -97,6 +99,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
 // Return a string that contains the copy of handle.
 std::string BlockHandle::ToString(bool hex) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string handle_str;
   EncodeTo(&handle_str);
   if (hex) {
@@ -110,6 +113,7 @@ const BlockHandle BlockHandle::kNullBlockHandle(0, 0);
 
 void IndexValue::EncodeTo(std::string* dst, bool have_first_key,
                           const BlockHandle* previous_handle) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (previous_handle) {
     // WART: this is specific to Block-based table
     assert(handle.offset() == previous_handle->offset() +
@@ -155,6 +159,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 std::string IndexValue::ToString(bool hex, bool have_first_key) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string s;
   EncodeTo(&s, have_first_key, nullptr);
   if (hex) {
@@ -336,6 +341,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 std::string Footer::ToString() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string result;
   result.reserve(1024);
 

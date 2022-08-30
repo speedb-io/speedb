@@ -270,6 +270,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 uint32_t WriteBatch::Count() const { return WriteBatchInternal::Count(this); }
 
 uint32_t WriteBatch::ComputeContentFlags() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   auto rv = content_flags_.load(std::memory_order_relaxed);
   if ((rv & ContentFlags::DEFERRED) != 0) {
     BatchContentClassifier classifier;
@@ -294,6 +295,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 size_t WriteBatch::GetProtectionBytesPerKey() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (prot_info_ != nullptr) {
     return prot_info_->GetBytesPerKey();
   }
@@ -301,22 +303,27 @@ size_t WriteBatch::GetProtectionBytesPerKey() const {
 }
 
 bool WriteBatch::HasPut() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return (ComputeContentFlags() & ContentFlags::HAS_PUT) != 0;
 }
 
 bool WriteBatch::HasDelete() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return (ComputeContentFlags() & ContentFlags::HAS_DELETE) != 0;
 }
 
 bool WriteBatch::HasSingleDelete() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return (ComputeContentFlags() & ContentFlags::HAS_SINGLE_DELETE) != 0;
 }
 
 bool WriteBatch::HasDeleteRange() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return (ComputeContentFlags() & ContentFlags::HAS_DELETE_RANGE) != 0;
 }
 
 bool WriteBatch::HasMerge() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return (ComputeContentFlags() & ContentFlags::HAS_MERGE) != 0;
 }
 
@@ -339,18 +346,22 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 bool WriteBatch::HasBeginPrepare() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return (ComputeContentFlags() & ContentFlags::HAS_BEGIN_PREPARE) != 0;
 }
 
 bool WriteBatch::HasEndPrepare() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return (ComputeContentFlags() & ContentFlags::HAS_END_PREPARE) != 0;
 }
 
 bool WriteBatch::HasCommit() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return (ComputeContentFlags() & ContentFlags::HAS_COMMIT) != 0;
 }
 
 bool WriteBatch::HasRollback() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return (ComputeContentFlags() & ContentFlags::HAS_ROLLBACK) != 0;
 }
 
@@ -461,6 +472,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 Status WriteBatch::Iterate(Handler* handler) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (rep_.size() < WriteBatchInternal::kHeader) {
     return Status::Corruption("malformed WriteBatch (too small)");
   }

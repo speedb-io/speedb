@@ -2586,7 +2586,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
 void rocksdb_set_options(
     rocksdb_t* db, int count, const char* const keys[], const char* const values[], char** errptr) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         std::unordered_map<std::string, std::string> options_map;
         for (int i=0; i<count; i++)
             options_map[keys[i]] = values[i];
@@ -2596,7 +2595,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
 void rocksdb_set_options_cf(
     rocksdb_t* db, rocksdb_column_family_handle_t* handle, int count, const char* const keys[], const char* const values[], char** errptr) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         std::unordered_map<std::string, std::string> options_map;
         for (int i=0; i<count; i++)
             options_map[keys[i]] = values[i];
@@ -3654,11 +3652,13 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 void rocksdb_options_set_disable_auto_compactions(rocksdb_options_t* opt, int disable) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   opt->rep.disable_auto_compactions = disable;
 }
 
 unsigned char rocksdb_options_get_disable_auto_compactions(
     rocksdb_options_t* opt) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return opt->rep.disable_auto_compactions;
 }
 

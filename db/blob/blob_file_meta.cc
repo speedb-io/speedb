@@ -13,10 +13,12 @@
 
 namespace ROCKSDB_NAMESPACE {
 uint64_t SharedBlobFileMetaData::GetBlobFileSize() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return BlobLogHeader::kSize + total_blob_bytes_ + BlobLogFooter::kSize;
 }
 
 std::string SharedBlobFileMetaData::DebugString() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::ostringstream oss;
   oss << (*this);
 
@@ -37,6 +39,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 std::string BlobFileMetaData::DebugString() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::ostringstream oss;
   oss << (*this);
 

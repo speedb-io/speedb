@@ -1183,6 +1183,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
  private:
   void ReportDuration(const FileOperationInfo& info) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_GT(info.duration.count(), 0);
   }
 };
@@ -1302,6 +1303,7 @@ class BlobDBJobLevelEventListenerTest : public EventListener {
       : test_(test), call_count_(0) {}
 
   const VersionStorageInfo* GetVersionStorageInfo() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     VersionSet* const versions = test_->dbfull()->GetVersionSet();
     assert(versions);
 
@@ -1319,6 +1321,7 @@ class BlobDBJobLevelEventListenerTest : public EventListener {
 
   void CheckBlobFileAdditions(
       const std::vector<BlobFileAdditionInfo>& blob_file_addition_infos) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     const auto* vstorage = GetVersionStorageInfo();
 
     EXPECT_FALSE(blob_file_addition_infos.empty());

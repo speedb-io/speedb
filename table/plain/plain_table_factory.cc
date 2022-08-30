@@ -62,6 +62,7 @@ Status PlainTableFactory::NewTableReader(
     std::unique_ptr<RandomAccessFileReader>&& file, uint64_t file_size,
     std::unique_ptr<TableReader>* table,
     bool /*prefetch_index_and_filter_in_cache*/) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return PlainTableReader::Open(
       table_reader_options.ioptions, table_reader_options.env_options,
       table_reader_options.internal_comparator, std::move(file), file_size,
@@ -74,6 +75,7 @@ Status PlainTableFactory::NewTableReader(
 TableBuilder* PlainTableFactory::NewTableBuilder(
     const TableBuilderOptions& table_builder_options,
     WritableFileWriter* file) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Ignore the skip_filters flag. PlainTable format is optimized for small
   // in-memory dbs. The skip_filters optimization is not useful for plain
   // tables
@@ -92,6 +94,7 @@ TableBuilder* PlainTableFactory::NewTableBuilder(
 }
 
 std::string PlainTableFactory::GetPrintableOptions() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string ret;
   ret.reserve(20000);
   const int kBufferSize = 200;

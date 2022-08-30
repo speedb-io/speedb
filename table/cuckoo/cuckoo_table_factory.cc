@@ -19,6 +19,7 @@ Status CuckooTableFactory::NewTableReader(
     std::unique_ptr<RandomAccessFileReader>&& file, uint64_t file_size,
     std::unique_ptr<TableReader>* table,
     bool /*prefetch_index_and_filter_in_cache*/) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::unique_ptr<CuckooTableReader> new_reader(new CuckooTableReader(
       table_reader_options.ioptions, std::move(file), file_size,
       table_reader_options.internal_comparator.user_comparator(), nullptr));
@@ -32,6 +33,7 @@ Status CuckooTableFactory::NewTableReader(
 TableBuilder* CuckooTableFactory::NewTableBuilder(
     const TableBuilderOptions& table_builder_options,
     WritableFileWriter* file) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // TODO: change builder to take the option struct
   return new CuckooTableBuilder(
       file, table_options_.hash_table_ratio, 64,
@@ -45,6 +47,7 @@ TableBuilder* CuckooTableFactory::NewTableBuilder(
 }
 
 std::string CuckooTableFactory::GetPrintableOptions() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string ret;
   ret.reserve(2000);
   const int kBufferSize = 200;

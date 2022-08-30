@@ -314,14 +314,17 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 uint64_t PlainTableBuilder::NumEntries() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return properties_.num_entries;
 }
 
 uint64_t PlainTableBuilder::FileSize() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return offset_;
 }
 
 std::string PlainTableBuilder::GetFileChecksum() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (file_ != nullptr) {
     return file_->GetFileChecksum();
   } else {
@@ -330,6 +333,7 @@ std::string PlainTableBuilder::GetFileChecksum() const {
 }
 
 const char* PlainTableBuilder::GetFileChecksumFuncName() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (file_ != nullptr) {
     return file_->GetFileChecksumFuncName();
   } else {

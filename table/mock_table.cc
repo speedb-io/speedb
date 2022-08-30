@@ -240,6 +240,7 @@ Status MockTableFactory::NewTableReader(
     std::unique_ptr<RandomAccessFileReader>&& file, uint64_t /*file_size*/,
     std::unique_ptr<TableReader>* table_reader,
     bool /*prefetch_index_and_filter_in_cache*/) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint32_t id;
   Status s = GetIDFromFile(file.get(), &id);
   if (!s.ok()) {
@@ -261,6 +262,7 @@ Status MockTableFactory::NewTableReader(
 TableBuilder* MockTableFactory::NewTableBuilder(
     const TableBuilderOptions& /*table_builder_options*/,
     WritableFileWriter* file) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint32_t id;
   Status s = GetAndWriteNextID(file, &id);
   assert(s.ok());
@@ -287,6 +289,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
 Status MockTableFactory::GetAndWriteNextID(WritableFileWriter* file,
                                            uint32_t* next_id) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   *next_id = next_id_.fetch_add(1);
   char buf[4];
   EncodeFixed32(buf, *next_id);
@@ -295,6 +298,7 @@ Status MockTableFactory::GetAndWriteNextID(WritableFileWriter* file,
 
 Status MockTableFactory::GetIDFromFile(RandomAccessFileReader* file,
                                        uint32_t* id) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   char buf[4];
   Slice result;
   Status s = file->Read(IOOptions(), 0, 4, &result, buf, nullptr,

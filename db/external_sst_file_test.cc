@@ -1091,14 +1091,12 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   SequenceNumber assigned_seqno = 0;
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "ExternalSstFileIngestionJob::Run", [&assigned_seqno](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         ASSERT_TRUE(arg != nullptr);
         assigned_seqno = *(static_cast<SequenceNumber*>(arg));
       });
   bool need_flush = false;
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::IngestExternalFile:NeedFlush", [&need_flush](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         ASSERT_TRUE(arg != nullptr);
         need_flush = *(static_cast<bool*>(arg));
       });
@@ -1106,7 +1104,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "ExternalSstFileIngestionJob::AssignLevelAndSeqnoForIngestedFile",
       [&overlap_with_db](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         ASSERT_TRUE(arg != nullptr);
         overlap_with_db = *(static_cast<bool*>(arg));
       });
@@ -1668,7 +1665,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "CompactionJob::Run():Start", [&](void* /*arg*/) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         // fit in L3 but will overlap with compaction so will be added
         // to L2 but a compaction will trivially move it to L3
         // and break LSM consistency
@@ -1734,7 +1730,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
         "DBImpl::WriteImpl:BeforeUnorderedWriteMemtable"}});
   SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::IngestExternalFile:NeedFlush", [&](void* need_flush) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         ASSERT_TRUE(*reinterpret_cast<bool*>(need_flush));
       });
 

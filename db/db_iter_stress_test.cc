@@ -50,6 +50,7 @@ struct Entry {
   bool visible = true;
 
   bool operator<(const Entry& e) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (key != e.key) return key < e.key;
     return std::tie(sequence, type) > std::tie(e.sequence, e.type);
   }

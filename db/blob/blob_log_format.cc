@@ -138,6 +138,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 Status BlobLogRecord::CheckBlobCRC() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint32_t expected_crc = 0;
   expected_crc = crc32c::Value(key.data(), key.size());
   expected_crc = crc32c::Extend(expected_crc, value.data(), value.size());

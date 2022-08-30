@@ -33,6 +33,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
 bool FIFOCompactionPicker::NeedsCompaction(
     const VersionStorageInfo* vstorage) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const int kLevel0 = 0;
   return vstorage->CompactionScore(kLevel0) >= 1;
 }

@@ -244,6 +244,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
 int MemTable::KeyComparator::operator()(const char* prefix_len_key1,
                                         const char* prefix_len_key2) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Internal keys are encoded as length-prefixed strings.
   Slice k1 = GetLengthPrefixedSlice(prefix_len_key1);
   Slice k2 = GetLengthPrefixedSlice(prefix_len_key2);
@@ -268,6 +269,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 Slice MemTableRep::UserKey(const char* key) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Slice slice = GetLengthPrefixedSlice(key);
   return Slice(slice.data(), slice.size() - 8);
 }

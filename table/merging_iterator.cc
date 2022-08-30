@@ -325,11 +325,13 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   void SwitchToBackward();
 
   IteratorWrapper* CurrentForward() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(direction_ == kForward);
     return !minHeap_.empty() ? minHeap_.top() : nullptr;
   }
 
   IteratorWrapper* CurrentReverse() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(direction_ == kReverse);
     assert(maxHeap_);
     return !maxHeap_->empty() ? maxHeap_->top() : nullptr;

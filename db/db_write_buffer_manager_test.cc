@@ -114,14 +114,12 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "WBMStallInterface::BlockDB", [&](void*) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         InstrumentedMutexLock lock(&mutex);
         wait_count_db++;
         cv.SignalAll();
       });
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "WriteThread::WriteStall::Wait", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         InstrumentedMutexLock lock(&mutex);
         WriteThread::Writer* w = reinterpret_cast<WriteThread::Writer*>(arg);
         w_set.insert(w);
@@ -136,7 +134,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   bool s = true;
 
   std::function<void(int)> writer = [&](int cf) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     int a = thread_num.fetch_add(1);
     std::string key = "foo" + std::to_string(a);
     Status tmp = Put(cf, Slice(key), DummyString(1), wo);
@@ -239,7 +236,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "WBMStallInterface::BlockDB", [&](void*) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         {
           InstrumentedMutexLock lock(&mutex);
           wait_count_db++;
@@ -257,7 +253,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   // Write to DB.
   std::function<void(DB*)> write_db = [&](DB* db) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     Status tmp = db->Put(wo, Key(3), DummyString(1));
     InstrumentedMutexLock lock(&mutex);
     s = s && tmp.ok();
@@ -363,7 +358,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "WBMStallInterface::BlockDB", [&](void*) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         {
           InstrumentedMutexLock lock(&mutex);
           wait_count_db++;
@@ -378,7 +372,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       });
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "WriteThread::WriteStall::Wait", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         WriteThread::Writer* w = reinterpret_cast<WriteThread::Writer*>(arg);
         {
           InstrumentedMutexLock lock(&mutex);
@@ -396,14 +389,12 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   bool s1 = true, s2 = true;
   // Write to multiple columns of db_.
   std::function<void(int)> write_cf = [&](int cf) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     Status tmp = Put(cf, Key(3), DummyString(1), wo);
     InstrumentedMutexLock lock(&mutex);
     s1 = s1 && tmp.ok();
   };
   // Write to multiple DBs.
   std::function<void(DB*)> write_db = [&](DB* db) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     Status tmp = db->Put(wo, Key(3), DummyString(1));
     InstrumentedMutexLock lock(&mutex);
     s2 = s2 && tmp.ok();
@@ -514,7 +505,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "WBMStallInterface::BlockDB", [&](void*) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         {
           InstrumentedMutexLock lock(&mutex);
           wait_count_db++;
@@ -524,7 +514,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "WriteThread::WriteStall::Wait", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         {
           InstrumentedMutexLock lock(&mutex);
           WriteThread::Writer* w = reinterpret_cast<WriteThread::Writer*>(arg);
@@ -543,7 +532,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   bool s1 = true, s2 = true;
 
   std::function<void(int)> write_slow_down = [&](int cf) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     int a = thread_num.fetch_add(1);
     std::string key = "foo" + std::to_string(a);
     WriteOptions write_op;
@@ -554,7 +542,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   };
 
   std::function<void(int)> write_no_slow_down = [&](int cf) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     int a = thread_num.fetch_add(1);
     std::string key = "foo" + std::to_string(a);
     WriteOptions write_op;
@@ -678,7 +665,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "WBMStallInterface::BlockDB", [&](void*) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         InstrumentedMutexLock lock(&mutex);
         wait_count_db++;
         cv.Signal();
@@ -694,7 +680,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "WriteThread::WriteStall::Wait", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         WriteThread::Writer* w = reinterpret_cast<WriteThread::Writer*>(arg);
         InstrumentedMutexLock lock(&mutex);
         w_slowdown_set.insert(w);
@@ -711,7 +696,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   bool s1 = true, s2 = true;
   std::function<void(DB*)> write_slow_down = [&](DB* db) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     int a = thread_num.fetch_add(1);
     std::string key = "foo" + std::to_string(a);
     WriteOptions write_op;
@@ -722,7 +706,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   };
 
   std::function<void(DB*)> write_no_slow_down = [&](DB* db) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     int a = thread_num.fetch_add(1);
     std::string key = "foo" + std::to_string(a);
     WriteOptions write_op;

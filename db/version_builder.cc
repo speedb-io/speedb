@@ -38,6 +38,7 @@ class VersionBuilder::Rep {
   class NewestFirstBySeqNo {
    public:
     bool operator()(const FileMetaData* lhs, const FileMetaData* rhs) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
       assert(lhs);
       assert(rhs);
 
@@ -59,6 +60,7 @@ class VersionBuilder::Rep {
     explicit BySmallestKey(const InternalKeyComparator* cmp) : cmp_(cmp) {}
 
     bool operator()(const FileMetaData* lhs, const FileMetaData* rhs) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
       assert(lhs);
       assert(rhs);
       assert(cmp_);
@@ -88,23 +90,28 @@ class VersionBuilder::Rep {
   class BlobFileMetaDataDelta {
    public:
     bool IsEmpty() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
       return !additional_garbage_count_ && !additional_garbage_bytes_ &&
              newly_linked_ssts_.empty() && newly_unlinked_ssts_.empty();
     }
 
     uint64_t GetAdditionalGarbageCount() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
       return additional_garbage_count_;
     }
 
     uint64_t GetAdditionalGarbageBytes() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
       return additional_garbage_bytes_;
     }
 
     const std::unordered_set<uint64_t>& GetNewlyLinkedSsts() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
       return newly_linked_ssts_;
     }
 
     const std::unordered_set<uint64_t>& GetNewlyUnlinkedSsts() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
       return newly_unlinked_ssts_;
     }
 
@@ -176,10 +183,12 @@ PERF_MARKER(__PRETTY_FUNCTION__);
           garbage_blob_bytes_(meta->GetGarbageBlobBytes()) {}
 
     const std::shared_ptr<SharedBlobFileMetaData>& GetSharedMeta() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
       return shared_meta_;
     }
 
     uint64_t GetBlobFileNumber() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
       assert(shared_meta_);
       return shared_meta_->GetBlobFileNumber();
     }
@@ -187,6 +196,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
     bool HasDelta() const { return !delta_.IsEmpty(); }
 
     const std::unordered_set<uint64_t>& GetLinkedSsts() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
       return linked_ssts_;
     }
 
@@ -329,6 +339,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       const VersionStorageInfo* vstorage, int level, Checker checker,
       const std::string& sync_point,
       ExpectedLinkedSsts* expected_linked_ssts) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifdef NDEBUG
     (void)sync_point;
 #endif
@@ -374,6 +385,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   // Make sure table files are sorted correctly and that the links between
   // table files and blob files are consistent.
   Status CheckConsistencyDetails(const VersionStorageInfo* vstorage) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(vstorage);
 
     ExpectedLinkedSsts expected_linked_ssts;
@@ -505,6 +517,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   }
 
   Status CheckConsistency(const VersionStorageInfo* vstorage) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(vstorage);
 
     // Always run consistency checks in debug build
@@ -531,6 +544,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   }
 
   bool CheckConsistencyForNumLevels() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // Make sure there are no files on or beyond num_levels().
     if (has_invalid_levels_) {
       return false;
@@ -547,6 +561,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   }
 
   bool IsBlobFileInVersion(uint64_t blob_file_number) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     auto mutable_it = mutable_blob_file_metas_.find(blob_file_number);
     if (mutable_it != mutable_blob_file_metas_.end()) {
       return true;
@@ -645,6 +660,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   }
 
   int GetCurrentLevelForTableFile(uint64_t file_number) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     auto it = table_file_levels_.find(file_number);
     if (it != table_file_levels_.end()) {
       return it->second;
@@ -656,6 +672,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   uint64_t GetOldestBlobFileNumberForTableFile(int level,
                                                uint64_t file_number) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(level < num_levels_);
 
     const auto& added_files = levels_[level].added_files;
@@ -865,6 +882,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   void MergeBlobFileMetas(uint64_t first_blob_file, ProcessBase process_base,
                           ProcessMutable process_mutable,
                           ProcessBoth process_both) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(base_vstorage_);
 
     auto base_it = base_vstorage_->GetBlobFileMetaDataLB(first_blob_file);
@@ -950,6 +968,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   // Find the oldest blob file that has linked SSTs.
   uint64_t GetMinOldestBlobFileNumber() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     uint64_t min_oldest_blob_file_num = kInvalidBlobFileNumber;
 
     auto process_base =
@@ -1012,6 +1031,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   // Merge the blob file metadata from the base version with the changes (edits)
   // applied, and save the result into *vstorage.
   void SaveBlobFilesTo(VersionStorageInfo* vstorage) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(vstorage);
 
     assert(base_vstorage_);
@@ -1066,6 +1086,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   void MaybeAddFile(VersionStorageInfo* vstorage, int level,
                     FileMetaData* f) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     const uint64_t file_number = f->fd.GetNumber();
 
     const auto& level_state = levels_[level];
@@ -1092,6 +1113,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   template <typename Cmp>
   void SaveSSTFilesTo(VersionStorageInfo* vstorage, int level, Cmp cmp) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     // Merge the set of added files with the set of pre-existing files.
     // Drop any deleted files.  Store the result in *vstorage.
     const auto& base_files = base_vstorage_->LevelFiles(level);
@@ -1121,6 +1143,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   }
 
   void SaveSSTFilesTo(VersionStorageInfo* vstorage) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     assert(vstorage);
 
     if (!num_levels_) {
@@ -1136,6 +1159,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   // Save the current state in *vstorage.
   Status SaveTo(VersionStorageInfo* vstorage) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     Status s = CheckConsistency(base_vstorage_);
     if (!s.ok()) {
       return s;
@@ -1280,6 +1304,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 Status VersionBuilder::SaveTo(VersionStorageInfo* vstorage) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return rep_->SaveTo(vstorage);
 }
 
@@ -1295,6 +1320,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 uint64_t VersionBuilder::GetMinOldestBlobFileNumber() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return rep_->GetMinOldestBlobFileNumber();
 }
 

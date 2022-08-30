@@ -162,6 +162,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 void BlockBasedTable::UpdateCacheHitMetrics(BlockType block_type,
                                             GetContext* get_context,
                                             size_t usage) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Statistics* const statistics = rep_->ioptions.stats;
 
   PERF_COUNTER_ADD(block_cache_hit_count, 1);
@@ -220,6 +221,7 @@ void BlockBasedTable::UpdateCacheHitMetrics(BlockType block_type,
 
 void BlockBasedTable::UpdateCacheMissMetrics(BlockType block_type,
                                              GetContext* get_context) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Statistics* const statistics = rep_->ioptions.stats;
 
   // TODO: introduce aggregate (not per-level) block cache miss count
@@ -366,6 +368,7 @@ Cache::Handle* BlockBasedTable::GetEntryFromCache(
     BlockType block_type, const bool wait, GetContext* get_context,
     const Cache::CacheItemHelper* cache_helper,
     const Cache::CreateCallback& create_cb, Cache::Priority priority) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Cache::Handle* cache_handle = nullptr;
   if (cache_tier == CacheTier::kNonVolatileBlockTier) {
     cache_handle = block_cache->Lookup(key, cache_helper, create_cb, priority,
@@ -390,6 +393,7 @@ Status BlockBasedTable::InsertEntryToCache(
     const Cache::CacheItemHelper* cache_helper,
     std::unique_ptr<TBlocklike>& block_holder, size_t charge,
     Cache::Handle** cache_handle, Cache::Priority priority) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Status s = Status::OK();
   if (cache_tier == CacheTier::kNonVolatileBlockTier) {
     s = block_cache->Insert(key, block_holder.get(), cache_helper, charge,
@@ -1137,6 +1141,7 @@ std::shared_ptr<const TableProperties> BlockBasedTable::GetTableProperties()
 }
 
 size_t BlockBasedTable::ApproximateMemoryUsage() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   size_t usage = 0;
   if (rep_) {
     usage += rep_->ApproximateMemoryUsage();
@@ -1198,6 +1203,7 @@ Status BlockBasedTable::GetDataBlockFromCache(
     const ReadOptions& read_options, CachableEntry<TBlocklike>* block,
     const UncompressionDict& uncompression_dict, BlockType block_type,
     const bool wait, GetContext* get_context) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const size_t read_amp_bytes_per_bit =
       block_type == BlockType::kData
           ? rep_->table_options.read_amp_bytes_per_bit
@@ -1327,6 +1333,7 @@ Status BlockBasedTable::PutDataBlockToCache(
     const UncompressionDict& uncompression_dict,
     MemoryAllocator* memory_allocator, BlockType block_type,
     GetContext* get_context) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const ImmutableOptions& ioptions = rep_->ioptions;
   const uint32_t format_version = rep_->table_options.format_version;
   const size_t read_amp_bytes_per_bit =
@@ -1465,6 +1472,7 @@ InternalIteratorBase<IndexValue>* BlockBasedTable::NewIndexIterator(
     const ReadOptions& read_options, bool disable_prefix_seek,
     IndexBlockIter* input_iter, GetContext* get_context,
     BlockCacheLookupContext* lookup_context) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(rep_ != nullptr);
   assert(rep_->index_reader != nullptr);
 
@@ -1511,6 +1519,7 @@ Status BlockBasedTable::MaybeReadBlockAndLoadToCache(
     CachableEntry<TBlocklike>* block_entry, BlockType block_type,
     GetContext* get_context, BlockCacheLookupContext* lookup_context,
     BlockContents* contents) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(block_entry != nullptr);
   const bool no_io = (ro.read_tier == kBlockCacheTier);
   Cache* block_cache = rep_->table_options.block_cache.get();
@@ -1697,6 +1706,7 @@ void BlockBasedTable::RetrieveMultipleBlocks(
     autovector<Status, MultiGetContext::MAX_BATCH_SIZE>* statuses,
     autovector<CachableEntry<Block>, MultiGetContext::MAX_BATCH_SIZE>* results,
     char* scratch, const UncompressionDict& uncompression_dict) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   RandomAccessFileReader* file = rep_->file.get();
   const Footer& footer = rep_->footer;
   const ImmutableOptions& ioptions = rep_->ioptions;
@@ -1972,6 +1982,7 @@ Status BlockBasedTable::RetrieveBlock(
     CachableEntry<TBlocklike>* block_entry, BlockType block_type,
     GetContext* get_context, BlockCacheLookupContext* lookup_context,
     bool for_compaction, bool use_cache, bool wait_for_cache) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(block_entry);
   assert(block_entry->IsEmpty());
 
@@ -2128,6 +2139,7 @@ bool BlockBasedTable::PrefixMayMatch(
     const SliceTransform* options_prefix_extractor,
     const bool need_upper_bound_check,
     BlockCacheLookupContext* lookup_context) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (!rep_->filter_policy) {
     return true;
   }
@@ -2235,6 +2247,7 @@ bool BlockBasedTable::PrefixMayMatch(
 
 bool BlockBasedTable::PrefixExtractorChanged(
     const SliceTransform* prefix_extractor) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (prefix_extractor == nullptr) {
     return true;
   } else if (prefix_extractor == rep_->table_prefix_extractor.get()) {
@@ -2294,6 +2307,7 @@ bool BlockBasedTable::FullFilterKeyMayMatch(
     FilterBlockReader* filter, const Slice& internal_key, const bool no_io,
     const SliceTransform* prefix_extractor, GetContext* get_context,
     BlockCacheLookupContext* lookup_context) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (filter == nullptr || filter->IsBlockBased()) {
     return true;
   }
@@ -2327,6 +2341,7 @@ void BlockBasedTable::FullFilterKeysMayMatch(
     FilterBlockReader* filter, MultiGetRange* range, const bool no_io,
     const SliceTransform* prefix_extractor,
     BlockCacheLookupContext* lookup_context) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (filter == nullptr || filter->IsBlockBased()) {
     return;
   }
@@ -3155,6 +3170,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 bool BlockBasedTable::TEST_BlockInCache(const BlockHandle& handle) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(rep_ != nullptr);
 
   Cache* const cache = rep_->table_options.block_cache.get();
@@ -3244,6 +3260,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 uint64_t BlockBasedTable::ApproximateDataOffsetOf(
     const InternalIteratorBase<IndexValue>& index_iter,
     uint64_t data_size) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(index_iter.status().ok());
   if (index_iter.Valid()) {
     BlockHandle handle = index_iter.value().handle;
@@ -3364,12 +3381,14 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 bool BlockBasedTable::TEST_FilterBlockInCache() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(rep_ != nullptr);
   return rep_->filter_type != Rep::FilterType::kNoFilter &&
          TEST_BlockInCache(rep_->filter_handle);
 }
 
 bool BlockBasedTable::TEST_IndexBlockInCache() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(rep_ != nullptr);
 
   return TEST_BlockInCache(rep_->footer.index_handle());

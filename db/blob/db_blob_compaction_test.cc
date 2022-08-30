@@ -104,6 +104,7 @@ class ValueBlindWriteFilter : public CompactionFilter {
 CompactionFilter::Decision ValueBlindWriteFilter::FilterBlobByKey(
     int /*level*/, const Slice& /*key*/, std::string* new_value,
     std::string* /*skip_until*/) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(new_value);
   new_value->assign(new_value_);
   return CompactionFilter::Decision::kChangeValue;
@@ -130,6 +131,7 @@ CompactionFilter::Decision ValueMutationFilter::FilterV2(
     int /*level*/, const Slice& /*key*/, ValueType value_type,
     const Slice& existing_value, std::string* new_value,
     std::string* /*skip_until*/) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(CompactionFilter::ValueType::kBlobIndex != value_type);
   if (CompactionFilter::ValueType::kValue != value_type) {
     return CompactionFilter::Decision::kKeep;
@@ -433,7 +435,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   SyncPoint::GetInstance()->SetCallBack(
       "CompactionIterator::InvokeFilterIfNeeded::TamperWithBlobIndex",
       [](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         Slice* const blob_index = static_cast<Slice*>(arg);
         assert(blob_index);
         assert(!blob_index->empty());

@@ -110,7 +110,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 Slice FullFilterBlockBuilder::Finish(
     const BlockHandle& /*tmp*/, Status* status,
     std::unique_ptr<const char[]>* filter_data) {
-PERF_MARKER(__PRETTY_FUNCTION__);
   Reset();
   // In this impl we ignore BlockHandle
   *status = Status::OK();
@@ -195,6 +194,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 bool FullFilterBlockReader::MayMatch(
     const Slice& entry, bool no_io, GetContext* get_context,
     BlockCacheLookupContext* lookup_context) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   CachableEntry<ParsedFullFilterBlock> filter_block;
 
   const Status s =
@@ -253,6 +253,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 void FullFilterBlockReader::MayMatch(
     MultiGetRange* range, bool no_io, const SliceTransform* prefix_extractor,
     BlockCacheLookupContext* lookup_context) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   CachableEntry<ParsedFullFilterBlock> filter_block;
 
   const Status s = GetOrReadFilterBlock(no_io, range->begin()->get_context,
@@ -310,6 +311,7 @@ void FullFilterBlockReader::MayMatch(
 }
 
 size_t FullFilterBlockReader::ApproximateMemoryUsage() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   size_t usage = ApproximateFilterBlockMemoryUsage();
 #ifdef ROCKSDB_MALLOC_USABLE_SIZE
   usage += malloc_usable_size(const_cast<FullFilterBlockReader*>(this));
@@ -346,6 +348,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 bool FullFilterBlockReader::IsFilterCompatible(
     const Slice* iterate_upper_bound, const Slice& prefix,
     const Comparator* comparator) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Try to reuse the bloom filter in the SST table if prefix_extractor in
   // mutable_cf_options has changed. If range [user_key, upper_bound) all
   // share the same prefix then we may still be able to use the bloom filter.

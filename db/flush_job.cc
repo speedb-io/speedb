@@ -154,6 +154,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 void FlushJob::ReportFlushInputSize(const autovector<MemTable*>& mems) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t input_size = 0;
   for (auto* mem : mems) {
     input_size += mem->ApproximateMemoryUsage();
@@ -1040,6 +1041,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
 #ifndef ROCKSDB_LITE
 std::unique_ptr<FlushJobInfo> FlushJob::GetFlushJobInfo() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   db_mutex_->AssertHeld();
   std::unique_ptr<FlushJobInfo> info(new FlushJobInfo{});
   info->cf_id = cfd_->GetID();

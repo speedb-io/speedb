@@ -23,6 +23,7 @@
 namespace ROCKSDB_NAMESPACE {
 
 uint64_t DBImpl::MinLogNumberToKeep() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return versions_->min_log_number_to_keep();
 }
 
@@ -99,6 +100,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 bool DBImpl::IsFileDeletionsEnabled() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return 0 == disable_delete_obsolete_files_;
 }
 
@@ -676,6 +678,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
 uint64_t FindMinPrepLogReferencedByMemTable(
     VersionSet* vset, const autovector<MemTable*>& memtables_to_flush) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t min_log = 0;
 
   // we must look through the memtables for two phase transactions
@@ -707,6 +710,7 @@ uint64_t FindMinPrepLogReferencedByMemTable(
 uint64_t FindMinPrepLogReferencedByMemTable(
     VersionSet* vset,
     const autovector<const autovector<MemTable*>*>& memtables_to_flush) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t min_log = 0;
 
   std::unordered_set<MemTable*> memtables_to_flush_set;
@@ -736,6 +740,7 @@ uint64_t FindMinPrepLogReferencedByMemTable(
 uint64_t PrecomputeMinLogNumberToKeepNon2PC(
     VersionSet* vset, const ColumnFamilyData& cfd_to_flush,
     const autovector<VersionEdit*>& edit_list) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(vset != nullptr);
 
   // Precompute the min log number containing unflushed data for the column
@@ -766,6 +771,7 @@ uint64_t PrecomputeMinLogNumberToKeepNon2PC(
 uint64_t PrecomputeMinLogNumberToKeepNon2PC(
     VersionSet* vset, const autovector<ColumnFamilyData*>& cfds_to_flush,
     const autovector<autovector<VersionEdit*>>& edit_lists) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(vset != nullptr);
   assert(!cfds_to_flush.empty());
   assert(cfds_to_flush.size() == edit_lists.size());
@@ -804,6 +810,7 @@ uint64_t PrecomputeMinLogNumberToKeep2PC(
     const autovector<VersionEdit*>& edit_list,
     const autovector<MemTable*>& memtables_to_flush,
     LogsWithPrepTracker* prep_tracker) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(vset != nullptr);
   assert(prep_tracker != nullptr);
   // Calculate updated min_log_number_to_keep
@@ -845,6 +852,7 @@ uint64_t PrecomputeMinLogNumberToKeep2PC(
     const autovector<autovector<VersionEdit*>>& edit_lists,
     const autovector<const autovector<MemTable*>*>& memtables_to_flush,
     LogsWithPrepTracker* prep_tracker) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(vset != nullptr);
   assert(prep_tracker != nullptr);
   assert(cfds_to_flush.size() == edit_lists.size());

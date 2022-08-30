@@ -93,6 +93,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 std::string ParsedInternalKey::DebugString(bool log_err_key, bool hex) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string result = "'";
   if (log_err_key) {
     result += user_key.ToString(hex);
@@ -109,6 +110,7 @@ std::string ParsedInternalKey::DebugString(bool log_err_key, bool hex) const {
 }
 
 std::string InternalKey::DebugString(bool hex) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string result;
   ParsedInternalKey parsed;
   if (ParseInternalKey(rep_, &parsed, false /* log_err_key */).ok()) {
@@ -121,6 +123,7 @@ std::string InternalKey::DebugString(bool hex) const {
 }
 
 const char* InternalKeyComparator::Name() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (name_.empty()) {
     return "rocksdb.anonymous.InternalKeyComparator";
   }
@@ -129,6 +132,7 @@ const char* InternalKeyComparator::Name() const {
 
 int InternalKeyComparator::Compare(const ParsedInternalKey& a,
                                    const ParsedInternalKey& b) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Order by:
   //    increasing user key (according to user-supplied comparator)
   //    decreasing sequence number
@@ -150,6 +154,7 @@ int InternalKeyComparator::Compare(const ParsedInternalKey& a,
 
 void InternalKeyComparator::FindShortestSeparator(std::string* start,
                                                   const Slice& limit) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Attempt to shorten the user portion of the key
   Slice user_start = ExtractUserKey(*start);
   Slice user_limit = ExtractUserKey(limit);
@@ -168,6 +173,7 @@ void InternalKeyComparator::FindShortestSeparator(std::string* start,
 }
 
 void InternalKeyComparator::FindShortSuccessor(std::string* key) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Slice user_key = ExtractUserKey(*key);
   std::string tmp(user_key.data(), user_key.size());
   user_comparator_.FindShortSuccessor(&tmp);

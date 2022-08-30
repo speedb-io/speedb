@@ -1117,7 +1117,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   size_t total_fadvised_bytes = 0;
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "SstFileWriter::Rep::InvalidatePageCache", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         size_t fadvise_size = *(reinterpret_cast<size_t*>(arg));
         total_fadvised_bytes += fadvise_size;
       });
@@ -1171,7 +1170,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       fault_injection_test_env_->SetFilesystemActive(false);
     });
     SyncPoint::GetInstance()->SetCallBack(test_cases[i].second, [&](void*) {
-PERF_MARKER(__PRETTY_FUNCTION__);
       fault_injection_test_env_->SetFilesystemActive(true);
     });
     if (i == 0) {
@@ -1239,7 +1237,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   SyncPoint::GetInstance()->SetCallBack(
       "ExternalSstFileIngestionJob::Prepare:Reopen", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         Status* s = static_cast<Status*>(arg);
         *s = Status::NotSupported();
       });

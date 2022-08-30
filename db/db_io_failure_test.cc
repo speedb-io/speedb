@@ -289,7 +289,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   std::atomic<int> range_sync_called(0);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "SpecialEnv::SStableFile::RangeSync", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         if (range_sync_called.fetch_add(1) == 0) {
           Status* st = static_cast<Status*>(arg);
           *st = Status::IOError(io_error_msg);
@@ -373,7 +372,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   std::atomic<int> range_sync_called(0);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "SpecialEnv::SStableFile::RangeSync", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         if (range_sync_called.fetch_add(1) == 0) {
           Status* st = static_cast<Status*>(arg);
           *st = Status::IOError(io_error_msg);
@@ -417,7 +415,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   std::atomic<int> close_called(0);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "SpecialEnv::SStableFile::Close", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         if (close_called.fetch_add(1) == 0) {
           Status* st = static_cast<Status*>(arg);
           *st = Status::IOError(io_error_msg);
@@ -473,7 +470,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   std::atomic<int> close_called(0);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "SpecialEnv::SStableFile::Close", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         if (close_called.fetch_add(1) == 0) {
           Status* st = static_cast<Status*>(arg);
           *st = Status::IOError(io_error_msg);
@@ -517,7 +513,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   std::atomic<int> sync_called(0);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "SpecialEnv::SStableFile::Sync", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         if (sync_called.fetch_add(1) == 0) {
           Status* st = static_cast<Status*>(arg);
           *st = Status::IOError(io_error_msg);
@@ -574,7 +569,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   std::atomic<int> sync_called(0);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "SpecialEnv::SStableFile::Sync", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         if (sync_called.fetch_add(1) == 0) {
           Status* st = static_cast<Status*>(arg);
           *st = Status::IOError(io_error_msg);

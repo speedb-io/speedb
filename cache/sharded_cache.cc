@@ -22,6 +22,7 @@ namespace ROCKSDB_NAMESPACE {
 namespace {
 
 inline uint32_t HashSlice(const Slice& s) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return Lower32of64(GetSliceNPHash64(s));
 }
 
@@ -37,6 +38,7 @@ ShardedCache::ShardedCache(size_t capacity, int num_shard_bits,
       last_id_(1) {}
 
 void ShardedCache::SetCapacity(size_t capacity) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint32_t num_shards = GetNumShards();
   const size_t per_shard = (capacity + (num_shards - 1)) / num_shards;
   MutexLock l(&capacity_mutex_);
@@ -47,6 +49,7 @@ void ShardedCache::SetCapacity(size_t capacity) {
 }
 
 void ShardedCache::SetStrictCapacityLimit(bool strict_capacity_limit) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint32_t num_shards = GetNumShards();
   MutexLock l(&capacity_mutex_);
   for (uint32_t s = 0; s < num_shards; s++) {
@@ -58,6 +61,7 @@ void ShardedCache::SetStrictCapacityLimit(bool strict_capacity_limit) {
 Status ShardedCache::Insert(const Slice& key, void* value, size_t charge,
                             DeleterFn deleter, Handle** handle,
                             Priority priority) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint32_t hash = HashSlice(key);
   return GetShard(Shard(hash))
       ->Insert(key, hash, value, charge, deleter, handle, priority);
@@ -66,6 +70,7 @@ Status ShardedCache::Insert(const Slice& key, void* value, size_t charge,
 Status ShardedCache::Insert(const Slice& key, void* value,
                             const CacheItemHelper* helper, size_t charge,
                             Handle** handle, Priority priority) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint32_t hash = HashSlice(key);
   if (!helper) {
     return Status::InvalidArgument();
@@ -75,6 +80,7 @@ Status ShardedCache::Insert(const Slice& key, void* value,
 }
 
 Cache::Handle* ShardedCache::Lookup(const Slice& key, Statistics* /*stats*/) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint32_t hash = HashSlice(key);
   return GetShard(Shard(hash))->Lookup(key, hash);
 }
@@ -84,57 +90,68 @@ Cache::Handle* ShardedCache::Lookup(const Slice& key,
                                     const CreateCallback& create_cb,
                                     Priority priority, bool wait,
                                     Statistics* stats) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint32_t hash = HashSlice(key);
   return GetShard(Shard(hash))
       ->Lookup(key, hash, helper, create_cb, priority, wait, stats);
 }
 
 bool ShardedCache::IsReady(Handle* handle) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint32_t hash = GetHash(handle);
   return GetShard(Shard(hash))->IsReady(handle);
 }
 
 void ShardedCache::Wait(Handle* handle) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint32_t hash = GetHash(handle);
   GetShard(Shard(hash))->Wait(handle);
 }
 
 bool ShardedCache::Ref(Handle* handle) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint32_t hash = GetHash(handle);
   return GetShard(Shard(hash))->Ref(handle);
 }
 
 bool ShardedCache::Release(Handle* handle, bool erase_if_last_ref) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint32_t hash = GetHash(handle);
   return GetShard(Shard(hash))->Release(handle, erase_if_last_ref);
 }
 
 bool ShardedCache::Release(Handle* handle, bool useful,
                            bool erase_if_last_ref) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint32_t hash = GetHash(handle);
   return GetShard(Shard(hash))->Release(handle, useful, erase_if_last_ref);
 }
 
 void ShardedCache::Erase(const Slice& key) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint32_t hash = HashSlice(key);
   GetShard(Shard(hash))->Erase(key, hash);
 }
 
 uint64_t ShardedCache::NewId() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return last_id_.fetch_add(1, std::memory_order_relaxed);
 }
 
 size_t ShardedCache::GetCapacity() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   MutexLock l(&capacity_mutex_);
   return capacity_;
 }
 
 bool ShardedCache::HasStrictCapacityLimit() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   MutexLock l(&capacity_mutex_);
   return strict_capacity_limit_;
 }
 
 size_t ShardedCache::GetUsage() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // We will not lock the cache when getting the usage from shards.
   uint32_t num_shards = GetNumShards();
   size_t usage = 0;
@@ -145,10 +162,12 @@ size_t ShardedCache::GetUsage() const {
 }
 
 size_t ShardedCache::GetUsage(Handle* handle) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return GetCharge(handle);
 }
 
 size_t ShardedCache::GetPinnedUsage() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // We will not lock the cache when getting the usage from shards.
   uint32_t num_shards = GetNumShards();
   size_t usage = 0;
@@ -162,6 +181,7 @@ void ShardedCache::ApplyToAllEntries(
     const std::function<void(const Slice& key, void* value, size_t charge,
                              DeleterFn deleter)>& callback,
     const ApplyToAllEntriesOptions& opts) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint32_t num_shards = GetNumShards();
   // Iterate over part of each shard, rotating between shards, to
   // minimize impact on latency of concurrent operations.
@@ -184,6 +204,7 @@ void ShardedCache::ApplyToAllEntries(
 }
 
 void ShardedCache::EraseUnRefEntries() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   uint32_t num_shards = GetNumShards();
   for (uint32_t s = 0; s < num_shards; s++) {
     GetShard(s)->EraseUnRefEntries();
@@ -191,6 +212,7 @@ void ShardedCache::EraseUnRefEntries() {
 }
 
 std::string ShardedCache::GetPrintableOptions() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::string ret;
   ret.reserve(20000);
   const int kBufferSize = 200;
@@ -214,6 +236,7 @@ std::string ShardedCache::GetPrintableOptions() const {
   return ret;
 }
 int GetDefaultCacheShardBits(size_t capacity) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   int num_shard_bits = 0;
   size_t min_shard_size = 512L * 1024L;  // Every shard is at least 512KB.
   size_t num_shards = capacity / min_shard_size;

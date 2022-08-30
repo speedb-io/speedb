@@ -436,7 +436,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   // RocksDB sanitize max open files to at least 20. Modify it back.
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "SanitizeOptions::AfterChangeMaxOpenFiles", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         int* max_open_files = static_cast<int*>(arg);
         *max_open_files = 11;
       });

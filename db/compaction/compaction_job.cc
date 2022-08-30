@@ -1245,6 +1245,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 void CompactionJob::BuildSubcompactionJobInfo(
     SubcompactionState* sub_compact,
     SubcompactionJobInfo* subcompaction_job_info) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Compaction* c = compact_->compaction;
   ColumnFamilyData* cfd = c->column_family_data();
 
@@ -2434,6 +2435,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
 void CompactionJob::UpdateCompactionJobStats(
     const InternalStats::CompactionStats& stats) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifndef ROCKSDB_LITE
   compaction_job_stats_->elapsed_micros = stats.micros;
 
@@ -2659,14 +2661,12 @@ static std::unordered_map<std::string, OptionTypeInfo> cfd_type_info = {
       OptionTypeFlags::kNone,
       [](const ConfigOptions& opts, const std::string& /*name*/,
          const std::string& value, void* addr) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         auto cf_options = static_cast<ColumnFamilyOptions*>(addr);
         return GetColumnFamilyOptionsFromString(opts, ColumnFamilyOptions(),
                                                 value, cf_options);
       },
       [](const ConfigOptions& opts, const std::string& /*name*/,
          const void* addr, std::string* value) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         const auto cf_options = static_cast<const ColumnFamilyOptions*>(addr);
         std::string result;
         auto status =
@@ -2676,7 +2676,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       },
       [](const ConfigOptions& opts, const std::string& name, const void* addr1,
          const void* addr2, std::string* mismatch) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         const auto this_one = static_cast<const ColumnFamilyOptions*>(addr1);
         const auto that_one = static_cast<const ColumnFamilyOptions*>(addr2);
         auto this_conf = CFOptionsAsConfigurable(*this_one);
@@ -2703,13 +2702,11 @@ static std::unordered_map<std::string, OptionTypeInfo> cs_input_type_info = {
       OptionTypeFlags::kNone,
       [](const ConfigOptions& opts, const std::string& /*name*/,
          const std::string& value, void* addr) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         auto options = static_cast<DBOptions*>(addr);
         return GetDBOptionsFromString(opts, DBOptions(), value, options);
       },
       [](const ConfigOptions& opts, const std::string& /*name*/,
          const void* addr, std::string* value) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         const auto options = static_cast<const DBOptions*>(addr);
         std::string result;
         auto status = GetStringFromDBOptions(opts, *options, &result);
@@ -2718,7 +2715,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       },
       [](const ConfigOptions& opts, const std::string& name, const void* addr1,
          const void* addr2, std::string* mismatch) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         const auto this_one = static_cast<const DBOptions*>(addr1);
         const auto that_one = static_cast<const DBOptions*>(addr2);
         auto this_conf = DBOptionsAsConfigurable(*this_one);
@@ -2975,7 +2971,6 @@ static std::unordered_map<std::string, OptionTypeInfo> cs_result_type_info = {
       OptionTypeFlags::kNone,
       [](const ConfigOptions& opts, const std::string& /*name*/,
          const std::string& value, void* addr) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         auto status_obj = static_cast<Status*>(addr);
         StatusSerializationAdapter adapter;
         Status s = OptionTypeInfo::ParseType(
@@ -2985,7 +2980,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       },
       [](const ConfigOptions& opts, const std::string& /*name*/,
          const void* addr, std::string* value) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         const auto status_obj = static_cast<const Status*>(addr);
         StatusSerializationAdapter adapter(*status_obj);
         std::string result;
@@ -2996,7 +2990,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       },
       [](const ConfigOptions& opts, const std::string& /*name*/,
          const void* addr1, const void* addr2, std::string* mismatch) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         const auto status1 = static_cast<const Status*>(addr1);
         const auto status2 = static_cast<const Status*>(addr2);
         StatusSerializationAdapter adatper1(*status1);

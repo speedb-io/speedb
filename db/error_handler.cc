@@ -497,6 +497,7 @@ const Status& ErrorHandler::SetBGError(const Status& bg_status,
 
 Status ErrorHandler::OverrideNoSpaceError(const Status& bg_error,
                                           bool* auto_recovery) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifndef ROCKSDB_LITE
   if (bg_error.severity() >= Status::Severity::kFatalError) {
     return bg_error;

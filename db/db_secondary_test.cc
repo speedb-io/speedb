@@ -105,6 +105,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 void DBSecondaryTest::CheckFileTypeCounts(const std::string& dir,
                                           int expected_log, int expected_sst,
                                           int expected_manifest) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::vector<std::string> filenames;
   ASSERT_OK(env_->GetChildren(dir, &filenames));
 
@@ -471,6 +472,7 @@ class TraceFileEnv : public EnvWrapper {
   }
 
   int files_closed() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return files_closed_.load(std::memory_order_relaxed);
   }
 
@@ -1205,7 +1207,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   SyncPoint::GetInstance()->ClearAllCallBacks();
   SyncPoint::GetInstance()->SetCallBack(
       "VersionBuilder::CheckConsistencyBeforeReturn", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         ASSERT_NE(nullptr, arg);
         *(reinterpret_cast<Status*>(arg)) =
             Status::Corruption("Inject corruption");
@@ -1241,7 +1242,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   SyncPoint::GetInstance()->ClearAllCallBacks();
   SyncPoint::GetInstance()->SetCallBack(
       "VersionBuilder::CheckConsistencyBeforeReturn", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         ASSERT_NE(nullptr, arg);
         *(reinterpret_cast<Status*>(arg)) =
             Status::Corruption("Inject corruption");

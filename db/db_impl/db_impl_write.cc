@@ -1434,6 +1434,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
 void DBImpl::SelectColumnFamiliesForAtomicFlush(
     autovector<ColumnFamilyData*>* cfds) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   for (ColumnFamilyData* cfd : *versions_->GetColumnFamilySet()) {
     if (cfd->IsDropped()) {
       continue;
@@ -1447,6 +1448,7 @@ void DBImpl::SelectColumnFamiliesForAtomicFlush(
 
 // Assign sequence number for atomic flush.
 void DBImpl::AssignAtomicFlushSeq(const autovector<ColumnFamilyData*>& cfds) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(immutable_db_options_.atomic_flush);
   auto seq = versions_->LastSequence();
   for (auto cfd : cfds) {
@@ -1645,6 +1647,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 uint64_t DBImpl::GetMaxTotalWalSize() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   mutex_.AssertHeld();
   return mutable_db_options_.max_total_wal_size == 0
              ? 4 * max_total_in_memory_state_
@@ -1790,6 +1793,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 void DBImpl::MaybeFlushStatsCF(autovector<ColumnFamilyData*>* cfds) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(cfds != nullptr);
   if (!cfds->empty() && immutable_db_options_.persist_stats_to_disk) {
     ColumnFamilyData* cfd_stats =
@@ -2133,6 +2137,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 size_t DBImpl::GetWalPreallocateBlockSize(uint64_t write_buffer_size) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   mutex_.AssertHeld();
   size_t bsize =
       static_cast<size_t>(write_buffer_size / 10 + write_buffer_size);

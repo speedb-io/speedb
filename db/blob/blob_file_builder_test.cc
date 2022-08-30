@@ -465,7 +465,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   SyncPoint::GetInstance()->SetCallBack("CompressData:TamperWithReturnValue",
                                         [](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
                                           bool* ret = static_cast<bool*>(arg);
                                           *ret = false;
                                         });
@@ -644,7 +643,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       BlobFileCreationReason::kFlush, &blob_file_paths, &blob_file_additions);
 
   SyncPoint::GetInstance()->SetCallBack(sync_point_, [this](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     Status* const s = static_cast<Status*>(arg);
     assert(s);
 

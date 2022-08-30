@@ -47,7 +47,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 Status PersistentCacheHelper::LookupRawPage(
     const PersistentCacheOptions& cache_options, const BlockHandle& handle,
     std::unique_ptr<char[]>* raw_data, const size_t raw_data_size) {
-PERF_MARKER(__PRETTY_FUNCTION__);
 #ifdef NDEBUG
   (void)raw_data_size;
 #endif

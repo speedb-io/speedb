@@ -54,6 +54,7 @@ class FlushBlockBySizePolicy : public FlushBlockPolicy {
 
  private:
   bool BlockAlmostFull(const Slice& key, const Slice& value) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     if (block_size_deviation_limit_ == 0) {
       return false;
     }
@@ -80,6 +81,7 @@ class FlushBlockBySizePolicy : public FlushBlockPolicy {
 FlushBlockPolicy* FlushBlockBySizePolicyFactory::NewFlushBlockPolicy(
     const BlockBasedTableOptions& table_options,
     const BlockBuilder& data_block_builder) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return new FlushBlockBySizePolicy(
       table_options.block_size, table_options.block_size_deviation,
       table_options.block_align, data_block_builder);

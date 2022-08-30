@@ -39,6 +39,7 @@ static std::unordered_map<std::string, OptionTypeInfo>
 Status SecondaryCache::CreateFromString(
     const ConfigOptions& config_options, const std::string& value,
     std::shared_ptr<SecondaryCache>* result) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return LoadSharedObject<SecondaryCache>(config_options, value, nullptr,
                                           result);
 }
@@ -46,6 +47,7 @@ Status SecondaryCache::CreateFromString(
 Status Cache::CreateFromString(const ConfigOptions& config_options,
                                const std::string& value,
                                std::shared_ptr<Cache>* result) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   Status status;
   std::shared_ptr<Cache> cache;
   if (value.find('=') == std::string::npos) {

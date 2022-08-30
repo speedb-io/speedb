@@ -138,6 +138,7 @@ struct TombstoneStartKeyComparator {
   explicit TombstoneStartKeyComparator(const Comparator* c) : cmp(c) {}
 
   bool operator()(const RangeTombstone& a, const RangeTombstone& b) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
     return cmp->Compare(a.start_key_, b.start_key_) < 0;
   }
 

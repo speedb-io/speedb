@@ -12,6 +12,7 @@
 #include "table/unique_id_impl.h"
 #include "util/hash.h"
 #include "util/math.h"
+#include "rocksdb/env.h"
 
 namespace ROCKSDB_NAMESPACE {
 
@@ -25,6 +26,7 @@ namespace ROCKSDB_NAMESPACE {
 //            > 0 |           any | OffsetableCacheKey.WithOffset
 
 CacheKey CacheKey::CreateUniqueForCacheLifetime(Cache *cache) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // +1 so that we can reserve all zeros for "unset" cache key
   uint64_t id = cache->NewId() + 1;
   // Ensure we don't collide with CreateUniqueForProcessLifetime
@@ -33,6 +35,7 @@ CacheKey CacheKey::CreateUniqueForCacheLifetime(Cache *cache) {
 }
 
 CacheKey CacheKey::CreateUniqueForProcessLifetime() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // To avoid colliding with CreateUniqueForCacheLifetime, assuming
   // Cache::NewId counts up from zero, here we count down from UINT64_MAX.
   // If this ever becomes a point of contention, we could sub-divide the
@@ -251,6 +254,7 @@ OffsetableCacheKey::OffsetableCacheKey(const std::string &db_id,
                                        const std::string &db_session_id,
                                        uint64_t file_number,
                                        uint64_t max_offset) {
+PERF_MARKER(__PRETTY_FUNCTION__);
 #ifndef NDEBUG
   max_offset_ = max_offset;
 #endif

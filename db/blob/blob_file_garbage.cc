@@ -31,6 +31,7 @@ enum BlobFileGarbage::CustomFieldTags : uint32_t {
 };
 
 void BlobFileGarbage::EncodeTo(std::string* output) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   PutVarint64(output, blob_file_number_);
   PutVarint64(output, garbage_blob_count_);
   PutVarint64(output, garbage_blob_bytes_);
@@ -87,6 +88,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 std::string BlobFileGarbage::DebugString() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   std::ostringstream oss;
 
   oss << *this;
@@ -95,6 +97,7 @@ std::string BlobFileGarbage::DebugString() const {
 }
 
 std::string BlobFileGarbage::DebugJSON() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   JSONWriter jw;
 
   jw << *this;

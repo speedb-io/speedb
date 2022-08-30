@@ -53,6 +53,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 std::unique_ptr<SstPartitioner>
 SstPartitionerFixedPrefixFactory::CreatePartitioner(
     const SstPartitioner::Context& /* context */) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return std::unique_ptr<SstPartitioner>(new SstPartitionerFixedPrefix(len_));
 }
 

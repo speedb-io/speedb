@@ -73,7 +73,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_TRUE(s.ok() || s.IsIncomplete());
   };
   std::function<void(void*)> unblock_main_thread_func = [&](void*) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     mutex.Lock();
     ++writers;
     cv.SignalAll();
@@ -194,7 +193,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_TRUE(s.ok() || s.IsIncomplete());
   };
   std::function<void(void *)> unblock_main_thread_func = [&](void *) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     mutex.Lock();
     ++writers;
     cv.SignalAll();
@@ -281,7 +279,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   // all threads join the same batch group.
   SyncPoint::GetInstance()->SetCallBack(
       "WriteThread::JoinBatchGroup:Wait", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         ready_count++;
         auto* w = reinterpret_cast<WriteThread::Writer*>(arg);
         if (w->state == WriteThread::STATE_GROUP_LEADER) {

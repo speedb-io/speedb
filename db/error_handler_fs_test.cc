@@ -178,7 +178,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   ASSERT_OK(Put(Key(0), "val"));
   SyncPoint::GetInstance()->SetCallBack("FlushJob::Start", [&](void*) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     fault_fs_->SetFilesystemActive(false, IOStatus::NoSpace("Out of space"));
   });
   SyncPoint::GetInstance()->EnableProcessing();
@@ -672,7 +671,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(Put(Key(1), "val"));
   SyncPoint::GetInstance()->SetCallBack(
       "VersionSet::LogAndApply:WriteManifest", [&](void*) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         fault_fs_->SetFilesystemActive(false,
                                        IOStatus::NoSpace("Out of space"));
       });
@@ -852,7 +850,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(Put(Key(1), "val"));
   SyncPoint::GetInstance()->SetCallBack(
       "VersionSet::LogAndApply:WriteManifest", [&](void*) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         fault_fs_->SetFilesystemActive(false,
                                        IOStatus::NoSpace("Out of space"));
       });
@@ -923,7 +920,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       "BackgroundCallCompaction:0", [&](void*) { fail_manifest.store(true); });
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "VersionSet::LogAndApply:WriteManifest", [&](void*) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         if (fail_manifest.load()) {
           fault_fs_->SetFilesystemActive(false,
                                          IOStatus::NoSpace("Out of space"));
@@ -998,7 +994,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       "BackgroundCallCompaction:0", [&](void*) { fail_manifest.store(true); });
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "VersionSet::LogAndApply:WriteManifest", [&](void*) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         if (fail_manifest.load()) {
           fault_fs_->SetFilesystemActive(false, error_msg);
         }
@@ -1056,7 +1051,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
         "BackgroundCallCompaction:0"}});
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "BackgroundCallCompaction:0", [&](void*) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         fault_fs_->SetFilesystemActive(false,
                                        IOStatus::NoSpace("Out of space"));
       });
@@ -1194,7 +1188,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
         "BackgroundCallCompaction:0"}});
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "BackgroundCallCompaction:0", [&](void*) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         fault_fs_->SetFilesystemActive(false,
                                        IOStatus::Corruption("Corruption"));
       });
@@ -1234,7 +1227,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   ASSERT_OK(Put(Key(0), "val"));
   SyncPoint::GetInstance()->SetCallBack("FlushJob::Start", [&](void*) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     fault_fs_->SetFilesystemActive(false, IOStatus::NoSpace("Out of space"));
   });
   SyncPoint::GetInstance()->EnableProcessing();
@@ -1280,7 +1272,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   ASSERT_OK(Put(Key(0), "val"));
   SyncPoint::GetInstance()->SetCallBack("FlushJob::Start", [&](void*) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     fault_fs_->SetFilesystemActive(false, IOStatus::NoSpace("Out of space"));
   });
   SyncPoint::GetInstance()->EnableProcessing();
@@ -1333,7 +1324,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
     SyncPoint::GetInstance()->SetCallBack(
         "WritableFileWriter::Append:BeforePrepareWrite", [&](void*) {
-PERF_MARKER(__PRETTY_FUNCTION__);
           write_error++;
           if (write_error > 2) {
             fault_fs_->SetFilesystemActive(false,
@@ -1410,7 +1400,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
     SyncPoint::GetInstance()->SetCallBack(
         "WritableFileWriter::Append:BeforePrepareWrite", [&](void*) {
-PERF_MARKER(__PRETTY_FUNCTION__);
           write_error++;
           if (write_error > 2) {
             fault_fs_->SetFilesystemActive(false, error_msg);
@@ -1503,7 +1492,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
     SyncPoint::GetInstance()->SetCallBack(
         "WritableFileWriter::Append:BeforePrepareWrite", [&](void*) {
-PERF_MARKER(__PRETTY_FUNCTION__);
           write_error++;
           if (write_error > 2) {
             fault_fs_->SetFilesystemActive(false,
@@ -2186,7 +2174,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       "BackgroundCallCompaction:0", [&](void*) { fail_manifest.store(true); });
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "VersionSet::LogAndApply:WriteManifest", [&](void*) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         if (fail_manifest.load()) {
           fault_fs_->SetFilesystemActive(false, error_msg);
         }
@@ -2262,7 +2249,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       "BackgroundCallCompaction:0", [&](void*) { fail_first.store(true); });
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "CompactionJob::OpenCompactionOutputFile", [&](void*) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         if (fail_first.load() && fail_second.load()) {
           fault_fs_->SetFilesystemActive(false, error_msg);
           fail_second.store(false);
@@ -2332,7 +2318,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
     SyncPoint::GetInstance()->SetCallBack(
         "WritableFileWriter::Append:BeforePrepareWrite", [&](void*) {
-PERF_MARKER(__PRETTY_FUNCTION__);
           write_error++;
           if (write_error > 2) {
             fault_fs_->SetFilesystemActive(false, error_msg);
@@ -2436,7 +2421,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
     SyncPoint::GetInstance()->SetCallBack(
         "WritableFileWriter::Append:BeforePrepareWrite", [&](void*) {
-PERF_MARKER(__PRETTY_FUNCTION__);
           write_error++;
           if (write_error > 2) {
             fault_fs_->SetFilesystemActive(false, error_msg);
@@ -2542,7 +2526,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(Put(Key(0), "val"));
   SyncPoint::GetInstance()->SetCallBack(
       "BuildTable:BeforeOutputValidation", [&](void*) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         IOStatus st = IOStatus::IOError();
         st.SetRetryable(true);
         st.SetScope(IOStatus::IOErrorScope::kIOErrorScopeFile);
@@ -2593,7 +2576,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(Put(1, Key(0), "val"));
   SyncPoint::GetInstance()->SetCallBack(
       "BuildTable:BeforeOutputValidation", [&](void*) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         IOStatus st = IOStatus::IOError();
         st.SetRetryable(true);
         st.SetScope(IOStatus::IOErrorScope::kIOErrorScopeFile);
@@ -2644,7 +2626,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(Put(0, Key(0), "val"));
   ASSERT_OK(Put(1, Key(0), "val"));
   SyncPoint::GetInstance()->SetCallBack("BuildTable:create_file", [&](void*) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     IOStatus st = IOStatus::NoSpace();
     fault_fs_->SetFilesystemActive(false, st);
   });
@@ -2716,7 +2697,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       "BackgroundCallCompaction:0", [&](void*) { fail_first.store(true); });
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "CompactionJob::Run():PausingManualCompaction:2", [&](void*) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         if (fail_first.load() && fail_second.load()) {
           fault_fs_->SetFilesystemActive(false, error_msg);
           fail_second.store(false);
@@ -2756,7 +2736,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   ASSERT_OK(Put(Key(0), "val"));
   SyncPoint::GetInstance()->SetCallBack("FlushJob::Start", [&](void*) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     fault_fs_->SetFilesystemActive(false, IOStatus::IOFenced("IO fenced"));
   });
   SyncPoint::GetInstance()->EnableProcessing();
@@ -2792,7 +2771,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(Put(Key(1), "val"));
   SyncPoint::GetInstance()->SetCallBack(
       "VersionSet::LogAndApply:WriteManifest", [&](void*) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         fault_fs_->SetFilesystemActive(false, IOStatus::IOFenced("IO fenced"));
       });
   SyncPoint::GetInstance()->EnableProcessing();
@@ -2831,7 +2809,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
         "BackgroundCallCompaction:0"}});
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "BackgroundCallCompaction:0", [&](void*) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         fault_fs_->SetFilesystemActive(false, IOStatus::IOFenced("IO fenced"));
       });
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->EnableProcessing();
@@ -2888,7 +2865,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
     SyncPoint::GetInstance()->SetCallBack(
         "WritableFileWriter::Append:BeforePrepareWrite", [&](void*) {
-PERF_MARKER(__PRETTY_FUNCTION__);
           write_error++;
           if (write_error > 2) {
             fault_fs_->SetFilesystemActive(false,

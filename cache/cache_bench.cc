@@ -9,12 +9,14 @@
 #ifndef GFLAGS
 #include <cstdio>
 int main() {
+PERF_MARKER(__PRETTY_FUNCTION__);
   fprintf(stderr, "Please install gflags to run rocksdb tools\n");
   return 1;
 }
 #else
 #include "rocksdb/cache_bench_tool.h"
 int main(int argc, char** argv) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return ROCKSDB_NAMESPACE::cache_bench_tool(argc, argv);
 }
 #endif  // GFLAGS

@@ -117,7 +117,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   bool is_changed_stats = false;
   SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::WriteOptionsFile:PersistOptions", [&](void* /*arg*/) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         ASSERT_FALSE(is_changed_stats);  // should only save options file once
         is_changed_stats = true;
       });
@@ -429,7 +428,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   std::atomic<int> unmatch_cnt(0);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "WritableFileWriter::WritableFileWriter:0", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         int value = static_cast<int>(reinterpret_cast<uintptr_t>(arg));
         if (value == buffer_size) {
           match_cnt++;
@@ -1129,7 +1127,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   bool compacted = false;
   SyncPoint::GetInstance()->SetCallBack(
       "LevelCompactionPicker::PickCompaction:Return", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         Compaction* c = reinterpret_cast<Compaction*>(arg);
         compression_used = c->output_compression();
         compression_opt_used = c->output_compression_opts();
@@ -1198,7 +1195,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   bool compacted = false;
   SyncPoint::GetInstance()->SetCallBack(
       "CompactionPicker::RegisterCompaction:Registered", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         Compaction* c = static_cast<Compaction*>(arg);
         compression_used = c->output_compression();
         compression_opt_used = c->output_compression_opts();

@@ -283,7 +283,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   uint32_t pin_offset = 0;
   SyncPoint::GetInstance()->SetCallBack(
       "BlockReadAmpBitmap:rnd", [&pin_offset](void *arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         pin_offset = *(static_cast<uint32_t *>(arg));
       });
   SyncPoint::GetInstance()->EnableProcessing();

@@ -44,6 +44,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 bool WriteController::IsStopped() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return total_stopped_.load(std::memory_order_relaxed) > 0;
 }
 // This is inside DB mutex, so we can't sleep and need to minimize

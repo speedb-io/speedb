@@ -295,6 +295,7 @@ Status BlobFileReader::GetBlob(const ReadOptions& read_options,
                                FilePrefetchBuffer* prefetch_buffer,
                                PinnableSlice* value,
                                uint64_t* bytes_read) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(value);
 
   const uint64_t key_size = user_key.size();
@@ -384,6 +385,7 @@ void BlobFileReader::MultiGetBlob(
     const autovector<uint64_t>& offsets,
     const autovector<uint64_t>& value_sizes, autovector<Status*>& statuses,
     autovector<PinnableSlice*>& values, uint64_t* bytes_read) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   const size_t num_blobs = user_keys.size();
   assert(num_blobs > 0);
   assert(num_blobs == offsets.size());

@@ -75,6 +75,7 @@ CuckooTableBuilder::CuckooTableBuilder(
       identity_as_first_hash_(identity_as_first_hash),
       get_slice_hash_(get_slice_hash),
       closed_(false) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   // Data is in a huge block.
   properties_.num_data_blocks = 1;
   properties_.index_size = 0;
@@ -168,11 +169,13 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 bool CuckooTableBuilder::IsDeletedKey(uint64_t idx) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(closed_);
   return idx >= num_values_;
 }
 
 Slice CuckooTableBuilder::GetKey(uint64_t idx) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(closed_);
   if (IsDeletedKey(idx)) {
     return Slice(&deleted_keys_[static_cast<size_t>((idx - num_values_) * key_size_)], static_cast<size_t>(key_size_));
@@ -181,11 +184,13 @@ Slice CuckooTableBuilder::GetKey(uint64_t idx) const {
 }
 
 Slice CuckooTableBuilder::GetUserKey(uint64_t idx) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(closed_);
   return is_last_level_file_ ? GetKey(idx) : ExtractUserKey(GetKey(idx));
 }
 
 Slice CuckooTableBuilder::GetValue(uint64_t idx) const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   assert(closed_);
   if (IsDeletedKey(idx)) {
     static std::string empty_value(static_cast<unsigned int>(value_size_), 'a');
@@ -411,10 +416,12 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 }
 
 uint64_t CuckooTableBuilder::NumEntries() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   return num_entries_;
 }
 
 uint64_t CuckooTableBuilder::FileSize() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (closed_) {
     return file_->GetFileSize();
   } else if (num_entries_ == 0) {
@@ -452,6 +459,7 @@ bool CuckooTableBuilder::MakeSpaceForKey(
     const autovector<uint64_t>& hash_vals,
     const uint32_t make_space_for_key_call_id,
     std::vector<CuckooBucket>* buckets, uint64_t* bucket_id) {
+PERF_MARKER(__PRETTY_FUNCTION__);
   struct CuckooNode {
     uint64_t bucket_id;
     uint32_t depth;
@@ -528,6 +536,7 @@ bool CuckooTableBuilder::MakeSpaceForKey(
 }
 
 std::string CuckooTableBuilder::GetFileChecksum() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (file_ != nullptr) {
     return file_->GetFileChecksum();
   } else {
@@ -536,6 +545,7 @@ std::string CuckooTableBuilder::GetFileChecksum() const {
 }
 
 const char* CuckooTableBuilder::GetFileChecksumFuncName() const {
+PERF_MARKER(__PRETTY_FUNCTION__);
   if (file_ != nullptr) {
     return file_->GetFileChecksumFuncName();
   } else {

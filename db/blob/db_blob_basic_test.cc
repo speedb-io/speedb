@@ -265,7 +265,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   SyncPoint::GetInstance()->ClearAllCallBacks();
   SyncPoint::GetInstance()->SetCallBack(
       "RandomAccessFileReader::MultiRead:AlignedReqs", [&](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         auto* aligned_reqs = static_cast<std::vector<FSReadRequest>*>(arg);
         assert(aligned_reqs);
         ASSERT_EQ(1, aligned_reqs->size());
@@ -379,7 +378,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   SyncPoint::GetInstance()->SetCallBack(
       "Version::Get::TamperWithBlobIndex", [](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         Slice* const blob_index = static_cast<Slice*>(arg);
         assert(blob_index);
         assert(!blob_index->empty());
@@ -424,7 +422,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   SyncPoint::GetInstance()->SetCallBack(
       "Version::MultiGet::TamperWithBlobIndex", [&key](void* arg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         KeyContext* const key_context = static_cast<KeyContext*>(arg);
         assert(key_context);
         assert(key_context->key);
@@ -925,7 +922,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(Flush());
 
   SyncPoint::GetInstance()->SetCallBack(sync_point_, [this](void* /* arg */) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     fault_injection_env_->SetFilesystemActive(false,
                                               Status::IOError(sync_point_));
   });
@@ -967,7 +963,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   std::array<Status, num_keys> statuses;
 
   SyncPoint::GetInstance()->SetCallBack(sync_point_, [this](void* /* arg */) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     fault_injection_env_->SetFilesystemActive(false,
                                               Status::IOError(sync_point_));
   });
@@ -1013,7 +1008,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   bool first_blob_file = true;
   SyncPoint::GetInstance()->SetCallBack(
       sync_point_, [&first_blob_file, this](void* /* arg */) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         if (first_blob_file) {
           first_blob_file = false;
           return;
@@ -1073,7 +1067,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_OK(Flush());
 
   SyncPoint::GetInstance()->SetCallBack(sync_point_, [this](void* /* arg */) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     fault_injection_env_->SetFilesystemActive(false,
                                               Status::IOError(sync_point_));
   });

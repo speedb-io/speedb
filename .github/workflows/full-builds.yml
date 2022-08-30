@@ -22,7 +22,6 @@ jobs:
     steps:
     - name: Pre-build
       run: |
-        rm -rf /usr/share/dotnet || echo ""
         echo "nameserver 8.8.8.8" > /etc/resolv.conf
         apk add git
         apk add bash python3 py3-pip clang clang-extra-tools shellcheck gcc g++ cmake ninja ccache \
@@ -54,7 +53,7 @@ jobs:
     - name: ${{ matrix.name }}
       run: |
         if [ -d "$GITHUB_WORKSPACE/build" ]; then
-          echo >&2 "error: the build directory should not exist" && false NIK 
+          echo >&2 "error: the build directory should not exist" && false 
         fi
         if [ -d "~/.ccache" ]; then
           echo "CCache folder exists, folder creation skipped"

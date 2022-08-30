@@ -22,11 +22,9 @@ jobs:
     steps:
     - name: Pre-build
       run: |
-        env
         rm -rf /usr/share/dotnet || echo ""
-        df -h
-        apk add git
         echo "nameserver 8.8.8.8" > /etc/resolv.conf
+        apk add git
         apk add bash python3 py3-pip clang clang-extra-tools shellcheck gcc g++ cmake ninja ccache \
         openjdk10 gflags-dev snappy-dev lz4-dev bzip2-dev zstd-dev zlib-dev linux-headers openssh-client tar
         python3 -m pip install lint-diffs flake8
@@ -59,14 +57,9 @@ jobs:
           echo >&2 "error: the build directory should not exist" && false NIK 
         fi
         if [ -d "~/.ccache" ]; then
-          echo "Already exists"
+          echo "CCache folder exists, folder creation skipped"
         else
           mkdir -p ~/.ccache
-          ls ~ | grep cache || echo ""
-          touch ~/.ccache/ccache.txt
-          echo "aaa" > ~/.ccache/ccache.txt
-          ls ~/.ccache
-          cat ~/.ccache/ccache.txt
         fi
         mkdir -p "$GITHUB_WORKSPACE/build"
         cd "$GITHUB_WORKSPACE/build"

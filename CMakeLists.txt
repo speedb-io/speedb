@@ -1372,6 +1372,7 @@ if(WITH_TESTS)
         utilities/cassandra/cassandra_functional_test.cc
         utilities/cassandra/cassandra_format_test.cc
         utilities/cassandra/cassandra_row_merge_test.cc
+        utilities/cassandra/cassandra_serialize_test.cc
         utilities/checkpoint/checkpoint_test.cc
         utilities/env_timed_test.cc
         utilities/memory/memory_test.cc
@@ -1394,7 +1395,7 @@ if(WITH_TESTS)
         utilities/ttl/ttl_test.cc
         utilities/util_merge_operators_test.cc
         utilities/write_batch_with_index/write_batch_with_index_test.cc
-	${PLUGIN_TESTS}
+        ${PLUGIN_TESTS}
     )
   endif()
 

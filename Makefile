@@ -571,8 +571,10 @@ ALL_SOURCES += $(TOOL_LIB_SOURCES) $(BENCH_LIB_SOURCES) $(CACHE_BENCH_LIB_SOURCE
 ALL_SOURCES += $(TEST_MAIN_SOURCES) $(TOOL_MAIN_SOURCES) $(BENCH_MAIN_SOURCES)
 ALL_SOURCES += $(ROCKSDB_PLUGIN_SOURCES) $(ROCKSDB_PLUGIN_TESTS)
 
-TESTS = $(patsubst %.cc, %, $(notdir $(TEST_MAIN_SOURCES) $(ROCKSDB_PLUGIN_TESTS)))
+PLUGIN_TESTS = $(patsubst %.cc, %, $(notdir $(ROCKSDB_PLUGIN_TESTS)))
+TESTS = $(patsubst %.cc, %, $(notdir $(TEST_MAIN_SOURCES)))
 TESTS += $(patsubst %.c, %, $(notdir $(TEST_MAIN_SOURCES_C)))
+TESTS += $(PLUGIN_TESTS)
 
 # `make check-headers` to very that each header file includes its own
 # dependencies
@@ -627,6 +629,7 @@ NON_PARALLEL_TEST = \
 	env_test \
 	deletefile_test \
 	db_bloom_filter_test \
+	$(PLUGIN_TESTS) \
 
 PARALLEL_TEST = $(filter-out $(NON_PARALLEL_TEST), $(TESTS))
 
@@ -1285,13 +1288,12 @@ db_repl_stress: $(OBJ_DIR)/tools/db_repl_stress.o $(LIBRARY)
 	$(AM_LINK)
 
 define MakeTestRule
-$(1): $(2) $(TEST_LIBRARY) $(LIBRARY)
-	$(AM_V_CCLD)$(CXX) -L. $(patsubst lib%.a, -l%, $(patsubst lib%.$(PLATFORM_SHARED_EXT), -l%, $$^)) $(EXEC_LDFLAGS) -o $$@ $(LDFLAGS) $(COVERAGEFLAGS)
+$(notdir $(1:%.cc=%)): $(1:%.cc=$$(OBJ_DIR)/%.o) $$(TEST_LIBRARY) $$(LIBRARY)
+	$$(AM_LINK)
 endef
 
 # For each PLUGIN test, create a rule to generate the test executable
-$(foreach test, $(ROCKSDB_PLUGIN_TESTS), $(eval $(call MakeTestRule, $(notdir $(patsubst %.cc, %, $(test))), $(patsubst %.cc, $(OBJ_DIR)/%.o, $(test)))))
-
+$(foreach test, $(ROCKSDB_PLUGIN_TESTS), $(eval $(call MakeTestRule, $(test))))
 
 arena_test: $(OBJ_DIR)/memory/arena_test.o $(TEST_LIBRARY) $(LIBRARY)
 	$(AM_LINK)

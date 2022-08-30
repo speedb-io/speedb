@@ -725,9 +725,6 @@ void MemTableList::RemoveMemTablesOrRestoreFlags(
   assert(mu);
   mu->AssertHeld();
   assert(to_delete);
-  // we will be changing the version in the next code path,
-  // so we better create a new one, since versions are immutable
-  InstallNewVersion();
 
   // All the later memtables that have the same filenum
   // are part of the same batch. They can be committed now.
@@ -748,6 +745,10 @@ void MemTableList::RemoveMemTablesOrRestoreFlags(
   // read full data as long as column family handle is not deleted, even if
   // the column family is dropped.
   if (s.ok() && !cfd->IsDropped()) {  // commit new state
+    // we will be changing the version in the next code path,
+    // so we better create a new one, since versions are immutable
+    InstallNewVersion();
+
     while (batch_count-- > 0) {
       MemTable* m = current_->memlist_.back();
       if (m->edit_.GetBlobFileAdditions().empty()) {
@@ -788,13 +789,19 @@ void MemTableList::RemoveMemTablesOrRestoreFlags(
                          m->edit_.GetBlobFileAdditions().size(), mem_id);
       }
 
-      m->SetFlushCompleted(false);
-      m->SetFlushInProgress(false);
+      // Do not roll back if the CF has been dropped. There's no point in
+      // setting a pending flush state again since we won't be able to complete
+      // a flush anyway in that state, and we can only drop the memtable after
+      // all handles are destroyed.
+      if (!cfd->IsDropped()) {
+        m->SetFlushCompleted(false);
+        m->SetFlushInProgress(false);
 
-      m->edit_.Clear();
-      num_flush_not_started_++;
-      m->file_number_ = 0;
-      imm_flush_needed.store(true, std::memory_order_release);
+        m->edit_.Clear();
+        num_flush_not_started_++;
+        m->file_number_ = 0;
+        imm_flush_needed.store(true, std::memory_order_release);
+      }
       ++mem_id;
     }
   }

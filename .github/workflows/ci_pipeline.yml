@@ -56,9 +56,9 @@ jobs:
       uses: actions/cache@v2
       with:
         path: ~/.ccache
-        key: ${{runner.os}}-ccache-${{steps.ccache_cache_timestamp.outputs.timestamp}}
-        restore-keys: |
-          ${{runner.os}}-ccache-
+        key: ${{runner.os}}-ccache #-${{steps.ccache_cache_timestamp.outputs.timestamp}}
+        #restore-keys: |
+          #${{runner.os}}-ccache-
         
       
     - name: ${{ matrix.name }}

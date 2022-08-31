@@ -8,7 +8,7 @@ on:
     types: [submitted]
 
   
-permissions: write-all
+permissions: read-all
 
 jobs:
   #Sanity:

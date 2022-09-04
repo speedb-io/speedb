@@ -21,11 +21,11 @@ jobs:
     strategy:
       matrix:
         include:
-          - name: verify build
+          - name: verify-build
             command: cmake ..  -GNinja
-          - name: optimized build
+          - name: optimized-build
             command: cmake .. -DCMAKE_BUILD_TYPE=Release  -GNinja
-          - mame: clang build
+          - mame: clang-build
             command: CC=clang CXX=clang++ cmake ..  -GNinja
     container:
       image: alpine:3.14
@@ -56,7 +56,8 @@ jobs:
       uses: actions/cache@v3
       with:
         path: ~/.ccache
-        key: ${{runner.os}}-ccache-${{ matrix.name }} #-${{steps.ccache_cache_timestamp.outputs.timestamp}}
+        key: ${{runner.os}}-ccache-${{ matrix.name }}
+        #-${{steps.ccache_cache_timestamp.outputs.timestamp}}
         #restore-keys: |
           #${{runner.os}}-ccache-
         

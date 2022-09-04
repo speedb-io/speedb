@@ -8,7 +8,8 @@ on:
     types: [submitted]
 
   
-permissions: read-all
+permissions:
+  contents: read
 
 jobs:
   #Sanity:

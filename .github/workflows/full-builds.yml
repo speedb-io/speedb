@@ -4,7 +4,8 @@ on:
   workflow_dispatch:
   workflow_call:
   
-permissions: read-all
+permissions:
+  contents: read
 
 jobs:
   Build:
@@ -34,23 +35,11 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v3 
       
-      
-    - name: Prepare ccache timestamp
-      id: ccache_cache_timestamp
-      shell: cmake -P {0}
-      run: |
-        string(TIMESTAMP current_date "%Y-%m-%d-%H;%M;%S" UTC)
-        message("::set-output name=timestamp::${current_date}")
-        
-        
     - name: ccache cache files
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: ~/.ccache
-        key: ${{runner.os}}-ccache-${{steps.ccache_cache_timestamp.outputs.timestamp}}
-        restore-keys: |
-          ${{runner.os}}-ccache-
-        
+        key: ${{runner.os}}-${{ matrix.name }}-ccache
       
     - name: ${{ matrix.name }}
       run: |

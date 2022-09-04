@@ -21,11 +21,11 @@ jobs:
     strategy:
       matrix:
         include:
-          - name: verify-build
+          - name: verify_build
             command: cmake ..  -GNinja
-          - name: optimized-build
+          - name: optimized_build
             command: cmake .. -DCMAKE_BUILD_TYPE=Release  -GNinja
-          - mame: clang-build
+          - mame: clang_build
             command: CC=clang CXX=clang++ cmake ..  -GNinja
     container:
       image: alpine:3.14
@@ -43,7 +43,6 @@ jobs:
         
     - name: Checkout
       uses: actions/checkout@v3 
-      
       
     - name: Prepare ccache timestamp
       id: ccache_cache_timestamp

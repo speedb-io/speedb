@@ -25,7 +25,7 @@ jobs:
             command: cmake ..  -GNinja
           - name: optimized_build
             command: cmake .. -DCMAKE_BUILD_TYPE=Release  -GNinja
-          - mame: clang_build
+          - name: clang_build
             command: CC=clang CXX=clang++ cmake ..  -GNinja
     container:
       image: alpine:3.14

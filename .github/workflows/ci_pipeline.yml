@@ -51,16 +51,11 @@ jobs:
         string(TIMESTAMP current_date "%Y-%m-%d-%H;%M;%S" UTC)
         message("::set-output name=timestamp::${current_date}")
         
-        
     - name: ccache cache files
       uses: actions/cache@v3
       with:
         path: ~/.ccache
-        key: ${{runner.os}}-ccache-${{ matrix.name }}
-        #-${{steps.ccache_cache_timestamp.outputs.timestamp}}
-        #restore-keys: |
-          #${{runner.os}}-ccache-
-        
+        key: ${{runner.os}}-${{ matrix.name }}-ccache        
       
     - name: ${{ matrix.name }}
       run: |

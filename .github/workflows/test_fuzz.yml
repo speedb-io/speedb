@@ -67,7 +67,7 @@ jobs:
            
       - name: Copy ${{ matrix.name }} logs to S3
         run: |
-          aws s3 cp $GITHUB_WORKSPACE/out/${{ matrix.name }}.log-$GITHUB_SHA s3://spdb-github-ci/
+          aws s3 cp $GITHUB_WORKSPACE/out/${{ matrix.name }}.log s3://spdb-github-ci/$GITHUB_SHA-${{ matrix.name }}.log
     
   fuzzer_sum:
     runs-on: [self-hosted, ubuntu, asrunner]
@@ -95,21 +95,21 @@ jobs:
       - name: download db_fuzzer.log from s3
         run: |
           mkdir -p $GITHUB_WORKSPACE/out
-          aws s3 cp s3://spdb-github-ci/db_fuzzer.log $GITHUB_WORKSPACE/out/db_fuzzer.log-$GITHUB_SHA || echo "db_fuzzer.log not found"
+          aws s3 cp s3://spdb-github-ci/$GITHUB_SHA-db_fuzzer.log $GITHUB_WORKSPACE/out/$GITHUB_SHA-db_fuzzer.log || echo "db_fuzzer.log not found"
           ls -alFh $GITHUB_WORKSPACE/out
           
       - name: download db_map_fuzzer.log from s3
         run: |
           mkdir -p $GITHUB_WORKSPACE/out
-          aws s3 cp s3://spdb-github-ci/db_map_fuzzer.log $GITHUB_WORKSPACE/out/db_map_fuzzer.log-$GITHUB_SHA || echo "db_map_fuzzer.log not found"
+          aws s3 cp s3://spdb-github-ci/$GITHUB_SHA-db_map_fuzzer.log $GITHUB_WORKSPACE/out/$GITHUB_SHA-db_map_fuzzer.log || echo "db_fuzzer.log not found"
           ls -alFh $GITHUB_WORKSPACE/out
       
       - name: fuzzersum
         run: |
           echo "~~~~ db_map_fuzzer LOGS ~~~~~"
-          tail -20 $GITHUB_WORKSPACE/out/db_map_fuzzer.log | grep "==AddressSanitizer. Thread limit (4194304 threads) exceeded\. Dying\." || echo "db_map_fuzzer failed!"
+          tail -20 $GITHUB_WORKSPACE/out/$GITHUB_SHA-db_map_fuzzer.log | grep "==AddressSanitizer. Thread limit (4194304 threads) exceeded\. Dying\." || echo "db_map_fuzzer failed!"
           echo "~~~~ db_fuzzer LOGS ~~~~~"
-          tail -20 $GITHUB_WORKSPACE/out/db_fuzzer.log | grep "==AddressSanitizer. Thread limit (4194304 threads) exceeded\. Dying\." || echo "db_fuzzer failed!"
+          tail -20 $GITHUB_WORKSPACE/out/$GITHUB_SHA-db_fuzzer.log | grep "==AddressSanitizer. Thread limit (4194304 threads) exceeded\. Dying\." || echo "db_fuzzer failed!"
           
       - name: clear s3 bucket
         run: |

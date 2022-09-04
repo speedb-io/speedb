@@ -39,6 +39,7 @@ jobs:
         openjdk10 gflags-dev snappy-dev lz4-dev bzip2-dev zstd-dev zlib-dev linux-headers openssh-client tar
         python3 -m pip install lint-diffs flake8
         git config --global --add safe.directory $GITHUB_WORKSPACE
+        echo ${{ matrix.name }}
         
     - name: Checkout
       uses: actions/checkout@v3 

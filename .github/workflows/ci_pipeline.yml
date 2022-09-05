@@ -11,11 +11,11 @@ on:
 jobs:
   #Sanity:
     #uses: speedb-io/speedb/.github/workflows/sanity_check.yml@main
-  
+
   Build:
     needs: [Sanity]
     if: ${{ github.event.review.state == 'approved' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/release') }}
-    uses: speedb-io/speedb/.github/workflows/full-builds.yml@main
+    uses: ./.github/workflows/full-builds.yml
   #Performance:
     #if: ${{ github.event.review.state == 'approved' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/release') }}
     #needs: [Build]

@@ -66,6 +66,6 @@ jobs:
            tail -20 $GITHUB_WORKSPACE/out/${{ matrix.name }}.log | grep "==AddressSanitizer. Thread limit (4194304 threads) exceeded\. Dying\." || { echo "${{ matrix.name }} failed!" && false; }
            
       - name: Copy ${{ matrix.name }} logs to S3 due to failure
-        if: steps.${{ matrix.name }}.outcome != 'success'
+        if: steps.${{ matrix.name }}.outcome == 'failure'
         run: |
           aws s3 cp $GITHUB_WORKSPACE/out/${{ matrix.name }}.log s3://spdb-github-ci/$GITHUB_SHA-${{ matrix.name }}.log

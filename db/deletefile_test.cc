@@ -252,11 +252,11 @@ TEST_F(DeleteFileTest, BackgroundPurgeIteratorTest) {
   CheckFileTypeCounts(dbname_, 0, 3, 1);
   test::SleepingBackgroundTask sleeping_task_before;
   env_->Schedule(&test::SleepingBackgroundTask::DoSleepTask,
-                 &sleeping_task_before, Env::Priority::HIGH);
+                 &sleeping_task_before, Env::Priority::LOW);
   delete itr;
   test::SleepingBackgroundTask sleeping_task_after;
   env_->Schedule(&test::SleepingBackgroundTask::DoSleepTask,
-                 &sleeping_task_after, Env::Priority::HIGH);
+                 &sleeping_task_after, Env::Priority::LOW);
 
   // Make sure no purges are executed foreground
   CheckFileTypeCounts(dbname_, 0, 3, 1);
@@ -334,7 +334,7 @@ TEST_F(DeleteFileTest, BackgroundPurgeCFDropTest) {
     delete cfh;
     test::SleepingBackgroundTask sleeping_task_after;
     env_->Schedule(&test::SleepingBackgroundTask::DoSleepTask,
-                   &sleeping_task_after, Env::Priority::HIGH);
+                   &sleeping_task_after, Env::Priority::LOW);
     // If background purge is enabled, the file should still be there.
     CheckFileTypeCounts(dbname_, 0, bg_purge ? 1 : 0, 1);
     TEST_SYNC_POINT("DeleteFileTest::BackgroundPurgeCFDropTest:1");
@@ -403,7 +403,7 @@ TEST_F(DeleteFileTest, BackgroundPurgeCopyOptions) {
 
   test::SleepingBackgroundTask sleeping_task_after;
   env_->Schedule(&test::SleepingBackgroundTask::DoSleepTask,
-                 &sleeping_task_after, Env::Priority::HIGH);
+                 &sleeping_task_after, Env::Priority::LOW);
 
   // Make sure all background purges are executed
   sleeping_task_after.WakeUp();

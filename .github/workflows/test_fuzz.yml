@@ -1,7 +1,6 @@
 name: Fuzz Test
 
 on:
-  workflow_dispatch:
   workflow_call:
     secrets:
       AWS_ACCESS_KEY_ID:
@@ -9,63 +8,126 @@ on:
       AWS_SECRET_ACCESS_KEY:
         required: true
 
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   Fuzz:
     runs-on: [self-hosted, ubuntu, asrunner]
     container:
-      image: ubuntu:18.04
+      image: ubuntu:22.04
+
+    env:
+      CC: clang
+      CXX: clang++
+
     strategy:
       matrix:
-        include:
-          - name: db_fuzzer
-          - name: db_map_fuzzer
+        fuzzer: [db_fuzzer, db_map_fuzzer]
 
     steps:
-      - name: Pre-build
+      - name: pre
         run: |
           echo "nameserver 8.8.8.8" > /etc/resolv.conf
-          apt update && apt install -y sudo python3 git clang-tools cmake make automake ucommon-utils libtool gettext pkg-config build-essential clang-10 zlib1g-dev libbz2-dev ninja-build liblzma-dev autoconf libsnappy-dev libzstd-dev liblz4-dev binutils m4 g++-10 unzip
-          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-          unzip awscliv2.zip
-          sudo ./aws/install
-      
-      - uses: actions/checkout@v3
+          apt update -y
+          apt install -y git-core python3 clang libfuzzer-14-dev \
+            unzip wget ccache cmake ninja-build pkg-config protobuf-compiler \
+            zlib1g-dev libbz2-dev liblzma-dev libsnappy-dev
 
-      - name: Configure AWS credentials from Test account
+      - name: Install awscli
+        run: |
+          wget "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -O "awscliv2.zip"
+          unzip awscliv2.zip
+          ./aws/install
+          rm -rf aws awscliv2.zip
+
+      - name: Fetch build cache
+        uses: actions/cache@v3
+        with:
+          path: ~/.ccache
+          key: ${{ runner.os }}-fuzzing-build-ccache-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-fuzzing-build-ccache
+
+      - run: |
+          mkdir -p ~/.ccache
+          echo "CCACHE_BASEDIR=$HOME" >> $GITHUB_ENV
+          echo "CCACHE_DIR=$HOME/.ccache" >> $GITHUB_ENV
+          echo "CCACHE_COMPILERCHECK=content" >> $GITHUB_ENV
+
+      - name: Checkout libprotobuf-mutator
+        uses: actions/checkout@v3
+        with:
+          repository: google/libprotobuf-mutator
+          ref: ffd86a32874e5c08a143019aad1aaf0907294c9f
+          path: 'libprotobuf-mutator'
+
+      - name: Build and install libprotobuf-mutator
+        run: |
+          mkdir "$GITHUB_WORKSPACE/LPM" && cd "$GITHUB_WORKSPACE/LPM"
+          cmake "$GITHUB_WORKSPACE/libprotobuf-mutator" -GNinja -DCMAKE_BUILD_TYPE=Release \
+            -DLIB_PROTO_MUTATOR_DOWNLOAD_PROTOBUF=ON -DLIB_PROTO_MUTATOR_TESTING=OFF
+          ninja install
+
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: eu-west-2
 
-      - name: ${{ matrix.name }}
+      - name: Checkout Speedb
+        uses: actions/checkout@v3
+        with:
+          path: 'speedb'
+
+      - name: Set fuzzing compilation flags
         run: |
-           echo 'git clone https://github.com/google/libprotobuf-mutator.git \n
-             cd libprotobuf-mutator \n
-             git checkout ffd86a32874e5c08a143019aad1aaf0907294c9f \n
-             cd .. \n
-             export CC=clang && export CXX=clang++ && mkdir LPM && cd LPM \n
-             ln -s /usr/lib/x86_64-linux-gnu/libstdc++.so.6 /usr/lib/x86_64-linux-gnu/libstdc++.so \n
-             ln -s /usr/bin/clang-10 /usr/bin/clang \n
-             ln -s /usr/bin/clang++-10 /usr/bin/clang++ \n
-             cmake ../libprotobuf-mutator -GNinja -DLIB_PROTO_MUTATOR_DOWNLOAD_PROTOBUF=ON -DLIB_PROTO_MUTATOR_TESTING=OFF -DCMAKE_BUILD_TYPE=Release \n
-             ninja \n
-             ninja install \n
-             export PKG_CONFIG_PATH=$PWD:$PWD/external.protobuf/lib/pkgconfig/ \n
-             export PATH=$PWD/external.protobuf/bin:$PATH \n
-             cd $GITHUB_WORKSPACE \n
-             COMPILE_WITH_ASAN=1 PORTABLE=1 make -j$(nproc) static_lib \n
-             cd $GITHUB_WORKSPACE/fuzz \n
-             make ${{ matrix.name }} \n
-             ls -alFh $GITHUB_WORKSPACE/fuzz/ \n
-             echo ASAN_OPTIONS=detect_leaks=0 ./db_fuzzer \n' > prepfuz.sh
-           chmod +x prepfuz.sh
-           bash -xv prepfuz.sh
-           mkdir -p $GITHUB_WORKSPACE/out/
-           ASAN_OPTIONS=detect_odr_violation=0 $GITHUB_WORKSPACE/fuzz/${{ matrix.name }} 2>&1 | tee $GITHUB_WORKSPACE/out/${{ matrix.name }}.log
-           tail -20 $GITHUB_WORKSPACE/out/${{ matrix.name }}.log | grep "==AddressSanitizer. Thread limit (4194304 threads) exceeded\. Dying\." || { echo "${{ matrix.name }} failed!" && false; }
+          echo "FUZZ_ENV=ossfuzz" >> $GITHUB_ENV
+          echo "CFLAGS=-O1 -fno-omit-frame-pointer -gline-tables-only \
+            -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION -fsanitize=address \
+            -fsanitize-address-use-after-scope -fsanitize=fuzzer-no-link" >> $GITHUB_ENV
+          echo "CXXFLAGS=-O1 -fno-omit-frame-pointer -gline-tables-only \
+            -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION -fsanitize=address \
+            -fsanitize-address-use-after-scope -fsanitize=fuzzer-no-link" >> $GITHUB_ENV
+          echo "LIB_FUZZING_ENGINE=-fsanitize=fuzzer" >> $GITHUB_ENV
+          echo "PKG_CONFIG_PATH=$GITHUB_WORKSPACE/LPM:$GITHUB_WORKSPACE/LPM/external.protobuf/lib/pkgconfig/" >> $GITHUB_ENV
+          echo "PATH=$GITHUB_WORKSPACE/LPM/external.protobuf/bin:$PATH" >> $GITHUB_ENV
+
+      - name: Build Speedb static library
+        run: |
+          cd "$GITHUB_WORKSPACE/speedb"
+          make -j$(nproc) static_lib
+
+      - name: ${{ matrix.fuzzer }}
+        id: fuzzer-run
+        run: |
+          cd "$GITHUB_WORKSPACE/speedb/fuzz"
+          export "CXXFLAGS=$CXXFLAGS -std=c++17"
+          make ${{ matrix.fuzzer }}
+
+          OUTDIR="$GITHUB_WORKSPACE/$GITHUB_SHA-${{ matrix.fuzzer }}-out"
+          rm -rf "$OUTDIR" && mkdir -p "$OUTDIR"
+          echo "OUTDIR=$OUTDIR" >> $GITHUB_ENV
+
+          export ASAN_OPTIONS=detect_odr_violation=0
+          if ! ./${{ matrix.fuzzer }} -max_total_time=1800 "-artifact_prefix=$OUTDIR/" 2>&1 | tee "$OUTDIR/output.log" && \
+             ! tail -20 "OUTDIR/output.log" | grep -q "==AddressSanitizer. Thread limit (4194304 threads) exceeded\. Dying\."
+          then
+            echo >&2 "${{ matrix.fuzzer }} failed!" && false
+          fi
+
+          rm -rf "$OUTDIR"
            
-      - name: Copy ${{ matrix.name }} logs to S3 due to failure
-        if: steps.${{ matrix.name }}.outcome == 'failure'
+      - name: Copy ${{ matrix.fuzzer }} logs to S3 on failure
+        if: ${{ always() && steps.fuzzer-run.outcome == 'failure' }}
         run: |
-          aws s3 cp $GITHUB_WORKSPACE/out/${{ matrix.name }}.log s3://spdb-github-ci/$GITHUB_SHA-${{ matrix.name }}.log
+          if [ -d "$OUTDIR" ]; then
+            aws s3 cp --recursive "$OUTDIR" s3://spdb-github-ci/
+            rm -rf "$OUTDIR"
+          fi

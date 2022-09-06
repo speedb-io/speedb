@@ -74,7 +74,7 @@ default_params = {
     "destroy_db_initially": 0,
     "enable_pipelined_write": lambda: random.choice([0, 0, 0, 0, 1]),
     "enable_compaction_filter": lambda: random.choice([0, 0, 0, 1]),
-    "expected_values_dir": lambda: setup_expected_values_dir(),
+    "expected_values_dir": "",
     "fail_if_options_file_error": lambda: random.randint(0, 1),
     "flush_one_in": 1000000,
     "file_checksum_impl": lambda: random.choice(["none", "crc32c", "xxh64", "big"]),
@@ -188,60 +188,41 @@ default_params = {
 }
 
 _TEST_DIR_ENV_VAR = 'TEST_TMPDIR'
-_DEBUG_LEVEL_ENV_VAR = 'DEBUG_LEVEL'
 
 stress_cmd = "./db_stress"
 
+
 def is_release_mode():
-    return os.environ.get(_DEBUG_LEVEL_ENV_VAR) == "0"
+    chunk = bytearray(8192)
+    with open(stress_cmd, "rb") as f:
+        for c in iter(lambda: f.read(4096), b''):
+            del chunk[:4096]
+            chunk.append(c)
+            # Look for a sync point, which will only be enabled in non-release builds
+            if chunk.find(b'FlushJob::Start') >= 0:
+                return False
+    return True
 
 
 def get_dbname(test_name):
-    test_dir_name = "rocksdb_crashtest_" + test_name
+    test_db_prefix = "rocksdb_crashtest_{}.{}".format(test_name, time.time())
     test_tmpdir = os.environ.get(_TEST_DIR_ENV_VAR)
-    if test_tmpdir is None or test_tmpdir == "":
-        dbname = tempfile.mkdtemp(prefix=test_dir_name)
-    else:
-        dbname = test_tmpdir + "/" + test_dir_name
-        shutil.rmtree(dbname, True)
-        os.mkdir(dbname)
-    return dbname
+    return tempfile.mkdtemp(prefix=test_db_prefix, dir=test_tmpdir if test_tmpdir else None)
 
 
-expected_values_dir = None
-def setup_expected_values_dir():
-    global expected_values_dir
-    if expected_values_dir is not None:
-        return expected_values_dir
-    expected_dir_prefix = "rocksdb_crashtest_expected_"
-    test_tmpdir = os.environ.get(_TEST_DIR_ENV_VAR)
-    if test_tmpdir is None or test_tmpdir == "":
-        expected_values_dir = tempfile.mkdtemp(
-            prefix=expected_dir_prefix)
-    else:
-        # if tmpdir is specified, store the expected_values_dir under that dir
-        expected_values_dir = test_tmpdir + "/rocksdb_crashtest_expected"
-        if os.path.exists(expected_values_dir):
-            shutil.rmtree(expected_values_dir)
-        os.mkdir(expected_values_dir)
+def setup_expected_values_dir(db_path):
+    expected_values_dir = "{}_expected".format(db_path)
+    if os.path.exists(expected_values_dir):
+        shutil.rmtree(expected_values_dir)
+    os.mkdir(expected_values_dir)
     return expected_values_dir
 
-multiops_txn_key_spaces_file = None
-def setup_multiops_txn_key_spaces_file():
-    global multiops_txn_key_spaces_file
-    if multiops_txn_key_spaces_file is not None:
-        return multiops_txn_key_spaces_file
-    key_spaces_file_prefix = "rocksdb_crashtest_multiops_txn_key_spaces"
-    test_tmpdir = os.environ.get(_TEST_DIR_ENV_VAR)
-    if test_tmpdir is None or test_tmpdir == "":
-        multiops_txn_key_spaces_file = tempfile.mkstemp(
-                prefix=key_spaces_file_prefix)[1]
-    else:
-        if not os.path.exists(test_tmpdir):
-            os.mkdir(test_tmpdir)
-        multiops_txn_key_spaces_file = tempfile.mkstemp(
-                prefix=key_spaces_file_prefix, dir=test_tmpdir)[1]
-    return multiops_txn_key_spaces_file
+
+def setup_multiops_txn_key_spaces_file(db_path):
+    key_spaces_file_path = "{}_multiops_txn_key_spaces".format(db_path)
+    with open(key_spaces_file_path, "ab") as f:
+        pass
+    return key_spaces_file_path
 
 
 def is_direct_io_supported(dbname):
@@ -429,7 +410,7 @@ multiops_txn_default_params = {
     # flush more frequently to generate more files, thus trigger more
     # compactions.
     "flush_one_in": 1000,
-    "key_spaces_path": setup_multiops_txn_key_spaces_file(),
+    "key_spaces_path": "",
 }
 
 multiops_wc_txn_params = {
@@ -454,7 +435,7 @@ narrow_ops_per_thread = 50000
 
 narrow_params = {
     "duration": 1800,
-    "expected_values_dir": lambda: setup_expected_values_dir(),
+    "expected_values_dir": "",
     "max_key_len": 8,
     "value_size_mult": 8,
     "fail_if_options_file_error": True,
@@ -644,7 +625,7 @@ def finalize_and_sanitize(src_params, counter):
     return dest_params
 
 
-def gen_cmd_params(args):
+def gen_cmd_params(args, dbname):
     params = {}
 
     params.update(default_params)
@@ -673,22 +654,28 @@ def gen_cmd_params(args):
         elif args.write_policy == 'write_prepared':
             params.update(multiops_wp_txn_params)
 
+        if not params["key_spaces_path"]:
+            params["key_spaces_path"] = setup_multiops_txn_key_spaces_file(dbname)
+
     # Best-effort recovery and BlobDB are currently incompatible. Test BE recovery
     # if specified on the command line; otherwise, apply BlobDB related overrides
     # with a 10% chance.
     if (not args.test_best_efforts_recovery and
-        not args.enable_ts and
-        random.choice([0] * 9 + [1]) == 1):
+            not args.enable_ts and
+            random.choice([0] * 9 + [1]) == 1):
         params.update(blob_params)
 
     for k, v in vars(args).items():
         if v is not None:
             params[k] = v
-    
+
     if params["max_key_len"] == 0 or params["key_len_percent_dist"] == "0":
         generate_key_dist_and_len(params)
 
-    return params
+    if not params["expected_values_dir"]:
+        params["expected_values_dir"] = setup_expected_values_dir(dbname)
+
+    return params["expected_values_dir"], params.get("key_spaces_path"), params
 
 
 def gen_cmd(params, unknown_params, counter):
@@ -776,14 +763,16 @@ def execute_cmd(cmd, timeout):
     return hit_timeout, child.returncode, outs.decode('utf-8'), errs.decode('utf-8')
 
 
-# old copy of the db is kept at same src dir as new db. 
-def copy_tree_and_remove_old(counter, dbname):
-    dest = dbname + "_" + str(counter)
+# old copy of the db is kept at same src dir as new db
+def copy_tree_and_remove_old(counter, dbname, expected_values_dir):
+    dest = "{}_{}".format(dbname, counter)
+    shutil.rmtree(dest, ignore_errors=True)
     shutil.copytree(dbname, dest)
-    shutil.copytree(expected_values_dir, dest + "/" + "expected_values_dir")
-    old_db = dbname + "_" + str(counter - 2)
+    if expected_values_dir:
+        shutil.copytree(expected_values_dir, os.path.join(dest, "expected_values_dir"))
     if counter > 1:
-        shutil.rmtree(old_db, True)
+        old_db = dbname + "_" + str(counter - 2)
+        shutil.rmtree(old_db, ignore_errors=True)
 
 
 def gen_narrow_cmd_params(args):
@@ -800,27 +789,30 @@ def gen_narrow_cmd_params(args):
     for k, v in vars(args).items():
         if v is not None:
             params[k] = v
-            
+
     return params
 
 
 def narrow_crash_main(args, unknown_args):
     cmd_params = gen_narrow_cmd_params(args)
     dbname = get_dbname('narrow')
+    if not params["expected_values_dir"]:
+        params["expected_values_dir"] = setup_expected_values_dir(dbname)
+    expected_values_dir = cmd_params["expected_values_dir"]
     exit_time = time.time() + cmd_params['duration']
-    
+
     store_ops_supplied(cmd_params)
 
     print("Running narrow-crash-test\n")
-    
+
     counter = 0
-    
+
     while time.time() < exit_time:
         randomize_operation_type_percentages(cmd_params)
         cmd = gen_cmd(dict(cmd_params, **{'db': dbname}), unknown_args, counter)
 
         hit_timeout, retcode, outs, errs = execute_cmd(cmd, cmd_params['duration'])
-        copy_tree_and_remove_old(counter, dbname)
+        copy_tree_and_remove_old(counter, dbname, expected_values_dir)
         counter += 1
 
         for line in errs.splitlines():
@@ -828,22 +820,23 @@ def narrow_crash_main(args, unknown_args):
                 run_had_errors = True
                 print('stderr has error message:')
                 print('***' + line + '***')
-        
+
         if retcode != 0:
             raise SystemExit('TEST FAILED. See kill option and exit code above!!!\n')
 
         time.sleep(2)  # time to stabilize before the next run
 
-    shutil.rmtree(dbname, True)
+    shutil.rmtree(dbname, ignore_errors=True)
+    shutil.rmtree(expected_values_dir, ignore_errors=True)
     for ctr in range(max(0, counter - 2), counter):
-        shutil.rmtree('{}_{}'.format(dbname, ctr), True)
+        shutil.rmtree('{}_{}'.format(dbname, ctr), ignore_errors=True)
 
 
 # This script runs and kills db_stress multiple times. It checks consistency
 # in case of unsafe crashes in RocksDB.
 def blackbox_crash_main(args, unknown_args):
-    cmd_params = gen_cmd_params(args)
     dbname = get_dbname('blackbox')
+    expected_values_dir, multiops_txn_key_spaces_file, cmd_params = gen_cmd_params(args, dbname)
     exit_time = time.time() + cmd_params['duration']
 
     store_ops_supplied(cmd_params)
@@ -851,7 +844,7 @@ def blackbox_crash_main(args, unknown_args):
     print("Running blackbox-crash-test with \n"
           + "interval_between_crash=" + str(cmd_params['interval']) + "\n"
           + "total-duration=" + str(cmd_params['duration']) + "\n")
-   
+
     counter = 0
 
     while time.time() < exit_time:
@@ -859,8 +852,8 @@ def blackbox_crash_main(args, unknown_args):
         cmd = gen_cmd(dict(cmd_params, **{'db': dbname}), unknown_args, counter)
 
         hit_timeout, retcode, outs, errs = execute_cmd(cmd, cmd_params['interval'])
-        copy_tree_and_remove_old(counter, dbname)
-        counter+=1
+        copy_tree_and_remove_old(counter, dbname, expected_values_dir)
+        counter += 1
 
         if not hit_timeout:
             print('Exit Before Killing')
@@ -871,7 +864,7 @@ def blackbox_crash_main(args, unknown_args):
             sys.exit(2)
 
         for line in errs.split('\n'):
-            if line != '' and  not line.startswith('WARNING'):
+            if line and not line.startswith('WARNING'):
                 print('stderr has error message:')
                 print('***' + line + '***')
 
@@ -883,16 +876,19 @@ def blackbox_crash_main(args, unknown_args):
         time.sleep(1)  # time to stabilize before the next run
 
     # we need to clean up after ourselves -- only do this on test success
-    shutil.rmtree(dbname, True)
+    shutil.rmtree(dbname, ignore_errors=True)
+    shutil.rmtree(expected_values_dir, ignore_errors=True)
+    if multiops_txn_key_spaces_file:
+        os.remove(multiops_txn_key_spaces_file)
     for ctr in range(max(0, counter - 2), counter):
-        shutil.rmtree('{}_{}'.format(dbname, ctr), True)
+        shutil.rmtree('{}_{}'.format(dbname, ctr), ignore_errors=True)
 
 
 # This python script runs db_stress multiple times. Some runs with
 # kill_random_test that causes rocksdb to crash at various points in code.
 def whitebox_crash_main(args, unknown_args):
-    cmd_params = gen_cmd_params(args)
     dbname = get_dbname('whitebox')
+    expected_values_dir, multiops_txn_key_spaces_file, cmd_params = gen_cmd_params(args, dbname)
 
     cur_time = time.time()
     exit_time = cur_time + cmd_params['duration']
@@ -992,9 +988,9 @@ def whitebox_crash_main(args, unknown_args):
         print(msg)
         print(stdoutdata)
         print(stderrdata)
-        
-        copy_tree_and_remove_old(counter, dbname)
-        counter+=1
+
+        copy_tree_and_remove_old(counter, dbname, expected_values_dir)
+        counter += 1
 
         if hit_timeout:
             print("Killing the run for running too long")
@@ -1031,18 +1027,24 @@ def whitebox_crash_main(args, unknown_args):
         if time.time() > half_time:
             # we need to clean up after ourselves -- only do this on test
             # success
-            shutil.rmtree(dbname, True)
+            shutil.rmtree(dbname, ignore_errors=True)
             os.mkdir(dbname)
-            global expected_values_dir
-            if os.path.exists(expected_values_dir):
+            if expected_values_dir and os.path.exists(expected_values_dir):
                 shutil.rmtree(expected_values_dir)
+                del cmd_params["expected_values_dir"]
             expected_values_dir = None
             check_mode = (check_mode + 1) % total_check_mode
 
         time.sleep(1)  # time to stabilize after a kill
 
+    # we need to clean up after ourselves -- only do this on test success
+    shutil.rmtree(dbname, ignore_errors=True)
+    if expected_values_dir:
+        shutil.rmtree(expected_values_dir, ignore_errors=True)
+    if multiops_txn_key_spaces_file:
+        os.remove(multiops_txn_key_spaces_file)
     for ctr in range(max(0, counter - 2), counter):
-        shutil.rmtree('{}_{}'.format(dbname, ctr), True)
+        shutil.rmtree('{}_{}'.format(dbname, ctr), ignore_errors=True)
 
 
 def bool_converter(v):
@@ -1093,9 +1095,8 @@ def main():
 
     test_tmpdir = os.environ.get(_TEST_DIR_ENV_VAR)
     if test_tmpdir and not os.path.isdir(test_tmpdir):
-        print('%s env var is set to a non-existent directory: %s' %
-                (_TEST_DIR_ENV_VAR, test_tmpdir))
-        sys.exit(1)
+        raise SystemExit('{} env var is set to a non-existent directory: {}'.format(
+            _TEST_DIR_ENV_VAR, test_tmpdir))
 
     if args.stress_cmd:
         stress_cmd = args.stress_cmd
@@ -1105,11 +1106,6 @@ def main():
         whitebox_crash_main(args, unknown_args)
     if args.test_type == 'narrow':
         narrow_crash_main(args, unknown_args)
-    # Only delete the `expected_values_dir` if test passes
-    if expected_values_dir and os.path.exists(expected_values_dir):
-        shutil.rmtree(expected_values_dir)
-    if multiops_txn_key_spaces_file is not None:
-        os.remove(multiops_txn_key_spaces_file)
 
 
 if __name__ == '__main__':

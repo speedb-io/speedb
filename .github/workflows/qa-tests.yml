@@ -2,55 +2,149 @@ name: QA Tests
 
 on:
   workflow_dispatch:
+    inputs:
+      duration:
+        description: "Crash test duration in seconds (optional)"
+        required: false
   workflow_call:
 
-env:
-  GTEST_COLOR: 1
-  GTEST_THROW_ON_FAILURE: 0
-  SKIP_FORMAT_BUCK_CHECKS: 1
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  test:
+  unit_tests:
     runs-on: [self-hosted, ubuntu, asrunner]
+
     container:
-      image: ubuntu:18.04
+      image: alpine:3.16
       volumes:
         - /var/tmp:/var/tmp # Needed for env_test's IoctlFriendlyTmpdir
-        - /tmp:/tmp # Needed for running tests on non-overlayfs (can't use /dev/shm because there's not enough RAM on the runner)
-    strategy:
-      matrix:
-        include:
-          - name: Unit tests
-            short_test: TMPD="$(mktemp -d /tmp/speedb.XXXX)" make -j$(nproc) check
-            long_test: TMPD="$(mktemp -d /tmp/speedb.XXXX)" make -j$(nproc) check
-          - name: black-box
-            short_test: CRASH_TEST_EXT_ARGS="--duration=3600" make -j$(nproc) blackbox_asan_crash_test
-            long_test: CRASH_TEST_EXT_ARGS="--duration=10000" make -j$(nproc) blackbox_asan_crash_test
-          - name: white-box
-            short_test: CRASH_TEST_EXT_ARGS="--duration=3600" make -j$(nproc) whitebox_asan_crash_test
-            long_test: CRASH_TEST_EXT_ARGS="--duration=10000" make -j$(nproc) whitebox_asan_crash_test
-    
+      options: --shm-size=5500m # The unit tests use ~5GiB at peak
+
     steps:
-      - name: Network hotfix
-        run: echo "nameserver 8.8.8.8" > /etc/resolv.conf
-    
-      - name: Pre
+      - name: pre
         run: |
-          apt update -y
-          apt install -y build-essential clang-format parallel libgflags-dev liblz4-dev libsnappy-dev libzstd-dev python3 python3-pip curl
+          echo "nameserver 8.8.8.8" > /etc/resolv.conf
+          # GNU tar is needed for the ccache action
+          apk add bash git python3 gcc g++ cmake ninja ccache tar \
+            gflags-dev snappy-dev lz4-dev bzip2-dev zstd-dev zlib-dev linux-headers
+          # Install mold for faster linking
+          apk add libcrypto3 --repository=http://dl-cdn.alpinelinux.org/alpine/edge/main
+          apk add mold --repository=http://dl-cdn.alpinelinux.org/alpine/edge/community
+          ln -fs /usr/bin/ld.mold /usr/bin/ld
+
+      - name: Fetch build cache
+        uses: actions/cache@v3
+        with:
+          path: ~/.ccache
+          key: ${{ runner.os }}-unit-tests-build-ccache-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-unit-tests-build-ccache
+
+      - run: |
+          mkdir -p ~/.ccache
+          echo "CCACHE_BASEDIR=$HOME" >> $GITHUB_ENV
+          echo "CCACHE_DIR=$HOME/.ccache" >> $GITHUB_ENV
+          echo "CCACHE_COMPILERCHECK=content" >> $GITHUB_ENV
+          echo "CCACHE_MAXSIZE=512M" >> $GITHUB_ENV
 
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: ${{ matrix.name }}
+      - name: Configure
         run: |
-          case "$GITHUB_REF_NAME" in
-            release/*)
-              echo "Running long test for release, $(nproc) jobs"
-              make clean && ${{ matrix.long_test }}
-              ;;
-            *)
-              echo "Running short test, $(nproc) jobs"
-              make clean && ${{ matrix.short_test }}
-              ;;
-          esac
+          mkdir -p "$GITHUB_WORKSPACE/build"
+          cd "$GITHUB_WORKSPACE/build"
+          cmake .. -GNinja -DCMAKE_BUILD_TYPE=Debug -DPORTABLE=1 -DWITH_GFLAGS=1 \
+            -DWITH_ZLIB=1 -DWITH_SNAPPY=1 -DWITH_BZ2=1 -DWITH_LZ4=1 -DWITH_ZSTD=1 \
+            -DWITH_TESTS=1 -DWITH_ALL_TESTS=1 -DWITH_TOOLS=1 -DWITH_CORE_TOOLS=1
+
+      - name: check
+        run: |
+          cd "$GITHUB_WORKSPACE/build"
+          export J=$(if [ "$(nproc)" -lt 8 ]; then echo 8; else nproc; fi)
+          GTEST_COLOR=1 GTEST_THROW_ON_FAILURE=0 TEST_TIMEOUT=900 ninja -j${J} check
+          cd "$GITHUB_WORKSPACE/build/tools"
+          "$GITHUB_WORKSPACE/tools/ldb_test.py"
+          sh "$GITHUB_WORKSPACE/tools/rocksdb_dump_test.sh"
+
+  crash_tests:
+    needs: [unit_tests]
+    runs-on: [self-hosted, ubuntu, asrunner]
+
+    container:
+      image: ubuntu:22.04
+
+    strategy:
+      matrix:
+        crash_type: [blackbox, whitebox]
+        include:
+          - flags: --random_kill_odd 888887
+            crash_type: whitebox
+
+    steps:
+      - name: Verify duration
+        run: |
+          if ! echo "${{ inputs.duration }}" | grep -q "^[0-9]*$"; then
+            echo >&2 "error: test duration must be a positive number" && false
+          fi
+
+      - name: pre
+        run: |
+          echo "nameserver 8.8.8.8" > /etc/resolv.conf
+          apt update -y
+          apt install -y git-core build-essential ccache libgflags-dev zlib1g-dev liblz4-dev libsnappy-dev libzstd-dev python3
+
+      - name: Fetch build cache
+        uses: actions/cache@v3
+        with:
+          path: ~/.ccache
+          key: ${{ runner.os }}-crash-tests-build-ccache-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-crash-tests-build-ccache
+
+      - run: |
+          mkdir -p ~/.ccache
+          echo "CCACHE_BASEDIR=$HOME" >> $GITHUB_ENV
+          echo "CCACHE_DIR=$HOME/.ccache" >> $GITHUB_ENV
+          echo "CCACHE_COMPILERCHECK=content" >> $GITHUB_ENV
+          echo "CCACHE_MAXSIZE=512M" >> $GITHUB_ENV
+
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Configure and build
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/build"
+          cd "$GITHUB_WORKSPACE/build"
+          cmake .. -GNinja -DCMAKE_BUILD_TYPE=Debug -DWITH_ASAN=1 -DPORTABLE=1
+            -DWITH_GFLAGS=1 -DWITH_ZLIB=1 -DWITH_SNAPPY=1 -DWITH_BZ2=1 -DWITH_LZ4=1
+            -DWITH_ZSTD=1 -DWITH_TOOLS=1
+          J=$(if [ "$(nproc)" -lt 8 ]; then echo 8; else nproc; fi)
+          ninja -j${J} db_stress
+
+      - name: Run ${{ matrix.crash_type }} crash test
+        run: |
+          if [ -n "${{ inputs.duration }}" ]; then
+            duration=${{ inputs.duration }}
+          else
+            case "$GITHUB_REF_NAME" in
+              release/*)
+                echo "Running long test for release"
+                duration=10000
+                ;;
+              *)
+                echo "Running short test"
+                duration=3600
+                ;;
+            esac
+          fi
+          export TEST_TMPDIR=$(mktemp -d /tmp/speedb.crash-test.XXXXXX)
+          export ASAN_OPTIONS=detect_stack_use_after_return=1
+          ./tools/db_crashtest.py --stress_cmd "$GITHUB_WORKSPACE/build/db_stress_tool/db_stress" --simple ${{ matrix.crash_type }} ${{ matrix.flags }} "--duration=${duration}"
+          ./tools/db_crashtest.py --stress_cmd "$GITHUB_WORKSPACE/build/db_stress_tool/db_stress" ${{ matrix.crash_type }} ${{ matrix.flags }} "--duration=${duration}"
+          rm -rf "$(TEST_TMPDIR)"

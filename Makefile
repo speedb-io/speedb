@@ -1182,16 +1182,16 @@ clean: clean-ext-libraries-all clean-rocks clean-rocksjava
 clean-not-downloaded: clean-ext-libraries-bin clean-rocks clean-not-downloaded-rocksjava
 
 clean-rocks:
-	echo shared=$(ALL_SHARED_LIBS)
-	echo static=$(ALL_STATIC_LIBS)
-	rm -f $(BENCHMARKS) $(TOOLS) $(TESTS) $(PARALLEL_TEST) $(ALL_STATIC_LIBS) $(ALL_SHARED_LIBS) $(MICROBENCHS)
-	rm -rf $(CLEAN_FILES) ios-x86 ios-arm scan_build_report
-	$(FIND) . -name "*.[oda]" -exec rm -f {} \;
-	$(FIND) . -type f \( -name "*.gcda" -o -name "*.gcno" \) -exec rm -f {} \;
+	@echo shared=$(ALL_SHARED_LIBS)
+	@echo static=$(ALL_STATIC_LIBS)
+	$(AM_V_at)rm -f $(BENCHMARKS) $(TOOLS) $(TESTS) $(PARALLEL_TEST) $(ALL_STATIC_LIBS) $(ALL_SHARED_LIBS) $(MICROBENCHS)
+	$(AM_V_at)rm -rf $(CLEAN_FILES) ios-x86 ios-arm scan_build_report
+	$(AM_V_at)$(FIND) . -name "*.[oda]" -exec rm -f {} \;
+	$(AM_V_at)$(FIND) . -type f \( -name "*.gcda" -o -name "*.gcno" \) -exec rm -f {} \;
 
 clean-rocksjava: clean-rocks
-	rm -rf jl jls
-	cd java && $(MAKE) clean
+	$(AM_V_at)rm -rf jl jls
+	$(AM_V_at)cd java && $(MAKE) clean
 
 clean-not-downloaded-rocksjava:
 	cd java && $(MAKE) clean-not-downloaded

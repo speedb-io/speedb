@@ -46,6 +46,10 @@ jobs:
 
       - uses: actions/checkout@v3
 
+      - name: Get release date
+        run: |
+          echo "RELEASE_DATE=$(git for-each-ref "--format=%(creatordate:short)" "refs/tags/${GITHUB_REF_NAME}")" >> $GITHUB_ENV
+
       - run: mkdir "$GITHUB_WORKSPACE/out"
 
       - name: Build and package release libraries
@@ -54,7 +58,7 @@ jobs:
           cmake .. -DCMAKE_BUILD_TYPE=Release -DPORTABLE=1 -DWITH_GFLAGS=0 -DWITH_SNAPPY=1 -DWITH_LZ4=1 -DWITH_ZLIB=1 -DWITH_ZSTD=1
           mkdir -p "$GITHUB_WORKSPACE/out/root"
           DESTDIR="$GITHUB_WORKSPACE/out/root" make -j$(nproc) install
-          ( cd "$GITHUB_WORKSPACE/out/root" && tar czf ../speedb-${RELEASE_VERSION}.tar.gz . )
+          ( cd "$GITHUB_WORKSPACE/out/root" && tar czf ../speedb-${RELEASE_VERSION}-linux64.tar.gz . )
           rm -rf "$GITHUB_WORKSPACE/out/root"
           cd .. && rm -rf build
 
@@ -72,7 +76,7 @@ jobs:
             -DWITH_SNAPPY=1 -DWITH_LZ4=1 -DWITH_ZLIB=1 -DWITH_ZSTD=1 \
             -DWITH_BENCHMARK_TOOLS=1 -DROCKSDB_BUILD_SHARED=1
           make -j$(nproc) db_bench
-          tar czf "$GITHUB_WORKSPACE/out/db_bench-speedb-${RELEASE_VERSION}.tar.gz" db_bench
+          tar czf "$GITHUB_WORKSPACE/out/db_bench-speedb-${RELEASE_VERSION}-linux64.tar.gz" db_bench
           cd .. && rm -rf build
 
       - name: Generate checksums
@@ -81,10 +85,6 @@ jobs:
             sha256sum "$f" > "$f.sha256"
           done
 
-      - name: Get release date
-        run: |
-          echo "RELEASE_DATE=$(git for-each-ref "--format=%(creatordate:short)" "refs/tags/${GITHUB_REF_NAME}")" >> $GITHUB_ENV
-
       - name: Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
@@ -92,10 +92,10 @@ jobs:
           generate_release_notes: false
           name: Speedb ${{ env.RELEASE_VERSION }} (${{ env.RELEASE_DATE }})
           files: |
-            out/db_bench-speedb-${{ env.RELEASE_VERSION }}.tar.gz
-            out/db_bench-speedb-${{ env.RELEASE_VERSION }}.tar.gz.sha256
-            out/speedb-${{ env.RELEASE_VERSION }}.tar.gz
-            out/speedb-${{ env.RELEASE_VERSION }}.tar.gz.sha256
+            out/db_bench-speedb-${{ env.RELEASE_VERSION }}-linux64.tar.gz
+            out/db_bench-speedb-${{ env.RELEASE_VERSION }}-linux64.tar.gz.sha256
+            out/speedb-${{ env.RELEASE_VERSION }}-linux64.tar.gz
+            out/speedb-${{ env.RELEASE_VERSION }}-linux64.tar.gz.sha256
             out/speedbjni-${{ env.RELEASE_VERSION }}-linux64.jar
             out/speedbjni-${{ env.RELEASE_VERSION }}-linux64.jar.sha256
 

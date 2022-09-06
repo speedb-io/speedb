@@ -1,6 +1,6 @@
 # shellcheck disable=SC2148
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
-TESTDIR=`mktemp -d ${TMPDIR:-/tmp}/speedb-dump-test.XXXXX`
+TESTDIR=$(mktemp -d "${TMPDIR:-/tmp}/speedb-dump-test.XXXXXX")
 DUMPFILE="tools/sample-dump.dmp"
 
 # Verify that the sample dump file is undumpable and then redumpable.

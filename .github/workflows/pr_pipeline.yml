@@ -1,0 +1,95 @@
+name: PR Pipeline
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.event.pull_request.id }}
+  cancel-in-progress: true
+
+jobs:
+  sanity:
+    uses: ./.github/workflows/sanity_check.yml
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft }}
+    with:
+      head_ref: ${{ github.event.pull_request.head.sha }}
+      target_ref: ${{ github.event.pull_request.base.ref }}
+      commit_count: ${{ github.event.pull_request.commits }}
+
+  review-status:
+    needs: [sanity]
+    permissions:
+      pull-requests: read
+    runs-on: [self-hosted, ubuntu, asrunner]
+    outputs:
+      value: ${{ steps.set-result.outputs.result }}
+    steps:
+    - uses: actions/github-script@v6
+      id: set-result
+      with:
+        result-encoding: string
+        script: |
+          let pr_status = "";
+          if (${{ github.event.pull_request.draft }}) {
+            pr_status = "DRAFT";
+          } else {
+            const res = await github.rest.pulls.listReviews({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: ${{ github.event.pull_request.number }},
+            });
+            const reviews = res["data"];
+            let user_reviews = {};
+            for (var i in reviews) {
+              const review = reviews[i];
+              const state = review["state"];
+              if (state === "COMMENTED") {
+                continue;
+              }
+              const user = review["user"]["login"];
+              user_reviews[user] = state;
+            }
+            for (var user in user_reviews) {
+              const state = user_reviews[user];
+              if (pr_status === "" || state !== "APPROVED") {
+                  pr_status = state;
+              }
+            }
+            if (pr_status === "") {
+              pr_status = "NOT_REVIEWED";
+            }
+          }
+          console.log(pr_status);
+          return pr_status;
+
+  build:
+    needs: [review-status]
+    if: ${{ needs.review-status.outputs.value == 'APPROVED' }}
+    uses: ./.github/workflows/full_build.yml
+        
+  test:
+    needs: [review-status, build]
+    if: ${{ needs.review-status.outputs.value == 'APPROVED' }}
+    uses: ./.github/workflows/qa-tests.yml
+
+  fuzzing:
+    needs: [review-status, test]
+    if: ${{ needs.review-status.outputs.value == 'APPROVED' }}
+    uses: ./.github/workflows/test_fuzz.yml
+    permissions:
+      contents: read
+      id-token: write # Needed for AWS credentials setting
+    secrets:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+  # performance:
+  #   if: ${{ needs.review-status.outputs.value == 'APPROVED' }}
+  #   needs: [test, fuzzing]
+  #   uses: ./.github/workflows/perf-test.yml

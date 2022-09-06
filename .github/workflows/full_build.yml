@@ -1,0 +1,67 @@
+name: Build
+
+on: [workflow_dispatch, workflow_call]
+  
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: [self-hosted, ubuntu, asrunner]
+    strategy:
+      matrix:
+        include:
+          - name: debug-build
+            flags: -DCMAKE_BUILD_TYPE=Debug
+          - name: optimized-build
+            flags: -DCMAKE_BUILD_TYPE=Release
+          - name: clang-build
+            flags: -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
+
+    container:
+      image: alpine:3.14
+
+    steps:
+    - name: pre
+      run: |
+        echo "nameserver 8.8.8.8" > /etc/resolv.conf
+        # GNU tar is needed for the ccache action
+        apk add git python3 clang gcc g++ cmake ninja ccache tar openjdk10 \
+          gflags-dev snappy-dev lz4-dev bzip2-dev zstd-dev zlib-dev linux-headers
+
+    - name: Fetch build cache
+      uses: actions/cache@v3
+      with:
+        path: ~/.ccache
+        key: ${{ runner.os }}-${{ matrix.name }}-ccache-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-${{ matrix.name }}-ccache
+
+    - run: |
+        mkdir -p ~/.ccache
+        echo "CCACHE_BASEDIR=$HOME" >> $GITHUB_ENV
+        echo "CCACHE_DIR=$HOME/.ccache" >> $GITHUB_ENV
+        echo "CCACHE_COMPILERCHECK=content" >> $GITHUB_ENV
+        echo "CCACHE_MAXSIZE=512M" >> $GITHUB_ENV
+
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Verify ${{ matrix.name }}
+      run: |
+        if [ -d "$GITHUB_WORKSPACE/build" ]; then
+          echo >&2 "error: the build directory should not exist" && false 
+        fi
+        mkdir -p "$GITHUB_WORKSPACE/build"
+        cd "$GITHUB_WORKSPACE/build"
+        cmake .. -GNinja ${{ matrix.flags }} -DPORTABLE=1 -DWITH_GFLAGS=1 \
+          -DWITH_ZLIB=1 -DWITH_SNAPPY=1 -DWITH_BZ2=1 -DWITH_LZ4=1 -DWITH_ZSTD=1 \
+          -DWITH_JNI=1 -DJAVA_HOME=/usr/lib/jvm/default-jvm \
+          -DWITH_BENCHMARK_TOOLS=1 -DWITH_CORE_TOOLS=1 -DWITH_TOOLS=1 \
+          -DWITH_TESTS=1 -DWITH_ALL_TESTS=1 -DWITH_EXAMPLES=1
+        J=$(if [ "$(nproc)" -lt 8 ]; then echo 8; else nproc; fi)
+        ninja -j${J}

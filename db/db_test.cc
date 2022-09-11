@@ -235,7 +235,8 @@ TEST_F(DBTest, SkipDelay) {
       // when we do Put
       // TODO(myabandeh): this is time dependent and could potentially make
       // the test flaky
-      auto token = dbfull()->TEST_write_controler().GetDelayToken(1);
+      auto token = dbfull()->TEST_write_controler().GetDelayToken(
+          WriteController::DelaySource::kCF, 1);
       std::atomic<int> sleep_count(0);
       ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
           "DBImpl::DelayWrite:Sleep",
@@ -262,7 +263,8 @@ TEST_F(DBTest, SkipDelay) {
       ASSERT_GE(wait_count.load(), 0);
       token.reset();
 
-      token = dbfull()->TEST_write_controler().GetDelayToken(1000000);
+      token = dbfull()->TEST_write_controler().GetDelayToken(
+          WriteController::DelaySource::kCF, 1000000);
       wo.no_slowdown = false;
       ASSERT_OK(dbfull()->Put(wo, "foo3", large_value));
       ASSERT_GE(sleep_count.load(), 1);
@@ -297,7 +299,8 @@ TEST_F(DBTest, MixedSlowdownOptions) {
   // when we do Put
   // TODO(myabandeh): this is time dependent and could potentially make
   // the test flaky
-  auto token = dbfull()->TEST_write_controler().GetDelayToken(1);
+  auto token = dbfull()->TEST_write_controler().GetDelayToken(
+      WriteController::DelaySource::kCF, 1);
   std::atomic<int> sleep_count(0);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::DelayWrite:BeginWriteStallDone", [&](void* /*arg*/) {
@@ -351,7 +354,8 @@ TEST_F(DBTest, MixedSlowdownOptionsInQueue) {
   // when we do Put
   // TODO(myabandeh): this is time dependent and could potentially make
   // the test flaky
-  auto token = dbfull()->TEST_write_controler().GetDelayToken(1);
+  auto token = dbfull()->TEST_write_controler().GetDelayToken(
+      WriteController::DelaySource::kCF, 1);
   std::atomic<int> sleep_count(0);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::DelayWrite:Sleep", [&](void* /*arg*/) {

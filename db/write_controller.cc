@@ -20,7 +20,7 @@ std::unique_ptr<WriteControllerToken> WriteController::GetStopToken() {
 }
 
 std::unique_ptr<WriteControllerToken> WriteController::GetDelayToken(
-    uint64_t write_rate) {
+    DelaySource source, uint64_t write_rate) {
   if (0 == total_delayed_++) {
     // Starting delay, so reset counters.
     next_refill_time_ = 0;
@@ -29,7 +29,7 @@ std::unique_ptr<WriteControllerToken> WriteController::GetDelayToken(
   // NOTE: for simplicity, any current credit_in_bytes_ or "debt" in
   // next_refill_time_ will be based on an old rate. This rate will apply
   // for subsequent additional debts and for the next refill.
-  set_delayed_write_rate(write_rate);
+  set_delayed_write_rate(source, write_rate);
   return std::unique_ptr<WriteControllerToken>(new DelayWriteToken(this));
 }
 

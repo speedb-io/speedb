@@ -8,6 +8,8 @@
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 
 #include "rocksdb/write_buffer_manager.h"
+
+#include "rocksdb/cache.h"
 #include "test_util/testharness.h"
 
 namespace ROCKSDB_NAMESPACE {
@@ -304,6 +306,165 @@ TEST_F(WriteBufferManagerTest, CacheFull) {
 }
 
 #endif  // ROCKSDB_LITE
+
+#define VALIDATE_USAGE_STATE(memory_change_size, expected_state,   \
+                             expected_factor)                      \
+  ValidateUsageState(__LINE__, memory_change_size, expected_state, \
+                     expected_factor)
+
+class WriteBufferManagerTestWithParams
+    : public WriteBufferManagerTest,
+      public ::testing::WithParamInterface<std::tuple<bool, bool, bool>> {
+ public:
+  void SetUp() override {
+    wbm_enabled_ = std::get<0>(GetParam());
+    cost_cache_ = std::get<1>(GetParam());
+    allow_delays_and_stalls_ = std::get<2>(GetParam());
+  }
+
+  bool wbm_enabled_;
+  bool cost_cache_;
+  bool allow_delays_and_stalls_;
+};
+// Test that the write buffer manager sends the expected usage notifications
+TEST_P(WriteBufferManagerTestWithParams, UsageNotifications) {
+  constexpr size_t kQuota = 10 * 1000;
+  constexpr size_t kStepSize = kQuota / 100;
+  constexpr size_t kDelayThreshold =
+      WriteBufferManager::kStartDelayPercentThreshold * kQuota / 100;
+  constexpr size_t kMaxUsed = kQuota - kDelayThreshold;
+
+  std::shared_ptr<Cache> cache = NewLRUCache(4 * 1024 * 1024, 2);
+
+  std::unique_ptr<WriteBufferManager> wbf;
+
+  auto wbm_quota = (wbm_enabled_ ? kQuota : 0U);
+  if (cost_cache_) {
+    wbf.reset(
+        new WriteBufferManager(wbm_quota, cache, allow_delays_and_stalls_));
+  } else {
+    wbf.reset(
+        new WriteBufferManager(wbm_quota, nullptr, allow_delays_and_stalls_));
+  }
+  ASSERT_EQ(wbf->enabled(), wbm_enabled_);
+
+  size_t expected_usage = 0U;
+  auto ExpectedDelayFactor = [&](uint64_t extra_used) {
+    return (extra_used * WriteBufferManager::kMaxDelayedWriteFactor) / kMaxUsed;
+  };
+
+  auto ValidateUsageState = [&](unsigned long line, size_t memory_change_size,
+                                WriteBufferManager::UsageState expected_state,
+                                uint64_t expected_factor) {
+    const auto location_str =
+        "write_buffer_manager_test.cc:" + std::to_string(line) + "\n";
+
+    if (wbm_enabled_ || cost_cache_) {
+      expected_usage += memory_change_size;
+    }
+    ASSERT_EQ(wbf->memory_usage(), expected_usage) << location_str;
+
+    if (wbm_enabled_ && allow_delays_and_stalls_) {
+      auto [actual_state, actual_delay_factor] = wbf->GetUsageStateInfo();
+      ASSERT_EQ(actual_state, expected_state) << location_str;
+      ASSERT_EQ(actual_delay_factor, expected_factor) << location_str;
+    }
+  };
+
+  // Initial state
+  VALIDATE_USAGE_STATE(0, WriteBufferManager::UsageState::kNone,
+                       WriteBufferManager::kNoneDelayedWriteFactor);
+
+  auto FreeMem = [&, this](size_t mem) {
+    wbf->ScheduleFreeMem(mem);
+    wbf->FreeMemBegin(mem);
+    wbf->FreeMem(mem);
+  };
+
+  // Jump straight to quota
+  wbf->ReserveMem(kQuota);
+  VALIDATE_USAGE_STATE(kQuota, WriteBufferManager::UsageState::kStop,
+                       WriteBufferManager::kStopDelayedWriteFactor);
+
+  // And back to 0 again
+  FreeMem(kQuota);
+  VALIDATE_USAGE_STATE(-kQuota, WriteBufferManager::UsageState::kNone,
+                       WriteBufferManager::kNoneDelayedWriteFactor);
+
+  // Small reservations, below soft limit
+  wbf->ReserveMem(1000);
+  VALIDATE_USAGE_STATE(1000, WriteBufferManager::UsageState::kNone,
+                       WriteBufferManager::kNoneDelayedWriteFactor);
+
+  wbf->ReserveMem(2000);
+  VALIDATE_USAGE_STATE(2000, WriteBufferManager::UsageState::kNone,
+                       WriteBufferManager::kNoneDelayedWriteFactor);
+
+  FreeMem(3000);
+  VALIDATE_USAGE_STATE(-3000, WriteBufferManager::UsageState::kNone,
+                       WriteBufferManager::kNoneDelayedWriteFactor);
+
+  // 0 => soft limit
+  wbf->ReserveMem(kDelayThreshold);
+  VALIDATE_USAGE_STATE(kDelayThreshold, WriteBufferManager::UsageState::kDelay,
+                       1U);
+
+  // A bit more, but still within the same "step" => same delay factor
+  wbf->ReserveMem(kStepSize - 1);
+  VALIDATE_USAGE_STATE(kStepSize - 1, WriteBufferManager::UsageState::kDelay,
+                       1U);
+
+  // Cross the step => Delay factor updated
+  wbf->ReserveMem(1);
+  VALIDATE_USAGE_STATE(1, WriteBufferManager::UsageState::kDelay,
+                       ExpectedDelayFactor(kStepSize));
+
+  // Free all => None
+  FreeMem(expected_usage);
+  VALIDATE_USAGE_STATE(-expected_usage, WriteBufferManager::UsageState::kNone,
+                       WriteBufferManager::kNoneDelayedWriteFactor);
+
+  // None -> Stop (usage == quota)
+  wbf->ReserveMem(kQuota);
+  VALIDATE_USAGE_STATE(kQuota, WriteBufferManager::UsageState::kStop,
+                       WriteBufferManager::kMaxDelayedWriteFactor);
+
+  // Increasing the quota, usage as is => Now in the none
+  wbf->SetBufferSize(wbm_quota * 2);
+  VALIDATE_USAGE_STATE(0, WriteBufferManager::UsageState::kNone,
+                       WriteBufferManager::kNoneDelayedWriteFactor);
+
+  // Restoring the quota
+  wbf->SetBufferSize(wbm_quota);
+  VALIDATE_USAGE_STATE(0, WriteBufferManager::UsageState::kStop,
+                       WriteBufferManager::kMaxDelayedWriteFactor);
+
+  // 1 byte below quota => Delay with max factor
+  FreeMem(1);
+  VALIDATE_USAGE_STATE(-1, WriteBufferManager::UsageState::kDelay,
+                       ExpectedDelayFactor(kMaxUsed - 1));
+
+  // An entire step below => delay factor updated
+  FreeMem(kStepSize);
+  VALIDATE_USAGE_STATE(-kStepSize, WriteBufferManager::UsageState::kDelay,
+                       ExpectedDelayFactor(kMaxUsed - 1 - kStepSize));
+
+  // Again in the top "step"
+  wbf->ReserveMem(1);
+  VALIDATE_USAGE_STATE(1, WriteBufferManager::UsageState::kDelay,
+                       ExpectedDelayFactor(kMaxUsed - kStepSize));
+
+  // And back to 0 to wrap it up
+  FreeMem(expected_usage);
+  VALIDATE_USAGE_STATE(-expected_usage, WriteBufferManager::UsageState::kNone,
+                       WriteBufferManager::kNoneDelayedWriteFactor);
+}
+
+INSTANTIATE_TEST_CASE_P(WriteBufferManagerTestWithParams,
+                        WriteBufferManagerTestWithParams,
+                        ::testing::Combine(testing::Bool(), testing::Bool(),
+                                           testing::Bool()));
+
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {

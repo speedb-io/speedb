@@ -14,10 +14,12 @@
 namespace ROCKSDB_NAMESPACE {
 
 class DBWriteBufferManagerTest : public DBTestBase,
-                                 public testing::WithParamInterface<bool> {
+                                 public ::testing::WithParamInterface<bool> {
  public:
   DBWriteBufferManagerTest()
       : DBTestBase("db_write_buffer_manager_test", /*env_do_fsync=*/false) {}
+
+  void SetUp() override { cost_cache_ = GetParam(); }
   bool cost_cache_;
 };
 
@@ -27,7 +29,6 @@ TEST_P(DBWriteBufferManagerTest, SharedBufferAcrossCFs1) {
   options.write_buffer_size = 500000;  // this is never hit
   std::shared_ptr<Cache> cache = NewLRUCache(4 * 1024 * 1024, 2);
   ASSERT_LT(cache->GetUsage(), 256 * 1024);
-  cost_cache_ = GetParam();
 
   if (cost_cache_) {
     options.write_buffer_manager.reset(
@@ -70,7 +71,6 @@ TEST_P(DBWriteBufferManagerTest, SharedWriteBufferAcrossCFs2) {
   options.write_buffer_size = 500000;  // this is never hit
   std::shared_ptr<Cache> cache = NewLRUCache(4 * 1024 * 1024, 2);
   ASSERT_LT(cache->GetUsage(), 256 * 1024);
-  cost_cache_ = GetParam();
 
   if (cost_cache_) {
     options.write_buffer_manager.reset(
@@ -197,7 +197,6 @@ TEST_P(DBWriteBufferManagerTest, SharedWriteBufferLimitAcrossDB) {
   options.write_buffer_size = 500000;  // this is never hit
   std::shared_ptr<Cache> cache = NewLRUCache(4 * 1024 * 1024, 2);
   ASSERT_LT(cache->GetUsage(), 256 * 1024);
-  cost_cache_ = GetParam();
 
   if (cost_cache_) {
     options.write_buffer_manager.reset(
@@ -314,7 +313,6 @@ TEST_P(DBWriteBufferManagerTest, SharedWriteBufferLimitAcrossDB1) {
   options.write_buffer_size = 500000;  // this is never hit
   std::shared_ptr<Cache> cache = NewLRUCache(4 * 1024 * 1024, 2);
   ASSERT_LT(cache->GetUsage(), 256 * 1024);
-  cost_cache_ = GetParam();
 
   if (cost_cache_) {
     options.write_buffer_manager.reset(
@@ -456,7 +454,6 @@ TEST_P(DBWriteBufferManagerTest, MixedSlowDownOptionsSingleDB) {
   options.write_buffer_size = 500000;  // this is never hit
   std::shared_ptr<Cache> cache = NewLRUCache(4 * 1024 * 1024, 2);
   ASSERT_LT(cache->GetUsage(), 256 * 1024);
-  cost_cache_ = GetParam();
 
   if (cost_cache_) {
     options.write_buffer_manager.reset(
@@ -618,7 +615,6 @@ TEST_P(DBWriteBufferManagerTest, MixedSlowDownOptionsMultipleDB) {
   options.write_buffer_size = 500000;  // this is never hit
   std::shared_ptr<Cache> cache = NewLRUCache(4 * 1024 * 1024, 2);
   ASSERT_LT(cache->GetUsage(), 256 * 1024);
-  cost_cache_ = GetParam();
 
   if (cost_cache_) {
     options.write_buffer_manager.reset(
@@ -780,8 +776,132 @@ TEST_P(DBWriteBufferManagerTest, MixedSlowDownOptionsMultipleDB) {
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->DisableProcessing();
 }
 
+class DBWriteBufferManagerTest1 : public DBTestBase,
+                                  public ::testing::WithParamInterface<bool> {
+ public:
+  DBWriteBufferManagerTest1()
+      : DBTestBase("db_write_buffer_manager_test", /*env_do_fsync=*/false) {}
+
+  void SetUp() override { cost_cache_ = GetParam(); }
+  bool cost_cache_;
+};
+
+TEST_P(DBWriteBufferManagerTest1, WbmDelaySharedWriteBufferAcrossCFs) {
+  constexpr size_t kQuota = 100 * 1000;
+  constexpr size_t kDelayThreshold =
+      WriteBufferManager::kStartDelayPercentThreshold * kQuota / 100;
+
+  Options options = CurrentOptions();
+  options.arena_block_size = 4096;
+  options.write_buffer_size = kQuota;  // this is never hit
+  std::shared_ptr<Cache> cache = NewLRUCache(4 * 1024 * 1024, 2);
+  ASSERT_LT(cache->GetUsage(), 256 * 1024);
+
+  if (cost_cache_) {
+    options.write_buffer_manager.reset(
+        new WriteBufferManager(kQuota, cache, true));
+  } else {
+    options.write_buffer_manager.reset(
+        new WriteBufferManager(kQuota, nullptr, true));
+  }
+  WriteOptions wo;
+  wo.disableWAL = true;
+
+  CreateAndReopenWithCF({"cf1", "cf2", "cf3"}, options);
+
+  // Reach the delay threshold by writing to two cf-s, no flush
+  ASSERT_OK(Put(0, Key(1), DummyString(kDelayThreshold / 2), wo));
+  ASSERT_OK(Put(1, Key(1), DummyString(kDelayThreshold / 2), wo));
+
+  // Write another byte to trigger writing and a delay token in the write
+  // controller
+  auto& write_controller = dbfull()->TEST_write_controler();
+  ASSERT_FALSE(dbfull()->TEST_has_write_controller_token());
+  ASSERT_FALSE(write_controller.NeedsDelay());
+  ASSERT_OK(Put(1, Key(1), DummyString(1), wo));
+  ASSERT_TRUE(dbfull()->TEST_has_write_controller_token());
+  ASSERT_TRUE(write_controller.NeedsDelay());
+
+  Flush(1);
+
+  // Delay token should be released when the next write arrives
+  ASSERT_TRUE(dbfull()->TEST_has_write_controller_token());
+  ASSERT_TRUE(write_controller.NeedsDelay());
+  ASSERT_OK(Put(0, Key(1), DummyString(1), wo));
+  ASSERT_FALSE(write_controller.NeedsDelay());
+
+  ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->ClearAllCallBacks();
+  ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->DisableProcessing();
+}
+
+TEST_P(DBWriteBufferManagerTest1, WbmDelaySharedWriteBufferAcrossDBs) {
+  constexpr size_t kQuota = 500 * 1000;
+  constexpr size_t kDelayThreshold =
+      WriteBufferManager::kStartDelayPercentThreshold * kQuota / 100;
+
+  std::vector<std::string> dbnames;
+  std::vector<DB*> dbs;
+  int num_dbs = 3;
+
+  for (int i = 0; i < num_dbs; i++) {
+    dbs.push_back(nullptr);
+    dbnames.push_back(
+        test::PerThreadDBPath("db_shared_wb_db" + std::to_string(i)));
+  }
+
+  Options options = CurrentOptions();
+  options.arena_block_size = 4096;
+  options.write_buffer_size = 500000;  // this is never hit
+  std::shared_ptr<Cache> cache = NewLRUCache(4 * 1024 * 1024, 2);
+  ASSERT_LT(cache->GetUsage(), 256 * 1024);
+
+  if (cost_cache_) {
+    options.write_buffer_manager.reset(
+        new WriteBufferManager(kQuota, cache, true));
+  } else {
+    options.write_buffer_manager.reset(
+        new WriteBufferManager(kQuota, nullptr, true));
+  }
+
+  CreateAndReopenWithCF({"cf1", "cf2"}, options);
+
+  for (int i = 0; i < num_dbs; i++) {
+    ASSERT_OK(DestroyDB(dbnames[i], options));
+    ASSERT_OK(DB::Open(options, dbnames[i], &(dbs[i])));
+  }
+  WriteOptions wo;
+  wo.disableWAL = true;
+
+  for (int i = 0; i < num_dbs; i++) {
+    ASSERT_OK(dbs[i]->Put(wo, Key(1), DummyString(kDelayThreshold / num_dbs)));
+  }
+
+  // Write another byte to trigger writing and a delay token in the write
+  // controller
+  auto& write_controller = dbfull()->TEST_write_controler();
+  ASSERT_FALSE(dbfull()->TEST_has_write_controller_token());
+  ASSERT_FALSE(write_controller.NeedsDelay());
+
+  ASSERT_OK(Put(1, Key(1), DummyString(1), wo));
+  ASSERT_TRUE(dbfull()->TEST_has_write_controller_token());
+  ASSERT_TRUE(write_controller.NeedsDelay());
+
+  // Clean up DBs.
+  for (int i = 0; i < num_dbs; i++) {
+    ASSERT_OK(dbs[i]->Close());
+    ASSERT_OK(DestroyDB(dbnames[i], options));
+    delete dbs[i];
+  }
+
+  ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->ClearAllCallBacks();
+  ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->DisableProcessing();
+}
+
 INSTANTIATE_TEST_CASE_P(DBWriteBufferManagerTest, DBWriteBufferManagerTest,
                         testing::Bool());
+
+INSTANTIATE_TEST_CASE_P(DBWriteBufferManagerTest1, DBWriteBufferManagerTest1,
+                        ::testing::Bool());
 
 }  // namespace ROCKSDB_NAMESPACE
 

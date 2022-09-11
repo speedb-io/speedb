@@ -2697,7 +2697,8 @@ TEST_P(ColumnFamilyTest, WriteStallSingleColumnFamily) {
   ASSERT_TRUE(!dbfull()->TEST_write_controler().NeedsDelay());
 
   mutable_cf_options.disable_auto_compactions = true;
-  dbfull()->TEST_write_controler().set_delayed_write_rate(kBaseRate);
+  dbfull()->TEST_write_controler().set_delayed_write_rate(
+      WriteController::DelaySource::kCF, kBaseRate);
   RecalculateWriteStallConditions(cfd, mutable_cf_options);
   ASSERT_TRUE(!IsDbWriteStopped());
   ASSERT_TRUE(!dbfull()->TEST_write_controler().NeedsDelay());

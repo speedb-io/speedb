@@ -1094,6 +1094,10 @@ class DBImpl : public DB {
   PeriodicWorkTestScheduler* TEST_GetPeriodicWorkScheduler() const;
 #endif  // !ROCKSDB_LITE
 
+  bool TEST_has_write_controller_token() const {
+    return (write_controller_token_.get() != nullptr);
+  }
+
 #endif  // NDEBUG
 
   // persist stats to column family "_persistent_stats"
@@ -2393,6 +2397,13 @@ class DBImpl : public DB {
 
   // Pointer to WriteBufferManager stalling interface.
   std::unique_ptr<StallInterface> wbm_stall_;
+
+  // Members used for WBM's required delay
+  std::unique_ptr<WriteControllerToken> write_controller_token_;
+  WriteBufferManager::UsageState wbm_spdb_usage_state_ =
+      WriteBufferManager::UsageState::kNone;
+  uint64_t wbm_spdb_delayed_write_factor_ =
+      WriteBufferManager::kNoneDelayedWriteFactor;
 };
 
 extern Options SanitizeOptions(const std::string& db, const Options& src,

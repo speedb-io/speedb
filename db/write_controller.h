@@ -7,8 +7,10 @@
 
 #include <stdint.h>
 
+#include <algorithm>
 #include <atomic>
 #include <memory>
+
 #include "rocksdb/rate_limiter.h"
 
 namespace ROCKSDB_NAMESPACE {
@@ -22,6 +24,11 @@ class WriteControllerToken;
 // to be called while holding DB mutex
 class WriteController {
  public:
+  enum class DelaySource { kCF = 0, kWBM = 1, kNumSources };
+  static constexpr auto kNumDelaySources =
+      static_cast<size_t>(DelaySource::kNumSources);
+
+ public:
   explicit WriteController(uint64_t _delayed_write_rate = 1024u * 1024u * 32u,
                            int64_t low_pri_rate_bytes_per_sec = 1024 * 1024)
       : total_stopped_(0),
@@ -32,6 +39,8 @@ class WriteController {
         low_pri_rate_limiter_(
             NewGenericRateLimiter(low_pri_rate_bytes_per_sec)) {
     set_max_delayed_write_rate(_delayed_write_rate);
+    std::fill(delayed_write_rates_.begin(), delayed_write_rates_.end(),
+              max_delayed_write_rate());
   }
   ~WriteController() = default;
 
@@ -43,7 +52,7 @@ class WriteController {
   // write needs to call GetDelay() with number of bytes writing to the DB,
   // which returns number of microseconds to sleep.
   std::unique_ptr<WriteControllerToken> GetDelayToken(
-      uint64_t delayed_write_rate);
+      DelaySource source, uint64_t delayed_write_rate);
   // When an actor (column family) requests a moderate token, compaction
   // threads will be increased
   std::unique_ptr<WriteControllerToken> GetCompactionPressureToken();
@@ -58,14 +67,19 @@ class WriteController {
   // num_bytes: how many number of bytes to put into the DB.
   // Prerequisite: DB mutex held.
   uint64_t GetDelay(SystemClock* clock, uint64_t num_bytes);
-  void set_delayed_write_rate(uint64_t write_rate) {
+  void set_delayed_write_rate(DelaySource source, uint64_t write_rate) {
     // avoid divide 0
     if (write_rate == 0) {
       write_rate = 1u;
     } else if (write_rate > max_delayed_write_rate()) {
       write_rate = max_delayed_write_rate();
     }
-    delayed_write_rate_ = write_rate;
+    auto source_value = static_cast<unsigned int>(source);
+    assert(source_value < delayed_write_rates_.size());
+    delayed_write_rates_[source_value] = write_rate;
+
+    delayed_write_rate_ = *std::min_element(delayed_write_rates_.begin(),
+                                            delayed_write_rates_.end());
   }
 
   void set_max_delayed_write_rate(uint64_t write_rate) {
@@ -83,6 +97,13 @@ class WriteController {
   uint64_t max_delayed_write_rate() const { return max_delayed_write_rate_; }
 
   RateLimiter* low_pri_rate_limiter() { return low_pri_rate_limiter_.get(); }
+
+  // Not thread-safe
+  uint64_t TEST_delayed_write_rate(DelaySource source) const {
+    auto source_value = static_cast<unsigned int>(source);
+    assert(source_value < delayed_write_rates_.size());
+    return delayed_write_rates_[source_value];
+  }
 
  private:
   uint64_t NowMicrosMonotonic(SystemClock* clock);
@@ -103,6 +124,7 @@ class WriteController {
   // Write rate set when initialization or by `DBImpl::SetDBOptions`
   uint64_t max_delayed_write_rate_;
   // Current write rate (bytes / second)
+  std::array<uint64_t, kNumDelaySources> delayed_write_rates_;
   uint64_t delayed_write_rate_;
 
   std::unique_ptr<RateLimiter> low_pri_rate_limiter_;

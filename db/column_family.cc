@@ -799,7 +799,8 @@ std::unique_ptr<WriteControllerToken> SetupDelay(
       }
     }
   }
-  return write_controller->GetDelayToken(write_rate);
+  return write_controller->GetDelayToken(WriteController::DelaySource::kCF,
+                                         write_rate);
 }
 
 int GetL0ThresholdSpeedupCompaction(int level0_file_num_compaction_trigger,
@@ -1020,8 +1021,10 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
       // increase signal.
       if (needed_delay) {
         uint64_t write_rate = write_controller->delayed_write_rate();
-        write_controller->set_delayed_write_rate(static_cast<uint64_t>(
-            static_cast<double>(write_rate) * kDelayRecoverSlowdownRatio));
+        write_controller->set_delayed_write_rate(
+            WriteController::DelaySource::kCF,
+            static_cast<uint64_t>(static_cast<double>(write_rate) *
+                                  kDelayRecoverSlowdownRatio));
         // Set the low pri limit to be 1/4 the delayed write rate.
         // Note we don't reset this value even after delay condition is relased.
         // Low-pri rate will continue to apply if there is a compaction

@@ -1028,6 +1028,27 @@ void DBImpl::MemTableInsertStatusCheck(const Status& status) {
   }
 }
 
+namespace {
+
+std::unique_ptr<WriteControllerToken> SetupDelayFromFactor(
+    WriteController& write_controller, uint64_t delay_factor) {
+  assert(delay_factor > 0U);
+  constexpr uint64_t kMinWriteRate = 16 * 1024u;  // Minimum write rate 16KB/s.
+
+  auto max_write_rate = write_controller.max_delayed_write_rate();
+
+  auto wbm_write_rate = max_write_rate;
+  if (max_write_rate >= kMinWriteRate) {
+    // If user gives rate less than kMinWriteRate, don't adjust it.
+    wbm_write_rate = max_write_rate / delay_factor;
+  }
+
+  return write_controller.GetDelayToken(WriteController::DelaySource::kWBM,
+                                        wbm_write_rate);
+}
+
+}  // namespace
+
 Status DBImpl::PreprocessWrite(const WriteOptions& write_options,
                                bool* need_log_sync,
                                WriteContext* write_context) {
@@ -1070,6 +1091,29 @@ Status DBImpl::PreprocessWrite(const WriteOptions& write_options,
 
   PERF_TIMER_STOP(write_scheduling_flushes_compactions_time);
   PERF_TIMER_GUARD(write_pre_and_post_process_time);
+
+  // Handle latest WBM calculated write delay, if applicable
+  if (status.ok() && write_buffer_manager_ &&
+      write_buffer_manager_->IsDelayAllowed()) {
+    auto [new_usage_state, new_delayed_write_factor] =
+        write_buffer_manager_->GetUsageStateInfo();
+
+    if (UNLIKELY(
+            (wbm_spdb_usage_state_ != new_usage_state) ||
+            (wbm_spdb_delayed_write_factor_ != new_delayed_write_factor))) {
+      if (new_usage_state != WriteBufferManager::UsageState::kDelay) {
+        write_controller_token_.reset();
+      } else if ((wbm_spdb_usage_state_ !=
+                  WriteBufferManager::UsageState::kDelay) ||
+                 (wbm_spdb_delayed_write_factor_ != new_delayed_write_factor)) {
+        write_controller_token_ =
+            SetupDelayFromFactor(write_controller_, new_delayed_write_factor);
+      }
+
+      wbm_spdb_usage_state_ = new_usage_state;
+      wbm_spdb_delayed_write_factor_ = new_delayed_write_factor;
+    }
+  }
 
   if (UNLIKELY(status.ok() && (write_controller_.IsStopped() ||
                                write_controller_.NeedsDelay()))) {

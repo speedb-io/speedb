@@ -41,38 +41,86 @@ TEST_F(WriteControllerTest, BasicAPI) {
   EXPECT_EQ(0, controller.GetDelay(clock_.get(), 100 MB));
 
   // set, get
-  controller.set_delayed_write_rate(20 MBPS);
+  controller.set_delayed_write_rate(WriteController::DelaySource::kCF, 20 MBPS);
   EXPECT_EQ(controller.delayed_write_rate(), 20 MBPS);
   EXPECT_FALSE(controller.IsStopped());
   EXPECT_FALSE(controller.NeedsDelay());
   EXPECT_EQ(0, controller.GetDelay(clock_.get(), 100 MB));
 
+  controller.set_delayed_write_rate(WriteController::DelaySource::kWBM,
+                                    30 MBPS);
+  ASSERT_EQ(controller.delayed_write_rate(), 20 MBPS);
+
+  controller.set_delayed_write_rate(WriteController::DelaySource::kWBM,
+                                    10 MBPS);
+  ASSERT_EQ(controller.delayed_write_rate(), 10 MBPS);
+
+  controller.set_delayed_write_rate(WriteController::DelaySource::kWBM,
+                                    35 MBPS);
+  ASSERT_EQ(controller.delayed_write_rate(), 20 MBPS);
+
+  controller.set_delayed_write_rate(WriteController::DelaySource::kWBM,
+                                    controller.max_delayed_write_rate());
+  ASSERT_EQ(controller.delayed_write_rate(), 20 MBPS);
+
   {
     // set with token, get
-    auto delay_token_0 = controller.GetDelayToken(10 MBPS);
+    auto delay_token_0 =
+        controller.GetDelayToken(WriteController::DelaySource::kCF, 10 MBPS);
     EXPECT_EQ(controller.delayed_write_rate(), 10 MBPS);
     EXPECT_FALSE(controller.IsStopped());
     EXPECT_TRUE(controller.NeedsDelay());
+
+    delay_token_0.reset();
+    EXPECT_EQ(controller.delayed_write_rate(), 10 MBPS);
+    EXPECT_FALSE(controller.IsStopped());
+    EXPECT_FALSE(controller.NeedsDelay());
+    EXPECT_EQ(0, controller.GetDelay(clock_.get(), 20 MB));
+
+    delay_token_0 =
+        controller.GetDelayToken(WriteController::DelaySource::kCF, 10 MBPS);
+    EXPECT_EQ(controller.delayed_write_rate(), 10 MBPS);
+    EXPECT_FALSE(controller.IsStopped());
+    EXPECT_TRUE(controller.NeedsDelay());
+
     // test with delay
     EXPECT_EQ(2 SECS, controller.GetDelay(clock_.get(), 20 MB));
     clock_->now_micros_ += 2 SECS;  // pay the "debt"
 
-    auto delay_token_1 = controller.GetDelayToken(2 MBPS);
+    auto delay_token_1 =
+        controller.GetDelayToken(WriteController::DelaySource::kCF, 2 MBPS);
     EXPECT_EQ(10 SECS, controller.GetDelay(clock_.get(), 20 MB));
     clock_->now_micros_ += 10 SECS;  // pay the "debt"
 
-    auto delay_token_2 = controller.GetDelayToken(1 MBPS);
+    auto delay_token_2 =
+        controller.GetDelayToken(WriteController::DelaySource::kWBM, 1 MBPS);
     EXPECT_EQ(20 SECS, controller.GetDelay(clock_.get(), 20 MB));
     clock_->now_micros_ += 20 SECS;  // pay the "debt"
 
-    auto delay_token_3 = controller.GetDelayToken(20 MBPS);
+    auto delay_token_3 =
+        controller.GetDelayToken(WriteController::DelaySource::kCF, 20 MBPS);
+    EXPECT_EQ(20 SECS, controller.GetDelay(clock_.get(), 20 MB));
+    clock_->now_micros_ += 20 SECS;  // pay the "debt"
+
+    auto delay_token_4 =
+        controller.GetDelayToken(WriteController::DelaySource::kWBM, 20 MBPS);
     EXPECT_EQ(1 SECS, controller.GetDelay(clock_.get(), 20 MB));
     clock_->now_micros_ += 1 SECS;  // pay the "debt"
 
-    // 60M is more than the max rate of 40M. Max rate will be used.
+    auto delay_token_5 =
+        controller.GetDelayToken(WriteController::DelaySource::kWBM, 30 MBPS);
+    EXPECT_EQ(1 SECS, controller.GetDelay(clock_.get(), 20 MB));
+    clock_->now_micros_ += 1 SECS;  // pay the "debt"
+
     EXPECT_EQ(controller.delayed_write_rate(), 20 MBPS);
-    auto delay_token_4 =
-        controller.GetDelayToken(controller.delayed_write_rate() * 3);
+
+    auto delay_token_6 = controller.GetDelayToken(
+        WriteController::DelaySource::kCF, controller.delayed_write_rate() * 3);
+    auto delay_token_7 =
+        controller.GetDelayToken(WriteController::DelaySource::kWBM,
+                                 controller.delayed_write_rate() * 3);
+
+    // 60M is more than the max rate of 40M. Max rate will be used.
     EXPECT_EQ(controller.delayed_write_rate(), 40 MBPS);
     EXPECT_EQ(static_cast<uint64_t>(0.5 SECS),
               controller.GetDelay(clock_.get(), 20 MB));
@@ -111,8 +159,8 @@ TEST_F(WriteControllerTest, StartFilled) {
 
   // Attempt to write two things that combined would be allowed within
   // a single refill interval
-  auto delay_token_0 =
-      controller.GetDelayToken(controller.delayed_write_rate());
+  auto delay_token_0 = controller.GetDelayToken(
+      WriteController::DelaySource::kCF, controller.delayed_write_rate());
 
   // Verify no delay because write rate has not been exceeded within
   // refill interval.
@@ -142,7 +190,8 @@ TEST_F(WriteControllerTest, DebtAccumulation) {
   // would reset the debt on every GetDelayToken.)
   uint64_t debt = 0;
   for (unsigned i = 0; i < tokens.size(); ++i) {
-    tokens[i] = controller.GetDelayToken((i + 1u) MBPS);
+    tokens[i] = controller.GetDelayToken(WriteController::DelaySource::kCF,
+                                         (i + 1u) MBPS);
     uint64_t delay = controller.GetDelay(clock_.get(), 63 MB);
     ASSERT_GT(delay, debt);
     uint64_t incremental = delay - debt;
@@ -159,7 +208,8 @@ TEST_F(WriteControllerTest, DebtAccumulation) {
     // Debt is accumulated in time, not in bytes, so this new write
     // limit is not applied to prior requested delays, even it they are
     // in progress.
-    tokens[i] = controller.GetDelayToken((i + 1u) MBPS);
+    tokens[i] = controller.GetDelayToken(WriteController::DelaySource::kCF,
+                                         (i + 1u) MBPS);
     uint64_t delay = controller.GetDelay(clock_.get(), 63 MB);
     ASSERT_GT(delay, debt);
     uint64_t incremental = delay - debt;
@@ -187,7 +237,8 @@ TEST_F(WriteControllerTest, DebtAccumulation) {
   }
   // All tokens released.
   // Verify that releasing all tokens pays down debt, even with no time passage.
-  tokens[0] = controller.GetDelayToken(1 MBPS);
+  tokens[0] =
+      controller.GetDelayToken(WriteController::DelaySource::kCF, 1 MBPS);
   ASSERT_EQ(0U, controller.GetDelay(clock_.get(), 100u /*small bytes*/));
 }
 
@@ -198,7 +249,8 @@ TEST_F(WriteControllerTest, CreditAccumulation) {
   std::array<std::unique_ptr<WriteControllerToken>, 10> tokens;
 
   // Ensure started
-  tokens[0] = controller.GetDelayToken(1 MBPS);
+  tokens[0] =
+      controller.GetDelayToken(WriteController::DelaySource::kCF, 1 MBPS);
   ASSERT_EQ(10 SECS, controller.GetDelay(clock_.get(), 10 MB));
   clock_->now_micros_ += 10 SECS;
 
@@ -208,7 +260,8 @@ TEST_F(WriteControllerTest, CreditAccumulation) {
 
   // Spend some credit (burst of I/O)
   for (unsigned i = 0; i < tokens.size(); ++i) {
-    tokens[i] = controller.GetDelayToken((i + 1u) MBPS);
+    tokens[i] = controller.GetDelayToken(WriteController::DelaySource::kCF,
+                                         (i + 1u) MBPS);
     ASSERT_EQ(0U, controller.GetDelay(clock_.get(), 63 MB));
     // In WriteController, credit is accumulated in bytes, not in time.
     // After an "unnecessary" delay, all of our time credit will be
@@ -218,7 +271,8 @@ TEST_F(WriteControllerTest, CreditAccumulation) {
     credit -= 63 MB;
   }
   // Spend remaining credit
-  tokens[0] = controller.GetDelayToken(1 MBPS);
+  tokens[0] =
+      controller.GetDelayToken(WriteController::DelaySource::kCF, 1 MBPS);
   ASSERT_EQ(0U, controller.GetDelay(clock_.get(), credit));
   // Verify
   ASSERT_EQ(10 SECS, controller.GetDelay(clock_.get(), 10 MB));
@@ -235,7 +289,8 @@ TEST_F(WriteControllerTest, CreditAccumulation) {
 
   // All tokens released.
   // Verify credit is wiped away on new delay.
-  tokens[0] = controller.GetDelayToken(1 MBPS);
+  tokens[0] =
+      controller.GetDelayToken(WriteController::DelaySource::kCF, 1 MBPS);
   ASSERT_EQ(10 SECS, controller.GetDelay(clock_.get(), 10 MB));
 }
 

@@ -118,6 +118,46 @@ TEST_F(CompactFilesTest, L0ConflictsFiles) {
   delete db;
 }
 
+// to check scenario : 1-3, 5-6, 2-7 L0 files,
+// 1-3 is picked in SetupInitialFiles().
+// will 5-6 be picked in SetupOtherL0FilesIfNeeded.
+TEST_F(CompactFilesTest, L0PickExpansion) {
+  Options options;
+  options.create_if_missing = true;
+  options.compaction_style = kCompactionStyleLevel;
+  // Small slowdown and stop trigger for experimental purpose.
+  options.compaction_pri = CompactionPri::kOldestSmallestSeqFirst;
+  options.level0_file_num_compaction_trigger = 4;
+
+  DB* db = nullptr;
+  DestroyDB(db_name_, options);
+  Status s = DB::Open(options, db_name_, &db);
+  assert(s.ok());
+  assert(db);
+  WriteOptions write_options;
+  // create L0 files
+  ASSERT_OK(db->Put(write_options, "foo1", "v1"));
+  ASSERT_OK(db->Put(write_options, "foo3", "v1"));
+  ASSERT_OK(db->Flush(FlushOptions()));
+
+  ASSERT_OK(db->Put(write_options, "foo2", "v1"));
+  ASSERT_OK(db->Put(write_options, "foo5", "v1"));
+  ASSERT_OK(db->Put(write_options, "foo7", "v1"));
+  ASSERT_OK(db->Flush(FlushOptions()));
+
+  ASSERT_OK(db->Put(write_options, "foo5", "v2"));
+  ASSERT_OK(db->Put(write_options, "foo6", "v1"));
+  ASSERT_OK(db->Flush(FlushOptions()));
+
+  ASSERT_OK(db->Put(write_options, "foo8", "v1"));
+  ASSERT_OK(db->Put(write_options, "foo9", "v1"));
+  ASSERT_OK(db->Flush(FlushOptions()));
+
+  ASSERT_OK(static_cast_with_check<DBImpl>(db)->TEST_WaitForBackgroundWork());
+
+  delete db;
+}
+
 TEST_F(CompactFilesTest, MultipleLevel) {
   Options options;
   options.create_if_missing = true;

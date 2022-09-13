@@ -21,8 +21,8 @@ STRIPFLAGS = -S -x
 # Transform parallel LOG output into something more readable.
 parallel_log_extract = awk \
   'BEGIN{FS="\t"} { \
-  	t=$$9; sub(/if *\[\[ *"/,"",t); sub(/" =.*/,"",t); sub(/ >.*/,"",t); sub(/.*--gtest_filter=/,"",t); \
-  	printf("%7.3f %s %s\n",4,($$7 == 0 ? "PASS" : "FAIL"),t) \
+     t=$$9; sub(/if *\[\[ *"/,"",t); sub(/" =.*/,"",t); sub(/ >.*/,"",t); sub(/.*--gtest_filter=/,"",t); \
+     printf("%7.3f %s %s\n",4,($$7 == 0 ? "PASS" : "FAIL"),t) \
   }'
 
 # DEBUG_LEVEL can have three values:

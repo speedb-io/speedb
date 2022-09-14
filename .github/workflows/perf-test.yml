@@ -4,6 +4,9 @@ on:
   workflow_call:
   workflow_dispatch:
     inputs:
+      db_bench:
+        type: boolean
+        description: db_bench
       run_db_bench_small_obj:
         type: boolean
         description: run_db_bench_small_obj
@@ -27,13 +30,26 @@ jobs:
           echo ${{ github.event.inputs.run_db_bench_small_obj }}
           echo ${{ github.event.inputs.run_db_bench_large_obj }}
           echo ${{ github.event.inputs.run_db_bench_huge_memtable }}
-          #echo  ${{ github.sender.login }} 
-          #ssh -i ~/remo.k remo@9.148.1.183 /home/remo/tremotnic.sh main HG_auto_T1 ${{ github.event.pusher.name }} 
+          echo  ${{ github.sender.login }} 
+          if ${{ github.event.inputs.db_bench }} == true; then
+            echo db_bench
+            ssh -i ~/remo.k remo@9.148.1.183 /home/remo/tremotnic.sh main HG_auto_T1 ${{ github.actor }} 
+          fi
           if ${{ github.event.inputs.run_db_bench_small_obj }} == true; then
             echo run_db_bench_small_obj
+            ssh -i ~/remo.k remo@9.148.1.183 /home/remo/tremotnic.sh main HG_auto_T1 ${{ github.actor }} run_db_bench_small_obj
           fi
+          if ${{ github.event.inputs.run_db_bench_large_obj }} == true; then
+            echo run_db_bench_large_obj
+            ssh -i ~/remo.k remo@9.148.1.183 /home/remo/tremotnic.sh main HG_auto_T1 ${{ github.actor }} run_db_bench_large_obj
+          fi
+          if ${{ github.event.inputs.run_db_bench_huge_memtable }} == true; then
+            echo run_db_bench_huge_memtable
+            ssh -i ~/remo.k remo@9.148.1.183 /home/remo/tremotnic.sh main HG_auto_T1 ${{ github.actor }} run_db_bench_huge_memtable
+          fi
+          #ssh -i ~/remo.k remo@9.148.1.183 /home/remo/tremotnic.sh main HG_auto_T1 ${{ github.actor }} 
           #ssh -i ~/remo.k remo@9.148.1.183 /home/remo/tremotnic.sh main HG_auto_T1 ${{ github.actor }} run_db_bench_large_obj
-          #ssh -i ~/remo.k remo@9.148.1.183 /home/remo/tremotnic.sh main HG_auto_T1 ${{ github.event.pusher.name }} run_db_bench_small_obj
-          #ssh -i ~/remo.k remo@9.148.1.183 /home/remo/tremotnic.sh main HG_auto_T1 ${{ github.event.pusher.name }} run_db_bench_huge_memtable
+          #ssh -i ~/remo.k remo@9.148.1.183 /home/remo/tremotnic.sh main HG_auto_T1 ${{ github.actor }} run_db_bench_small_obj
+          #ssh -i ~/remo.k remo@9.148.1.183 /home/remo/tremotnic.sh main HG_auto_T1 ${{ github.actor }} run_db_bench_huge_memtable
 
 

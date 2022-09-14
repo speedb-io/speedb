@@ -2,6 +2,9 @@ name: QA Tests
 
 on:
   workflow_dispatch:
+    inputs:
+      duration:
+        description: 'Test duration:'
   workflow_call:
 
 env:
@@ -23,12 +26,15 @@ jobs:
           - name: Unit tests
             short_test: TMPD="$(mktemp -d /tmp/speedb.XXXX)" make -j$(nproc) check
             long_test: TMPD="$(mktemp -d /tmp/speedb.XXXX)" make -j$(nproc) check
+            manual_test: TMPD="$(mktemp -d /tmp/speedb.XXXX)" make -j$(nproc) check
           - name: black-box
             short_test: CRASH_TEST_EXT_ARGS="--duration=500" make -j$(nproc) blackbox_asan_crash_test
             long_test: CRASH_TEST_EXT_ARGS="--duration=10000" make -j$(nproc) blackbox_asan_crash_test
+            manual_test: CRASH_TEST_EXT_ARGS="--duration=${{ github.event.inputs.duration }}" make -j$(nproc) blackbox_asan_crash_test
           - name: white-box
             short_test: CRASH_TEST_EXT_ARGS="--duration=500" make -j$(nproc) whitebox_asan_crash_test
             long_test: CRASH_TEST_EXT_ARGS="--duration=10000" make -j$(nproc) whitebox_asan_crash_test
+            manual_test: CRASH_TEST_EXT_ARGS="--duration=${{ github.event.inputs.duration }}" make -j$(nproc) whitebox_asan_crash_test
     
     steps:
       - name: Network hotfix
@@ -44,13 +50,17 @@ jobs:
 
       - name: ${{ matrix.name }}
         run: |
-          case "$GITHUB_REF_NAME" in
-            release/*)
-              echo "Running long test for release, $(nproc) jobs"
-              make clean && ${{ matrix.long_test }}
-              ;;
-            *)
-              echo "Running short test, $(nproc) jobs"
-              make clean && ${{ matrix.short_test }}
-              ;;
-          esac
+          if [ ! -z ${{ github.event.inputs.duration }} ]; then
+            make clean && ${{ matrix.manual_test }} && echo $?
+          else
+            case "$GITHUB_REF_NAME" in
+              release/*)
+                echo "Running long test for release, $(nproc) jobs"
+                make clean && ${{ matrix.long_test }}
+                ;;
+              *)
+                echo "Running short test, $(nproc) jobs"
+                make clean && ${{ matrix.short_test }}
+                ;;
+            esac
+          fi

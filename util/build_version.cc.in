@@ -22,6 +22,9 @@ static const std::string speedb_build_date = "speedb_build_date:@GIT_DATE@";
 static const std::string speedb_build_date = "speedb_build_date:@BUILD_DATE@";
 #endif
 
+#define SPDB_BUILD_TAG "@SPDB_BUILD_TAG@"
+static const std::string speedb_build_tag = "speedb_build_tag:" SPDB_BUILD_TAG;
+
 #ifndef ROCKSDB_LITE
 extern "C" {
 @ROCKSDB_PLUGIN_EXTERNS@
@@ -50,6 +53,11 @@ static std::unordered_map<std::string, std::string>* LoadPropertiesSet() {
   AddProperty(properties, speedb_build_git_sha);
   AddProperty(properties, speedb_build_git_tag);
   AddProperty(properties, speedb_build_date);
+  if (SPDB_BUILD_TAG[0] == '@') {
+    AddProperty(properties, "?");
+  } else {
+    AddProperty(properties, speedb_build_tag);
+  }
   return properties;
 }
 
@@ -61,10 +69,18 @@ const std::unordered_map<std::string, std::string>& GetRocksBuildProperties() {
 std::string GetRocksVersionAsString(bool with_patch) {
   std::string version = ToString(ROCKSDB_MAJOR) + "." + ToString(ROCKSDB_MINOR);
   if (with_patch) {
-    return version + "." + ToString(ROCKSDB_PATCH);
-  } else {
-    return version;
- }
+    version += "." + ToString(SPEEDB_PATCH);
+    // Only add a build tag if it was specified (e.g. not a release build)
+    if (SPDB_BUILD_TAG[0] != '\0') {
+      if (SPDB_BUILD_TAG[0] == '@') {
+        // In case build tag substitution at build time failed, add a question mark
+        version += "-?";
+      } else {
+        version += "-" + std::string(SPDB_BUILD_TAG);
+      }
+    }
+  }
+  return version;
 }
 
 std::string GetSpeedbVersionAsString(bool with_patch) {

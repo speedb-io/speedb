@@ -91,23 +91,6 @@ void SpdbWriteImpl::WriteBatchComplete(void* list, bool leader_batch) {
   }
 }
 
-/*void SpdbWriteImpl::SpdbFlushWriteThread() {
-  for (;;) {
-    {
-      std::unique_lock<std::mutex> lck(flush_thread_mutex_);
-      flush_thread_cv_.wait(lck);
-      if (flush_thread_terminate_.load()) {
-        break;
-      }
-    }
-    // make sure no on the fly writes
-    flush_rwlock_.WriteLock();
-    db_->RegisterFlushOrTrim();
-    action_needed_.store(false);
-    flush_rwlock_.WriteUnlock();
-  }
-}*/
-
 SpdbWriteImpl::SpdbWriteImpl(DBImpl* db) : db_(db) {}
 
 SpdbWriteImpl::~SpdbWriteImpl() { Shutdown(); }

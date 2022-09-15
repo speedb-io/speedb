@@ -1,0 +1,29 @@
+name: Cron Tests
+
+on:
+  schedule:
+    - cron: "0 20 * * 5"
+
+jobs:
+  Sanity:
+    uses: ./.github/workflows/sanity_check.yml
+  
+  Build:
+    needs: [Sanity]
+    uses: ./.github/workflows/full-builds.yml
+  
+  QA-Tests:
+    needs: [Build]
+    uses: ./.github/workflows/qa-tests.yml
+
+  Fuzz:
+    needs: [Build]
+    uses: ./.github/workflows/test_fuzz.yml
+    secrets:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  
+  Perf-Tests:
+    needs: [Build]
+    uses: ./.github/workflows/perf-test.yml
+

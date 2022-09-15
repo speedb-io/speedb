@@ -22,7 +22,7 @@ SPDX-License-Identifier: Apache-2.0
     -   [Source code](#source-code)
     -   [Markdown files](#markdown-files)
 -   [License](#license)
-    -   [Source files](#source-files-1)
+    -   [Source files](#source-files)
     -   [Markdown](#markdown)
 -   [Contribution workflow](#contribution-workflow)
     -   [Fork and build](#fork-and-build)
@@ -211,7 +211,7 @@ request, a Speedb team member will merge it.
 [Fork](https://github.com/speedb-io/speedb/fork) the Speedb repository to your
 own account and clone the resulting repository to your machine.
 
-Refer to the [README](README.me) and [INSTALL](INSTALL.md) documents for
+Refer to the [README](README.md) and [INSTALL](INSTALL.md) documents for
 information about how to build Speedb locally.
 
 ### Checkout a pull request

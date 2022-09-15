@@ -2,7 +2,7 @@ name: Cron Tests
 
 on:
   schedule:
-    - cron: "0 20 * * 5"
+    - cron: "0 20 * * 5" #This job will run on every friday at 20:00 UTC time / 23:00 Jerusalem time
 
 jobs:
   Sanity:

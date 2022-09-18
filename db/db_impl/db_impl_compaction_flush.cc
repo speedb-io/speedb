@@ -2057,9 +2057,6 @@ Status DBImpl::FlushMemTable(ColumnFamilyData* cfd,
         }
       }
     }
-    if (spdb_write_) {
-      ResumeSpdbWrites();
-    }
 
     if (s.ok() && !flush_reqs.empty()) {
       for (const auto& req : flush_reqs) {
@@ -2083,8 +2080,9 @@ Status DBImpl::FlushMemTable(ColumnFamilyData* cfd,
       }
       MaybeScheduleFlushOrCompaction();
     }
-
-    if (!spdb_write_) {
+    if (spdb_write_) {
+      ResumeSpdbWrites();
+    } else {
       if (!writes_stopped) {
         write_thread_.ExitUnbatched(&w);
         if (two_write_queues_) {
@@ -2181,9 +2179,6 @@ Status DBImpl::AtomicFlushMemTables(
         break;
       }
     }
-    if (spdb_write_) {
-      ResumeSpdbWrites();
-    }
 
     if (s.ok()) {
       AssignAtomicFlushSeq(cfds);
@@ -2203,7 +2198,9 @@ Status DBImpl::AtomicFlushMemTables(
       SchedulePendingFlush(flush_req, flush_reason);
       MaybeScheduleFlushOrCompaction();
     }
-    if (!spdb_write_) {
+    if (spdb_write_) {
+      ResumeSpdbWrites();
+    } else {
       if (!writes_stopped) {
         write_thread_.ExitUnbatched(&w);
         if (two_write_queues_) {

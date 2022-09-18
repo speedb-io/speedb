@@ -124,10 +124,10 @@ class WriteBatchInternal {
 
   static Status MarkCommit(WriteBatch* batch, const Slice& xid);
 
+  static Status MarkIgnore(WriteBatch* batch);
+
   static Status MarkCommitWithTimestamp(WriteBatch* batch, const Slice& xid,
                                         const Slice& commit_ts);
-
-  static Status MarkDelete(WriteBatch* b);
 
   static Status InsertNoop(WriteBatch* batch);
 

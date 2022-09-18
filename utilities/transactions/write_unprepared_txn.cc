@@ -596,9 +596,8 @@ Status WriteUnpreparedTxn::CommitInternal() {
   // need to redundantly reference the log that contains the prepared data.
   const uint64_t zero_log_number = 0ull;
   size_t batch_cnt = UNLIKELY(commit_batch_cnt) ? commit_batch_cnt : 1;
-  WriteOptions write_options = write_options_;
 
-  s = db_impl_->WriteImpl(write_options, working_batch, nullptr, nullptr,
+  s = db_impl_->WriteImpl(write_options_, working_batch, nullptr, nullptr,
                           zero_log_number, disable_memtable, &seq_used,
                           batch_cnt, pre_release_callback);
   assert(!s.ok() || seq_used != kMaxSequenceNumber);
@@ -643,7 +642,7 @@ Status WriteUnpreparedTxn::CommitInternal() {
   const size_t ONE_BATCH = 1;
   const uint64_t NO_REF_LOG = 0;
 
-  s = db_impl_->WriteImpl(write_options, &empty_batch, nullptr, nullptr,
+  s = db_impl_->WriteImpl(write_options_, &empty_batch, nullptr, nullptr,
                           NO_REF_LOG, DISABLE_MEMTABLE, &seq_used, ONE_BATCH,
                           &update_commit_map_with_commit_batch);
   assert(!s.ok() || seq_used != kMaxSequenceNumber);

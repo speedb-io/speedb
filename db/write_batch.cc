@@ -82,6 +82,7 @@ enum ContentFlags : uint32_t {
   HAS_DELETE_RANGE = 1 << 9,
   HAS_BLOB_INDEX = 1 << 10,
   HAS_BEGIN_UNPREPARE = 1 << 11,
+  HAS_IGNORE = 1 << 12,
 };
 
 struct BatchContentClassifier : public WriteBatch::Handler {
@@ -931,10 +932,10 @@ Status WriteBatchInternal::MarkEndPrepare(WriteBatch* b, const Slice& xid,
   return Status::OK();
 }
 
-Status WriteBatchInternal::MarkDelete(WriteBatch* b) {
-  b->rep_.push_back(static_cast<char>(kTypeCommitXID));
+Status WriteBatchInternal::MarkIgnore(WriteBatch* b) {
+  b->rep_.push_back(static_cast<char>(kTypeIgnore));
   b->content_flags_.store(b->content_flags_.load(std::memory_order_relaxed) |
-                              ContentFlags::HAS_DELETE,
+                              ContentFlags::HAS_IGNORE,
                           std::memory_order_relaxed);
   return Status::OK();
 }

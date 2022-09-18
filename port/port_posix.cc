@@ -160,20 +160,6 @@ RWMutex::RWMutex() {
 
 RWMutex::~RWMutex() { PthreadCall("destroy mutex", pthread_rwlock_destroy(&mu_)); }
 
-RWMutexWr::RWMutexWr() {
-#ifdef OS_LINUX
-  pthread_rwlockattr_t attr;
-  PthreadCall("init attr", pthread_rwlockattr_init(&attr));
-  PthreadCall("attr setkind",
-              pthread_rwlockattr_setkind_np(
-                  &attr, PTHREAD_RWLOCK_PREFER_WRITER_NONRECURSIVE_NP));
-  PthreadCall("init mutex", pthread_rwlock_init(&mu_, &attr));
-  PthreadCall("destroy attr", pthread_rwlockattr_destroy(&attr));
-#else
-  PthreadCall("init mutex", pthread_rwlock_init(&mu_, nullptr));
-#endif
-}
-
 void RWMutex::ReadLock() { PthreadCall("read lock", pthread_rwlock_rdlock(&mu_)); }
 
 void RWMutex::WriteLock() { PthreadCall("write lock", pthread_rwlock_wrlock(&mu_)); }
@@ -181,6 +167,19 @@ void RWMutex::WriteLock() { PthreadCall("write lock", pthread_rwlock_wrlock(&mu_
 void RWMutex::ReadUnlock() { PthreadCall("read unlock", pthread_rwlock_unlock(&mu_)); }
 
 void RWMutex::WriteUnlock() { PthreadCall("write unlock", pthread_rwlock_unlock(&mu_)); }
+
+RWMutexWr::RWMutexWr() { m_wr_pending.store(0); }
+
+void RWMutexWr::ReadLock() {
+  while (m_wr_pending.load() != 0) usleep(1);
+  PthreadCall("read lock", pthread_rwlock_rdlock(&mu_));
+}
+
+void RWMutexWr::WriteLock() {
+  m_wr_pending++;
+  PthreadCall("write lock", pthread_rwlock_wrlock(&mu_));
+  m_wr_pending--;
+}
 
 int PhysicalCoreID() {
 #if defined(ROCKSDB_SCHED_GETCPU_PRESENT) && defined(__x86_64__) && \

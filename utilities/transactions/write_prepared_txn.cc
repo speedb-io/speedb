@@ -217,9 +217,8 @@ Status WritePreparedTxn::CommitInternal() {
   // TransactionOptions::use_only_the_last_commit_time_batch_for_recovery to
   // true. See the comments about GetCommitTimeWriteBatch() in
   // include/rocksdb/utilities/transaction.h.
-  WriteOptions write_options = write_options_;
 
-  s = db_impl_->WriteImpl(write_options, working_batch, nullptr, nullptr,
+  s = db_impl_->WriteImpl(write_options_, working_batch, nullptr, nullptr,
                           zero_log_number, disable_memtable, &seq_used,
                           batch_cnt, pre_release_callback);
   assert(!s.ok() || seq_used != kMaxSequenceNumber);
@@ -257,7 +256,7 @@ Status WritePreparedTxn::CommitInternal() {
   const size_t ONE_BATCH = 1;
   const uint64_t NO_REF_LOG = 0;
 
-  s = db_impl_->WriteImpl(write_options, &empty_batch, nullptr, nullptr,
+  s = db_impl_->WriteImpl(write_options_, &empty_batch, nullptr, nullptr,
                           NO_REF_LOG, DISABLE_MEMTABLE, &seq_used, ONE_BATCH,
                           &update_commit_map_with_aux_batch);
   assert(!s.ok() || seq_used != kMaxSequenceNumber);

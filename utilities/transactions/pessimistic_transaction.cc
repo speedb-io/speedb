@@ -653,8 +653,6 @@ Status WriteCommittedTxn::CommitWithoutPrepareInternal() {
   assert(wbwi);
   WriteBatch* wb = wbwi->GetWriteBatch();
   assert(wb);
-  WriteOptions write_options = write_options_;
-
   const bool needs_ts = WriteBatchInternal::HasKeyWithTimestamp(*wb);
   if (needs_ts && commit_timestamp_ == kMaxTxnTimestamp) {
     return Status::InvalidArgument("Must assign a commit timestamp");
@@ -684,7 +682,7 @@ Status WriteCommittedTxn::CommitWithoutPrepareInternal() {
 
   uint64_t seq_used = kMaxSequenceNumber;
   auto s =
-      db_impl_->WriteImpl(write_options, wb,
+      db_impl_->WriteImpl(write_options_, wb,
                           /*callback*/ nullptr, /*log_used*/ nullptr,
                           /*log_ref*/ 0, /*disable_memtable*/ false, &seq_used);
   assert(!s.ok() || seq_used != kMaxSequenceNumber);

@@ -159,6 +159,11 @@ class RWMutex {
 class RWMutexWr : public RWMutex {
  public:
   RWMutexWr();
+  void ReadLock();
+  void WriteLock();
+
+ private:
+  std::atomic<int> m_wr_pending;
 };
 
 class CondVar {

@@ -1315,10 +1315,6 @@ int DBImpl::FindMinimumEmptyLevelFitting(
 }
 
 Status DBImpl::FlushWAL(bool sync) {
-  if (spdb_write_) {
-    ROCKS_LOG_INFO(immutable_db_options_.info_log,
-                   "FlushWAL called manual_wal_flush_=%d", manual_wal_flush_);
-  }
   if (manual_wal_flush_) {
     IOStatus io_s;
     {

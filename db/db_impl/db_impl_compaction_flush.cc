@@ -1989,19 +1989,22 @@ Status DBImpl::FlushMemTable(ColumnFamilyData* cfd,
   autovector<FlushRequest> flush_reqs;
   autovector<uint64_t> memtable_ids_to_wait;
   {
-    SuspendSpdbWrites();
+    if (spdb_write_) {
+      SuspendSpdbWrites();
+    }
     WriteContext context;
     InstrumentedMutexLock guard_lock(&mutex_);
-
     WriteThread::Writer w;
     WriteThread::Writer nonmem_w;
-    if (!writes_stopped) {
-      write_thread_.EnterUnbatched(&w, &mutex_);
-      if (two_write_queues_) {
-        nonmem_write_thread_.EnterUnbatched(&nonmem_w, &mutex_);
+    if (!spdb_write_) {
+      if (!writes_stopped) {
+        write_thread_.EnterUnbatched(&w, &mutex_);
+        if (two_write_queues_) {
+          nonmem_write_thread_.EnterUnbatched(&nonmem_w, &mutex_);
+        }
       }
+      WaitForPendingWrites();
     }
-    WaitForPendingWrites();
 
     if (flush_reason != FlushReason::kErrorRecoveryRetryFlush &&
         (!cfd->mem()->IsEmpty() || !cached_recoverable_state_empty_.load())) {
@@ -2054,7 +2057,9 @@ Status DBImpl::FlushMemTable(ColumnFamilyData* cfd,
         }
       }
     }
-    ResumeSpdbWrites();
+    if (spdb_write_) {
+      ResumeSpdbWrites();
+    }
 
     if (s.ok() && !flush_reqs.empty()) {
       for (const auto& req : flush_reqs) {
@@ -2079,10 +2084,12 @@ Status DBImpl::FlushMemTable(ColumnFamilyData* cfd,
       MaybeScheduleFlushOrCompaction();
     }
 
-    if (!writes_stopped) {
-      write_thread_.ExitUnbatched(&w);
-      if (two_write_queues_) {
-        nonmem_write_thread_.ExitUnbatched(&nonmem_w);
+    if (!spdb_write_) {
+      if (!writes_stopped) {
+        write_thread_.ExitUnbatched(&w);
+        if (two_write_queues_) {
+          nonmem_write_thread_.ExitUnbatched(&nonmem_w);
+        }
       }
     }
   }
@@ -2135,19 +2142,23 @@ Status DBImpl::AtomicFlushMemTables(
   FlushRequest flush_req;
   autovector<ColumnFamilyData*> cfds;
   {
-    SuspendSpdbWrites();
+    if (spdb_write_) {
+      SuspendSpdbWrites();
+    }
     WriteContext context;
     InstrumentedMutexLock guard_lock(&mutex_);
-
     WriteThread::Writer w;
     WriteThread::Writer nonmem_w;
-    if (!writes_stopped) {
-      write_thread_.EnterUnbatched(&w, &mutex_);
-      if (two_write_queues_) {
-        nonmem_write_thread_.EnterUnbatched(&nonmem_w, &mutex_);
+
+    if (!spdb_write_) {
+      if (!writes_stopped) {
+        write_thread_.EnterUnbatched(&w, &mutex_);
+        if (two_write_queues_) {
+          nonmem_write_thread_.EnterUnbatched(&nonmem_w, &mutex_);
+        }
       }
+      WaitForPendingWrites();
     }
-    WaitForPendingWrites();
 
     for (auto cfd : column_family_datas) {
       if (cfd->IsDropped()) {
@@ -2170,7 +2181,9 @@ Status DBImpl::AtomicFlushMemTables(
         break;
       }
     }
-    ResumeSpdbWrites();
+    if (spdb_write_) {
+      ResumeSpdbWrites();
+    }
 
     if (s.ok()) {
       AssignAtomicFlushSeq(cfds);
@@ -2190,11 +2203,12 @@ Status DBImpl::AtomicFlushMemTables(
       SchedulePendingFlush(flush_req, flush_reason);
       MaybeScheduleFlushOrCompaction();
     }
-
-    if (!writes_stopped) {
-      write_thread_.ExitUnbatched(&w);
-      if (two_write_queues_) {
-        nonmem_write_thread_.ExitUnbatched(&nonmem_w);
+    if (!spdb_write_) {
+      if (!writes_stopped) {
+        write_thread_.ExitUnbatched(&w);
+        if (two_write_queues_) {
+          nonmem_write_thread_.ExitUnbatched(&nonmem_w);
+        }
       }
     }
   }

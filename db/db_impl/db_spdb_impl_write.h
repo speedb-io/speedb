@@ -42,9 +42,10 @@ class SpdbWriteImpl {
   void Shutdown();
   bool NotifyIfActionNeeded();
   void WaitForWalWriteComplete(void* list);
-  Status SwitchAndWriteBatchGroup(uint64_t* seq_used);
-  void WriteBatchComplete(void* list);
-  Status WriteBatchLeaderComplete(uint64_t* seq_used);
+  Status SwitchAndWriteBatchGroup(bool disable_memtable, WriteBatch* batch);
+  Status WriteBatchComplete(void* list, bool disable_memtable,
+                            WriteBatch* batch);
+  Status WriteBatchLeaderComplete(bool disable_memtable, WriteBatch* batch);
   port::RWMutexWr& GetFlushRWLock() { return flush_rwlock_; }
   void Lock(bool is_read);
   void Unlock(bool is_read);
@@ -52,27 +53,43 @@ class SpdbWriteImpl {
  private:
   struct WritesBatchList {
     std::list<WriteBatch*> wal_writes_;
-    std::list<WriteBatch*> memtable_only_writes_;
-    uint64_t max_seq_ = 0;
+    uint64_t pulished_seq_ = 0;
+    uint64_t roll_back_seq_ = 0;
     port::RWMutexWr buffer_write_rw_lock_;
     port::RWMutexWr write_ref_rwlock_;
+    // this is to be able notify the batch group members about needed rollback
+    // and protect the container be cleared
+    port::RWMutexWr roll_back_write_ref_rwlock_;
+    // this is to be able notify the batch group members about the status and
+    // make sure the batch group wasnt cleared .. in the next version this wpnt
+    // be needed since the batch group will be a shared pointer
+    port::RWMutexWr batch_group_rwlock_;
     bool empty_ = true;
     std::atomic<bool> need_sync_ = false;
+    Status status_ = Status::OK();
+
     void Clear() {
       wal_writes_.clear();
-      memtable_only_writes_.clear();
-      max_seq_ = 0;
+      pulished_seq_ = 0;
+      roll_back_seq_ = 0;
       empty_ = true;
       need_sync_ = false;
+      status_ = Status::OK();
     }
 
     void Add(WriteBatch* batch, const WriteOptions& write_options,
              bool* leader_batch);
-    uint64_t GetMaxSeq() const { return max_seq_; }
+    uint64_t GetNextPublishedSeq() const { return pulished_seq_; }
+    void SetRollback(uint64_t roll_back_seq, Status rc) {
+      roll_back_seq_ = roll_back_seq;
+      status_ = rc;
+    }
     void WaitForPendingWrites();
 
-    void WriteBatchComplete();
-    void WriteBatchLeaderComplete(DBImpl* db, uint64_t* seq_used, Status s);
+    Status WriteBatchComplete(DBImpl* db, bool disable_memtable,
+                              WriteBatch* batch);
+    void WriteBatchLeaderComplete(DBImpl* db, bool disable_memtable,
+                                  WriteBatch* batch);
   };
 
   WritesBatchList* SwitchBatchGroup();

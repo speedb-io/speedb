@@ -594,8 +594,11 @@ class VersionStorageInfo {
 
   // A list for the same set of files that are stored in files_,
   // but files in each level are now sorted based on file
-  // size. The file with the largest size is at the front.
+  // size. or other pri as in CompactionPri advanced_options.h .
+  // sorting is done in each version edit in PrepareForVersionAppend.
+  // The file with the largest size is at the front.
   // This vector stores the index of the file from files_.
+  // only first number_of_files_to_sort_ files are sorted.
   std::vector<std::vector<int>> files_by_compaction_pri_;
 
   // If true, means that files in L0 have keys with non overlapping ranges

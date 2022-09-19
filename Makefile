@@ -819,6 +819,8 @@ all_but_some_tests: $(LIBRARY) $(BENCHMARKS) tools tools_lib test_libs $(ROCKSDB
 
 static_lib: $(STATIC_LIBRARY)
 
+debug_lib: $(STATIC_LIBRARY)
+
 shared_lib: $(SHARED)
 
 stress_lib: $(STRESS_LIBRARY)

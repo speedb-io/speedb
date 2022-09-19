@@ -872,6 +872,8 @@ def narrow_crash_main(args, unknown_args):
         time.sleep(2)  # time to stabilize before the next run
 
     shutil.rmtree(dbname, True)
+    for ctr in range(max(0, counter - 2), counter):
+        shutil.rmtree('{}_{}'.format(dbname, ctr), True)
 
 
 # This script runs and kills db_stress multiple times. It checks consistency
@@ -917,7 +919,7 @@ def blackbox_crash_main(args, unknown_args):
     # we need to clean up after ourselves -- only do this on test success
     shutil.rmtree(dbname, True)
     for ctr in range(max(0, counter - 2), counter):
-        shutil.rmtree('{}_{}'.format(dbname, ctr))
+        shutil.rmtree('{}_{}'.format(dbname, ctr), True)
 
 
 # This python script runs db_stress multiple times. Some runs with
@@ -1070,11 +1072,11 @@ def whitebox_crash_main(args, unknown_args):
                 shutil.rmtree(expected_values_dir)
             expected_values_dir = None
             check_mode = (check_mode + 1) % total_check_mode
-            for ctr in range(max(0, counter - 2), counter):
-                shutil.rmtree('{}_{}'.format(dbname, ctr))
-            counter = 0
 
         time.sleep(1)  # time to stabilize after a kill
+
+    for ctr in range(max(0, counter - 2), counter):
+        shutil.rmtree('{}_{}'.format(dbname, ctr), True)
 
 
 def bool_converter(v):
@@ -1129,7 +1131,7 @@ def main():
     args, unknown_args = parser.parse_known_args()
 
     test_tmpdir = os.environ.get(_TEST_DIR_ENV_VAR)
-    if test_tmpdir is not None and not os.path.isdir(test_tmpdir):
+    if test_tmpdir and not os.path.isdir(test_tmpdir):
         print('%s env var is set to a non-existent directory: %s' %
                 (_TEST_DIR_ENV_VAR, test_tmpdir))
         sys.exit(1)

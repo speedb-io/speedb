@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/sh
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 # If clang_format_diff.py command is not specfied, we assume we are able to
 # access directly without any path.
@@ -31,25 +31,23 @@ REPO_ROOT="$(git rev-parse --show-toplevel)"
 if [ "$CLANG_FORMAT_DIFF" ]; then
   echo "Note: CLANG_FORMAT_DIFF='$CLANG_FORMAT_DIFF'"
   # Dry run to confirm dependencies like argparse
-  if $CLANG_FORMAT_DIFF --help >/dev/null < /dev/null; then
-    true #Good
-  else
+  if ! "$CLANG_FORMAT_DIFF" --help >/dev/null < /dev/null; then
     exit 128
   fi
 else
   # First try directly executing the possibilities
-  if clang-format-diff --help &> /dev/null < /dev/null; then
+  if clang-format-diff --help > /dev/null 2>&1 < /dev/null; then
     CLANG_FORMAT_DIFF=clang-format-diff
-  elif clang-format-diff.py --help &> /dev/null < /dev/null; then
+  elif clang-format-diff.py --help > /dev/null 2>&1 < /dev/null; then
     CLANG_FORMAT_DIFF=clang-format-diff.py
-  elif $REPO_ROOT/clang-format-diff.py --help &> /dev/null < /dev/null; then
+  elif "$REPO_ROOT/clang-format-diff.py" --help > /dev/null 2>&1 < /dev/null; then
     CLANG_FORMAT_DIFF=$REPO_ROOT/clang-format-diff.py
   else
     # This probably means we need to directly invoke the interpreter.
     # But first find clang-format-diff.py
     if [ -f "$REPO_ROOT/clang-format-diff.py" ]; then
       CFD_PATH="$REPO_ROOT/clang-format-diff.py"
-    elif which clang-format-diff.py &> /dev/null; then
+    elif which clang-format-diff.py > /dev/null 2>&1; then
       CFD_PATH="$(which clang-format-diff.py)"
     else
       echo "You didn't have clang-format-diff.py and/or clang-format available in your computer!"
@@ -70,7 +68,7 @@ else
     if echo import argparse | ${PYTHON:-python3}; then
       true # Good
     else
-      echo "To run clang-format-diff.py, we'll need the library "argparse" to be"
+      echo "To run clang-format-diff.py, we'll need the library \"argparse\" to be"
       echo "installed. You can try either of the follow ways to install it:"
       echo "  1. Manually download argparse: https://pypi.python.org/pypi/argparse"
       echo "  2. easy_install argparse (if you have easy_install)"
@@ -106,7 +104,7 @@ fi
 # Will suggest user to add this script to pre-commit hook if their pre-commit
 # is empty.
 # PRE_COMMIT_SCRIPT_PATH="`git rev-parse --show-toplevel`/.git/hooks/pre-commit"
-# if ! ls $PRE_COMMIT_SCRIPT_PATH &> /dev/null
+# if ! ls $PRE_COMMIT_SCRIPT_PATH > /dev/null 2>&1
 # then
 #   echo "Would you like to add this script to pre-commit hook, which will do "
 #   echo -n "the format check for all the affected lines before you check in (y/n):"
@@ -118,7 +116,7 @@ fi
 # fi
 set -e
 
-uncommitted_code=`git diff HEAD`
+uncommitted_code=$(git diff HEAD)
 
 # If there's no uncommitted changes, we assume user are doing post-commit
 # format check, in which case we'll try to check the modified lines vs. the
@@ -152,7 +150,7 @@ then
 elif [ $CHECK_ONLY ]
 then
   echo "Your change has unformatted code. Please run make format!"
-  if [ $VERBOSE_CHECK ]; then
+  if [ "$VERBOSE_CHECK" ]; then
     clang-format --version
     echo "$diffs"
   fi
@@ -164,22 +162,23 @@ COLOR_END="\033[0m"
 COLOR_RED="\033[0;31m"
 COLOR_GREEN="\033[0;32m"
 
-echo -e "Detect lines that doesn't follow the format rules:\r"
+echo "Detect lines that doesn't follow the format rules:"
 # Add the color to the diff. lines added will be green; lines removed will be red.
 echo "$diffs" |
-  sed -e "s/\(^-.*$\)/`echo -e \"$COLOR_RED\1$COLOR_END\"`/" |
-  sed -e "s/\(^+.*$\)/`echo -e \"$COLOR_GREEN\1$COLOR_END\"`/"
+  sed -e "s/\(^-.*$\)/$(printf "$COLOR_RED")\1$(printf "$COLOR_END")/" |
+  sed -e "s/\(^+.*$\)/$(printf "$COLOR_GREEN")\1$(printf "$COLOR_END")/"
 
-if [[ "$OPT" == *"-DTRAVIS"* ]]
-then
-  exit 1
-fi
+case "$OPT" in
+  *-DTRAVIS*)
+    exit 1
+    ;;
+esac
 
-echo -e "Would you like to fix the format automatically (y/n): \c"
+printf "Would you like to fix the format automatically (y/n): "
 
 # Make sure under any mode, we can read user input.
 exec < /dev/tty
-read to_fix
+read -r to_fix
 
 if [ "$to_fix" != "y" ]
 then
@@ -197,10 +196,10 @@ echo "Files reformatted!"
 
 # Amend to last commit if user do the post-commit format check
 if [ -z "$uncommitted_code" ]; then
-  echo -e "Would you like to amend the changes to last commit (`git log HEAD --oneline | head -1`)? (y/n): \c"
-  read to_amend
+  printf "Would you like to amend the changes to last commit (%s)? (y/n): " "$(git log HEAD --oneline | head -1)"
+  read -r to_amend
 
-  if [ "$to_amend" == "y" ]
+  if [ "$to_amend" = "y" ]
   then
     git commit -a --amend --reuse-message HEAD
     echo "Amended to last commit"

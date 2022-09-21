@@ -1,11 +1,11 @@
-#!/usr/bin/env bash
+#!/bin/sh
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 # If clang_format_diff.py command is not specfied, we assume we are able to
 # access directly without any path.
 
-TGT_DIFF=`git diff TARGETS | head -n 1`
+TGT_DIFF=$(git diff TARGETS | head -n 1)
 
-if [ ! -z "$TGT_DIFF" ]
+if [ -n "$TGT_DIFF" ]
 then
   echo "TARGETS file has uncommitted changes. Skip this check."
   exit 0
@@ -17,7 +17,7 @@ cp TARGETS TARGETS.bkp
 
 ${PYTHON:-python3} buckifier/buckify_rocksdb.py
 
-TGT_DIFF=`git diff TARGETS | head -n 1`
+TGT_DIFF=$(git diff TARGETS | head -n 1)
 
 if [ -z "$TGT_DIFF" ]
 then

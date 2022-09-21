@@ -964,7 +964,7 @@ else
 # Default: print failure output only, as it happens
 # Note: parallel --eta is now always used because CircleCI will
 # kill a job if no output for 10min.
-	parallel_redir = >& t/$(test_log_prefix)log-{/} || bash -c "cat t/$(test_log_prefix)log-{/}; exit $$?"
+	parallel_redir = >& t/$(test_log_prefix)log-{/} || sh -c "cat t/$(test_log_prefix)log-{/}; exit $$?"
 endif
 
 .PHONY: check_0 check_1

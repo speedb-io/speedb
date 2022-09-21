@@ -36,9 +36,9 @@ class SpdbWriteImpl {
   void SpdbFlushWriteThread();
   void* Add(WriteBatch* batch, const WriteOptions& write_options,
             bool* leader_batch);
-  void* AddMerge(WriteBatch* batch, const WriteOptions& write_options,
-                 bool* leader_batch);
-  void CompleteMerge();
+  void* AddWithBlockParallel(WriteBatch* batch, const WriteOptions& write_options,
+                             bool* leader_batch);
+  void UnBlockParallel();
   void Shutdown();
   bool NotifyIfActionNeeded();
   void WaitForWalWriteComplete(void* list);
@@ -103,11 +103,7 @@ class SpdbWriteImpl {
   size_t active_buffer_index_ = 0;
 
   DBImpl* db_;
-  std::atomic<bool> flush_thread_terminate_;
-  // this means we need to do some actions
-  std::atomic<bool> action_needed_;
-  std::mutex flush_thread_mutex_;
-  std::condition_variable flush_thread_cv_;
+  std::atomic<bool> shutdown_initiated_ = false;
   port::Mutex add_buffer_mutex_;
   port::RWMutexWr flush_rwlock_;
   std::thread flush_thread_;

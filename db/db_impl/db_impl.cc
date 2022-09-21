@@ -1349,10 +1349,6 @@ Status DBImpl::SyncWAL() {
   autovector<log::Writer*, 1> logs_to_sync;
   bool need_log_dir_sync;
   uint64_t current_log_number;
-  if (spdb_write_) {
-    ROCKS_LOG_INFO(immutable_db_options_.info_log, "SyncWAL called");
-  }
-
   {
     InstrumentedMutexLock l(&mutex_);
     assert(!logs_.empty());

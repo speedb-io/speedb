@@ -653,6 +653,7 @@ Status WriteCommittedTxn::CommitWithoutPrepareInternal() {
   assert(wbwi);
   WriteBatch* wb = wbwi->GetWriteBatch();
   assert(wb);
+
   const bool needs_ts = WriteBatchInternal::HasKeyWithTimestamp(*wb);
   if (needs_ts && commit_timestamp_ == kMaxTxnTimestamp) {
     return Status::InvalidArgument("Must assign a commit timestamp");
@@ -694,8 +695,7 @@ Status WriteCommittedTxn::CommitWithoutPrepareInternal() {
 
 Status WriteCommittedTxn::CommitBatchInternal(WriteBatch* batch, size_t) {
   uint64_t seq_used = kMaxSequenceNumber;
-  WriteOptions write_options = write_options_;
-  auto s = db_impl_->WriteImpl(write_options, batch, /*callback*/ nullptr,
+  auto s = db_impl_->WriteImpl(write_options_, batch, /*callback*/ nullptr,
                                /*log_used*/ nullptr, /*log_ref*/ 0,
                                /*disable_memtable*/ false, &seq_used);
   assert(!s.ok() || seq_used != kMaxSequenceNumber);
@@ -757,9 +757,7 @@ Status WriteCommittedTxn::CommitInternal() {
   assert(s.ok());
 
   uint64_t seq_used = kMaxSequenceNumber;
-  WriteOptions write_options = write_options_;
-
-  s = db_impl_->WriteImpl(write_options, working_batch, /*callback*/ nullptr,
+  s = db_impl_->WriteImpl(write_options_, working_batch, /*callback*/ nullptr,
                           /*log_used*/ nullptr, /*log_ref*/ log_number_,
                           /*disable_memtable*/ false, &seq_used);
   assert(!s.ok() || seq_used != kMaxSequenceNumber);
@@ -811,8 +809,7 @@ Status WriteCommittedTxn::RollbackInternal() {
   WriteBatch rollback_marker;
   auto s = WriteBatchInternal::MarkRollback(&rollback_marker, name_);
   assert(s.ok());
-  WriteOptions write_options = write_options_;
-  s = db_impl_->WriteImpl(write_options, &rollback_marker);
+  s = db_impl_->WriteImpl(write_options_, &rollback_marker);
   return s;
 }
 

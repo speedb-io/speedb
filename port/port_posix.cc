@@ -171,7 +171,9 @@ void RWMutex::WriteUnlock() { PthreadCall("write unlock", pthread_rwlock_unlock(
 RWMutexWr::RWMutexWr() { m_wr_pending.store(0); }
 
 void RWMutexWr::ReadLock() {
-  while (m_wr_pending.load() != 0) usleep(1);
+  while (m_wr_pending.load() != 0) {
+    usleep(1);
+  }
   PthreadCall("read lock", pthread_rwlock_rdlock(&mu_));
 }
 

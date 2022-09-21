@@ -1040,6 +1040,71 @@ void MemTable::MultiGet(const ReadOptions& read_options, MultiGetRange* range,
   PERF_COUNTER_ADD(get_from_memtable_count, 1);
 }
 
+Status MemTable::UpdateIgnore(SequenceNumber seq, const Slice& key) {
+  LookupKey lkey(key, seq);
+  Slice mem_key = lkey.memtable_key();
+
+  std::unique_ptr<MemTableRep::Iterator> iter(
+      table_->GetDynamicPrefixIterator());
+  iter->Seek(lkey.internal_key(), mem_key.data());
+   
+  /*if (iter->Valid()) {
+    // entry format is:
+    //    key_length  varint32
+    //    userkey  char[klength-8]
+    //    tag      uint64
+    //    vlength  varint32
+    //    value    char[vlength]
+    // Check that it belongs to same user key. if not assert casue the memtable must have
+    // this key
+    // iter until you find the user key with the exact seq
+     
+    char* entry = iter->key();
+    uint32_t key_length = 0;
+    const char* key_ptr = GetVarint32Ptr(entry, entry + 5, &key_length);
+    while ()
+    if (comparator_.comparator.user_comparator()->Equal(
+            Slice(key_ptr, key_length - 8), lkey.user_key())) {
+      // Correct user key
+      const uint64_t tag = DecodeFixed64(key_ptr + key_length - 8);
+      ValueType type;
+      SequenceNumber existing_seq;
+      UnPackSequenceAndType(tag, &existing_seq, &type);
+      assert(existing_seq != seq);
+      if (type == kTypeValue) {
+        Slice prev_value = GetLengthPrefixedSlice(key_ptr + key_length);
+        uint32_t prev_size = static_cast<uint32_t>(prev_value.size());
+        uint32_t new_size = static_cast<uint32_t>(value.size());
+
+        // Update value, if new value size  <= previous value size
+        if (new_size <= prev_size) {
+          char* p =
+              EncodeVarint32(const_cast<char*>(key_ptr) + key_length, new_size);
+          WriteLock wl(GetLock(lkey.user_key()));
+          memcpy(p, value.data(), value.size());
+          assert((unsigned)((p + value.size()) - entry) ==
+                 (unsigned)(VarintLength(key_length) + key_length +
+                            VarintLength(value.size()) + value.size()));
+          RecordTick(moptions_.statistics, NUMBER_KEYS_UPDATED);
+          if (kv_prot_info != nullptr) {
+            ProtectionInfoKVOS64 updated_kv_prot_info(*kv_prot_info);
+            // `seq` is swallowed and `existing_seq` prevails.
+            updated_kv_prot_info.UpdateS(seq, existing_seq);
+            Slice encoded(entry, p + value.size() - entry);
+            return VerifyEncodedEntry(encoded, updated_kv_prot_info);
+          }
+          return Status::OK();
+        }
+      }
+    }
+  }
+  */
+ return Status::OK();
+  
+}
+
+
+
 Status MemTable::Update(SequenceNumber seq, const Slice& key,
                         const Slice& value,
                         const ProtectionInfoKVOS64* kv_prot_info) {

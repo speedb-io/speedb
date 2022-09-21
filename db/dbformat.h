@@ -66,7 +66,7 @@ enum ValueType : unsigned char {
   kTypeBeginUnprepareXID = 0x13,  // WAL only.
   kTypeDeletionWithTimestamp = 0x14,
   kTypeCommitXIDAndTimestamp = 0x15,  // WAL only
-  kTypeIgnore = 0x15,                 // SPDB write flow only
+  kTypeIgnore = 0x16,                 // SPDB write flow only
   kMaxValue = 0x7F                    // Not used for storing records.
 };
 

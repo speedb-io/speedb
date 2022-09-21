@@ -305,6 +305,11 @@ class MemTable {
                         const Slice& delta,
                         const ProtectionInfoKVOS64* kv_prot_info);
 
+
+  Status UpdateIgnore(SequenceNumber seq, const Slice& key);
+
+                      
+
   // Returns the number of successive merge entries starting from the newest
   // entry for the key up to the last non-merge entry or last entry for the
   // key in the memtable.

@@ -12,15 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 #include "db/db_impl/db_spdb_impl_write.h"
-
-#include <cinttypes>
-
 #include "db/db_impl/db_impl.h"
 #include "db/error_handler.h"
 #include "db/write_batch_internal.h"
 #include "logging/logging.h"
 #include "monitoring/instrumented_mutex.h"
-#include "options/options_helper.h"
 #include "rocksdb/perf_context.h"
 #include "rocksdb/statistics.h"
 #include "rocksdb/status.h"
@@ -57,9 +53,11 @@ void SpdbWriteImpl::WritesBatchList::Add(WriteBatch* batch,
 void DBImpl::RollbackBatch(WriteBatch* batch) {
   WriteBatchInternal::MarkIgnore(batch);
   Status status = WriteBatchInternal::InsertInto(
-      batch, column_family_memtables_.get(), &flush_scheduler_,
-      &trim_history_scheduler_, true, 0 /*recovery_log_number*/, this, true,
-      nullptr, nullptr, seq_per_batch_, batch_per_txn_);
+                          batch, column_family_memtables_.get(), &flush_scheduler_,
+                          &trim_history_scheduler_, false,
+                          0 /*recovery_log_number*/, this, true, nullptr,
+                          nullptr, seq_per_batch_, batch_per_txn_);
+  assert(status.ok());
 }
 
 void SpdbWriteImpl::WritesBatchList::WriteBatchLeaderComplete(
@@ -74,12 +72,10 @@ void SpdbWriteImpl::WritesBatchList::WriteBatchLeaderComplete(
 
   // get the status of the batch group write...
   // if not ok roll back should be performed
-  // note!! this is a duplicate memtable key support!
-  // in the spdb memtable the supoort for that is build in
   if (!status_.ok()) {
     // wal write has been completed wal waiters will be released
     buffer_write_rw_lock_.WriteUnlock();
-    if (WriteBatchInternal::Sequence(batch) < roll_back_seq_) {
+    if (WriteBatchInternal::Sequence(batch) >= roll_back_seq_) {
       if (!disable_memtable) {
         // call rollback
         db->RollbackBatch(batch);
@@ -155,7 +151,10 @@ SpdbWriteImpl::SpdbWriteImpl(DBImpl* db) : db_(db) {}
 
 SpdbWriteImpl::~SpdbWriteImpl() { Shutdown(); }
 
-void SpdbWriteImpl::Shutdown() { WriteLock wl(&flush_rwlock_); }
+void SpdbWriteImpl::Shutdown() { 
+  shutdown_initiated_ = true;
+  WriteLock wl(&flush_rwlock_);
+}
 
 bool DBImpl::CheckIfActionNeeded() {
   InstrumentedMutexLock l(&mutex_);
@@ -183,7 +182,6 @@ bool DBImpl::CheckIfActionNeeded() {
   return false;
 }
 
-// REQUIRES: mutex_ is held
 Status DBImpl::SpdbDelayWrite() {
   uint64_t time_delayed = 0;
   bool delayed = false;
@@ -284,9 +282,9 @@ void* SpdbWriteImpl::Add(WriteBatch* batch, const WriteOptions& write_options,
   return &pending_list;
 }
 
-void* SpdbWriteImpl::AddMerge(WriteBatch* batch,
-                              const WriteOptions& write_options,
-                              bool* leader_batch) {
+void* SpdbWriteImpl::AddWithBlockParallel(WriteBatch* batch,
+                                          const WriteOptions& write_options,
+                                          bool* leader_batch) {
   // thie will be released AFTER ths batch will be written to memtable!
   add_buffer_mutex_.Lock();
   const uint64_t sequence =
@@ -302,8 +300,8 @@ void* SpdbWriteImpl::AddMerge(WriteBatch* batch,
   pending_list.Add(batch, write_options, leader_batch);
   return &pending_list;
 }
-// release the add merge lock
-void SpdbWriteImpl::CompleteMerge() { add_buffer_mutex_.Unlock(); }
+// release the block parallel
+void SpdbWriteImpl::UnBlockParallel() { add_buffer_mutex_.Unlock(); }
 
 void SpdbWriteImpl::Lock(bool is_read) {
   if (is_read) {
@@ -409,6 +407,8 @@ Status SpdbWriteImpl::SwitchAndWriteBatchGroup(bool disable_memtable,
         if (batch_group->need_sync_) {
           status = db_->SpdbSyncWAL();
           if (!status.ok()) {
+            WriteBatch* wal_batch = batch_group->wal_writes_.front();
+            potential_roll_back_batch_seq = WriteBatchInternal::Sequence(wal_batch);
             ROCKS_LOG_ERROR(db_->immutable_db_options().info_log,
                             "Error sync to wal!!! %s", io_s.ToString().c_str());
           }
@@ -437,17 +437,23 @@ Status DBImpl::SpdbWrite(const WriteOptions& write_options, WriteBatch* batch,
   }
 
   Status status;
+  bool allow_callback_write_batching = true;
   if (callback) {
     status = callback->Callback(this);
     if (!status.ok()) {
       return status;
     }
+    allow_callback_write_batching = callback->AllowWriteBatching();
   }
 
   if (WriteBatchInternal::Count(batch) > 0) {
     last_batch_group_size_ = WriteBatchInternal::ByteSize(batch);
   }
   spdb_write_->Lock(true);
+  if (shutdown_initiated_) {
+    spdb_write_->Unlock(true);
+    return Status::ShutdownInProgress();
+  }
   if (log_used) {
     *log_used = logfile_number_;
   }
@@ -458,10 +464,11 @@ Status DBImpl::SpdbWrite(const WriteOptions& write_options, WriteBatch* batch,
 
   bool leader_batch = false;
   void* list;
-  if (batch->HasMerge()) {
+  bool prevent_parallel_batches_write = batch->HasMerge() || !allow_callback_write_batching;
+  if (prevent_parallel_batches_write) {
     // need to wait all prev batches completed to write to memetable and avoid
     // new batches to write to memetable before this one
-    list = spdb_write_->AddMerge(batch, write_options, &leader_batch);
+    list = spdb_write_->AddWithBlockParallel(batch, write_options, &leader_batch);
   } else {
     list = spdb_write_->Add(batch, write_options, &leader_batch);
   }
@@ -478,8 +485,8 @@ Status DBImpl::SpdbWrite(const WriteOptions& write_options, WriteBatch* batch,
         nullptr, seq_per_batch_, batch_per_txn_);
   }
 
-  if (batch->HasMerge()) {
-    spdb_write_->CompleteMerge();
+  if (prevent_parallel_batches_write) {
+    spdb_write_->UnBlockParallel();
   }
   if (leader_batch) {
     // handle !status.ok() inside

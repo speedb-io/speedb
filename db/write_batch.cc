@@ -665,6 +665,16 @@ Status WriteBatchInternal::Iterate(const WriteBatch* wb,
         assert(s.ok());
         empty_batch = true;
         break;
+      case kTypeIgnore:
+        assert(wb->content_flags_.load(std::memory_order_relaxed) &
+               (ContentFlags::DEFERRED | ContentFlags::HAS_IGNORE));
+        //s = handler->IgnoreCF(column_family, key, value);
+        if (LIKELY(s.ok())) {
+          empty_batch = false;
+          found++;
+        }
+        break;
+
       default:
         return Status::Corruption("unknown WriteBatch tag");
     }

@@ -96,6 +96,14 @@ if test -z "$AR"; then
     fi
 fi
 
+if [ "$ROCKSDB_USE_CCACHE" = "1" ]; then
+    if command -v sccache > /dev/null; then
+        CCACHE=sccache
+    elif command -v ccache > /dev/null; then
+        CCACHE=ccache
+    fi
+fi
+
 # Detect OS
 if test -z "$TARGET_OS"; then
     TARGET_OS=`uname -s`
@@ -743,6 +751,7 @@ VERSION_PATCH="$(build_tools/version.sh patch)"
 TMP_OUTPUT="${OUTPUT}.tmp"
 
 {
+    echo "CCACHE=$CCACHE"
     echo "CC=$CC"
     echo "CXX=$CXX"
     echo "AR=$AR"

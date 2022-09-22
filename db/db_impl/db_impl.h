@@ -1183,7 +1183,7 @@ class DBImpl : public DB {
   void SuspendSpdbWrites();
   void ResumeSpdbWrites();
   Status SpdbDelayWrite();
-  void RollbackBatch(WriteBatch* batch);
+  Status RollbackBatch(WriteBatch* batch);
 
  protected:
   const std::string dbname_;

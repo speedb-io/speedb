@@ -236,7 +236,9 @@ class WriteBatch : public WriteBatchBase {
       return Status::InvalidArgument(
           "non-default column family and PutCF not implemented");
     }
+
     virtual void Put(const Slice& /*key*/, const Slice& /*value*/) {}
+    virtual Status IgnoreCF(const Slice& /*key*/) { return Status::OK(); }
 
     virtual Status DeleteCF(uint32_t column_family_id, const Slice& key) {
       if (column_family_id == 0) {

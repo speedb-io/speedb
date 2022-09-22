@@ -211,8 +211,6 @@ class RWMutexWr : public RWMutex {
   RWMutexWr() {}
 };
 
-
-
 class CondVar {
  public:
   explicit CondVar(Mutex* mu) : mu_(mu) {

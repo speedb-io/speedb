@@ -668,7 +668,7 @@ Status WriteBatchInternal::Iterate(const WriteBatch* wb,
       case kTypeIgnore:
         assert(wb->content_flags_.load(std::memory_order_relaxed) &
                (ContentFlags::DEFERRED | ContentFlags::HAS_IGNORE));
-        //s = handler->IgnoreCF(column_family, key, value);
+        s = handler->IgnoreCF(key);
         if (LIKELY(s.ok())) {
           empty_batch = false;
           found++;
@@ -1884,6 +1884,14 @@ class MemTableInserter : public WriteBatch::Handler {
       ret_status = WriteBatchInternal::Put(rebuilding_trx_, column_family_id,
                                            key, value);
     }
+    return ret_status;
+  }
+
+  Status IgnoreCF(const Slice& key) override {
+    Status ret_status;
+    MemTable* mem = cf_mems_->GetMemTable();
+    ret_status = mem->UpdateIgnore(sequence_, key);
+
     return ret_status;
   }
 

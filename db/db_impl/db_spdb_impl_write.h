@@ -27,28 +27,40 @@
 namespace ROCKSDB_NAMESPACE {
 
 class DBImpl;
+enum BatchWriteType { kNone = 0, kWalAndMemtable, kWalOnly, kMemtableOnly };
 
 class SpdbWriteImpl {
  public:
   SpdbWriteImpl(DBImpl* db);
 
   ~SpdbWriteImpl();
+
   void SpdbFlushWriteThread();
   void* Add(WriteBatch* batch, const WriteOptions& write_options,
             bool* leader_batch);
-  void* AddWithBlockParallel(WriteBatch* batch, const WriteOptions& write_options,
+  void* AddWithBlockParallel(WriteBatch* batch,
+                             const WriteOptions& write_options,
                              bool* leader_batch);
   void UnBlockParallel();
   void Shutdown();
   bool NotifyIfActionNeeded();
   void WaitForWalWriteComplete(void* list);
-  Status SwitchAndWriteBatchGroup(bool disable_memtable, WriteBatch* batch);
-  Status WriteBatchComplete(void* list, bool disable_memtable,
-                            WriteBatch* batch);
-  Status WriteBatchLeaderComplete(bool disable_memtable, WriteBatch* batch);
+  Status SwitchAndWriteBatchGroup(BatchWriteType batch_write_type,
+                                  WriteBatch* batch, Status batch_status);
+  Status WriteBatchComplete(void* list, BatchWriteType batch_write_type,
+                            WriteBatch* batch, Status batch_status);
+  Status WriteBatchLeaderComplete(BatchWriteType batch_write_type,
+                                  WriteBatch* batch, Status batch_status);
   port::RWMutexWr& GetFlushRWLock() { return flush_rwlock_; }
   void Lock(bool is_read);
   void Unlock(bool is_read);
+  void SetMemtableWriteError(void* list) {
+    static_cast<WritesBatchList*>(list)->SetMemtableWriteError();
+  }
+
+  bool GetMemtableWriteError(void* list) {
+    return static_cast<WritesBatchList*>(list)->GetMemtableWriteError();
+  }
 
  private:
   struct WritesBatchList {
@@ -67,6 +79,7 @@ class SpdbWriteImpl {
     bool empty_ = true;
     std::atomic<bool> need_sync_ = false;
     Status status_ = Status::OK();
+    std::atomic<bool> failed_write_to_memtable_ = false;
 
     void Clear() {
       wal_writes_.clear();
@@ -75,6 +88,7 @@ class SpdbWriteImpl {
       empty_ = true;
       need_sync_ = false;
       status_ = Status::OK();
+      failed_write_to_memtable_ = 0;
     }
 
     void Add(WriteBatch* batch, const WriteOptions& write_options,
@@ -84,12 +98,18 @@ class SpdbWriteImpl {
       roll_back_seq_ = roll_back_seq;
       status_ = rc;
     }
-    void WaitForPendingWrites();
 
-    Status WriteBatchComplete(DBImpl* db, bool disable_memtable,
-                              WriteBatch* batch);
-    void WriteBatchLeaderComplete(DBImpl* db, bool disable_memtable,
-                                  WriteBatch* batch);
+    void SetMemtableWriteError() { failed_write_to_memtable_ = true; }
+    bool GetMemtableWriteError() { return failed_write_to_memtable_; }
+    void WaitForPendingWrites();
+    Status InternalWriteBatchComplete(DBImpl* db,
+                                      BatchWriteType batch_write_type,
+                                      WriteBatch* batch, Status batch_status);
+
+    Status WriteBatchComplete(DBImpl* db, BatchWriteType batch_write_type,
+                              WriteBatch* batch, Status batch_status);
+    Status WriteBatchLeaderComplete(DBImpl* db, BatchWriteType batch_write_type,
+                                    WriteBatch* batch, Status batch_status);
   };
 
   WritesBatchList* SwitchBatchGroup();
@@ -103,7 +123,6 @@ class SpdbWriteImpl {
   size_t active_buffer_index_ = 0;
 
   DBImpl* db_;
-  std::atomic<bool> shutdown_initiated_ = false;
   port::Mutex add_buffer_mutex_;
   port::RWMutexWr flush_rwlock_;
   std::thread flush_thread_;

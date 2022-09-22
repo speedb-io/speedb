@@ -164,6 +164,8 @@ class RWMutexWr : public RWMutex {
 
  private:
   std::atomic<int> m_wr_pending;
+  std::mutex wr_pending_mutex_;
+  std::condition_variable wr_pending_cv_;
 };
 
 class CondVar {

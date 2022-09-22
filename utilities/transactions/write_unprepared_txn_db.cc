@@ -176,9 +176,7 @@ Status WriteUnpreparedTxnDB::RollbackRecoveredTransaction(
     const bool kDisableMemtable = true;
     const size_t kOneBatch = 1;
     uint64_t seq_used = kMaxSequenceNumber;
-    WriteOptions write_options = w_options;
-
-    s = db_impl_->WriteImpl(write_options, &rollback_batch, nullptr, nullptr,
+    s = db_impl_->WriteImpl(w_options, &rollback_batch, nullptr, nullptr,
                             kNoLogRef, !kDisableMemtable, &seq_used, kOneBatch);
     if (!s.ok()) {
       return s;

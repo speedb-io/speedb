@@ -170,7 +170,6 @@ Status WritePreparedTxnDB::WriteInternal(const WriteOptions& write_options_orig,
 
   bool do_one_write = !db_impl_->immutable_db_options().two_write_queues;
   WriteOptions write_options(write_options_orig);
-
   // In the absence of Prepare markers, use Noop as a batch separator
   auto s = WriteBatchInternal::InsertNoop(batch);
   assert(s.ok());

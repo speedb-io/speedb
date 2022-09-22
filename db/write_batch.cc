@@ -459,6 +459,15 @@ Status WriteBatch::Iterate(Handler* handler) const {
                                      rep_.size());
 }
 
+Status WriteBatch::IterateToSetIgnore(Handler* handler) const {
+  if (rep_.size() < WriteBatchInternal::kHeader) {
+    return Status::Corruption("malformed WriteBatch (too small)");
+  }
+
+  return WriteBatchInternal::IterateToSetIgnore(
+      this, handler, WriteBatchInternal::kHeader, rep_.size());
+}
+
 Status WriteBatchInternal::Iterate(const WriteBatch* wb,
                                    WriteBatch::Handler* handler, size_t begin,
                                    size_t end) {
@@ -665,9 +674,87 @@ Status WriteBatchInternal::Iterate(const WriteBatch* wb,
         assert(s.ok());
         empty_batch = true;
         break;
-      case kTypeIgnore:
-        assert(wb->content_flags_.load(std::memory_order_relaxed) &
-               (ContentFlags::DEFERRED | ContentFlags::HAS_IGNORE));
+      default:
+        return Status::Corruption("unknown WriteBatch tag");
+    }
+  }
+  if (!s.ok()) {
+    return s;
+  }
+  if (handler_continue && whole_batch &&
+      found != WriteBatchInternal::Count(wb)) {
+    return Status::Corruption("WriteBatch has wrong count");
+  } else {
+    return Status::OK();
+  }
+}
+
+Status WriteBatchInternal::IterateToSetIgnore(const WriteBatch* wb,
+                                              WriteBatch::Handler* handler,
+                                              size_t begin, size_t end) {
+  if (begin > wb->rep_.size() || end > wb->rep_.size() || end < begin) {
+    return Status::Corruption("Invalid start/end bounds for Iterate");
+  }
+  assert(begin <= end);
+  Slice input(wb->rep_.data() + begin, static_cast<size_t>(end - begin));
+  bool whole_batch =
+      (begin == WriteBatchInternal::kHeader) && (end == wb->rep_.size());
+
+  Slice key, value, blob, xid;
+  // Sometimes a sub-batch starts with a Noop. We want to exclude such Noops as
+  // the batch boundary symbols otherwise we would mis-count the number of
+  // batches. We do that by checking whether the accumulated batch is empty
+  // before seeing the next Noop.
+  bool empty_batch = true;
+  uint32_t found = 0;
+  Status s;
+  char tag = 0;
+  uint32_t column_family = 0;  // default
+  bool last_was_try_again = false;
+  bool handler_continue = true;
+  while (((s.ok() && !input.empty()) || UNLIKELY(s.IsTryAgain()))) {
+    handler_continue = handler->Continue();
+    if (!handler_continue) {
+      break;
+    }
+    // delete range. and other types
+
+    if (LIKELY(!s.IsTryAgain())) {
+      last_was_try_again = false;
+      tag = 0;
+      column_family = 0;  // default
+
+      s = ReadRecordFromWriteBatch(&input, &tag, &column_family, &key, &value,
+                                   &blob, &xid);
+      if (!s.ok()) {
+        return s;
+      }
+    } else {
+      assert(s.IsTryAgain());
+      assert(!last_was_try_again);  // to detect infinite loop bugs
+      if (UNLIKELY(last_was_try_again)) {
+        return Status::Corruption(
+            "two consecutive TryAgain in WriteBatch handler; this is either a "
+            "software bug or data corruption.");
+      }
+      last_was_try_again = true;
+      s = Status::OK();
+    }
+
+    switch (tag) {
+      case kTypeColumnFamilyValue:
+      case kTypeValue:
+      case kTypeColumnFamilyDeletion:
+      case kTypeDeletion:
+      case kTypeColumnFamilySingleDeletion:
+      case kTypeSingleDeletion:
+        // in case of range deletion, an entry is inserted to the skip list
+        // delete memtable with key and value as the last key in range like a
+        // regular entry. we set the delete range entry as ignored
+      case kTypeColumnFamilyRangeDeletion:
+      case kTypeRangeDeletion:
+      case kTypeColumnFamilyBlobIndex:
+      case kTypeBlobIndex:
         s = handler->IgnoreCF(key);
         if (LIKELY(s.ok())) {
           empty_batch = false;
@@ -675,6 +762,32 @@ Status WriteBatchInternal::Iterate(const WriteBatch* wb,
         }
         break;
 
+      case kTypeColumnFamilyMerge:
+      case kTypeMerge:
+        // in case of merge, a merge entry type was inserted or a value type
+        // entry if count the number of successive merges reaches the
+        // moptions->max_successive_merges we set the merge entry as ignore as
+        // done above
+        s = handler->IgnoreCF(key);
+        if (LIKELY(s.ok())) {
+          empty_batch = false;
+          found++;
+        }
+        break;
+
+      case kTypeLogData:
+      case kTypeBeginPrepareXID:
+      case kTypeBeginPersistedPrepareXID:
+      case kTypeBeginUnprepareXID:
+      case kTypeEndPrepareXID:
+      case kTypeCommitXID:
+      case kTypeCommitXIDAndTimestamp:
+      case kTypeRollbackXID:
+      case kTypeNoop:
+        // for WAL only . there is nothing to handle in rollback. note that
+        // transaction that get error on part of the process will do the roll
+        // back as part of the process
+        break;
       default:
         return Status::Corruption("unknown WriteBatch tag");
     }
@@ -939,14 +1052,6 @@ Status WriteBatchInternal::MarkEndPrepare(WriteBatch* b, const Slice& xid,
                                 ContentFlags::HAS_BEGIN_UNPREPARE,
                             std::memory_order_relaxed);
   }
-  return Status::OK();
-}
-
-Status WriteBatchInternal::MarkIgnore(WriteBatch* b) {
-  b->rep_.push_back(static_cast<char>(kTypeIgnore));
-  b->content_flags_.store(b->content_flags_.load(std::memory_order_relaxed) |
-                              ContentFlags::HAS_IGNORE,
-                          std::memory_order_relaxed);
   return Status::OK();
 }
 
@@ -2636,6 +2741,26 @@ Status WriteBatchInternal::InsertInto(
   }
   if (concurrent_memtable_writes) {
     inserter.PostProcess();
+  }
+  return s;
+}
+
+Status WriteBatchInternal::Rollback(
+    const WriteBatch* batch, ColumnFamilyMemTables* memtables,
+    FlushScheduler* flush_scheduler,
+    TrimHistoryScheduler* trim_history_scheduler,
+    bool ignore_missing_column_families, uint64_t log_number, DB* db,
+    bool concurrent_memtable_writes, SequenceNumber* next_seq,
+    bool* has_valid_writes, bool seq_per_batch, bool batch_per_txn) {
+  MemTableInserter inserter(Sequence(batch), memtables, flush_scheduler,
+                            trim_history_scheduler,
+                            ignore_missing_column_families, log_number, db,
+                            concurrent_memtable_writes, batch->prot_info_.get(),
+                            has_valid_writes, seq_per_batch, batch_per_txn);
+
+  Status s = batch->IterateToSetIgnore(&inserter);
+  if (next_seq != nullptr) {
+    *next_seq = inserter.sequence();
   }
   return s;
 }

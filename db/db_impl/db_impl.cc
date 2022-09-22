@@ -1349,6 +1349,7 @@ Status DBImpl::SyncWAL() {
   autovector<log::Writer*, 1> logs_to_sync;
   bool need_log_dir_sync;
   uint64_t current_log_number;
+
   {
     InstrumentedMutexLock l(&mutex_);
     assert(!logs_.empty());

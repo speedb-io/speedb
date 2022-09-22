@@ -20,6 +20,7 @@
 #include <thread>
 #include <vector>
 
+#include "db/write_batch_internal.h"
 #include "port/port.h"
 #include "rocksdb/write_batch.h"
 #include "util/mutexlock.h"
@@ -27,20 +28,20 @@
 namespace ROCKSDB_NAMESPACE {
 
 class DBImpl;
-enum BatchWriteType { kNone = 0, kWalAndMemtable, kWalOnly, kMemtableOnly };
 
 class SpdbWriteImpl {
  public:
   SpdbWriteImpl(DBImpl* db);
 
   ~SpdbWriteImpl();
+  enum BatchWriteType { kNone = 0, kWalAndMemtable, kWalOnly, kMemtableOnly };
 
   void SpdbFlushWriteThread();
   void* Add(WriteBatch* batch, const WriteOptions& write_options,
             bool* leader_batch);
   void* AddWithBlockParallel(WriteBatch* batch,
                              const WriteOptions& write_options,
-                             bool* leader_batch);
+                             bool allow_write_batching, bool* leader_batch);
   void UnBlockParallel();
   void Shutdown();
   bool NotifyIfActionNeeded();
@@ -49,7 +50,7 @@ class SpdbWriteImpl {
                                   WriteBatch* batch, Status batch_status);
   Status WriteBatchComplete(void* list, BatchWriteType batch_write_type,
                             WriteBatch* batch, Status batch_status);
-  Status WriteBatchLeaderComplete(BatchWriteType batch_write_type,
+  Status WriteBatchLeaderComplete(void* list, BatchWriteType batch_write_type,
                                   WriteBatch* batch, Status batch_status);
   port::RWMutexWr& GetFlushRWLock() { return flush_rwlock_; }
   void Lock(bool is_read);
@@ -80,6 +81,9 @@ class SpdbWriteImpl {
     std::atomic<bool> need_sync_ = false;
     Status status_ = Status::OK();
     std::atomic<bool> failed_write_to_memtable_ = false;
+    uint64_t batch_group_size_in_bytes_;
+    uint64_t batch_group_size_;
+    WriteBatch barrier_batch;
 
     void Clear() {
       wal_writes_.clear();
@@ -89,10 +93,13 @@ class SpdbWriteImpl {
       need_sync_ = false;
       status_ = Status::OK();
       failed_write_to_memtable_ = 0;
+      batch_group_size_in_bytes_ = 0;
+      batch_group_size_ = 0;
+      WriteBatchInternal::SetSequence(&barrier_batch, 0);
     }
 
     void Add(WriteBatch* batch, const WriteOptions& write_options,
-             bool* leader_batch);
+             bool* leader_batch, bool with_barrier = false);
     uint64_t GetNextPublishedSeq() const { return pulished_seq_; }
     void SetRollback(uint64_t roll_back_seq, Status rc) {
       roll_back_seq_ = roll_back_seq;
@@ -108,6 +115,7 @@ class SpdbWriteImpl {
 
     Status WriteBatchComplete(DBImpl* db, BatchWriteType batch_write_type,
                               WriteBatch* batch, Status batch_status);
+    void WriteBatchLeaderPreComplete();
     Status WriteBatchLeaderComplete(DBImpl* db, BatchWriteType batch_write_type,
                                     WriteBatch* batch, Status batch_status);
   };

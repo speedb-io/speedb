@@ -1171,7 +1171,11 @@ class DBImpl : public DB {
   uint64_t FetchAddLastAllocatedSequence(uint64_t batch_count) {
     return versions_->FetchAddLastAllocatedSequence(batch_count);
   }
-
+  void UpdateLastGroupBatchSize(uint64_t last_batch_group_size) {
+    last_batch_group_size_ = last_batch_group_size;
+  }
+  InternalStats* GetDefaultStat() { return default_cf_internal_stats_; }
+  Statistics* GetStatistic() { return stats_; }
   Status SpdbWrite(const WriteOptions& write_options, WriteBatch* batch,
                    WriteCallback* callback, uint64_t* log_used,
                    bool disable_memtable, uint64_t* seq_used);

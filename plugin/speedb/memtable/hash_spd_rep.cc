@@ -343,6 +343,7 @@ bool SortVector::SeekBackward(const MemTableRep::KeyComparator& comparator,
       }
     }
   }
+
   return (sort_item->curr_iter_ == items_.end()) ? false : true;
 }
 

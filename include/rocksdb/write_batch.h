@@ -324,6 +324,8 @@ class WriteBatch : public WriteBatchBase {
     virtual bool WriteBeforePrepare() const { return false; }
   };
   Status Iterate(Handler* handler) const;
+  // Iterate over [begin, end) range of a write batch
+  Status IterateToSetIgnore(Handler* handler) const;
 
   // Retrieve the serialized version of this batch.
   const std::string& Data() const { return rep_; }

@@ -119,7 +119,8 @@ class VersionStorageInfo {
                      const Comparator* user_comparator, int num_levels,
                      CompactionStyle compaction_style,
                      VersionStorageInfo* src_vstorage,
-                     bool _force_consistency_checks);
+                     bool _force_consistency_checks,
+                     const MutableCFOptions& mutable_cf_options);
   // No copying allowed
   VersionStorageInfo(const VersionStorageInfo&) = delete;
   void operator=(const VersionStorageInfo&) = delete;
@@ -685,6 +686,10 @@ class VersionStorageInfo {
   // If set to true, we will run consistency checks even if RocksDB
   // is compiled in release mode
   bool force_consistency_checks_;
+
+  size_t max_num_L0_files_to_compact_;
+  size_t level0_stop_writes_trigger_;
+  size_t min_l0_size_to_compact;
 
   friend class Version;
   friend class VersionSet;

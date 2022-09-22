@@ -1715,7 +1715,7 @@ VersionStorageInfo::VersionStorageInfo(
     const InternalKeyComparator* internal_comparator,
     const Comparator* user_comparator, int levels,
     CompactionStyle compaction_style, VersionStorageInfo* ref_vstorage,
-    bool _force_consistency_checks)
+    bool _force_consistency_checks, const MutableCFOptions& mutable_cf_options)
     : internal_comparator_(internal_comparator),
       user_comparator_(user_comparator),
       // cfd is nullptr if Version is dummy
@@ -1743,6 +1743,14 @@ VersionStorageInfo::VersionStorageInfo(
       estimated_compaction_needed_bytes_(0),
       finalized_(false),
       force_consistency_checks_(_force_consistency_checks) {
+  max_num_L0_files_to_compact_ =
+      (mutable_cf_options.level0_stop_writes_trigger +
+       mutable_cf_options.level0_file_num_compaction_trigger) /
+      2;
+  level0_stop_writes_trigger_ = mutable_cf_options.level0_stop_writes_trigger;
+  min_l0_size_to_compact =
+      mutable_cf_options.write_buffer_size * max_num_L0_files_to_compact_;
+
   if (ref_vstorage != nullptr) {
     accumulated_file_size_ = ref_vstorage->accumulated_file_size_;
     accumulated_raw_key_size_ = ref_vstorage->accumulated_raw_key_size_;
@@ -1780,7 +1788,8 @@ Version::Version(ColumnFamilyData* column_family_data, VersionSet* vset,
           (cfd_ == nullptr || cfd_->current() == nullptr)
               ? nullptr
               : cfd_->current()->storage_info(),
-          cfd_ == nullptr ? false : cfd_->ioptions()->force_consistency_checks),
+          cfd_ == nullptr ? false : cfd_->ioptions()->force_consistency_checks,
+          mutable_cf_options),
       vset_(vset),
       next_(this),
       prev_(this),
@@ -3438,6 +3447,17 @@ void VersionStorageInfo::GetOverlappingInputs(
   for (size_t i = 0; i < level_files_brief_[level].num_files; i++) {
     index.emplace_back(i);
   }
+  uint64_t cur_files_size = 0;
+
+  // sortedness is required for https://github.com/speedb-io/speedb/issues/154.
+  // order of files is newest to oldest.
+  // files seq: 21 - 30 , 11 - 20 , 1 - 10
+  for (size_t i = 1; i < level_files_brief_[level].num_files; i++) {
+    assert(files_[0][i - 1]->fd.smallest_seqno >=
+           files_[0][i]->fd.largest_seqno);
+  }
+  // to make sure that files are picked from oldest to newest.
+  index.reverse();
 
   while (!index.empty()) {
     bool found_overlapping_file = false;
@@ -3456,7 +3476,22 @@ void VersionStorageInfo::GetOverlappingInputs(
         iter++;
       } else {
         // if overlap
+
+        // stop accumulating L0 files for compaction once enough are added.
+        // 2nd condition is to keep the bulkload behavior of compacting all L0
+        // files at once. and then the 2nd if () is to ensure we only stop
+        // accumulating L0 files if the compaction is big enough.
+        if (inputs->size() == max_num_L0_files_to_compact_ &&
+            level_files_brief_[level].num_files <=
+                level0_stop_writes_trigger_) {
+          if (cur_files_size > min_l0_size_to_compact) {
+            // fprintf(stdout, "Limited to %lu L0 files",
+            //         inputs->size());
+            return;
+          }
+        }
         inputs->emplace_back(files_[level][*iter]);
+        cur_files_size += f->fd.file_size;
         found_overlapping_file = true;
         // record the first file index.
         if (file_index && *file_index == -1) {

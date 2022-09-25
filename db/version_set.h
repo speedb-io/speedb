@@ -687,7 +687,7 @@ class VersionStorageInfo {
   // is compiled in release mode
   bool force_consistency_checks_;
 
-  size_t max_num_L0_files_to_compact_;
+  size_t max_l0_files_to_compact_;
   size_t level0_stop_writes_trigger_;
   size_t min_l0_size_to_compact;
 

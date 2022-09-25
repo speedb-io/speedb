@@ -1743,13 +1743,12 @@ VersionStorageInfo::VersionStorageInfo(
       estimated_compaction_needed_bytes_(0),
       finalized_(false),
       force_consistency_checks_(_force_consistency_checks) {
-  max_num_L0_files_to_compact_ =
-      (mutable_cf_options.level0_stop_writes_trigger +
-       mutable_cf_options.level0_file_num_compaction_trigger) /
-      2;
+  max_l0_files_to_compact_ =
+      mutable_cf_options.level0_stop_writes_trigger / 2 +
+      mutable_cf_options.level0_file_num_compaction_trigger / 2;
   level0_stop_writes_trigger_ = mutable_cf_options.level0_stop_writes_trigger;
   min_l0_size_to_compact =
-      mutable_cf_options.write_buffer_size * max_num_L0_files_to_compact_;
+      mutable_cf_options.write_buffer_size * max_l0_files_to_compact_;
 
   if (ref_vstorage != nullptr) {
     accumulated_file_size_ = ref_vstorage->accumulated_file_size_;
@@ -3481,12 +3480,10 @@ void VersionStorageInfo::GetOverlappingInputs(
         // 2nd condition is to keep the bulkload behavior of compacting all L0
         // files at once. and then the 2nd if () is to ensure we only stop
         // accumulating L0 files if the compaction is big enough.
-        if (inputs->size() == max_num_L0_files_to_compact_ &&
+        if (inputs->size() >= max_l0_files_to_compact_ &&
             level_files_brief_[level].num_files <=
                 level0_stop_writes_trigger_) {
           if (cur_files_size > min_l0_size_to_compact) {
-            // fprintf(stdout, "Limited to %lu L0 files",
-            //         inputs->size());
             return;
           }
         }

@@ -16,6 +16,17 @@ class WriteBufferManagerTest : public testing::Test {};
 #ifndef ROCKSDB_LITE
 const size_t kSizeDummyEntry = 256 * 1024;
 
+namespace {
+void BeginAndFree(WriteBufferManager& wbf, size_t size) {
+  wbf.FreeMemBegin(size);
+  wbf.FreeMem(size);
+}
+
+void ScheduleBeginAndFreeMem(WriteBufferManager& wbf, size_t size) {
+  wbf.ScheduleFreeMem(size);
+  BeginAndFree(wbf, size);
+}
+}  // namespace
 TEST_F(WriteBufferManagerTest, ShouldFlush) {
   // A write buffer manager of size 10MB
   std::unique_ptr<WriteBufferManager> wbf(
@@ -46,7 +57,7 @@ TEST_F(WriteBufferManagerTest, ShouldFlush) {
   // 15 MB total, 8MB mutable.
   ASSERT_TRUE(wbf->ShouldFlush());
 
-  wbf->FreeMem(7 * 1024 * 1024);
+  BeginAndFree(*wbf, 7 * 1024 * 1024);
   // 8MB total, 8MB mutable.
   ASSERT_FALSE(wbf->ShouldFlush());
 
@@ -59,7 +70,7 @@ TEST_F(WriteBufferManagerTest, ShouldFlush) {
   // 8MB total, 6MB mutable.
   ASSERT_TRUE(wbf->ShouldFlush());
 
-  wbf->FreeMem(2 * 1024 * 1024);
+  BeginAndFree(*wbf, 2 * 1024 * 1024);
   // 6MB total, 6MB mutable.
   ASSERT_FALSE(wbf->ShouldFlush());
 
@@ -72,7 +83,7 @@ TEST_F(WriteBufferManagerTest, ShouldFlush) {
   ASSERT_TRUE(wbf->ShouldFlush());
 
   wbf->ScheduleFreeMem(1 * 1024 * 1024);
-  wbf->FreeMem(1 * 1024 * 1024);
+  BeginAndFree(*wbf, 1 * 1024 * 1024);
   // 7MB total, 7MB mutable.
   ASSERT_FALSE(wbf->ShouldFlush());
 }
@@ -116,7 +127,7 @@ TEST_F(WriteBufferManagerTest, CacheCost) {
   // Free 1MB, memory_used_ = 10061KB
   // It will not cause any change in cache cost
   // since memory_used_ > dummy_entries_in_cache_usage * (3/4)
-  wbf->FreeMem(1 * 1024 * 1024);
+  ScheduleBeginAndFreeMem(*wbf, 1 * 1024 * 1024);
   ASSERT_EQ(wbf->dummy_entries_in_cache_usage(), 44 * kSizeDummyEntry);
   ASSERT_GE(cache->GetPinnedUsage(), 44 * 256 * 1024);
   ASSERT_LT(cache->GetPinnedUsage(), 44 * 256 * 1024 + kMetaDataChargeOverhead);
@@ -147,7 +158,7 @@ TEST_F(WriteBufferManagerTest, CacheCost) {
   // since memory_used_ < dummy_entries_in_cache_usage * (3/4)
   // and floor((dummy_entries_in_cache_usage - memory_used_) % kSizeDummyEntry)
   // = 80
-  wbf->FreeMem(20 * 1024 * 1024);
+  BeginAndFree(*wbf, 20 * 1024 * 1024);
   ASSERT_EQ(wbf->dummy_entries_in_cache_usage(), 124 * kSizeDummyEntry);
   ASSERT_GE(cache->GetPinnedUsage(), 124 * 256 * 1024);
   ASSERT_LT(cache->GetPinnedUsage(),
@@ -158,7 +169,7 @@ TEST_F(WriteBufferManagerTest, CacheCost) {
   // Free 16KB, memory_used_ = 31549KB
   // It will not release any dummy entry since memory_used_ >=
   // dummy_entries_in_cache_usage * (3/4)
-  wbf->FreeMem(16 * 1024);
+  ScheduleBeginAndFreeMem(*wbf, 16 * 1024);
   ASSERT_EQ(wbf->dummy_entries_in_cache_usage(), 124 * kSizeDummyEntry);
   ASSERT_GE(cache->GetPinnedUsage(), 124 * 256 * 1024);
   ASSERT_LT(cache->GetPinnedUsage(),
@@ -169,7 +180,7 @@ TEST_F(WriteBufferManagerTest, CacheCost) {
   // since memory_used_ < dummy_entries_in_cache_usage * (3/4)
   // and floor((dummy_entries_in_cache_usage - memory_used_) % kSizeDummyEntry)
   // = 80
-  wbf->FreeMem(20 * 1024 * 1024);
+  ScheduleBeginAndFreeMem(*wbf, 20 * 1024 * 1024);
   ASSERT_EQ(wbf->dummy_entries_in_cache_usage(), 44 * kSizeDummyEntry);
   ASSERT_GE(cache->GetPinnedUsage(), 44 * 256 * 1024);
   ASSERT_LT(cache->GetPinnedUsage(), 44 * 256 * 1024 + kMetaDataChargeOverhead);
@@ -177,7 +188,7 @@ TEST_F(WriteBufferManagerTest, CacheCost) {
   // Free 1MB, memory_used_ = 10045KB
   // It will not cause any change in cache cost
   // since memory_used_ > dummy_entries_in_cache_usage * (3/4)
-  wbf->FreeMem(1 * 1024 * 1024);
+  ScheduleBeginAndFreeMem(*wbf, 1 * 1024 * 1024);
   ASSERT_EQ(wbf->dummy_entries_in_cache_usage(), 44 * kSizeDummyEntry);
   ASSERT_GE(cache->GetPinnedUsage(), 44 * 256 * 1024);
   ASSERT_LT(cache->GetPinnedUsage(), 44 * 256 * 1024 + kMetaDataChargeOverhead);
@@ -215,7 +226,7 @@ TEST_F(WriteBufferManagerTest, NoCapCacheCost) {
 
   // Free 9MB,  memory_used_ = 1024KB
   // It will free 36 dummy entries
-  wbf->FreeMem(9 * 1024 * 1024);
+  ScheduleBeginAndFreeMem(*wbf, 9 * 1024 * 1024);
   ASSERT_EQ(wbf->dummy_entries_in_cache_usage(), 4 * kSizeDummyEntry);
   ASSERT_GE(cache->GetPinnedUsage(), 4 * 256 * 1024);
   ASSERT_LT(cache->GetPinnedUsage(), 4 * 256 * 1024 + kMetaDataChargeOverhead);
@@ -224,7 +235,7 @@ TEST_F(WriteBufferManagerTest, NoCapCacheCost) {
   // It will not cause any change
   // since memory_used_ > dummy_entries_in_cache_usage * 3/4
   for (int i = 0; i < 40; i++) {
-    wbf->FreeMem(4 * 1024);
+    ScheduleBeginAndFreeMem(*wbf, 4 * 1024);
   }
   ASSERT_EQ(wbf->dummy_entries_in_cache_usage(), 4 * kSizeDummyEntry);
   ASSERT_GE(cache->GetPinnedUsage(), 4 * 256 * 1024);
@@ -257,7 +268,7 @@ TEST_F(WriteBufferManagerTest, CacheFull) {
   ASSERT_LT(wbf->dummy_entries_in_cache_usage(), 80 * kSizeDummyEntry);
 
   // Free 15MB after encoutering cache full, memory_used_ = 5120KB
-  wbf->FreeMem(15 * 1024 * 1024);
+  ScheduleBeginAndFreeMem(*wbf, 15 * 1024 * 1024);
   ASSERT_EQ(wbf->dummy_entries_in_cache_usage(), 20 * kSizeDummyEntry);
   ASSERT_GE(cache->GetPinnedUsage(), 20 * kSizeDummyEntry);
   ASSERT_LT(cache->GetPinnedUsage(),
@@ -283,7 +294,7 @@ TEST_F(WriteBufferManagerTest, CacheFull) {
   // memory_used_ decreases to 22528KB, 16384KB, 11776KB.
   // In total, it releases 74 dummy entries
   for (int i = 0; i < 40; i++) {
-    wbf->FreeMem(512 * 1024);
+    ScheduleBeginAndFreeMem(*wbf, 512 * 1024);
   }
 
   ASSERT_EQ(wbf->dummy_entries_in_cache_usage(), 46 * kSizeDummyEntry);

@@ -5896,10 +5896,12 @@ TEST_F(DBTest2, BackgroundPurgeTest) {
   size_t value = options.write_buffer_manager->memory_usage();
   ASSERT_GT(value, base_value);
 
-  db_->GetEnv()->SetBackgroundThreads(1, Env::Priority::HIGH);
+  // Take up a slot in the low priority pool
+  // in order to prevent a purge from running when the iterator is deleted.
+  db_->GetEnv()->SetBackgroundThreads(1, Env::Priority::LOW);
   test::SleepingBackgroundTask sleeping_task_after;
   db_->GetEnv()->Schedule(&test::SleepingBackgroundTask::DoSleepTask,
-                          &sleeping_task_after, Env::Priority::HIGH);
+                          &sleeping_task_after, Env::Priority::LOW);
   delete iter;
 
   Env::Default()->SleepForMicroseconds(100000);
@@ -5911,7 +5913,7 @@ TEST_F(DBTest2, BackgroundPurgeTest) {
 
   test::SleepingBackgroundTask sleeping_task_after2;
   db_->GetEnv()->Schedule(&test::SleepingBackgroundTask::DoSleepTask,
-                          &sleeping_task_after2, Env::Priority::HIGH);
+                          &sleeping_task_after2, Env::Priority::LOW);
   sleeping_task_after2.WakeUp();
   sleeping_task_after2.WaitUntilDone();
 

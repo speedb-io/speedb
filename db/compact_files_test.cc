@@ -118,6 +118,12 @@ TEST_F(CompactFilesTest, L0ConflictsFiles) {
   delete db;
 }
 
+// TODO: add unit tests for:
+// base case - stop adding to L0 files once limit has reached.
+// small files, make sure it keeps adding until it reaches the size limit.
+// make sure - oldest files are picked.
+// test that bulkload still holds.
+
 // to check scenario : 1-3, 5-6, 2-7 L0 files,
 // 1-3 is picked in SetupInitialFiles().
 // will 5-6 be picked in SetupOtherL0FilesIfNeeded.

@@ -10,12 +10,23 @@
 #include <intrin.h>
 #endif
 
+#include <cstddef>
 #include <cstdint>
 #include <type_traits>
 
 #include "rocksdb/rocksdb_namespace.h"
 
 namespace ROCKSDB_NAMESPACE {
+
+template <size_t N>
+struct CeiledLog2 {
+  static constexpr size_t value = 1 + CeiledLog2<(N >> 1)>::value;
+};
+
+template <>
+struct CeiledLog2<0> {
+  static constexpr size_t value = 0;
+};
 
 // Fast implementation of floor(log2(v)). Undefined for 0 or negative
 // numbers (in case of signed type).

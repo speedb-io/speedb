@@ -21,6 +21,24 @@ class SnapshotList;
 // Each SnapshotImpl corresponds to a particular sequence number.
 class SnapshotImpl : public Snapshot {
  public:
+  SnapshotImpl(int64_t unix_time, bool is_write_conflict_boundary)
+      : Snapshot(),
+        unix_time_(unix_time),
+        is_write_conflict_boundary_(is_write_conflict_boundary),
+        refcount_(1) {}
+
+  SnapshotImpl() : Snapshot(), refcount_(1) {}
+
+  ~SnapshotImpl() {}
+
+  void ref(uint32_t refs = 1) {
+    refcount_.fetch_add(refs, std::memory_order_relaxed);
+  }
+
+  size_t unref(uint32_t refs = 1) const {
+    return refcount_.fetch_sub(refs, std::memory_order_relaxed) - refs;
+  }
+
   SequenceNumber number_;  // const after creation
   // It indicates the smallest uncommitted data at the time the snapshot was
   // taken. This is currently used by WritePrepared transactions to limit the
@@ -28,6 +46,10 @@ class SnapshotImpl : public Snapshot {
   SequenceNumber min_uncommitted_ = kMinUnCommittedSeq;
 
   virtual SequenceNumber GetSequenceNumber() const override { return number_; }
+
+  bool is_write_conflict_boundary() const {
+    return is_write_conflict_boundary_;
+  }
 
  private:
   friend class SnapshotList;
@@ -42,18 +64,18 @@ class SnapshotImpl : public Snapshot {
 
   // Will this snapshot be used by a Transaction to do write-conflict checking?
   bool is_write_conflict_boundary_;
+
+  mutable std::atomic<size_t> refcount_;
 };
 
 class SnapshotList {
  public:
-  SnapshotList() {
+  SnapshotList() : list_(0, false) {
     list_.prev_ = &list_;
     list_.next_ = &list_;
     list_.number_ = 0xFFFFFFFFL;      // placeholder marker, for debugging
     // Set all the variables to make UBSAN happy.
     list_.list_ = nullptr;
-    list_.unix_time_ = 0;
-    list_.is_write_conflict_boundary_ = false;
     count_ = 0;
   }
 
@@ -64,11 +86,8 @@ class SnapshotList {
   SnapshotImpl* oldest() const { assert(!empty()); return list_.next_; }
   SnapshotImpl* newest() const { assert(!empty()); return list_.prev_; }
 
-  SnapshotImpl* New(SnapshotImpl* s, SequenceNumber seq, uint64_t unix_time,
-                    bool is_write_conflict_boundary) {
+  SnapshotImpl* New(SnapshotImpl* s, SequenceNumber seq) {
     s->number_ = seq;
-    s->unix_time_ = unix_time;
-    s->is_write_conflict_boundary_ = is_write_conflict_boundary;
     s->list_ = this;
     s->next_ = &list_;
     s->prev_ = list_.prev_;

@@ -1,7 +1,7 @@
 <div align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset=".github/speedb-logo.gif" width="480px" >
-    <img  src=".github/speedb-logo-dark.gif" width="480px">
+    <source media="(prefers-color-scheme: dark)" srcset=".github/speedb-logo-dark.gif" width="480px" >
+    <img src=".github/speedb-logo.gif" width="480px">
   </picture>
 </div>
 
@@ -18,8 +18,8 @@ Speedb is a library that provides persistent key-value stores. Keys and values a
 It is maintained by Speedb and is forked from Rocksdb, developed by Facebook.
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset=".github/speedb-b-dark.gif" width="80px" >
-  <img  src=".github/speedb-b.gif" width="80px">
+  <source media="(prefers-color-scheme: dark)" srcset=".github/speedb-bee-dark.gif" width="80px" >
+  <img src=".github/speedb-bee.gif" width="80px">
 </picture>
 
 
@@ -94,4 +94,5 @@ See the [contributing guide](CONTRIBUTING.md).
 ## License
 Speedb is open-source and licensed under the [Apache 2.0 License](LICENSE.Apache).
 
-<img src="speedb-b.gif" width="200px" />
+
+<img src=".github/speedb-b.gif" width="200px">

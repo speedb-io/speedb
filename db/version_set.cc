@@ -3404,6 +3404,7 @@ bool VersionStorageInfo::OverlapInLevel(int level,
 }
 
 // Store in "*inputs" all files in "level" that overlap [begin,end]
+// or max_l0_files_to_compact_ files to limit the compaction size.
 // If hint_index is specified, then it points to a file in the
 // overlapping range.
 // The file_index returns a pointer to any file in an overlapping range.
@@ -3441,13 +3442,6 @@ void VersionStorageInfo::GetOverlappingInputs(
     user_end = end->user_key();
   }
 
-  // index stores the file index need to check.
-  std::list<size_t> index;
-  for (size_t i = 0; i < level_files_brief_[level].num_files; i++) {
-    index.emplace_back(i);
-  }
-  uint64_t cur_files_size = 0;
-
   // sortedness is required for https://github.com/speedb-io/speedb/issues/154.
   // order of files is newest to oldest.
   // files seq: 21 - 30 , 11 - 20 , 1 - 10
@@ -3455,8 +3449,13 @@ void VersionStorageInfo::GetOverlappingInputs(
     assert(files_[0][i - 1]->fd.smallest_seqno >=
            files_[0][i]->fd.largest_seqno);
   }
-  // to make sure that files are picked from oldest to newest.
-  index.reverse();
+  // build index in reverse order to make sure that files are picked from oldest
+  // to newest. index stores the file index need to check.
+  std::list<size_t> index;
+  for (size_t i = level_files_brief_[level].num_files - 1; i >= 0; i--) {
+    index.emplace_back(i);
+  }
+  uint64_t cur_files_size = 0;
 
   while (!index.empty()) {
     bool found_overlapping_file = false;
@@ -3476,17 +3475,6 @@ void VersionStorageInfo::GetOverlappingInputs(
       } else {
         // if overlap
 
-        // stop accumulating L0 files for compaction once enough are added.
-        // 2nd condition is to keep the bulkload behavior of compacting all L0
-        // files at once. and then the 2nd if () is to ensure we only stop
-        // accumulating L0 files if the compaction is big enough.
-        if (inputs->size() >= max_l0_files_to_compact_ &&
-            level_files_brief_[level].num_files <=
-                level0_stop_writes_trigger_) {
-          if (cur_files_size > min_l0_size_to_compact) {
-            return;
-          }
-        }
         inputs->emplace_back(files_[level][*iter]);
         cur_files_size += f->fd.file_size;
         found_overlapping_file = true;
@@ -3504,6 +3492,18 @@ void VersionStorageInfo::GetOverlappingInputs(
           if (end != nullptr &&
               user_cmp->CompareWithoutTimestamp(file_limit, user_end) > 0) {
             user_end = file_limit;
+          }
+        }
+
+        // stop accumulating L0 files for compaction once enough are added.
+        // 2nd condition is to keep the bulkload behavior of compacting all L0
+        // files at once. and then the 2nd if () is to ensure we only stop
+        // accumulating L0 files if the compaction is big enough.
+        if (inputs->size() >= max_l0_files_to_compact_ &&
+            level_files_brief_[level].num_files <=
+                level0_stop_writes_trigger_) {
+          if (cur_files_size > min_l0_size_to_compact) {
+            return;
           }
         }
       }

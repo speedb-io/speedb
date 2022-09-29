@@ -60,6 +60,7 @@
 #include "rocksdb/utilities/transaction.h"
 #include "rocksdb/utilities/transaction_db.h"
 #include "rocksdb/write_batch.h"
+#include "rocksdb/write_buffer_manager.h"
 #include "test_util/testutil.h"
 #include "util/coding.h"
 #include "util/compression.h"
@@ -104,6 +105,8 @@ DECLARE_bool(verbose);
 DECLARE_bool(progress_reports);
 DECLARE_uint64(db_write_buffer_size);
 DECLARE_bool(allow_wbm_stalls);
+DECLARE_bool(initiate_wbm_flushes);
+DECLARE_uint32(max_num_parallel_flushes);
 DECLARE_int32(write_buffer_size);
 DECLARE_int32(max_write_buffer_number);
 DECLARE_int32(min_write_buffer_number_to_merge);

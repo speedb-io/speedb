@@ -463,7 +463,14 @@ class ColumnFamilyData {
   void ResetThreadLocalSuperVersions();
 
   // Protected by DB mutex
-  void set_queued_for_flush(bool value) { queued_for_flush_ = value; }
+  void set_queued_for_flush(bool value) {
+    queued_for_flush_ = value;
+
+    if (value) {
+      ++num_queued_for_flush_;
+    }
+  }
+
   void set_queued_for_compaction(bool value) { queued_for_compaction_ = value; }
   bool queued_for_flush() { return queued_for_flush_; }
   bool queued_for_compaction() { return queued_for_compaction_; }
@@ -548,6 +555,11 @@ class ColumnFamilyData {
   // Keep track of whether the mempurge feature was ever used.
   void SetMempurgeUsed() { mempurge_used_ = true; }
   bool GetMempurgeUsed() { return mempurge_used_; }
+  uint64_t GetNumQueuedForFlush() const { return num_queued_for_flush_; }
+
+  // TODO - Make it a CF option
+  static constexpr uint64_t kLaggingFlushesThreshold = 10U;
+  void SetNumTimedQueuedForFlush(uint64_t num) { num_queued_for_flush_ = num; }
 
   // Allocate and return a new epoch number
   uint64_t NewEpochNumber() { return next_epoch_number_.fetch_add(1); }
@@ -666,6 +678,10 @@ class ColumnFamilyData {
   // a Version associated with this CFD
   std::shared_ptr<CacheReservationManager> file_metadata_cache_res_mgr_;
   bool mempurge_used_;
+
+  // Used in the WBM's flush initiation heuristics.
+  // See DBImpl::InitiateMemoryManagerFlushRequest() for more details
+  uint64_t num_queued_for_flush_ = 0U;
 
   std::atomic<uint64_t> next_epoch_number_;
 };

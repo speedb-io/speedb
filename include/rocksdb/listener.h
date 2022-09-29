@@ -183,6 +183,7 @@ enum class FlushReason : int {
   kWalFull = 0xd,
   // SwitchMemtable will not be called for this flush reason.
   kCatchUpAfterErrorRecovery = 0xe,
+  kWriteBufferManagerInitiated = 0xf
 };
 
 const char* GetFlushReasonString(FlushReason flush_reason);

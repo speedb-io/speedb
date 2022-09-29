@@ -520,6 +520,13 @@ Status DBImpl::MaybeReleaseTimestampedSnapshotsAndCheck() {
 }
 
 Status DBImpl::CloseHelper() {
+  if (is_registered_for_flush_initiation_rqsts_) {
+    assert(write_buffer_manager_);
+    assert(write_buffer_manager_->IsInitiatingFlushes());
+    write_buffer_manager_->DeregisterFlushInitiator(this);
+    is_registered_for_flush_initiation_rqsts_ = false;
+  }
+
   // Guarantee that there is no background error recovery in progress before
   // continuing with the shutdown
   mutex_.Lock();

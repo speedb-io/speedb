@@ -2262,6 +2262,23 @@ Status DBImpl::Open(const DBOptions& db_options, const std::string& dbname,
     delete impl;
     *dbptr = nullptr;
   }
+
+  if (s.ok()) {
+    auto wbm = db_options.write_buffer_manager.get();
+    auto db_impl = static_cast<DBImpl*>(*dbptr);
+
+    if (wbm && wbm->IsInitiatingFlushes()) {
+      // Registering regardless of wbm->enabled() since the buffer size may be
+      // set later making the WBM enabled, but we will not re-register again
+      // However, notifications will only be received when the wbm is enabled
+      auto cb = [db_impl](size_t min_size_to_flush) {
+        return db_impl->InitiateMemoryManagerFlushRequest(min_size_to_flush);
+      };
+      wbm->RegisterFlushInitiator(db_impl, cb);
+      db_impl->is_registered_for_flush_initiation_rqsts_ = true;
+    }
+  }
+
   return s;
 }
 }  // namespace ROCKSDB_NAMESPACE

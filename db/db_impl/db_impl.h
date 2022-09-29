@@ -442,6 +442,13 @@ class DBImpl : public DB {
   virtual Status LockWAL() override;
   virtual Status UnlockWAL() override;
 
+  // flush initiated by the write buffer manager to free some space
+  bool InitiateMemoryManagerFlushRequest(size_t min_size_to_flush);
+  bool InitiateMemoryManagerFlushRequestAtomicFlush(
+      size_t min_size_to_flush, const FlushOptions& flush_options);
+  bool InitiateMemoryManagerFlushRequestNonAtomicFlush(
+      size_t min_size_to_flush, const FlushOptions& flush_options);
+
   virtual SequenceNumber GetLatestSequenceNumber() const override;
 
   // IncreaseFullHistoryTsLow(ColumnFamilyHandle*, std::string) will acquire
@@ -2790,6 +2797,8 @@ class DBImpl : public DB {
   // seqno_to_time_mapping_ stores the sequence number to time mapping, it's not
   // thread safe, both read and write need db mutex hold.
   SeqnoToTimeMapping seqno_to_time_mapping_;
+
+  bool is_registered_for_flush_initiation_rqsts_ = false;
 
   // Stop write token that is acquired when first LockWAL() is called.
   // Destroyed when last UnlockWAL() is called. Controlled by DB mutex.

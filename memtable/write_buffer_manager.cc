@@ -84,9 +84,11 @@ void WriteBufferManager::ReserveMem(size_t mem) {
 
     // Checking outside the locks is not reliable, but avoids locking
     // unnecessarily which is expensive
-    if (UNLIKELY(ShouldInitiateAnotherFlushMemOnly(new_memory_used))) {
+    if (UNLIKELY(new_memory_used >= additional_flush_initiation_size_ )) {
       std::unique_lock<std::mutex> lock(flushes_mu_);
-      ReevaluateNeedForMoreFlushes(new_memory_used);
+      if (new_memory_used >= additional_flush_initiation_size_) {
+        ReevaluateNeedForMoreFlushes(new_memory_used);
+      }
     }
   }
 }
@@ -164,6 +166,7 @@ void WriteBufferManager::FreeMem(size_t mem) {
 
     UpdateUsageState(new_memory_used, -mem, buffer_size());
   }
+  
 
   // Check if stall is active and can be ended.
   MaybeEndWriteStall();
@@ -171,10 +174,11 @@ void WriteBufferManager::FreeMem(size_t mem) {
   if (is_enabled) {
     UpdateUsageState(new_memory_used, -mem, buffer_size());
 
+    printf("free mem %lu %lu\n", size_t(mem), (size_t) memory_usage());
     // Checking outside the locks is not reliable, but avoids locking
     // unnecessarily which is expensive
     if (UNLIKELY(ShouldInitiateAnotherFlushMemOnly(new_memory_used))) {
-      std::unique_lock<std::mutex> lock(flushes_mu_);
+      std::unique_lock<std::mutex> lock(flushes_mu_);      
       ReevaluateNeedForMoreFlushes(new_memory_used);
     }
   }
@@ -478,7 +482,7 @@ void WriteBufferManager::InitFlushInitiationVars(size_t quota) {
   {
     std::unique_lock<std::mutex> lock(flushes_mu_);
     additional_flush_step_size_ =
-        quota / flush_initiation_options_.max_num_parallel_flushes;
+      quota * 90/100/ flush_initiation_options_.max_num_parallel_flushes;
     flush_initiation_start_size_ = additional_flush_step_size_;
     // TODO - Update this to a formula. If it depends on the number of initators
     // => update when that number changes
@@ -585,13 +589,15 @@ void WriteBufferManager::TerminateFlushesThread() {
 void WriteBufferManager::FlushStarted(bool wbm_initiated) {
   // num_running_flushes_ is incremented in our thread when initiating flushes
   // => Already accounted for
+
   if (wbm_initiated || !enabled()) {
     return;
   }
-
+  
   std::unique_lock<std::mutex> lock(flushes_mu_);
-
   ++num_running_flushes_;
+  printf("flush started %d %lu\n", (int) num_running_flushes_, size_t(memory_usage()));
+  
   size_t curr_memory_used = memory_usage();
   RecalcFlushInitiationSize();
   ReevaluateNeedForMoreFlushes(curr_memory_used);
@@ -607,6 +613,7 @@ void WriteBufferManager::FlushEnded(bool /* wbm_initiated */) {
   assert(num_running_flushes_ > 0U);
   --num_running_flushes_;
   size_t curr_memory_used = memory_usage();
+  printf("flush ended %d %lu\n", (int) num_running_flushes_, curr_memory_used);
   RecalcFlushInitiationSize();
   ReevaluateNeedForMoreFlushes(curr_memory_used);
 }
@@ -628,6 +635,7 @@ void WriteBufferManager::ReevaluateNeedForMoreFlushes(size_t curr_memory_used) {
     // need to schedule more
     ++num_flushes_to_initiate_;
     RecalcFlushInitiationSize();
+    printf("initate one more flush %lu %lu\n", size_t(memory_usage()),size_t(additional_flush_initiation_size_));    
     WakeupFlushInitiationThread();
   }
 }

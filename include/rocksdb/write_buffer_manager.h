@@ -339,7 +339,9 @@ class WriteBufferManager final {
   // This is used outside the flushes_mu_ lock => only
   // additional_flush_initiation_size_ needs to be atomic
   bool ShouldInitiateAnotherFlushMemOnly(size_t curr_memory_used) const {
-    return (curr_memory_used >= additional_flush_initiation_size_);
+    
+    return (curr_memory_used >= additional_flush_initiation_size_ &&
+	    curr_memory_used - memory_being_freed_  > additional_flush_step_size_ * 9/10);
   }
 
   // This should be called only unther the flushes_mu_ lock

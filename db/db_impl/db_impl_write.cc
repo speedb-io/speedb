@@ -1114,6 +1114,11 @@ Status DBImpl::PreprocessWrite(const WriteOptions& write_options,
           auto wbm_quota = write_buffer_manager_->buffer_size();
           assert(wbm_quota > 0U);
           auto wbm_used_percentage = (100 * wbm_memory_used) / wbm_quota;
+          // // printf("Write - WBM Delay - %" PRIu64 "%%(%" PRIu64 "/%" PRIu64
+          // //                "). Factor:%" PRIu64 ", Controller-Rate:%" PRIu64 ", ",
+          // //                wbm_used_percentage, wbm_memory_used, wbm_quota,
+          // //                new_delayed_write_factor,
+          // //                write_controller_.delayed_write_rate());
           ROCKS_LOG_INFO(immutable_db_options_.info_log,
                          "Delaying writes due to WBM's usage relative to quota "
                          "which is %" PRIu64 "%%(%" PRIu64 "/%" PRIu64

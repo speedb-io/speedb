@@ -25,6 +25,9 @@ class WriteControllerToken;
 class WriteController {
  public:
   enum class DelaySource { kCF = 0, kWBM = 1, kNumSources };
+  static constexpr auto kSourceCf = static_cast<int>(DelaySource::kCF);
+  static constexpr auto kSourceWBM = static_cast<int>(DelaySource::kWBM);
+
   static constexpr auto kNumDelaySources =
       static_cast<size_t>(DelaySource::kNumSources);
 
@@ -32,7 +35,6 @@ class WriteController {
   explicit WriteController(uint64_t _delayed_write_rate = 1024u * 1024u * 32u,
                            int64_t low_pri_rate_bytes_per_sec = 1024 * 1024)
       : total_stopped_(0),
-        total_delayed_(0),
         total_compaction_pressure_(0),
         credit_in_bytes_(0),
         next_refill_time_(0),
@@ -59,7 +61,7 @@ class WriteController {
 
   // these three metods are querying the state of the WriteController
   bool IsStopped() const;
-  bool NeedsDelay() const { return total_delayed_.load() > 0; }
+  bool NeedsDelay() const { return TotalDelayed() > 0; }
   bool NeedSpeedupCompaction() const {
     return IsStopped() || NeedsDelay() || total_compaction_pressure_ > 0;
   }
@@ -80,6 +82,8 @@ class WriteController {
 
     delayed_write_rate_ = *std::min_element(delayed_write_rates_.begin(),
                                             delayed_write_rates_.end());
+    // // printf("set_delayed_write_rate - source:%s, write_rate:%d, delayed_write_rate_:%d\n",
+    // //         ((source_value == 0)? "CF":"WBM"), (int)write_rate, (int)delayed_write_rate_);
   }
 
   void set_max_delayed_write_rate(uint64_t write_rate) {
@@ -90,6 +94,7 @@ class WriteController {
     max_delayed_write_rate_ = write_rate;
     // update delayed_write_rate_ as well
     delayed_write_rate_ = write_rate;
+    // // printf("max_delayed_write_rate_:%d\n", (int)max_delayed_write_rate_);
   }
 
   uint64_t delayed_write_rate() const { return delayed_write_rate_; }
@@ -107,6 +112,10 @@ class WriteController {
 
  private:
   uint64_t NowMicrosMonotonic(SystemClock* clock);
+  int TotalDelayed() const {
+    return (total_delayed_[kSourceCf].load(std::memory_order_relaxed) + 
+            total_delayed_[kSourceWBM].load(std::memory_order_relaxed));
+  }
 
   friend class WriteControllerToken;
   friend class StopWriteToken;
@@ -114,7 +123,8 @@ class WriteController {
   friend class CompactionPressureToken;
 
   std::atomic<int> total_stopped_;
-  std::atomic<int> total_delayed_;
+  // // std::atomic<int> total_delayed_;
+  std::array<std::atomic<int>, kNumDelaySources> total_delayed_ {};
   std::atomic<int> total_compaction_pressure_;
 
   // Number of bytes allowed to write without delay
@@ -154,9 +164,13 @@ class StopWriteToken : public WriteControllerToken {
 
 class DelayWriteToken : public WriteControllerToken {
  public:
-  explicit DelayWriteToken(WriteController* controller)
-      : WriteControllerToken(controller) {}
+  explicit DelayWriteToken(WriteController* controller, int source_value)
+      : WriteControllerToken(controller),
+        source_value_(source_value) {}
   virtual ~DelayWriteToken();
+
+ private:
+  int source_value_;
 };
 
 class CompactionPressureToken : public WriteControllerToken {

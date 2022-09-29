@@ -181,6 +181,7 @@ enum class FlushReason : int {
   kWalFull = 0xd,
   // SwitchMemtable will not be called for this flush reason.
   kCatchUpAfterErrorRecovery = 0xe,
+  kWriteBufferManagerInitiated = 0xf
 };
 
 // TODO: In the future, BackgroundErrorReason will only be used to indicate

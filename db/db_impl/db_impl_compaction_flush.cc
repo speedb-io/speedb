@@ -2816,6 +2816,11 @@ void DBImpl::BackgroundCallFlush(Env::Priority thread_pri) {
 
     Status s = BackgroundFlush(&made_progress, &job_context, &log_buffer,
                                &reason, thread_pri);
+    if (write_buffer_manager_) {
+      write_buffer_manager_->FlushStarted(
+          reason == FlushReason::kSpeedbWriteBufferManager);
+    }
+
     if (!s.ok() && !s.IsShutdownInProgress() && !s.IsColumnFamilyDropped() &&
         reason != FlushReason::kErrorRecovery) {
       // Wait a little bit before retrying background flush in
@@ -2865,6 +2870,10 @@ void DBImpl::BackgroundCallFlush(Env::Priority thread_pri) {
     assert(num_running_flushes_ > 0);
     num_running_flushes_--;
     bg_flush_scheduled_--;
+    if (write_buffer_manager_) {
+      write_buffer_manager_->FlushEnded(reason ==
+                                        FlushReason::kSpeedbWriteBufferManager);
+    }
     // See if there's more work to be done
     MaybeScheduleFlushOrCompaction();
     atomic_flush_install_cv_.SignalAll();
@@ -3784,6 +3793,102 @@ Status DBImpl::WaitForCompact(bool wait_unscheduled) {
     bg_cv_.Wait();
   }
   return error_handler_.GetBGError();
+}
+
+bool DBImpl::InitiateMemoryManagerFlushRequest(size_t min_size_to_flush) {
+  ColumnFamilyData* cfd_to_flush = nullptr;
+
+  {
+    InstrumentedMutexLock l(&mutex_);
+
+    if (shutdown_initiated_) {
+      return false;
+    }
+
+    autovector<ColumnFamilyData*> cfds;
+    if (immutable_db_options_.atomic_flush) {
+      SelectColumnFamiliesForAtomicFlush(&cfds);
+      size_t total_size_to_flush = 0U;
+      for (const auto& cfd : cfds) {
+        if (cfd->imm()->NumNotFlushed() > 0) {
+          total_size_to_flush = min_size_to_flush;
+          break;
+        } else {
+          total_size_to_flush += cfd->mem()->ApproximateMemoryUsage();
+        }
+      }
+      if (total_size_to_flush < min_size_to_flush) {
+        return false;
+      }
+    } else {
+      ColumnFamilyData* cfd_picked = nullptr;
+      SequenceNumber seq_num_for_cf_picked = kMaxSequenceNumber;
+
+      for (auto cfd : *versions_->GetColumnFamilySet()) {
+        if (cfd->IsDropped()) {
+          continue;
+        }
+        if ((cfd->imm()->NumNotFlushed() != 0) ||
+            (!cfd->mem()->IsEmpty() &&
+             (cfd->mem()->ApproximateMemoryUsage() >= min_size_to_flush))) {
+          // We only consider active mem table, hoping immutable memtable is
+          // already in the process of flushing.
+          uint64_t seq = cfd->mem()->GetCreationSeq();
+          if (cfd_picked == nullptr || seq < seq_num_for_cf_picked) {
+            cfd_picked = cfd;
+            seq_num_for_cf_picked = seq;
+          }
+        }
+      }
+      if (cfd_picked != nullptr) {
+        cfds.push_back(cfd_picked);
+      }
+
+      // // MaybeFlushStatsCF(&cfds);
+    }
+
+    if (cfds.empty()) {
+      // printf("InitiateMemoryManagerFlushRequest - Nothing To Flush\n");
+      return false;
+    }
+
+    cfd_to_flush = cfds.front();
+  }
+
+  ROCKS_LOG_INFO(
+      immutable_db_options_.info_log,
+      "[%s] write buffer manager flush started current usage %lu out of %lu",
+      cfd_to_flush->GetName().c_str(),
+      cfd_to_flush->write_buffer_mgr()->memory_usage(),
+      cfd_to_flush->write_buffer_mgr()->buffer_size());
+
+  // printf("InitiateMemoryManagerFlushRequest - Flushing %s\n",
+  // cfd_to_flush->GetName().c_str());
+
+  TEST_SYNC_POINT("DBImpl::InitiateMemoryManagerFlushRequest::BeforeFlush");
+
+  // URQ - When the memory manager picks a cf for flushing, it considers its
+  // mutable memtable as well. However, here we reuest a flush of only the
+  // immutable ones => the freed memory by flushing is not the same as the one
+  // causing this cf to be picked
+  FlushOptions flush_options;
+  flush_options.allow_write_stall = true;
+  flush_options.wait = false;
+  Status s;
+  if (immutable_db_options_.atomic_flush) {
+    s = AtomicFlushMemTables({cfd_to_flush}, flush_options,
+                             FlushReason::kSpeedbWriteBufferManager);
+  } else {
+    s = FlushMemTable(cfd_to_flush, flush_options,
+                      FlushReason::kSpeedbWriteBufferManager);
+  }
+
+  ROCKS_LOG_INFO(
+      immutable_db_options_.info_log,
+      "[%s] write buffer manager intialize flush finished, status: %s\n",
+      cfd_to_flush->GetName().c_str(), s.ToString().c_str());
+
+  return s.ok();
 }
 
 }  // namespace ROCKSDB_NAMESPACE

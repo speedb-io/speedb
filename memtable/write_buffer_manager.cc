@@ -9,18 +9,21 @@
 
 #include "rocksdb/write_buffer_manager.h"
 
+#include <array>
 #include <memory>
 
 #include "cache/cache_entry_roles.h"
 #include "cache/cache_reservation_manager.h"
 #include "db/db_impl/db_impl.h"
 #include "rocksdb/status.h"
+#include "test_util/sync_point.h"
 #include "util/coding.h"
 
 namespace ROCKSDB_NAMESPACE {
-WriteBufferManager::WriteBufferManager(size_t _buffer_size,
-                                       std::shared_ptr<Cache> cache,
-                                       bool allow_delays_and_stalls)
+WriteBufferManager::WriteBufferManager(
+    size_t _buffer_size, std::shared_ptr<Cache> cache,
+    bool allow_delays_and_stalls, bool initiate_flushes,
+    const FlushInitiationOptions& flush_initiation_options)
     : buffer_size_(_buffer_size),
       mutable_limit_(buffer_size_ * 7 / 8),
       memory_used_(0),
@@ -28,7 +31,9 @@ WriteBufferManager::WriteBufferManager(size_t _buffer_size,
       memory_being_freed_(0U),
       cache_res_mgr_(nullptr),
       allow_delays_and_stalls_(allow_delays_and_stalls),
-      stall_active_(false) {
+      stall_active_(false),
+      initiate_flushes_(initiate_flushes),
+      flush_initiation_options_(flush_initiation_options) {
 #ifndef ROCKSDB_LITE
   if (cache) {
     // Memtable's memory usage tends to fluctuate frequently
@@ -41,6 +46,10 @@ WriteBufferManager::WriteBufferManager(size_t _buffer_size,
 #else
   (void)cache;
 #endif  // ROCKSDB_LITE
+
+  if (initiate_flushes_) {
+    InitFlushInitiationVars(buffer_size());
+  }
 }
 
 WriteBufferManager::~WriteBufferManager() {
@@ -48,6 +57,7 @@ WriteBufferManager::~WriteBufferManager() {
   std::unique_lock<std::mutex> lock(mu_);
   assert(queue_.empty());
 #endif
+  TerminateFlushesThread();
 }
 
 std::size_t WriteBufferManager::dummy_entries_in_cache_usage() const {
@@ -71,6 +81,13 @@ void WriteBufferManager::ReserveMem(size_t mem) {
   }
   if (is_enabled) {
     UpdateUsageState(new_memory_used, mem, buffer_size());
+
+    // Checking outside the locks is not reliable, but avoids locking
+    // unnecessarily which is expensive
+    if (UNLIKELY(ShouldInitiateAnotherFlushMemOnly(new_memory_used))) {
+      std::unique_lock<std::mutex> lock(flushes_mu_);
+      ReevaluateNeedForMoreFlushes(new_memory_used);
+    }
   }
 }
 
@@ -153,6 +170,13 @@ void WriteBufferManager::FreeMem(size_t mem) {
 
   if (is_enabled) {
     UpdateUsageState(new_memory_used, -mem, buffer_size());
+
+    // Checking outside the locks is not reliable, but avoids locking
+    // unnecessarily which is expensive
+    if (UNLIKELY(ShouldInitiateAnotherFlushMemOnly(new_memory_used))) {
+      std::unique_lock<std::mutex> lock(flushes_mu_);
+      ReevaluateNeedForMoreFlushes(new_memory_used);
+    }
   }
 }
 
@@ -405,6 +429,236 @@ void WriteBufferManager::UpdateUsageState(size_t new_memory_used,
       done = true;
     }
   }
+}
+
+// ================================================================================================
+void WriteBufferManager::RegisterFlushInitiator(
+    void* initiator, InitiateFlushRequestCb request) {
+  {
+    std::unique_lock<std::mutex> lock(flushes_initiators_mu_);
+    assert(IsInitiatorIdxValid(FindInitiator(initiator)) == false);
+    flush_initiators_.push_back({initiator, request});
+    num_initiators_ = flush_initiators_.size();
+  }
+
+  WakeupFlushInitiationThread();
+}
+
+void WriteBufferManager::DeregisterFlushInitiator(void* initiator) {
+  {
+    std::unique_lock<std::mutex> lock(flushes_initiators_mu_);
+
+    auto initiator_idx = FindInitiator(initiator);
+    assert(IsInitiatorIdxValid(initiator_idx));
+
+    // Move to the next initiator (if there is one) in case the current one
+    // deregisters
+    if (initiator_idx == next_candidate_initiator_idx_) {
+      next_candidate_initiator_idx_ = CalcNextCandidateInitiatorIdx();
+    }
+
+    flush_initiators_.erase(flush_initiators_.begin() + initiator_idx);
+    num_initiators_ = flush_initiators_.size();
+  }
+
+  WakeupFlushInitiationThread();
+}
+
+void WriteBufferManager::InitFlushInitiationVars(size_t quota) {
+  assert(initiate_flushes_);
+
+  {
+    std::unique_lock<std::mutex> lock(flushes_mu_);
+    additional_flush_step_size_ =
+        quota / flush_initiation_options_.max_num_parallel_flushes;
+    flush_initiation_start_size_ = additional_flush_step_size_;
+    // TODO - Update this to a formula. If it depends on the number of initators
+    // => update when that number changes
+    min_flush_size_ = 4 * 1024U * 1024U;  // 4 MB
+    RecalcFlushInitiationSize();
+  }
+
+  if (flushes_thread_.joinable() == false) {
+    flushes_thread_ =
+        std::thread(&WriteBufferManager::InitiateFlushesThread, this);
+  }
+}
+
+void WriteBufferManager::InitiateFlushesThread() {
+  while (true) {
+    // Should return true when the waiting should stop (no spurious wakeups
+    // guaranteed)
+    auto StopWaiting = [this]() {
+      return (new_flushes_wakeup_ &&
+              (terminate_flushes_thread_ || (num_flushes_to_initiate_ > 0U)));
+    };
+
+    std::unique_lock<std::mutex> lock(flushes_mu_);
+    flushes_wakeup_cv_.wait(lock, StopWaiting);
+    new_flushes_wakeup_ = false;
+
+    if (terminate_flushes_thread_) {
+      break;
+    }
+
+    // The code below tries to initiate num_flushes_to_initiate_ flushes by
+    // invoking its registered initiators, and requesting them to initiate a
+    // flush of a certain minimum size. The initiation is done in iterations. An
+    // iteration is an attempt to give evey initiator an opportunity to flush,
+    // in a round-robin ordering. An initiator may or may not be able to
+    // initiate a flush. Reasons for not initiating could be:
+    // - The flush is less than the specified minimum size.
+    // - The initiator is in the process of shutting down or being disposed of.
+    //
+    // The assumption is that in case flush initiation stopped when
+    // num_flushes_to_initiate_ == 0, there will be some future event that will
+    // wake up this thread and initiation attempts will be retried:
+    // - Initiator will be enabled
+    // - A flush in progress will end
+    // - The memory_used() will increase above additional_flush_initiation_size_
+
+    // Two iterations:
+    // 1. Flushes of a min size.
+    // 2. Flushes of any size
+    constexpr size_t kNumIters = 2U;
+    const std::array<size_t, kNumIters> kMinFlushSizes{min_flush_size_, 0U};
+
+    auto iter = 0U;
+    while ((iter < kMinFlushSizes.size()) && (num_flushes_to_initiate_ > 0U)) {
+      auto num_repeated_failures_to_initiate = 0U;
+      while ((num_repeated_failures_to_initiate < num_initiators_) &&
+             (num_flushes_to_initiate_ > 0U)) {
+        bool was_flush_initiated = false;
+        // Unlocking the flushed_mu_ since flushing (via the initiator cb) may
+        // call a WBM service (e.g., ReserveMem()), that, in turn, needs to lock
+        // the same mutex => will get stuck
+        lock.unlock();
+
+        {
+          std::unique_lock<std::mutex> initiators_lock(flushes_initiators_mu_);
+          auto& initiator = flush_initiators_[next_candidate_initiator_idx_];
+          next_candidate_initiator_idx_ = CalcNextCandidateInitiatorIdx();
+          was_flush_initiated = initiator.cb(kMinFlushSizes[iter]);
+        }
+
+        lock.lock();
+        if (was_flush_initiated) {
+          // Not recalculating flush initiation size since the increment &
+          // decrement cancel each other with respect to the recalc
+          assert(num_running_flushes_ <
+                 flush_initiation_options_.max_num_parallel_flushes);
+          ++num_running_flushes_;
+          --num_flushes_to_initiate_;
+          num_repeated_failures_to_initiate = 0U;
+        } else {
+          ++num_repeated_failures_to_initiate;
+        }
+      }
+      ++iter;
+    }
+    TEST_SYNC_POINT_CALLBACK(
+        "WriteBufferManager::InitiateFlushesThread::DoneInitiationsAttempt",
+        &num_flushes_to_initiate_);
+  }
+}
+
+void WriteBufferManager::TerminateFlushesThread() {
+  {
+    std::unique_lock<std::mutex> lock(flushes_mu_);
+    terminate_flushes_thread_ = true;
+    WakeupFlushInitiationThread();
+  }
+
+  if (flushes_thread_.joinable()) {
+    flushes_thread_.join();
+  }
+}
+
+void WriteBufferManager::FlushStarted(bool wbm_initiated) {
+  // num_running_flushes_ is incremented in our thread when initiating flushes
+  // => Already accounted for
+  if (wbm_initiated || !enabled()) {
+    return;
+  }
+
+  std::unique_lock<std::mutex> lock(flushes_mu_);
+
+  ++num_running_flushes_;
+  size_t curr_memory_used = memory_usage();
+  RecalcFlushInitiationSize();
+  ReevaluateNeedForMoreFlushes(curr_memory_used);
+}
+
+void WriteBufferManager::FlushEnded(bool /* wbm_initiated */) {
+  if (!enabled()) {
+    return;
+  }
+
+  std::unique_lock<std::mutex> lock(flushes_mu_);
+
+  assert(num_running_flushes_ > 0U);
+  --num_running_flushes_;
+  size_t curr_memory_used = memory_usage();
+  RecalcFlushInitiationSize();
+  ReevaluateNeedForMoreFlushes(curr_memory_used);
+}
+
+void WriteBufferManager::RecalcFlushInitiationSize() {
+  additional_flush_initiation_size_ =
+      flush_initiation_start_size_ +
+      additional_flush_step_size_ *
+          (num_running_flushes_ + num_flushes_to_initiate_);
+}
+
+void WriteBufferManager::ReevaluateNeedForMoreFlushes(size_t curr_memory_used) {
+  // TODO - Assert flushes_mu_ is held at this point
+  assert(enabled());
+
+  // URQ - I SUGGEST USING HERE THE AMOUNT OF MEMORY STILL NOT MARKED FOR FLUSH
+  // (MUTABLE + IMMUTABLE)
+  if (ShouldInitiateAnotherFlush(curr_memory_used)) {
+    // need to schedule more
+    ++num_flushes_to_initiate_;
+    RecalcFlushInitiationSize();
+    WakeupFlushInitiationThread();
+  }
+}
+
+uint64_t WriteBufferManager::FindInitiator(void* initiator) const {
+  // Assumes lock is held on the flushes_mu_
+
+  auto initiator_idx = kInvalidInitiatorIdx;
+  for (auto i = 0U; i < flush_initiators_.size(); ++i) {
+    if (flush_initiators_[i].initiator == initiator) {
+      initiator_idx = i;
+      break;
+    }
+  }
+
+  return initiator_idx;
+}
+
+void WriteBufferManager::TEST_WakeupFlushInitiationThread() {
+  std::unique_lock<std::mutex> lock(flushes_mu_);
+  WakeupFlushInitiationThread();
+}
+
+void SanitizeOptionsToDisableFlushesBasedOnWriteBufferOptions(
+    Options& options) {
+  if (options.write_buffer_size == 0)
+    options.write_buffer_size = options.db_write_buffer_size / 2;
+  options.max_write_buffer_number =
+      (options.db_write_buffer_size / options.write_buffer_size + 1) * 2;
+  options.min_write_buffer_number_to_merge =
+      options.max_write_buffer_number / 2;
+  int compaction_trigger = options.level0_file_num_compaction_trigger;
+  if (compaction_trigger == 0) {
+    compaction_trigger = options.level0_file_num_compaction_trigger = 4;
+  }
+  // URQ - Why and should it also be part of the options sanitization?
+  // // options.max_background_compactions = options.max_background_flushes * 2;
+  // // options.max_background_jobs =
+  // //   options.max_background_flushes + options.max_background_compactions;
 }
 
 }  // namespace ROCKSDB_NAMESPACE

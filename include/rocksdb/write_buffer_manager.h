@@ -17,11 +17,15 @@
 #include <cstddef>
 #include <list>
 #include <mutex>
+#include <thread>
+#include <unordered_map>
 #include <utility>
+#include <vector>
 
 #include "rocksdb/cache.h"
 
 namespace ROCKSDB_NAMESPACE {
+class Options;
 class CacheReservationManager;
 
 // Interface to block and signal DB instances, intended for RocksDB
@@ -46,6 +50,11 @@ class WriteBufferManager final {
   static constexpr uint64_t kMaxDelayedWriteFactor = 200U;
   static constexpr uint64_t kStopDelayedWriteFactor = kMaxDelayedWriteFactor;
 
+  struct FlushInitiationOptions {
+    FlushInitiationOptions() {}
+    size_t max_num_parallel_flushes = 4U;
+  };
+
  public:
   // Parameters:
   // _buffer_size: _buffer_size = 0 indicates no limit. Memory won't be capped.
@@ -68,9 +77,11 @@ class WriteBufferManager final {
   //  Stalls: stalling of writes when memory_usage() exceeds buffer_size. It
   //  will wait for flush to complete and
   //   memory usage to drop down.
-  explicit WriteBufferManager(size_t _buffer_size,
-                              std::shared_ptr<Cache> cache = {},
-                              bool allow_delays_and_stalls = true);
+  explicit WriteBufferManager(
+      size_t _buffer_size, std::shared_ptr<Cache> cache = {},
+      bool allow_delays_and_stalls = true, bool initiate_flushes = false,
+      const FlushInitiationOptions& flush_initiation_options =
+          FlushInitiationOptions());
 
   // No copying allowed
   WriteBufferManager(const WriteBufferManager&) = delete;
@@ -132,6 +143,10 @@ class WriteBufferManager final {
     MaybeEndWriteStall();
     if (enabled()) {
       UpdateUsageState(memory_usage(), 0 /* mem_changed_size */, new_size);
+
+      if (initiate_flushes_) {
+        InitFlushInitiationVars(new_size);
+      }
     }
   }
 
@@ -139,7 +154,7 @@ class WriteBufferManager final {
 
   // Should only be called from write thread
   bool ShouldFlush() const {
-    if (enabled()) {
+    if ((initiate_flushes_ == false) && enabled()) {
       if (mutable_memtable_memory_usage() >
           mutable_limit_.load(std::memory_order_relaxed)) {
         return true;
@@ -215,6 +230,11 @@ class WriteBufferManager final {
 
  public:
   bool IsDelayAllowed() const { return allow_delays_and_stalls_; }
+  bool IsInitiatingFlushes() const { return initiate_flushes_; }
+  const FlushInitiationOptions& GetFlushInitiationOptions() const {
+    return flush_initiation_options_;
+  }
+
   std::pair<UsageState, uint64_t> GetUsageStateInfo() const {
     return ParseCodedUsageState(GetCodedUsageState());
   }
@@ -226,9 +246,6 @@ class WriteBufferManager final {
   // will actually be used for the delay token
   static constexpr uint64_t kNoneCodedUsageState = 0U;
   static constexpr uint64_t kStopCodedUsageState = kMaxDelayedWriteFactor + 1;
-
-  void UpdateUsageState(size_t new_memory_used, ssize_t mem_changed_size,
-                        size_t quota);
 
   uint64_t CalcNewCodedUsageState(size_t new_memory_used,
                                   ssize_t memory_changed_size, size_t quota,
@@ -242,6 +259,30 @@ class WriteBufferManager final {
                                       uint64_t delay_factor);
   static std::pair<UsageState, uint64_t> ParseCodedUsageState(
       uint64_t coded_usage_state);
+
+ private:
+  void UpdateUsageState(size_t new_memory_used, ssize_t mem_changed_size,
+                        size_t quota);
+
+ public:
+  using InitiateFlushRequestCb = std::function<bool(size_t min_size_to_flush)>;
+
+  void RegisterFlushInitiator(void* initiator, InitiateFlushRequestCb request);
+  void DeregisterFlushInitiator(void* initiator);
+
+  void FlushStarted(bool wbm_initiated);
+  void FlushEnded(bool wbm_initiated);
+
+ public:
+  size_t TEST_GetNumFlushesToInitiate() const {
+    return num_flushes_to_initiate_;
+  }
+  size_t TEST_GetNumRunningFlushes() const { return num_running_flushes_; }
+  size_t TEST_GetNextCandidateInitiatorIdx() const {
+    return next_candidate_initiator_idx_;
+  }
+
+  void TEST_WakeupFlushInitiationThread();
 
  private:
   std::atomic<size_t> buffer_size_;
@@ -267,5 +308,93 @@ class WriteBufferManager final {
   // Return the new memory usage
   size_t ReserveMemWithCache(size_t mem);
   size_t FreeMemWithCache(size_t mem);
+
+ private:
+  struct InitiatorInfo {
+    void* initiator;
+    InitiateFlushRequestCb cb;
+  };
+
+  static constexpr uint64_t kInvalidInitiatorIdx =
+      std::numeric_limits<uint64_t>::max();
+
+ private:
+  void InitFlushInitiationVars(size_t quota);
+  void InitiateFlushesThread();
+  bool InitiateAdditionalFlush();
+  void WakeUpFlushesThread();
+  void TerminateFlushesThread();
+  void RecalcFlushInitiationSize();
+  void ReevaluateNeedForMoreFlushes(size_t curr_memory_used);
+  uint64_t FindInitiator(void* initiator) const;
+
+  // Assumed the lock is held
+  void WakeupFlushInitiationThread() {
+    new_flushes_wakeup_ = true;
+    flushes_wakeup_cv_.notify_one();
+  }
+
+  // This is used outside the flushes_mu_ lock => only
+  // additional_flush_initiation_size_ needs to be atomic
+  bool ShouldInitiateAnotherFlushMemOnly(size_t curr_memory_used) const {
+    return (curr_memory_used >= additional_flush_initiation_size_);
+  }
+
+  // This should be called only unther the flushes_mu_ lock
+  bool ShouldInitiateAnotherFlush(size_t curr_memory_used) const {
+    return (((num_running_flushes_ + num_flushes_to_initiate_) <
+             flush_initiation_options_.max_num_parallel_flushes) &&
+            ShouldInitiateAnotherFlushMemOnly(curr_memory_used));
+  }
+
+  // Assumed flushes_mu_ is locked
+  uint64_t CalcNextCandidateInitiatorIdx() const {
+    // The index is irrelevant when there are no initiators so we might as well
+    // set it to 0
+    return (flush_initiators_.empty() ? 0U
+                                      : (next_candidate_initiator_idx_ + 1) %
+                                            flush_initiators_.size());
+  }
+
+  bool IsInitiatorIdxValid(uint64_t initiator_idx) const {
+    return (initiator_idx != kInvalidInitiatorIdx);
+  }
+
+ private:
+  // Flush Initiation Data Members
+
+  const bool initiate_flushes_ = false;
+  const FlushInitiationOptions flush_initiation_options_ =
+      FlushInitiationOptions();
+
+  std::vector<InitiatorInfo> flush_initiators_;
+  std::atomic<size_t> num_initiators_ = 0U;
+  uint64_t next_candidate_initiator_idx_ = 0U;
+
+  // Consider if this needs to be atomic
+  size_t num_flushes_to_initiate_ = 0U;
+  size_t num_running_flushes_ = 0U;
+  size_t flush_initiation_start_size_ = 0U;
+  size_t additional_flush_step_size_ = 0U;
+  std::atomic<size_t> additional_flush_initiation_size_ = 0U;
+  size_t min_flush_size_ = 0U;
+
+  std::mutex flushes_mu_;
+  std::mutex flushes_initiators_mu_;
+  std::condition_variable flushes_wakeup_cv_;
+  bool new_flushes_wakeup_ = false;
+
+  std::thread flushes_thread_;
+  bool terminate_flushes_thread_ = false;
 };
+
+// This is a convenience utility for users of the WriteBufferManager that
+// wish to use Speedb's WBM flush initiation mechanism.
+// For such users, Speedb recommends effectively disabling the existing
+// mechanisms that flush based on write buffers' configureation (size, number,
+// etc). So, Speedb's recommendation would be to call this function resulting
+// the WBM as the sole automatic initiator of flushes.
+extern void SanitizeOptionsToDisableFlushesBasedOnWriteBufferOptions(
+    Options& options);
+
 }  // namespace ROCKSDB_NAMESPACE

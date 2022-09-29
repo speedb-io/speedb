@@ -363,6 +363,9 @@ class DBImpl : public DB {
   virtual Status LockWAL() override;
   virtual Status UnlockWAL() override;
 
+  // flush initiated by the write buffer manager to free some space
+  bool InitiateMemoryManagerFlushRequest(size_t min_size_to_flush);
+
   virtual SequenceNumber GetLatestSequenceNumber() const override;
 
   // IncreaseFullHistoryTsLow(ColumnFamilyHandle*, std::string) will acquire
@@ -2404,6 +2407,8 @@ class DBImpl : public DB {
       WriteBufferManager::UsageState::kNone;
   uint64_t wbm_spdb_delayed_write_factor_ =
       WriteBufferManager::kNoneDelayedWriteFactor;
+
+  bool is_registered_for_flush_initiation_rqsts_ = false;
 };
 
 extern Options SanitizeOptions(const std::string& db, const Options& src,

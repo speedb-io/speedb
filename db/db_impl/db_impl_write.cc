@@ -1103,11 +1103,26 @@ Status DBImpl::PreprocessWrite(const WriteOptions& write_options,
             (wbm_spdb_delayed_write_factor_ != new_delayed_write_factor))) {
       if (new_usage_state != WriteBufferManager::UsageState::kDelay) {
         write_controller_token_.reset();
+        ROCKS_LOG_INFO(immutable_db_options_.info_log, "Reset WBM Delay Token");
       } else if ((wbm_spdb_usage_state_ !=
                   WriteBufferManager::UsageState::kDelay) ||
                  (wbm_spdb_delayed_write_factor_ != new_delayed_write_factor)) {
         write_controller_token_ =
             SetupDelayFromFactor(write_controller_, new_delayed_write_factor);
+        {
+          auto wbm_memory_used = write_buffer_manager_->memory_usage();
+          auto wbm_quota = write_buffer_manager_->buffer_size();
+          assert(wbm_quota > 0U);
+          auto wbm_used_percentage = (100 * wbm_memory_used) / wbm_quota;
+          ROCKS_LOG_INFO(immutable_db_options_.info_log,
+                         "Delaying writes due to WBM's usage relative to quota "
+                         "which is %" PRIu64 "%%(%" PRIu64 "/%" PRIu64
+                         "). "
+                         "Factor:%" PRIu64 ", Controller-Rate:%" PRIu64 ", ",
+                         wbm_used_percentage, wbm_memory_used, wbm_quota,
+                         new_delayed_write_factor,
+                         write_controller_.delayed_write_rate());
+        }
       }
 
       wbm_spdb_usage_state_ = new_usage_state;
@@ -1137,6 +1152,9 @@ Status DBImpl::PreprocessWrite(const WriteOptions& write_options,
     if (write_options.no_slowdown) {
       status = Status::Incomplete("Write stall");
     } else {
+      // Initiating a flush to avoid blocking forever
+      WaitForPendingWrites();
+      status = HandleWriteBufferManagerFlush(write_context);
       WriteBufferManagerStallWrites();
     }
   }

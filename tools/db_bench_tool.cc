@@ -1554,6 +1554,10 @@ DEFINE_bool(persist_stats_to_disk,
 DEFINE_uint64(stats_history_buffer_size,
               ROCKSDB_NAMESPACE::Options().stats_history_buffer_size,
               "Max number of stats snapshots to keep in memory");
+DEFINE_bool(avoid_unnecessary_blocking_io,
+            ROCKSDB_NAMESPACE::Options().avoid_unnecessary_blocking_io,
+            "If true, some expensive cleaning up operations will be moved from "
+            "user threads to background threads.");
 DEFINE_bool(avoid_flush_during_recovery,
             ROCKSDB_NAMESPACE::Options().avoid_flush_during_recovery,
             "If true, avoids flushing the recovered WAL data where possible.");
@@ -4328,6 +4332,7 @@ class Benchmark {
     options.persist_stats_to_disk = FLAGS_persist_stats_to_disk;
     options.stats_history_buffer_size =
         static_cast<size_t>(FLAGS_stats_history_buffer_size);
+    options.avoid_unnecessary_blocking_io = FLAGS_avoid_unnecessary_blocking_io;
     options.avoid_flush_during_recovery = FLAGS_avoid_flush_during_recovery;
 
     options.compression_opts.level = FLAGS_compression_level;

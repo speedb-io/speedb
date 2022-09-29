@@ -8,6 +8,7 @@
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 #include <cinttypes>
 #include <deque>
+#include <limits>
 
 #include "db/builder.h"
 #include "db/db_impl/db_impl.h"
@@ -2827,12 +2828,17 @@ Status DBImpl::BackgroundFlush(bool* made_progress, JobContext* job_context,
           bg_job_limits.max_compactions, bg_flush_scheduled_,
           bg_compaction_scheduled_);
     }
+    *reason = bg_flush_args[0].cfd_->GetFlushReason();
+    if (write_buffer_manager_) {
+      write_buffer_manager_->FlushStarted(
+          *reason == FlushReason::kWriteBufferManagerInitiated);
+    }
+
     status = FlushMemTablesToOutputFiles(bg_flush_args, made_progress,
                                          job_context, log_buffer, thread_pri);
     TEST_SYNC_POINT("DBImpl::BackgroundFlush:BeforeFlush");
     // All the CFDs in the FlushReq must have the same flush reason, so just
     // grab the first one
-    *reason = bg_flush_args[0].cfd_->GetFlushReason();
     for (auto& arg : bg_flush_args) {
       ColumnFamilyData* cfd = arg.cfd_;
       if (cfd->UnrefAndTryDelete()) {
@@ -2917,6 +2923,10 @@ void DBImpl::BackgroundCallFlush(Env::Priority thread_pri) {
     assert(num_running_flushes_ > 0);
     num_running_flushes_--;
     bg_flush_scheduled_--;
+    if (write_buffer_manager_) {
+      write_buffer_manager_->FlushEnded(
+          reason == FlushReason::kWriteBufferManagerInitiated);
+    }
     // See if there's more work to be done
     MaybeScheduleFlushOrCompaction();
     atomic_flush_install_cv_.SignalAll();
@@ -3841,6 +3851,161 @@ Status DBImpl::WaitForCompact(bool wait_unscheduled) {
     bg_cv_.Wait();
   }
   return error_handler_.GetBGError();
+}
+
+bool DBImpl::InitiateMemoryManagerFlushRequest(size_t min_size_to_flush) {
+  if (shutdown_initiated_) {
+    return false;
+  }
+
+  FlushOptions flush_options;
+  flush_options.allow_write_stall = true;
+  flush_options.wait = false;
+
+  if (immutable_db_options_.atomic_flush) {
+    return InitiateMemoryManagerFlushRequestAtomicFlush(min_size_to_flush,
+                                                        flush_options);
+  } else {
+    return InitiateMemoryManagerFlushRequestNonAtomicFlush(min_size_to_flush,
+                                                           flush_options);
+  }
+}
+
+bool DBImpl::InitiateMemoryManagerFlushRequestAtomicFlush(
+    size_t min_size_to_flush, const FlushOptions& flush_options) {
+  assert(immutable_db_options_.atomic_flush);
+
+  autovector<ColumnFamilyData*> cfds;
+  {
+    InstrumentedMutexLock lock(&mutex_);
+    SelectColumnFamiliesForAtomicFlush(&cfds);
+
+    size_t total_size_to_flush = 0U;
+    for (const auto& cfd : cfds) {
+      if (cfd->imm()->NumNotFlushed() > 0) {
+        total_size_to_flush = min_size_to_flush;
+        break;
+      } else if (cfd->mem()->IsEmpty() == false) {
+        total_size_to_flush += cfd->mem()->ApproximateMemoryUsage();
+      }
+    }
+    if (total_size_to_flush < min_size_to_flush) {
+      return false;
+    }
+  }
+
+  ROCKS_LOG_INFO(immutable_db_options_.info_log,
+                 "write buffer manager initiated Atomic flush started current "
+                 "usage %lu out of %lu",
+                 cfds.front()->write_buffer_mgr()->memory_usage(),
+                 cfds.front()->write_buffer_mgr()->buffer_size());
+
+  TEST_SYNC_POINT(
+      "DBImpl::InitiateMemoryManagerFlushRequestAtomicFlush::BeforeFlush");
+  auto s = AtomicFlushMemTables(cfds, flush_options,
+                                FlushReason::kWriteBufferManagerInitiated);
+
+  ROCKS_LOG_INFO(
+      immutable_db_options_.info_log,
+      "write buffer manager initiated Atomic flush finished, status: %s",
+      s.ToString().c_str());
+  return s.ok();
+}
+
+bool DBImpl::InitiateMemoryManagerFlushRequestNonAtomicFlush(
+    size_t min_size_to_flush, const FlushOptions& flush_options) {
+  assert(immutable_db_options_.atomic_flush == false);
+
+  // Pick the "oldest" CF that meets one of the following:
+  // 1. Has at least one IMMUTABLE memtable (=> already has a memtable that
+  //     should be flushed); Or
+  // 2. Has a MUTABLE memtable > min size to flush
+  //
+  // However, care must be taken to avoid starving a CF which has data to flush
+  // (=> and associated WAL) but to which there is not much writing. So, in case
+  // we find such a CF that is lagging enough in the number of flushes it has
+  // undergone, relative to the other cf-s, we will pick it, regardless of its
+  // mutable memtable size.
+  ColumnFamilyData* cfd_to_flush = nullptr;
+  SequenceNumber seq_num_for_cf_picked = kMaxSequenceNumber;
+  bool picked_lagging = false;
+
+  {
+    InstrumentedMutexLock lock(&mutex_);
+    auto total_num_flushes = 0U;
+    ColumnFamilyData* cfd_with_min_num_flushes = nullptr;
+    auto min_num_flushes = std::numeric_limits<uint64_t>::max();
+
+    for (auto* cfd : *versions_->GetColumnFamilySet()) {
+      if (cfd->IsDropped()) {
+        continue;
+      }
+      if ((cfd->imm()->NumNotFlushed() != 0) ||
+          ((cfd->mem()->IsEmpty() == false) &&
+           (cfd->mem()->ApproximateMemoryUsage() >= min_size_to_flush))) {
+        uint64_t seq = cfd->mem()->GetCreationSeq();
+        if (cfd_to_flush == nullptr || seq < seq_num_for_cf_picked) {
+          cfd_to_flush = cfd;
+          seq_num_for_cf_picked = seq;
+        }
+      }
+
+      // Pick a lagging cf if applicable (per the hueristic)
+      if ((cfd->imm()->NumNotFlushed() != 0) ||
+          (cfd->mem()->IsEmpty() == false)) {
+        total_num_flushes += cfd->GetNumQueuedForFlush();
+        // There may be 2 cf-s with the min num, one older than the other and I
+        // may pick the newer one. But, that will be fixed the next time we
+        // evaluate.
+        if (cfd->GetNumQueuedForFlush() < min_num_flushes) {
+          cfd_with_min_num_flushes = cfd;
+          min_num_flushes = cfd->GetNumQueuedForFlush();
+        }
+      }
+    }
+    // It's possible that no applicable CF was found
+    if (min_num_flushes != std::numeric_limits<uint64_t>::max()) {
+      assert(total_num_flushes >= min_num_flushes);
+      if (total_num_flushes - min_num_flushes >
+          ColumnFamilyData::kLaggingFlushesThreshold) {
+        cfd_to_flush = cfd_with_min_num_flushes;
+        // Assuming the picked CF had little activity and will stay that way.
+        // Therefore, we should not keep picking it whenever any other CF is
+        // flushed once => Set its value so we pick it again when it is again
+        // lagging.
+        cfd_to_flush->SetNumTimedQueuedForFlush(total_num_flushes - 1);
+        picked_lagging = true;
+      }
+    }
+
+    if (cfd_to_flush == nullptr) {
+      return false;
+    }
+
+    autovector<ColumnFamilyData*> cfds{cfd_to_flush};
+    MaybeFlushStatsCF(&cfds);
+  }
+
+  ROCKS_LOG_INFO(immutable_db_options_.info_log,
+                 "[%s] write buffer manager initiated flush started current "
+                 "usage %lu out of %lu, min-size:%lu, lagging:%d, seq:%lu",
+                 cfd_to_flush->GetName().c_str(),
+                 cfd_to_flush->write_buffer_mgr()->memory_usage(),
+                 cfd_to_flush->write_buffer_mgr()->buffer_size(),
+                 min_size_to_flush, static_cast<int>(picked_lagging),
+                 seq_num_for_cf_picked);
+
+  TEST_SYNC_POINT(
+      "DBImpl::InitiateMemoryManagerFlushRequestNonAtomicFlush::BeforeFlush");
+  auto s = FlushMemTable(cfd_to_flush, flush_options,
+                         FlushReason::kWriteBufferManagerInitiated);
+
+  ROCKS_LOG_INFO(
+      immutable_db_options_.info_log,
+      "[%s] write buffer manager initialize flush finished, status: %s\n",
+      cfd_to_flush->GetName().c_str(), s.ToString().c_str());
+
+  return s.ok();
 }
 
 }  // namespace ROCKSDB_NAMESPACE

@@ -7,6 +7,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 
+#include <chrono>
+#include <thread>
+
 #include "db/db_test_util.h"
 #include "db/write_thread.h"
 #include "port/stack_trace.h"
@@ -14,10 +17,12 @@
 namespace ROCKSDB_NAMESPACE {
 
 class DBWriteBufferManagerTest : public DBTestBase,
-                                 public testing::WithParamInterface<bool> {
+                                 public ::testing::WithParamInterface<bool> {
  public:
   DBWriteBufferManagerTest()
       : DBTestBase("db_write_buffer_manager_test", /*env_do_fsync=*/false) {}
+
+  void SetUp() override { cost_cache_ = GetParam(); }
   bool cost_cache_;
 };
 
@@ -27,7 +32,6 @@ TEST_P(DBWriteBufferManagerTest, SharedBufferAcrossCFs1) {
   options.write_buffer_size = 500000;  // this is never hit
   std::shared_ptr<Cache> cache = NewLRUCache(4 * 1024 * 1024, 2);
   ASSERT_LT(cache->GetUsage(), 256 * 1024);
-  cost_cache_ = GetParam();
 
   if (cost_cache_) {
     options.write_buffer_manager.reset(
@@ -70,7 +74,6 @@ TEST_P(DBWriteBufferManagerTest, SharedWriteBufferAcrossCFs2) {
   options.write_buffer_size = 500000;  // this is never hit
   std::shared_ptr<Cache> cache = NewLRUCache(4 * 1024 * 1024, 2);
   ASSERT_LT(cache->GetUsage(), 256 * 1024);
-  cost_cache_ = GetParam();
 
   if (cost_cache_) {
     options.write_buffer_manager.reset(
@@ -197,7 +200,6 @@ TEST_P(DBWriteBufferManagerTest, SharedWriteBufferLimitAcrossDB) {
   options.write_buffer_size = 500000;  // this is never hit
   std::shared_ptr<Cache> cache = NewLRUCache(4 * 1024 * 1024, 2);
   ASSERT_LT(cache->GetUsage(), 256 * 1024);
-  cost_cache_ = GetParam();
 
   if (cost_cache_) {
     options.write_buffer_manager.reset(
@@ -314,7 +316,6 @@ TEST_P(DBWriteBufferManagerTest, SharedWriteBufferLimitAcrossDB1) {
   options.write_buffer_size = 500000;  // this is never hit
   std::shared_ptr<Cache> cache = NewLRUCache(4 * 1024 * 1024, 2);
   ASSERT_LT(cache->GetUsage(), 256 * 1024);
-  cost_cache_ = GetParam();
 
   if (cost_cache_) {
     options.write_buffer_manager.reset(
@@ -456,7 +457,6 @@ TEST_P(DBWriteBufferManagerTest, MixedSlowDownOptionsSingleDB) {
   options.write_buffer_size = 500000;  // this is never hit
   std::shared_ptr<Cache> cache = NewLRUCache(4 * 1024 * 1024, 2);
   ASSERT_LT(cache->GetUsage(), 256 * 1024);
-  cost_cache_ = GetParam();
 
   if (cost_cache_) {
     options.write_buffer_manager.reset(
@@ -618,7 +618,6 @@ TEST_P(DBWriteBufferManagerTest, MixedSlowDownOptionsMultipleDB) {
   options.write_buffer_size = 500000;  // this is never hit
   std::shared_ptr<Cache> cache = NewLRUCache(4 * 1024 * 1024, 2);
   ASSERT_LT(cache->GetUsage(), 256 * 1024);
-  cost_cache_ = GetParam();
 
   if (cost_cache_) {
     options.write_buffer_manager.reset(
@@ -849,8 +848,79 @@ TEST_P(DBWriteBufferManagerTest, StopSwitchingMemTablesOnceFlushing) {
 
 #endif  // ROCKSDB_LITE
 
+class DBWriteBufferManagerTest1 : public DBTestBase,
+                                  public ::testing::WithParamInterface<bool> {
+ public:
+  DBWriteBufferManagerTest1()
+      : DBTestBase("db_write_buffer_manager_test", /*env_do_fsync=*/false) {}
+
+  void SetUp() override { cost_cache_ = GetParam(); }
+  bool cost_cache_;
+};
+// ===============================================================================================================
+class DBWriteBufferManagerFlushTests
+    : public DBTestBase,
+      public ::testing::WithParamInterface<bool> {
+ public:
+  DBWriteBufferManagerFlushTests()
+      : DBTestBase("db_write_buffer_manager_test", /*env_do_fsync=*/false) {}
+
+  void SetUp() override { cost_cache_ = GetParam(); }
+  bool cost_cache_;
+};
+
+TEST_P(DBWriteBufferManagerFlushTests, DISABLED_WbmFlushesSingleDBSingleCf) {
+  constexpr size_t kQuota = 100 * 1000;
+
+  Options options = CurrentOptions();
+  options.arena_block_size = 4096;
+  options.write_buffer_size = kQuota;  // this is never hit
+  std::shared_ptr<Cache> cache = NewLRUCache(4 * 1024 * 1024, 2);
+  ASSERT_LT(cache->GetUsage(), 256 * 1024);
+
+  auto allow_stall_ = false;
+
+  if (cost_cache_) {
+    options.write_buffer_manager.reset(
+        new WriteBufferManager(kQuota, cache, allow_stall_, true));
+  } else {
+    options.write_buffer_manager.reset(
+        new WriteBufferManager(kQuota, nullptr, allow_stall_, true));
+  }
+  auto* wbm = options.write_buffer_manager.get();
+  size_t flush_step_size =
+      kQuota / wbm->GetFlushInitiationOptions().max_num_parallel_flushes;
+
+  WriteOptions wo;
+  wo.disableWAL = true;
+
+  DestroyAndReopen(options);
+
+  ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->EnableProcessing();
+  ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->LoadDependency(
+      {{"DBImpl::InitiateMemoryManagerFlushRequestNonAtomicFlush::BeforeFlush",
+        "DBWriteBufferManagerFlushTests::WbmFlushesSingleDBSingleCf::"
+        "Flushing"}});
+
+  // Reach the flush step by writing to two cf-s, no flush
+  ASSERT_OK(Put(Key(1), DummyString(flush_step_size / 2), wo));
+  ASSERT_OK(Put(Key(1), DummyString(flush_step_size / 2), wo));
+
+  TEST_SYNC_POINT(
+      "DBWriteBufferManagerFlushTests::WbmFlushesSingleDBSingleCf::Flushing");
+
+  ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->DisableProcessing();
+  ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->ClearAllCallBacks();
+}
+
 INSTANTIATE_TEST_CASE_P(DBWriteBufferManagerTest, DBWriteBufferManagerTest,
                         testing::Bool());
+INSTANTIATE_TEST_CASE_P(DBWriteBufferManagerTest1, DBWriteBufferManagerTest1,
+                        ::testing::Bool());
+
+INSTANTIATE_TEST_CASE_P(DBWriteBufferManagerFlushTests,
+                        DBWriteBufferManagerFlushTests,
+                        ::testing::Values(false));
 
 }  // namespace ROCKSDB_NAMESPACE
 

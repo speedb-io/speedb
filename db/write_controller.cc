@@ -21,7 +21,10 @@ std::unique_ptr<WriteControllerToken> WriteController::GetStopToken() {
 
 std::unique_ptr<WriteControllerToken> WriteController::GetDelayToken(
     DelaySource source, uint64_t write_rate) {
-  if (0 == total_delayed_++) {
+  auto source_value = static_cast<int>(source);
+
+  ++total_delayed_[source_value];
+  if (1 == TotalDelayed()) {
     // Starting delay, so reset counters.
     next_refill_time_ = 0;
     credit_in_bytes_ = 0;
@@ -30,7 +33,7 @@ std::unique_ptr<WriteControllerToken> WriteController::GetDelayToken(
   // next_refill_time_ will be based on an old rate. This rate will apply
   // for subsequent additional debts and for the next refill.
   set_delayed_write_rate(source, write_rate);
-  return std::unique_ptr<WriteControllerToken>(new DelayWriteToken(this));
+  return std::unique_ptr<WriteControllerToken>(new DelayWriteToken(this, source_value));
 }
 
 std::unique_ptr<WriteControllerToken>
@@ -52,7 +55,7 @@ uint64_t WriteController::GetDelay(SystemClock* clock, uint64_t num_bytes) {
   if (total_stopped_.load(std::memory_order_relaxed) > 0) {
     return 0;
   }
-  if (total_delayed_.load(std::memory_order_relaxed) == 0) {
+  if (TotalDelayed() == 0) {
     return 0;
   }
 
@@ -109,8 +112,11 @@ StopWriteToken::~StopWriteToken() {
 }
 
 DelayWriteToken::~DelayWriteToken() {
-  controller_->total_delayed_--;
-  assert(controller_->total_delayed_.load() >= 0);
+  auto total_delayed_before = controller_->total_delayed_[source_value_]--;
+  assert(controller_->total_delayed_[source_value_].load() >= 0);
+  if (total_delayed_before == 1) {
+    controller_->total_delayed_[source_value_] = controller_->max_delayed_write_rate();
+  }
 }
 
 CompactionPressureToken::~CompactionPressureToken() {

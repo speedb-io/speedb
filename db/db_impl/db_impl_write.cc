@@ -1093,6 +1093,11 @@ Status DBImpl::PreprocessWrite(const WriteOptions& write_options,
     if (write_options.no_slowdown) {
       status = Status::Incomplete("Write stall");
     } else {
+      // Initiating a flush to avoid blocking forever      
+      if (num_running_flushes_ == 0) {
+        WaitForPendingWrites();
+        status = HandleWriteBufferManagerFlush(write_context);
+      }
       WriteBufferManagerStallWrites();
     }
   }

@@ -328,6 +328,22 @@ DEFINE_int64(max_scan_distance, 0,
 
 DEFINE_bool(use_uint64_comparator, false, "use Uint64 user comparator");
 
+DEFINE_bool(allow_wbm_delays_and_stalls, true,
+            "Enable WBM write stalls and delays ");
+DEFINE_bool(initiate_wbm_flushes, true,
+            "WBM will proactively initiate flushes (Speedb)."
+            "If false, WBM-related flushes will be initiated using the "
+            "ShouldFlush() service "
+            "of the WBM.");
+DEFINE_bool(disable_non_wbm_initated_auto_flushes, true,
+            "In case FLAGS_initiate_wbm_flushes is true, this flag will "
+            "overwrite the applilcable "
+            "options so that only the WBM will initiate automatic flushes.");
+DEFINE_uint32(max_num_parallel_flushes, 0,
+              "In case FLAGGS_initiate_wbm_flushes is true, this flag will "
+              "overwrite the default "
+              "max number of parallel flushes.");
+
 DEFINE_int64(batch_size, 1, "Batch size");
 
 static bool ValidateKeySize(const char* /*flagname*/, int32_t /*value*/) {
@@ -3880,10 +3896,6 @@ class Benchmark {
 
     options.env = FLAGS_env;
     options.max_open_files = FLAGS_open_files;
-    if (FLAGS_cost_write_buffer_to_cache || FLAGS_db_write_buffer_size != 0) {
-      options.write_buffer_manager.reset(
-          new WriteBufferManager(FLAGS_db_write_buffer_size, cache_));
-    }
     options.arena_block_size = FLAGS_arena_block_size;
     options.write_buffer_size = FLAGS_write_buffer_size;
     options.max_write_buffer_number = FLAGS_max_write_buffer_number;
@@ -4287,6 +4299,18 @@ class Benchmark {
         exit(1);
       }
       options.comparator = test::BytewiseComparatorWithU64TsWrapper();
+    }
+
+    if (FLAGS_cost_write_buffer_to_cache || FLAGS_db_write_buffer_size != 0) {
+      WriteBufferManager::FlushInitiationOptions flush_initiation_options;
+      if (FLAGS_max_num_parallel_flushes > 0U) {
+        flush_initiation_options.max_num_parallel_flushes =
+            FLAGS_max_num_parallel_flushes;
+      }
+
+      options.write_buffer_manager.reset(new WriteBufferManager(
+          FLAGS_db_write_buffer_size, cache_, FLAGS_allow_wbm_delays_and_stalls,
+          FLAGS_initiate_wbm_flushes, flush_initiation_options));
     }
 
     // Integrated BlobDB

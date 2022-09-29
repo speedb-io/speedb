@@ -291,6 +291,14 @@ std::string WriteBufferManager::GetPrintableOptions() const {
            "size", buffer_size());
   ret.append(buffer);
 
+  snprintf(buffer, kBufferSize, "%*s: %d\n", field_width,
+           "allow_delays_and_stalls", IsDelayAllowed());
+  ret.append(buffer);
+
+  snprintf(buffer, kBufferSize, "%*s: %d\n", field_width,
+           "initiate_flushes", IsInitiatingFlushes());
+  ret.append(buffer);
+
   return ret;
 }
 

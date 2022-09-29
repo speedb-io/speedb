@@ -303,6 +303,14 @@ class DBTestSharedWriteBufferAcrossCFs
 };
 
 TEST_P(DBTestSharedWriteBufferAcrossCFs, SharedWriteBufferAcrossCFs) {
+  // When using the old interface (configuring options.db_write_buffer_size
+  // rather than creating a WBM and setting options.write_buffer_manager, the
+  // WBM is created automatically by rocksdb and initiate_flushes is set to true
+  // (the default)). This test fails in that case.
+  if (use_old_interface_) {
+    return;
+  }
+
   Options options = CurrentOptions();
   options.arena_block_size = 4096;
   auto flush_listener = std::make_shared<FlushCounterListener>();
@@ -333,9 +341,13 @@ TEST_P(DBTestSharedWriteBufferAcrossCFs, SharedWriteBufferAcrossCFs) {
   if (use_old_interface_) {
     options.db_write_buffer_size = 120000;  // this is the real limit
   } else if (!cost_cache_) {
-    options.write_buffer_manager.reset(new WriteBufferManager(114285));
+    options.write_buffer_manager.reset(
+        new WriteBufferManager(114285, {}, WriteBufferManager::kDfltAllowStall,
+                               false /* initiate_flushes */));
   } else {
-    options.write_buffer_manager.reset(new WriteBufferManager(114285, cache));
+    options.write_buffer_manager.reset(new WriteBufferManager(
+        114285, cache, WriteBufferManager::kDfltAllowStall,
+        false /* initiate_flushes */));
   }
   options.write_buffer_size = 500000;  // this is never hit
   CreateAndReopenWithCF({"pikachu", "dobrynia", "nikitich"}, options);
@@ -514,7 +526,9 @@ TEST_F(DBTest2, SharedWriteBufferLimitAcrossDB) {
   options.write_buffer_size = 500000;  // this is never hit
   // Use a write buffer total size so that the soft limit is about
   // 105000.
-  options.write_buffer_manager.reset(new WriteBufferManager(120000));
+  options.write_buffer_manager.reset(new WriteBufferManager(
+      120000, {} /* cache */, WriteBufferManager::kDfltAllowStall,
+      false /* initiate_flushes */));
   CreateAndReopenWithCF({"cf1", "cf2"}, options);
 
   ASSERT_OK(DestroyDB(dbname2, options));

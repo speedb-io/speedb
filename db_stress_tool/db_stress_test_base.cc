@@ -2963,6 +2963,7 @@ void InitializeOptionsFromFlags(
   options.atomic_flush = FLAGS_atomic_flush;
   options.avoid_unnecessary_blocking_io = FLAGS_avoid_unnecessary_blocking_io;
   options.write_dbid_to_manifest = FLAGS_write_dbid_to_manifest;
+  options.avoid_unnecessary_blocking_io = FLAGS_avoid_unnecessary_blocking_io;
   options.avoid_flush_during_recovery = FLAGS_avoid_flush_during_recovery;
   options.max_write_batch_group_size_bytes =
       FLAGS_max_write_batch_group_size_bytes;

@@ -338,8 +338,13 @@ class WriteBufferManager final {
 
   // This is used outside the flushes_mu_ lock => only
   // additional_flush_initiation_size_ needs to be atomic
+  // TODO
+  // free mem can be delayed after flush ended due to a thread that holds the version
+  // for now the memory is accounted as dirty (althogh it is not)
+  // need to move the accounting to the cache / clean where it belong 
   bool ShouldInitiateAnotherFlushMemOnly(size_t curr_memory_used) const {
-    return (curr_memory_used >= additional_flush_initiation_size_);
+    return (curr_memory_used - memory_being_freed_ >= additional_flush_step_size_/2 &&
+	    curr_memory_used >= additional_flush_initiation_size_);
   }
 
   // This should be called only unther the flushes_mu_ lock

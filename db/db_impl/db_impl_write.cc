@@ -1040,7 +1040,12 @@ std::unique_ptr<WriteControllerToken> SetupDelayFromFactor(
   auto wbm_write_rate = max_write_rate;
   if (max_write_rate >= kMinWriteRate) {
     // If user gives rate less than kMinWriteRate, don't adjust it.
-    wbm_write_rate = max_write_rate / delay_factor;
+    assert(delay_factor <= WriteBufferManager::kMaxDelayedWriteFactor);
+    auto write_rate_factor = static_cast<double>(1 + WriteBufferManager::kMaxDelayedWriteFactor - delay_factor) / 
+                              WriteBufferManager::kMaxDelayedWriteFactor;                              
+    wbm_write_rate = max_write_rate * write_rate_factor;
+    // printf("delay_factor:%d, write_rate_factor:%d, max_write_rate:%d, wbm_write_rate:%d\n",
+    //         (int)delay_factor, (int)write_rate_factor, (int)max_write_rate, (int)wbm_write_rate);
   }
 
   return write_controller.GetDelayToken(WriteController::DelaySource::kWBM,
@@ -1114,12 +1119,7 @@ Status DBImpl::PreprocessWrite(const WriteOptions& write_options,
           auto wbm_quota = write_buffer_manager_->buffer_size();
           assert(wbm_quota > 0U);
           auto wbm_used_percentage = (100 * wbm_memory_used) / wbm_quota;
-          // // printf("Write - WBM Delay - %" PRIu64 "%%(%" PRIu64 "/%" PRIu64
-          // //                "). Factor:%" PRIu64 ", Controller-Rate:%" PRIu64 ", ",
-          // //                wbm_used_percentage, wbm_memory_used, wbm_quota,
-          // //                new_delayed_write_factor,
-          // //                write_controller_.delayed_write_rate());
-          ROCKS_LOG_INFO(immutable_db_options_.info_log,
+          ROCKS_LOG_WARN(immutable_db_options_.info_log,
                          "Delaying writes due to WBM's usage relative to quota "
                          "which is %" PRIu64 "%%(%" PRIu64 "/%" PRIu64
                          "). "

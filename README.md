@@ -65,7 +65,7 @@ Release:
     cmake .. -DCMAKE_BUILD_TYPE=Release [cmake options]
     make rocksdb
 
-This will build the static library. If you want to build the dynammic library,
+This will build the static library. If you want to build the dynamic library,
 use:
 
     make rocksdb-shared

@@ -115,7 +115,7 @@ DelayWriteToken::~DelayWriteToken() {
   auto total_delayed_before = controller_->total_delayed_[source_value_]--;
   assert(controller_->total_delayed_[source_value_].load() >= 0);
   if (total_delayed_before == 1) {
-    controller_->total_delayed_[source_value_] = controller_->max_delayed_write_rate();
+    controller_->delayed_write_rates_[source_value_] = controller_->max_delayed_write_rate();
   }
 }
 

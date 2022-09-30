@@ -7,6 +7,7 @@
 #include <vector>
 #include <thread>
 #include <unistd.h>
+#include <array>
 
 #include "rocksdb/db.h"
 #include "rocksdb/slice.h"
@@ -33,16 +34,17 @@ static int write_thread(int tid, size_t write_rate) {
   DB* db;
   Options options;  
   options.create_if_missing = true;
-  options.IncreaseParallelism();
-  options.compression = rocksdb::kNoCompression;
-  options.write_buffer_size = 1024 * 1024 * 256;
+  options.db_write_buffer_size = wbm->buffer_size();
+  // // SanitizeOptionsToDisableFlushesBasedOnWriteBufferOptions(options);
+  options.write_buffer_size = options.db_write_buffer_size / 2;
+  options.max_write_buffer_number = (options.db_write_buffer_size / options.write_buffer_size + 1) * 2;
+  options.min_write_buffer_number_to_merge = options.max_write_buffer_number / 2;
   options.write_buffer_manager = wbm;
 
-  // open DB with N column families  
-  std::vector<ColumnFamilyDescriptor> column_families;
-  // have to open default column family
-  column_families.push_back(ColumnFamilyDescriptor(
-      ROCKSDB_NAMESPACE::kDefaultColumnFamilyName, ColumnFamilyOptions()));
+  options.IncreaseParallelism();
+  options.compression = rocksdb::kNoCompression;
+
+  options.delayed_write_rate = 256 * 1024 * 1024; // 128MBPS
 
   char tsuf[64];
   sprintf(tsuf, "%d", tid);
@@ -52,10 +54,15 @@ static int write_thread(int tid, size_t write_rate) {
   auto s = DB::Open(options, db_path,  &db);
   assert(s.ok());
 
+  ColumnFamilyOptions cf_options;
+  cf_options.write_buffer_size = options.write_buffer_size;
+  cf_options.max_write_buffer_number = options.max_write_buffer_number;
+  cf_options.min_write_buffer_number_to_merge = options.min_write_buffer_number_to_merge;
+  
   for (int i = 0; i < 2; i++) {
     char cf_name[64];
     sprintf(cf_name, "cf_%d", i);
-    s = db->CreateColumnFamily(ColumnFamilyOptions(), cf_name, &handles[i]);
+    s = db->CreateColumnFamily(cf_options, cf_name, &handles[i]);
     assert(s.ok());
   }
   
@@ -90,21 +97,25 @@ static int write_thread(int tid, size_t write_rate) {
   return 0;
 }
 
-
 void report_thread(int count)
 {
+  std::array<int, 10> pred_ios {};
+
   for (int t = 0; t < 1800; t++)  {
     sleep(1);
     printf("%d ,", t);
     for (int i = 0; i < count; i++) {
-      printf("%d , ", ios[i]);
+      printf("%d , %d", ios[i], ios[i] - pred_ios[i]);
+      pred_ios[i] = ios[i];
     }
     printf("\n" );
+
   } 
 }
 
 int main() {
   
+  // // // wbm.reset(new  WriteBufferManager(1024 * 1024 * 256, {}, true, true));
   wbm.reset(new  WriteBufferManager(1024 * 1024 * 256, {}, true));
   std::thread *threads[10];
   std::thread *reporter;

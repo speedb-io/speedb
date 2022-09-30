@@ -746,8 +746,7 @@ std::unique_ptr<WriteControllerToken> SetupDelay(
   const uint64_t kMinWriteRate = 16 * 1024u;  // Minimum write rate 16KB/s.
 
   uint64_t max_write_rate = write_controller->max_delayed_write_rate();
-  uint64_t write_rate = write_controller->delayed_write_rate();
-
+  uint64_t write_rate = write_controller->delayed_write_rate(WriteController::kSourceCf);
   if (auto_comapctions_disabled) {
     // When auto compaction is disabled, always use the value user gave.
     write_rate = max_write_rate;

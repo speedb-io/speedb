@@ -98,6 +98,8 @@ class WriteController {
   }
 
   uint64_t delayed_write_rate() const { return delayed_write_rate_; }
+  uint64_t delayed_write_rate(int src) const { return delayed_write_rates_[src]; }
+  
 
   uint64_t max_delayed_write_rate() const { return max_delayed_write_rate_; }
 

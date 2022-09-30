@@ -478,7 +478,7 @@ void WriteBufferManager::InitFlushInitiationVars(size_t quota) {
   {
     std::unique_lock<std::mutex> lock(flushes_mu_);
     additional_flush_step_size_ =
-        quota / flush_initiation_options_.max_num_parallel_flushes;
+        quota * kStartDelayPercentThreshold / 100 / flush_initiation_options_.max_num_parallel_flushes;
     flush_initiation_start_size_ = additional_flush_step_size_;
     // TODO - Update this to a formula. If it depends on the number of initators
     // => update when that number changes

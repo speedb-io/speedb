@@ -12,11 +12,12 @@
 #include "rocksdb/slice.h"
 #include "rocksdb/options.h"
 #include "rocksdb/rate_limiter.h"
+#include "common.h"
 
 #if defined(OS_WIN)
-std::string kDBPath = "C:\\Windows\\TEMP\\rocksdb_column_families_example";
+std::string kDBPath = "C:\\Windows\\TEMP\\rocksdb_multiple_db_example";
 #else
-std::string kDBPath = "/tmp/rocksdb_column_families_example";
+std::string kDBPath = "/tmp/rocksdb_multiple_db_example";
 #endif
 
 using namespace ROCKSDB_NAMESPACE;
@@ -34,14 +35,8 @@ static int write_thread(int tid, size_t write_rate) {
   Options options;  
   options.create_if_missing = true;
   options.compression = rocksdb::kNoCompression;
-  options.write_buffer_size = 1024 * 1024 * 256;
-  options.write_buffer_manager = wbm;
 
-  // open DB with N column families  
-  std::vector<ColumnFamilyDescriptor> column_families;
-  // have to open default column family
-  column_families.push_back(ColumnFamilyDescriptor(
-      ROCKSDB_NAMESPACE::kDefaultColumnFamilyName, ColumnFamilyOptions()));
+  ddm_tests::OptimizeOptions(wbm, options);
 
   char tsuf[64];
   sprintf(tsuf, "%d", tid);
@@ -51,13 +46,13 @@ static int write_thread(int tid, size_t write_rate) {
   auto s = DB::Open(options, db_path,  &db);
   assert(s.ok());
 
+  auto cf_options = ddm_tests::GetCfOptionsFromOptions(options);  
   for (int i = 0; i < 2; i++) {
     char cf_name[64];
     sprintf(cf_name, "cf_%d", i);
-    s = db->CreateColumnFamily(ColumnFamilyOptions(), cf_name, &handles[i]);
+    s = db->CreateColumnFamily(cf_options, cf_name, &handles[i]);
     assert(s.ok());
-  }
-  
+  }  
 
   const int kDataSize = 1024;
   int val[kDataSize / sizeof(int)];
@@ -103,9 +98,8 @@ void report_thread(int count)
   } 
 }
 
-int main() {
-  
-  wbm.reset(new  WriteBufferManager(1024 * 1024 * 256, {}, true));
+int main() {  
+  wbm = ddm_tests::CreateWBM();
   const int n_threads = 10;
   std::thread *threads[n_threads];
   std::thread *reporter;

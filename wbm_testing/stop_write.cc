@@ -12,11 +12,12 @@
 #include "rocksdb/slice.h"
 #include "rocksdb/options.h"
 #include "rocksdb/rate_limiter.h"
+#include "common.h"
 
 #if defined(OS_WIN)
-std::string kDBPath = "C:\\Windows\\TEMP\\rocksdb_column_families_example";
+std::string kDBPath = "C:\\Windows\\TEMP\\rocksdb_stop_writes_example";
 #else
-std::string kDBPath = "/tmp/rocksdb_column_families_example";
+std::string kDBPath = "/tmp/rocksdb_stop_writes_example";
 #endif
 
 using namespace ROCKSDB_NAMESPACE;
@@ -34,14 +35,10 @@ static int write_thread(int tid, size_t write_rate) {
   Options options;  
   options.create_if_missing = true;
   options.compression = rocksdb::kNoCompression;
-  options.write_buffer_size = 1024 * 1024 * 256;
-  options.write_buffer_manager = wbm;
 
-  // open DB with N column families  
-  std::vector<ColumnFamilyDescriptor> column_families;
+  ddm_tests::OptimizeOptions(wbm, options);
+
   // have to open default column family
-  column_families.push_back(ColumnFamilyDescriptor(
-      ROCKSDB_NAMESPACE::kDefaultColumnFamilyName, ColumnFamilyOptions()));
 
   char tsuf[64];
   sprintf(tsuf, "%d", tid);

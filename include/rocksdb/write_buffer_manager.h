@@ -380,7 +380,7 @@ class WriteBufferManager final {
 
   // Consider if this needs to be atomic
   size_t num_flushes_to_initiate_ = 0U;
-  size_t num_running_flushes_ = 0U;
+  std::atomic<size_t> num_running_flushes_ = 0U;
   size_t flush_initiation_start_size_ = 0U;
   size_t additional_flush_step_size_ = 0U;
   std::atomic<size_t> additional_flush_initiation_size_ = 0U;

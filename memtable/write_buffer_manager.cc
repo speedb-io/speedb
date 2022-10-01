@@ -479,6 +479,7 @@ void WriteBufferManager::InitFlushInitiationVars(size_t quota) {
     std::unique_lock<std::mutex> lock(flushes_mu_);
     additional_flush_step_size_ =
         quota * kStartDelayPercentThreshold / 100 / flush_initiation_options_.max_num_parallel_flushes;
+    
     flush_initiation_start_size_ = additional_flush_step_size_;
     // TODO - Update this to a formula. If it depends on the number of initators
     // => update when that number changes
@@ -546,17 +547,22 @@ void WriteBufferManager::InitiateFlushesThread() {
           std::unique_lock<std::mutex> initiators_lock(flushes_initiators_mu_);
           auto& initiator = flush_initiators_[next_candidate_initiator_idx_];
           next_candidate_initiator_idx_ = CalcNextCandidateInitiatorIdx();
+          ++num_running_flushes_;
+          --num_flushes_to_initiate_;	  
           was_flush_initiated = initiator.cb(kMinFlushSizes[iter]);
+	  if (!was_flush_initiated) {
+            --num_running_flushes_;
+            ++num_flushes_to_initiate_;
+	  }	    
         }
 
         lock.lock();
         if (was_flush_initiated) {
           // Not recalculating flush initiation size since the increment &
           // decrement cancel each other with respect to the recalc
-          assert(num_running_flushes_ <
-                 flush_initiation_options_.max_num_parallel_flushes);
-          ++num_running_flushes_;
-          --num_flushes_to_initiate_;
+	  
+          // assert(num_running_flushes_ <
+          //       flush_initiation_options_.max_num_parallel_flushes);
           num_repeated_failures_to_initiate = 0U;
         } else {
           ++num_repeated_failures_to_initiate;
@@ -612,10 +618,15 @@ void WriteBufferManager::FlushEnded(bool /* wbm_initiated */) {
 }
 
 void WriteBufferManager::RecalcFlushInitiationSize() {
-  additional_flush_initiation_size_ =
-      flush_initiation_start_size_ +
-      additional_flush_step_size_ *
-          (num_running_flushes_ + num_flushes_to_initiate_);
+  if (num_running_flushes_ + num_flushes_to_initiate_ >=
+      flush_initiation_options_.max_num_parallel_flushes) {
+    additional_flush_initiation_size_ = buffer_size();
+  } else {
+    additional_flush_initiation_size_ =
+        flush_initiation_start_size_ +
+        additional_flush_step_size_ *
+            (num_running_flushes_ + num_flushes_to_initiate_);
+  }
 }
 
 void WriteBufferManager::ReevaluateNeedForMoreFlushes(size_t curr_memory_used) {

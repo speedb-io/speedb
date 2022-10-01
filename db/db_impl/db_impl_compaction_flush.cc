@@ -2775,12 +2775,18 @@ Status DBImpl::BackgroundFlush(bool* made_progress, JobContext* job_context,
           bg_job_limits.max_compactions, bg_flush_scheduled_,
           bg_compaction_scheduled_);
     }
+    // HILIK: must move here 
+    *reason = bg_flush_args[0].cfd_->GetFlushReason();
+    if (write_buffer_manager_) {
+      write_buffer_manager_->FlushStarted(
+          *reason == FlushReason::kSpeedbWriteBufferManager);
+    }
+    
     status = FlushMemTablesToOutputFiles(bg_flush_args, made_progress,
                                          job_context, log_buffer, thread_pri);
     TEST_SYNC_POINT("DBImpl::BackgroundFlush:BeforeFlush");
     // All the CFDs in the FlushReq must have the same flush reason, so just
     // grab the first one
-    *reason = bg_flush_args[0].cfd_->GetFlushReason();
     for (auto& arg : bg_flush_args) {
       ColumnFamilyData* cfd = arg.cfd_;
       if (cfd->UnrefAndTryDelete()) {
@@ -2816,10 +2822,6 @@ void DBImpl::BackgroundCallFlush(Env::Priority thread_pri) {
 
     Status s = BackgroundFlush(&made_progress, &job_context, &log_buffer,
                                &reason, thread_pri);
-    if (write_buffer_manager_) {
-      write_buffer_manager_->FlushStarted(
-          reason == FlushReason::kSpeedbWriteBufferManager);
-    }
 
     if (!s.ok() && !s.IsShutdownInProgress() && !s.IsColumnFamilyDropped() &&
         reason != FlushReason::kErrorRecovery) {

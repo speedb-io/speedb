@@ -18,7 +18,6 @@
 
 #include <algorithm>
 #include <atomic>
-#include <condition_variable>  // std::condition_variable
 #include <list>
 #include <vector>
 
@@ -88,7 +87,7 @@ struct BucketHeader {
 
 struct SpdbHashTable {
   std::vector<BucketHeader> buckets_;
-  std::vector<port::Mutex> mutexes_;
+  std::vector<port::RWMutexWr> mutexes_;
 
   SpdbHashTable(size_t n_buckets, size_t n_mutexes)
       : buckets_(n_buckets), mutexes_(n_mutexes) {}
@@ -96,7 +95,7 @@ struct SpdbHashTable {
   bool Add(SpdbKeyHandle* val, const MemTableRep::KeyComparator& comparator) {
     auto mutex_and_bucket = GetMutexAndBucket(val->key, comparator);
     BucketHeader* bucket = mutex_and_bucket.second;
-    MutexLock l(mutex_and_bucket.first);
+    WriteLock wl(mutex_and_bucket.first);
     return bucket->Add(val, comparator);
   }
 
@@ -104,7 +103,7 @@ struct SpdbHashTable {
                 const MemTableRep::KeyComparator& comparator) const {
     auto mutex_and_bucket = GetMutexAndBucket(check_key, comparator);
     BucketHeader* bucket = mutex_and_bucket.second;
-    MutexLock l(mutex_and_bucket.first);
+    ReadLock rl(mutex_and_bucket.first);
     return bucket->Contains(comparator, check_key);
   }
 
@@ -112,17 +111,14 @@ struct SpdbHashTable {
            void* callback_args,
            bool (*callback_func)(void* arg, const char* entry)) const {
     auto mutex_and_bucket = GetMutexAndBucket(k.internal_key(), comparator);
-    MutexLock l(mutex_and_bucket.first);
+    ReadLock rl(mutex_and_bucket.first);
 
     auto iter = mutex_and_bucket.second->items_;
 
     for (; iter != nullptr; iter = iter->next) {
       if (comparator(iter->key, k.internal_key()) >= 0) {
-        break;
+        continue;
       }
-    }
-
-    for (; iter != nullptr; iter = iter->next) {
       if (!callback_func(callback_args, iter->key)) {
         break;
       }
@@ -144,18 +140,18 @@ struct SpdbHashTable {
     return ExtractUserKeyAndStripTimestamp(internal_key, ts_sz);
   }
 
-  std::pair<port::Mutex*, BucketHeader*> GetMutexAndBucket(
+  std::pair<port::RWMutexWr*, BucketHeader*> GetMutexAndBucket(
       const char* key, const MemTableRep::KeyComparator& comparator) const {
     return GetMutexAndBucket(comparator.decode_key(key), comparator);
   }
 
-  std::pair<port::Mutex*, BucketHeader*> GetMutexAndBucket(
+  std::pair<port::RWMutexWr*, BucketHeader*> GetMutexAndBucket(
       const Slice& internal_key,
       const MemTableRep::KeyComparator& comparator) const {
     const size_t hash =
         GetHash(UserKeyWithoutTimestamp(internal_key, comparator));
-    port::Mutex* mutex =
-        const_cast<port::Mutex*>(&mutexes_[hash % mutexes_.size()]);
+    port::RWMutexWr* mutex =
+        const_cast<port::RWMutexWr*>(&mutexes_[hash % mutexes_.size()]);
     BucketHeader* bucket =
         const_cast<BucketHeader*>(&buckets_[hash % buckets_.size()]);
     return {mutex, bucket};
@@ -167,8 +163,8 @@ struct SpdbHashTable {
 bool SpdbVector::Add(const char* key) {
   ReadLock rl(&add_rwlock_);
   if (sorted_) {
-    // it means this  entry arrived after an iterator was created and this vector is immutable
-    // return with false
+    // it means this  entry arrived after an iterator was created and this
+    // vector is immutable return with false
     return false;
   }
   const size_t location = n_elements_.fetch_add(1, std::memory_order_relaxed);
@@ -314,7 +310,7 @@ bool SpdbVectorContainer::InitIterator(IterAnchors& iter_anchor) {
         spdb_vectors_.push_back(spdb_vector);
         spdb_vector->SetVectorListIter(std::prev(spdb_vectors_.end()));
         curr_vector_.store(spdb_vector.get());
-      }      
+      }
       notify_sort_thread = true;
     } else {
       --last_iter;
@@ -446,6 +442,10 @@ class HashSpdRep : public MemTableRep {
   HashSpdRep(const MemTableRep::KeyComparator& compare, Allocator* allocator,
              size_t bucket_size, size_t spdb_vector_limit_size);
 
+  HashSpdRep(Allocator* allocator, size_t bucket_size);
+  void PostCreate(const MemTableRep::KeyComparator& compare,
+                  Allocator* allocator, uint32_t add_vector_limit_size);
+
   KeyHandle Allocate(const size_t len, char** buf) override;
 
   void Insert(KeyHandle handle) override { InsertKey(handle); }
@@ -476,24 +476,40 @@ class HashSpdRep : public MemTableRep {
   ~HashSpdRep() override;
 
   MemTableRep::Iterator* GetIterator(Arena* arena = nullptr) override;
-  
+
   const MemTableRep::KeyComparator& GetComparator() const {
     return spdb_vectors_cont_->GetComparator();
   }
+
  private:
   SpdbHashTable spdb_hash_table_;
-  std::shared_ptr<SpdbVectorContainer> spdb_vectors_cont_;
+  std::shared_ptr<SpdbVectorContainer> spdb_vectors_cont_ = nullptr;
 };
 
 HashSpdRep::HashSpdRep(const MemTableRep::KeyComparator& compare,
                        Allocator* allocator, size_t bucket_size,
                        size_t add_list_limit_size)
-    : MemTableRep(allocator),
-      spdb_hash_table_(bucket_size, 1024),
-      spdb_vectors_cont_(
-          new SpdbVectorContainer(compare, add_list_limit_size)) {}
+    : HashSpdRep(allocator, bucket_size) {
+  spdb_vectors_cont_ =
+      std::make_shared<SpdbVectorContainer>(compare, add_list_limit_size);
+}
 
-HashSpdRep::~HashSpdRep() { MarkReadOnly(); }
+HashSpdRep::HashSpdRep(Allocator* allocator, size_t bucket_size)
+    : MemTableRep(allocator), spdb_hash_table_(bucket_size, 1024) {}
+
+void HashSpdRep::PostCreate(const MemTableRep::KeyComparator& compare,
+                            Allocator* allocator,
+                            uint32_t add_list_limit_size) {
+  allocator_ = allocator;
+  spdb_vectors_cont_ =
+      std::make_shared<SpdbVectorContainer>(compare, add_list_limit_size);
+}
+
+HashSpdRep::~HashSpdRep() {
+  if (spdb_vectors_cont_) {
+    MarkReadOnly();
+  }
+}
 
 KeyHandle HashSpdRep::Allocate(const size_t len, char** buf) {
   constexpr size_t kInlineDataSize =
@@ -564,12 +580,64 @@ static std::unordered_map<std::string, OptionTypeInfo> hash_spd_factory_info = {
 HashSpdRepFactory::HashSpdRepFactory(size_t bucket_count)
     : bucket_count_(bucket_count) {
   RegisterOptions("", &bucket_count_, &hash_spd_factory_info);
+  switch_memtable_thread_ =
+      std::thread(&HashSpdRepFactory::PrepareSwitchMemTable, this);
 }
 
+// HashSpdRepFactory
+
+HashSpdRepFactory::~HashSpdRepFactory() {
+  {
+    std::unique_lock<std::mutex> lck(switch_memtable_thread_mutex_);
+    terminate_switch_memtable_ = true;
+  }
+  switch_memtable_thread_cv_.notify_one();
+  switch_memtable_thread_.join();
+
+  const MemTableRep* memtable = switch_mem_.exchange(nullptr);
+  if (memtable != nullptr) {
+    delete memtable;
+  }
+}
 MemTableRep* HashSpdRepFactory::CreateMemTableRep(
     const MemTableRep::KeyComparator& compare, Allocator* allocator,
     const SliceTransform* /*transform*/, Logger* /*logger*/) {
-  return new HashSpdRep(compare, allocator, bucket_count_, 10000);
+  return GetSwitchMemtable(compare, allocator);
+}
+
+void HashSpdRepFactory::PrepareSwitchMemTable() {
+  for (;;) {
+    {
+      std::unique_lock<std::mutex> lck(switch_memtable_thread_mutex_);
+      while (switch_mem_.load(std::memory_order_acquire) != nullptr) {
+        if (terminate_switch_memtable_) {
+          return;
+        }
+
+        switch_memtable_thread_cv_.wait(lck);
+      }
+    }
+    switch_mem_.store(new HashSpdRep(nullptr, bucket_count_),
+                      std::memory_order_release);
+  }
+}
+
+MemTableRep* HashSpdRepFactory::GetSwitchMemtable(
+    const MemTableRep::KeyComparator& compare, Allocator* allocator) {
+  MemTableRep* switch_mem = nullptr;
+  {
+    std::unique_lock<std::mutex> lck(switch_memtable_thread_mutex_);
+    switch_mem = switch_mem_.exchange(nullptr, std::memory_order_release);
+  }
+  switch_memtable_thread_cv_.notify_one();
+
+  if (switch_mem == nullptr) {
+    // No point in suspending, just construct the memtable here
+    switch_mem = new HashSpdRep(compare, allocator, bucket_count_, 10000);
+  } else {
+    static_cast<HashSpdRep*>(switch_mem)->PostCreate(compare, allocator, 10000);
+  }
+  return switch_mem;
 }
 
 }  // namespace ROCKSDB_NAMESPACE

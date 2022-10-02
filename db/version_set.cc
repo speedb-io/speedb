@@ -3452,7 +3452,7 @@ void VersionStorageInfo::GetOverlappingInputs(
   // build index in reverse order to make sure that files are picked from oldest
   // to newest. index stores the file index need to check.
   std::list<size_t> index;
-  for (size_t i = level_files_brief_[level].num_files - 1; i >= 0; i--) {
+  for (int64_t i = level_files_brief_[level].num_files - 1; i >= 0; i--) {
     index.emplace_back(i);
   }
   uint64_t cur_files_size = 0;

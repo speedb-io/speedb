@@ -81,7 +81,7 @@ class SpdbVector {
   std::atomic<bool> sorted_;
   // this is the iter the SpdbVector 
   std::list<std::shared_ptr<SpdbVector>>::iterator iter_;
-  port::RWMutex add_rwlock_;
+  port::RWMutexWr add_rwlock_;
 
 };
 
@@ -219,10 +219,10 @@ class SpdbVectorContainer {
     }
     sort_thread_cv_.notify_one();
   }
-
   const MemTableRep::KeyComparator& GetComparator() const {
     return comparator_;
   }
+
  private:
   void SortThread();
 
@@ -232,8 +232,8 @@ class SpdbVectorContainer {
              std::list<SpdbVectorPtr>::iterator& last);
 
  private:
-  port::RWMutex spdb_vectors_add_rwlock_;
-  port::RWMutex spdb_vectors_merge_rwlock_;
+  port::RWMutexWr spdb_vectors_add_rwlock_;
+  port::RWMutexWr spdb_vectors_merge_rwlock_;
   port::Mutex spdb_vectors_mutex_;
   std::list<SpdbVectorPtr> spdb_vectors_;
   std::atomic<SpdbVector*> curr_vector_;

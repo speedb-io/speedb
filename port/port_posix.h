@@ -151,8 +151,21 @@ class RWMutex {
   void WriteUnlock();
   void AssertHeld() { }
 
- private:
+ protected:
   pthread_rwlock_t mu_; // the underlying platform mutex
+};
+
+// RWLock with write preference
+class RWMutexWr : public RWMutex {
+ public:
+  RWMutexWr();
+  void ReadLock();
+  void WriteLock();
+
+ private:
+  std::atomic<int> m_wr_pending;
+  std::mutex wr_pending_mutex_;
+  std::condition_variable wr_pending_cv_;
 };
 
 class CondVar {

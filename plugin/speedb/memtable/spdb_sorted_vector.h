@@ -206,6 +206,9 @@ class SpdbVectorContainer {
     }
     sort_thread_cv_.notify_one();
   }
+  const MemTableRep::KeyComparator& GetComparator() const {
+    return comparator_;
+  }
 
  private:
   void SortThread();

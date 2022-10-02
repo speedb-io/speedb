@@ -25,7 +25,7 @@
 #include "rocksdb/cache.h"
 
 namespace ROCKSDB_NAMESPACE {
-class Options;
+struct Options;
 class CacheReservationManager;
 
 // Interface to block and signal DB instances, intended for RocksDB

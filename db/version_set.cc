@@ -1743,12 +1743,12 @@ VersionStorageInfo::VersionStorageInfo(
       estimated_compaction_needed_bytes_(0),
       finalized_(false),
       force_consistency_checks_(_force_consistency_checks) {
-  max_l0_files_to_compact_ =
-      mutable_cf_options.level0_stop_writes_trigger / 2 +
-      mutable_cf_options.level0_file_num_compaction_trigger / 2;
   level0_stop_writes_trigger_ = mutable_cf_options.level0_stop_writes_trigger;
-  min_l0_size_to_compact =
-      mutable_cf_options.write_buffer_size * max_l0_files_to_compact_;
+  level0_size_to_compact_ =
+      mutable_cf_options.write_buffer_size *
+      (mutable_cf_options.level0_stop_writes_trigger / 2 +
+       mutable_cf_options.level0_file_num_compaction_trigger / 2);
+  // one_compaction_thread = mutable_cf_options
 
   if (ref_vstorage != nullptr) {
     accumulated_file_size_ = ref_vstorage->accumulated_file_size_;
@@ -3404,7 +3404,7 @@ bool VersionStorageInfo::OverlapInLevel(int level,
 }
 
 // Store in "*inputs" all files in "level" that overlap [begin,end]
-// or max_l0_files_to_compact_ files to limit the compaction size.
+// up to level0_size_to_compact_ Mb to limit the compaction size.
 // If hint_index is specified, then it points to a file in the
 // overlapping range.
 // The file_index returns a pointer to any file in an overlapping range.
@@ -3496,15 +3496,14 @@ void VersionStorageInfo::GetOverlappingInputs(
         }
 
         // stop accumulating L0 files for compaction once enough are added.
-        // 2nd condition is to keep the bulkload behavior of compacting all L0
-        // files at once. and then the 2nd if () is to ensure we only stop
-        // accumulating L0 files if the compaction is big enough.
-        if (inputs->size() >= max_l0_files_to_compact_ &&
-            level_files_brief_[level].num_files <=
-                level0_stop_writes_trigger_) {
-          if (cur_files_size > min_l0_size_to_compact) {
-            return;
-          }
+        // stop when:
+        //    1. its not a compaction after bulkload.
+        //    2. theres more than one compaction thread.
+        //    3. total size of currently selected files is big enough.
+        bool bulkload_situation =
+            level_files_brief_[level].num_files > level0_stop_writes_trigger_;
+        if (!bulkload_situation && cur_files_size > level0_size_to_compact_) {
+          return;
         }
       }
     }

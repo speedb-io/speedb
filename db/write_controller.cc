@@ -21,16 +21,20 @@ std::unique_ptr<WriteControllerToken> WriteController::GetStopToken() {
 
 std::unique_ptr<WriteControllerToken> WriteController::GetDelayToken(
     DelaySource source, uint64_t write_rate) {
-  if (0 == total_delayed_++) {
+  if (TotalDelayed() == 0) {
     // Starting delay, so reset counters.
     next_refill_time_ = 0;
     credit_in_bytes_ = 0;
   }
+
+  ++total_delayed_[DelaySourceValue(source)];
+
   // NOTE: for simplicity, any current credit_in_bytes_ or "debt" in
   // next_refill_time_ will be based on an old rate. This rate will apply
   // for subsequent additional debts and for the next refill.
   set_delayed_write_rate(source, write_rate);
-  return std::unique_ptr<WriteControllerToken>(new DelayWriteToken(this));
+  return std::unique_ptr<WriteControllerToken>(
+      new DelayWriteToken(this, source));
 }
 
 std::unique_ptr<WriteControllerToken>
@@ -41,6 +45,8 @@ WriteController::GetCompactionPressureToken() {
 }
 
 bool WriteController::IsStopped() const {
+  // TODO - All other uses of the token counters are using the default memory
+  // order, not relaxed!!!
   return total_stopped_.load(std::memory_order_relaxed) > 0;
 }
 // This is inside DB mutex, so we can't sleep and need to minimize
@@ -52,7 +58,7 @@ uint64_t WriteController::GetDelay(SystemClock* clock, uint64_t num_bytes) {
   if (total_stopped_.load(std::memory_order_relaxed) > 0) {
     return 0;
   }
-  if (total_delayed_.load(std::memory_order_relaxed) == 0) {
+  if (TotalDelayed() == 0) {
     return 0;
   }
 
@@ -109,8 +115,16 @@ StopWriteToken::~StopWriteToken() {
 }
 
 DelayWriteToken::~DelayWriteToken() {
-  controller_->total_delayed_--;
-  assert(controller_->total_delayed_.load() >= 0);
+  auto total_delayed_before =
+      controller_->total_delayed_[WriteController::DelaySourceValue(source_)]--;
+  assert(total_delayed_before > 0);
+
+  if (total_delayed_before == 1) {
+    // When all tokens of a source are cleared, it should not lower the global
+    // max delayed write rate
+    controller_->set_delayed_write_rate(source_,
+                                        controller_->max_delayed_write_rate());
+  }
 }
 
 CompactionPressureToken::~CompactionPressureToken() {

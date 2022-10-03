@@ -144,14 +144,12 @@ void WriteBufferManager::FreeMem(size_t mem) {
 
     assert(curr_memory_inactive >= mem);
     assert(curr_memory_being_freed >= mem);
+
+    UpdateUsageState(new_memory_used, -mem, buffer_size());
   }
 
   // Check if stall is active and can be ended.
   MaybeEndWriteStall();
-
-  if (is_enabled) {
-    UpdateUsageState(new_memory_used, -mem, buffer_size());
-  }
 }
 
 size_t WriteBufferManager::FreeMemWithCache(size_t mem) {
@@ -163,6 +161,7 @@ size_t WriteBufferManager::FreeMemWithCache(size_t mem) {
 
   const auto old_mem_used = memory_used_.load(std::memory_order_relaxed);
   assert(old_mem_used >= mem);
+
   size_t new_mem_used = old_mem_used - mem;
   memory_used_.store(new_mem_used, std::memory_order_relaxed);
   Status s = cache_res_mgr_->UpdateCacheReservation(new_mem_used);
@@ -262,6 +261,10 @@ std::string WriteBufferManager::GetPrintableOptions() const {
 
   snprintf(buffer, kBufferSize, "%*s: %" ROCKSDB_PRIszt "\n", field_width,
            "size", buffer_size());
+  ret.append(buffer);
+
+  snprintf(buffer, kBufferSize, "%*s: %d\n", field_width,
+           "allow_delays_and_stalls", IsDelayAllowed());
   ret.append(buffer);
 
   return ret;

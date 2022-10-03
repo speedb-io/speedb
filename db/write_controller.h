@@ -5,12 +5,17 @@
 
 #pragma once
 
+#include <logging/event_logger.h>
 #include <stdint.h>
 
 #include <algorithm>
 #include <atomic>
 #include <memory>
+#include <mutex>
+#include <numeric>
+#include <type_traits>
 
+#include "logging/logging.h"
 #include "rocksdb/rate_limiter.h"
 
 namespace ROCKSDB_NAMESPACE {
@@ -25,32 +30,36 @@ class WriteControllerToken;
 class WriteController {
  public:
   enum class DelaySource { kCF = 0, kWBM = 1, kNumSources };
-  static constexpr auto kNumDelaySources =
-      static_cast<size_t>(DelaySource::kNumSources);
+  static constexpr unsigned int DelaySourceValue(DelaySource source) {
+    return static_cast<int>(source);
+  }
+  static constexpr auto kNumDelaySources{
+      static_cast<int>(DelaySource::kNumSources)};
 
  public:
   explicit WriteController(uint64_t _delayed_write_rate = 1024u * 1024u * 32u,
                            int64_t low_pri_rate_bytes_per_sec = 1024 * 1024)
       : total_stopped_(0),
-        total_delayed_(0),
         total_compaction_pressure_(0),
         credit_in_bytes_(0),
         next_refill_time_(0),
         low_pri_rate_limiter_(
             NewGenericRateLimiter(low_pri_rate_bytes_per_sec)) {
     set_max_delayed_write_rate(_delayed_write_rate);
-    std::fill(delayed_write_rates_.begin(), delayed_write_rates_.end(),
-              max_delayed_write_rate());
   }
   ~WriteController() = default;
 
   // When an actor (column family) requests a stop token, all writes will be
   // stopped until the stop token is released (deleted)
   std::unique_ptr<WriteControllerToken> GetStopToken();
-  // When an actor (column family) requests a delay token, total delay for all
-  // writes to the DB will be controlled under the delayed write rate. Every
-  // write needs to call GetDelay() with number of bytes writing to the DB,
-  // which returns number of microseconds to sleep.
+  // Delay tokens are managed per delay source. Every delay source controls its
+  // own delay indepndently of the other sources. Every call to get a new delay
+  // token for a source, sets the delayed for that source (and overwrites the
+  // previous delay values of that source). The total delay for all writes is
+  // the smallest delayed write rate of all the individaul sources. Writes to
+  // the DB will be controlled under that delayed write rate. Every write needs
+  // to call GetDelay() with number of bytes writing to the DB, which returns
+  // number of microseconds to sleep.
   std::unique_ptr<WriteControllerToken> GetDelayToken(
       DelaySource source, uint64_t delayed_write_rate);
   // When an actor (column family) requests a moderate token, compaction
@@ -59,14 +68,24 @@ class WriteController {
 
   // these three metods are querying the state of the WriteController
   bool IsStopped() const;
-  bool NeedsDelay() const { return total_delayed_.load() > 0; }
+  bool NeedsDelay() const { return TotalDelayed() > 0; }
+  bool NeedsDelay(DelaySource source) const {
+    return (total_delayed_[DelaySourceValue(source)] > 0);
+  }
   bool NeedSpeedupCompaction() const {
-    return IsStopped() || NeedsDelay() || total_compaction_pressure_ > 0;
+    // Compaction depends only on the Column-Families delay source requirements
+    return IsStopped() || NeedsDelay(WriteController::DelaySource::kCF) ||
+           total_compaction_pressure_ > 0;
   }
   // return how many microseconds the caller needs to sleep after the call
   // num_bytes: how many number of bytes to put into the DB.
   // Prerequisite: DB mutex held.
   uint64_t GetDelay(SystemClock* clock, uint64_t num_bytes);
+  void UpdateDelayedWriteRate() {
+    delayed_write_rate_ = *std::min_element(delayed_write_rates_.begin(),
+                                            delayed_write_rates_.end());
+  }
+
   void set_delayed_write_rate(DelaySource source, uint64_t write_rate) {
     // avoid divide 0
     if (write_rate == 0) {
@@ -76,10 +95,11 @@ class WriteController {
     }
     auto source_value = static_cast<unsigned int>(source);
     assert(source_value < delayed_write_rates_.size());
-    delayed_write_rates_[source_value] = write_rate;
 
-    delayed_write_rate_ = *std::min_element(delayed_write_rates_.begin(),
-                                            delayed_write_rates_.end());
+    // Do we need a lock here? Isn't it always called when the DB mutex is held?
+    // std::unique_lock<std::mutex> l(delayed_write_rate_mu_);
+    delayed_write_rates_[source_value] = write_rate;
+    UpdateDelayedWriteRate();
   }
 
   void set_max_delayed_write_rate(uint64_t write_rate) {
@@ -87,26 +107,51 @@ class WriteController {
     if (write_rate == 0) {
       write_rate = 1u;
     }
+
+    // std::unique_lock<std::mutex> l(delayed_write_rate_mu_);
     max_delayed_write_rate_ = write_rate;
+    for (auto source_value = 0U; source_value < total_delayed_.size();
+         ++source_value) {
+      if (total_delayed_[source_value] == 0U) {
+        total_delayed_[source_value] = max_delayed_write_rate_;
+      }
+    }
     // update delayed_write_rate_ as well
-    delayed_write_rate_ = write_rate;
+    UpdateDelayedWriteRate();
   }
 
   uint64_t delayed_write_rate() const { return delayed_write_rate_; }
+
+  uint64_t delayed_write_rate(DelaySource source) const {
+    if (total_delayed_[DelaySourceValue(source)] > 0) {
+      return delayed_write_rates_[DelaySourceValue(source)];
+    } else {
+      return max_delayed_write_rate();
+    }
+  }
 
   uint64_t max_delayed_write_rate() const { return max_delayed_write_rate_; }
 
   RateLimiter* low_pri_rate_limiter() { return low_pri_rate_limiter_.get(); }
 
-  // Not thread-safe
+  // XXX - REMOVE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1
+  void Confess(const char* prefix, Logger* log) const {
+    ROCKS_LOG_DEBUG(log, "%s Write-Controller Data: %d %d %lu %lu %lu ", prefix,
+                    (int)total_delayed_[0], (int)total_delayed_[1],
+                    (size_t)delayed_write_rates_[0],
+                    (size_t)delayed_write_rates_[1],
+                    (size_t)delayed_write_rate_);
+  }
+
   uint64_t TEST_delayed_write_rate(DelaySource source) const {
-    auto source_value = static_cast<unsigned int>(source);
-    assert(source_value < delayed_write_rates_.size());
-    return delayed_write_rates_[source_value];
+    return delayed_write_rates_[DelaySourceValue(source)];
   }
 
  private:
   uint64_t NowMicrosMonotonic(SystemClock* clock);
+  int TotalDelayed() const {
+    return std::accumulate(total_delayed_.begin(), total_delayed_.end(), 0);
+  }
 
   friend class WriteControllerToken;
   friend class StopWriteToken;
@@ -114,20 +159,21 @@ class WriteController {
   friend class CompactionPressureToken;
 
   std::atomic<int> total_stopped_;
-  std::atomic<int> total_delayed_;
+  std::array<std::atomic<int>, kNumDelaySources> total_delayed_{};
   std::atomic<int> total_compaction_pressure_;
 
   // Number of bytes allowed to write without delay
-  uint64_t credit_in_bytes_;
+  uint64_t credit_in_bytes_ = 0U;
   // Next time that we can add more credit of bytes
-  uint64_t next_refill_time_;
+  uint64_t next_refill_time_ = 0U;
   // Write rate set when initialization or by `DBImpl::SetDBOptions`
-  uint64_t max_delayed_write_rate_;
+  uint64_t max_delayed_write_rate_ = 0U;
   // Current write rate (bytes / second)
-  std::array<uint64_t, kNumDelaySources> delayed_write_rates_;
-  uint64_t delayed_write_rate_;
+  std::array<uint64_t, kNumDelaySources> delayed_write_rates_{};
+  uint64_t delayed_write_rate_ = 0U;
 
   std::unique_ptr<RateLimiter> low_pri_rate_limiter_;
+  // std::mutex delayed_write_rate_mu_;
 };
 
 class WriteControllerToken {
@@ -154,9 +200,13 @@ class StopWriteToken : public WriteControllerToken {
 
 class DelayWriteToken : public WriteControllerToken {
  public:
-  explicit DelayWriteToken(WriteController* controller)
-      : WriteControllerToken(controller) {}
+  explicit DelayWriteToken(WriteController* controller,
+                           WriteController::DelaySource source)
+      : WriteControllerToken(controller), source_(source) {}
   virtual ~DelayWriteToken();
+
+ private:
+  WriteController::DelaySource source_;
 };
 
 class CompactionPressureToken : public WriteControllerToken {

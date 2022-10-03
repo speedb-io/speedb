@@ -1040,7 +1040,16 @@ std::unique_ptr<WriteControllerToken> SetupDelayFromFactor(
   auto wbm_write_rate = max_write_rate;
   if (max_write_rate >= kMinWriteRate) {
     // If user gives rate less than kMinWriteRate, don't adjust it.
-    wbm_write_rate = max_write_rate / delay_factor;
+    assert(delay_factor <= WriteBufferManager::kMaxDelayedWriteFactor);
+    auto write_rate_factor =
+        static_cast<double>(1 + WriteBufferManager::kMaxDelayedWriteFactor -
+                            delay_factor) /
+        WriteBufferManager::kMaxDelayedWriteFactor;
+    wbm_write_rate = max_write_rate * write_rate_factor;
+    // printf("delay_factor:%d, write_rate_factor:%d, max_write_rate:%d,
+    // wbm_write_rate:%d\n",
+    //         (int)delay_factor, (int)write_rate_factor, (int)max_write_rate,
+    //         (int)wbm_write_rate);
   }
 
   return write_controller.GetDelayToken(WriteController::DelaySource::kWBM,
@@ -1101,15 +1110,34 @@ Status DBImpl::PreprocessWrite(const WriteOptions& write_options,
     if (UNLIKELY(
             (wbm_spdb_usage_state_ != new_usage_state) ||
             (wbm_spdb_delayed_write_factor_ != new_delayed_write_factor))) {
+      write_controller_.Confess("before", immutable_db_options_.info_log.get());
       if (new_usage_state != WriteBufferManager::UsageState::kDelay) {
         write_controller_token_.reset();
+        ROCKS_LOG_INFO(immutable_db_options_.info_log,
+                       "Reset WBM Delay Token %d %lu",
+                       (int)write_controller_.NeedsDelay(),
+                       write_controller_.delayed_write_rate());
       } else if ((wbm_spdb_usage_state_ !=
                   WriteBufferManager::UsageState::kDelay) ||
                  (wbm_spdb_delayed_write_factor_ != new_delayed_write_factor)) {
         write_controller_token_ =
             SetupDelayFromFactor(write_controller_, new_delayed_write_factor);
+        {
+          auto wbm_memory_used = write_buffer_manager_->memory_usage();
+          auto wbm_quota = write_buffer_manager_->buffer_size();
+          assert(wbm_quota > 0U);
+          auto wbm_used_percentage = (100 * wbm_memory_used) / wbm_quota;
+          ROCKS_LOG_WARN(immutable_db_options_.info_log,
+                         "Delaying writes due to WBM's usage relative to quota "
+                         "which is %" PRIu64 "%%(%" PRIu64 "/%" PRIu64
+                         "). "
+                         "Factor:%" PRIu64 ", Controller-Rate:%" PRIu64 ", ",
+                         wbm_used_percentage, wbm_memory_used, wbm_quota,
+                         new_delayed_write_factor,
+                         write_controller_.delayed_write_rate());
+        }
       }
-
+      write_controller_.Confess("after", immutable_db_options_.info_log.get());
       wbm_spdb_usage_state_ = new_usage_state;
       wbm_spdb_delayed_write_factor_ = new_delayed_write_factor;
     }

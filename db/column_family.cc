@@ -746,8 +746,8 @@ std::unique_ptr<WriteControllerToken> SetupDelay(
   const uint64_t kMinWriteRate = 16 * 1024u;  // Minimum write rate 16KB/s.
 
   uint64_t max_write_rate = write_controller->max_delayed_write_rate();
-  uint64_t write_rate = write_controller->delayed_write_rate();
-
+  uint64_t write_rate =
+      write_controller->delayed_write_rate(WriteController::DelaySource::kCF);
   if (auto_comapctions_disabled) {
     // When auto compaction is disabled, always use the value user gave.
     write_rate = max_write_rate;
@@ -891,7 +891,8 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
     auto write_stall_cause = write_stall_condition_and_cause.second;
 
     bool was_stopped = write_controller->IsStopped();
-    bool needed_delay = write_controller->NeedsDelay();
+    bool needed_delay =
+        write_controller->NeedsDelay(WriteController::DelaySource::kCF);
 
     if (write_stall_condition == WriteStallCondition::kStopped &&
         write_stall_cause == WriteStallCause::kMemtableLimit) {
@@ -1020,7 +1021,8 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
       // double the slowdown ratio. This is to balance the long term slowdown
       // increase signal.
       if (needed_delay) {
-        uint64_t write_rate = write_controller->delayed_write_rate();
+        uint64_t write_rate = write_controller->delayed_write_rate(
+            WriteController::DelaySource::kCF);
         write_controller->set_delayed_write_rate(
             WriteController::DelaySource::kCF,
             static_cast<uint64_t>(static_cast<double>(write_rate) *

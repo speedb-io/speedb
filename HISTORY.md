@@ -1,3 +1,31 @@
+# Speedb Change Log 
+## Apricot 2.0.0 (08/04/2022)
+## New Features
+* Added a new hash based memtable that supports concurrent reads and writes
+* Added ability to create MemTableFactory from URI/string to tools
+
+## Bug Fixes
+* Avoid comparing Status using == as it compares only status codes. The comparison breaks when comparing against status::NoSpace() since it has a status code of `Code::kIOError` and only a subcode of `SubCode::kNoSpace`
+* Fixed snapshots leak in optimistic_transaction_example: whenever the example is run under ASan, snapshots are acquired but not released, resulting in a memory leak error.
+* ldb: fix get to print the entire value
+* db_bench: fix Rocksdb bug of last_ref assertion. Test fails to delete multi-dbs correctly.
+* db_bench: fix SeekRandom and ReadRandomWriteRandom to work on all CFs instead of the default
+* db_bench to report accurate response time when using rate limit 
+* db_test: add test for - forward the incomplete status on no_io (https://github.com/facebook/rocksdb/pull/8485) 
+* CMake: use the old plugin infra and add support for *_FUNC* registration
+
+## Miscellaneous
+* LOG: Print write_buffer_manager size to LOG
+* LOG: change log header to SpeeDB
+* LOG & db_bench: metadata_cache_options - print to LOG and support its configuration in db_bench
+* db_impl: use unique_ptr in DBImpl::Open for nicer memory management
+* Explicitly compare the SuperVersion pointer in column_family
+* Rename rocksdb threads to speedb
+* Add a version number to Speedb builds
+* Clang-Format: Do not include third-party code as any changes are either version updates or fixes.
+* Git: add clangd cache to .gitignore
+
+
 # Rocksdb Change Log
 > NOTE: Entries for next release do not go here. Follow instructions in `unreleased_history/README.txt`
 

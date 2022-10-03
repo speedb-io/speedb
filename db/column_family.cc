@@ -890,7 +890,7 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
     auto write_stall_cause = write_stall_condition_and_cause.second;
 
     bool was_stopped = write_controller->IsStopped();
-    bool needed_delay = write_controller->NeedsDelay();
+    bool needed_delay = write_controller->NeedsDelay( WriteController::DelaySource::kCF);
 
     if (write_stall_condition == WriteStallCondition::kStopped &&
         write_stall_cause == WriteStallCause::kMemtableLimit) {

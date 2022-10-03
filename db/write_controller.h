@@ -10,8 +10,10 @@
 #include <algorithm>
 #include <atomic>
 #include <memory>
-
+#include <mutex>
 #include "rocksdb/rate_limiter.h"
+#include <logging/event_logger.h>
+#include "logging/logging.h"
 
 namespace ROCKSDB_NAMESPACE {
 
@@ -62,14 +64,17 @@ class WriteController {
   // these three metods are querying the state of the WriteController
   bool IsStopped() const;
   bool NeedsDelay() const { return TotalDelayed() > 0; }
+  bool NeedsDelay(DelaySource source) const { return total_delayed_[int(source)] > 0; }
   bool NeedSpeedupCompaction() const {
-    return IsStopped() || NeedsDelay() || total_compaction_pressure_ > 0;
+    return IsStopped() || NeedsDelay( WriteController::DelaySource::kCF) || total_compaction_pressure_ > 0;
   }
   // return how many microseconds the caller needs to sleep after the call
   // num_bytes: how many number of bytes to put into the DB.
   // Prerequisite: DB mutex held.
   uint64_t GetDelay(SystemClock* clock, uint64_t num_bytes);
   void set_delayed_write_rate(DelaySource source, uint64_t write_rate) {
+    std::mutex singleton;
+    std::unique_lock<std::mutex> l(singleton);
     // avoid divide 0
     if (write_rate == 0) {
       write_rate = 1u;
@@ -79,10 +84,9 @@ class WriteController {
     auto source_value = static_cast<unsigned int>(source);
     assert(source_value < delayed_write_rates_.size());
     delayed_write_rates_[source_value] = write_rate;
-
     delayed_write_rate_ = *std::min_element(delayed_write_rates_.begin(),
                                             delayed_write_rates_.end());
-    // // printf("set_delayed_write_rate - source:%s, write_rate:%d, delayed_write_rate_:%d\n",
+	    // // printf("set_delayed_write_rate - source:%s, write_rate:%d, delayed_write_rate_:%d\n",
     // //         ((source_value == 0)? "CF":"WBM"), (int)write_rate, (int)delayed_write_rate_);
   }
 
@@ -98,13 +102,20 @@ class WriteController {
   }
 
   uint64_t delayed_write_rate() const { return delayed_write_rate_; }
-  uint64_t delayed_write_rate(int src) const { return delayed_write_rates_[src]; }
+  uint64_t delayed_write_rate(int src) const { return total_delayed_[src]? delayed_write_rates_[src] : max_delayed_write_rate(); }
   
 
   uint64_t max_delayed_write_rate() const { return max_delayed_write_rate_; }
 
   RateLimiter* low_pri_rate_limiter() { return low_pri_rate_limiter_.get(); }
 
+  void Confese(const char *prefix, Logger *log) const {
+    ROCKS_LOG_DEBUG(log, "%s WBM data  %d %d %lu %lu %lu ", prefix,  (int) total_delayed_[0],
+		   (int) total_delayed_[1], (size_t) delayed_write_rates_[0],
+		   (size_t) delayed_write_rates_[1], (size_t) delayed_write_rate_);
+		   
+  }
+  
   // Not thread-safe
   uint64_t TEST_delayed_write_rate(DelaySource source) const {
     auto source_value = static_cast<unsigned int>(source);

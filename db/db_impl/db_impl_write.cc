@@ -1102,16 +1102,18 @@ Status DBImpl::PreprocessWrite(const WriteOptions& write_options,
       write_buffer_manager_->IsDelayAllowed()) {
     auto [new_usage_state, new_delayed_write_factor] =
         write_buffer_manager_->GetUsageStateInfo();
-
     if (UNLIKELY(
             (wbm_spdb_usage_state_ != new_usage_state) ||
             (wbm_spdb_delayed_write_factor_ != new_delayed_write_factor))) {
+      write_controller_.Confese("before" , immutable_db_options_.info_log.get());
       if (new_usage_state != WriteBufferManager::UsageState::kDelay) {
+	
         write_controller_token_.reset();
-        ROCKS_LOG_INFO(immutable_db_options_.info_log, "Reset WBM Delay Token");
+        ROCKS_LOG_INFO(immutable_db_options_.info_log, "Reset WBM Delay Token %d %lu", (int) write_controller_.NeedsDelay(), write_controller_.delayed_write_rate());
       } else if ((wbm_spdb_usage_state_ !=
                   WriteBufferManager::UsageState::kDelay) ||
                  (wbm_spdb_delayed_write_factor_ != new_delayed_write_factor)) {
+
         write_controller_token_ =
             SetupDelayFromFactor(write_controller_, new_delayed_write_factor);
         {
@@ -1129,7 +1131,7 @@ Status DBImpl::PreprocessWrite(const WriteOptions& write_options,
                          write_controller_.delayed_write_rate());
         }
       }
-
+      write_controller_.Confese("after", immutable_db_options_.info_log.get());
       wbm_spdb_usage_state_ = new_usage_state;
       wbm_spdb_delayed_write_factor_ = new_delayed_write_factor;
     }

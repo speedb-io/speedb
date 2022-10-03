@@ -23,8 +23,8 @@ std::unique_ptr<WriteControllerToken> WriteController::GetDelayToken(
     DelaySource source, uint64_t write_rate) {
   auto source_value = static_cast<int>(source);
 
-  ++total_delayed_[source_value];
-  if (1 == TotalDelayed()) {
+  auto total_delayed = ++total_delayed_[source_value];
+  if (1 == total_delayed) {
     // Starting delay, so reset counters.
     next_refill_time_ = 0;
     credit_in_bytes_ = 0;
@@ -115,7 +115,7 @@ DelayWriteToken::~DelayWriteToken() {
   auto total_delayed_before = controller_->total_delayed_[source_value_]--;
   assert(controller_->total_delayed_[source_value_].load() >= 0);
   if (total_delayed_before == 1) {
-    controller_->delayed_write_rates_[source_value_] = controller_->max_delayed_write_rate();
+    controller_->set_delayed_write_rate(WriteController::DelaySource(source_value_), controller_->max_delayed_write_rate());
   }
 }
 

@@ -739,6 +739,9 @@ Status WriteBatchInternal::IterateToSetIgnore(const WriteBatch* wb,
       case kTypeDeletion:
       case kTypeColumnFamilySingleDeletion:
       case kTypeSingleDeletion:
+        // in case of range deletion, an entry is inserted to the skip list delete memtable
+        // with key and value as the last key in range like a regular entry. 
+        // we set the delete range entry as ignored
       case kTypeColumnFamilyRangeDeletion:
       case kTypeRangeDeletion:
       case kTypeColumnFamilyBlobIndex:

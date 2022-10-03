@@ -19,6 +19,8 @@ class SkipListRep : public MemTableRep {
   const MemTableRep::KeyComparator& cmp_;
   const SliceTransform* transform_;
   const size_t lookahead_;
+  std::atomic<bool> contain_rollback_;
+
 
   friend class LookaheadIterator;
 public:
@@ -35,6 +37,14 @@ public:
    *buf = skip_list_.AllocateKey(len);
    return static_cast<KeyHandle>(*buf);
  }
+
+ void MarkRollback() override {
+    contain_rollback_.store(true);
+  }
+
+  bool IsContainsRollback() const {
+    return contain_rollback_.load();
+  }
 
   // Insert key into the list.
   // REQUIRES: nothing that compares equal to key is currently in the list.
@@ -73,8 +83,11 @@ public:
 
   // Returns true iff an entry that compares equal to key is in the list.
  bool Contains(const char* key) const override {
-   return skip_list_.Contains(key);
-   // IsKeyShouldBeIgnore
+    bool key_exist = skip_list_.Contains(key);
+    if (key_exist && MemTable::IsKeyShouldBeIgnore(key, IsContainsRollback())) {
+      return false;
+    }
+    return key_exist;
  }
 
  size_t ApproximateMemoryUsage() override {
@@ -84,13 +97,10 @@ public:
 
  void Get(const LookupKey& k, void* callback_args,
           bool (*callback_func)(void* arg, const char* entry)) override {
-   SkipListRep::Iterator iter(&skip_list_);
+   SkipListRep::Iterator iter(&skip_list_, IsContainsRollback());
    Slice dummy_slice;
    for (iter.Seek(dummy_slice, k.memtable_key().data()); iter.Valid();
         iter.Next()) {
-     if (MemTable::IsKeyShouldBeIgnore(iter.key(), IsRollback())) {
-       continue;
-     }
      if (!callback_func(callback_args, iter.key())) {
        break;
      }
@@ -171,13 +181,15 @@ public:
   // Iteration over the contents of a skip list
   class Iterator : public MemTableRep::Iterator {
     InlineSkipList<const MemTableRep::KeyComparator&>::Iterator iter_;
+    bool contains_rollback_;
 
    public:
     // Initialize an iterator over the specified list.
     // The returned iterator is not valid.
     explicit Iterator(
-        const InlineSkipList<const MemTableRep::KeyComparator&>* list)
-        : iter_(list) {}
+        const InlineSkipList<const MemTableRep::KeyComparator&>* list,
+        bool contains_rollback = false)
+        : iter_(list), contains_rollback_(contains_rollback) {}
 
     ~Iterator() override {}
 
@@ -203,6 +215,9 @@ public:
       } else {
         iter_.Seek(EncodeKey(&tmp_, user_key));
       }
+      while (iter_.Valid() && MemTable::IsKeyShouldBeIgnore(iter_.key(), contains_rollback_)) {
+        iter_.Next();     
+      }
     }
 
     // Retreat to the last entry with a key <= target
@@ -212,17 +227,36 @@ public:
       } else {
         iter_.SeekForPrev(EncodeKey(&tmp_, user_key));
       }
+      while (iter_.Valid() && MemTable::IsKeyShouldBeIgnore(iter_.key(), contains_rollback_)) {
+        iter_.Prev();     
+      }
+
     }
 
-    void RandomSeek() override { iter_.RandomSeek(); }
+    void RandomSeek() override { 
+      iter_.RandomSeek(); 
+      while (iter_.Valid() && MemTable::IsKeyShouldBeIgnore(iter_.key(), contains_rollback_)) {
+        iter_.Next();     
+      }
+    }
 
     // Position at the first entry in list.
     // Final state of iterator is Valid() iff list is not empty.
-    void SeekToFirst() override { iter_.SeekToFirst(); }
+    void SeekToFirst() override { 
+      iter_.SeekToFirst();
+      while (iter_.Valid() && MemTable::IsKeyShouldBeIgnore(iter_.key(), contains_rollback_)) {
+        iter_.Next();     
+      }
+    }
 
     // Position at the last entry in list.
     // Final state of iterator is Valid() iff list is not empty.
-    void SeekToLast() override { iter_.SeekToLast(); }
+    void SeekToLast() override { 
+      iter_.SeekToLast();
+      while (iter_.Valid() && MemTable::IsKeyShouldBeIgnore(iter_.key(), contains_rollback_)) {
+        iter_.Prev();     
+      }
+    }
 
    protected:
     std::string tmp_;       // For passing to EncodeKey

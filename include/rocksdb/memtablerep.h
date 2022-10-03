@@ -282,9 +282,7 @@ class MemTableRep {
   // Default: true
   virtual bool IsSnapshotSupported() const { return true; }
 
-  void MarkRollback() { conatins_rollback_.store(true); }
-
-  bool IsRollback() { return conatins_rollback_.load(); }
+  virtual void MarkRollback() {}
 
  protected:
   // When *key is an internal key concatenated with the value, returns the
@@ -292,7 +290,6 @@ class MemTableRep {
   virtual Slice UserKey(const char* key) const;
 
   Allocator* allocator_;
-  std::atomic<bool> conatins_rollback_ = false;
 };
 
 // This is the base class for all factories that are used by RocksDB to create

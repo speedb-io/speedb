@@ -375,13 +375,19 @@ TEST_P(WriteBufferManagerTestWithParams, UsageNotifications) {
   VALIDATE_USAGE_STATE(0, WriteBufferManager::UsageState::kNone,
                        WriteBufferManager::kNoneDelayedWriteFactor);
 
+  auto FreeMem = [&, this](size_t mem) {
+    wbf->ScheduleFreeMem(mem);
+    wbf->FreeMemBegin(mem);
+    wbf->FreeMem(mem);
+  };
+
   // Jump straight to quota
   wbf->ReserveMem(kQuota);
   VALIDATE_USAGE_STATE(kQuota, WriteBufferManager::UsageState::kStop,
                        WriteBufferManager::kStopDelayedWriteFactor);
 
   // And back to 0 again
-  wbf->FreeMem(kQuota);
+  FreeMem(kQuota);
   VALIDATE_USAGE_STATE(-kQuota, WriteBufferManager::UsageState::kNone,
                        WriteBufferManager::kNoneDelayedWriteFactor);
 
@@ -394,7 +400,7 @@ TEST_P(WriteBufferManagerTestWithParams, UsageNotifications) {
   VALIDATE_USAGE_STATE(2000, WriteBufferManager::UsageState::kNone,
                        WriteBufferManager::kNoneDelayedWriteFactor);
 
-  wbf->FreeMem(3000);
+  FreeMem(3000);
   VALIDATE_USAGE_STATE(-3000, WriteBufferManager::UsageState::kNone,
                        WriteBufferManager::kNoneDelayedWriteFactor);
 
@@ -414,7 +420,7 @@ TEST_P(WriteBufferManagerTestWithParams, UsageNotifications) {
                        ExpectedDelayFactor(kStepSize));
 
   // Free all => None
-  wbf->FreeMem(expected_usage);
+  FreeMem(expected_usage);
   VALIDATE_USAGE_STATE(-expected_usage, WriteBufferManager::UsageState::kNone,
                        WriteBufferManager::kNoneDelayedWriteFactor);
 
@@ -434,12 +440,12 @@ TEST_P(WriteBufferManagerTestWithParams, UsageNotifications) {
                        WriteBufferManager::kMaxDelayedWriteFactor);
 
   // 1 byte below quota => Delay with max factor
-  wbf->FreeMem(1);
+  FreeMem(1);
   VALIDATE_USAGE_STATE(-1, WriteBufferManager::UsageState::kDelay,
                        ExpectedDelayFactor(kMaxUsed - 1));
 
   // An entire step below => delay factor updated
-  wbf->FreeMem(kStepSize);
+  FreeMem(kStepSize);
   VALIDATE_USAGE_STATE(-kStepSize, WriteBufferManager::UsageState::kDelay,
                        ExpectedDelayFactor(kMaxUsed - 1 - kStepSize));
 
@@ -449,7 +455,7 @@ TEST_P(WriteBufferManagerTestWithParams, UsageNotifications) {
                        ExpectedDelayFactor(kMaxUsed - kStepSize));
 
   // And back to 0 to wrap it up
-  wbf->FreeMem(expected_usage);
+  FreeMem(expected_usage);
   VALIDATE_USAGE_STATE(-expected_usage, WriteBufferManager::UsageState::kNone,
                        WriteBufferManager::kNoneDelayedWriteFactor);
 }

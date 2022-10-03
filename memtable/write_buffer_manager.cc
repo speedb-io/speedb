@@ -144,14 +144,12 @@ void WriteBufferManager::FreeMem(size_t mem) {
 
     assert(curr_memory_inactive >= mem);
     assert(curr_memory_being_freed >= mem);
+
+    UpdateUsageState(new_memory_used, -mem, buffer_size());
   }
 
   // Check if stall is active and can be ended.
   MaybeEndWriteStall();
-
-  if (is_enabled) {
-    UpdateUsageState(new_memory_used, -mem, buffer_size());
-  }
 }
 
 size_t WriteBufferManager::FreeMemWithCache(size_t mem) {
@@ -258,10 +256,14 @@ std::string WriteBufferManager::GetPrintableOptions() const {
   char buffer[kBufferSize];
 
   // The assumed width of the callers display code
-  int field_width = 47;
+  int field_width = 85;
 
   snprintf(buffer, kBufferSize, "%*s: %" ROCKSDB_PRIszt "\n", field_width,
-           "size", buffer_size());
+           "wbm.size", buffer_size());
+  ret.append(buffer);
+
+  snprintf(buffer, kBufferSize, "%*s: %d\n", field_width,
+           "wbm.allow_delays_and_stalls", IsDelayAllowed());
   ret.append(buffer);
 
   return ret;

@@ -43,6 +43,7 @@ class WriteBufferManager final {
   enum class UsageState { kNone, kDelay, kStop };
 
   static constexpr uint64_t kNoneDelayedWriteFactor = 0U;
+  static constexpr uint64_t kMinDelayedWriteFactor = 1U;
   static constexpr uint64_t kMaxDelayedWriteFactor = 200U;
   static constexpr uint64_t kStopDelayedWriteFactor = kMaxDelayedWriteFactor;
 
@@ -89,6 +90,14 @@ class WriteBufferManager final {
   // Only valid if enabled()
   size_t memory_usage() const {
     return memory_used_.load(std::memory_order_relaxed);
+  }
+
+  size_t GetMemoryUsagePercentageOfBufferSize() const {
+    if (enabled()) {
+      return ((100 * memory_usage()) / buffer_size());
+    } else {
+      return 0U;
+    }
   }
 
   // Returns the total memory used by active memtables.

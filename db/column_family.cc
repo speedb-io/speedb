@@ -739,6 +739,12 @@ const double kDelayRecoverSlowdownRatio = 1.4;
 
 namespace {
 // If penalize_stop is true, we further reduce slowdown rate.
+// being one of them. The columen families have their own delay / stop logic
+// that should rely solely on their considerations. For that reason, the values
+// specific to the cf-s source are used in the code below, rather than the
+// global values (see write_controller->delayed_write_rate() and
+// The write controller supports multiple sources of delay, the column families
+// write_controller->NeedsDelay()) below.
 std::unique_ptr<WriteControllerToken> SetupDelay(
     WriteController* write_controller, uint64_t compaction_needed_bytes,
     uint64_t prev_compaction_need_bytes, bool penalize_stop,
@@ -746,12 +752,13 @@ std::unique_ptr<WriteControllerToken> SetupDelay(
   const uint64_t kMinWriteRate = 16 * 1024u;  // Minimum write rate 16KB/s.
 
   uint64_t max_write_rate = write_controller->max_delayed_write_rate();
-  uint64_t write_rate = write_controller->delayed_write_rate();
-
+  uint64_t write_rate =
+      write_controller->delayed_write_rate(WriteController::DelaySource::kCF);
   if (auto_comapctions_disabled) {
     // When auto compaction is disabled, always use the value user gave.
     write_rate = max_write_rate;
-  } else if (write_controller->NeedsDelay() && max_write_rate > kMinWriteRate) {
+  } else if (write_controller->NeedsDelay(WriteController::DelaySource::kCF) &&
+             max_write_rate > kMinWriteRate) {
     // If user gives rate less than kMinWriteRate, don't adjust it.
     //
     // If already delayed, need to adjust based on previous compaction debt.
@@ -891,7 +898,8 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
     auto write_stall_cause = write_stall_condition_and_cause.second;
 
     bool was_stopped = write_controller->IsStopped();
-    bool needed_delay = write_controller->NeedsDelay();
+    bool needed_delay =
+        write_controller->NeedsDelay(WriteController::DelaySource::kCF);
 
     if (write_stall_condition == WriteStallCondition::kStopped &&
         write_stall_cause == WriteStallCause::kMemtableLimit) {
@@ -935,9 +943,11 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
           ioptions_.logger,
           "[%s] Stalling writes because we have %d immutable memtables "
           "(waiting for flush), max_write_buffer_number is set to %d "
-          "rate %" PRIu64,
+          "rate %" PRIu64 " global rate %" PRIu64,
           name_.c_str(), imm()->NumNotFlushed(),
           mutable_cf_options.max_write_buffer_number,
+          write_controller->delayed_write_rate(
+              WriteController::DelaySource::kCF),
           write_controller->delayed_write_rate());
     } else if (write_stall_condition == WriteStallCondition::kDelayed &&
                write_stall_cause == WriteStallCause::kL0FileCountLimit) {
@@ -956,8 +966,10 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
       }
       ROCKS_LOG_WARN(ioptions_.logger,
                      "[%s] Stalling writes because we have %d level-0 files "
-                     "rate %" PRIu64,
+                     "rate %" PRIu64 " global rate %" PRIu64,
                      name_.c_str(), vstorage->l0_delay_trigger_count(),
+                     write_controller->delayed_write_rate(
+                         WriteController::DelaySource::kCF),
                      write_controller->delayed_write_rate());
     } else if (write_stall_condition == WriteStallCondition::kDelayed &&
                write_stall_cause == WriteStallCause::kPendingCompactionBytes) {
@@ -978,11 +990,14 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
                      mutable_cf_options.disable_auto_compactions);
       internal_stats_->AddCFStats(
           InternalStats::PENDING_COMPACTION_BYTES_LIMIT_SLOWDOWNS, 1);
+
       ROCKS_LOG_WARN(
           ioptions_.logger,
           "[%s] Stalling writes because of estimated pending compaction "
-          "bytes %" PRIu64 " rate %" PRIu64,
+          "bytes %" PRIu64 " rate %" PRIu64 " global rate %" PRIu64,
           name_.c_str(), vstorage->estimated_compaction_needed_bytes(),
+          write_controller->delayed_write_rate(
+              WriteController::DelaySource::kCF),
           write_controller->delayed_write_rate());
     } else {
       assert(write_stall_condition == WriteStallCondition::kNormal);
@@ -1020,7 +1035,8 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
       // double the slowdown ratio. This is to balance the long term slowdown
       // increase signal.
       if (needed_delay) {
-        uint64_t write_rate = write_controller->delayed_write_rate();
+        uint64_t write_rate = write_controller->delayed_write_rate(
+            WriteController::DelaySource::kCF);
         write_controller->set_delayed_write_rate(
             WriteController::DelaySource::kCF,
             static_cast<uint64_t>(static_cast<double>(write_rate) *

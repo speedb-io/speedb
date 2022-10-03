@@ -34,45 +34,95 @@ class WriteControllerTest : public testing::Test {
 #define SECS MILLION  // in microseconds
 
 TEST_F(WriteControllerTest, BasicAPI) {
-  WriteController controller(40 MBPS);  // also set max delayed rate
-  EXPECT_EQ(controller.delayed_write_rate(), 40 MBPS);
+  constexpr uint64_t kMaxDelayedWriteRate = 40 MBPS;
+  WriteController controller(
+      kMaxDelayedWriteRate);  // also set max delayed rate
+
+  EXPECT_EQ(controller.delayed_write_rate(), kMaxDelayedWriteRate);
+  EXPECT_EQ(controller.delayed_write_rate(WriteController::DelaySource::kCF),
+            kMaxDelayedWriteRate);
+  EXPECT_EQ(controller.delayed_write_rate(WriteController::DelaySource::kWBM),
+            kMaxDelayedWriteRate);
+
   EXPECT_FALSE(controller.IsStopped());
   EXPECT_FALSE(controller.NeedsDelay());
+  EXPECT_FALSE(controller.NeedsDelay(WriteController::DelaySource::kCF));
+  EXPECT_FALSE(controller.NeedsDelay(WriteController::DelaySource::kWBM));
   EXPECT_EQ(0, controller.GetDelay(clock_.get(), 100 MB));
 
   // set, get
   controller.set_delayed_write_rate(WriteController::DelaySource::kCF, 20 MBPS);
-  EXPECT_EQ(controller.delayed_write_rate(), 20 MBPS);
+  ASSERT_EQ(controller.delayed_write_rate(), kMaxDelayedWriteRate);
+  ASSERT_EQ(controller.delayed_write_rate(WriteController::DelaySource::kCF),
+            20 MBPS);
+  ASSERT_EQ(controller.delayed_write_rate(WriteController::DelaySource::kWBM),
+            kMaxDelayedWriteRate);
+
   EXPECT_FALSE(controller.IsStopped());
   EXPECT_FALSE(controller.NeedsDelay());
+  EXPECT_FALSE(controller.NeedsDelay(WriteController::DelaySource::kCF));
+  EXPECT_FALSE(controller.NeedsDelay(WriteController::DelaySource::kWBM));
   EXPECT_EQ(0, controller.GetDelay(clock_.get(), 100 MB));
 
   controller.set_delayed_write_rate(WriteController::DelaySource::kWBM,
                                     30 MBPS);
-  ASSERT_EQ(controller.delayed_write_rate(), 20 MBPS);
+  ASSERT_EQ(controller.delayed_write_rate(), kMaxDelayedWriteRate);
+  ASSERT_EQ(controller.delayed_write_rate(WriteController::DelaySource::kCF),
+            20 MBPS);
+  ASSERT_EQ(controller.delayed_write_rate(WriteController::DelaySource::kWBM),
+            30 MBPS);
 
   controller.set_delayed_write_rate(WriteController::DelaySource::kWBM,
                                     10 MBPS);
-  ASSERT_EQ(controller.delayed_write_rate(), 10 MBPS);
+  ASSERT_EQ(controller.delayed_write_rate(), kMaxDelayedWriteRate);
+  ASSERT_EQ(controller.delayed_write_rate(WriteController::DelaySource::kCF),
+            20 MBPS);
+  ASSERT_EQ(controller.delayed_write_rate(WriteController::DelaySource::kWBM),
+            10 MBPS);
 
   controller.set_delayed_write_rate(WriteController::DelaySource::kWBM,
                                     35 MBPS);
-  ASSERT_EQ(controller.delayed_write_rate(), 20 MBPS);
+  ASSERT_EQ(controller.delayed_write_rate(), kMaxDelayedWriteRate);
+  ASSERT_EQ(controller.delayed_write_rate(WriteController::DelaySource::kCF),
+            20 MBPS);
+  ASSERT_EQ(controller.delayed_write_rate(WriteController::DelaySource::kWBM),
+            35 MBPS);
 
   controller.set_delayed_write_rate(WriteController::DelaySource::kWBM,
                                     controller.max_delayed_write_rate());
-  ASSERT_EQ(controller.delayed_write_rate(), 20 MBPS);
+  ASSERT_EQ(controller.delayed_write_rate(), kMaxDelayedWriteRate);
+  ASSERT_EQ(controller.delayed_write_rate(WriteController::DelaySource::kCF),
+            20 MBPS);
+  ASSERT_EQ(controller.delayed_write_rate(WriteController::DelaySource::kWBM),
+            kMaxDelayedWriteRate);
+
+  // Over the max should set to max
+  controller.set_delayed_write_rate(WriteController::DelaySource::kCF,
+                                    2 * kMaxDelayedWriteRate);
+  ASSERT_EQ(controller.delayed_write_rate(), kMaxDelayedWriteRate);
+  ASSERT_EQ(controller.delayed_write_rate(WriteController::DelaySource::kCF),
+            kMaxDelayedWriteRate);
+  ASSERT_EQ(controller.delayed_write_rate(WriteController::DelaySource::kWBM),
+            kMaxDelayedWriteRate);
 
   {
     // set with token, get
     auto delay_token_0 =
         controller.GetDelayToken(WriteController::DelaySource::kCF, 10 MBPS);
     EXPECT_EQ(controller.delayed_write_rate(), 10 MBPS);
+    EXPECT_EQ(controller.delayed_write_rate(WriteController::DelaySource::kCF),
+              10 MBPS);
+    EXPECT_EQ(controller.delayed_write_rate(WriteController::DelaySource::kWBM),
+              kMaxDelayedWriteRate);
     EXPECT_FALSE(controller.IsStopped());
     EXPECT_TRUE(controller.NeedsDelay());
 
     delay_token_0.reset();
-    EXPECT_EQ(controller.delayed_write_rate(), 10 MBPS);
+    ASSERT_EQ(controller.delayed_write_rate(), kMaxDelayedWriteRate);
+    EXPECT_EQ(controller.delayed_write_rate(WriteController::DelaySource::kCF),
+              10 MBPS);
+    EXPECT_EQ(controller.delayed_write_rate(WriteController::DelaySource::kWBM),
+              kMaxDelayedWriteRate);
     EXPECT_FALSE(controller.IsStopped());
     EXPECT_FALSE(controller.NeedsDelay());
     EXPECT_EQ(0, controller.GetDelay(clock_.get(), 20 MB));

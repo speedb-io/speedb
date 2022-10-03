@@ -1040,7 +1040,13 @@ std::unique_ptr<WriteControllerToken> SetupDelayFromFactor(
   auto wbm_write_rate = max_write_rate;
   if (max_write_rate >= kMinWriteRate) {
     // If user gives rate less than kMinWriteRate, don't adjust it.
-    wbm_write_rate = max_write_rate / delay_factor;
+    assert(delay_factor <= WriteBufferManager::kMaxDelayedWriteFactor);
+    auto write_rate_factor =
+        static_cast<double>(WriteBufferManager::kMaxDelayedWriteFactor +
+                            WriteBufferManager::kMinDelayedWriteFactor -
+                            delay_factor) /
+        WriteBufferManager::kMaxDelayedWriteFactor;
+    wbm_write_rate = max_write_rate * write_rate_factor;
   }
 
   return write_controller.GetDelayToken(WriteController::DelaySource::kWBM,
@@ -1048,6 +1054,41 @@ std::unique_ptr<WriteControllerToken> SetupDelayFromFactor(
 }
 
 }  // namespace
+
+void DBImpl::HandleWBMDelayWritesDuringPreprocessWrite() {
+  auto [new_usage_state, new_delayed_write_factor] =
+      write_buffer_manager_->GetUsageStateInfo();
+
+  if (UNLIKELY((wbm_spdb_usage_state_ != new_usage_state) ||
+               (wbm_spdb_delayed_write_factor_ != new_delayed_write_factor))) {
+    if (new_usage_state != WriteBufferManager::UsageState::kDelay) {
+      write_controller_token_.reset();
+      ROCKS_LOG_INFO(immutable_db_options_.info_log,
+                     "Reset WBM Delay Token needs-delay:%d, rate:%lu",
+                     write_controller_.NeedsDelay(),
+                     write_controller_.delayed_write_rate());
+    } else if ((wbm_spdb_usage_state_ !=
+                WriteBufferManager::UsageState::kDelay) ||
+               (wbm_spdb_delayed_write_factor_ != new_delayed_write_factor)) {
+      write_controller_token_ =
+          SetupDelayFromFactor(write_controller_, new_delayed_write_factor);
+      ROCKS_LOG_WARN(
+          immutable_db_options_.info_log,
+          "Delaying writes due to WBM's usage relative to quota "
+          "which is %" PRIu64 "%%(%" PRIu64 "/%" PRIu64
+          "). "
+          "factor:%" PRIu64 ", wbm-rate:%" PRIu64 ", rate:%" PRIu64,
+          write_buffer_manager_->GetMemoryUsagePercentageOfBufferSize(),
+          write_buffer_manager_->memory_usage(),
+          write_buffer_manager_->buffer_size(), new_delayed_write_factor,
+          write_controller_.delayed_write_rate(
+              WriteController::DelaySource::kWBM),
+          write_controller_.delayed_write_rate());
+    }
+    wbm_spdb_usage_state_ = new_usage_state;
+    wbm_spdb_delayed_write_factor_ = new_delayed_write_factor;
+  }
+}
 
 Status DBImpl::PreprocessWrite(const WriteOptions& write_options,
                                bool* need_log_sync,
@@ -1095,24 +1136,7 @@ Status DBImpl::PreprocessWrite(const WriteOptions& write_options,
   // Handle latest WBM calculated write delay, if applicable
   if (status.ok() && write_buffer_manager_ &&
       write_buffer_manager_->IsDelayAllowed()) {
-    auto [new_usage_state, new_delayed_write_factor] =
-        write_buffer_manager_->GetUsageStateInfo();
-
-    if (UNLIKELY(
-            (wbm_spdb_usage_state_ != new_usage_state) ||
-            (wbm_spdb_delayed_write_factor_ != new_delayed_write_factor))) {
-      if (new_usage_state != WriteBufferManager::UsageState::kDelay) {
-        write_controller_token_.reset();
-      } else if ((wbm_spdb_usage_state_ !=
-                  WriteBufferManager::UsageState::kDelay) ||
-                 (wbm_spdb_delayed_write_factor_ != new_delayed_write_factor)) {
-        write_controller_token_ =
-            SetupDelayFromFactor(write_controller_, new_delayed_write_factor);
-      }
-
-      wbm_spdb_usage_state_ = new_usage_state;
-      wbm_spdb_delayed_write_factor_ = new_delayed_write_factor;
-    }
+    HandleWBMDelayWritesDuringPreprocessWrite();
   }
 
   if (UNLIKELY(status.ok() && (write_controller_.IsStopped() ||

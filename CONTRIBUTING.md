@@ -211,7 +211,7 @@ request, a Speedb team member will merge it.
 [Fork](https://github.com/speedb-io/speedb/fork) the Speedb repository to your
 own account and clone the resulting repository to your machine.
 
-Refer to the [README](README.me) and [INSTALL](INSTALL.md) documents for
+Refer to the [README](README.md) and [INSTALL](INSTALL.md) documents for
 information about how to build Speedb locally.
 
 ### Checkout a pull request

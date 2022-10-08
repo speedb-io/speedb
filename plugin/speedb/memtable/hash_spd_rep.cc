@@ -87,7 +87,7 @@ struct BucketHeader {
 
 struct SpdbHashTable {
   std::vector<BucketHeader> buckets_;
-  std::vector<port::Mutex> mutexes_;
+  std::vector<port::RWMutexWr> mutexes_;
 
   SpdbHashTable(size_t n_buckets, size_t n_mutexes)
       : buckets_(n_buckets), mutexes_(n_mutexes) {}
@@ -95,7 +95,7 @@ struct SpdbHashTable {
   bool Add(SpdbKeyHandle* val, const MemTableRep::KeyComparator& comparator) {
     auto mutex_and_bucket = GetMutexAndBucket(val->key, comparator);
     BucketHeader* bucket = mutex_and_bucket.second;
-    MutexLock l(mutex_and_bucket.first);
+    WriteLock wl(mutex_and_bucket.first);
     return bucket->Add(val, comparator);
   }
 
@@ -103,7 +103,7 @@ struct SpdbHashTable {
                 const MemTableRep::KeyComparator& comparator) const {
     auto mutex_and_bucket = GetMutexAndBucket(check_key, comparator);
     BucketHeader* bucket = mutex_and_bucket.second;
-    MutexLock l(mutex_and_bucket.first);
+    ReadLock rl(mutex_and_bucket.first);
     return bucket->Contains(comparator, check_key);
   }
 
@@ -111,17 +111,14 @@ struct SpdbHashTable {
            void* callback_args,
            bool (*callback_func)(void* arg, const char* entry)) const {
     auto mutex_and_bucket = GetMutexAndBucket(k.internal_key(), comparator);
-    MutexLock l(mutex_and_bucket.first);
+    ReadLock rl(mutex_and_bucket.first);
 
     auto iter = mutex_and_bucket.second->items_;
 
     for (; iter != nullptr; iter = iter->next) {
       if (comparator(iter->key, k.internal_key()) >= 0) {
-        break;
+        continue;
       }
-    }
-
-    for (; iter != nullptr; iter = iter->next) {
       if (!callback_func(callback_args, iter->key)) {
         break;
       }
@@ -143,18 +140,18 @@ struct SpdbHashTable {
     return ExtractUserKeyAndStripTimestamp(internal_key, ts_sz);
   }
 
-  std::pair<port::Mutex*, BucketHeader*> GetMutexAndBucket(
+  std::pair<port::RWMutexWr*, BucketHeader*> GetMutexAndBucket(
       const char* key, const MemTableRep::KeyComparator& comparator) const {
     return GetMutexAndBucket(comparator.decode_key(key), comparator);
   }
 
-  std::pair<port::Mutex*, BucketHeader*> GetMutexAndBucket(
+  std::pair<port::RWMutexWr*, BucketHeader*> GetMutexAndBucket(
       const Slice& internal_key,
       const MemTableRep::KeyComparator& comparator) const {
     const size_t hash =
         GetHash(UserKeyWithoutTimestamp(internal_key, comparator));
-    port::Mutex* mutex =
-        const_cast<port::Mutex*>(&mutexes_[hash % mutexes_.size()]);
+    port::RWMutexWr* mutex =
+        const_cast<port::RWMutexWr*>(&mutexes_[hash % mutexes_.size()]);
     BucketHeader* bucket =
         const_cast<BucketHeader*>(&buckets_[hash % buckets_.size()]);
     return {mutex, bucket};

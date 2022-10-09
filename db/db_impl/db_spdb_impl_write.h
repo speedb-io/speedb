@@ -72,15 +72,11 @@ class SpdbWriteImpl {
   WritesBatchList& GetActiveList() { return wb_lists_[active_buffer_index_]; }
   static constexpr size_t kWalWritesContainers = 2;
 
-  std::atomic<uint64_t> last_wal_write_seq_{0};
-
   std::array<WritesBatchList, kWalWritesContainers> wb_lists_;
   size_t active_buffer_index_ = 0;
 
   DBImpl* db_;
   std::atomic<bool> flush_thread_terminate_;
-  // this means we need to do some actions
-  std::atomic<bool> action_needed_;
   std::mutex flush_thread_mutex_;
   std::condition_variable flush_thread_cv_;
   port::Mutex add_buffer_mutex_;

@@ -200,6 +200,8 @@ class SpdbVectorContainer {
 
   bool IsEmpty() const;
 
+  bool IsReadOnly() const { return immutable_.load(); }
+
   // create a list of current vectors
   bool InitIterator(IterAnchors& iter_anchor);
 

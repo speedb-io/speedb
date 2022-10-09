@@ -184,6 +184,7 @@ default_params = {
     "data_block_index_type": random.randint(0, 1),
     "data_block_hash_table_util_ratio": random.randint(0, 100) / 100.0,
     "customopspercent": 0,
+    "use_spdb_writes": lambda: random.randint(0, 1),
 }
 
 _TEST_DIR_ENV_VAR = 'TEST_TMPDIR'
@@ -636,6 +637,10 @@ def finalize_and_sanitize(src_params, counter):
         dest_params["memtable_prefix_bloom_size_ratio"] = 0
     if dest_params.get("two_write_queues") == 1:
         dest_params["enable_pipelined_write"] = 0
+    if dest_params.get("use_spdb_writes") == 1:
+        dest_params["allow_concurrent_memtable_write"] = 1
+        # TODO: add hash_spdb memtablerep
+        dest_params["memtablerep"] = "skip_list"
     return dest_params
 
 

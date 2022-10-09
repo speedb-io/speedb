@@ -183,7 +183,6 @@ Status SpdbWriteImpl::WriteBatchComplete(void* list,
       db_, batch_write_type, batch, batch_status);
 }
 
-
 SpdbWriteImpl::SpdbWriteImpl(DBImpl* db) : db_(db) {}
 
 SpdbWriteImpl::~SpdbWriteImpl() { Shutdown(); }

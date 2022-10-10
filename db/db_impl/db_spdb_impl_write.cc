@@ -372,7 +372,6 @@ Status SpdbWriteImpl::SwitchAndWriteBatchGroup(BatchWriteType batch_write_type,
     // take the wal write rw lock from protecting another batch group wal write
     MutexLock l(&wal_write_mutex_);
     batch_group = SwitchBatchGroup();
-    db_->UpdateLastGroupBatchSize(batch_group->batch_group_size_in_bytes_);
     if (!batch_group->wal_writes_.empty()) {
       auto const& immutable_db_options = db_->immutable_db_options();
       StopWatch write_sw(immutable_db_options.clock, immutable_db_options.stats,

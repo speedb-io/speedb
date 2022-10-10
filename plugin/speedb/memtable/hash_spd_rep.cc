@@ -117,12 +117,14 @@ struct SpdbHashTable {
 
     for (; iter != nullptr; iter = iter->next) {
       if (comparator(iter->key, k.internal_key()) >= 0) {
-        continue;
-      }
-      if (!callback_func(callback_args, iter->key)) {
-        break;
+        break;;
       }
     }
+    for (; iter != nullptr; iter = iter->next) {
+       if (!callback_func(callback_args, iter->key)) {
+        break;
+      }
+   }
   }
 
  private:
@@ -549,7 +551,7 @@ void HashSpdRep::Get(const LookupKey& k, void* callback_args,
 }
 
 MemTableRep::Iterator* HashSpdRep::GetIterator(Arena* arena) {
-  const bool empty_iter = spdb_vectors_cont_->IsEmpty() || !spdb_vectors_cont_->IsReadOnly();
+  const bool empty_iter = spdb_vectors_cont_->IsEmpty();
 
   if (arena != nullptr) {
     void* mem;

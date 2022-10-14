@@ -965,7 +965,7 @@ void HashLocklessRep::Get(const LookupKey& k, void* callback_args,
 
 MemTableRep::Iterator* HashLocklessRep::GetIterator(Arena* arena) {
   bool empty_iter = (sort_vectors_cont_->items_count_.load() == 0);
-  //if (!sort_vectors_cont_->immutable_.load()) empty_iter = true;
+  if (!sort_vectors_cont_->immutable_.load()) empty_iter = true;
   if (arena != nullptr) {
     void* mem;
     if (empty_iter) {

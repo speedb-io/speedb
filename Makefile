@@ -133,6 +133,13 @@ CXXFLAGS += $(PLATFORM_SHARED_CFLAGS) -DROCKSDB_DLL
 CFLAGS +=  $(PLATFORM_SHARED_CFLAGS) -DROCKSDB_DLL
 endif
 
+ifeq ($(USE_COROUTINES), 1)
+	USE_FOLLY = 1
+	OPT += -DUSE_COROUTINES
+	ROCKSDB_CXX_STANDARD = c++2a
+	USE_RTTI = 1
+endif
+
 # if we're compiling for release, compile without debug code (-DNDEBUG)
 ifeq ($(DEBUG_LEVEL),0)
 OPT += -DNDEBUG
@@ -239,6 +246,7 @@ dummy := $(shell (export ROCKSDB_ROOT="$(CURDIR)"; \
                   export ROCKSDB_NO_FBCODE="$(ROCKSDB_NO_FBCODE)"; \
                   export USE_CLANG="$(USE_CLANG)"; \
                   export LIB_MODE="$(LIB_MODE)"; \
+		  export ROCKSDB_CXX_STANDARD="$(ROCKSDB_CXX_STANDARD)"; \
                   "$(CURDIR)/build_tools/build_detect_platform" "$(CURDIR)/make_config.mk"))
 
 endif
@@ -363,6 +371,8 @@ endif
 # ASAN doesn't work well with jemalloc. If we're compiling with ASAN, we should use regular malloc.
 ifdef COMPILE_WITH_ASAN
 	DISABLE_JEMALLOC=1
+	ASAN_OPTIONS?=detect_stack_use_after_return=1
+	export ASAN_OPTIONS
 	EXEC_LDFLAGS += -fsanitize=address
 	PLATFORM_CCFLAGS += -fsanitize=address
 	PLATFORM_CXXFLAGS += -fsanitize=address
@@ -621,9 +631,6 @@ am__v_CCH_1 =
 check-headers: $(HEADER_OK_FILES)
 
 # options_settable_test doesn't pass with UBSAN as we use hack in the test
-ifdef COMPILE_WITH_UBSAN
-TESTS := $(shell echo $(TESTS) | sed 's/\boptions_settable_test\b//g')
-endif
 ifdef ASSERT_STATUS_CHECKED
 # TODO: finish fixing all tests to pass this check
 TESTS_FAILING_ASC = \
@@ -661,7 +668,6 @@ TESTS_PLATFORM_DEPENDENT := \
 	db_basic_test \
 	db_blob_basic_test \
 	db_encryption_test \
-	db_test2 \
 	external_sst_file_basic_test \
 	auto_roll_logger_test \
 	bloom_test \
@@ -683,7 +689,6 @@ TESTS_PLATFORM_DEPENDENT := \
 	rate_limiter_test \
 	perf_context_test \
 	iostats_context_test \
-	db_wal_test \
 
 # Sort ROCKSDBTESTS_SUBSET for filtering, except db_test is special (expensive)
 # so is placed first (out-of-order)
@@ -820,17 +825,10 @@ $(SHARED4): $(LIB_OBJECTS)
 	$(AM_V_CCLD) $(CXX) $(PLATFORM_SHARED_LDFLAGS)$(SHARED3) $(LIB_OBJECTS) $(LDFLAGS) -o $@
 endif  # PLATFORM_SHARED_EXT
 
-.PHONY: blackbox_crash_test check clean coverage crash_test ldb_tests package \
-	release tags tags0 valgrind_check whitebox_crash_test format static_lib shared_lib all \
-	dbg rocksdbjavastatic rocksdbjava gen-pc install install-static install-shared uninstall \
-	analyze tools tools_lib check-headers checkout_folly \
-	blackbox_crash_test_with_atomic_flush whitebox_crash_test_with_atomic_flush  \
-	blackbox_crash_test_with_txn whitebox_crash_test_with_txn \
-	blackbox_crash_test_with_best_efforts_recovery \
-	blackbox_crash_test_with_ts whitebox_crash_test_with_ts \
-	blackbox_crash_test_with_multiops_wc_txn \
-	blackbox_crash_test_with_multiops_wp_txn
-
+.PHONY: check clean coverage ldb_tests package dbg gen-pc build_size \
+	release tags tags0 valgrind_check format static_lib shared_lib all \
+	rocksdbjavastatic rocksdbjava install install-static install-shared \
+	uninstall analyze tools tools_lib check-headers checkout_folly
 
 all: $(LIBRARY) $(BENCHMARKS) tools tools_lib test_libs $(TESTS)
 
@@ -1060,31 +1058,31 @@ ldb_tests: ldb
 include crash_test.mk
 
 asan_check: clean
-	ASAN_OPTIONS=detect_stack_use_after_return=1 COMPILE_WITH_ASAN=1 $(MAKE) check -j32
+	COMPILE_WITH_ASAN=1 $(MAKE) check -j32
 	$(MAKE) clean
 
 asan_crash_test: clean
-	ASAN_OPTIONS=detect_stack_use_after_return=1 COMPILE_WITH_ASAN=1 $(MAKE) crash_test
+	COMPILE_WITH_ASAN=1 $(MAKE) crash_test
 	$(MAKE) clean
 
 whitebox_asan_crash_test: clean
-	ASAN_OPTIONS=detect_stack_use_after_return=1 COMPILE_WITH_ASAN=1 $(MAKE) whitebox_crash_test
+	COMPILE_WITH_ASAN=1 $(MAKE) whitebox_crash_test
 	$(MAKE) clean
 
 blackbox_asan_crash_test: clean
-	ASAN_OPTIONS=detect_stack_use_after_return=1 COMPILE_WITH_ASAN=1 $(MAKE) blackbox_crash_test
+	COMPILE_WITH_ASAN=1 $(MAKE) blackbox_crash_test
 	$(MAKE) clean
 
 asan_crash_test_with_atomic_flush: clean
-	ASAN_OPTIONS=detect_stack_use_after_return=1 COMPILE_WITH_ASAN=1 $(MAKE) crash_test_with_atomic_flush
+	COMPILE_WITH_ASAN=1 $(MAKE) crash_test_with_atomic_flush
 	$(MAKE) clean
 
 asan_crash_test_with_txn: clean
-	ASAN_OPTIONS=detect_stack_use_after_return=1 COMPILE_WITH_ASAN=1 $(MAKE) crash_test_with_txn
+	COMPILE_WITH_ASAN=1 $(MAKE) crash_test_with_txn
 	$(MAKE) clean
 
 asan_crash_test_with_best_efforts_recovery: clean
-	ASAN_OPTIONS=detect_stack_use_after_return=1 COMPILE_WITH_ASAN=1 $(MAKE) crash_test_with_best_efforts_recovery
+	COMPILE_WITH_ASAN=1 $(MAKE) crash_test_with_best_efforts_recovery
 	$(MAKE) clean
 
 ubsan_check: clean
@@ -1393,6 +1391,9 @@ db_blob_basic_test: $(OBJ_DIR)/db/blob/db_blob_basic_test.o $(TEST_LIBRARY) $(LI
 	$(AM_LINK)
 
 db_blob_compaction_test: $(OBJ_DIR)/db/blob/db_blob_compaction_test.o $(TEST_LIBRARY) $(LIBRARY)
+	$(AM_LINK)
+
+db_readonly_with_timestamp_test: $(OBJ_DIR)/db/db_readonly_with_timestamp_test.o $(TEST_LIBRARY) $(LIBRARY)
 	$(AM_LINK)
 
 db_with_timestamp_basic_test: $(OBJ_DIR)/db/db_with_timestamp_basic_test.o $(TEST_LIBRARY) $(LIBRARY)
@@ -1890,7 +1891,7 @@ testutil_test: $(OBJ_DIR)/test_util/testutil_test.o $(TEST_LIBRARY) $(LIBRARY)
 io_tracer_test: $(OBJ_DIR)/trace_replay/io_tracer_test.o $(OBJ_DIR)/trace_replay/io_tracer.o $(TEST_LIBRARY) $(LIBRARY)
 	$(AM_LINK)
 
-prefetch_test: $(OBJ_DIR)/file/prefetch_test.o $(TEST_LIBRARY) $(LIBRARY)
+prefetch_test: $(OBJ_DIR)/file/prefetch_test.o  $(OBJ_DIR)/tools/io_tracer_parser_tool.o $(TEST_LIBRARY) $(LIBRARY)
 	$(AM_LINK)
 
 io_tracer_parser_test: $(OBJ_DIR)/tools/io_tracer_parser_test.o $(OBJ_DIR)/tools/io_tracer_parser_tool.o $(TEST_LIBRARY) $(LIBRARY)
@@ -2079,6 +2080,7 @@ ifeq ($(PLATFORM), OS_OPENBSD)
 	ROCKSDBJNILIB = librocksdbjni-openbsd$(ARCH).so
 	ROCKSDB_JAR = rocksdbjni-$(ROCKSDB_JAVA_VERSION)-openbsd$(ARCH).jar
 endif
+export SHA256_CMD
 
 zlib-$(ZLIB_VER).tar.gz:
 	curl --fail --output zlib-$(ZLIB_VER).tar.gz --location ${ZLIB_DOWNLOAD_BASE}/zlib-$(ZLIB_VER).tar.gz
@@ -2211,7 +2213,7 @@ JAR_CMD := jar
 endif
 endif
 rocksdbjavastatic_javalib:
-	cd java; SHA256_CMD='$(SHA256_CMD)' $(MAKE) javalib
+	cd java; $(MAKE) javalib
 	rm -f java/target/$(ROCKSDBJNILIB)
 	$(CXX) $(CXXFLAGS) -I./java/. $(JAVA_INCLUDE) -shared -fPIC \
 	  -o ./java/target/$(ROCKSDBJNILIB) $(ALL_JNI_NATIVE_SOURCES) \
@@ -2325,7 +2327,7 @@ rocksdbjava: $(LIB_OBJECTS)
 ifeq ($(JAVA_HOME),)
 	$(error JAVA_HOME is not set)
 endif
-	$(AM_V_GEN)cd java; SHA256_CMD='$(SHA256_CMD)' $(MAKE) javalib;
+	$(AM_V_GEN)cd java; $(MAKE) javalib;
 	$(AM_V_at)rm -f ./java/target/$(ROCKSDBJNILIB)
 	$(AM_V_at)$(CXX) $(CXXFLAGS) -I./java/. -I./java/rocksjni $(JAVA_INCLUDE) $(ROCKSDB_PLUGIN_JNI_CXX_INCLUDEFLAGS) -shared -fPIC -o ./java/target/$(ROCKSDBJNILIB) $(ALL_JNI_NATIVE_SOURCES) $(LIB_OBJECTS) $(JAVA_LDFLAGS) $(COVERAGEFLAGS)
 	$(AM_V_at)cd java; $(JAR_CMD) -cf target/$(ROCKSDB_JAR) HISTORY*.md
@@ -2337,14 +2339,13 @@ jclean:
 	cd java;$(MAKE) clean;
 
 jtest_compile: rocksdbjava
-	cd java; SHA256_CMD='$(SHA256_CMD)' $(MAKE) java_test
+	cd java;$(MAKE) java_test
 
 jtest_run:
 	cd java;$(MAKE) run_test
 
 jtest: rocksdbjava
-	cd java;$(MAKE) sample; SHA256_CMD='$(SHA256_CMD)' $(MAKE) test;
-	$(PYTHON) tools/check_all_python.py # TODO peterd: find a better place for this check in CI targets
+	cd java;$(MAKE) sample test
 
 jdb_bench:
 	cd java;$(MAKE) db_bench;
@@ -2369,6 +2370,38 @@ checkout_folly:
 	@# A hack to remove boost dependency.
 	@# NOTE: this hack is not needed if using FBCODE compiler config
 	sed -i 's/^\(#include <boost\)/\/\/\1/' third-party/folly/folly/functional/Invoke.h
+
+# ---------------------------------------------------------------------------
+#   Build size testing
+# ---------------------------------------------------------------------------
+
+REPORT_BUILD_STATISTIC?=echo STATISTIC:
+
+build_size:
+	# === normal build, static ===
+	$(MAKE) clean
+	$(MAKE) static_lib
+	$(REPORT_BUILD_STATISTIC) rocksdb.build_size.static_lib $$(stat --printf="%s" librocksdb.a)
+	strip librocksdb.a
+	$(REPORT_BUILD_STATISTIC) rocksdb.build_size.static_lib_stripped $$(stat --printf="%s" librocksdb.a)
+	# === normal build, shared ===
+	$(MAKE) clean
+	$(MAKE) shared_lib
+	$(REPORT_BUILD_STATISTIC) rocksdb.build_size.shared_lib $$(stat --printf="%s" `readlink -f librocksdb.so`)
+	strip `readlink -f librocksdb.so`
+	$(REPORT_BUILD_STATISTIC) rocksdb.build_size.shared_lib_stripped $$(stat --printf="%s" `readlink -f librocksdb.so`)
+	# === lite build, static ===
+	$(MAKE) clean
+	$(MAKE) LITE=1 static_lib
+	$(REPORT_BUILD_STATISTIC) rocksdb.build_size.static_lib_lite $$(stat --printf="%s" librocksdb.a)
+	strip librocksdb.a
+	$(REPORT_BUILD_STATISTIC) rocksdb.build_size.static_lib_lite_stripped $$(stat --printf="%s" librocksdb.a)
+	# === lite build, shared ===
+	$(MAKE) clean
+	$(MAKE) LITE=1 shared_lib
+	$(REPORT_BUILD_STATISTIC) rocksdb.build_size.shared_lib_lite $$(stat --printf="%s" `readlink -f librocksdb.so`)
+	strip `readlink -f librocksdb.so`
+	$(REPORT_BUILD_STATISTIC) rocksdb.build_size.shared_lib_lite_stripped $$(stat --printf="%s" `readlink -f librocksdb.so`)
 
 # ---------------------------------------------------------------------------
 #  	Platform-specific compilation

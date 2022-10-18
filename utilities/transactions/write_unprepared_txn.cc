@@ -281,8 +281,8 @@ Status WriteUnpreparedTxn::FlushWriteBatchToDBInternal(bool prepared) {
     static std::atomic_ullong autogen_id{0};
     // To avoid changing all tests to call SetName, just autogenerate one.
     if (wupt_db_->txn_db_options_.autogenerate_name) {
-      auto s =
-          SetName(std::string("autoxid") + ToString(autogen_id.fetch_add(1)));
+      auto s = SetName(std::string("autoxid") +
+                       std::to_string(autogen_id.fetch_add(1)));
       assert(s.ok());
     } else
 #endif
@@ -675,7 +675,11 @@ Status WriteUnpreparedTxn::WriteRollbackKeys(
       s = rollback_batch->Put(cf_handle, key, pinnable_val);
       assert(s.ok());
     } else if (s.IsNotFound()) {
-      s = rollback_batch->Delete(cf_handle, key);
+      if (wupt_db_->ShouldRollbackWithSingleDelete(cf_handle, key)) {
+        s = rollback_batch->SingleDelete(cf_handle, key);
+      } else {
+        s = rollback_batch->Delete(cf_handle, key);
+      }
       assert(s.ok());
     } else {
       return s;

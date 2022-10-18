@@ -465,7 +465,7 @@ EOF
 
     if ! test $ROCKSDB_DISABLE_MEMKIND; then
         # Test whether memkind library is installed
-        $CXX $PLATFORM_CXXFLAGS $COMMON_FLAGS -lmemkind -x c++ - -o test.o 2>/dev/null  <<EOF
+        $CXX $PLATFORM_CXXFLAGS $LDFLAGS -x c++ - -o test.o -lmemkind 2>/dev/null  <<EOF
           #include <memkind.h>
           int main() {
             memkind_malloc(MEMKIND_DAX_KMEM, 1024);
@@ -795,9 +795,6 @@ EOF
 if [ "$?" = 0 ]; then
   COMMON_FLAGS="$COMMON_FLAGS -DHAVE_UINT128_EXTENSION"
 fi
-
-# thread_local is part of C++11 and later (TODO: clean up this define)
-COMMON_FLAGS="$COMMON_FLAGS -DROCKSDB_SUPPORT_THREAD_LOCAL"
 
 if [ "$FBCODE_BUILD" != "true" -a "$PLATFORM" = OS_LINUX ]; then
   $CXX $COMMON_FLAGS $PLATFORM_SHARED_CFLAGS -x c++ -c - -o test_dl.o 2>/dev/null <<EOF

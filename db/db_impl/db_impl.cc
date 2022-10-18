@@ -568,7 +568,7 @@ Status DBImpl::CloseHelper() {
   // flushing by first checking if there is a need for
   // flushing (but need to implement something
   // else than imm()->IsFlushPending() because the output
-  // memtables added to imm() dont trigger flushes).
+  // memtables added to imm() don't trigger flushes).
   if (immutable_db_options_.experimental_mempurge_threshold > 0.0) {
     Status flush_ret;
     mutex_.Unlock();
@@ -850,7 +850,8 @@ void DBImpl::PersistStats() {
           if (stats_slice_.find(stat.first) != stats_slice_.end()) {
             uint64_t delta = stat.second - stats_slice_[stat.first];
             s = batch.Put(persist_stats_cf_handle_,
-                          Slice(key, std::min(100, length)), ToString(delta));
+                          Slice(key, std::min(100, length)),
+                          std::to_string(delta));
           }
         }
       }
@@ -1337,6 +1338,7 @@ Status DBImpl::FlushWAL(bool sync) {
 }
 
 Status DBImpl::SyncWAL() {
+  TEST_SYNC_POINT("DBImpl::SyncWAL:Begin");
   autovector<log::Writer*, 1> logs_to_sync;
   bool need_log_dir_sync;
   uint64_t current_log_number;
@@ -1349,7 +1351,7 @@ Status DBImpl::SyncWAL() {
     current_log_number = logfile_number_;
 
     while (logs_.front().number <= current_log_number &&
-           logs_.front().getting_synced) {
+           logs_.front().IsSyncing()) {
       log_sync_cv_.Wait();
     }
     // First check that logs are safe to sync in background.
@@ -1366,8 +1368,7 @@ Status DBImpl::SyncWAL() {
     for (auto it = logs_.begin();
          it != logs_.end() && it->number <= current_log_number; ++it) {
       auto& log = *it;
-      assert(!log.getting_synced);
-      log.getting_synced = true;
+      log.PrepareForSync();
       logs_to_sync.push_back(log.writer);
     }
 
@@ -1440,24 +1441,24 @@ Status DBImpl::MarkLogsSynced(uint64_t up_to, bool synced_dir) {
   VersionEdit synced_wals;
   for (auto it = logs_.begin(); it != logs_.end() && it->number <= up_to;) {
     auto& wal = *it;
-    assert(wal.getting_synced);
+    assert(wal.IsSyncing());
+
     if (logs_.size() > 1) {
       if (immutable_db_options_.track_and_verify_wals_in_manifest &&
-          wal.writer->file()->GetFileSize() > 0) {
-        synced_wals.AddWal(wal.number,
-                           WalMetadata(wal.writer->file()->GetFileSize()));
+          wal.GetPreSyncSize() > 0) {
+        synced_wals.AddWal(wal.number, WalMetadata(wal.GetPreSyncSize()));
       }
       logs_to_free_.push_back(wal.ReleaseWriter());
       // To modify logs_ both mutex_ and log_write_mutex_ must be held
       InstrumentedMutexLock l(&log_write_mutex_);
       it = logs_.erase(it);
     } else {
-      wal.getting_synced = false;
+      wal.FinishSync();
       ++it;
     }
   }
   assert(logs_.empty() || logs_[0].number > up_to ||
-         (logs_.size() == 1 && !logs_[0].getting_synced));
+         (logs_.size() == 1 && !logs_[0].IsSyncing()));
 
   Status s;
   if (synced_wals.IsWalAddition()) {
@@ -1477,8 +1478,7 @@ void DBImpl::MarkLogsNotSynced(uint64_t up_to) {
   for (auto it = logs_.begin(); it != logs_.end() && it->number <= up_to;
        ++it) {
     auto& wal = *it;
-    assert(wal.getting_synced);
-    wal.getting_synced = false;
+    wal.FinishSync();
   }
   log_sync_cv_.SignalAll();
 }
@@ -1722,17 +1722,6 @@ Status DBImpl::Get(const ReadOptions& read_options,
   Status s = GetImpl(read_options, key, get_impl_options);
   return s;
 }
-
-namespace {
-class GetWithTimestampReadCallback : public ReadCallback {
- public:
-  explicit GetWithTimestampReadCallback(SequenceNumber seq)
-      : ReadCallback(seq) {}
-  bool IsVisibleFullCheck(SequenceNumber seq) override {
-    return seq <= max_visible_seq_;
-  }
-};
-}  // namespace
 
 Status DBImpl::GetImpl(const ReadOptions& read_options, const Slice& key,
                        GetImplOptions& get_impl_options) {
@@ -2590,7 +2579,8 @@ Status DBImpl::MultiGetImpl(
                             ? MultiGetContext::MAX_BATCH_SIZE
                             : keys_left;
     MultiGetContext ctx(sorted_keys, start_key + num_keys - keys_left,
-                        batch_size, snapshot, read_options);
+                        batch_size, snapshot, read_options, GetFileSystem(),
+                        stats_);
     MultiGetRange range = ctx.GetMultiGetRange();
     range.AddValueSize(curr_value_size);
     bool lookup_current = false;
@@ -3356,7 +3346,7 @@ bool DBImpl::GetProperty(ColumnFamilyHandle* column_family,
     bool ret_value =
         GetIntPropertyInternal(cfd, *property_info, false, &int_value);
     if (ret_value) {
-      *value = ToString(int_value);
+      *value = std::to_string(int_value);
     }
     return ret_value;
   } else if (property_info->handle_string) {
@@ -3991,8 +3981,8 @@ Status DBImpl::CheckConsistency() {
       } else if (fsize != md.size) {
         corruption_messages += "Sst file size mismatch: " + file_path +
                                ". Size recorded in manifest " +
-                               ToString(md.size) + ", actual size " +
-                               ToString(fsize) + "\n";
+                               std::to_string(md.size) + ", actual size " +
+                               std::to_string(fsize) + "\n";
       }
     }
   }
@@ -5125,8 +5115,8 @@ Status DBImpl::VerifyChecksumInternal(const ReadOptions& read_options,
                                      fmeta->file_checksum_func_name, fname,
                                      read_options);
         } else {
-          s = ROCKSDB_NAMESPACE::VerifySstFileChecksum(opts, file_options_,
-                                                       read_options, fname);
+          s = ROCKSDB_NAMESPACE::VerifySstFileChecksum(
+              opts, file_options_, read_options, fname, fd.largest_seqno);
         }
         RecordTick(stats_, VERIFY_CHECKSUM_READ_BYTES,
                    IOSTATS(bytes_read) - prev_bytes_read);
@@ -5340,7 +5330,7 @@ Status DBImpl::ReserveFileNumbersBeforeIngestion(
 
 Status DBImpl::GetCreationTimeOfOldestFile(uint64_t* creation_time) {
   if (mutable_db_options_.max_open_files == -1) {
-    uint64_t oldest_time = port::kMaxUint64;
+    uint64_t oldest_time = std::numeric_limits<uint64_t>::max();
     for (auto cfd : *versions_->GetColumnFamilySet()) {
       if (!cfd->IsDropped()) {
         uint64_t ctime;

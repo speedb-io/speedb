@@ -29,28 +29,38 @@ else
   MAYBE_PIC=_pic
 fi
 
-# snappy
-SNAPPY_INCLUDE=" -I $SNAPPY_BASE/include/"
-SNAPPY_LIBS=" $SNAPPY_BASE/lib/libsnappy${MAYBE_PIC}.a"
-CFLAGS+=" -DSNAPPY"
+if ! test $ROCKSDB_DISABLE_SNAPPY; then
+  # snappy
+  SNAPPY_INCLUDE=" -I $SNAPPY_BASE/include/"
+  SNAPPY_LIBS=" $SNAPPY_BASE/lib/libsnappy${MAYBE_PIC}.a"
+  CFLAGS+=" -DSNAPPY"
+fi
 
-# location of zlib headers and libraries
-ZLIB_INCLUDE=" -I $ZLIB_BASE/include/"
-ZLIB_LIBS=" $ZLIB_BASE/lib/libz${MAYBE_PIC}.a"
-CFLAGS+=" -DZLIB"
+if ! test $ROCKSDB_DISABLE_ZLIB; then
+  # location of zlib headers and libraries
+  ZLIB_INCLUDE=" -I $ZLIB_BASE/include/"
+  ZLIB_LIBS=" $ZLIB_BASE/lib/libz${MAYBE_PIC}.a"
+  CFLAGS+=" -DZLIB"
+fi
 
-# location of bzip headers and libraries
-BZIP_INCLUDE=" -I $BZIP2_BASE/include/"
-BZIP_LIBS=" $BZIP2_BASE/lib/libbz2${MAYBE_PIC}.a"
-CFLAGS+=" -DBZIP2"
+if ! test $ROCKSDB_DISABLE_BZIP; then
+  # location of bzip headers and libraries
+  BZIP_INCLUDE=" -I $BZIP2_BASE/include/"
+  BZIP_LIBS=" $BZIP2_BASE/lib/libbz2${MAYBE_PIC}.a"
+  CFLAGS+=" -DBZIP2"
+fi
 
-LZ4_INCLUDE=" -I $LZ4_BASE/include/"
-LZ4_LIBS=" $LZ4_BASE/lib/liblz4${MAYBE_PIC}.a"
-CFLAGS+=" -DLZ4"
+if ! test $ROCKSDB_DISABLE_LZ4; then
+  LZ4_INCLUDE=" -I $LZ4_BASE/include/"
+  LZ4_LIBS=" $LZ4_BASE/lib/liblz4${MAYBE_PIC}.a"
+  CFLAGS+=" -DLZ4"
+fi
 
-ZSTD_INCLUDE=" -I $ZSTD_BASE/include/"
-ZSTD_LIBS=" $ZSTD_BASE/lib/libzstd${MAYBE_PIC}.a"
-CFLAGS+=" -DZSTD"
+if ! test $ROCKSDB_DISABLE_ZSTD; then
+  ZSTD_INCLUDE=" -I $ZSTD_BASE/include/"
+  ZSTD_LIBS=" $ZSTD_BASE/lib/libzstd${MAYBE_PIC}.a"
+  CFLAGS+=" -DZSTD"
+fi
 
 # location of gflags headers and libraries
 GFLAGS_INCLUDE=" -I $GFLAGS_BASE/include/"
@@ -108,10 +118,19 @@ if [ -z "$USE_CLANG" ]; then
   CXX="$GCC_BASE/bin/g++"
   AR="$GCC_BASE/bin/gcc-ar"
 
-  
-  CFLAGS+=" -B$BINUTILS"
+  CFLAGS+=" -B$BINUTILS -nostdinc -nostdlib"
+  CFLAGS+=" -I$GCC_BASE/include"
+  CFLAGS+=" -isystem $GCC_BASE/lib/gcc/x86_64-redhat-linux-gnu/11.2.1/include"
+  CFLAGS+=" -isystem $GCC_BASE/lib/gcc/x86_64-redhat-linux-gnu/11.2.1/install-tools/include"
+  CFLAGS+=" -isystem $GCC_BASE/lib/gcc/x86_64-redhat-linux-gnu/11.2.1/include-fixed/"
   CFLAGS+=" -isystem $LIBGCC_INCLUDE"
   CFLAGS+=" -isystem $GLIBC_INCLUDE"
+  CFLAGS+=" -I$GLIBC_INCLUDE"
+  CFLAGS+=" -I$LIBGCC_BASE/include"
+  CFLAGS+=" -I$LIBGCC_BASE/include/c++/11.x/"
+  CFLAGS+=" -I$LIBGCC_BASE/include/c++/11.x/x86_64-facebook-linux/"
+  CFLAGS+=" -I$LIBGCC_BASE/include/c++/11.x/backward"
+  CFLAGS+=" -isystem $GLIBC_INCLUDE -I$GLIBC_INCLUDE"
   JEMALLOC=1
 else
   # clang
@@ -135,7 +154,7 @@ CFLAGS+=" -isystem $KERNEL_HEADERS_INCLUDE/linux "
 CFLAGS+=" -isystem $KERNEL_HEADERS_INCLUDE "
 
 CFLAGS+=" $DEPS_INCLUDE"
-CFLAGS+=" -DROCKSDB_PLATFORM_POSIX -DROCKSDB_LIB_IO_POSIX -DROCKSDB_FALLOCATE_PRESENT -DROCKSDB_MALLOC_USABLE_SIZE -DROCKSDB_RANGESYNC_PRESENT -DROCKSDB_SCHED_GETCPU_PRESENT -DROCKSDB_SUPPORT_THREAD_LOCAL -DHAVE_SSE42 -DROCKSDB_IOURING_PRESENT"
+CFLAGS+=" -DROCKSDB_PLATFORM_POSIX -DROCKSDB_LIB_IO_POSIX -DROCKSDB_FALLOCATE_PRESENT -DROCKSDB_MALLOC_USABLE_SIZE -DROCKSDB_RANGESYNC_PRESENT -DROCKSDB_SCHED_GETCPU_PRESENT -DHAVE_SSE42 -DROCKSDB_IOURING_PRESENT"
 CXXFLAGS+=" $CFLAGS"
 
 EXEC_LDFLAGS=" $SNAPPY_LIBS $ZLIB_LIBS $BZIP_LIBS $LZ4_LIBS $ZSTD_LIBS $GFLAGS_LIBS $NUMA_LIB $TBB_LIBS $LIBURING_LIBS $BENCHMARK_LIBS"

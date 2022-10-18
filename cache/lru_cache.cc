@@ -19,6 +19,7 @@
 #include "util/mutexlock.h"
 
 namespace ROCKSDB_NAMESPACE {
+namespace lru_cache {
 
 LRUHandleTable::LRUHandleTable(int max_upper_hash_bits)
     : length_bits_(/* historical starting size*/ 4),
@@ -758,6 +759,8 @@ void LRUCache::WaitAll(std::vector<Handle*>& handles) {
     }
   }
 }
+
+}  // namespace lru_cache
 
 std::shared_ptr<Cache> NewLRUCache(
     size_t capacity, int num_shard_bits, bool strict_capacity_limit,

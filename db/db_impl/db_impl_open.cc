@@ -518,7 +518,13 @@ Status DBImpl::Recover(
   if (!s.ok()) {
     return s;
   }
-  s = SetDBId(read_only);
+  if (immutable_db_options_.verify_sst_unique_id_in_manifest) {
+    s = VerifySstUniqueIdInManifest();
+    if (!s.ok()) {
+      return s;
+    }
+  }
+  s = SetDBId(read_only, recovery_ctx);
   if (s.ok() && !read_only) {
     s = DeleteUnreferencedSstFiles();
   }
@@ -698,6 +704,25 @@ Status DBImpl::Recover(
   return s;
 }
 
+Status DBImpl::VerifySstUniqueIdInManifest() {
+  mutex_.AssertHeld();
+  ROCKS_LOG_INFO(
+      immutable_db_options_.info_log,
+      "Verifying SST unique id between MANIFEST and SST file table properties");
+  Status status;
+  for (auto cfd : *versions_->GetColumnFamilySet()) {
+    if (!cfd->IsDropped()) {
+      auto version = cfd->current();
+      version->Ref();
+      mutex_.Unlock();
+      status = version->VerifySstUniqueIds();
+      mutex_.Lock();
+      version->Unref();
+    }
+  }
+  return status;
+}
+
 Status DBImpl::PersistentStatsProcessFormatVersion() {
   mutex_.AssertHeld();
   Status s;
@@ -760,11 +785,11 @@ Status DBImpl::PersistentStatsProcessFormatVersion() {
     WriteBatch batch;
     if (s.ok()) {
       s = batch.Put(persist_stats_cf_handle_, kFormatVersionKeyString,
-                    ToString(kStatsCFCurrentFormatVersion));
+                    std::to_string(kStatsCFCurrentFormatVersion));
     }
     if (s.ok()) {
       s = batch.Put(persist_stats_cf_handle_, kCompatibleVersionKeyString,
-                    ToString(kStatsCFCompatibleFormatVersion));
+                    std::to_string(kStatsCFCompatibleFormatVersion));
     }
     if (s.ok()) {
       WriteOptions wo;
@@ -947,7 +972,6 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& wal_numbers,
     // Read all the records and add to a memtable
     std::string scratch;
     Slice record;
-    WriteBatch batch;
 
     TEST_SYNC_POINT_CALLBACK("DBImpl::RecoverLogFiles:BeforeReadWal",
                              /*arg=*/nullptr);
@@ -961,10 +985,15 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& wal_numbers,
         continue;
       }
 
+      // We create a new batch and initialize with a valid prot_info_ to store
+      // the data checksums
+      WriteBatch batch(0, 0, 8, 0);
+
       status = WriteBatchInternal::SetContents(&batch, record);
       if (!status.ok()) {
         return status;
       }
+
       SequenceNumber sequence = WriteBatchInternal::Sequence(&batch);
 
       if (immutable_db_options_.wal_recovery_mode ==
@@ -1266,6 +1295,8 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& wal_numbers,
       autovector<ColumnFamilyData*> cfds;
       autovector<const MutableCFOptions*> cf_opts;
       autovector<autovector<VersionEdit*>> edit_lists;
+      assert(recovery_ctx != nullptr);
+
       for (auto* cfd : *versions_->GetColumnFamilySet()) {
         cfds.push_back(cfd);
         cf_opts.push_back(cfd->GetLatestMutableCFOptions());
@@ -1298,8 +1329,8 @@ Status DBImpl::RecoverLogFiles(const std::vector<uint64_t>& wal_numbers,
   if (status.ok()) {
     if (data_seen && !flushed) {
       status = RestoreAliveLogFiles(wal_numbers);
-    } else {
-      // If there's no data in the WAL, or we flushed all the data, still
+    } else if (!wal_numbers.empty()) {  // If there's no data in the WAL, or we
+                                        // flushed all the data, still
       // truncate the log file. If the process goes into a crash loop before
       // the file is deleted, the preallocated space will never get freed.
       const bool truncate = !read_only;
@@ -1322,6 +1353,7 @@ Status DBImpl::GetLogSizeAndMaybeTruncate(uint64_t wal_number, bool truncate,
   Status s;
   // This gets the appear size of the wals, not including preallocated space.
   s = env_->GetFileSize(fname, &log.size);
+  TEST_SYNC_POINT_CALLBACK("DBImpl::GetLogSizeAndMaybeTruncate:0", /*arg=*/&s);
   if (s.ok() && truncate) {
     std::unique_ptr<FSWritableFile> last_log;
     Status truncate_status = fs_->ReopenWritableFile(
@@ -1493,13 +1525,14 @@ Status DBImpl::WriteLevel0TableForRecovery(int job_id, ColumnFamilyData* cfd,
   constexpr int level = 0;
 
   if (s.ok() && has_output) {
-    edit->AddFile(
-        level, meta.fd.GetNumber(), meta.fd.GetPathId(), meta.fd.GetFileSize(),
-        meta.smallest, meta.largest, meta.fd.smallest_seqno,
-        meta.fd.largest_seqno, meta.marked_for_compaction, meta.temperature,
-        meta.oldest_blob_file_number, meta.oldest_ancester_time,
-        meta.file_creation_time, meta.file_checksum,
-        meta.file_checksum_func_name, meta.min_timestamp, meta.max_timestamp);
+    edit->AddFile(level, meta.fd.GetNumber(), meta.fd.GetPathId(),
+                  meta.fd.GetFileSize(), meta.smallest, meta.largest,
+                  meta.fd.smallest_seqno, meta.fd.largest_seqno,
+                  meta.marked_for_compaction, meta.temperature,
+                  meta.oldest_blob_file_number, meta.oldest_ancester_time,
+                  meta.file_creation_time, meta.file_checksum,
+                  meta.file_checksum_func_name, meta.min_timestamp,
+                  meta.max_timestamp, meta.unique_id);
 
     for (const auto& blob : blob_file_additions) {
       edit->AddBlobFile(blob);
@@ -1693,6 +1726,7 @@ Status DBImpl::Open(const DBOptions& db_options, const std::string& dbname,
   }
 
   *dbptr = nullptr;
+  assert(handles);
   handles->clear();
 
   size_t max_write_buffer_size = 0;
@@ -1735,8 +1769,9 @@ Status DBImpl::Open(const DBOptions& db_options, const std::string& dbname,
   }
 
   impl->wal_in_db_path_ = impl->immutable_db_options_.IsWalDirSameAsDBPath();
-
+  RecoveryContext recovery_ctx;
   impl->mutex_.Lock();
+
   // Handles create_if_missing, error_if_exists
   uint64_t recovered_seq(kMaxSequenceNumber);
   s = impl->Recover(column_families, false, false, false, &recovered_seq);
@@ -1821,6 +1856,7 @@ Status DBImpl::Open(const DBOptions& db_options, const std::string& dbname,
         if (s.ok()) {
           // Need to fsync, otherwise it might get lost after a power reset.
           s = impl->FlushWAL(false);
+          TEST_SYNC_POINT_CALLBACK("DBImpl::Open::BeforeSyncWAL", /*arg=*/&s);
           if (s.ok()) {
             s = log_writer->file()->Sync(impl->immutable_db_options_.use_fsync);
           }
@@ -1828,6 +1864,53 @@ Status DBImpl::Open(const DBOptions& db_options, const std::string& dbname,
       }
     }
   }
+  if (s.ok()) {
+    s = impl->LogAndApplyForRecovery(recovery_ctx);
+  }
+
+  if (s.ok() && impl->immutable_db_options_.persist_stats_to_disk) {
+    impl->mutex_.AssertHeld();
+    s = impl->InitPersistStatsColumnFamily();
+  }
+
+  if (s.ok()) {
+    // set column family handles
+    for (auto cf : column_families) {
+      auto cfd =
+          impl->versions_->GetColumnFamilySet()->GetColumnFamily(cf.name);
+      if (cfd != nullptr) {
+        handles->push_back(
+            new ColumnFamilyHandleImpl(cfd, impl, &impl->mutex_));
+        impl->NewThreadStatusCfInfo(cfd);
+      } else {
+        if (db_options.create_missing_column_families) {
+          // missing column family, create it
+          ColumnFamilyHandle* handle = nullptr;
+          impl->mutex_.Unlock();
+          s = impl->CreateColumnFamily(cf.options, cf.name, &handle);
+          impl->mutex_.Lock();
+          if (s.ok()) {
+            handles->push_back(handle);
+          } else {
+            break;
+          }
+        } else {
+          s = Status::InvalidArgument("Column family not found", cf.name);
+          break;
+        }
+      }
+    }
+  }
+
+  if (s.ok()) {
+    SuperVersionContext sv_context(/* create_superversion */ true);
+    for (auto cfd : *impl->versions_->GetColumnFamilySet()) {
+      impl->InstallSuperVersionAndScheduleWork(
+          cfd, &sv_context, *cfd->GetLatestMutableCFOptions());
+    }
+    sv_context.Clean();
+  }
+
   if (s.ok() && impl->immutable_db_options_.persist_stats_to_disk) {
     // try to read format version
     s = impl->PersistentStatsProcessFormatVersion();

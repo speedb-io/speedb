@@ -321,6 +321,8 @@ DEFINE_bool(reverse_iterator, false,
             "When true use Prev rather than Next for iterators that do "
             "Seek and then Next");
 
+DEFINE_bool(auto_prefix_mode, false, "Set auto_prefix_mode for seek benchmark");
+
 DEFINE_int64(max_scan_distance, 0,
              "Used to define iterate_upper_bound (or iterate_lower_bound "
              "if FLAGS_reverse_iterator is set to true) when value is nonzero");
@@ -412,6 +414,10 @@ DEFINE_double(read_random_exp_range, 0.0,
               "Only used in readrandom and multireadrandom benchmarks.");
 
 DEFINE_bool(histogram, false, "Print histogram of operation timings");
+
+DEFINE_bool(confidence_interval_only, false,
+            "Print 95% confidence interval upper and lower bounds only for "
+            "aggregate stats.");
 
 DEFINE_bool(enable_numa, false,
             "Make operations aware of NUMA architecture and bind memory "
@@ -1143,10 +1149,20 @@ DEFINE_bool(async_io, false,
             "When set true, RocksDB does asynchronous reads for internal auto "
             "readahead prefetching.");
 
-DEFINE_bool(reserve_table_reader_memory, false,
-            "A dynamically updating charge to block cache, loosely based on "
-            "the actual memory usage of table reader, will occur to account "
-            "the memory, if block cache available.");
+DEFINE_bool(charge_compression_dictionary_building_buffer, false,
+            "Setting for "
+            "CacheEntryRoleOptions::charged of"
+            "CacheEntryRole::kCompressionDictionaryBuildingBuffer");
+
+DEFINE_bool(charge_filter_construction, false,
+            "Setting for "
+            "CacheEntryRoleOptions::charged of"
+            "CacheEntryRole::kFilterConstruction");
+
+DEFINE_bool(charge_table_reader, false,
+            "Setting for "
+            "CacheEntryRoleOptions::charged of"
+            "CacheEntryRole::kBlockBasedTableReader");
 
 static enum ROCKSDB_NAMESPACE::CompressionType StringToCompressionType(
     const char* ctype) {
@@ -1217,6 +1233,11 @@ DEFINE_int32(compression_parallel_threads, 1,
 DEFINE_uint64(compression_max_dict_buffer_bytes,
               ROCKSDB_NAMESPACE::CompressionOptions().max_dict_buffer_bytes,
               "Maximum bytes to buffer to collect samples for dictionary.");
+
+DEFINE_bool(compression_use_zstd_dict_trainer,
+            ROCKSDB_NAMESPACE::CompressionOptions().use_zstd_dict_trainer,
+            "If true, use ZSTD_TrainDictionary() to create dictionary, else"
+            "use ZSTD_FinalizeDictionary() to create dictionary");
 
 static bool ValidateTableCacheNumshardbits(const char* flagname,
                                            int32_t value) {
@@ -1621,6 +1642,9 @@ static const bool FLAGS_table_cache_numshardbits_dummy __attribute__((__unused__
     RegisterFlagValidator(&FLAGS_table_cache_numshardbits,
                           &ValidateTableCacheNumshardbits);
 
+DEFINE_bool(track_and_verify_wals_in_manifest, false,
+            "If true, enable WAL tracking in the MANIFEST");
+
 namespace ROCKSDB_NAMESPACE {
 namespace {
 static Status CreateMemTableRepFactory(
@@ -1967,9 +1991,9 @@ class ReporterAgent {
       auto secs_elapsed =
           (clock->NowMicros() - time_started + kMicrosInSecond / 2) /
           kMicrosInSecond;
-      std::string report = ToString(secs_elapsed) + "," +
-                           ToString(total_ops_done_snapshot - last_report_) +
-                           "\n";
+      std::string report =
+          std::to_string(secs_elapsed) + "," +
+          std::to_string(total_ops_done_snapshot - last_report_) + "\n";
       auto s = report_file_->Append(report);
       if (s.ok()) {
         s = report_file_->Flush();
@@ -2223,7 +2247,7 @@ class Stats {
                     if (db->GetProperty(
                             db_with_cfh->cfh[i],
                             "rocksdb.aggregated-table-properties-at-level" +
-                                ToString(level),
+                                std::to_string(level),
                             &stats)) {
                       if (stats.find("# entries=0") == std::string::npos) {
                         fprintf(stderr, "Level[%d]: %s\n", level,
@@ -2247,7 +2271,7 @@ class Stats {
                 for (int level = 0; level < FLAGS_num_levels; ++level) {
                   if (db->GetProperty(
                           "rocksdb.aggregated-table-properties-at-level" +
-                              ToString(level),
+                              std::to_string(level),
                           &stats)) {
                     if (stats.find("# entries=0") == std::string::npos) {
                       fprintf(stderr, "Level[%d]: %s\n", level, stats.c_str());
@@ -2280,25 +2304,23 @@ class Stats {
     if (done_ < 1) done_ = 1;
 
     std::string extra;
+    double elapsed = (finish_ - start_) * 1e-6;
     if (bytes_ > 0) {
       // Rate is computed on actual elapsed time, not the sum of per-thread
       // elapsed times.
-      double elapsed = (finish_ - start_) * 1e-6;
       char rate[100];
       snprintf(rate, sizeof(rate), "%6.1f MB/s",
                (bytes_ / 1048576.0) / elapsed);
       extra = rate;
     }
     AppendWithSpace(&extra, message_);
-    double elapsed = (finish_ - start_) * 1e-6;
     double throughput = (double)done_/elapsed;
 
-    fprintf(stdout, "%-12s : %11.3f micros/op %ld ops/sec;%s%s\n",
-            name.ToString().c_str(),
-            seconds_ * 1e6 / done_,
-            (long)throughput,
-            (extra.empty() ? "" : " "),
-            extra.c_str());
+    fprintf(stdout,
+            "%-12s : %11.3f micros/op %ld ops/sec %.3f seconds %" PRIu64
+            " operations;%s%s\n",
+            name.ToString().c_str(), seconds_ * 1e6 / done_, (long)throughput,
+            elapsed, done_, (extra.empty() ? "" : " "), extra.c_str());
     if (FLAGS_histogram) {
       for (auto it = hist_.begin(); it != hist_.end(); ++it) {
         fprintf(stdout, "Microseconds per %s:\n%s\n",
@@ -2338,28 +2360,83 @@ class CombinedStats {
   }
 
   void Report(const std::string& bench_name) {
+    if (throughput_ops_.size() < 2) {
+      // skip if there are not enough samples
+      return;
+    }
+
     const char* name = bench_name.c_str();
     int num_runs = static_cast<int>(throughput_ops_.size());
 
     if (throughput_mbs_.size() == throughput_ops_.size()) {
       fprintf(stdout,
-              "%s [AVG    %d runs] : %d ops/sec; %6.1f MB/sec\n"
+              "%s [AVG %d runs] : %d (± %d) ops/sec; %6.1f (± %.1f) MB/sec\n",
+              name, num_runs, static_cast<int>(CalcAvg(throughput_ops_)),
+              static_cast<int>(CalcConfidence95(throughput_ops_)),
+              CalcAvg(throughput_mbs_), CalcConfidence95(throughput_mbs_));
+    } else {
+      fprintf(stdout, "%s [AVG %d runs] : %d (± %d) ops/sec\n", name, num_runs,
+              static_cast<int>(CalcAvg(throughput_ops_)),
+              static_cast<int>(CalcConfidence95(throughput_ops_)));
+    }
+  }
+
+  void ReportWithConfidenceIntervals(const std::string& bench_name) {
+    if (throughput_ops_.size() < 2) {
+      // skip if there are not enough samples
+      return;
+    }
+
+    const char* name = bench_name.c_str();
+    int num_runs = static_cast<int>(throughput_ops_.size());
+
+    int ops_avg = static_cast<int>(CalcAvg(throughput_ops_));
+    int ops_confidence_95 = static_cast<int>(CalcConfidence95(throughput_ops_));
+
+    if (throughput_mbs_.size() == throughput_ops_.size()) {
+      double mbs_avg = CalcAvg(throughput_mbs_);
+      double mbs_confidence_95 = CalcConfidence95(throughput_mbs_);
+      fprintf(stdout,
+              "%s [CI95 %d runs] : (%d, %d) ops/sec; (%.1f, %.1f) MB/sec\n",
+              name, num_runs, ops_avg - ops_confidence_95,
+              ops_avg + ops_confidence_95, mbs_avg - mbs_confidence_95,
+              mbs_avg + mbs_confidence_95);
+    } else {
+      fprintf(stdout, "%s [CI95 %d runs] : (%d, %d) ops/sec\n", name, num_runs,
+              ops_avg - ops_confidence_95, ops_avg + ops_confidence_95);
+    }
+  }
+
+  void ReportFinal(const std::string& bench_name) {
+    if (throughput_ops_.size() < 2) {
+      // skip if there are not enough samples
+      return;
+    }
+
+    const char* name = bench_name.c_str();
+    int num_runs = static_cast<int>(throughput_ops_.size());
+
+    if (throughput_mbs_.size() == throughput_ops_.size()) {
+      fprintf(stdout,
+              "%s [AVG    %d runs] : %d (± %d) ops/sec; %6.1f (± %.1f) MB/sec\n"
               "%s [MEDIAN %d runs] : %d ops/sec; %6.1f MB/sec\n",
               name, num_runs, static_cast<int>(CalcAvg(throughput_ops_)),
-              CalcAvg(throughput_mbs_), name, num_runs,
-              static_cast<int>(CalcMedian(throughput_ops_)),
+              static_cast<int>(CalcConfidence95(throughput_ops_)),
+              CalcAvg(throughput_mbs_), CalcConfidence95(throughput_mbs_), name,
+              num_runs, static_cast<int>(CalcMedian(throughput_ops_)),
               CalcMedian(throughput_mbs_));
     } else {
       fprintf(stdout,
-              "%s [AVG    %d runs] : %d ops/sec\n"
+              "%s [AVG    %d runs] : %d (± %d) ops/sec\n"
               "%s [MEDIAN %d runs] : %d ops/sec\n",
-              name, num_runs, static_cast<int>(CalcAvg(throughput_ops_)), name,
+              name, num_runs, static_cast<int>(CalcAvg(throughput_ops_)),
+              static_cast<int>(CalcConfidence95(throughput_ops_)), name,
               num_runs, static_cast<int>(CalcMedian(throughput_ops_)));
     }
   }
 
  private:
-  double CalcAvg(std::vector<double> data) {
+  double CalcAvg(std::vector<double>& data) {
     double avg = 0;
     for (double x : data) {
       avg += x;
@@ -2368,7 +2445,20 @@ class CombinedStats {
     return avg;
   }
 
-  double CalcMedian(std::vector<double> data) {
+  // Calculates 95% CI assuming a normal distribution of samples.
+  // Samples are not from a normal distribution, but it still
+  // provides useful approximation.
+  double CalcConfidence95(std::vector<double>& data) {
+    assert(data.size() > 1);
+    double avg = CalcAvg(data);
+    double std_error = CalcStdDev(data, avg) / std::sqrt(data.size());
+
+    // Z score for the 97.5 percentile
+    // see https://en.wikipedia.org/wiki/1.96
+    return 1.959964 * std_error;
+  }
+
+  double CalcMedian(std::vector<double>& data) {
     assert(data.size() > 0);
     std::sort(data.begin(), data.end());
 
@@ -2380,6 +2470,18 @@ class CombinedStats {
       // Even number of entries
       return (data[mid] + data[mid - 1]) / 2;
     }
+  }
+
+  double CalcStdDev(std::vector<double>& data, double average) {
+    assert(data.size() > 1);
+    double squared_sum = 0.0;
+    for (double x : data) {
+      squared_sum += std::pow(x - average, 2);
+    }
+
+    // using samples count - 1 following Bessel's correction
+    // see https://en.wikipedia.org/wiki/Bessel%27s_correction
+    return std::sqrt(squared_sum / (data.size() - 1));
   }
 
   std::vector<double> throughput_ops_;
@@ -2490,7 +2592,7 @@ class Benchmark {
  private:
   std::shared_ptr<Cache> cache_;
   std::shared_ptr<Cache> compressed_cache_;
-  const SliceTransform* prefix_extractor_;
+  std::shared_ptr<const SliceTransform> prefix_extractor_;
   DBWithColumnFamilies db_;
   std::vector<DBWithColumnFamilies> multi_dbs_;
   int64_t num_;
@@ -2891,7 +2993,9 @@ class Benchmark {
   Benchmark()
       : cache_(NewCache(FLAGS_cache_size)),
         compressed_cache_(NewCache(FLAGS_compressed_cache_size)),
-        prefix_extractor_(NewFixedPrefixTransform(FLAGS_prefix_size)),
+        prefix_extractor_(FLAGS_prefix_size != 0
+                              ? NewFixedPrefixTransform(FLAGS_prefix_size)
+                              : nullptr),
         num_(FLAGS_num),
         key_size_(FLAGS_key_size),
         user_timestamp_size_(FLAGS_user_timestamp_size),
@@ -2984,7 +3088,6 @@ class Benchmark {
 
   ~Benchmark() {
     DeleteDBs();
-    delete prefix_extractor_;
     if (cache_.get() != nullptr) {
       // Clear cache reference first
       open_options_.write_buffer_manager.reset();
@@ -3079,7 +3182,7 @@ class Benchmark {
       }
 #endif
     }
-    return base_name + ToString(id);
+    return base_name + std::to_string(id);
   }
 
   void VerifyDBFromDB(std::string& truth_db_name) {
@@ -3546,9 +3649,14 @@ class Benchmark {
         for (int i = 0; i < num_repeat; i++) {
           Stats stats = RunBenchmark(num_threads, name, method);
           combined_stats.AddStats(stats);
+          if (FLAGS_confidence_interval_only) {
+            combined_stats.ReportWithConfidenceIntervals(name);
+          } else {
+            combined_stats.Report(name);
+          }
         }
         if (num_repeat > 1) {
-          combined_stats.Report(name);
+          combined_stats.ReportFinal(name);
         }
       }
       if (post_process_method != nullptr) {
@@ -3725,7 +3833,7 @@ class Benchmark {
   static inline void ChecksumBenchmark(FnType fn, ThreadState* thread,
                                        Args... args) {
     const int size = FLAGS_block_size; // use --block_size option for db_bench
-    std::string labels = "(" + ToString(FLAGS_block_size) + " per op)";
+    std::string labels = "(" + std::to_string(FLAGS_block_size) + " per op)";
     const char* label = labels.c_str();
 
     std::string data(size, 'x');
@@ -3878,6 +3986,28 @@ class Benchmark {
     assert(db_.db == nullptr);
 
     options.env = FLAGS_env;
+    options.wal_dir = FLAGS_wal_dir;
+    options.dump_malloc_stats = FLAGS_dump_malloc_stats;
+    options.stats_dump_period_sec =
+        static_cast<unsigned int>(FLAGS_stats_dump_period_sec);
+    options.stats_persist_period_sec =
+        static_cast<unsigned int>(FLAGS_stats_persist_period_sec);
+    options.persist_stats_to_disk = FLAGS_persist_stats_to_disk;
+    options.stats_history_buffer_size =
+        static_cast<size_t>(FLAGS_stats_history_buffer_size);
+    options.avoid_flush_during_recovery = FLAGS_avoid_flush_during_recovery;
+
+    options.compression_opts.level = FLAGS_compression_level;
+    options.compression_opts.max_dict_bytes = FLAGS_compression_max_dict_bytes;
+    options.compression_opts.zstd_max_train_bytes =
+        FLAGS_compression_zstd_max_train_bytes;
+    options.compression_opts.parallel_threads =
+        FLAGS_compression_parallel_threads;
+    options.compression_opts.max_dict_buffer_bytes =
+        FLAGS_compression_max_dict_buffer_bytes;
+    options.compression_opts.use_zstd_dict_trainer =
+        FLAGS_compression_use_zstd_dict_trainer;
+
     options.max_open_files = FLAGS_open_files;
     if (FLAGS_cost_write_buffer_to_cache || FLAGS_db_write_buffer_size != 0) {
       options.write_buffer_manager.reset(
@@ -3912,10 +4042,7 @@ class Benchmark {
         FLAGS_fifo_compaction_allow_compaction);
     options.compaction_options_fifo.age_for_warm = FLAGS_fifo_age_for_warm;
 #endif  // ROCKSDB_LITE
-    if (FLAGS_prefix_size != 0) {
-      options.prefix_extractor.reset(
-          NewFixedPrefixTransform(FLAGS_prefix_size));
-    }
+    options.prefix_extractor = prefix_extractor_;
     if (FLAGS_use_uint64_comparator) {
       options.comparator = test::Uint64Comparator();
       if (FLAGS_key_size != 8) {
@@ -4088,8 +4215,21 @@ class Benchmark {
                                       : PinningTier::kFallback;
 
       block_based_options.block_cache = cache_;
-      block_based_options.reserve_table_reader_memory =
-          FLAGS_reserve_table_reader_memory;
+      block_based_options.cache_usage_options.options_overrides.insert(
+          {CacheEntryRole::kCompressionDictionaryBuildingBuffer,
+           {/*.charged = */ FLAGS_charge_compression_dictionary_building_buffer
+                ? CacheEntryRoleOptions::Decision::kEnabled
+                : CacheEntryRoleOptions::Decision::kDisabled}});
+      block_based_options.cache_usage_options.options_overrides.insert(
+          {CacheEntryRole::kFilterConstruction,
+           {/*.charged = */ FLAGS_charge_filter_construction
+                ? CacheEntryRoleOptions::Decision::kEnabled
+                : CacheEntryRoleOptions::Decision::kDisabled}});
+      block_based_options.cache_usage_options.options_overrides.insert(
+          {CacheEntryRole::kBlockBasedTableReader,
+           {/*.charged = */ FLAGS_charge_table_reader
+                ? CacheEntryRoleOptions::Decision::kEnabled
+                : CacheEntryRoleOptions::Decision::kDisabled}});
       block_based_options.block_cache_compressed = compressed_cache_;
       block_based_options.block_size = FLAGS_block_size;
       block_based_options.block_restart_interval = FLAGS_block_restart_interval;
@@ -4288,6 +4428,9 @@ class Benchmark {
       options.comparator = test::BytewiseComparatorWithU64TsWrapper();
     }
 
+    options.track_and_verify_wals_in_manifest =
+        FLAGS_track_and_verify_wals_in_manifest;
+
     // Integrated BlobDB
     options.enable_blob_files = FLAGS_enable_blob_files;
     options.min_blob_size = FLAGS_min_blob_size;
@@ -4318,95 +4461,104 @@ class Benchmark {
   }
 
   void InitializeOptionsGeneral(Options* opts) {
+    // Be careful about what is set here to avoid accidentally overwriting
+    // settings already configured by OPTIONS file. Only configure settings that
+    // are needed for the benchmark to run, settings for shared objects that
+    // were not configured already, settings that require dynamically invoking
+    // APIs, and settings for the benchmark itself.
     Options& options = *opts;
 
-    options.create_missing_column_families = FLAGS_num_column_families > 1;
-    options.statistics = dbstats;
-    options.wal_dir = FLAGS_wal_dir;
-    options.create_if_missing = !FLAGS_use_existing_db;
-    options.dump_malloc_stats = FLAGS_dump_malloc_stats;
-    options.stats_dump_period_sec =
-        static_cast<unsigned int>(FLAGS_stats_dump_period_sec);
-    options.stats_persist_period_sec =
-        static_cast<unsigned int>(FLAGS_stats_persist_period_sec);
-    options.persist_stats_to_disk = FLAGS_persist_stats_to_disk;
-    options.stats_history_buffer_size =
-        static_cast<size_t>(FLAGS_stats_history_buffer_size);
-    options.avoid_unnecessary_blocking_io = FLAGS_avoid_unnecessary_blocking_io;
-    options.avoid_flush_during_recovery = FLAGS_avoid_flush_during_recovery;
+    // Always set these since they are harmless when not needed and prevent
+    // a guaranteed failure when they are needed.
+    options.create_missing_column_families = true;
+    options.create_if_missing = true;
 
-    options.compression_opts.level = FLAGS_compression_level;
-    options.compression_opts.max_dict_bytes = FLAGS_compression_max_dict_bytes;
-    options.compression_opts.zstd_max_train_bytes =
-        FLAGS_compression_zstd_max_train_bytes;
-    options.compression_opts.parallel_threads =
-        FLAGS_compression_parallel_threads;
-    options.compression_opts.max_dict_buffer_bytes =
-        FLAGS_compression_max_dict_buffer_bytes;
-    // If this is a block based table, set some related options
+    if (options.statistics == nullptr) {
+      options.statistics = dbstats;
+    }
+
     auto table_options =
         options.table_factory->GetOptions<BlockBasedTableOptions>();
     if (table_options != nullptr) {
-      if (FLAGS_cache_size) {
+      if (FLAGS_cache_size > 0) {
+        // This violates this function's rules on when to set options. But we
+        // have to do it because the case of unconfigured block cache in OPTIONS
+        // file is indistinguishable (it is sanitized to 8MB by this point, not
+        // nullptr), and our regression tests assume this will be the shared
+        // block cache, even with OPTIONS file provided.
         table_options->block_cache = cache_;
       }
-      if (FLAGS_bloom_bits < 0) {
-        table_options->filter_policy = BlockBasedTableOptions().filter_policy;
-      } else if (FLAGS_bloom_bits == 0) {
-        table_options->filter_policy.reset();
-      } else if (FLAGS_use_block_based_filter) {
-        // Use back-door way of enabling obsolete block-based Bloom
-        Status s = FilterPolicy::CreateFromString(
-            ConfigOptions(),
-            "rocksdb.internal.DeprecatedBlockBasedBloomFilter:" +
-                ROCKSDB_NAMESPACE::ToString(FLAGS_bloom_bits),
-            &table_options->filter_policy);
-        if (!s.ok()) {
-          fprintf(stderr, "failure creating obsolete block-based filter: %s\n",
-                  s.ToString().c_str());
-          exit(1);
+      if (table_options->filter_policy == nullptr) {
+        if (FLAGS_bloom_bits < 0) {
+          table_options->filter_policy = BlockBasedTableOptions().filter_policy;
+        } else if (FLAGS_bloom_bits == 0) {
+          table_options->filter_policy.reset();
+        } else if (FLAGS_use_block_based_filter) {
+          // Use back-door way of enabling obsolete block-based Bloom
+          Status s = FilterPolicy::CreateFromString(
+              ConfigOptions(),
+              "rocksdb.internal.DeprecatedBlockBasedBloomFilter:" +
+                  std::to_string(FLAGS_bloom_bits),
+              &table_options->filter_policy);
+          if (!s.ok()) {
+            fprintf(stderr,
+                    "failure creating obsolete block-based filter: %s\n",
+                    s.ToString().c_str());
+            exit(1);
+          }
+        } else {
+          table_options->filter_policy.reset(
+              FLAGS_use_ribbon_filter ? NewRibbonFilterPolicy(FLAGS_bloom_bits)
+                                      : NewBloomFilterPolicy(FLAGS_bloom_bits));
         }
-      } else {
-        table_options->filter_policy.reset(
-            FLAGS_use_ribbon_filter ? NewRibbonFilterPolicy(FLAGS_bloom_bits)
-                                    : NewBloomFilterPolicy(FLAGS_bloom_bits));
       }
     }
-    if (FLAGS_row_cache_size) {
-      if (FLAGS_cache_numshardbits >= 1) {
-        options.row_cache =
-            NewLRUCache(FLAGS_row_cache_size, FLAGS_cache_numshardbits);
-      } else {
-        options.row_cache = NewLRUCache(FLAGS_row_cache_size);
+
+    if (options.row_cache == nullptr) {
+      if (FLAGS_row_cache_size) {
+        if (FLAGS_cache_numshardbits >= 1) {
+          options.row_cache =
+              NewLRUCache(FLAGS_row_cache_size, FLAGS_cache_numshardbits);
+        } else {
+          options.row_cache = NewLRUCache(FLAGS_row_cache_size);
+        }
       }
+    }
+
+    if (options.env == Env::Default()) {
+      options.env = FLAGS_env;
     }
     if (FLAGS_enable_io_prio) {
-      FLAGS_env->LowerThreadPoolIOPriority(Env::LOW);
-      FLAGS_env->LowerThreadPoolIOPriority(Env::HIGH);
+      options.env->LowerThreadPoolIOPriority(Env::LOW);
+      options.env->LowerThreadPoolIOPriority(Env::HIGH);
     }
     if (FLAGS_enable_cpu_prio) {
-      FLAGS_env->LowerThreadPoolCPUPriority(Env::LOW);
-      FLAGS_env->LowerThreadPoolCPUPriority(Env::HIGH);
+      options.env->LowerThreadPoolCPUPriority(Env::LOW);
+      options.env->LowerThreadPoolCPUPriority(Env::HIGH);
     }
-    options.env = FLAGS_env;
+
     if (FLAGS_sine_write_rate) {
       FLAGS_benchmark_write_rate_limit = static_cast<uint64_t>(SineRate(0));
     }
 
-    if (FLAGS_rate_limiter_bytes_per_sec > 0) {
-      options.rate_limiter.reset(NewGenericRateLimiter(
-          FLAGS_rate_limiter_bytes_per_sec, FLAGS_rate_limiter_refill_period_us,
-          10 /* fairness */,
-          FLAGS_rate_limit_bg_reads ? RateLimiter::Mode::kReadsOnly
-                                    : RateLimiter::Mode::kWritesOnly,
-          FLAGS_rate_limiter_auto_tuned));
+    if (options.rate_limiter == nullptr) {
+      if (FLAGS_rate_limiter_bytes_per_sec > 0) {
+        options.rate_limiter.reset(NewGenericRateLimiter(
+            FLAGS_rate_limiter_bytes_per_sec,
+            FLAGS_rate_limiter_refill_period_us, 10 /* fairness */,
+            FLAGS_rate_limit_bg_reads ? RateLimiter::Mode::kReadsOnly
+                                      : RateLimiter::Mode::kWritesOnly,
+            FLAGS_rate_limiter_auto_tuned));
+      }
     }
 
     options.listeners.emplace_back(listener_);
 
-    if (FLAGS_file_checksum) {
-      options.file_checksum_gen_factory.reset(
-          new FileChecksumGenCrc32cFactory());
+    if (options.file_checksum_gen_factory == nullptr) {
+      if (FLAGS_file_checksum) {
+        options.file_checksum_gen_factory.reset(
+            new FileChecksumGenCrc32cFactory());
+      }
     }
 
     if (FLAGS_num_multi_db <= 1) {
@@ -4425,9 +4577,11 @@ class Benchmark {
     }
 
     // KeepFilter is a noop filter, this can be used to test compaction filter
-    if (FLAGS_use_keep_filter) {
-      options.compaction_filter = new KeepFilter();
-      fprintf(stdout, "A noop compaction filter is used\n");
+    if (options.compaction_filter == nullptr) {
+      if (FLAGS_use_keep_filter) {
+        options.compaction_filter = new KeepFilter();
+        fprintf(stdout, "A noop compaction filter is used\n");
+      }
     }
 
     if (FLAGS_use_existing_keys) {
@@ -6439,6 +6593,7 @@ class Benchmark {
         }
       }
     }
+    options.auto_prefix_mode = FLAGS_auto_prefix_mode;
 
     std::unique_ptr<const char[]> key_guard;
     Slice key = AllocateKey(&key_guard);
@@ -6470,6 +6625,14 @@ class Benchmark {
                              &upper_bound);
           options.iterate_upper_bound = &upper_bound;
         }
+      } else if (FLAGS_auto_prefix_mode && prefix_extractor_ &&
+                 !FLAGS_reverse_iterator) {
+        // Set upper bound to next prefix
+        auto mutable_upper_bound = const_cast<char*>(upper_bound.data());
+        std::memcpy(mutable_upper_bound, key.data(), prefix_size_);
+        mutable_upper_bound[prefix_size_ - 1]++;
+        upper_bound = Slice(upper_bound.data(), prefix_size_);
+        options.iterate_upper_bound = &upper_bound;
       }
 
       // Pick a Iterator to use
@@ -8153,14 +8316,27 @@ class Benchmark {
     flush_opt.wait = true;
 
     if (db_.db != nullptr) {
-      Status s = db_.db->Flush(flush_opt, db_.cfh);
+      Status s;
+      if (FLAGS_num_column_families > 1) {
+        s = db_.db->Flush(flush_opt, db_.cfh);
+      } else {
+        s = db_.db->Flush(flush_opt, db_.db->DefaultColumnFamily());
+      }
+
       if (!s.ok()) {
         fprintf(stderr, "Flush failed: %s\n", s.ToString().c_str());
         exit(1);
       }
     } else {
       for (const auto& db_with_cfh : multi_dbs_) {
-        Status s = db_with_cfh.db->Flush(flush_opt, db_with_cfh.cfh);
+        Status s;
+        if (FLAGS_num_column_families > 1) {
+          s = db_with_cfh.db->Flush(flush_opt, db_with_cfh.cfh);
+        } else {
+          s = db_with_cfh.db->Flush(flush_opt,
+                                    db_with_cfh.db->DefaultColumnFamily());
+        }
+
         if (!s.ok()) {
           fprintf(stderr, "Flush failed: %s\n", s.ToString().c_str());
           exit(1);
@@ -8194,7 +8370,8 @@ class Benchmark {
     }
 
     std::unique_ptr<StatsHistoryIterator> shi;
-    Status s = db->GetStatsHistory(0, port::kMaxUint64, &shi);
+    Status s =
+        db->GetStatsHistory(0, std::numeric_limits<uint64_t>::max(), &shi);
     if (!s.ok()) {
       fprintf(stdout, "%s\n", s.ToString().c_str());
       return;

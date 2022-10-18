@@ -54,6 +54,7 @@
 #include "table/get_context.h"
 #include "table/multiget_context.h"
 #include "trace_replay/block_cache_tracer.h"
+#include "util/coro_utils.h"
 #include "util/hash_containers.h"
 
 namespace ROCKSDB_NAMESPACE {
@@ -851,6 +852,8 @@ class Version {
 
   const MutableCFOptions& GetMutableCFOptions() { return mutable_cf_options_; }
 
+  Status VerifySstUniqueIds() const;
+
  private:
   Env* env_;
   SystemClock* clock_;
@@ -881,6 +884,14 @@ class Version {
   // Update the accumulated stats associated with the current version.
   // This accumulated stats will be used in compaction.
   void UpdateAccumulatedStats();
+
+  DECLARE_SYNC_AND_ASYNC(
+      /* ret_type */ Status, /* func_name */ MultiGetFromSST,
+      const ReadOptions& read_options, MultiGetRange file_range,
+      int hit_file_level, bool is_hit_file_last_in_level, FdWithKeyRange* f,
+      std::unordered_map<uint64_t, BlobReadRequests>& blob_rqs,
+      uint64_t& num_filter_read, uint64_t& num_index_read,
+      uint64_t& num_data_read, uint64_t& num_sst_read);
 
   ColumnFamilyData* cfd_;  // ColumnFamilyData to which this Version belongs
   Logger* info_log_;
@@ -1213,7 +1224,7 @@ class VersionSet {
   // new_log_number_for_empty_cf.
   uint64_t PreComputeMinLogNumberWithUnflushedData(
       uint64_t new_log_number_for_empty_cf) const {
-    uint64_t min_log_num = port::kMaxUint64;
+    uint64_t min_log_num = std::numeric_limits<uint64_t>::max();
     for (auto cfd : *column_family_set_) {
       // It's safe to ignore dropped column families here:
       // cfd->IsDropped() becomes true after the drop is persisted in MANIFEST.
@@ -1229,7 +1240,7 @@ class VersionSet {
   // file, except data from `cfd_to_skip`.
   uint64_t PreComputeMinLogNumberWithUnflushedData(
       const ColumnFamilyData* cfd_to_skip) const {
-    uint64_t min_log_num = port::kMaxUint64;
+    uint64_t min_log_num = std::numeric_limits<uint64_t>::max();
     for (auto cfd : *column_family_set_) {
       if (cfd == cfd_to_skip) {
         continue;
@@ -1246,7 +1257,7 @@ class VersionSet {
   // file, except data from `cfds_to_skip`.
   uint64_t PreComputeMinLogNumberWithUnflushedData(
       const std::unordered_set<const ColumnFamilyData*>& cfds_to_skip) const {
-    uint64_t min_log_num = port::kMaxUint64;
+    uint64_t min_log_num = std::numeric_limits<uint64_t>::max();
     for (auto cfd : *column_family_set_) {
       if (cfds_to_skip.count(cfd)) {
         continue;

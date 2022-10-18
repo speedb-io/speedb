@@ -1240,6 +1240,39 @@ class DBImpl : public DB {
 
   std::atomic<bool> shutting_down_;
 
+  // RecoveryContext struct stores the context about version edits along
+  // with corresponding column_family_data and column_family_options.
+  class RecoveryContext {
+   public:
+    ~RecoveryContext() {
+      for (auto& edit_list : edit_lists_) {
+        for (auto* edit : edit_list) {
+          delete edit;
+        }
+      }
+    }
+
+    void UpdateVersionEdits(ColumnFamilyData* cfd, const VersionEdit& edit) {
+      assert(cfd != nullptr);
+      if (map_.find(cfd->GetID()) == map_.end()) {
+        uint32_t size = static_cast<uint32_t>(map_.size());
+        map_.emplace(cfd->GetID(), size);
+        cfds_.emplace_back(cfd);
+        mutable_cf_opts_.emplace_back(cfd->GetLatestMutableCFOptions());
+        edit_lists_.emplace_back(autovector<VersionEdit*>());
+      }
+      uint32_t i = map_[cfd->GetID()];
+      edit_lists_[i].emplace_back(new VersionEdit(edit));
+    }
+
+    std::unordered_map<uint32_t, uint32_t> map_;  // cf_id to index;
+    autovector<ColumnFamilyData*> cfds_;
+    autovector<const MutableCFOptions*> mutable_cf_opts_;
+    autovector<autovector<VersionEdit*>> edit_lists_;
+    // files_to_delete_ contains sst files
+    std::unordered_set<std::string> files_to_delete_;
+  };
+
   // Except in DB::Open(), WriteOptionsFile can only be called when:
   // Persist options to options file.
   // If need_mutex_lock = false, the method will lock DB mutex.
@@ -1389,6 +1422,14 @@ class DBImpl : public DB {
   Status FailIfTsSizesMismatch(const ColumnFamilyHandle* column_family,
                                const Slice& ts) const;
 
+  // recovery_ctx stores the context about version edits and
+  // LogAndApplyForRecovery persist all those edits to new Manifest after
+  // successfully syncing new WAL.
+  // LogAndApplyForRecovery should be called only once during recovery and it
+  // should be called when RocksDB writes to a first new MANIFEST since this
+  // recovery.
+  Status LogAndApplyForRecovery(const RecoveryContext& recovery_ctx);
+
  private:
   friend class DB;
   friend class ErrorHandler;
@@ -1465,12 +1506,38 @@ class DBImpl : public DB {
       return s;
     }
 
+    bool IsSyncing() { return getting_synced; }
+
+    uint64_t GetPreSyncSize() {
+      assert(getting_synced);
+      return pre_sync_size;
+    }
+
+    void PrepareForSync() {
+      assert(!getting_synced);
+      // Size is expected to be monotonically increasing.
+      assert(writer->file()->GetFlushedSize() >= pre_sync_size);
+      getting_synced = true;
+      pre_sync_size = writer->file()->GetFlushedSize();
+    }
+
+    void FinishSync() {
+      assert(getting_synced);
+      getting_synced = false;
+    }
+
     uint64_t number;
     // Visual Studio doesn't support deque's member to be noncopyable because
     // of a std::unique_ptr as a member.
     log::Writer* writer;  // own
+
+   private:
     // true for some prefix of logs_
     bool getting_synced = false;
+    // The size of the file before the sync happens. This amount is guaranteed
+    // to be persisted even if appends happen during sync so it can be used for
+    // tracking the synced size in MANIFEST.
+    uint64_t pre_sync_size = 0;
   };
 
   // PurgeFileInfo is a structure to hold information of files to be deleted in
@@ -1974,6 +2041,11 @@ class DBImpl : public DB {
   IOStatus CreateWAL(uint64_t log_file_num, uint64_t recycle_log_number,
                      size_t preallocate_block_size, log::Writer** new_log);
 
+  // Verify SST file unique id between Manifest and table properties to make
+  // sure they're the same. Currently only used during DB open when
+  // `verify_sst_unique_id_in_manifest = true`.
+  Status VerifySstUniqueIdInManifest();
+
   // Validate self-consistency of DB options
   static Status ValidateOptions(const DBOptions& db_options);
   // Validate self-consistency of DB options and its consistency with cf options
@@ -2299,7 +2371,7 @@ class DBImpl : public DB {
 
   static const int KEEP_LOG_FILE_NUM = 1000;
   // MSVC version 1800 still does not have constexpr for ::max()
-  static const uint64_t kNoTimeOut = port::kMaxUint64;
+  static const uint64_t kNoTimeOut = std::numeric_limits<uint64_t>::max();
 
   std::string db_absolute_path_;
 
@@ -2393,6 +2465,15 @@ class DBImpl : public DB {
 
   // Pointer to WriteBufferManager stalling interface.
   std::unique_ptr<StallInterface> wbm_stall_;
+};
+
+class GetWithTimestampReadCallback : public ReadCallback {
+ public:
+  explicit GetWithTimestampReadCallback(SequenceNumber seq)
+      : ReadCallback(seq) {}
+  bool IsVisibleFullCheck(SequenceNumber seq) override {
+    return seq <= max_visible_seq_;
+  }
 };
 
 extern Options SanitizeOptions(const std::string& db, const Options& src,

@@ -48,6 +48,7 @@
 #include "util/coding.h"
 #include "util/crc32c.h"
 #include "util/math.h"
+#include "util/rate_limiter.h"
 #include "util/string_util.h"
 #include "utilities/backup/backup_engine_impl.h"
 #include "utilities/checkpoint/checkpoint_impl.h"
@@ -179,6 +180,61 @@ class BackupEngineImpl {
   ShareFilesNaming GetNamingFlags() const {
     return options_.share_files_with_checksum_naming &
            BackupEngineOptions::kMaskNamingFlags;
+  }
+
+  void TEST_SetDefaultRateLimitersClock(
+      const std::shared_ptr<SystemClock>& backup_rate_limiter_clock,
+      const std::shared_ptr<SystemClock>& restore_rate_limiter_clock) {
+    if (backup_rate_limiter_clock) {
+      assert(options_.backup_rate_limiter->IsInstanceOf(
+          GenericRateLimiter::kClassName()));
+      auto* backup_rate_limiter_options =
+          options_.backup_rate_limiter
+              ->GetOptions<GenericRateLimiter::GenericRateLimiterOptions>();
+
+      assert(backup_rate_limiter_options);
+      RateLimiter::Mode backup_rate_limiter_mode;
+      if (!options_.backup_rate_limiter->IsRateLimited(
+              RateLimiter::OpType::kRead)) {
+        backup_rate_limiter_mode = RateLimiter::Mode::kWritesOnly;
+      } else if (!options_.backup_rate_limiter->IsRateLimited(
+                     RateLimiter::OpType::kWrite)) {
+        backup_rate_limiter_mode = RateLimiter::Mode::kReadsOnly;
+      } else {
+        backup_rate_limiter_mode = RateLimiter::Mode::kAllIo;
+      }
+      options_.backup_rate_limiter.reset(new GenericRateLimiter(
+          backup_rate_limiter_options->max_bytes_per_sec,
+          backup_rate_limiter_options->refill_period_us,
+          backup_rate_limiter_options->fairness, backup_rate_limiter_mode,
+          backup_rate_limiter_clock, backup_rate_limiter_options->auto_tuned));
+    }
+
+    if (restore_rate_limiter_clock) {
+      assert(options_.restore_rate_limiter->IsInstanceOf(
+          GenericRateLimiter::kClassName()));
+      auto* restore_rate_limiter_options =
+          options_.restore_rate_limiter
+              ->GetOptions<GenericRateLimiter::GenericRateLimiterOptions>();
+      assert(restore_rate_limiter_options);
+
+      RateLimiter::Mode restore_rate_limiter_mode;
+      if (!options_.restore_rate_limiter->IsRateLimited(
+              RateLimiter::OpType::kRead)) {
+        restore_rate_limiter_mode = RateLimiter::Mode::kWritesOnly;
+      } else if (!options_.restore_rate_limiter->IsRateLimited(
+                     RateLimiter::OpType::kWrite)) {
+        restore_rate_limiter_mode = RateLimiter::Mode::kReadsOnly;
+      } else {
+        restore_rate_limiter_mode = RateLimiter::Mode::kAllIo;
+      }
+      options_.restore_rate_limiter.reset(new GenericRateLimiter(
+          restore_rate_limiter_options->max_bytes_per_sec,
+          restore_rate_limiter_options->refill_period_us,
+          restore_rate_limiter_options->fairness, restore_rate_limiter_mode,
+          restore_rate_limiter_clock,
+          restore_rate_limiter_options->auto_tuned));
+    }
   }
 
  private:
@@ -496,8 +552,8 @@ class BackupEngineImpl {
                                        bool tmp = false,
                                        const std::string& file = "") const {
     assert(file.size() == 0 || file[0] != '/');
-    return kPrivateDirSlash + ROCKSDB_NAMESPACE::ToString(backup_id) +
-           (tmp ? ".tmp" : "") + "/" + file;
+    return kPrivateDirSlash + std::to_string(backup_id) + (tmp ? ".tmp" : "") +
+           "/" + file;
   }
   inline std::string GetSharedFileRel(const std::string& file = "",
                                       bool tmp = false) const {
@@ -524,13 +580,13 @@ class BackupEngineImpl {
     if (UseLegacyNaming(db_session_id)) {
       assert(!checksum_hex.empty());
       file_copy.insert(file_copy.find_last_of('.'),
-                       "_" + ToString(ChecksumHexToInt32(checksum_hex)) + "_" +
-                           ToString(file_size));
+                       "_" + std::to_string(ChecksumHexToInt32(checksum_hex)) +
+                           "_" + std::to_string(file_size));
     } else {
       file_copy.insert(file_copy.find_last_of('.'), "_s" + db_session_id);
       if (GetNamingFlags() & BackupEngineOptions::kFlagIncludeFileSize) {
         file_copy.insert(file_copy.find_last_of('.'),
-                         "_" + ToString(file_size));
+                         "_" + std::to_string(file_size));
       }
     }
     return file_copy;
@@ -544,7 +600,7 @@ class BackupEngineImpl {
   }
   inline std::string GetBackupMetaFile(BackupID backup_id, bool tmp) const {
     return GetAbsolutePath(kMetaDirName) + "/" + (tmp ? "." : "") +
-           ROCKSDB_NAMESPACE::ToString(backup_id) + (tmp ? ".tmp" : "");
+           std::to_string(backup_id) + (tmp ? ".tmp" : "");
   }
 
   // If size_limit == 0, there is no size limit, copy everything.
@@ -942,6 +998,15 @@ class BackupEngineImplThreadSafe : public BackupEngine,
     impl_.schema_test_options_.reset(new TEST_BackupMetaSchemaOptions(options));
   }
 
+  // Not public API but used in testing
+  void TEST_SetDefaultRateLimitersClock(
+      const std::shared_ptr<SystemClock>& backup_rate_limiter_clock = nullptr,
+      const std::shared_ptr<SystemClock>& restore_rate_limiter_clock =
+          nullptr) {
+    impl_.TEST_SetDefaultRateLimitersClock(backup_rate_limiter_clock,
+                                           restore_rate_limiter_clock);
+  }
+
  private:
   mutable port::RWMutex mutex_;
   BackupEngineImpl impl_;
@@ -1012,8 +1077,9 @@ IOStatus BackupEngineImpl::Initialize() {
     // we might need to clean up from previous crash or I/O errors
     might_need_garbage_collect_ = true;
 
-    if (options_.max_valid_backups_to_open != port::kMaxInt32) {
-      options_.max_valid_backups_to_open = port::kMaxInt32;
+    if (options_.max_valid_backups_to_open !=
+        std::numeric_limits<int32_t>::max()) {
+      options_.max_valid_backups_to_open = std::numeric_limits<int32_t>::max();
       ROCKS_LOG_WARN(
           options_.info_log,
           "`max_valid_backups_to_open` is not set to the default value. Ignoring "
@@ -1066,7 +1132,7 @@ IOStatus BackupEngineImpl::Initialize() {
     ROCKS_LOG_INFO(options_.info_log, "Detected backup %s", file.c_str());
     BackupID backup_id = 0;
     sscanf(file.c_str(), "%u", &backup_id);
-    if (backup_id == 0 || file != ROCKSDB_NAMESPACE::ToString(backup_id)) {
+    if (backup_id == 0 || file != std::to_string(backup_id)) {
       // Invalid file name, will be deleted with auto-GC when user
       // initiates an append or write operation. (Behave as read-only until
       // then.)
@@ -1434,7 +1500,8 @@ IOStatus BackupEngineImpl::CreateNewBackupWithMetadata(
               contents.size(), db_options.statistics.get(), 0 /* size_limit */,
               false /* shared_checksum */, options.progress_callback, contents);
         } /* create_file_cb */,
-        &sequence_number, options.flush_before_backup ? 0 : port::kMaxUint64,
+        &sequence_number,
+        options.flush_before_backup ? 0 : std::numeric_limits<uint64_t>::max(),
         compare_checksum));
     if (io_s.ok()) {
       new_backup->SetSequenceNumber(sequence_number);
@@ -1664,8 +1731,8 @@ void BackupEngineImpl::SetBackupInfoFromBackupMeta(
     bool include_file_details) const {
   *backup_info = BackupInfo(id, meta.GetTimestamp(), meta.GetSize(),
                             meta.GetNumberFiles(), meta.GetAppMetadata());
-  std::string dir = options_.backup_dir + "/" + kPrivateDirSlash +
-                    ROCKSDB_NAMESPACE::ToString(id);
+  std::string dir =
+      options_.backup_dir + "/" + kPrivateDirSlash + std::to_string(id);
   if (include_file_details) {
     auto& file_details = backup_info->file_details;
     file_details.reserve(meta.GetFiles().size());
@@ -1960,9 +2027,9 @@ IOStatus BackupEngineImpl::VerifyBackup(BackupID backup_id,
     // verify file size
     if (file_info->size != curr_abs_path_to_size[abs_path]) {
       std::string size_info("Expected file size is " +
-                            ToString(file_info->size) +
+                            std::to_string(file_info->size) +
                             " while found file size is " +
-                            ToString(curr_abs_path_to_size[abs_path]));
+                            std::to_string(curr_abs_path_to_size[abs_path]));
       return IOStatus::Corruption("File corrupted: File size mismatch for " +
                                   abs_path + ": " + size_info);
     }
@@ -2171,7 +2238,7 @@ IOStatus BackupEngineImpl::AddBackupFileWorkItem(
         return io_s;
       }
     }
-    if (size_bytes == port::kMaxUint64) {
+    if (size_bytes == std::numeric_limits<uint64_t>::max()) {
       return IOStatus::NotFound("File missing: " + src_path);
     }
     // dst_relative depends on the following conditions:
@@ -2643,8 +2710,8 @@ IOStatus BackupEngineImpl::BackupMeta::AddFile(
     if (itr->second->size != file_info->size) {
       std::string msg = "Size mismatch for existing backup file: ";
       msg.append(file_info->filename);
-      msg.append(" Size in backup is " + ToString(itr->second->size) +
-                 " while size in DB is " + ToString(file_info->size));
+      msg.append(" Size in backup is " + std::to_string(itr->second->size) +
+                 " while size in DB is " + std::to_string(file_info->size));
       msg.append(
           " If this DB file checks as not corrupt, try deleting old"
           " backups or backing up to a different backup directory.");
@@ -2937,7 +3004,7 @@ IOStatus BackupEngineImpl::BackupMeta::LoadFromFile(
       if (field_name == kFileCrc32cFieldName) {
         uint32_t checksum_value =
             static_cast<uint32_t>(strtoul(field_data.c_str(), nullptr, 10));
-        if (field_data != ROCKSDB_NAMESPACE::ToString(checksum_value)) {
+        if (field_data != std::to_string(checksum_value)) {
           return IOStatus::Corruption("Invalid checksum value for " + filename +
                                       " in " + meta_filename_);
         }
@@ -2947,8 +3014,9 @@ IOStatus BackupEngineImpl::BackupMeta::LoadFromFile(
             std::strtoull(field_data.c_str(), nullptr, /*base*/ 10);
         if (ex_size != actual_size) {
           return IOStatus::Corruption(
-              "For file " + filename + " expected size " + ToString(ex_size) +
-              " but found size" + ToString(actual_size));
+              "For file " + filename + " expected size " +
+              std::to_string(ex_size) + " but found size" +
+              std::to_string(actual_size));
         }
       } else if (field_name == kTemperatureFieldName) {
         auto iter = temperature_string_map.find(field_data);
@@ -3046,7 +3114,7 @@ IOStatus BackupEngineImpl::BackupMeta::StoreToFile(
   if (schema_version > static_cast<int>(minor_version_strings.size() - 1)) {
     return IOStatus::NotSupported(
         "Only BackupEngineOptions::schema_version <= " +
-        ToString(minor_version_strings.size() - 1) + " is supported");
+        std::to_string(minor_version_strings.size() - 1) + " is supported");
   }
   std::string ver = minor_version_strings[schema_version];
 
@@ -3101,7 +3169,7 @@ IOStatus BackupEngineImpl::BackupMeta::StoreToFile(
           << temperature_to_string[file->temp];
     }
     if (schema_test_options && schema_test_options->file_sizes) {
-      buf << " " << kFileSizeFieldName << " " << ToString(file->size);
+      buf << " " << kFileSizeFieldName << " " << std::to_string(file->size);
     }
     if (schema_test_options) {
       for (auto& e : schema_test_options->file_fields) {
@@ -3159,6 +3227,15 @@ void TEST_SetBackupMetaSchemaOptions(
   impl->TEST_SetBackupMetaSchemaOptions(options);
 }
 
+void TEST_SetDefaultRateLimitersClock(
+    BackupEngine* engine,
+    const std::shared_ptr<SystemClock>& backup_rate_limiter_clock,
+    const std::shared_ptr<SystemClock>& restore_rate_limiter_clock) {
+  BackupEngineImplThreadSafe* impl =
+      static_cast_with_check<BackupEngineImplThreadSafe>(engine);
+  impl->TEST_SetDefaultRateLimitersClock(backup_rate_limiter_clock,
+                                         restore_rate_limiter_clock);
+}
 }  // namespace ROCKSDB_NAMESPACE
 
 #endif  // ROCKSDB_LITE

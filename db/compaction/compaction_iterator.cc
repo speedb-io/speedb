@@ -28,7 +28,8 @@ CompactionIterator::CompactionIterator(
     Env* env, bool report_detailed_time, bool expect_valid_internal_key,
     CompactionRangeDelAggregator* range_del_agg,
     BlobFileBuilder* blob_file_builder, bool allow_data_in_errors,
-    const Compaction* compaction, const CompactionFilter* compaction_filter,
+    bool enforce_single_del_contracts, const Compaction* compaction,
+    const CompactionFilter* compaction_filter,
     const std::atomic<bool>* shutting_down,
     const std::atomic<int>* manual_compaction_paused,
     const std::atomic<bool>* manual_compaction_canceled,
@@ -38,7 +39,7 @@ CompactionIterator::CompactionIterator(
           input, cmp, merge_helper, last_sequence, snapshots,
           earliest_write_conflict_snapshot, job_snapshot, snapshot_checker, env,
           report_detailed_time, expect_valid_internal_key, range_del_agg,
-          blob_file_builder, allow_data_in_errors,
+          blob_file_builder, allow_data_in_errors, enforce_single_del_contracts,
           std::unique_ptr<CompactionProxy>(
               compaction ? new RealCompaction(compaction) : nullptr),
           compaction_filter, shutting_down, manual_compaction_paused,
@@ -52,6 +53,7 @@ CompactionIterator::CompactionIterator(
     Env* env, bool report_detailed_time, bool expect_valid_internal_key,
     CompactionRangeDelAggregator* range_del_agg,
     BlobFileBuilder* blob_file_builder, bool allow_data_in_errors,
+    bool enforce_single_del_contracts,
     std::unique_ptr<CompactionProxy> compaction,
     const CompactionFilter* compaction_filter,
     const std::atomic<bool>* shutting_down,
@@ -80,6 +82,7 @@ CompactionIterator::CompactionIterator(
       manual_compaction_canceled_(manual_compaction_canceled),
       info_log_(info_log),
       allow_data_in_errors_(allow_data_in_errors),
+      enforce_single_del_contracts_(enforce_single_del_contracts),
       timestamp_size_(cmp_ ? cmp_->timestamp_size() : 0),
       full_history_ts_low_(full_history_ts_low),
       current_user_key_sequence_(0),
@@ -305,6 +308,14 @@ bool CompactionIterator::InvokeFilterIfNeeded(bool* need_skip,
     ikey_.type = kTypeDeletion;
     current_key_.UpdateInternalKey(ikey_.sequence, kTypeDeletion);
     // no value associated with delete
+    value_.clear();
+    iter_stats_.num_record_drop_user++;
+  } else if (filter == CompactionFilter::Decision::kPurge) {
+    // convert the current key to a single delete; key_ is pointing into
+    // current_key_ at this point, so updating current_key_ updates key()
+    ikey_.type = kTypeSingleDeletion;
+    current_key_.UpdateInternalKey(ikey_.sequence, kTypeSingleDeletion);
+    // no value associated with single delete
     value_.clear();
     iter_stats_.num_record_drop_user++;
   } else if (filter == CompactionFilter::Decision::kChangeValue) {
@@ -625,24 +636,39 @@ void CompactionIterator::NextFromInput() {
 
           TEST_SYNC_POINT_CALLBACK(
               "CompactionIterator::NextFromInput:SingleDelete:2", nullptr);
-          if (next_ikey.type == kTypeSingleDeletion ||
-              next_ikey.type == kTypeDeletion) {
+          if (next_ikey.type == kTypeSingleDeletion) {
             // We encountered two SingleDeletes for same key in a row. This
             // could be due to unexpected user input. If write-(un)prepared
             // transaction is used, this could also be due to releasing an old
             // snapshot between a Put and its matching SingleDelete.
-            // Furthermore, if write-(un)prepared transaction is rolled back
-            // after prepare, we will write a Delete to cancel a prior Put. If
-            // old snapshot is released between a later Put and its matching
-            // SingleDelete, we will end up with a Delete followed by
-            // SingleDelete.
             // Skip the first SingleDelete and let the next iteration decide
-            // how to handle the second SingleDelete or Delete.
+            // how to handle the second SingleDelete.
 
             // First SingleDelete has been skipped since we already called
             // input_.Next().
             ++iter_stats_.num_record_drop_obsolete;
             ++iter_stats_.num_single_del_mismatch;
+          } else if (next_ikey.type == kTypeDeletion) {
+            std::ostringstream oss;
+            oss << "Found SD and type: " << static_cast<int>(next_ikey.type)
+                << " on the same key, violating the contract "
+                   "of SingleDelete. Check your application to make sure the "
+                   "application does not mix SingleDelete and Delete for "
+                   "the same key. If you are using "
+                   "write-prepared/write-unprepared transactions, and use "
+                   "SingleDelete to delete certain keys, then make sure "
+                   "TransactionDBOptions::rollback_deletion_type_callback is "
+                   "configured properly. Mixing SD and DEL can lead to "
+                   "undefined behaviors";
+            ++iter_stats_.num_record_drop_obsolete;
+            ++iter_stats_.num_single_del_mismatch;
+            if (enforce_single_del_contracts_) {
+              ROCKS_LOG_ERROR(info_log_, "%s", oss.str().c_str());
+              valid_ = false;
+              status_ = Status::Corruption(oss.str());
+              return;
+            }
+            ROCKS_LOG_WARN(info_log_, "%s", oss.str().c_str());
           } else if (!is_timestamp_eligible_for_gc) {
             // We cannot drop the SingleDelete as timestamp is enabled, and
             // timestamp of this key is greater than or equal to

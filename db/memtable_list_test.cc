@@ -209,7 +209,8 @@ TEST_F(MemTableListTest, Empty) {
   ASSERT_FALSE(list.IsFlushPending());
 
   autovector<MemTable*> mems;
-  list.PickMemtablesToFlush(port::kMaxUint64 /* memtable_id */, &mems);
+  list.PickMemtablesToFlush(
+      std::numeric_limits<uint64_t>::max() /* memtable_id */, &mems);
   ASSERT_EQ(0, mems.size());
 
   autovector<MemTable*> to_delete;
@@ -418,7 +419,8 @@ TEST_F(MemTableListTest, GetFromHistoryTest) {
   // Flush this memtable from the list.
   // (It will then be a part of the memtable history).
   autovector<MemTable*> to_flush;
-  list.PickMemtablesToFlush(port::kMaxUint64 /* memtable_id */, &to_flush);
+  list.PickMemtablesToFlush(
+      std::numeric_limits<uint64_t>::max() /* memtable_id */, &to_flush);
   ASSERT_EQ(1, to_flush.size());
 
   MutableCFOptions mutable_cf_options(options);
@@ -472,7 +474,8 @@ TEST_F(MemTableListTest, GetFromHistoryTest) {
   ASSERT_EQ(0, to_delete.size());
 
   to_flush.clear();
-  list.PickMemtablesToFlush(port::kMaxUint64 /* memtable_id */, &to_flush);
+  list.PickMemtablesToFlush(
+      std::numeric_limits<uint64_t>::max() /* memtable_id */, &to_flush);
   ASSERT_EQ(1, to_flush.size());
 
   // Flush second memtable
@@ -601,15 +604,15 @@ TEST_F(MemTableListTest, FlushPendingTest) {
       std::string value;
       MergeContext merge_context;
 
-      ASSERT_OK(mem->Add(++seq, kTypeValue, "key1", ToString(i),
+      ASSERT_OK(mem->Add(++seq, kTypeValue, "key1", std::to_string(i),
                          nullptr /* kv_prot_info */));
-      ASSERT_OK(mem->Add(++seq, kTypeValue, "keyN" + ToString(i), "valueN",
+      ASSERT_OK(mem->Add(++seq, kTypeValue, "keyN" + std::to_string(i),
+                         "valueN", nullptr /* kv_prot_info */));
+      ASSERT_OK(mem->Add(++seq, kTypeValue, "keyX" + std::to_string(i), "value",
                          nullptr /* kv_prot_info */));
-      ASSERT_OK(mem->Add(++seq, kTypeValue, "keyX" + ToString(i), "value",
-                         nullptr /* kv_prot_info */));
-      ASSERT_OK(mem->Add(++seq, kTypeValue, "keyM" + ToString(i), "valueM",
-                         nullptr /* kv_prot_info */));
-      ASSERT_OK(mem->Add(++seq, kTypeDeletion, "keyX" + ToString(i), "",
+      ASSERT_OK(mem->Add(++seq, kTypeValue, "keyM" + std::to_string(i),
+                         "valueM", nullptr /* kv_prot_info */));
+      ASSERT_OK(mem->Add(++seq, kTypeDeletion, "keyX" + std::to_string(i), "",
                          nullptr /* kv_prot_info */));
 
       tables.push_back(mem);

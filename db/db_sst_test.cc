@@ -280,6 +280,58 @@ TEST_F(DBSSTTest, DeleteObsoleteFilesPendingOutputs) {
   listener->VerifyMatchedCount(1);
 }
 
+// Test that producing an empty .sst file does not write it out to
+// disk, and that the DeleteFile() env method is not called for
+// removing the non-existing file later.
+TEST_F(DBSSTTest, DeleteFileNotCalledForNotCreatedSSTFile) {
+  Options options = CurrentOptions();
+  options.env = env_;
+
+  OnFileDeletionListener* listener = new OnFileDeletionListener();
+  options.listeners.emplace_back(listener);
+
+  Reopen(options);
+
+  // Flush the empty database.
+  ASSERT_OK(Flush());
+  ASSERT_EQ("", FilesPerLevel(0));
+
+  // We expect no .sst files.
+  std::vector<LiveFileMetaData> metadata;
+  db_->GetLiveFilesMetaData(&metadata);
+  ASSERT_EQ(metadata.size(), 0U);
+
+  // We expect no file deletions.
+  listener->VerifyMatchedCount(0);
+}
+
+// Test that producing a non-empty .sst file does write it out to
+// disk, and that the DeleteFile() env method is not called for removing
+// the file later.
+TEST_F(DBSSTTest, DeleteFileNotCalledForCreatedSSTFile) {
+  Options options = CurrentOptions();
+  options.env = env_;
+
+  OnFileDeletionListener* listener = new OnFileDeletionListener();
+  options.listeners.emplace_back(listener);
+
+  Reopen(options);
+
+  ASSERT_OK(Put("pika", "choo"));
+
+  // Flush the non-empty database.
+  ASSERT_OK(Flush());
+  ASSERT_EQ("1", FilesPerLevel(0));
+
+  // We expect 1 .sst files.
+  std::vector<LiveFileMetaData> metadata;
+  db_->GetLiveFilesMetaData(&metadata);
+  ASSERT_EQ(metadata.size(), 1U);
+
+  // We expect no file deletions.
+  listener->VerifyMatchedCount(0);
+}
+
 TEST_F(DBSSTTest, DBWithSstFileManager) {
   std::shared_ptr<SstFileManager> sst_file_manager(NewSstFileManager(env_));
   auto sfm = static_cast<SstFileManagerImpl*>(sst_file_manager.get());
@@ -947,7 +999,7 @@ TEST_F(DBSSTTest, DeleteSchedulerMultipleDBPaths) {
 
   // Create 4 files in L0
   for (int i = 0; i < 4; i++) {
-    ASSERT_OK(Put("Key" + ToString(i), DummyString(1024, 'A'), wo));
+    ASSERT_OK(Put("Key" + std::to_string(i), DummyString(1024, 'A'), wo));
     ASSERT_OK(Flush());
   }
   // We created 4 sst files in L0
@@ -963,7 +1015,7 @@ TEST_F(DBSSTTest, DeleteSchedulerMultipleDBPaths) {
 
   // Create 4 files in L0
   for (int i = 4; i < 8; i++) {
-    ASSERT_OK(Put("Key" + ToString(i), DummyString(1024, 'B'), wo));
+    ASSERT_OK(Put("Key" + std::to_string(i), DummyString(1024, 'B'), wo));
     ASSERT_OK(Flush());
   }
   ASSERT_EQ("4,1", FilesPerLevel(0));
@@ -1009,7 +1061,7 @@ TEST_F(DBSSTTest, DestroyDBWithRateLimitedDelete) {
 
   // Create 4 files in L0
   for (int i = 0; i < 4; i++) {
-    ASSERT_OK(Put("Key" + ToString(i), DummyString(1024, 'A')));
+    ASSERT_OK(Put("Key" + std::to_string(i), DummyString(1024, 'A')));
     ASSERT_OK(Flush());
   }
   // We created 4 sst files in L0
@@ -1396,7 +1448,9 @@ TEST_F(DBSSTTest, OpenDBWithInfiniteMaxOpenFiles) {
 }
 
 TEST_F(DBSSTTest, OpenDBWithInfiniteMaxOpenFilesSubjectToMemoryLimit) {
-  for (bool reserve_table_builder_memory : {true, false}) {
+  for (CacheEntryRoleOptions::Decision charge_table_reader :
+       {CacheEntryRoleOptions::Decision::kEnabled,
+        CacheEntryRoleOptions::Decision::kDisabled}) {
     // Open DB with infinite max open files
     //  - First iteration use 1 thread to open files
     //  - Second iteration use 5 threads to open files
@@ -1436,7 +1490,9 @@ TEST_F(DBSSTTest, OpenDBWithInfiniteMaxOpenFilesSubjectToMemoryLimit) {
       }
       Close();
 
-      table_options.reserve_table_reader_memory = reserve_table_builder_memory;
+      table_options.cache_usage_options.options_overrides.insert(
+          {CacheEntryRole::kBlockBasedTableReader,
+           {/*.charged = */ charge_table_reader}});
       table_options.block_cache =
           NewLRUCache(1024 /* capacity */, 0 /* num_shard_bits */,
                       true /* strict_capacity_limit */);
@@ -1445,8 +1501,13 @@ TEST_F(DBSSTTest, OpenDBWithInfiniteMaxOpenFilesSubjectToMemoryLimit) {
       // Reopening the DB will try to load all existing files, conditionally
       // subject to memory limit
       Status s = TryReopen(options);
-      if (table_options.reserve_table_reader_memory) {
+
+      if (charge_table_reader == CacheEntryRoleOptions::Decision::kEnabled) {
         EXPECT_TRUE(s.IsMemoryLimit());
+        EXPECT_TRUE(s.ToString().find(
+                        kCacheEntryRoleToCamelString[static_cast<std::uint32_t>(
+                            CacheEntryRole::kBlockBasedTableReader)]) !=
+                    std::string::npos);
         EXPECT_TRUE(s.ToString().find("memory limit based on cache capacity") !=
                     std::string::npos);
 
@@ -1478,7 +1539,7 @@ TEST_F(DBSSTTest, GetTotalSstFilesSize) {
   // Generate 5 files in L0
   for (int i = 0; i < 5; i++) {
     for (int j = 0; j < 10; j++) {
-      std::string val = "val_file_" + ToString(i);
+      std::string val = "val_file_" + std::to_string(i);
       ASSERT_OK(Put(Key(j), val));
     }
     ASSERT_OK(Flush());

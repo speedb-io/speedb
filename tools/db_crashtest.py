@@ -184,6 +184,7 @@ default_params = {
     "data_block_index_type": random.randint(0, 1),
     "data_block_hash_table_util_ratio": random.randint(0, 100) / 100.0,
     "customopspercent": 0,
+    "memtablerep": lambda: random.choice(["skip_list", "speedb.HashSpdRepFactory"]),
 }
 
 _TEST_DIR_ENV_VAR = 'TEST_TMPDIR'
@@ -310,7 +311,7 @@ simple_default_params = {
     "experimental_mempurge_threshold": lambda: 10.0*random.random(),
     "max_background_compactions": 1,
     "max_bytes_for_level_base": 67108864,
-    "memtablerep": lambda: random.choice(["skip_list", "speedb.HashSpdRepFactory"]),
+    "memtablerep": "skip_list",
     "target_file_size_base": 16777216,
     "target_file_size_multiplier": 1,
     "test_batches_snapshots": 0,
@@ -536,10 +537,6 @@ def finalize_and_sanitize(src_params, counter):
         dest_params["compression_max_dict_buffer_bytes"] = 0
     if dest_params.get("compression_type") != "zstd":
         dest_params["compression_zstd_max_train_bytes"] = 0
-    if dest_params.get("allow_concurrent_memtable_write", 1) == 1:
-        dest_params["memtablerep"] = random.choice(
-            ["skip_list", "speedb.HashSpdRepFactory"]
-        )
     if dest_params["mmap_read"] == 1:
         dest_params["use_direct_io_for_flush_and_compaction"] = 0
         dest_params["use_direct_reads"] = 0
@@ -565,6 +562,12 @@ def finalize_and_sanitize(src_params, counter):
     if dest_params.get("unordered_write", 0) == 1:
         dest_params["txn_write_policy"] = 1
         dest_params["allow_concurrent_memtable_write"] = 1
+    if dest_params.get("allow_concurrent_memtable_write", 0) == 1:
+        if (dest_params["memtablerep"] != "skip_list" or 
+            dest_params["memtablerep"] != "speedb.HashSpdRepFactory"):
+                dest_params["memtablerep"] = random.choice(
+                    ["skip_list", "speedb.HashSpdRepFactory"]
+                )
     if dest_params.get("disable_wal", 0) == 1:
         dest_params["atomic_flush"] = 1
         # The `DbStressCompactionFilter` can apply memtable updates to SST

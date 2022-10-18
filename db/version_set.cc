@@ -1744,10 +1744,7 @@ VersionStorageInfo::VersionStorageInfo(
       finalized_(false),
       force_consistency_checks_(_force_consistency_checks) {
   level0_stop_writes_trigger_ = mutable_cf_options.level0_stop_writes_trigger;
-  level0_size_to_compact_ =
-      mutable_cf_options.write_buffer_size *
-      (mutable_cf_options.level0_stop_writes_trigger / 2 +
-       mutable_cf_options.level0_file_num_compaction_trigger / 2);
+  min_size_to_compact_ = mutable_cf_options.max_bytes_for_level_base;
   // one_compaction_thread = mutable_cf_options
 
   if (ref_vstorage != nullptr) {
@@ -3495,6 +3492,11 @@ void VersionStorageInfo::GetOverlappingInputs(
           }
         }
 
+        // ideal L0->L1 compaction size is the size of L1.
+        // but dont force a compaction size which is below the theoretical L1
+        // size (max_bytes_for_level_base)
+        uint64_t base_level_size = NumLevelBytes(1);
+
         // stop accumulating L0 files for compaction once enough are added.
         // stop when:
         //    1. its not a compaction after bulkload.
@@ -3502,7 +3504,8 @@ void VersionStorageInfo::GetOverlappingInputs(
         //    3. total size of currently selected files is big enough.
         bool bulkload_situation =
             level_files_brief_[level].num_files > level0_stop_writes_trigger_;
-        if (!bulkload_situation && cur_files_size > level0_size_to_compact_) {
+        if (!bulkload_situation && cur_files_size > min_size_to_compact_ &&
+            cur_files_size > base_level_size) {
           return;
         }
       }

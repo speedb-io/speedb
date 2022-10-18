@@ -688,7 +688,8 @@ class VersionStorageInfo {
   bool force_consistency_checks_;
 
   size_t level0_stop_writes_trigger_;
-  size_t level0_size_to_compact_;
+  // mutable_cf_options.max_bytes_for_level_base
+  size_t min_size_to_compact_;
   // bool one_compaction_thread;
 
   friend class Version;

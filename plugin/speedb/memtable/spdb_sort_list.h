@@ -15,9 +15,11 @@
 #pragma once
 #include <assert.h>
 #include <stdlib.h>
+
 #include <algorithm>
 #include <atomic>
 #include <type_traits>
+
 #include "memory/allocator.h"
 #include "port/likely.h"
 #include "port/port.h"
@@ -27,7 +29,6 @@
 
 namespace ROCKSDB_NAMESPACE {
 
-
 template <class Comparator>
 class SpdbSortedList {
  private:
@@ -35,8 +36,8 @@ class SpdbSortedList {
   struct Splice;
 
  public:
-  using DecodedKey = \
-    typename std::remove_reference<Comparator>::type::DecodedType;
+  using DecodedKey =
+      typename std::remove_reference<Comparator>::type::DecodedType;
 
   static const uint16_t kMaxPossibleHeight = 32;
 
@@ -54,7 +55,8 @@ class SpdbSortedList {
   // Allocates a key and a spdbsortedlist node, returning a pointer to the key
   // portion of the node.  This method is thread-safe if the allocator
   // is thread-safe.
-  char* AllocateSpdbItem(size_t key_size, size_t header_size, char** spdb_sorted_key);
+  char* AllocateSpdbItem(size_t key_size, size_t header_size,
+                         char** spdb_sorted_key);
 
   // Allocate a splice using allocator.
   Splice* AllocateSplice();
@@ -84,7 +86,6 @@ class SpdbSortedList {
     // Initialize an iterator over the specified list.
     // The returned iterator is not valid.
     explicit Iterator(const SpdbSortedList* list);
-
 
     // Change the underlying spdbsortedlist used for this iterator
     // This enables us not changing the iterator without deallocating
@@ -158,7 +159,6 @@ class SpdbSortedList {
 
   Node* AllocateNode(size_t key_size, int height);
 
-
   bool Equal(const char* a, const char* b) const {
     return (compare_(a, b) == 0);
   }
@@ -202,9 +202,9 @@ class SpdbSortedList {
   // point to a node that is before the key, and after should point to
   // a node that is after the key.  after should be nullptr if a good after
   // node isn't conveniently available.
-  template<bool prefetch_before>
-  void FindSpliceForLevel(const DecodedKey& key, Node* before, Node* after, int level,
-                          Node** out_prev, Node** out_next);
+  template <bool prefetch_before>
+  void FindSpliceForLevel(const DecodedKey& key, Node* before, Node* after,
+                          int level, Node** out_prev, Node** out_next);
 
   // Recomputes Splice levels from highest_level (inclusive) down to
   // lowest_level (inclusive).
@@ -312,8 +312,7 @@ inline void SpdbSortedList<Comparator>::Iterator::SetList(
 }
 
 template <class Comparator>
-inline void SpdbSortedList<Comparator>::Iterator::SetSeek(
-    const char* key) {
+inline void SpdbSortedList<Comparator>::Iterator::SetSeek(const char* key) {
   node_ = reinterpret_cast<Node*>(const_cast<char*>(key)) - 1;
 }
 
@@ -607,7 +606,9 @@ SpdbSortedList<Comparator>::SpdbSortedList(const Comparator cmp,
 }
 
 template <class Comparator>
-char* SpdbSortedList<Comparator>::AllocateSpdbItem(size_t key_size, size_t header_size, char** spdb_sorted_key) {
+char* SpdbSortedList<Comparator>::AllocateSpdbItem(size_t key_size,
+                                                   size_t header_size,
+                                                   char** spdb_sorted_key) {
   int height = RandomHeight();
   auto prefix = header_size + sizeof(std::atomic<Node*>) * (height - 1);
 
@@ -620,11 +621,8 @@ char* SpdbSortedList<Comparator>::AllocateSpdbItem(size_t key_size, size_t heade
   Node* x = reinterpret_cast<Node*>(raw + prefix);
   x->StashHeight(height);
   *spdb_sorted_key = const_cast<char*>(x->Key());
-  return raw;  
+  return raw;
 }
-
-
-
 
 template <class Comparator>
 typename SpdbSortedList<Comparator>::Node*
@@ -692,8 +690,8 @@ void SpdbSortedList<Comparator>::FindSpliceForLevel(const DecodedKey& key,
       PREFETCH(next->Next(level), 0, 1);
     }
     if (prefetch_before == true) {
-      if (next != nullptr && level>0) {
-        PREFETCH(next->Next(level-1), 0, 1);
+      if (next != nullptr && level > 0) {
+        PREFETCH(next->Next(level - 1), 0, 1);
       }
     }
     assert(before == head_ || next == nullptr ||
@@ -717,7 +715,7 @@ void SpdbSortedList<Comparator>::RecomputeSpliceLevels(const DecodedKey& key,
   assert(recompute_level <= splice->height_);
   for (int i = recompute_level - 1; i >= 0; --i) {
     FindSpliceForLevel<true>(key, splice->prev_[i + 1], splice->next_[i + 1], i,
-                       &splice->prev_[i], &splice->next_[i]);
+                             &splice->prev_[i], &splice->next_[i]);
   }
 }
 
@@ -807,8 +805,7 @@ bool SpdbSortedList<Comparator>::Insert(const char* key, Splice* splice,
           // we're pessimistic, recompute everything
           recompute_height = max_height;
         }
-      } else if (KeyIsAfterNode(key_decoded,
-                                splice->next_[recompute_height])) {
+      } else if (KeyIsAfterNode(key_decoded, splice->next_[recompute_height])) {
         // key is from after splice
         if (allow_partial_splice_fix) {
           Node* bad = splice->next_[recompute_height];
@@ -922,7 +919,6 @@ bool SpdbSortedList<Comparator>::Insert(const char* key, Splice* splice,
   return true;
 }
 
-
 template <class Comparator>
 void SpdbSortedList<Comparator>::TEST_Validate() const {
   // Interate over all levels at the same time, and verify nodes appear in
@@ -963,7 +959,5 @@ void SpdbSortedList<Comparator>::TEST_Validate() const {
     assert(nodes[i] != nullptr && nodes[i]->Next(i) == nullptr);
   }
 }
-
-
 
 }  // namespace ROCKSDB_NAMESPACE

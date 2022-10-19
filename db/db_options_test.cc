@@ -632,6 +632,9 @@ TEST_F(DBOptionsTest, SetBackgroundJobs) {
   Options options;
   options.create_if_missing = true;
   options.max_background_jobs = 8;
+  options.max_background_compactions = options.max_background_flushes = -1;
+  env_->SetBackgroundThreads(1, Env::Priority::HIGH);
+  env_->SetBackgroundThreads(1, Env::Priority::LOW);
   options.env = env_;
   Reopen(options);
 

@@ -4370,9 +4370,6 @@ TEST_F(DBTest, ConcurrentMemtableNotSupported) {
 
 TEST_F(DBTest, SanitizeNumThreads) {
   for (int attempt = 0; attempt < 2; attempt++) {
-    const size_t kTotalTasks = 8;
-    test::SleepingBackgroundTask sleeping_tasks[kTotalTasks];
-
     Options options = CurrentOptions();
     if (attempt == 0) {
       options.max_background_compactions = 3;
@@ -4381,11 +4378,17 @@ TEST_F(DBTest, SanitizeNumThreads) {
     options.create_if_missing = true;
     DestroyAndReopen(options);
 
-    for (size_t i = 0; i < kTotalTasks; i++) {
+    const size_t low_task_count =
+        options.env->GetBackgroundThreads(Env::Priority::LOW) + 1;
+    const size_t high_task_count =
+        options.env->GetBackgroundThreads(Env::Priority::HIGH) + 2;
+    std::vector<test::SleepingBackgroundTask> sleeping_tasks(low_task_count +
+                                                             high_task_count);
+    for (size_t i = 0; i < sleeping_tasks.size(); ++i) {
       // Insert 5 tasks to low priority queue and 5 tasks to high priority queue
-      env_->Schedule(&test::SleepingBackgroundTask::DoSleepTask,
-                     &sleeping_tasks[i],
-                     (i < 4) ? Env::Priority::LOW : Env::Priority::HIGH);
+      env_->Schedule(
+          &test::SleepingBackgroundTask::DoSleepTask, &sleeping_tasks[i],
+          (i < low_task_count) ? Env::Priority::LOW : Env::Priority::HIGH);
     }
 
     // Wait until 10s for they are scheduled.
@@ -4402,9 +4405,9 @@ TEST_F(DBTest, SanitizeNumThreads) {
     // pool size 2, total task 4. Queue size should be 2.
     ASSERT_EQ(2U, options.env->GetThreadPoolQueueLen(Env::Priority::HIGH));
 
-    for (size_t i = 0; i < kTotalTasks; i++) {
-      sleeping_tasks[i].WakeUp();
-      sleeping_tasks[i].WaitUntilDone();
+    for (auto& task : sleeping_tasks) {
+      task.WakeUp();
+      task.WaitUntilDone();
     }
 
     ASSERT_OK(Put("abc", "def"));
@@ -5457,10 +5460,13 @@ TEST_F(DBTest, DynamicCompactionOptions) {
   ASSERT_OK(dbfull()->TEST_FlushMemTable(true, true));
   ASSERT_OK(dbfull()->CompactRange(CompactRangeOptions(), nullptr, nullptr));
   // Block compaction
-  test::SleepingBackgroundTask sleeping_task_low;
-  env_->Schedule(&test::SleepingBackgroundTask::DoSleepTask, &sleeping_task_low,
-                 Env::Priority::LOW);
-  sleeping_task_low.WaitUntilSleeping();
+  std::vector<test::SleepingBackgroundTask> sleeping_task_low(
+      std::max(1, env_->GetBackgroundThreads(Env::Priority::LOW)));
+  for (auto& sleeping_task : sleeping_task_low) {
+    env_->Schedule(&test::SleepingBackgroundTask::DoSleepTask, &sleeping_task,
+                   Env::Priority::LOW);
+    sleeping_task.WaitUntilSleeping();
+  }
   ASSERT_EQ(NumTableFilesAtLevel(0), 0);
   int count = 0;
   Random rnd(301);
@@ -5470,14 +5476,18 @@ TEST_F(DBTest, DynamicCompactionOptions) {
     ASSERT_OK(dbfull()->TEST_FlushMemTable(true, true));
     count++;
     if (dbfull()->TEST_write_controler().IsStopped()) {
-      sleeping_task_low.WakeUp();
+      for (auto& sleeping_task : sleeping_task_low) {
+        sleeping_task.WakeUp();
+      }
       break;
     }
   }
   // Stop trigger = 8
   ASSERT_EQ(count, 8);
   // Unblock
-  sleeping_task_low.WaitUntilDone();
+  for (auto& sleeping_task : sleeping_task_low) {
+    sleeping_task.WaitUntilDone();
+  }
 
   // Now reduce level0_stop_writes_trigger to 6. Clear up memtables and L0.
   // Block compaction thread again. Perform the put and memtable flushes
@@ -5488,23 +5498,29 @@ TEST_F(DBTest, DynamicCompactionOptions) {
   ASSERT_EQ(NumTableFilesAtLevel(0), 0);
 
   // Block compaction again
-  sleeping_task_low.Reset();
-  env_->Schedule(&test::SleepingBackgroundTask::DoSleepTask, &sleeping_task_low,
-                 Env::Priority::LOW);
-  sleeping_task_low.WaitUntilSleeping();
+  for (auto& sleeping_task : sleeping_task_low) {
+    sleeping_task.Reset();
+    env_->Schedule(&test::SleepingBackgroundTask::DoSleepTask, &sleeping_task,
+                   Env::Priority::LOW);
+    sleeping_task.WaitUntilSleeping();
+  }
   count = 0;
   while (count < 64) {
     ASSERT_OK(Put(Key(count), rnd.RandomString(1024), wo));
     ASSERT_OK(dbfull()->TEST_FlushMemTable(true, true));
     count++;
     if (dbfull()->TEST_write_controler().IsStopped()) {
-      sleeping_task_low.WakeUp();
+      for (auto& sleeping_task : sleeping_task_low) {
+        sleeping_task.WakeUp();
+      }
       break;
     }
   }
   ASSERT_EQ(count, 6);
   // Unblock
-  sleeping_task_low.WaitUntilDone();
+  for (auto& sleeping_task : sleeping_task_low) {
+    sleeping_task.WaitUntilDone();
+  }
 
   // Test disable_auto_compactions
   // Compaction thread is unblocked but auto compaction is disabled. Write
@@ -6845,11 +6861,14 @@ TEST_F(DBTest, SoftLimit) {
 
   ASSERT_OK(Put(Key(0), ""));
 
-  test::SleepingBackgroundTask sleeping_task_low;
+  std::vector<test::SleepingBackgroundTask> sleeping_task_low(
+      std::max(1, env_->GetBackgroundThreads(Env::Priority::LOW)));
   // Block compactions
-  env_->Schedule(&test::SleepingBackgroundTask::DoSleepTask, &sleeping_task_low,
-                 Env::Priority::LOW);
-  sleeping_task_low.WaitUntilSleeping();
+  for (auto& sleeping_task : sleeping_task_low) {
+    env_->Schedule(&test::SleepingBackgroundTask::DoSleepTask, &sleeping_task,
+                   Env::Priority::LOW);
+    sleeping_task.WaitUntilSleeping();
+  }
 
   // Create 3 L0 files, making score of L0 to be 3.
   for (int i = 0; i < 3; i++) {
@@ -6863,9 +6882,11 @@ TEST_F(DBTest, SoftLimit) {
   ASSERT_TRUE(dbfull()->TEST_write_controler().NeedsDelay());
   ASSERT_TRUE(listener->CheckCondition(WriteStallCondition::kDelayed));
 
-  sleeping_task_low.WakeUp();
-  sleeping_task_low.WaitUntilDone();
-  sleeping_task_low.Reset();
+  for (auto& sleeping_task : sleeping_task_low) {
+    sleeping_task.WakeUp();
+    sleeping_task.WaitUntilDone();
+    sleeping_task.Reset();
+  }
   ASSERT_OK(dbfull()->TEST_WaitForCompact());
 
   // Now there is one L1 file but doesn't trigger soft_rate_limit
@@ -6882,14 +6903,16 @@ TEST_F(DBTest, SoftLimit) {
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "BackgroundCallCompaction:0", [&](void* /*arg*/) {
         // Schedule a sleeping task.
-        sleeping_task_low.Reset();
+        sleeping_task_low[0].Reset();
         env_->Schedule(&test::SleepingBackgroundTask::DoSleepTask,
-                       &sleeping_task_low, Env::Priority::LOW);
+                       &sleeping_task_low[0], Env::Priority::LOW);
       });
 
-  env_->Schedule(&test::SleepingBackgroundTask::DoSleepTask, &sleeping_task_low,
-                 Env::Priority::LOW);
-  sleeping_task_low.WaitUntilSleeping();
+  for (auto& sleeping_task : sleeping_task_low) {
+    env_->Schedule(&test::SleepingBackgroundTask::DoSleepTask, &sleeping_task,
+                   Env::Priority::LOW);
+    sleeping_task.WaitUntilSleeping();
+  }
   // Create 3 L0 files, making score of L0 to be 3
   for (int i = 0; i < 3; i++) {
     ASSERT_OK(Put(Key(10 + i), std::string(5000, 'x')));
@@ -6903,8 +6926,8 @@ TEST_F(DBTest, SoftLimit) {
   // Wake up sleep task to enable compaction to run and waits
   // for it to go to sleep state again to make sure one compaction
   // goes through.
-  sleeping_task_low.WakeUp();
-  sleeping_task_low.WaitUntilSleeping();
+  sleeping_task_low[0].WakeUp();
+  sleeping_task_low[0].WaitUntilSleeping();
 
   // Now there is one L1 file (around 60KB) which exceeds 50KB base by 10KB
   // Given level multiplier 10, estimated pending compaction is around 100KB
@@ -6925,8 +6948,8 @@ TEST_F(DBTest, SoftLimit) {
   // Wake up sleep task to enable compaction to run and waits
   // for it to go to sleep state again to make sure one compaction
   // goes through.
-  sleeping_task_low.WakeUp();
-  sleeping_task_low.WaitUntilSleeping();
+  sleeping_task_low[0].WakeUp();
+  sleeping_task_low[0].WaitUntilSleeping();
 
   // Now there is one L1 file (around 90KB) which exceeds 50KB base by 40KB
   // L2 size is 360KB, so the estimated level fanout 4, estimated pending
@@ -6936,8 +6959,8 @@ TEST_F(DBTest, SoftLimit) {
   ASSERT_TRUE(dbfull()->TEST_write_controler().NeedsDelay());
   ASSERT_TRUE(listener->CheckCondition(WriteStallCondition::kDelayed));
 
-  sleeping_task_low.WakeUp();
-  sleeping_task_low.WaitUntilSleeping();
+  sleeping_task_low[0].WakeUp();
+  sleeping_task_low[0].WaitUntilSleeping();
 
   ASSERT_TRUE(!dbfull()->TEST_write_controler().NeedsDelay());
   ASSERT_TRUE(listener->CheckCondition(WriteStallCondition::kNormal));
@@ -6952,10 +6975,12 @@ TEST_F(DBTest, SoftLimit) {
   ASSERT_TRUE(dbfull()->TEST_write_controler().NeedsDelay());
   ASSERT_TRUE(listener->CheckCondition(WriteStallCondition::kDelayed));
 
-  sleeping_task_low.WaitUntilSleeping();
+  sleeping_task_low[0].WaitUntilSleeping();
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->DisableProcessing();
-  sleeping_task_low.WakeUp();
-  sleeping_task_low.WaitUntilDone();
+  for (auto& sleeping_task : sleeping_task_low) {
+    sleeping_task.WakeUp();
+    sleeping_task.WaitUntilDone();
+  }
 }
 
 TEST_F(DBTest, LastWriteBufferDelay) {

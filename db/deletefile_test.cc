@@ -248,9 +248,12 @@ TEST_F(DeleteFileTest, BackgroundPurgeIteratorTest) {
   ASSERT_OK(db_->CompactRange(compact_options, &first_slice, &last_slice));
   // 3 sst after compaction with live iterator
   CheckFileTypeCounts(dbname_, 0, 3, 1);
-  test::SleepingBackgroundTask sleeping_task_before;
-  env_->Schedule(&test::SleepingBackgroundTask::DoSleepTask,
-                 &sleeping_task_before, Env::Priority::LOW);
+  std::vector<test::SleepingBackgroundTask> sleeping_task_before(
+      std::max(1, env_->GetBackgroundThreads(Env::Priority::LOW)));
+  for (auto& sleeping_task : sleeping_task_before) {
+    env_->Schedule(&test::SleepingBackgroundTask::DoSleepTask, &sleeping_task,
+                   Env::Priority::LOW);
+  }
   delete itr;
   test::SleepingBackgroundTask sleeping_task_after;
   env_->Schedule(&test::SleepingBackgroundTask::DoSleepTask,
@@ -258,14 +261,19 @@ TEST_F(DeleteFileTest, BackgroundPurgeIteratorTest) {
 
   // Make sure no purges are executed foreground
   CheckFileTypeCounts(dbname_, 0, 3, 1);
-  sleeping_task_before.WakeUp();
-  sleeping_task_before.WaitUntilDone();
+  sleeping_task_before[0].WakeUp();
+  sleeping_task_before[0].WaitUntilDone();
 
   // Make sure all background purges are executed
   sleeping_task_after.WakeUp();
   sleeping_task_after.WaitUntilDone();
   // 1 sst after iterator deletion
   CheckFileTypeCounts(dbname_, 0, 1, 1);
+
+  for (size_t i = 1; i < sleeping_task_before.size(); ++i) {
+    sleeping_task_before[i].WakeUp();
+    sleeping_task_before[i].WaitUntilDone();
+  }
 }
 
 TEST_F(DeleteFileTest, PurgeDuringOpen) {
@@ -330,16 +338,21 @@ TEST_F(DeleteFileTest, BackgroundPurgeCFDropTest) {
     CheckFileTypeCounts(dbname_, 0, 1, 1);
 
     delete cfh;
-    test::SleepingBackgroundTask sleeping_task_after;
-    env_->Schedule(&test::SleepingBackgroundTask::DoSleepTask,
-                   &sleeping_task_after, Env::Priority::LOW);
+    std::vector<test::SleepingBackgroundTask> sleeping_task_after(
+        std::max(1, env_->GetBackgroundThreads(Env::Priority::LOW)));
+    for (auto& sleeping_task : sleeping_task_after) {
+      env_->Schedule(&test::SleepingBackgroundTask::DoSleepTask, &sleeping_task,
+                     Env::Priority::LOW);
+    }
     // If background purge is enabled, the file should still be there.
     CheckFileTypeCounts(dbname_, 0, bg_purge ? 1 : 0, 1);
     TEST_SYNC_POINT("DeleteFileTest::BackgroundPurgeCFDropTest:1");
 
     // Execute background purges.
-    sleeping_task_after.WakeUp();
-    sleeping_task_after.WaitUntilDone();
+    for (auto& sleeping_task : sleeping_task_after) {
+      sleeping_task.WakeUp();
+      sleeping_task.WaitUntilDone();
+    }
     // The file should have been deleted.
     CheckFileTypeCounts(dbname_, 0, 0, 1);
   };
@@ -399,13 +412,18 @@ TEST_F(DeleteFileTest, BackgroundPurgeCopyOptions) {
   CheckFileTypeCounts(dbname_, 0, 3, 1);
   delete itr;
 
-  test::SleepingBackgroundTask sleeping_task_after;
-  env_->Schedule(&test::SleepingBackgroundTask::DoSleepTask,
-                 &sleeping_task_after, Env::Priority::LOW);
+  std::vector<test::SleepingBackgroundTask> sleeping_task_after(
+      std::max(1, env_->GetBackgroundThreads(Env::Priority::LOW)));
+  for (auto& sleeping_task : sleeping_task_after) {
+    env_->Schedule(&test::SleepingBackgroundTask::DoSleepTask, &sleeping_task,
+                   Env::Priority::LOW);
+  }
 
   // Make sure all background purges are executed
-  sleeping_task_after.WakeUp();
-  sleeping_task_after.WaitUntilDone();
+  for (auto& sleeping_task : sleeping_task_after) {
+    sleeping_task.WakeUp();
+    sleeping_task.WaitUntilDone();
+  }
   // 1 sst after iterator deletion
   CheckFileTypeCounts(dbname_, 0, 1, 1);
 }
@@ -445,9 +463,14 @@ TEST_F(DeleteFileTest, BackgroundPurgeTestMultipleJobs) {
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->EnableProcessing();
 
   delete itr1;
+  for (int i = 0;
+       i < std::max(1, env_->GetBackgroundThreads(Env::Priority::LOW)); ++i) {
+    env_->Schedule(&DeleteFileTest::DoSleep, this, Env::Priority::LOW);
+  }
   env_->Schedule(&DeleteFileTest::DoSleep, this, Env::Priority::HIGH);
   delete itr2;
   env_->Schedule(&DeleteFileTest::GuardFinish, nullptr, Env::Priority::HIGH);
+  env_->Schedule(&DeleteFileTest::GuardFinish, nullptr, Env::Priority::LOW);
   Close();
 
   TEST_SYNC_POINT("DeleteFileTest::BackgroundPurgeTestMultipleJobs:DBClose");

@@ -2886,7 +2886,11 @@ DBImpl::BGJobLimits DBImpl::GetBGJobLimits(int max_background_flushes,
                                            int max_background_jobs,
                                            bool parallelize_compactions) {
   BGJobLimits res;
-  if (max_background_flushes == -1 && max_background_compactions == -1) {
+  const int flushes = std::max(1, max_background_flushes);
+  const int compactions = std::max(1, max_background_compactions);
+
+  if ((max_background_flushes == -1 && max_background_compactions == -1) ||
+      (max_background_jobs > flushes + compactions)) {
     // for our first stab implementing max_background_jobs, simply allocate a
     // quarter of the threads to flushes.
     res.max_flushes = std::max(1, max_background_jobs / 4);

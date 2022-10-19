@@ -743,10 +743,10 @@ struct DBOptions {
   // LOW priority thread pool. For more information, see
   // Env::SetBackgroundThreads
   //
-  // Default: -1
+  // Default: 8
   //
   // Dynamically changeable through SetDBOptions() API.
-  int max_background_compactions = -1;
+  int max_background_compactions = 8;
 
   // This value represents the maximum number of threads that will
   // concurrently perform a compaction job by breaking it into multiple,

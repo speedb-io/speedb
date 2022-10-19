@@ -3129,8 +3129,6 @@ TEST_P(ColumnFamilyTest, IteratorCloseWALFile2) {
 #ifndef ROCKSDB_LITE  // TEST functions are not supported in lite
 TEST_P(ColumnFamilyTest, ForwardIteratorCloseWALFile) {
   SpecialEnv env(Env::Default());
-  // Allow both of flush and purge job to schedule.
-  env.SetBackgroundThreads(2, Env::HIGH);
   db_options_.env = &env;
   db_options_.max_background_flushes = 1;
   column_family_options_.memtable_factory.reset(
@@ -3164,9 +3162,8 @@ TEST_P(ColumnFamilyTest, ForwardIteratorCloseWALFile) {
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->LoadDependency({
       {"ColumnFamilyTest::IteratorCloseWALFile2:0",
        "DBImpl::BGWorkPurge:start"},
-      {"ColumnFamilyTest::IteratorCloseWALFile2:2",
+      {"ColumnFamilyTest::IteratorCloseWALFile2:1",
        "DBImpl::BackgroundCallFlush:start"},
-      {"DBImpl::BGWorkPurge:end", "ColumnFamilyTest::IteratorCloseWALFile2:1"},
   });
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->EnableProcessing();
 
@@ -3178,22 +3175,37 @@ TEST_P(ColumnFamilyTest, ForwardIteratorCloseWALFile) {
   ASSERT_EQ(2, env.num_open_wal_file_.load());
   // Deleting the iterator will clear its super version, triggering
   // closing all files
-  it->Seek("");
+  it->Seek("");  // purge (x2)
   ASSERT_OK(it->status());
 
   ASSERT_EQ(2, env.num_open_wal_file_.load());
   ASSERT_EQ(0, env.delete_count_.load());
 
   TEST_SYNC_POINT("ColumnFamilyTest::IteratorCloseWALFile2:0");
-  TEST_SYNC_POINT("ColumnFamilyTest::IteratorCloseWALFile2:1");
+
+  // Fill the low priority pool in order to ensure that all background purges
+  // finished before we continue
+  std::vector<test::SleepingBackgroundTask> sleeping_tasks(
+      std::max(1, env_->GetBackgroundThreads(Env::Priority::LOW)));
+  for (auto& task : sleeping_tasks) {
+    env_->Schedule(&test::SleepingBackgroundTask::DoSleepTask, &task,
+                   Env::Priority::LOW);
+    task.WaitUntilSleeping();
+  }
+  // Release and wait for all of the tasks to finish
+  for (auto& task : sleeping_tasks) {
+    task.WakeUp();
+    task.WaitUntilDone();
+  }
+
   ASSERT_EQ(1, env.num_open_wal_file_.load());
   ASSERT_EQ(1, env.delete_count_.load());
-  TEST_SYNC_POINT("ColumnFamilyTest::IteratorCloseWALFile2:2");
+  TEST_SYNC_POINT("ColumnFamilyTest::IteratorCloseWALFile2:1");
   WaitForFlush(1);
   ASSERT_EQ(1, env.num_open_wal_file_.load());
   ASSERT_EQ(1, env.delete_count_.load());
 
-  delete it;
+  delete it;  // purge
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->DisableProcessing();
 
   Reopen();

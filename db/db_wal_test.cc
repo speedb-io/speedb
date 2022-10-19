@@ -1496,6 +1496,9 @@ TEST_F(DBWALTest, RaceInstallFlushResultsWithWalObsoletion) {
   options.track_and_verify_wals_in_manifest = true;
   // The following make sure there are two bg flush threads.
   options.max_background_jobs = 8;
+  options.max_background_compactions = options.max_background_flushes = -1;
+  env_->SetBackgroundThreads(1, Env::Priority::HIGH);
+  env_->SetBackgroundThreads(1, Env::Priority::LOW);
 
   const std::string cf1_name("cf1");
   CreateAndReopenWithCF({cf1_name}, options);

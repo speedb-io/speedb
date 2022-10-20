@@ -1592,8 +1592,8 @@ struct ReadOptions {
   bool pin_data;
 
   // If true, when PurgeObsoleteFile is called in CleanupIteratorState, we
-  // schedule a background job in the flush job queue and delete obsolete files
-  // in background.
+  // schedule a background job in the compaction job queue and delete obsolete
+  // files in background.
   // Default: false
   bool background_purge_on_iterator_cleanup;
 

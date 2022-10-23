@@ -3006,14 +3006,16 @@ TEST_P(DBCompactionTestWithParam, PartialCompactionFailure) {
   options.max_bytes_for_level_multiplier = 2;
   options.compression = kNoCompression;
   options.max_subcompactions = max_subcompactions_;
-  options.max_background_compactions = 1;
 
   env_->SetBackgroundThreads(1, Env::HIGH);
-  env_->SetBackgroundThreads(1, Env::LOW);
   // stop the compaction thread until we simulate the file creation failure.
-  test::SleepingBackgroundTask sleeping_task_low;
-  env_->Schedule(&test::SleepingBackgroundTask::DoSleepTask, &sleeping_task_low,
-                 Env::Priority::LOW);
+  std::vector<test::SleepingBackgroundTask> sleeping_task_low(
+      std::max(1, env_->GetBackgroundThreads(Env::Priority::LOW)));
+  for (auto& sleeping_task : sleeping_task_low) {
+    env_->Schedule(&test::SleepingBackgroundTask::DoSleepTask, &sleeping_task,
+                   Env::Priority::LOW);
+    sleeping_task.WaitUntilSleeping();
+  }
 
   options.env = env_;
 
@@ -3042,8 +3044,8 @@ TEST_P(DBCompactionTestWithParam, PartialCompactionFailure) {
 
   // Fail the first file creation.
   env_->non_writable_count_ = 1;
-  sleeping_task_low.WakeUp();
-  sleeping_task_low.WaitUntilDone();
+  sleeping_task_low[0].WakeUp();
+  sleeping_task_low[0].WaitUntilDone();
 
   // Expect compaction to fail here as one file will fail its
   // creation.
@@ -3061,6 +3063,10 @@ TEST_P(DBCompactionTestWithParam, PartialCompactionFailure) {
   }
 
   env_->non_writable_count_ = 0;
+  for (size_t i = 1; i < sleeping_task_low.size(); ++i) {
+    sleeping_task_low[i].WakeUp();
+    sleeping_task_low[i].WaitUntilDone();
+  }
 
   // Make sure RocksDB will not get into corrupted state.
   Reopen(options);

@@ -644,6 +644,8 @@ TEST_F(DBRangeDelTest, TableEvictedDuringScan) {
   bbto.cache_index_and_filter_blocks = true;
   bbto.block_cache = NewLRUCache(8 << 20);
   opts.table_factory.reset(NewBlockBasedTableFactory(bbto));
+  opts.max_background_compactions = 1;
+  env_->SetBackgroundThreads(1, Env::Priority::LOW);
   DestroyAndReopen(opts);
 
   // Hold a snapshot so range deletions can't become obsolete during compaction

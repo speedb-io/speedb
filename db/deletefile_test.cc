@@ -417,6 +417,7 @@ TEST_F(DeleteFileTest, BackgroundPurgeCopyOptions) {
   for (auto& sleeping_task : sleeping_task_after) {
     env_->Schedule(&test::SleepingBackgroundTask::DoSleepTask, &sleeping_task,
                    Env::Priority::LOW);
+    sleeping_task.WaitUntilSleeping();
   }
 
   // Make sure all background purges are executed

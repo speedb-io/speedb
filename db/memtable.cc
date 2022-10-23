@@ -544,16 +544,13 @@ Status MemTable::Add(SequenceNumber s, ValueType type,
   uint32_t key_size = static_cast<uint32_t>(key.size());
   uint32_t val_size = static_cast<uint32_t>(value.size());
   uint32_t internal_key_size = key_size + 8;
-  // we added to encoded len
   const uint32_t encoded_len = VarintLength(internal_key_size) +
                                internal_key_size + VarintLength(val_size) +
                                val_size;
   char* buf = nullptr;
   std::unique_ptr<MemTableRep>& table =
       type == kTypeRangeDeletion ? range_del_table_ : table_;
-  KeyHandle handle =
-      table->Allocate(encoded_len + sizeof(InternalMemtableEntryInfo), &buf);
-
+  KeyHandle handle = table->Allocate(encoded_len, &buf);
   char* p = EncodeVarint32(buf, internal_key_size);
   memcpy(p, key.data(), key_size);
   Slice key_slice(p, key_size);
@@ -564,10 +561,6 @@ Status MemTable::Add(SequenceNumber s, ValueType type,
   p = EncodeVarint32(p, val_size);
   memcpy(p, value.data(), val_size);
   assert((unsigned)(p + val_size - buf) == (unsigned)encoded_len);
-  InternalMemtableEntryInfo* internal_info =
-      static_cast<InternalMemtableEntryInfo*>(
-          static_cast<void*>(&buf[encoded_len + 1]));
-  internal_info->ignore.store(false);
   if (kv_prot_info != nullptr) {
     Slice encoded(buf, encoded_len);
     TEST_SYNC_POINT_CALLBACK("MemTable::Add:Encoded", &encoded);
@@ -1046,8 +1039,8 @@ void MemTable::MultiGet(const ReadOptions& read_options, MultiGetRange* range,
   PERF_COUNTER_ADD(get_from_memtable_count, 1);
 }
 
-Status MemTable::UpdateIgnore(SequenceNumber seq, const Slice& key) {
-  table_->MarkRollback();
+Status MemTable::UpdateIgnore(SequenceNumber /*seq*/, const Slice& /*key*/) {
+  /*table_->MarkRollback();
   LookupKey lkey(key, seq);
   Slice mem_key = lkey.memtable_key();
   std::unique_ptr<MemTableRep::Iterator> iter(
@@ -1080,6 +1073,8 @@ Status MemTable::UpdateIgnore(SequenceNumber seq, const Slice& key) {
     }
   }
   return status;
+  */
+ return Status::OK();
 }
 
 Status MemTable::Update(SequenceNumber seq, const Slice& key,

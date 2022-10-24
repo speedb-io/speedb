@@ -110,4 +110,9 @@ else()
 endif()
 
 # Run all tests, and show test output on failure
-execute_process(COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure --timeout ${test_timeout})
+execute_process(COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure --schedule-random --timeout ${test_timeout} RESULT_VARIABLE rv)
+
+# Clean up after ourselves if the run was successful
+if(DEFINED tmpdir AND DEFINED rv AND ${rv} EQUAL 0)
+    file(REMOVE_RECURSE ${tmpdir})
+endif()

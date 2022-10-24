@@ -40,9 +40,26 @@ std::string TmpDir(Env* env) {
   return dir;
 }
 
+std::string GetTestNameForDB(const std::string& suggested) {
+  const testing::TestInfo* const test_info =
+      testing::UnitTest::GetInstance()->current_test_info();
+  if (test_info == nullptr) {
+    return suggested;
+  }
+  std::string full_name = std::string(test_info->test_case_name()) + "-" + test_info->name();
+  if (!suggested.empty()) {
+    full_name += "-" + suggested;
+  }
+  for (auto pos = full_name.find("/"); pos != std::string::npos;
+       pos = full_name.find("/", pos)) {
+    full_name[pos] = '_';
+  }
+  return full_name;
+}
+
 std::string PerThreadDBPath(std::string dir, std::string name) {
   size_t tid = std::hash<std::thread::id>()(std::this_thread::get_id());
-  return dir + "/" + name + "_" + GetPidStr() + "_" + std::to_string(tid);
+  return dir + "/" + GetTestNameForDB(name) + "_" + GetPidStr() + "_" + std::to_string(tid);
 }
 
 std::string PerThreadDBPath(std::string name) {

@@ -81,8 +81,9 @@ struct BucketHeader {
   BucketHeader() {}
 
   bool InternalContains(const char* check_key,
-                        const MemTableRep::KeyComparator& comparator) {
-    SpdbKeyHandle* handle = curr_.load(std::memory_order_acquire);
+                        const MemTableRep::KeyComparator& comparator,
+                        SpdbKeyHandle** curr_handle) {
+    SpdbKeyHandle* handle = *curr_handle = curr_.load(std::memory_order_acquire);
     if (handle == nullptr) {
       return false;
     }
@@ -98,21 +99,23 @@ struct BucketHeader {
 
   bool Contains(const char* check_key,
                 const MemTableRep::KeyComparator& comparator) {
-    return InternalContains(check_key, comparator);
+    SpdbKeyHandle* curr_handle;
+    return InternalContains(check_key, comparator, &curr_handle);
   }
 
   bool Add(SpdbKeyHandle* handle, const MemTableRep::KeyComparator& comparator,
            bool check_exist) {
+             
     bool was_added = false;
-    while (!was_added) {
+    while (!was_added) {  
+      SpdbKeyHandle* curr_handle = curr_.load(std::memory_order_acquire);
       if (check_exist) {
-        if (InternalContains(handle->Key(), comparator)) {
+        if (InternalContains(handle->Key(), comparator, &curr_handle)) {
           return false;
         }
       }
-      SpdbKeyHandle* curr = curr_.load(std::memory_order_acquire);
-      handle->SetPrevBucketItem(curr);
-      was_added = curr_.compare_exchange_strong(curr, handle);
+      handle->SetPrevBucketItem(curr_handle);
+      was_added = curr_.compare_exchange_strong(curr_handle, handle);
     }
     return true;
   }
@@ -282,9 +285,7 @@ class HashSpdRep : public MemTableRep {
     explicit SpdbIterator(
         const SpdbSortedList<const MemTableRep::KeyComparator&>* list,
         HashSpdRep* rep)
-        : iter_(list), rep_(rep) {
-      rep_->WaitForImmutableCompletedIfNeeded();
-    }
+        : iter_(list), rep_(rep) {}
 
     ~SpdbIterator() override {}
 
@@ -308,7 +309,7 @@ class HashSpdRep : public MemTableRep {
       const char* seek_key =
           (memtable_key != nullptr) ? memtable_key : EncodeKey(&tmp_, user_key);
       // first try to see if we get it fast
-      SpdbKeyHandle* seek_handle = nullptr;  // rep_->InternalSeek(seek_key);
+      SpdbKeyHandle* seek_handle = rep_->InternalSeek(seek_key);
       if (seek_handle) {
         iter_.SetSeek(seek_handle->Key());
       } else {
@@ -327,7 +328,10 @@ class HashSpdRep : public MemTableRep {
 
     // Position at the first entry in list.
     // Final state of iterator is Valid() iff list is not empty.
-    void SeekToFirst() override { iter_.SeekToFirst(); }
+    void SeekToFirst() override { 
+      rep_->WaitForImmutableCompletedIfNeeded();
+      iter_.SeekToFirst(); 
+    }
 
     // Position at the last entry in list.
     // Final state of iterator is Valid() iff list is not empty.
@@ -395,7 +399,6 @@ class HashSpdRep : public MemTableRep {
   std::atomic<SpdbKeyHandle*> last_item_;
   SpdbKeyHandle anchor_item_;
   SpdbKeyHandle immutable_item_;
-  // std::shared_ptr<SpdbVectorContainer> spdb_vectors_cont_;
   std::atomic<bool> immutable_ = false;
   std::atomic<bool> immutable_completed_ = false;
 

@@ -54,6 +54,12 @@ struct SpdbKeyHandle {
   void SetKey(char* key) { spdb_sorted_key_ = key; }
   char* Key() { return spdb_sorted_key_; }
   bool IsSortBarrier() { return spdb_sorted_key_ == nullptr; }
+  void Init() {
+    bucket_item_link_ = nullptr;
+    spdb_item_link_ = nullptr;
+    spdb_sorted_key_ = nullptr;
+  }
+
   SpdbKeyHandle()
       : bucket_item_link_(nullptr),
         spdb_item_link_(nullptr),
@@ -82,7 +88,8 @@ struct BucketHeader {
   bool InternalContains(const char* check_key,
                         const MemTableRep::KeyComparator& comparator,
                         SpdbKeyHandle** curr_handle) {
-    SpdbKeyHandle* handle = *curr_handle = curr_.load(std::memory_order_acquire);
+    SpdbKeyHandle* handle = *curr_handle =
+        curr_.load(std::memory_order_acquire);
     if (handle == nullptr) {
       return false;
     }
@@ -104,9 +111,8 @@ struct BucketHeader {
 
   bool Add(SpdbKeyHandle* handle, const MemTableRep::KeyComparator& comparator,
            bool check_exist) {
-             
     bool was_added = false;
-    while (!was_added) {  
+    while (!was_added) {
       SpdbKeyHandle* curr_handle = curr_.load(std::memory_order_acquire);
       if (check_exist) {
         if (InternalContains(handle->Key(), comparator, &curr_handle)) {
@@ -220,9 +226,8 @@ struct SpdbHashTable {
 };
 
 struct SpdbSort {
-  SpdbSort(const MemTableRep::KeyComparator& compare, Allocator* allocator) : 
-  compare_(compare),
-  spdb_sorted_list_(compare, allocator) {}
+  SpdbSort(const MemTableRep::KeyComparator& compare, Allocator* allocator)
+      : compare_(compare), spdb_sorted_list_(compare, allocator) {}
   const MemTableRep::KeyComparator& compare_;
   SpdbSortedList<const MemTableRep::KeyComparator&> spdb_sorted_list_;
 };
@@ -237,7 +242,6 @@ class HashSpdRep : public MemTableRep {
   void PostCreate(const MemTableRep::KeyComparator& compare,
                   Allocator* allocator);
 
-  
   KeyHandle Allocate(const size_t len, char** buf) override;
 
   bool InsertInternal(KeyHandle handle, bool check_exist = false);
@@ -340,9 +344,9 @@ class HashSpdRep : public MemTableRep {
 
     // Position at the first entry in list.
     // Final state of iterator is Valid() iff list is not empty.
-    void SeekToFirst() override { 
+    void SeekToFirst() override {
       rep_->WaitForImmutableCompletedIfNeeded();
-      iter_.SeekToFirst(); 
+      iter_.SeekToFirst();
     }
 
     // Position at the last entry in list.
@@ -424,13 +428,11 @@ class HashSpdRep : public MemTableRep {
   std::condition_variable notify_sorted_cv_;
 };
 
-
 HashSpdRep::HashSpdRep(const MemTableRep::KeyComparator& compare,
                        Allocator* allocator, size_t bucket_size)
     : HashSpdRep(allocator, bucket_size) {
   PostCreate(compare, allocator);
 }
-
 
 HashSpdRep::~HashSpdRep() {
   if (sort_thread_init_.load()) {
@@ -493,7 +495,7 @@ void HashSpdRep::SpdbSortThread() {
 }
 
 HashSpdRep::HashSpdRep(Allocator* allocator, size_t bucket_size)
-    : MemTableRep(allocator), 
+    : MemTableRep(allocator),
       spdb_hash_table_(bucket_size),
       anchor_item_(),
       immutable_item_() {}
@@ -501,8 +503,7 @@ HashSpdRep::HashSpdRep(Allocator* allocator, size_t bucket_size)
 void HashSpdRep::PostCreate(const MemTableRep::KeyComparator& compare,
                             Allocator* allocator) {
   allocator_ = allocator;
-  spdb_sort_ =
-      std::make_shared<SpdbSort>(compare, allocator);
+  spdb_sort_ = std::make_shared<SpdbSort>(compare, allocator);
 
   last_item_.store(&anchor_item_);
   sort_thread_ = std::thread(&HashSpdRep::SpdbSortThread, this);
@@ -512,15 +513,15 @@ void HashSpdRep::PostCreate(const MemTableRep::KeyComparator& compare,
     while (!sort_thread_init_.load()) {
       sort_thread_cv_.wait(lck);
     }
-  }      
+  }
 }
 
 KeyHandle HashSpdRep::Allocate(const size_t len, char** buf) {
   char* spdb_sorted_key;
-  SpdbKeyHandle* h =
-      reinterpret_cast<SpdbKeyHandle*>(spdb_sort_->spdb_sorted_list_.AllocateSpdbItem(
-          len, sizeof(SpdbKeyHandle), &spdb_sorted_key));
-  memset(h, 0, sizeof(SpdbKeyHandle));
+  SpdbKeyHandle* h = reinterpret_cast<SpdbKeyHandle*>(
+      spdb_sort_->spdb_sorted_list_.AllocateSpdbItem(len, sizeof(SpdbKeyHandle),
+                                                     &spdb_sorted_key));
+  h->Init();
   h->SetKey(spdb_sorted_key);
   *buf = spdb_sorted_key;
   return h;

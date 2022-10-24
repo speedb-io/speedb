@@ -53,7 +53,6 @@ struct SpdbKeyHandle {
   }
   void SetKey(char* key) { spdb_sorted_key_ = key; }
   char* Key() { return spdb_sorted_key_; }
-  bool IsSortBarrier() { return spdb_sorted_key_ == nullptr; }
   void Init() {
     bucket_item_link_ = nullptr;
     spdb_item_link_ = nullptr;
@@ -285,6 +284,8 @@ class HashSpdRep : public MemTableRep {
 
   SpdbKeyHandle* InternalSeek(const char* seek_entry);
 
+  void SetSortBarrier();
+
   void Get(const LookupKey& k, void* callback_args,
            bool (*callback_func)(void* arg, const char* entry)) override;
 
@@ -301,7 +302,9 @@ class HashSpdRep : public MemTableRep {
     explicit SpdbIterator(
         const SpdbSortedList<const MemTableRep::KeyComparator&>* list,
         HashSpdRep* rep)
-        : iter_(list), rep_(rep) {}
+        : iter_(list), rep_(rep) {
+      rep->SetSortBarrier();
+    }
 
     ~SpdbIterator() override {}
 
@@ -344,10 +347,7 @@ class HashSpdRep : public MemTableRep {
 
     // Position at the first entry in list.
     // Final state of iterator is Valid() iff list is not empty.
-    void SeekToFirst() override {
-      rep_->WaitForImmutableCompletedIfNeeded();
-      iter_.SeekToFirst();
-    }
+    void SeekToFirst() override { iter_.SeekToFirst(); }
 
     // Position at the last entry in list.
     // Final state of iterator is Valid() iff list is not empty.
@@ -398,24 +398,17 @@ class HashSpdRep : public MemTableRep {
 
   MemTableRep::Iterator* GetIterator(Arena* arena = nullptr) override;
   bool IsImmutable() { return immutable_.load(); }
-  void WaitForImmutableCompletedIfNeeded() {
-    if (immutable_.load()) {
-      std::unique_lock<std::mutex> lck(notify_sorted_mutex_);
-      while (!immutable_completed_.load()) {
-        notify_sorted_cv_.wait(lck);
-      }
-    }
-  }
-  bool IsEmpty() { return (&anchor_item_ == last_item_.load()); }
+
+  bool IsEmpty() { return elements_num_ == 0; }
 
  private:
   SpdbHashTable spdb_hash_table_;
   std::shared_ptr<SpdbSort> spdb_sort_;
   std::atomic<SpdbKeyHandle*> last_item_;
   SpdbKeyHandle anchor_item_;
-  SpdbKeyHandle immutable_item_;
   std::atomic<bool> immutable_ = false;
-  std::atomic<bool> immutable_completed_ = false;
+  std::atomic<uint64_t> elements_num_ = 0;
+  std::atomic<uint64_t> sort_barrier_ = 0;
 
   // sort thread info
   std::atomic<bool> sort_thread_terminate_ = false;
@@ -470,16 +463,12 @@ void HashSpdRep::SpdbSortThread() {
 
     last_loop_item = last_loop_item->GetNextSortedItem();
     while (do_work) {
-      if (last_loop_item->IsSortBarrier()) {
-        // should notify the waiting iterator
-        {
-          std::unique_lock<std::mutex> notify_lck(notify_sorted_mutex_);
-          immutable_completed_.store(true);
-          notify_sorted_cv_.notify_all();
-        }
-      } else {
-        spdb_sort_->spdb_sorted_list_.Insert(last_loop_item->Key());
+      sort_barrier_.fetch_add(1);
+      {
+        std::unique_lock<std::mutex> notify_lck(notify_sorted_mutex_);
+        notify_sorted_cv_.notify_all();
       }
+      spdb_sort_->spdb_sorted_list_.Insert(last_loop_item->Key());
       if (last_loop_item->GetNextSortedItem()) {
         last_loop_item = last_loop_item->GetNextSortedItem();
       } else {
@@ -495,10 +484,7 @@ void HashSpdRep::SpdbSortThread() {
 }
 
 HashSpdRep::HashSpdRep(Allocator* allocator, size_t bucket_size)
-    : MemTableRep(allocator),
-      spdb_hash_table_(bucket_size),
-      anchor_item_(),
-      immutable_item_() {}
+    : MemTableRep(allocator), spdb_hash_table_(bucket_size), anchor_item_() {}
 
 void HashSpdRep::PostCreate(const MemTableRep::KeyComparator& compare,
                             Allocator* allocator) {
@@ -536,6 +522,7 @@ bool HashSpdRep::InsertInternal(KeyHandle handle, bool check_exist) {
 
   SpdbKeyHandle* prev_item = last_item_.exchange(spdb_handle);
   prev_item->SetNextSortedItem(spdb_handle);
+  elements_num_.fetch_add(1);
   if (sort_thread_idle) {
     // should notify the sort thread on work
     std::unique_lock<std::mutex> lck(sort_thread_mutex_);
@@ -548,16 +535,17 @@ bool HashSpdRep::Contains(const char* key) const {
   return spdb_hash_table_.Contains(key, spdb_sort_->compare_);
 }
 
-void HashSpdRep::MarkReadOnly() {
-  SpdbKeyHandle* prev_item = last_item_.exchange(&immutable_item_);
-  prev_item->SetNextSortedItem(&immutable_item_);
-  immutable_.store(true);
+void HashSpdRep::SetSortBarrier() {
+  uint64_t sort_barrier = elements_num_.load();
   {
-    // should notify the sort thread on work
-    std::unique_lock<std::mutex> lck(sort_thread_mutex_);
-    sort_thread_cv_.notify_one();
+    std::unique_lock<std::mutex> lck(notify_sorted_mutex_);
+    while (sort_barrier > sort_barrier_.load()) {
+      notify_sorted_cv_.wait(lck);
+    }
   }
 }
+
+void HashSpdRep::MarkReadOnly() { immutable_.store(true); }
 
 size_t HashSpdRep::ApproximateMemoryUsage() {
   // Memory is always allocated from the allocator.

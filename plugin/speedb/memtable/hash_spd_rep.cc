@@ -54,6 +54,12 @@ struct SpdbKeyHandle {
   void SetKey(char* key) { spdb_sorted_key_ = key; }
   char* Key() { return spdb_sorted_key_; }
   bool IsSortBarrier() { return spdb_sorted_key_ == nullptr; }
+  void Init() {
+    bucket_item_link_ = nullptr;
+    spdb_item_link_ = nullptr;
+    spdb_sorted_key_ = nullptr;
+  }
+
   SpdbKeyHandle()
       : bucket_item_link_(nullptr),
         spdb_item_link_(nullptr),
@@ -515,7 +521,7 @@ KeyHandle HashSpdRep::Allocate(const size_t len, char** buf) {
   SpdbKeyHandle* h = reinterpret_cast<SpdbKeyHandle*>(
       spdb_sort_->spdb_sorted_list_.AllocateSpdbItem(len, sizeof(SpdbKeyHandle),
                                                      &spdb_sorted_key));
-  memset(h, 0, sizeof(SpdbKeyHandle));
+  h->Init();
   h->SetKey(spdb_sorted_key);
   *buf = spdb_sorted_key;
   return h;

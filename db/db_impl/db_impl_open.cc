@@ -1701,6 +1701,19 @@ Status DBImpl::Open(const DBOptions& db_options, const std::string& dbname,
         std::max(max_write_buffer_size, cf.options.write_buffer_size);
   }
 
+  if (!db_options.create_if_missing) {
+    // Should technically use IsDirectory(), but MockFileSystem doesn't support
+    // it, and if it's indeed a file and not a directory we'll fail later trying
+    // to read files under it anyway
+    s = db_options.env->FileExists(dbname);
+    if (s.IsNotFound()) {
+      return Status::InvalidArgument(
+          dbname, "does not exist (create_if_missing is false)");
+    } else if (!s.ok()) {
+      return s;
+    }
+  }
+
   std::unique_ptr<DBImpl> impl{
       new DBImpl(db_options, dbname, seq_per_batch, batch_per_txn)};
   s = impl->env_->CreateDirIfMissing(impl->immutable_db_options_.GetWalDir());

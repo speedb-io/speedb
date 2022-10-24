@@ -277,8 +277,10 @@ Status CreateLoggerFromOptions(const std::string& dbname,
       InfoLogFileName(dbname, db_absolute_path, options.db_log_dir);
 
   const auto& clock = env->GetSystemClock();
-  env->CreateDirIfMissing(dbname)
-      .PermitUncheckedError();  // In case it does not exist
+  if (options.create_if_missing) {
+    env->CreateDirIfMissing(dbname)
+        .PermitUncheckedError();  // In case it does not exist
+  }
   // Currently we only support roll by time-to-roll and log size
 #ifndef ROCKSDB_LITE
   if (options.log_file_time_to_roll > 0 || options.max_log_file_size > 0) {

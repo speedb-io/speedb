@@ -445,8 +445,9 @@ void HashSpdRep::SpdbSortThread() {
   {
     std::unique_lock<std::mutex> lck(sort_thread_mutex_);
     sort_thread_init_.store(true);
-    sort_thread_cv_.notify_one();
   }
+  sort_thread_cv_.notify_one();
+
 
   while (!should_exit) {
     {
@@ -463,12 +464,13 @@ void HashSpdRep::SpdbSortThread() {
 
     last_loop_item = last_loop_item->GetNextSortedItem();
     while (do_work) {
+      spdb_sort_->spdb_sorted_list_.Insert(last_loop_item->Key());
       sort_barrier_.fetch_add(1);
       {
         std::unique_lock<std::mutex> notify_lck(notify_sorted_mutex_);
         notify_sorted_cv_.notify_all();
       }
-      spdb_sort_->spdb_sorted_list_.Insert(last_loop_item->Key());
+
       if (last_loop_item->GetNextSortedItem()) {
         last_loop_item = last_loop_item->GetNextSortedItem();
       } else {
@@ -525,7 +527,6 @@ bool HashSpdRep::InsertInternal(KeyHandle handle, bool check_exist) {
   elements_num_.fetch_add(1);
   if (sort_thread_idle) {
     // should notify the sort thread on work
-    std::unique_lock<std::mutex> lck(sort_thread_mutex_);
     sort_thread_cv_.notify_one();
   }
   return true;
@@ -537,6 +538,15 @@ bool HashSpdRep::Contains(const char* key) const {
 
 void HashSpdRep::SetSortBarrier() {
   uint64_t sort_barrier = elements_num_.load();
+  // should notify the sort thread on work
+  sort_thread_cv_.notify_one();
+
+  {
+    std::unique_lock<std::mutex> lck(notify_sorted_mutex_);
+    while (sort_barrier > sort_barrier_.load()) {
+      notify_sorted_cv_.wait(lck);
+    }
+  }
   {
     std::unique_lock<std::mutex> lck(notify_sorted_mutex_);
     while (sort_barrier > sort_barrier_.load()) {

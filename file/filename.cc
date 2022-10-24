@@ -278,6 +278,8 @@ bool ParseFileName(const std::string& fname,
 bool ParseFileName(const std::string& fname, uint64_t* number,
                    const Slice& info_log_name_prefix, FileType* type,
                    WalFileType* log_type) {
+  const std::string kTempFileNameSuffixWithDot =
+      std::string(".") + kTempFileNameSuffix;
   Slice rest(fname);
   if (fname.length() > 1 && fname[0] == '/') {
     rest.remove_prefix(1);
@@ -285,9 +287,19 @@ bool ParseFileName(const std::string& fname, uint64_t* number,
   if (rest == "IDENTITY") {
     *number = 0;
     *type = kIdentityFile;
-  } else if (rest == "CURRENT") {
+  } else if (rest.starts_with("CURRENT")) {
+    bool is_temp_file = false;
+    rest.remove_prefix(Slice("CURRENT").size());
+    // BackupEngine creates a temporary CURRENT file during restore
+    if (rest.ends_with(kTempFileNameSuffixWithDot)) {
+      rest.remove_suffix(kTempFileNameSuffixWithDot.size());
+      is_temp_file = true;
+    }
+    if (!rest.empty()) {
+      return false;
+    }
     *number = 0;
-    *type = kCurrentFile;
+    *type = is_temp_file ? kTempFile : kCurrentFile;
   } else if (rest == "LOCK") {
     *number = 0;
     *type = kDBLockFile;
@@ -333,8 +345,6 @@ bool ParseFileName(const std::string& fname, uint64_t* number,
     uint64_t ts_suffix;
     bool is_temp_file = false;
     rest.remove_prefix(kOptionsFileNamePrefix.size());
-    const std::string kTempFileNameSuffixWithDot =
-        std::string(".") + kTempFileNameSuffix;
     if (rest.ends_with(kTempFileNameSuffixWithDot)) {
       rest.remove_suffix(kTempFileNameSuffixWithDot.size());
       is_temp_file = true;

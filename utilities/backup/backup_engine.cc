@@ -1846,7 +1846,7 @@ IOStatus BackupEngineImpl::RestoreDBFromBackup(
     // process is interrupted.
     if (type == kCurrentFile) {
       final_current_file = dst;
-      dst = temporary_current_file = dst + ".tmp";
+      temporary_current_file = dst += "." + kTempFileNameSuffix;
     }
 
     ROCKS_LOG_INFO(options_.info_log, "Restoring %s to %s\n", file.c_str(),

@@ -70,6 +70,13 @@ Status PersistentCacheTier::Close() {
   return Status::OK();
 }
 
+Status PersistentCacheTier::CloseAndPurge() {
+  if (next_tier_) {
+    return next_tier_->CloseAndPurge();
+  }
+  return Status::OK();
+}
+
 bool PersistentCacheTier::Reserve(const size_t /*size*/) {
   // default implementation is a pass through
   return true;
@@ -116,6 +123,15 @@ Status PersistentTieredCache::Open() {
 Status PersistentTieredCache::Close() {
   assert(!tiers_.empty());
   Status status = tiers_.front()->Close();
+  if (status.ok()) {
+    tiers_.clear();
+  }
+  return status;
+}
+
+Status PersistentTieredCache::CloseAndPurge() {
+  assert(!tiers_.empty());
+  Status status = tiers_.front()->CloseAndPurge();
   if (status.ok()) {
     tiers_.clear();
   }

@@ -132,6 +132,19 @@ Status BlockCacheTier::Close() {
   return Status::OK();
 }
 
+Status BlockCacheTier::CloseAndPurge() {
+  Status s = Close();
+  if (!s.ok()) {
+    return s;
+  }
+  s = CleanupCacheFolder(GetCachePath());
+  if (s.ok()) {
+    // Try to get rid of the cache path, but don't bubble the error on failure
+    opt_.env->DeleteDir(GetCachePath()).PermitUncheckedError();
+  }
+  return s;
+}
+
 template<class T>
 void Add(std::map<std::string, double>* stats, const std::string& key,
          const T& t) {

@@ -245,6 +245,9 @@ class PersistentCacheTier : public PersistentCache {
   // Close the persistent cache tier
   virtual Status Close();
 
+  // Close the persistent cache tier and purge its contents
+  virtual Status CloseAndPurge();
+
   // Reserve space up to 'size' bytes
   virtual bool Reserve(const size_t size);
 
@@ -302,6 +305,7 @@ class PersistentTieredCache : public PersistentCacheTier {
 
   Status Open() override;
   Status Close() override;
+  Status CloseAndPurge() override;
   bool Erase(const Slice& key) override;
   std::string PrintStats() override;
   PersistentCache::StatsType Stats() override;

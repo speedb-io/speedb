@@ -61,6 +61,7 @@ class BlockCacheTier : public PersistentCacheTier {
                 size_t* size) override;
   Status Open() override;
   Status Close() override;
+  Status CloseAndPurge() override;
   bool Erase(const Slice& key) override;
   bool Reserve(const size_t size) override;
 

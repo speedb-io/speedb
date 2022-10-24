@@ -559,7 +559,13 @@ int main(int argc, char** argv) {
 
     CheckGet(db, roptions, "foo", "hello");
 
+    rocksdb_backup_engine_purge_old_backups(be, 0, &err);
+    CheckNoError(err);
+
     rocksdb_backup_engine_close(be);
+
+    rocksdb_destroy_db(options, dbbackupname, &err);
+    CheckNoError(err);
   }
 
   StartPhase("checkpoint");
@@ -677,6 +683,8 @@ int main(int argc, char** argv) {
     rocksdb_sstfilewriter_destroy(writer);
     rocksdb_options_destroy(io_options);
     rocksdb_envoptions_destroy(env_opt);
+
+    remove(sstfilename);
 
     // Delete all keys we just ingested
     rocksdb_delete(db, woptions, "sstk1", 5, &err);
@@ -2948,6 +2956,8 @@ int main(int argc, char** argv) {
 
   StartPhase("cleanup");
   rocksdb_close(db);
+  rocksdb_destroy_db(options, dbname, &err);
+  CheckNoError(err);
   rocksdb_options_destroy(options);
   rocksdb_block_based_options_destroy(table_options);
   rocksdb_readoptions_destroy(roptions);

@@ -40,6 +40,7 @@ class PersistentCacheTierTest : public testing::Test {
       Status s = cache_->Close();
       assert(s.ok());
     }
+    EXPECT_OK(DestroyDir(Env::Default(), path_));
   }
 
  protected:

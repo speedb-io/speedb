@@ -885,18 +885,14 @@ TEST_P(ColumnFamilyTest, IgnoreRecoveredLog) {
   std::string backup_logs = dbname_ + "/backup_logs";
 
   // delete old files in backup_logs directory
+  ASSERT_OK(DestroyDir(env_, backup_logs));
   ASSERT_OK(env_->CreateDirIfMissing(dbname_));
   ASSERT_OK(env_->CreateDirIfMissing(backup_logs));
-  std::vector<std::string> old_files;
-  ASSERT_OK(env_->GetChildren(backup_logs, &old_files));
-  for (auto& file : old_files) {
-    ASSERT_OK(env_->DeleteFile(backup_logs + "/" + file));
-  }
 
+  Destroy();
   column_family_options_.merge_operator =
       MergeOperators::CreateUInt64AddOperator();
   db_options_.wal_dir = dbname_ + "/logs";
-  Destroy();
   Open();
   CreateColumnFamilies({"cf1", "cf2"});
 
@@ -948,6 +944,8 @@ TEST_P(ColumnFamilyTest, IgnoreRecoveredLog) {
       }
     }
   }
+
+  ASSERT_OK(DestroyDir(env_, backup_logs));
 }
 
 #ifndef ROCKSDB_LITE  // TEST functions used are not supported

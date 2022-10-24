@@ -22,12 +22,9 @@
 namespace ROCKSDB_NAMESPACE {
 namespace cassandra {
 
-// Path to the database on file system
-const std::string kDbName = test::PerThreadDBPath("cassandra_functional_test");
-
 class CassandraStore {
  public:
-  explicit CassandraStore(std::shared_ptr<DB> db)
+  explicit CassandraStore(DB* db)
       : db_(db), write_option_(), get_option_() {
     assert(db);
   }
@@ -90,11 +87,11 @@ class CassandraStore {
   }
 
  private:
-  std::shared_ptr<DB> db_;
+  DB* db_;
   WriteOptions write_option_;
   ReadOptions get_option_;
 
-  DBImpl* dbfull() { return static_cast_with_check<DBImpl>(db_.get()); }
+  DBImpl* dbfull() { return static_cast_with_check<DBImpl>(db_); }
 };
 
 class TestCompactionFilterFactory : public CompactionFilterFactory {
@@ -125,7 +122,14 @@ public:
     DestroyDB(kDbName, Options());    // Start each test with a fresh DB
   }
 
-  std::shared_ptr<DB> OpenDb() {
+  ~CassandraFunctionalTest() {
+    if (db_ != nullptr) {
+      db_.reset();
+      DestroyDB(kDbName, Options());
+    }
+  }
+
+  void OpenDb() {
     DB* db;
     Options options;
     options.create_if_missing = true;
@@ -133,18 +137,24 @@ public:
     auto* cf_factory = new TestCompactionFilterFactory(
         purge_ttl_on_expiration_, gc_grace_period_in_seconds_);
     options.compaction_filter_factory.reset(cf_factory);
-    EXPECT_OK(DB::Open(options, kDbName, &db));
-    return std::shared_ptr<DB>(db);
+    ASSERT_OK(DB::Open(options, kDbName, &db));
+    db_.reset(db);
   }
+
+  std::unique_ptr<DB> db_;
 
   bool purge_ttl_on_expiration_ = false;
   int32_t gc_grace_period_in_seconds_ = 100;
+
+  // Path to the database on file system
+  const std::string kDbName = test::PerThreadDBPath("cassandra_functional_test");
 };
 
 // THE TEST CASES BEGIN HERE
 
 TEST_F(CassandraFunctionalTest, SimpleMergeTest) {
-  CassandraStore store(OpenDb());
+  OpenDb();
+  CassandraStore store(db_.get());
   int64_t now = time(nullptr);
 
   store.Append("k1", CreateTestRowValue({
@@ -186,7 +196,8 @@ constexpr int64_t kTestTimeoutSecs = 600;
 
 TEST_F(CassandraFunctionalTest,
        CompactionShouldConvertExpiredColumnsToTombstone) {
-  CassandraStore store(OpenDb());
+  OpenDb();
+  CassandraStore store(db_.get());
   int64_t now= time(nullptr);
 
   store.Append(
@@ -227,7 +238,8 @@ TEST_F(CassandraFunctionalTest,
 TEST_F(CassandraFunctionalTest,
        CompactionShouldPurgeExpiredColumnsIfPurgeTtlIsOn) {
   purge_ttl_on_expiration_ = true;
-  CassandraStore store(OpenDb());
+  OpenDb();
+  CassandraStore store(db_.get());
   int64_t now = time(nullptr);
 
   store.Append("k1", CreateTestRowValue({
@@ -261,7 +273,8 @@ TEST_F(CassandraFunctionalTest,
 TEST_F(CassandraFunctionalTest,
        CompactionShouldRemoveRowWhenAllColumnsExpiredIfPurgeTtlIsOn) {
   purge_ttl_on_expiration_ = true;
-  CassandraStore store(OpenDb());
+  OpenDb();
+  CassandraStore store(db_.get());
   int64_t now = time(nullptr);
 
   store.Append("k1", CreateTestRowValue({
@@ -283,7 +296,8 @@ TEST_F(CassandraFunctionalTest,
 TEST_F(CassandraFunctionalTest,
        CompactionShouldRemoveTombstoneExceedingGCGracePeriod) {
   purge_ttl_on_expiration_ = true;
-  CassandraStore store(OpenDb());
+  OpenDb();
+  CassandraStore store(db_.get());
   int64_t now = time(nullptr);
 
   store.Append("k1", CreateTestRowValue({
@@ -313,7 +327,8 @@ TEST_F(CassandraFunctionalTest,
 
 TEST_F(CassandraFunctionalTest, CompactionShouldRemoveTombstoneFromPut) {
   purge_ttl_on_expiration_ = true;
-  CassandraStore store(OpenDb());
+  OpenDb();
+  CassandraStore store(db_.get());
   int64_t now = time(nullptr);
 
   store.Put("k1", CreateTestRowValue({

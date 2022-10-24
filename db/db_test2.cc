@@ -4529,6 +4529,7 @@ TEST_F(DBTest2, TraceAndReplay) {
   }
   delete db2;
   ASSERT_OK(DestroyDB(dbname2, options));
+  ASSERT_OK(env_->DeleteFile(trace_filename));
 }
 
 TEST_F(DBTest2, TraceAndManualReplay) {
@@ -4870,6 +4871,7 @@ TEST_F(DBTest2, TraceAndManualReplay) {
   }
   delete db2;
   ASSERT_OK(DestroyDB(dbname2, options));
+  ASSERT_OK(env_->DeleteFile(trace_filename));
 }
 
 TEST_F(DBTest2, TraceWithLimit) {
@@ -4944,6 +4946,7 @@ TEST_F(DBTest2, TraceWithLimit) {
   }
   delete db2;
   ASSERT_OK(DestroyDB(dbname2, options));
+  ASSERT_OK(env_->DeleteFile(trace_filename));
 }
 
 TEST_F(DBTest2, TraceWithSampling) {
@@ -5021,6 +5024,7 @@ TEST_F(DBTest2, TraceWithSampling) {
   }
   delete db2;
   ASSERT_OK(DestroyDB(dbname2, options));
+  ASSERT_OK(env_->DeleteFile(trace_filename));
 }
 
 TEST_F(DBTest2, TraceWithFilter) {
@@ -5198,6 +5202,8 @@ TEST_F(DBTest2, TraceWithFilter) {
   // We also need to count the header and footer
   // 4 WRITE + HEADER + FOOTER = 6
   ASSERT_EQ(count, 6);
+  ASSERT_OK(env_->DeleteFile(trace_filename3));
+  ASSERT_OK(env_->DeleteFile(trace_filename));
 }
 
 #endif  // ROCKSDB_LITE
@@ -5545,6 +5551,10 @@ TEST_F(DBTest2, TestCompactFiles) {
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->DisableProcessing();
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->ClearAllCallBacks();
+
+  ASSERT_OK(env_->DeleteFile(external_file1));
+  ASSERT_OK(env_->DeleteFile(external_file2));
+  ASSERT_OK(env_->DeleteFile(external_file3));
 }
 #endif  // ROCKSDB_LITE
 
@@ -6954,9 +6964,9 @@ TEST_F(DBTest2, CheckpointFileTemperature) {
 
   test_fs->PopRequestedSstFileTemperatures();
   Checkpoint* checkpoint;
+  const std::string checkpoint_dir = dbname_ + kFilePathSeparator + "tempcp";
   ASSERT_OK(Checkpoint::Create(db_, &checkpoint));
-  ASSERT_OK(
-      checkpoint->CreateCheckpoint(dbname_ + kFilePathSeparator + "tempcp"));
+  ASSERT_OK(checkpoint->CreateCheckpoint(checkpoint_dir));
 
   // checking src file src_temperature hints: 2 sst files: 1 sst is kWarm,
   // another is kUnknown
@@ -6974,6 +6984,7 @@ TEST_F(DBTest2, CheckpointFileTemperature) {
   ASSERT_EQ(distinct_requests.size(), requested_temps.size());
 
   delete checkpoint;
+  ASSERT_OK(DestroyDir(env_, checkpoint_dir));
   Close();
 }
 

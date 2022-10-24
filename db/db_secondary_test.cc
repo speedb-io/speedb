@@ -36,7 +36,8 @@ class DBSecondaryTest : public DBTestBase {
     } else {
       Options options;
       options.env = env_;
-      EXPECT_OK(DestroyDB(secondary_path_, options));
+      Status s = DestroyDB(secondary_path_, options);
+      EXPECT_TRUE(s.ok() || s.IsPathNotFound()) << s.ToString();
     }
   }
 
@@ -53,6 +54,10 @@ class DBSecondaryTest : public DBTestBase {
       const std::vector<std::string>& column_families, const Options& options);
 
   void CloseSecondary() {
+    if (db_secondary_ == nullptr) {
+      ASSERT_EQ(handles_secondary_.size(), 0);
+      return;
+    }
     for (auto h : handles_secondary_) {
       ASSERT_OK(db_secondary_->DestroyColumnFamilyHandle(h));
     }

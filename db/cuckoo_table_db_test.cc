@@ -28,7 +28,8 @@ class CuckooTableDBTest : public testing::Test {
  public:
   CuckooTableDBTest() : env_(Env::Default()) {
     dbname_ = test::PerThreadDBPath("cuckoo_table_db_test");
-    EXPECT_OK(DestroyDB(dbname_, Options()));
+    Status s = DestroyDB(dbname_, Options());
+    EXPECT_TRUE(s.ok() || s.IsPathNotFound()) << s.ToString();
     db_ = nullptr;
     Reopen();
   }

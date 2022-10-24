@@ -49,18 +49,15 @@ void LogMessage(const InfoLogLevel log_level, Logger* logger,
 
 class AutoRollLoggerTest : public testing::Test {
  public:
-  static void InitTestDb() {
-#ifdef OS_WIN
-    // Replace all slashes in the path so windows CompSpec does not
-    // become confused
-    std::string testDir(kTestDir);
-    std::replace_if(testDir.begin(), testDir.end(),
-                    [](char ch) { return ch == '/'; }, '\\');
-    std::string deleteCmd = "if exist " + testDir + " rd /s /q " + testDir;
-#else
-    std::string deleteCmd = "rm -rf " + kTestDir;
-#endif
-    ASSERT_TRUE(system(deleteCmd.c_str()) == 0);
+  AutoRollLoggerTest() : kTestDir(test::PerThreadDBPath("db_log_test")),
+kLogFile(kTestDir + "/LOG") {}
+
+  ~AutoRollLoggerTest() {
+    DestroyDir(default_env, kTestDir).PermitUncheckedError();
+  }
+
+  void InitTestDb() {
+    ASSERT_OK(DestroyDir(default_env, kTestDir));
     ASSERT_OK(Env::Default()->CreateDir(kTestDir));
   }
 
@@ -107,18 +104,13 @@ class AutoRollLoggerTest : public testing::Test {
   }
 
   static const std::string kSampleMessage;
-  static const std::string kTestDir;
-  static const std::string kLogFile;
-  static Env* default_env;
+  const std::string kTestDir = test::PerThreadDBPath("db_log_test");
+  const std::string kLogFile = kTestDir + "/LOG";
+  Env* default_env = Env::Default();
 };
 
 const std::string AutoRollLoggerTest::kSampleMessage(
     "this is the message to be written to the log file!!");
-const std::string AutoRollLoggerTest::kTestDir(
-    test::PerThreadDBPath("db_log_test"));
-const std::string AutoRollLoggerTest::kLogFile(
-    test::PerThreadDBPath("db_log_test") + "/LOG");
-Env* AutoRollLoggerTest::default_env = Env::Default();
 
 void AutoRollLoggerTest::RollLogFileBySizeTest(AutoRollLogger* logger,
                                                size_t log_max_size,
@@ -297,6 +289,7 @@ TEST_F(AutoRollLoggerTest, CreateLoggerFromOptions) {
   std::shared_ptr<Logger> logger;
 
   // Normal logger
+  options.create_if_missing = true;
   ASSERT_OK(CreateLoggerFromOptions(kTestDir, options, &logger));
   ASSERT_TRUE(dynamic_cast<PosixLogger*>(logger.get()));
 

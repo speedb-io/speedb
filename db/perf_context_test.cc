@@ -32,15 +32,30 @@ int FLAGS_max_write_buffer_number = 8;
 int FLAGS_min_write_buffer_number_to_merge = 7;
 bool FLAGS_verbose = false;
 
-// Path to the database on file system
-const std::string kDbName =
-    ROCKSDB_NAMESPACE::test::PerThreadDBPath("perf_context_test");
-
 namespace ROCKSDB_NAMESPACE {
 
-std::shared_ptr<DB> OpenDb(bool read_only = false) {
-    DB* db;
-    Options options;
+class PerfContextTest : public testing::Test {
+  void Destroy() {
+    if (db_ != nullptr) {
+      db_.reset();
+      ASSERT_OK(DestroyDB(kDbName, options_));
+    }
+  }
+
+ protected:
+  ~PerfContextTest() {
+    Destroy();
+  }
+
+  void SetUp() {
+    if (FLAGS_verbose) {
+      std::cout << kDbName << "\n";
+    }
+  }
+
+  void OpenDb(bool read_only = false, const Options& base = Options()) {
+    Destroy();
+    Options options = base;
     options.create_if_missing = true;
     options.max_open_files = -1;
     options.write_buffer_size = FLAGS_write_buffer_size;
@@ -56,21 +71,28 @@ std::shared_ptr<DB> OpenDb(bool read_only = false) {
 #endif  // ROCKSDB_LITE
     }
 
+    DB* db;
     Status s;
     if (!read_only) {
       s = DB::Open(options, kDbName, &db);
     } else {
       s = DB::OpenForReadOnly(options, kDbName, &db);
     }
-    EXPECT_OK(s);
-    return std::shared_ptr<DB>(db);
-}
+    ASSERT_OK(s);
+    db_.reset(db);
+    options_ = options;
+  }
 
-class PerfContextTest : public testing::Test {};
+  std::unique_ptr<DB> db_ = nullptr;
+  Options options_;
+
+  // Path to the database on file system
+  const std::string kDbName =
+      ROCKSDB_NAMESPACE::test::PerThreadDBPath("perf_context_test");
+};
 
 TEST_F(PerfContextTest, SeekIntoDeletion) {
-  DestroyDB(kDbName, Options());
-  auto db = OpenDb();
+  OpenDb();
   WriteOptions write_options;
   ReadOptions read_options;
 
@@ -78,12 +100,12 @@ TEST_F(PerfContextTest, SeekIntoDeletion) {
     std::string key = "k" + ToString(i);
     std::string value = "v" + ToString(i);
 
-    ASSERT_OK(db->Put(write_options, key, value));
+    ASSERT_OK(db_->Put(write_options, key, value));
   }
 
   for (int i = 0; i < FLAGS_total_keys -1 ; ++i) {
     std::string key = "k" + ToString(i);
-    ASSERT_OK(db->Delete(write_options, key));
+    ASSERT_OK(db_->Delete(write_options, key));
   }
 
   HistogramImpl hist_get;
@@ -95,7 +117,7 @@ TEST_F(PerfContextTest, SeekIntoDeletion) {
     get_perf_context()->Reset();
     StopWatchNano timer(SystemClock::Default().get());
     timer.Start();
-    auto status = db->Get(read_options, key, &value);
+    auto status = db_->Get(read_options, key, &value);
     auto elapsed_nanos = timer.ElapsedNanos();
     ASSERT_TRUE(status.IsNotFound());
     hist_get.Add(get_perf_context()->user_key_comparison_count);
@@ -109,7 +131,7 @@ TEST_F(PerfContextTest, SeekIntoDeletion) {
 
   {
     HistogramImpl hist_seek_to_first;
-    std::unique_ptr<Iterator> iter(db->NewIterator(read_options));
+    std::unique_ptr<Iterator> iter(db_->NewIterator(read_options));
 
     get_perf_context()->Reset();
     StopWatchNano timer(SystemClock::Default().get(), true);
@@ -129,7 +151,7 @@ TEST_F(PerfContextTest, SeekIntoDeletion) {
 
   HistogramImpl hist_seek;
   for (int i = 0; i < FLAGS_total_keys; ++i) {
-    std::unique_ptr<Iterator> iter(db->NewIterator(read_options));
+    std::unique_ptr<Iterator> iter(db_->NewIterator(read_options));
     std::string key = "k" + ToString(i);
 
     get_perf_context()->Reset();
@@ -204,296 +226,297 @@ TEST_F(PerfContextTest, StopWatchOverhead) {
   }
 }
 
-void ProfileQueries(bool enabled_time = false) {
-  DestroyDB(kDbName, Options());    // Start this test with a fresh DB
-
-  auto db = OpenDb();
-
-  WriteOptions write_options;
-  ReadOptions read_options;
-
-  HistogramImpl hist_put;
-
-  HistogramImpl hist_get;
-  HistogramImpl hist_get_snapshot;
-  HistogramImpl hist_get_memtable;
-  HistogramImpl hist_get_files;
-  HistogramImpl hist_get_post_process;
-  HistogramImpl hist_num_memtable_checked;
-
-  HistogramImpl hist_mget;
-  HistogramImpl hist_mget_snapshot;
-  HistogramImpl hist_mget_memtable;
-  HistogramImpl hist_mget_files;
-  HistogramImpl hist_mget_post_process;
-  HistogramImpl hist_mget_num_memtable_checked;
-
-  HistogramImpl hist_write_pre_post;
-  HistogramImpl hist_write_wal_time;
-  HistogramImpl hist_write_memtable_time;
-  HistogramImpl hist_write_delay_time;
-  HistogramImpl hist_write_thread_wait_nanos;
-  HistogramImpl hist_write_scheduling_time;
-
-  uint64_t total_db_mutex_nanos = 0;
-
-  if (FLAGS_verbose) {
-    std::cout << "Inserting " << FLAGS_total_keys << " key/value pairs\n...\n";
-  }
-
-  std::vector<int> keys;
-  const int kFlushFlag = -1;
-  for (int i = 0; i < FLAGS_total_keys; ++i) {
-    keys.push_back(i);
-    if (i == FLAGS_total_keys / 2) {
-      // Issuing a flush in the middle.
-      keys.push_back(kFlushFlag);
-    }
-  }
-
-  if (FLAGS_random_key) {
-    RandomShuffle(std::begin(keys), std::end(keys));
-  }
-#ifndef NDEBUG
-  ThreadStatusUtil::TEST_SetStateDelay(ThreadStatus::STATE_MUTEX_WAIT, 1U);
-#endif
-  int num_mutex_waited = 0;
-  for (const int i : keys) {
-    if (i == kFlushFlag) {
-      FlushOptions fo;
-      db->Flush(fo);
-      continue;
-    }
-
-    std::string key = "k" + ToString(i);
-    std::string value = "v" + ToString(i);
-
-    std::vector<std::string> values;
-
-    get_perf_context()->Reset();
-    ASSERT_OK(db->Put(write_options, key, value));
-    if (++num_mutex_waited > 3) {
-#ifndef NDEBUG
-      ThreadStatusUtil::TEST_SetStateDelay(ThreadStatus::STATE_MUTEX_WAIT, 0U);
-#endif
-    }
-    hist_write_pre_post.Add(
-        get_perf_context()->write_pre_and_post_process_time);
-    hist_write_wal_time.Add(get_perf_context()->write_wal_time);
-    hist_write_memtable_time.Add(get_perf_context()->write_memtable_time);
-    hist_write_delay_time.Add(get_perf_context()->write_delay_time);
-    hist_write_thread_wait_nanos.Add(
-        get_perf_context()->write_thread_wait_nanos);
-    hist_write_scheduling_time.Add(
-        get_perf_context()->write_scheduling_flushes_compactions_time);
-    hist_put.Add(get_perf_context()->user_key_comparison_count);
-    total_db_mutex_nanos += get_perf_context()->db_mutex_lock_nanos;
-  }
-#ifndef NDEBUG
-  ThreadStatusUtil::TEST_SetStateDelay(ThreadStatus::STATE_MUTEX_WAIT, 0U);
-#endif
-
-  for (const int i : keys) {
-    if (i == kFlushFlag) {
-      continue;
-    }
-    std::string key = "k" + ToString(i);
-    std::string expected_value = "v" + ToString(i);
-    std::string value;
-
-    std::vector<Slice> multiget_keys = {Slice(key)};
-    std::vector<std::string> values;
-
-    get_perf_context()->Reset();
-    ASSERT_OK(db->Get(read_options, key, &value));
-    ASSERT_EQ(expected_value, value);
-    hist_get_snapshot.Add(get_perf_context()->get_snapshot_time);
-    hist_get_memtable.Add(get_perf_context()->get_from_memtable_time);
-    hist_get_files.Add(get_perf_context()->get_from_output_files_time);
-    hist_num_memtable_checked.Add(get_perf_context()->get_from_memtable_count);
-    hist_get_post_process.Add(get_perf_context()->get_post_process_time);
-    hist_get.Add(get_perf_context()->user_key_comparison_count);
-
-    get_perf_context()->Reset();
-    auto statuses = db->MultiGet(read_options, multiget_keys, &values);
-    for (const auto& s : statuses) {
-      ASSERT_OK(s);
-    }
-    hist_mget_snapshot.Add(get_perf_context()->get_snapshot_time);
-    hist_mget_memtable.Add(get_perf_context()->get_from_memtable_time);
-    hist_mget_files.Add(get_perf_context()->get_from_output_files_time);
-    hist_mget_num_memtable_checked.Add(get_perf_context()->get_from_memtable_count);
-    hist_mget_post_process.Add(get_perf_context()->get_post_process_time);
-    hist_mget.Add(get_perf_context()->user_key_comparison_count);
-  }
-
-  if (FLAGS_verbose) {
-    std::cout << "Put user key comparison: \n"
-              << hist_put.ToString() << "Get user key comparison: \n"
-              << hist_get.ToString() << "MultiGet user key comparison: \n"
-              << hist_get.ToString();
-    std::cout << "Put(): Pre and Post Process Time: \n"
-              << hist_write_pre_post.ToString() << " Writing WAL time: \n"
-              << hist_write_wal_time.ToString() << "\n"
-              << " Writing Mem Table time: \n"
-              << hist_write_memtable_time.ToString() << "\n"
-              << " Write Delay: \n" << hist_write_delay_time.ToString() << "\n"
-              << " Waiting for Batch time: \n"
-              << hist_write_thread_wait_nanos.ToString() << "\n"
-              << " Scheduling Flushes and Compactions Time: \n"
-              << hist_write_scheduling_time.ToString() << "\n"
-              << " Total DB mutex nanos: \n" << total_db_mutex_nanos << "\n";
-
-    std::cout << "Get(): Time to get snapshot: \n"
-              << hist_get_snapshot.ToString()
-              << " Time to get value from memtables: \n"
-              << hist_get_memtable.ToString() << "\n"
-              << " Time to get value from output files: \n"
-              << hist_get_files.ToString() << "\n"
-              << " Number of memtables checked: \n"
-              << hist_num_memtable_checked.ToString() << "\n"
-              << " Time to post process: \n" << hist_get_post_process.ToString()
-              << "\n";
-
-    std::cout << "MultiGet(): Time to get snapshot: \n"
-              << hist_mget_snapshot.ToString()
-              << " Time to get value from memtables: \n"
-              << hist_mget_memtable.ToString() << "\n"
-              << " Time to get value from output files: \n"
-              << hist_mget_files.ToString() << "\n"
-              << " Number of memtables checked: \n"
-              << hist_mget_num_memtable_checked.ToString() << "\n"
-              << " Time to post process: \n"
-              << hist_mget_post_process.ToString() << "\n";
-  }
-
-  if (enabled_time) {
-    ASSERT_GT(hist_get.Average(), 0);
-    ASSERT_GT(hist_get_snapshot.Average(), 0);
-    ASSERT_GT(hist_get_memtable.Average(), 0);
-    ASSERT_GT(hist_get_files.Average(), 0);
-    ASSERT_GT(hist_get_post_process.Average(), 0);
-    ASSERT_GT(hist_num_memtable_checked.Average(), 0);
-
-    ASSERT_GT(hist_mget.Average(), 0);
-    ASSERT_GT(hist_mget_snapshot.Average(), 0);
-    ASSERT_GT(hist_mget_memtable.Average(), 0);
-    ASSERT_GT(hist_mget_files.Average(), 0);
-    ASSERT_GT(hist_mget_post_process.Average(), 0);
-    ASSERT_GT(hist_mget_num_memtable_checked.Average(), 0);
-
-    EXPECT_GT(hist_write_pre_post.Average(), 0);
-    EXPECT_GT(hist_write_wal_time.Average(), 0);
-    EXPECT_GT(hist_write_memtable_time.Average(), 0);
-    EXPECT_EQ(hist_write_delay_time.Average(), 0);
-    EXPECT_EQ(hist_write_thread_wait_nanos.Average(), 0);
-    EXPECT_GT(hist_write_scheduling_time.Average(), 0);
-
-#ifndef NDEBUG
-    ASSERT_GT(total_db_mutex_nanos, 2000U);
-#endif
-  }
-
-  db.reset();
-  db = OpenDb(true);
-
-  hist_get.Clear();
-  hist_get_snapshot.Clear();
-  hist_get_memtable.Clear();
-  hist_get_files.Clear();
-  hist_get_post_process.Clear();
-  hist_num_memtable_checked.Clear();
-
-  hist_mget.Clear();
-  hist_mget_snapshot.Clear();
-  hist_mget_memtable.Clear();
-  hist_mget_files.Clear();
-  hist_mget_post_process.Clear();
-  hist_mget_num_memtable_checked.Clear();
-
-  for (const int i : keys) {
-    if (i == kFlushFlag) {
-      continue;
-    }
-    std::string key = "k" + ToString(i);
-    std::string expected_value = "v" + ToString(i);
-    std::string value;
-
-    std::vector<Slice> multiget_keys = {Slice(key)};
-    std::vector<std::string> values;
-
-    get_perf_context()->Reset();
-    ASSERT_OK(db->Get(read_options, key, &value));
-    ASSERT_EQ(expected_value, value);
-    hist_get_snapshot.Add(get_perf_context()->get_snapshot_time);
-    hist_get_memtable.Add(get_perf_context()->get_from_memtable_time);
-    hist_get_files.Add(get_perf_context()->get_from_output_files_time);
-    hist_num_memtable_checked.Add(get_perf_context()->get_from_memtable_count);
-    hist_get_post_process.Add(get_perf_context()->get_post_process_time);
-    hist_get.Add(get_perf_context()->user_key_comparison_count);
-
-    get_perf_context()->Reset();
-    auto statuses = db->MultiGet(read_options, multiget_keys, &values);
-    for (const auto& s : statuses) {
-      ASSERT_OK(s);
-    }
-    hist_mget_snapshot.Add(get_perf_context()->get_snapshot_time);
-    hist_mget_memtable.Add(get_perf_context()->get_from_memtable_time);
-    hist_mget_files.Add(get_perf_context()->get_from_output_files_time);
-    hist_mget_num_memtable_checked.Add(get_perf_context()->get_from_memtable_count);
-    hist_mget_post_process.Add(get_perf_context()->get_post_process_time);
-    hist_mget.Add(get_perf_context()->user_key_comparison_count);
-  }
-
-  if (FLAGS_verbose) {
-    std::cout << "ReadOnly Get user key comparison: \n"
-              << hist_get.ToString()
-              << "ReadOnly MultiGet user key comparison: \n"
-              << hist_mget.ToString();
-
-    std::cout << "ReadOnly Get(): Time to get snapshot: \n"
-              << hist_get_snapshot.ToString()
-              << " Time to get value from memtables: \n"
-              << hist_get_memtable.ToString() << "\n"
-              << " Time to get value from output files: \n"
-              << hist_get_files.ToString() << "\n"
-              << " Number of memtables checked: \n"
-              << hist_num_memtable_checked.ToString() << "\n"
-              << " Time to post process: \n" << hist_get_post_process.ToString()
-              << "\n";
-
-    std::cout << "ReadOnly MultiGet(): Time to get snapshot: \n"
-              << hist_mget_snapshot.ToString()
-              << " Time to get value from memtables: \n"
-              << hist_mget_memtable.ToString() << "\n"
-              << " Time to get value from output files: \n"
-              << hist_mget_files.ToString() << "\n"
-              << " Number of memtables checked: \n"
-              << hist_mget_num_memtable_checked.ToString() << "\n"
-              << " Time to post process: \n"
-              << hist_mget_post_process.ToString() << "\n";
-  }
-
-  if (enabled_time) {
-    ASSERT_GT(hist_get.Average(), 0);
-    ASSERT_GT(hist_get_memtable.Average(), 0);
-    ASSERT_GT(hist_get_files.Average(), 0);
-    ASSERT_GT(hist_num_memtable_checked.Average(), 0);
-    // In read-only mode Get(), no super version operation is needed
-    ASSERT_EQ(hist_get_post_process.Average(), 0);
-    ASSERT_GT(hist_get_snapshot.Average(), 0);
-
-    ASSERT_GT(hist_mget.Average(), 0);
-    ASSERT_GT(hist_mget_snapshot.Average(), 0);
-    ASSERT_GT(hist_mget_memtable.Average(), 0);
-    ASSERT_GT(hist_mget_files.Average(), 0);
-    ASSERT_GT(hist_mget_post_process.Average(), 0);
-    ASSERT_GT(hist_mget_num_memtable_checked.Average(), 0);
-  }
-}
-
 #ifndef ROCKSDB_LITE
-TEST_F(PerfContextTest, KeyComparisonCount) {
+class PerfContextQueriesTest : public PerfContextTest {
+ protected:
+  void ProfileQueries(bool enabled_time = false) {
+    OpenDb();
+
+    WriteOptions write_options;
+    ReadOptions read_options;
+
+    HistogramImpl hist_put;
+
+    HistogramImpl hist_get;
+    HistogramImpl hist_get_snapshot;
+    HistogramImpl hist_get_memtable;
+    HistogramImpl hist_get_files;
+    HistogramImpl hist_get_post_process;
+    HistogramImpl hist_num_memtable_checked;
+
+    HistogramImpl hist_mget;
+    HistogramImpl hist_mget_snapshot;
+    HistogramImpl hist_mget_memtable;
+    HistogramImpl hist_mget_files;
+    HistogramImpl hist_mget_post_process;
+    HistogramImpl hist_mget_num_memtable_checked;
+
+    HistogramImpl hist_write_pre_post;
+    HistogramImpl hist_write_wal_time;
+    HistogramImpl hist_write_memtable_time;
+    HistogramImpl hist_write_delay_time;
+    HistogramImpl hist_write_thread_wait_nanos;
+    HistogramImpl hist_write_scheduling_time;
+
+    uint64_t total_db_mutex_nanos = 0;
+
+    if (FLAGS_verbose) {
+      std::cout << "Inserting " << FLAGS_total_keys << " key/value pairs\n...\n";
+    }
+
+    std::vector<int> keys;
+    const int kFlushFlag = -1;
+    for (int i = 0; i < FLAGS_total_keys; ++i) {
+      keys.push_back(i);
+      if (i == FLAGS_total_keys / 2) {
+        // Issuing a flush in the middle.
+        keys.push_back(kFlushFlag);
+      }
+    }
+
+    if (FLAGS_random_key) {
+      RandomShuffle(std::begin(keys), std::end(keys));
+    }
+  #ifndef NDEBUG
+    ThreadStatusUtil::TEST_SetStateDelay(ThreadStatus::STATE_MUTEX_WAIT, 1U);
+  #endif
+    int num_mutex_waited = 0;
+    for (const int i : keys) {
+      if (i == kFlushFlag) {
+        FlushOptions fo;
+        db_->Flush(fo);
+        continue;
+      }
+
+      std::string key = "k" + ToString(i);
+      std::string value = "v" + ToString(i);
+
+      std::vector<std::string> values;
+
+      get_perf_context()->Reset();
+      ASSERT_OK(db_->Put(write_options, key, value));
+      if (++num_mutex_waited > 3) {
+  #ifndef NDEBUG
+        ThreadStatusUtil::TEST_SetStateDelay(ThreadStatus::STATE_MUTEX_WAIT, 0U);
+  #endif
+      }
+      hist_write_pre_post.Add(
+          get_perf_context()->write_pre_and_post_process_time);
+      hist_write_wal_time.Add(get_perf_context()->write_wal_time);
+      hist_write_memtable_time.Add(get_perf_context()->write_memtable_time);
+      hist_write_delay_time.Add(get_perf_context()->write_delay_time);
+      hist_write_thread_wait_nanos.Add(
+          get_perf_context()->write_thread_wait_nanos);
+      hist_write_scheduling_time.Add(
+          get_perf_context()->write_scheduling_flushes_compactions_time);
+      hist_put.Add(get_perf_context()->user_key_comparison_count);
+      total_db_mutex_nanos += get_perf_context()->db_mutex_lock_nanos;
+    }
+  #ifndef NDEBUG
+    ThreadStatusUtil::TEST_SetStateDelay(ThreadStatus::STATE_MUTEX_WAIT, 0U);
+  #endif
+
+    for (const int i : keys) {
+      if (i == kFlushFlag) {
+        continue;
+      }
+      std::string key = "k" + ToString(i);
+      std::string expected_value = "v" + ToString(i);
+      std::string value;
+
+      std::vector<Slice> multiget_keys = {Slice(key)};
+      std::vector<std::string> values;
+
+      get_perf_context()->Reset();
+      ASSERT_OK(db_->Get(read_options, key, &value));
+      ASSERT_EQ(expected_value, value);
+      hist_get_snapshot.Add(get_perf_context()->get_snapshot_time);
+      hist_get_memtable.Add(get_perf_context()->get_from_memtable_time);
+      hist_get_files.Add(get_perf_context()->get_from_output_files_time);
+      hist_num_memtable_checked.Add(get_perf_context()->get_from_memtable_count);
+      hist_get_post_process.Add(get_perf_context()->get_post_process_time);
+      hist_get.Add(get_perf_context()->user_key_comparison_count);
+
+      get_perf_context()->Reset();
+      auto statuses = db_->MultiGet(read_options, multiget_keys, &values);
+      for (const auto& s : statuses) {
+        ASSERT_OK(s);
+      }
+      hist_mget_snapshot.Add(get_perf_context()->get_snapshot_time);
+      hist_mget_memtable.Add(get_perf_context()->get_from_memtable_time);
+      hist_mget_files.Add(get_perf_context()->get_from_output_files_time);
+      hist_mget_num_memtable_checked.Add(get_perf_context()->get_from_memtable_count);
+      hist_mget_post_process.Add(get_perf_context()->get_post_process_time);
+      hist_mget.Add(get_perf_context()->user_key_comparison_count);
+    }
+
+    if (FLAGS_verbose) {
+      std::cout << "Put user key comparison: \n"
+                << hist_put.ToString() << "Get user key comparison: \n"
+                << hist_get.ToString() << "MultiGet user key comparison: \n"
+                << hist_get.ToString();
+      std::cout << "Put(): Pre and Post Process Time: \n"
+                << hist_write_pre_post.ToString() << " Writing WAL time: \n"
+                << hist_write_wal_time.ToString() << "\n"
+                << " Writing Mem Table time: \n"
+                << hist_write_memtable_time.ToString() << "\n"
+                << " Write Delay: \n" << hist_write_delay_time.ToString() << "\n"
+                << " Waiting for Batch time: \n"
+                << hist_write_thread_wait_nanos.ToString() << "\n"
+                << " Scheduling Flushes and Compactions Time: \n"
+                << hist_write_scheduling_time.ToString() << "\n"
+                << " Total DB mutex nanos: \n" << total_db_mutex_nanos << "\n";
+
+      std::cout << "Get(): Time to get snapshot: \n"
+                << hist_get_snapshot.ToString()
+                << " Time to get value from memtables: \n"
+                << hist_get_memtable.ToString() << "\n"
+                << " Time to get value from output files: \n"
+                << hist_get_files.ToString() << "\n"
+                << " Number of memtables checked: \n"
+                << hist_num_memtable_checked.ToString() << "\n"
+                << " Time to post process: \n" << hist_get_post_process.ToString()
+                << "\n";
+
+      std::cout << "MultiGet(): Time to get snapshot: \n"
+                << hist_mget_snapshot.ToString()
+                << " Time to get value from memtables: \n"
+                << hist_mget_memtable.ToString() << "\n"
+                << " Time to get value from output files: \n"
+                << hist_mget_files.ToString() << "\n"
+                << " Number of memtables checked: \n"
+                << hist_mget_num_memtable_checked.ToString() << "\n"
+                << " Time to post process: \n"
+                << hist_mget_post_process.ToString() << "\n";
+    }
+
+    if (enabled_time) {
+      ASSERT_GT(hist_get.Average(), 0);
+      ASSERT_GT(hist_get_snapshot.Average(), 0);
+      ASSERT_GT(hist_get_memtable.Average(), 0);
+      ASSERT_GT(hist_get_files.Average(), 0);
+      ASSERT_GT(hist_get_post_process.Average(), 0);
+      ASSERT_GT(hist_num_memtable_checked.Average(), 0);
+
+      ASSERT_GT(hist_mget.Average(), 0);
+      ASSERT_GT(hist_mget_snapshot.Average(), 0);
+      ASSERT_GT(hist_mget_memtable.Average(), 0);
+      ASSERT_GT(hist_mget_files.Average(), 0);
+      ASSERT_GT(hist_mget_post_process.Average(), 0);
+      ASSERT_GT(hist_mget_num_memtable_checked.Average(), 0);
+
+      EXPECT_GT(hist_write_pre_post.Average(), 0);
+      EXPECT_GT(hist_write_wal_time.Average(), 0);
+      EXPECT_GT(hist_write_memtable_time.Average(), 0);
+      EXPECT_EQ(hist_write_delay_time.Average(), 0);
+      EXPECT_EQ(hist_write_thread_wait_nanos.Average(), 0);
+      EXPECT_GT(hist_write_scheduling_time.Average(), 0);
+
+  #ifndef NDEBUG
+      ASSERT_GT(total_db_mutex_nanos, 2000U);
+  #endif
+    }
+
+    db_.reset();
+    OpenDb(true);
+
+    hist_get.Clear();
+    hist_get_snapshot.Clear();
+    hist_get_memtable.Clear();
+    hist_get_files.Clear();
+    hist_get_post_process.Clear();
+    hist_num_memtable_checked.Clear();
+
+    hist_mget.Clear();
+    hist_mget_snapshot.Clear();
+    hist_mget_memtable.Clear();
+    hist_mget_files.Clear();
+    hist_mget_post_process.Clear();
+    hist_mget_num_memtable_checked.Clear();
+
+    for (const int i : keys) {
+      if (i == kFlushFlag) {
+        continue;
+      }
+      std::string key = "k" + ToString(i);
+      std::string expected_value = "v" + ToString(i);
+      std::string value;
+
+      std::vector<Slice> multiget_keys = {Slice(key)};
+      std::vector<std::string> values;
+
+      get_perf_context()->Reset();
+      ASSERT_OK(db_->Get(read_options, key, &value));
+      ASSERT_EQ(expected_value, value);
+      hist_get_snapshot.Add(get_perf_context()->get_snapshot_time);
+      hist_get_memtable.Add(get_perf_context()->get_from_memtable_time);
+      hist_get_files.Add(get_perf_context()->get_from_output_files_time);
+      hist_num_memtable_checked.Add(get_perf_context()->get_from_memtable_count);
+      hist_get_post_process.Add(get_perf_context()->get_post_process_time);
+      hist_get.Add(get_perf_context()->user_key_comparison_count);
+
+      get_perf_context()->Reset();
+      auto statuses = db_->MultiGet(read_options, multiget_keys, &values);
+      for (const auto& s : statuses) {
+        ASSERT_OK(s);
+      }
+      hist_mget_snapshot.Add(get_perf_context()->get_snapshot_time);
+      hist_mget_memtable.Add(get_perf_context()->get_from_memtable_time);
+      hist_mget_files.Add(get_perf_context()->get_from_output_files_time);
+      hist_mget_num_memtable_checked.Add(get_perf_context()->get_from_memtable_count);
+      hist_mget_post_process.Add(get_perf_context()->get_post_process_time);
+      hist_mget.Add(get_perf_context()->user_key_comparison_count);
+    }
+
+    if (FLAGS_verbose) {
+      std::cout << "ReadOnly Get user key comparison: \n"
+                << hist_get.ToString()
+                << "ReadOnly MultiGet user key comparison: \n"
+                << hist_mget.ToString();
+
+      std::cout << "ReadOnly Get(): Time to get snapshot: \n"
+                << hist_get_snapshot.ToString()
+                << " Time to get value from memtables: \n"
+                << hist_get_memtable.ToString() << "\n"
+                << " Time to get value from output files: \n"
+                << hist_get_files.ToString() << "\n"
+                << " Number of memtables checked: \n"
+                << hist_num_memtable_checked.ToString() << "\n"
+                << " Time to post process: \n" << hist_get_post_process.ToString()
+                << "\n";
+
+      std::cout << "ReadOnly MultiGet(): Time to get snapshot: \n"
+                << hist_mget_snapshot.ToString()
+                << " Time to get value from memtables: \n"
+                << hist_mget_memtable.ToString() << "\n"
+                << " Time to get value from output files: \n"
+                << hist_mget_files.ToString() << "\n"
+                << " Number of memtables checked: \n"
+                << hist_mget_num_memtable_checked.ToString() << "\n"
+                << " Time to post process: \n"
+                << hist_mget_post_process.ToString() << "\n";
+    }
+
+    if (enabled_time) {
+      ASSERT_GT(hist_get.Average(), 0);
+      ASSERT_GT(hist_get_memtable.Average(), 0);
+      ASSERT_GT(hist_get_files.Average(), 0);
+      ASSERT_GT(hist_num_memtable_checked.Average(), 0);
+      // In read-only mode Get(), no super version operation is needed
+      ASSERT_EQ(hist_get_post_process.Average(), 0);
+      ASSERT_GT(hist_get_snapshot.Average(), 0);
+
+      ASSERT_GT(hist_mget.Average(), 0);
+      ASSERT_GT(hist_mget_snapshot.Average(), 0);
+      ASSERT_GT(hist_mget_memtable.Average(), 0);
+      ASSERT_GT(hist_mget_files.Average(), 0);
+      ASSERT_GT(hist_mget_post_process.Average(), 0);
+      ASSERT_GT(hist_mget_num_memtable_checked.Average(), 0);
+    }
+  }
+};
+
+TEST_F(PerfContextQueriesTest, KeyComparisonCount) {
   SetPerfLevel(kEnableCount);
   ProfileQueries();
 
@@ -518,8 +541,7 @@ TEST_F(PerfContextTest, KeyComparisonCount) {
 // starts to become linear to the input size.
 
 TEST_F(PerfContextTest, SeekKeyComparison) {
-  DestroyDB(kDbName, Options());
-  auto db = OpenDb();
+  OpenDb();
   WriteOptions write_options;
   ReadOptions read_options;
 
@@ -548,7 +570,7 @@ TEST_F(PerfContextTest, SeekKeyComparison) {
 
     get_perf_context()->Reset();
     timer.Start();
-    ASSERT_OK(db->Put(write_options, key, value));
+    ASSERT_OK(db_->Put(write_options, key, value));
     auto put_time = timer.ElapsedNanos();
     hist_put_time.Add(put_time);
     hist_wal_time.Add(get_perf_context()->write_wal_time);
@@ -568,7 +590,7 @@ TEST_F(PerfContextTest, SeekKeyComparison) {
     std::string key = "k" + ToString(i);
     std::string value = "v" + ToString(i);
 
-    std::unique_ptr<Iterator> iter(db->NewIterator(read_options));
+    std::unique_ptr<Iterator> iter(db_->NewIterator(read_options));
     get_perf_context()->Reset();
     iter->Seek(key);
     ASSERT_TRUE(iter->Valid());
@@ -576,7 +598,7 @@ TEST_F(PerfContextTest, SeekKeyComparison) {
     hist_seek.Add(get_perf_context()->user_key_comparison_count);
   }
 
-  std::unique_ptr<Iterator> iter(db->NewIterator(read_options));
+  std::unique_ptr<Iterator> iter(db_->NewIterator(read_options));
   for (iter->SeekToFirst(); iter->Valid();) {
     get_perf_context()->Reset();
     iter->Next();
@@ -652,53 +674,48 @@ TEST_F(PerfContextTest, ToString) {
 }
 
 TEST_F(PerfContextTest, MergeOperatorTime) {
-  DestroyDB(kDbName, Options());
-  DB* db;
   Options options;
   options.create_if_missing = true;
   options.merge_operator = MergeOperators::CreateStringAppendOperator();
-  Status s = DB::Open(options, kDbName, &db);
-  EXPECT_OK(s);
+  OpenDb(false, options);
 
   std::string val;
-  ASSERT_OK(db->Merge(WriteOptions(), "k1", "val1"));
-  ASSERT_OK(db->Merge(WriteOptions(), "k1", "val2"));
-  ASSERT_OK(db->Merge(WriteOptions(), "k1", "val3"));
-  ASSERT_OK(db->Merge(WriteOptions(), "k1", "val4"));
+  ASSERT_OK(db_->Merge(WriteOptions(), "k1", "val1"));
+  ASSERT_OK(db_->Merge(WriteOptions(), "k1", "val2"));
+  ASSERT_OK(db_->Merge(WriteOptions(), "k1", "val3"));
+  ASSERT_OK(db_->Merge(WriteOptions(), "k1", "val4"));
 
   SetPerfLevel(kEnableTime);
   get_perf_context()->Reset();
-  ASSERT_OK(db->Get(ReadOptions(), "k1", &val));
+  ASSERT_OK(db_->Get(ReadOptions(), "k1", &val));
 #ifdef OS_SOLARIS
   for (int i = 0; i < 100; i++) {
-    ASSERT_OK(db->Get(ReadOptions(), "k1", &val));
+    ASSERT_OK(db_->Get(ReadOptions(), "k1", &val));
   }
 #endif
   EXPECT_GT(get_perf_context()->merge_operator_time_nanos, 0);
 
-  ASSERT_OK(db->Flush(FlushOptions()));
+  ASSERT_OK(db_->Flush(FlushOptions()));
 
   get_perf_context()->Reset();
-  ASSERT_OK(db->Get(ReadOptions(), "k1", &val));
+  ASSERT_OK(db_->Get(ReadOptions(), "k1", &val));
 #ifdef OS_SOLARIS
   for (int i = 0; i < 100; i++) {
-    ASSERT_OK(db->Get(ReadOptions(), "k1", &val));
+    ASSERT_OK(db_->Get(ReadOptions(), "k1", &val));
   }
 #endif
   EXPECT_GT(get_perf_context()->merge_operator_time_nanos, 0);
 
-  ASSERT_OK(db->CompactRange(CompactRangeOptions(), nullptr, nullptr));
+  ASSERT_OK(db_->CompactRange(CompactRangeOptions(), nullptr, nullptr));
 
   get_perf_context()->Reset();
-  ASSERT_OK(db->Get(ReadOptions(), "k1", &val));
+  ASSERT_OK(db_->Get(ReadOptions(), "k1", &val));
 #ifdef OS_SOLARIS
   for (int i = 0; i < 100; i++) {
-    ASSERT_OK(db->Get(ReadOptions(), "k1", &val));
+    ASSERT_OK(db_->Get(ReadOptions(), "k1", &val));
   }
 #endif
   EXPECT_GT(get_perf_context()->merge_operator_time_nanos, 0);
-
-  delete db;
 }
 
 TEST_F(PerfContextTest, CopyAndMove) {
@@ -833,8 +850,7 @@ TEST_F(PerfContextTest, CPUTimer) {
     return;
   }
 
-  DestroyDB(kDbName, Options());
-  auto db = OpenDb();
+  OpenDb();
   WriteOptions write_options;
   ReadOptions read_options;
   SetPerfLevel(PerfLevel::kEnableTimeAndCPUTimeExceptForMutex);
@@ -846,7 +862,7 @@ TEST_F(PerfContextTest, CPUTimer) {
     std::string value = "v" + i_str;
     max_str = max_str > i_str ? max_str : i_str;
 
-    ASSERT_OK(db->Put(write_options, key, value));
+    ASSERT_OK(db_->Put(write_options, key, value));
   }
   std::string last_key = "k" + max_str;
   std::string last_value = "v" + max_str;
@@ -855,7 +871,7 @@ TEST_F(PerfContextTest, CPUTimer) {
     // Get
     get_perf_context()->Reset();
     std::string value;
-    ASSERT_OK(db->Get(read_options, "k0", &value));
+    ASSERT_OK(db_->Get(read_options, "k0", &value));
     ASSERT_EQ(value, "v0");
 
     if (FLAGS_verbose) {
@@ -864,7 +880,7 @@ TEST_F(PerfContextTest, CPUTimer) {
     }
 
     // Iter
-    std::unique_ptr<Iterator> iter(db->NewIterator(read_options));
+    std::unique_ptr<Iterator> iter(db_->NewIterator(read_options));
 
     // Seek
     get_perf_context()->Reset();
@@ -945,7 +961,7 @@ TEST_F(PerfContextTest, CPUTimer) {
 
     // iterator creation/destruction; multiple iterators
     {
-      std::unique_ptr<Iterator> iter2(db->NewIterator(read_options));
+      std::unique_ptr<Iterator> iter2(db_->NewIterator(read_options));
       ASSERT_EQ(count, get_perf_context()->iter_seek_cpu_nanos);
       iter2->Seek(last_key);
       ASSERT_TRUE(iter2->Valid());
@@ -987,10 +1003,6 @@ int main(int argc, char** argv) {
         (n == 0 || n == 1)) {
       FLAGS_verbose = n;
     }
-  }
-
-  if (FLAGS_verbose) {
-    std::cout << kDbName << "\n";
   }
 
   return RUN_ALL_TESTS();

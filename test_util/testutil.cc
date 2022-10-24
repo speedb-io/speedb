@@ -425,8 +425,12 @@ bool IsDirectIOSupported(Env* env, const std::string& dir) {
     std::unique_ptr<WritableFile> file;
     s = env->NewWritableFile(tmp, &file, env_options);
   }
+  // Delete even if file creation failed, since it doesn't always clean up
+  Status del_s = env->DeleteFile(tmp);
   if (s.ok()) {
-    s = env->DeleteFile(tmp);
+    s = del_s;
+  } else {
+    del_s.PermitUncheckedError();
   }
   return s.ok();
 }
@@ -446,7 +450,13 @@ bool IsPrefetchSupported(const std::shared_ptr<FileSystem>& fs,
       supported = !(file->Prefetch(0, data.size(), IOOptions(), nullptr)
                         .IsNotSupported());
     }
-    s = fs->DeleteFile(tmp, IOOptions(), nullptr);
+  }
+  // Delete even if file creation failed, since it doesn't always clean up
+  Status del_s = fs->DeleteFile(tmp, IOOptions(), nullptr);
+  if (s.ok()) {
+    s = del_s;
+  } else {
+    del_s.PermitUncheckedError();
   }
   return s.ok() && supported;
 }

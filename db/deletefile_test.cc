@@ -41,6 +41,7 @@ class DeleteFileTest : public DBTestBase {
 
   void SetOptions(Options* options) {
     ASSERT_NE(options, nullptr);
+    options->create_if_missing = true;
     options->delete_obsolete_files_period_micros = 0;  // always do full purge
     options->enable_thread_tracking = true;
     options->write_buffer_size = 1024 * 1024 * 1000;
@@ -142,9 +143,7 @@ class DeleteFileTest : public DBTestBase {
 TEST_F(DeleteFileTest, AddKeysAndQueryLevels) {
   Options options = CurrentOptions();
   SetOptions(&options);
-  Destroy(options);
-  options.create_if_missing = true;
-  Reopen(options);
+  DestroyAndReopen(options);
 
   CreateTwoLevels();
   std::vector<LiveFileMetaData> metadata;
@@ -193,9 +192,7 @@ TEST_F(DeleteFileTest, AddKeysAndQueryLevels) {
 TEST_F(DeleteFileTest, PurgeObsoleteFilesTest) {
   Options options = CurrentOptions();
   SetOptions(&options);
-  Destroy(options);
-  options.create_if_missing = true;
-  Reopen(options);
+  DestroyAndReopen(options);
 
   CreateTwoLevels();
   // there should be only one (empty) log file because CreateTwoLevels()
@@ -230,9 +227,7 @@ TEST_F(DeleteFileTest, PurgeObsoleteFilesTest) {
 TEST_F(DeleteFileTest, BackgroundPurgeIteratorTest) {
   Options options = CurrentOptions();
   SetOptions(&options);
-  Destroy(options);
-  options.create_if_missing = true;
-  Reopen(options);
+  DestroyAndReopen(options);
 
   std::string first("0"), last("999999");
   CompactRangeOptions compact_options;
@@ -316,9 +311,7 @@ TEST_F(DeleteFileTest, PurgeDuringOpen) {
 TEST_F(DeleteFileTest, BackgroundPurgeCFDropTest) {
   Options options = CurrentOptions();
   SetOptions(&options);
-  Destroy(options);
-  options.create_if_missing = true;
-  Reopen(options);
+  DestroyAndReopen(options);
 
   auto do_test = [&](bool bg_purge) {
     ColumnFamilyOptions co;
@@ -387,9 +380,7 @@ TEST_F(DeleteFileTest, BackgroundPurgeCFDropTest) {
 TEST_F(DeleteFileTest, BackgroundPurgeCopyOptions) {
   Options options = CurrentOptions();
   SetOptions(&options);
-  Destroy(options);
-  options.create_if_missing = true;
-  Reopen(options);
+  DestroyAndReopen(options);
 
   std::string first("0"), last("999999");
   CompactRangeOptions compact_options;
@@ -434,9 +425,7 @@ TEST_F(DeleteFileTest, BackgroundPurgeCopyOptions) {
 TEST_F(DeleteFileTest, BackgroundPurgeTestMultipleJobs) {
   Options options = CurrentOptions();
   SetOptions(&options);
-  Destroy(options);
-  options.create_if_missing = true;
-  Reopen(options);
+  DestroyAndReopen(options);
 
   std::string first("0"), last("999999");
   CompactRangeOptions compact_options;
@@ -484,9 +473,7 @@ TEST_F(DeleteFileTest, BackgroundPurgeTestMultipleJobs) {
 TEST_F(DeleteFileTest, DeleteFileWithIterator) {
   Options options = CurrentOptions();
   SetOptions(&options);
-  Destroy(options);
-  options.create_if_missing = true;
-  Reopen(options);
+  DestroyAndReopen(options);
 
   CreateTwoLevels();
   ReadOptions read_options;
@@ -521,9 +508,7 @@ TEST_F(DeleteFileTest, DeleteFileWithIterator) {
 TEST_F(DeleteFileTest, DeleteLogFiles) {
   Options options = CurrentOptions();
   SetOptions(&options);
-  Destroy(options);
-  options.create_if_missing = true;
-  Reopen(options);
+  DestroyAndReopen(options);
 
   AddKeys(10, 0);
   VectorLogPtr logfiles;
@@ -562,9 +547,7 @@ TEST_F(DeleteFileTest, DeleteLogFiles) {
 TEST_F(DeleteFileTest, DeleteNonDefaultColumnFamily) {
   Options options = CurrentOptions();
   SetOptions(&options);
-  Destroy(options);
-  options.create_if_missing = true;
-  Reopen(options);
+  DestroyAndReopen(options);
   CreateAndReopenWithCF({"new_cf"}, options);
 
   Random rnd(5);

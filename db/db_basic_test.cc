@@ -1089,7 +1089,6 @@ class TestEnv : public EnvWrapper {
    private:
     Status CloseHelper() {
       env->CloseCountInc();
-      ;
       return Status::IOError();
     }
     TestEnv* env;
@@ -1111,44 +1110,33 @@ class TestEnv : public EnvWrapper {
 
 TEST_F(DBBasicTest, DBClose) {
   Options options = GetDefaultOptions();
-  std::string dbname = test::PerThreadDBPath("db_close_test");
-  ASSERT_OK(DestroyDB(dbname, options));
 
-  DB* db = nullptr;
-  TestEnv* env = new TestEnv(env_);
-  std::unique_ptr<TestEnv> local_env_guard(env);
+  std::unique_ptr<TestEnv> env(new TestEnv(env_));
   options.create_if_missing = true;
-  options.env = env;
-  Status s = DB::Open(options, dbname, &db);
-  ASSERT_OK(s);
-  ASSERT_TRUE(db != nullptr);
+  options.env = env.get();
+  Reopen(options);
 
-  s = db->Close();
+  ASSERT_TRUE(db_->Close().IsIOError());
   ASSERT_EQ(env->GetCloseCount(), 1);
-  ASSERT_TRUE(s.IsIOError());
 
-  delete db;
+  Close();
   ASSERT_EQ(env->GetCloseCount(), 1);
 
   // Do not call DB::Close() and ensure our logger Close() still gets called
-  s = DB::Open(options, dbname, &db);
-  ASSERT_OK(s);
-  ASSERT_TRUE(db != nullptr);
-  delete db;
+  Reopen(options);
+  Close();
   ASSERT_EQ(env->GetCloseCount(), 2);
 
   // Provide our own logger and ensure DB::Close() does not close it
-  options.info_log.reset(new TestEnv::TestLogger(env));
+  options.info_log.reset(new TestEnv::TestLogger(env.get()));
   options.create_if_missing = false;
-  s = DB::Open(options, dbname, &db);
-  ASSERT_OK(s);
-  ASSERT_TRUE(db != nullptr);
+  Reopen(options);
 
-  s = db->Close();
-  ASSERT_OK(s);
-  delete db;
+  ASSERT_OK(db_->Close());
+  Close();
   ASSERT_EQ(env->GetCloseCount(), 2);
   options.info_log.reset();
+  last_options_.info_log.reset();
   ASSERT_EQ(env->GetCloseCount(), 3);
 }
 

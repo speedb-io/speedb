@@ -2270,6 +2270,7 @@ TEST_F(DBTest, DBOpen_Options) {
 
   delete db;
   db = nullptr;
+  ASSERT_OK(DestroyDB(dbname, options));
 }
 
 TEST_F(DBTest, DBOpen_Change_NumLevels) {
@@ -2323,9 +2324,9 @@ TEST_F(DBTest, DestroyDBMetaDatabase) {
 
   // Check if deletion worked.
   options.create_if_missing = false;
-  ASSERT_TRUE(!(DB::Open(options, dbname, &db)).ok());
-  ASSERT_TRUE(!(DB::Open(options, metadbname, &db)).ok());
-  ASSERT_TRUE(!(DB::Open(options, metametadbname, &db)).ok());
+  ASSERT_NOK(DB::Open(options, dbname, &db));
+  ASSERT_NOK(DB::Open(options, metadbname, &db));
+  ASSERT_NOK(DB::Open(options, metametadbname, &db));
 }
 
 #ifndef ROCKSDB_LITE
@@ -2477,6 +2478,7 @@ TEST_F(DBTest, SnapshotFiles) {
         ASSERT_EQ(info.file_number, manifest_number);
       }
     }
+    ASSERT_OK(DestroyDir(env_, snapdir));
   } while (ChangeCompactOptions());
 }
 
@@ -2747,6 +2749,9 @@ class MultiThreadedDBTest
   static std::vector<int> GenerateOptionConfigs() {
     std::vector<int> optionConfigs;
     for (int optionConfig = kDefault; optionConfig < kEnd; ++optionConfig) {
+      if (optionConfig == kPipelinedWrite) {
+        continue;
+      }
       optionConfigs.push_back(optionConfig);
     }
     return optionConfigs;
@@ -2756,7 +2761,6 @@ class MultiThreadedDBTest
 };
 
 TEST_P(MultiThreadedDBTest, MultiThreaded) {
-  if (option_config_ == kPipelinedWrite) return;
   anon::OptionsOverride options_override;
   options_override.skip_policy = kSkipNoSnapshot;
   Options options = CurrentOptions(options_override);
@@ -2764,7 +2768,7 @@ TEST_P(MultiThreadedDBTest, MultiThreaded) {
   for (int i = 1; i < kColumnFamilies; ++i) {
     cfs.push_back(ToString(i));
   }
-  Reopen(options);
+  DestroyAndReopen(options);
   CreateAndReopenWithCF(cfs, options);
   // Initialize state
   MTState mt;

@@ -269,12 +269,12 @@ class ComparatorDBTest
     toptions.format_version = GetParam();
     last_options_.table_factory.reset(
         ROCKSDB_NAMESPACE::NewBlockBasedTableFactory(toptions));
-    EXPECT_OK(DestroyDB(dbname_, last_options_));
+    Status s = DestroyDB(dbname_, last_options_);
+    EXPECT_TRUE(s.ok() || s.IsPathNotFound()) << s.ToString();
   }
 
   ~ComparatorDBTest() override {
-    delete db_;
-    EXPECT_OK(DestroyDB(dbname_, last_options_));
+    Destroy();
     kTestComparator = BytewiseComparator();
   }
 
@@ -300,9 +300,11 @@ class ComparatorDBTest
   }
 
   void Destroy() {
-    delete db_;
-    db_ = nullptr;
-    ASSERT_OK(DestroyDB(dbname_, last_options_));
+    if (db_ != nullptr) {
+      delete db_;
+      db_ = nullptr;
+      ASSERT_OK(DestroyDB(dbname_, last_options_));
+    }
   }
 
   Status TryReopen() {

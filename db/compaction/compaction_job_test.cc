@@ -97,6 +97,13 @@ class CompactionJobTestBase : public testing::Test {
     fs_ = env_->GetFileSystem();
   }
 
+  ~CompactionJobTestBase() {
+    if (versions_) {
+      versions_.reset();
+      EXPECT_OK(DestroyDB(dbname_, Options()));
+    }
+  }
+
   void SetUp() override {
     EXPECT_OK(env_->CreateDirIfMissing(dbname_));
     db_options_.env = env_;
@@ -271,7 +278,8 @@ class CompactionJobTestBase : public testing::Test {
   }
 
   void NewDB() {
-    EXPECT_OK(DestroyDB(dbname_, Options()));
+    Status s = DestroyDB(dbname_, Options());
+    EXPECT_TRUE(s.ok() || s.IsPathNotFound()) << s.ToString();
     EXPECT_OK(env_->CreateDirIfMissing(dbname_));
     versions_.reset(
         new VersionSet(dbname_, &db_options_, env_options_, table_cache_.get(),
@@ -289,7 +297,7 @@ class CompactionJobTestBase : public testing::Test {
     const std::string manifest = DescriptorFileName(dbname_, 1);
     std::unique_ptr<WritableFileWriter> file_writer;
     const auto& fs = env_->GetFileSystem();
-    Status s = WritableFileWriter::Create(
+    s = WritableFileWriter::Create(
         fs, manifest, fs->OptimizeForManifestWrite(env_options_), &file_writer,
         nullptr);
 

@@ -154,6 +154,7 @@ TEST_F(DBBlobBasicTest, MultiGetWithDirectIO) {
 
   Status s = TryReopen(options);
   if (s.IsInvalidArgument()) {
+    ASSERT_OK(env_->DeleteFile(file_path));
     ROCKSDB_GTEST_SKIP("This test requires direct IO support");
     return;
   }
@@ -220,6 +221,8 @@ TEST_F(DBBlobBasicTest, MultiGetWithDirectIO) {
     opts.ingest_behind = true;
     ASSERT_OK(
         db_->IngestExternalFile(db_->DefaultColumnFamily(), ext_files, opts));
+
+    ASSERT_OK(env_->DeleteFile(file_path));
   }
 
   // Now the database becomes as follows.
@@ -594,6 +597,7 @@ TEST_F(DBBlobBasicTest, GenerateIOTracing) {
     // Assuming blob files will have Append, Close and then Read operations.
     ASSERT_GT(blob_files_op_count, 2);
   }
+  ASSERT_OK(env_->DeleteFile(trace_file));
 }
 #endif  // !ROCKSDB_LITE
 

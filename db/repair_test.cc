@@ -143,6 +143,7 @@ TEST_F(RepairTest, IncompleteManifest) {
 
   ASSERT_EQ(Get("key"), "val");
   ASSERT_EQ(Get("key2"), "val2");
+  ASSERT_OK(env_->DeleteFile(orig_manifest_path + ".tmp"));
 }
 
 TEST_F(RepairTest, PostRepairSstFileNumbering) {
@@ -241,8 +242,6 @@ TEST_F(RepairTest, UnflushedSst) {
 
 TEST_F(RepairTest, SeparateWalDir) {
   do {
-    Options options = CurrentOptions();
-    DestroyAndReopen(options);
     ASSERT_OK(Put("key", "val"));
     ASSERT_OK(Put("foo", "bar"));
     VectorLogPtr wal_files;
@@ -260,9 +259,12 @@ TEST_F(RepairTest, SeparateWalDir) {
     Close();
     ASSERT_OK(env_->FileExists(manifest_path));
     ASSERT_OK(env_->DeleteFile(manifest_path));
+
+    Options options = last_options_;
     ASSERT_OK(RepairDB(dbname_, options));
 
     // make sure that all WALs are converted to SSTables.
+    const std::string last_wal_dir = options.wal_dir;
     options.wal_dir = "";
 
     Reopen(options);
@@ -277,6 +279,8 @@ TEST_F(RepairTest, SeparateWalDir) {
     ASSERT_EQ(Get("key"), "val");
     ASSERT_EQ(Get("foo"), "bar");
 
+    options.wal_dir = last_wal_dir;
+    Destroy(options);
  } while(ChangeWalOptions());
 }
 

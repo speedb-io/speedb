@@ -65,7 +65,7 @@ class BlobDBTest : public testing::Test {
     fault_injection_env_.reset(new FaultInjectionTestEnv(Env::Default()));
 
     Status s = DestroyBlobDB(dbname_, Options(), BlobDBOptions());
-    assert(s.ok());
+    assert(s.ok() || s.IsPathNotFound());
   }
 
   ~BlobDBTest() override {
@@ -802,6 +802,8 @@ TEST_F(BlobDBTest, SstFileManager) {
   // Make sure that DestroyBlobDB() also goes through delete scheduler.
   ASSERT_EQ(2, files_scheduled_to_delete);
   SyncPoint::GetInstance()->DisableProcessing();
+
+  sst_file_manager->SetDeleteRateBytesPerSecond(0);
   sfm->WaitForEmptyTrash();
 }
 
@@ -860,8 +862,9 @@ TEST_F(BlobDBTest, SstFileManagerRestart) {
     nfiles++;
   }
   ASSERT_EQ(nfiles, 1);
-
   SyncPoint::GetInstance()->DisableProcessing();
+
+  sst_file_manager->SetDeleteRateBytesPerSecond(0);
 }
 
 TEST_F(BlobDBTest, SnapshotAndGarbageCollection) {
@@ -1068,6 +1071,7 @@ TEST_F(BlobDBTest, MigrateFromPlainRocksDB) {
     }
   }
   delete db;
+  ASSERT_OK(DestroyBlobDB(dbname_, options, BlobDBOptions()));
 }
 
 // Test to verify that a NoSpace IOError Status is returned on reaching
@@ -2329,7 +2333,7 @@ TEST_F(BlobDBTest, ShutdownWait) {
 
   TEST_SYNC_POINT("BlobDBTest.ShutdownWait:2");
   TEST_SYNC_POINT("BlobDBTest.ShutdownWait:3");
-  Close();
+  Destroy();
 
   SyncPoint::GetInstance()->DisableProcessing();
 }

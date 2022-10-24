@@ -95,8 +95,10 @@ class CheckpointTest : public testing::Test {
     options.db_paths.emplace_back(dbname_ + "_2", 0);
     options.db_paths.emplace_back(dbname_ + "_3", 0);
     options.db_paths.emplace_back(dbname_ + "_4", 0);
-    EXPECT_OK(DestroyDB(dbname_, options));
-    EXPECT_OK(DestroyDB(snapshot_name_, options));
+    Status s = DestroyDB(dbname_, options);
+    EXPECT_TRUE(s.ok() || s.IsPathNotFound()) << s.ToString();
+    s = DestroyDB(snapshot_name_, options);
+    EXPECT_TRUE(s.ok() || s.IsPathNotFound()) << s.ToString();
     DestroyDir(env_, export_path_).PermitUncheckedError();
   }
 
@@ -751,6 +753,7 @@ TEST_F(CheckpointTest, CurrentFileModifiedWhileCheckpointing2PC) {
   delete snapshotDB;
   snapshotDB = nullptr;
   delete txdb;
+  ASSERT_OK(DestroyDB(dbname, options));
 }
 
 TEST_F(CheckpointTest, CheckpointInvalidDirectoryName) {

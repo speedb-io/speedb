@@ -572,7 +572,13 @@ class DBConstructor: public Constructor {
     db_ = nullptr;
     NewDB();
   }
-  ~DBConstructor() override { delete db_; }
+  ~DBConstructor() override {
+    if (db_ != nullptr) {
+      delete db_;
+      db_ = nullptr;
+      EXPECT_OK(DestroyDB(dbname_, options_));
+    }
+  }
   Status FinishImpl(const Options& /*options*/,
                     const ImmutableOptions& /*ioptions*/,
                     const MutableCFOptions& /*moptions*/,
@@ -604,17 +610,21 @@ class DBConstructor: public Constructor {
     Options options;
     options.comparator = comparator_;
     Status status = DestroyDB(name, options);
-    ASSERT_TRUE(status.ok()) << status.ToString();
+    ASSERT_TRUE(status.ok() || status.IsPathNotFound()) << status.ToString();
 
     options.create_if_missing = true;
     options.error_if_exists = true;
     options.write_buffer_size = 10000;  // Something small to force merging
     status = DB::Open(options, name, &db_);
     ASSERT_TRUE(status.ok()) << status.ToString();
+    dbname_ = name;
+    options_ = options;
   }
 
   const Comparator* comparator_;
   DB* db_;
+  std::string dbname_;
+  Options options_;
 };
 
 enum TestType {
@@ -4380,7 +4390,6 @@ TEST_F(PrefixTest, PrefixAndWholeKeyTest) {
 
   const std::string kDBPath = test::PerThreadDBPath("table_prefix_test");
   options.table_factory.reset(NewBlockBasedTableFactory(bbto));
-  ASSERT_OK(DestroyDB(kDBPath, options));
   ROCKSDB_NAMESPACE::DB* db;
   ASSERT_OK(ROCKSDB_NAMESPACE::DB::Open(options, kDBPath, &db));
 
@@ -4396,6 +4405,7 @@ TEST_F(PrefixTest, PrefixAndWholeKeyTest) {
   // Trigger compaction.
   ASSERT_OK(db->CompactRange(CompactRangeOptions(), nullptr, nullptr));
   delete db;
+  ASSERT_OK(DestroyDB(kDBPath, options));
   // In the second round, turn whole_key_filtering off and expect
   // rocksdb still works.
 }
@@ -4944,7 +4954,6 @@ TEST_P(BlockBasedTableTest, BadOptions) {
   const std::string kDBPath =
       test::PerThreadDBPath("block_based_table_bad_options_test");
   options.table_factory.reset(NewBlockBasedTableFactory(bbto));
-  ASSERT_OK(DestroyDB(kDBPath, options));
   ROCKSDB_NAMESPACE::DB* db;
   ASSERT_NOK(ROCKSDB_NAMESPACE::DB::Open(options, kDBPath, &db));
 

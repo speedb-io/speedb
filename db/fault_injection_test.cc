@@ -166,10 +166,11 @@ class FaultInjectionTest
 
     dbname_ = test::PerThreadDBPath("fault_test");
 
-    EXPECT_OK(DestroyDB(dbname_, options_));
+    Status s = DestroyDB(dbname_, options_);
+    EXPECT_TRUE(s.ok() || s.IsPathNotFound()) << s.ToString();
 
     options_.create_if_missing = true;
-    Status s = OpenDB();
+    s = OpenDB();
     options_.create_if_missing = false;
     return s;
   }
@@ -614,6 +615,7 @@ TEST_P(FaultInjectionTest, NoDuplicateTrailingEntries) {
     // Verify that only one version edit exists in the file.
     ASSERT_EQ(1, count);
   }
+  ASSERT_OK(env_->DeleteFile(file_name));
 }
 
 INSTANTIATE_TEST_CASE_P(

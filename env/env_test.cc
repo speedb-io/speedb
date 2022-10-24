@@ -345,6 +345,7 @@ TEST_F(EnvPosixTest, MemoryMappedFileBuffer) {
   std::string actual_data(reinterpret_cast<const char*>(mmap_buffer->GetBase()),
                           mmap_buffer->GetLen());
   ASSERT_EQ(expected_data, actual_data);
+  ASSERT_OK(env_->DeleteFile(fname));
 }
 
 #ifndef ROCKSDB_NO_DYNAMIC_EXTENSION
@@ -977,7 +978,8 @@ TEST_F(EnvPosixTest, PositionedAppend) {
   options.use_direct_writes = true;
   options.use_mmap_writes = false;
   IoctlFriendlyTmpdir ift;
-  ASSERT_OK(env_->NewWritableFile(ift.name() + "/f", &writable_file, options));
+  const std::string fname = ift.name() + "/f";
+  ASSERT_OK(env_->NewWritableFile(fname, &writable_file, options));
   const size_t kBlockSize = 4096;
   const size_t kDataSize = kPageSize;
   // Write a page worth of 'a'
@@ -993,7 +995,7 @@ TEST_F(EnvPosixTest, PositionedAppend) {
 
   // Verify the above
   std::unique_ptr<SequentialFile> seq_file;
-  ASSERT_OK(env_->NewSequentialFile(ift.name() + "/f", &seq_file, options));
+  ASSERT_OK(env_->NewSequentialFile(fname, &seq_file, options));
   size_t scratch_len = kPageSize * 2;
   std::unique_ptr<char[]> scratch(new char[scratch_len]);
   Slice result;
@@ -1001,6 +1003,7 @@ TEST_F(EnvPosixTest, PositionedAppend) {
   ASSERT_EQ(kPageSize + kBlockSize, result.size());
   ASSERT_EQ('a', result[kBlockSize - 1]);
   ASSERT_EQ('b', result[kBlockSize]);
+  ASSERT_OK(env_->DeleteFile(fname));
 }
 #endif  // !ROCKSDB_LITE
 
@@ -1080,6 +1083,7 @@ TEST_P(EnvPosixTestWithParam, AllocateTest) {
     ASSERT_OK(env_->DeleteFile(fname_test_fallocate));
     if (alloc_status != 0 && err_number == EOPNOTSUPP) {
       // The filesystem containing the file does not support fallocate
+      ASSERT_OK(env_->DeleteFile(fname));
       return;
     }
 
@@ -1121,6 +1125,7 @@ TEST_P(EnvPosixTestWithParam, AllocateTest) {
     // and expect the number of blocks to be less or equal to that.
     ASSERT_GE((f_stat.st_size + kPageSize + kBlockSize - 1) / kBlockSize,
               (unsigned int)f_stat.st_blocks);
+    ASSERT_OK(env_->DeleteFile(fname));
   }
 }
 #endif  // ROCKSDB_FALLOCATE_PRESENT
@@ -1298,6 +1303,7 @@ TEST_P(EnvPosixTestWithParam, MultiRead) {
     }
     ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->DisableProcessing();
   }
+  ASSERT_OK(env_->DeleteFile(fname));
 }
 
 TEST_F(EnvPosixTest, MultiReadNonAlignedLargeNum) {
@@ -1390,6 +1396,7 @@ TEST_F(EnvPosixTest, MultiReadNonAlignedLargeNum) {
 
     ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->DisableProcessing();
   }
+  ASSERT_OK(env_->DeleteFile(fname));
 }
 
 #if defined(ROCKSDB_IOURING_PRESENT)
@@ -1462,6 +1469,7 @@ TEST_F(EnvPosixTest, MultiReadIOUringError) {
 
   SyncPoint::GetInstance()->DisableProcessing();
   SyncPoint::GetInstance()->ClearAllCallBacks();
+  ASSERT_OK(env_->DeleteFile(fname));
 }
 
 TEST_F(EnvPosixTest, MultiReadIOUringError2) {
@@ -1504,6 +1512,7 @@ TEST_F(EnvPosixTest, MultiReadIOUringError2) {
 
   SyncPoint::GetInstance()->DisableProcessing();
   SyncPoint::GetInstance()->ClearAllCallBacks();
+  ASSERT_OK(env_->DeleteFile(fname));
 }
 #endif  // ROCKSDB_IOURING_PRESENT
 
@@ -1749,6 +1758,7 @@ TEST_P(EnvPosixTestWithParam, Preallocation) {
       ASSERT_EQ(last_allocated_block, 7UL);
     }
     ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->ClearTrace();
+    ASSERT_OK(env_->DeleteFile(src));
 }
 
 // Test that the two ways to get children file attributes (in bulk or
@@ -1795,8 +1805,10 @@ TEST_P(EnvPosixTestWithParam, ConsistentChildrenAttributes) {
       ASSERT_OK(env_->GetFileSize(path, &size));
       ASSERT_EQ(size, 4096 * i);
       ASSERT_EQ(size, file_attrs_iter->size_bytes);
+      ASSERT_OK(env_->DeleteFile(path));
     }
     ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->ClearTrace();
+    ASSERT_OK(env_->DeleteDir(test_base_dir));
 }
 
 // Test that all WritableFileWrapper forwards all calls to WritableFile.
@@ -2188,6 +2200,10 @@ class TestEnv : public EnvWrapper {
 class EnvTest : public testing::Test {
  public:
   EnvTest() : test_directory_(test::PerThreadDBPath("env_test")) {}
+  ~EnvTest() {
+    Status s = Env::Default()->DeleteDir(test_directory_);
+    EXPECT_TRUE(s.ok() || s.IsPathNotFound());
+  }
 
  protected:
   const std::string test_directory_;
@@ -2368,8 +2384,8 @@ TEST_F(EnvTest, MultipleCompositeEnv) {
 TEST_F(EnvTest, IsDirectory) {
   Status s = Env::Default()->CreateDirIfMissing(test_directory_);
   ASSERT_OK(s);
-  const std::string test_sub_dir = test_directory_ + "sub1";
-  const std::string test_file_path = test_directory_ + "file1";
+  const std::string test_sub_dir = test_directory_ + "/sub1";
+  const std::string test_file_path = test_directory_ + "/file1";
   ASSERT_OK(Env::Default()->CreateDirIfMissing(test_sub_dir));
   bool is_dir = false;
   ASSERT_OK(Env::Default()->IsDirectory(test_sub_dir, &is_dir));
@@ -2389,11 +2405,13 @@ TEST_F(EnvTest, IsDirectory) {
   }
   ASSERT_OK(Env::Default()->IsDirectory(test_file_path, &is_dir));
   ASSERT_FALSE(is_dir);
+  ASSERT_OK(Env::Default()->DeleteFile(test_file_path));
+  ASSERT_OK(Env::Default()->DeleteDir(test_sub_dir));
 }
 
 TEST_F(EnvTest, EnvWriteVerificationTest) {
   Status s = Env::Default()->CreateDirIfMissing(test_directory_);
-  const std::string test_file_path = test_directory_ + "file1";
+  const std::string test_file_path = test_directory_ + "/file1";
   ASSERT_OK(s);
   std::shared_ptr<FaultInjectionTestFS> fault_fs(
       new FaultInjectionTestFS(FileSystem::Default()));
@@ -2411,6 +2429,7 @@ TEST_F(EnvTest, EnvWriteVerificationTest) {
   v_info.checksum = Slice(checksum);
   s = file->Append(Slice(test_data), v_info);
   ASSERT_OK(s);
+  ASSERT_OK(Env::Default()->DeleteFile(test_file_path));
 }
 
 class CreateEnvTest : public testing::Test {
@@ -3309,6 +3328,8 @@ TEST_F(TestAsyncRead, ReadAsync) {
       del_fn(io_handles[i]);
     }
   }
+
+  ASSERT_OK(fs->DeleteFile(fname, IOOptions(), nullptr));
 }
 }  // namespace ROCKSDB_NAMESPACE
 

@@ -1371,6 +1371,7 @@ TEST_F(DBSecondaryCacheTest, LRUCacheDumpLoadBasic) {
   ASSERT_EQ(256, static_cast<int>(block_lookup));
 
   fault_fs_->SetFailGetUniqueId(false);
+  ASSERT_OK(env_->DeleteFile(dump_path));
   Destroy(options);
 }
 
@@ -1538,6 +1539,7 @@ TEST_F(DBSecondaryCacheTest, LRUCacheDumpLoadWithFilter) {
   ASSERT_EQ(256, static_cast<int>(block_lookup));
   fault_fs_->SetFailGetUniqueId(false);
   fault_fs_->SetFilesystemActive(true);
+  ASSERT_OK(env_->DeleteFile(dump_path));
   delete db1;
   delete db2;
   ASSERT_OK(DestroyDB(dbname1, options));

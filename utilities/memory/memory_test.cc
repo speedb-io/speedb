@@ -24,7 +24,11 @@ class MemoryTest : public testing::Test {
     assert(Env::Default()->CreateDirIfMissing(kDbDir).ok());
   }
 
-  std::string GetDBName(int id) { return kDbDir + "db_" + ToString(id); }
+  ~MemoryTest() {
+    EXPECT_OK(Env::Default()->DeleteDir(kDbDir));
+  }
+
+  std::string GetDBName(int id) { return kDbDir + "/db_" + ToString(id); }
 
   void UpdateUsagesHistory(const std::vector<DB*>& dbs) {
     std::map<MemoryUtil::UsageType, uint64_t> usage_by_type;
@@ -104,7 +108,6 @@ TEST_F(MemoryTest, SharedBlockCacheTotal) {
   BlockBasedTableOptions bbt_opts;
   bbt_opts.block_cache = NewLRUCache(4096 * 1000 * 10);
   for (int i = 0; i < kNumDBs; ++i) {
-    ASSERT_OK(DestroyDB(GetDBName(i), opt));
     DB* db = nullptr;
     ASSERT_OK(DB::Open(opt, GetDBName(i), &db));
     dbs.push_back(db);
@@ -138,6 +141,7 @@ TEST_F(MemoryTest, SharedBlockCacheTotal) {
   }
   for (int i = 0; i < kNumDBs; ++i) {
     delete dbs[i];
+    ASSERT_OK(DestroyDB(GetDBName(i), opt));
   }
 }
 
@@ -165,7 +169,6 @@ TEST_F(MemoryTest, MemTableAndTableReadersTotal) {
   };
 
   for (int i = 0; i < kNumDBs; ++i) {
-    ASSERT_OK(DestroyDB(GetDBName(i), opt));
     std::vector<ColumnFamilyHandle*> handles;
     dbs.emplace_back();
     vec_handles.emplace_back();
@@ -255,6 +258,7 @@ TEST_F(MemoryTest, MemTableAndTableReadersTotal) {
       delete handle;
     }
     delete dbs[i];
+    ASSERT_OK(DestroyDB(GetDBName(i), opt));
   }
 }
 }  // namespace ROCKSDB_NAMESPACE

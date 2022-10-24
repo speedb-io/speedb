@@ -116,6 +116,7 @@ TEST_F(CompactFilesTest, L0ConflictsFiles) {
   }
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->DisableProcessing();
   delete db;
+  ASSERT_OK(DestroyDB(db_name_, options));
 }
 
 TEST_F(CompactFilesTest, MultipleLevel) {
@@ -191,6 +192,7 @@ TEST_F(CompactFilesTest, MultipleLevel) {
   thread.join();
 
   delete db;
+  ASSERT_OK(DestroyDB(db_name_, options));
 }
 
 TEST_F(CompactFilesTest, ObsoleteFiles) {
@@ -231,6 +233,7 @@ TEST_F(CompactFilesTest, ObsoleteFiles) {
     ASSERT_TRUE(env_->FileExists(fname).IsNotFound());
   }
   delete db;
+  ASSERT_OK(DestroyDB(db_name_, options));
 }
 
 TEST_F(CompactFilesTest, NotCutOutputOnLevel0) {
@@ -273,6 +276,7 @@ TEST_F(CompactFilesTest, NotCutOutputOnLevel0) {
   ASSERT_OK(db->CompactFiles(CompactionOptions(), l0_files_2, 0));
   // no assertion failure
   delete db;
+  ASSERT_OK(DestroyDB(db_name_, options));
 }
 
 TEST_F(CompactFilesTest, CapturingPendingFiles) {
@@ -332,6 +336,7 @@ TEST_F(CompactFilesTest, CapturingPendingFiles) {
   ASSERT_OK(s);
   assert(db);
   delete db;
+  ASSERT_OK(DestroyDB(db_name_, options));
 }
 
 TEST_F(CompactFilesTest, CompactionFilterWithGetSv) {
@@ -387,6 +392,7 @@ TEST_F(CompactFilesTest, CompactionFilterWithGetSv) {
 
 
   delete db;
+  ASSERT_OK(DestroyDB(db_name_, options));
 }
 
 TEST_F(CompactFilesTest, SentinelCompressionType) {
@@ -438,6 +444,7 @@ TEST_F(CompactFilesTest, SentinelCompressionType) {
                 name_and_table_props.second->compression_name);
     }
     delete db;
+    ASSERT_OK(DestroyDB(db_name_, options));
   }
 }
 
@@ -485,6 +492,7 @@ TEST_F(CompactFilesTest, GetCompactionJobInfo) {
   ASSERT_OK(compaction_job_info.status);
   // no assertion failure
   delete db;
+  ASSERT_OK(DestroyDB(db_name_, options));
 }
 
 }  // namespace ROCKSDB_NAMESPACE

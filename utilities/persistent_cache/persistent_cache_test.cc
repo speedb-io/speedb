@@ -414,7 +414,7 @@ void PersistentCacheDBTest::RunTest(
     options.create_if_missing = true;
     DestroyAndReopen(options);
 
-    ASSERT_OK(pcache->Close());
+    ASSERT_OK(pcache->CloseAndPurge());
   }
 }
 

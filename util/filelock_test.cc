@@ -30,7 +30,10 @@ class LockTest : public testing::Test {
     current_ = this;
   }
 
-  ~LockTest() override {}
+  ~LockTest() override {
+    Status s = env_->DeleteFile(file_);
+    EXPECT_TRUE(s.ok() || s.IsPathNotFound());
+  }
 
   Status LockFile(FileLock** db_lock) {
     return env_->LockFile(file_, db_lock);

@@ -66,6 +66,13 @@ class DBWALTest : public DBWALTestBase {
 class EnrichedSpecialEnv : public SpecialEnv {
  public:
   explicit EnrichedSpecialEnv(Env* base) : SpecialEnv(base) {}
+  ~EnrichedSpecialEnv() {
+    InstrumentedMutexLock l(&env_mutex_);
+    if (!skipped_wal.empty()) {
+      EXPECT_OK(SpecialEnv::DeleteFile(skipped_wal));
+    }
+    skipped_wal.clear();
+  }
   Status NewSequentialFile(const std::string& f,
                            std::unique_ptr<SequentialFile>* r,
                            const EnvOptions& soptions) override {
@@ -670,12 +677,9 @@ TEST_F(DBWALTest, IgnoreRecoveredLog) {
 
   do {
     // delete old files in backup_logs directory
+    ASSERT_OK(DestroyDir(env_, backup_logs));
     ASSERT_OK(env_->CreateDirIfMissing(backup_logs));
-    std::vector<std::string> old_files;
-    ASSERT_OK(env_->GetChildren(backup_logs, &old_files));
-    for (auto& file : old_files) {
-      ASSERT_OK(env_->DeleteFile(backup_logs + "/" + file));
-    }
+
     Options options = CurrentOptions();
     options.create_if_missing = true;
     options.merge_operator = MergeOperators::CreateUInt64AddOperator();
@@ -738,6 +742,7 @@ TEST_F(DBWALTest, IgnoreRecoveredLog) {
       // we won't be needing this file no more
       ASSERT_OK(env_->DeleteFile(backup_logs + "/" + log));
     }
+    ASSERT_OK(env_->DeleteDir(backup_logs));
     Status s = TryReopen(options);
     ASSERT_NOK(s);
     Destroy(options);

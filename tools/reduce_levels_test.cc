@@ -26,6 +26,10 @@ public:
     db_ = nullptr;
   }
 
+  ~ReduceLevelTest() {
+    EXPECT_OK(DestroyDB(dbname_, Options()));
+  }
+
   Status OpenDB(bool create_if_missing, int levels);
 
   Status Put(const std::string& k, const std::string& v) {

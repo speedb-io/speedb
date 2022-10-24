@@ -215,6 +215,7 @@ TEST_F(SimCacheTest, SimCacheLogging) {
   // error margin of 100 bytes
   ASSERT_LT(fsize, max_size + 100);
   ASSERT_GT(fsize, max_size - 100);
+  ASSERT_OK(env_->DeleteFile(log_file));
 }
 
 }  // namespace ROCKSDB_NAMESPACE

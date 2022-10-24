@@ -177,6 +177,7 @@ TEST_F(PeriodicWorkSchedulerTest, MultiInstances) {
   int half = kInstanceNum / 2;
   for (int i = 0; i < half; i++) {
     delete dbs[i];
+    ASSERT_OK(DestroyDB(test::PerThreadDBPath(std::to_string(i)), options));
   }
 
   expected_run += (kInstanceNum - half) * 2;
@@ -191,6 +192,7 @@ TEST_F(PeriodicWorkSchedulerTest, MultiInstances) {
   for (int i = half; i < kInstanceNum; i++) {
     ASSERT_OK(dbs[i]->Close());
     delete dbs[i];
+    ASSERT_OK(DestroyDB(test::PerThreadDBPath(std::to_string(i)), options));
   }
 }
 
@@ -224,6 +226,7 @@ TEST_F(PeriodicWorkSchedulerTest, MultiEnv) {
 
   ASSERT_OK(db->Close());
   delete db;
+  ASSERT_OK(DestroyDB(dbname, options2));
   Close();
 }
 #endif  // !ROCKSDB_LITE

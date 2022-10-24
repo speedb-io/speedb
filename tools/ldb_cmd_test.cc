@@ -923,6 +923,7 @@ TEST_F(LdbCmdTest, LoadCFOptionsAndOverride) {
   ASSERT_EQ(options.num_levels, opts.num_levels);
   ASSERT_EQ(column_families[1].options.num_levels, cf_opts.num_levels);
   ASSERT_EQ(column_families[1].options.write_buffer_size, 268435456);
+  ASSERT_OK(DestroyDB(dbname, opts));
 }
 
 TEST_F(LdbCmdTest, UnsafeRemoveSstFile) {
@@ -1027,6 +1028,7 @@ TEST_F(LdbCmdTest, UnsafeRemoveSstFile) {
     delete h;
   }
   delete db;
+  ASSERT_OK(DestroyDB(dbname, opts));
 }
 
 TEST_F(LdbCmdTest, FileTemperatureUpdateManifest) {
@@ -1112,6 +1114,7 @@ TEST_F(LdbCmdTest, FileTemperatureUpdateManifest) {
     ASSERT_EQ(r.second, number_to_temp[r.first]);
   }
   delete db;
+  ASSERT_OK(DestroyDB(dbname, opts));
 }
 
 TEST_F(LdbCmdTest, RenameDbAndLoadOptions) {

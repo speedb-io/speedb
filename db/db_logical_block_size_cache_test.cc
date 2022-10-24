@@ -452,6 +452,8 @@ TEST_F(DBLogicalBlockSizeCacheTest, MultiDBWithDifferentPaths) {
   delete db1;
   ASSERT_EQ(0, cache_->Size());
   ASSERT_OK(DestroyDB(data_path_1_, options, {{"cf", cf_options1}}));
+
+  ASSERT_OK(env_->DeleteDir(dbname_));
 }
 
 TEST_F(DBLogicalBlockSizeCacheTest, MultiDBWithSamePaths) {
@@ -509,6 +511,8 @@ TEST_F(DBLogicalBlockSizeCacheTest, MultiDBWithSamePaths) {
   delete db1;
   ASSERT_EQ(0, cache_->Size());
   ASSERT_OK(DestroyDB(dbname_ + "/db1", options, {{"cf", cf_options}}));
+
+  ASSERT_OK(env_->DeleteDir(dbname_));
 }
 
 }  // namespace ROCKSDB_NAMESPACE

@@ -105,17 +105,38 @@ DBTestBase::~DBTestBase() {
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->LoadDependency({});
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->ClearAllCallBacks();
   Close();
+
+  // Copy all paths from the last options in order to use them in DestroyDB
   Options options;
-  options.db_paths.emplace_back(dbname_, 0);
-  options.db_paths.emplace_back(dbname_ + "_2", 0);
-  options.db_paths.emplace_back(dbname_ + "_3", 0);
-  options.db_paths.emplace_back(dbname_ + "_4", 0);
-  options.env = env_;
+  options.db_paths = last_options_.db_paths;
+  options.cf_paths = last_options_.cf_paths;
+  options.wal_dir = last_options_.wal_dir;
+  options.db_log_dir = last_options_.db_log_dir;
+
+  // Reset last_options_ in order to release shared pointers etc. before freeing
+  // env_ below, as some of these objects depend on it.
+  last_options_ = Options();
 
   if (getenv("KEEP_DB")) {
     printf("DB is still at %s\n", dbname_.c_str());
   } else {
-    EXPECT_OK(DestroyDB(dbname_, options));
+    std::unordered_set<std::string> paths;
+    for (const auto& path : options.db_paths) {
+      paths.insert(path.path);
+    }
+    if (paths.find(dbname_) == paths.end()) {
+      options.db_paths.emplace_back(dbname_, 0);
+    }
+    for (int i = 2; i <= 4; ++i) {
+      std::string p = dbname_ + "_" + std::to_string(i);
+      if (paths.find(p) == paths.end()) {
+        options.db_paths.emplace_back(p, 0);
+      }
+    }
+    options.env = env_;
+
+    Status s = DestroyDB(dbname_, options);
+    EXPECT_TRUE(s.ok() || s.IsPathNotFound()) << s.ToString();
   }
   delete env_;
 }
@@ -671,6 +692,10 @@ void DBTestBase::Reopen(const Options& options) {
 }
 
 void DBTestBase::Close() {
+  if (db_ == nullptr) {
+    ASSERT_EQ(handles_.size(), 0);
+    return;
+  }
   for (auto h : handles_) {
     EXPECT_OK(db_->DestroyColumnFamilyHandle(h));
   }

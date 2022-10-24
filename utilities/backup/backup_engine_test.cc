@@ -613,18 +613,18 @@ class BackupEngineTest : public testing::Test {
 
   BackupEngineTest() {
     // set up files
-    std::string db_chroot = test::PerThreadDBPath("db_for_backup");
-    std::string backup_chroot = test::PerThreadDBPath("db_backups");
-    EXPECT_OK(Env::Default()->CreateDirIfMissing(db_chroot));
-    EXPECT_OK(Env::Default()->CreateDirIfMissing(backup_chroot));
+    db_chroot_ = test::PerThreadDBPath("db_for_backup");
+    backup_chroot_ = test::PerThreadDBPath("db_backups");
+    EXPECT_OK(Env::Default()->CreateDirIfMissing(db_chroot_));
+    EXPECT_OK(Env::Default()->CreateDirIfMissing(backup_chroot_));
     dbname_ = "/tempdb";
     backupdir_ = "/tempbk";
     latest_backup_ = backupdir_ + "/LATEST_BACKUP";
 
     // set up FileSystem & Envs
-    db_chroot_fs_ = NewChrootFileSystem(FileSystem::Default(), db_chroot);
+    db_chroot_fs_ = NewChrootFileSystem(FileSystem::Default(), db_chroot_);
     backup_chroot_fs_ =
-        NewChrootFileSystem(FileSystem::Default(), backup_chroot);
+        NewChrootFileSystem(FileSystem::Default(), backup_chroot_);
     test_db_fs_ = std::make_shared<TestFs>(db_chroot_fs_);
     test_backup_fs_ = std::make_shared<TestFs>(backup_chroot_fs_);
     SetEnvsFromFileSystems();
@@ -664,6 +664,16 @@ class BackupEngineTest : public testing::Test {
     backup_chroot_env_->DeleteFile(latest_backup_).PermitUncheckedError();
   }
 
+  ~BackupEngineTest() {
+    if (getenv("KEEP_DB") == nullptr) {
+      CloseDBAndBackupEngine();
+      EXPECT_OK(DestroyDir(backup_chroot_env_.get(), backupdir_));
+      EXPECT_OK(DestroyDB(dbname_, options_));
+      EXPECT_OK(Env::Default()->DeleteDir(db_chroot_));
+      EXPECT_OK(Env::Default()->DeleteDir(backup_chroot_));
+    }
+  }
+
   void SetEnvsFromFileSystems() {
     db_chroot_env_.reset(
         new CompositeEnvWrapper(Env::Default(), db_chroot_fs_));
@@ -682,6 +692,7 @@ class BackupEngineTest : public testing::Test {
     // Create logger
     DBOptions logger_options;
     logger_options.env = db_chroot_env_.get();
+    logger_options.create_if_missing = true;
     ASSERT_OK(CreateLoggerFromOptions(dbname_, logger_options, &logger_));
   }
 
@@ -960,6 +971,9 @@ class BackupEngineTest : public testing::Test {
     }
     ASSERT_GE(found_count, minimum_count);
   }
+
+  std::string db_chroot_;
+  std::string backup_chroot_;
 
   // files
   std::string dbname_;
@@ -3547,6 +3561,7 @@ TEST_F(BackupEngineTest, Concurrency) {
                 AssertEmpty(restored, factor * keys_iteration,
                             (factor + 1) * keys_iteration);
                 delete restored;
+                ASSERT_OK(DestroyDB(restore_db_dir, db_opts));
               });
 
           // (Ok now) Restore one of the backups, or "latest"
@@ -4121,6 +4136,8 @@ TEST_F(BackupEngineTest, FileTemperatures) {
 
     // Delete backup to force next backup to copy files
     ASSERT_OK(backup_engine_->PurgeOldBackups(0));
+
+    ASSERT_OK(DestroyDir(test_db_env_.get(), restore_dir));
   }
 }
 

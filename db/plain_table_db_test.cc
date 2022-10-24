@@ -117,7 +117,8 @@ class PlainTableDBTest : public testing::Test,
   void SetUp() override {
     mmap_mode_ = GetParam();
     dbname_ = test::PerThreadDBPath("plain_table_db_test");
-    EXPECT_OK(DestroyDB(dbname_, Options()));
+    Status s = DestroyDB(dbname_, Options());
+    EXPECT_TRUE(s.ok() || s.IsPathNotFound());
     db_ = nullptr;
     Reopen();
   }

@@ -1710,6 +1710,10 @@ TEST_P(DBBlockCacheKeyTest, StableCacheKeys) {
   verify_stats();
 #endif  // !ROCKSDB_LITE
 
+  for (const auto& f : external) {
+    ASSERT_OK(env_->DeleteFile(f));
+  }
+
   Close();
   Destroy(options);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->DisableProcessing();

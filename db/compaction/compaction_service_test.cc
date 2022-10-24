@@ -150,6 +150,13 @@ class CompactionServiceTest : public DBTestBase {
   explicit CompactionServiceTest()
       : DBTestBase("compaction_service_test", true) {}
 
+  ~CompactionServiceTest() {
+    if (getenv("KEEP_DB") == nullptr) {
+      Destroy(last_options_);
+      EXPECT_OK(DestroyDir(env_, dbname_));
+    }
+  }
+
  protected:
   void ReopenWithCompactionService(Options* options) {
     options->env = env_;

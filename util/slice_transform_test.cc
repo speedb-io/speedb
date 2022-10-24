@@ -54,7 +54,8 @@ class SliceTransformDBTest : public testing::Test {
  public:
   SliceTransformDBTest() : env_(Env::Default()), db_(nullptr) {
     dbname_ = test::PerThreadDBPath("slice_transform_db_test");
-    EXPECT_OK(DestroyDB(dbname_, last_options_));
+    Status s = DestroyDB(dbname_, last_options_);
+    EXPECT_TRUE(s.ok() || s.IsPathNotFound()) << s.ToString();
   }
 
   ~SliceTransformDBTest() override {

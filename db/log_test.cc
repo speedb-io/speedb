@@ -730,6 +730,11 @@ class RetriableLogTest : public ::testing::TestWithParam<int> {
     log_writer_.reset(new Writer(std::move(wfw), 123, GetParam()));
   }
 
+  ~RetriableLogTest() {
+    EXPECT_OK(env_->DeleteFile(log_file_));
+    EXPECT_OK(env_->DeleteDir(test_dir_));
+  }
+
   Status SetupTestEnv() {
     Status s;
     FileOptions fopts;

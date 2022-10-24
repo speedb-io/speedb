@@ -5540,6 +5540,7 @@ TEST_P(DBCompactionTestWithParam, FixFileIngestionCompactionDeadlock) {
   ingestion_thr.join();
   ASSERT_OK(dbfull()->TEST_WaitForCompact());
   Close();
+  ASSERT_OK(DestroyDir(env_, sst_files_dir));
 }
 
 TEST_F(DBCompactionTest, ConsistencyFailTest) {
@@ -5632,6 +5633,7 @@ void IngestOneKeyValue(DBImpl* db, const std::string& key,
   IngestExternalFileOptions ingest_opt;
 
   ASSERT_OK(db->IngestExternalFile({info.file_path}, ingest_opt));
+  ASSERT_OK(options.env->DeleteFile(info.file_path));
 }
 
 TEST_P(DBCompactionTestWithParam,

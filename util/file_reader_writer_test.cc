@@ -298,6 +298,7 @@ TEST_F(DBWritableFileWriterTest, AppendWithChecksum) {
   }
   ASSERT_OK(file_writer->Close());
   Destroy(options);
+  ASSERT_OK(Env::Default()->DeleteFile(fname));
 }
 
 TEST_F(DBWritableFileWriterTest, AppendVerifyNoChecksum) {
@@ -340,6 +341,7 @@ TEST_F(DBWritableFileWriterTest, AppendVerifyNoChecksum) {
   }
   ASSERT_OK(file_writer->Close());
   Destroy(options);
+  ASSERT_OK(Env::Default()->DeleteFile(fname));
 }
 
 TEST_F(DBWritableFileWriterTest, AppendWithChecksumRateLimiter) {
@@ -385,6 +387,7 @@ TEST_F(DBWritableFileWriterTest, AppendWithChecksumRateLimiter) {
   uint64_t elapsed = fault_env_->NowMicros() - start;
   double raw_rate = bytes_written * 1000000.0 / elapsed;
   ASSERT_OK(file_writer->Close());
+  ASSERT_OK(Env::Default()->DeleteFile(fname));
 
   // Set the rate-limiter
   FileOptions file_options1 = FileOptions();
@@ -419,6 +422,7 @@ TEST_F(DBWritableFileWriterTest, AppendWithChecksumRateLimiter) {
   }
 
   Destroy(options);
+  ASSERT_OK(Env::Default()->DeleteFile(fname));
 }
 
 #ifndef ROCKSDB_LITE

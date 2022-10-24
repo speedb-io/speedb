@@ -85,7 +85,8 @@ TEST_F(OptionsUtilTest, SaveAndLoad) {
         exact, cf_opts[i], loaded_cf_descs[i].options));
   }
 
-  ASSERT_OK(DestroyDB(dbname_, Options(db_opt, cf_opts[0])));
+  Status s = DestroyDB(dbname_, Options(db_opt, cf_opts[0]));
+  ASSERT_TRUE(s.ok() || s.IsPathNotFound()) << s.ToString();
   for (size_t i = 0; i < kCFCount; ++i) {
     if (cf_opts[i].compaction_filter) {
       delete cf_opts[i].compaction_filter;
@@ -757,6 +758,7 @@ TEST_F(OptionsUtilTest, WalDirInOptins) {
   delete db;
   ASSERT_OK(LoadLatestOptions(dbname_, options.env, &db_opts, &cf_descs));
   ASSERT_EQ(db_opts.wal_dir, "");
+  ASSERT_OK(DestroyDB(dbname_, options));
 }
 }  // namespace ROCKSDB_NAMESPACE
 

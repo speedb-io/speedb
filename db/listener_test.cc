@@ -492,8 +492,9 @@ TEST_F(EventListenerTest, MultiDBMultiListeners) {
   }
   vec_handles.clear();
 
-  for (auto db : dbs) {
-    delete db;
+  for (size_t d = 0; d < dbs.size(); ++d) {
+    delete dbs[d];
+    ASSERT_OK(DestroyDB(dbname_ + ToString(d), options));
   }
 }
 

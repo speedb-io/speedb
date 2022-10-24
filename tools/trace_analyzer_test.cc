@@ -55,7 +55,10 @@ class TraceAnalyzerTest : public testing::Test {
     dbname_ = test_path_ + "/db";
   }
 
-  ~TraceAnalyzerTest() override {}
+  ~TraceAnalyzerTest() override {
+    env_->DeleteFile(test_path_ + "/0.txt").PermitUncheckedError();
+    EXPECT_OK(env_->DeleteDir(test_path_));
+  }
 
   void GenerateTrace(std::string trace_path) {
     Options options;
@@ -279,6 +282,9 @@ TEST_F(TraceAnalyzerTest, Get) {
   file_path = output_path + "/test-get-0-accessed_top_k_qps_prefix_cut.txt";
   CheckFileContent(top_qps, file_path, true);
   */
+
+  ASSERT_OK(env_->DeleteFile(trace_path));
+  ASSERT_OK(DestroyDir(env_, output_path));
 }
 
 // Test analyzing of Put
@@ -357,6 +363,9 @@ TEST_F(TraceAnalyzerTest, Put) {
   file_path = output_path + "/test-put-0-accessed_value_size_distribution.txt";
   CheckFileContent(value_dist, file_path, true);
   */
+
+  ASSERT_OK(env_->DeleteFile(trace_path));
+  ASSERT_OK(DestroyDir(env_, output_path));
 }
 
 // Test analyzing of delete
@@ -430,6 +439,9 @@ TEST_F(TraceAnalyzerTest, Delete) {
   file_path = output_path + "/test-delete-0-accessed_top_k_qps_prefix_cut.txt";
   CheckFileContent(top_qps, file_path, true);
   */
+
+  ASSERT_OK(env_->DeleteFile(trace_path));
+  ASSERT_OK(DestroyDir(env_, output_path));
 }
 
 // Test analyzing of Merge
@@ -509,6 +521,9 @@ TEST_F(TraceAnalyzerTest, Merge) {
   file_path =
       output_path + "/test-merge-0-accessed_value_size_distribution.txt";
   CheckFileContent(value_dist, file_path, true);
+
+  ASSERT_OK(env_->DeleteFile(trace_path));
+  ASSERT_OK(DestroyDir(env_, output_path));
 }
 
 // Test analyzing of SingleDelete
@@ -583,6 +598,9 @@ TEST_F(TraceAnalyzerTest, SingleDelete) {
       output_path + "/test-single_delete-0-accessed_top_k_qps_prefix_cut.txt";
   CheckFileContent(top_qps, file_path, true);
   */
+
+  ASSERT_OK(env_->DeleteFile(trace_path));
+  ASSERT_OK(DestroyDir(env_, output_path));
 }
 
 // Test analyzing of delete
@@ -659,6 +677,9 @@ TEST_F(TraceAnalyzerTest, DeleteRange) {
       output_path + "/test-range_delete-0-accessed_top_k_qps_prefix_cut.txt";
   CheckFileContent(top_qps, file_path, true);
   */
+
+  ASSERT_OK(env_->DeleteFile(trace_path));
+  ASSERT_OK(DestroyDir(env_, output_path));
 }
 
 // Test analyzing of Iterator
@@ -783,6 +804,9 @@ TEST_F(TraceAnalyzerTest, Iterator) {
               "/test-iterator_SeekForPrev-0-accessed_top_k_qps_prefix_cut.txt";
   CheckFileContent(top_qps, file_path, true);
   */
+
+  ASSERT_OK(env_->DeleteFile(trace_path));
+  ASSERT_OK(DestroyDir(env_, output_path));
 }
 
 // Test analyzing of multiget
@@ -868,6 +892,9 @@ TEST_F(TraceAnalyzerTest, MultiGet) {
       output_path + "/test-multiget-0-accessed_top_k_qps_prefix_cut.txt";
   CheckFileContent(top_qps, file_path, true);
   */
+
+  ASSERT_OK(env_->DeleteFile(trace_path));
+  ASSERT_OK(DestroyDir(env_, output_path));
 }
 
 }  // namespace ROCKSDB_NAMESPACE

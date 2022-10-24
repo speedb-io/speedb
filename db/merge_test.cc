@@ -102,7 +102,8 @@ std::shared_ptr<DB> OpenDb(const std::string& dbname, const bool ttl = false,
   options.merge_operator = std::make_shared<CountMergeOperator>();
   options.max_successive_merges = max_successive_merges;
   options.env = EnvMergeTest::GetInstance();
-  EXPECT_OK(DestroyDB(dbname, Options()));
+  Status ds = DestroyDB(dbname, Options());
+  EXPECT_TRUE(ds.ok() || ds.IsPathNotFound()) << ds.ToString();
   Status s;
 // DBWithTTL is not supported in ROCKSDB_LITE
 #ifndef ROCKSDB_LITE

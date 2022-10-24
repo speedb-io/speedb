@@ -79,7 +79,8 @@ TEST_P(MemoryAllocatorTest, DatabaseBlockCache) {
   // Create database with block cache using the MemoryAllocator
   Options options;
   std::string dbname = test::PerThreadDBPath("allocator_test");
-  ASSERT_OK(DestroyDB(dbname, options));
+  Status s = DestroyDB(dbname, options);
+  ASSERT_TRUE(s.ok() || s.IsPathNotFound()) << s.ToString();
 
   options.create_if_missing = true;
   BlockBasedTableOptions table_options;
@@ -87,7 +88,7 @@ TEST_P(MemoryAllocatorTest, DatabaseBlockCache) {
   table_options.block_cache = cache;
   options.table_factory.reset(NewBlockBasedTableFactory(table_options));
   DB* db = nullptr;
-  Status s = DB::Open(options, dbname, &db);
+  s = DB::Open(options, dbname, &db);
   ASSERT_OK(s);
   ASSERT_NE(db, nullptr);
   ASSERT_LE(cache->GetUsage(), 104);  // Cache will contain stats

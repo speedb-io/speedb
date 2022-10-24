@@ -88,7 +88,7 @@ class CorruptionTest : public testing::Test {
     options_.env = env_;
     dbname_ = test::PerThreadDBPath(env_, "corruption_test");
     Status s = DestroyDB(dbname_, options_);
-    EXPECT_OK(s);
+    EXPECT_TRUE(s.ok() || s.IsPathNotFound()) << s.ToString();
 
     db_ = nullptr;
     options_.create_if_missing = true;
@@ -110,7 +110,8 @@ class CorruptionTest : public testing::Test {
     } else {
       Options opts;
       opts.env = env_->target();
-      EXPECT_OK(DestroyDB(dbname_, opts));
+      Status s = DestroyDB(dbname_, opts);
+      EXPECT_TRUE(s.ok() || s.IsPathNotFound()) << s.ToString();
     }
     delete env_;
   }

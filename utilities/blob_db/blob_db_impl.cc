@@ -2077,6 +2077,16 @@ Status DestroyBlobDB(const std::string& dbname, const Options& options,
         }
       }
     }
+#ifndef ROCKSDB_LITE
+    // File deletions are scheduled in the background in case an SFM is present,
+    // so we'll not be able to delete the blob directory unless we wait for the
+    // file deletion to complete.
+    if (soptions.sst_file_manager) {
+      SstFileManagerImpl* sfm =
+        static_cast<SstFileManagerImpl*>(soptions.sst_file_manager.get());
+      sfm->WaitForEmptyTrash();
+    }
+#endif // !ROCKSDB_LITE
     // TODO: What to do if we cannot delete the directory?
     env->DeleteDir(blobdir).PermitUncheckedError();
   }

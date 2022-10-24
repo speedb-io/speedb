@@ -1163,7 +1163,7 @@ class DBImpl : public DB {
 
  public:
   // SPDB write
-  bool CheckIfActionNeeded();
+  bool ShouldDoAction();
   Status RegisterFlushOrTrim();
   void SetLastSequence(uint64_t seq_inc) {
     versions_->SetLastSequence(seq_inc);

@@ -133,7 +133,10 @@ class SpdbWriteImpl {
   DBImpl* db_;
   port::Mutex add_buffer_mutex_;
   port::RWMutexWr flush_rwlock_;
+  std::atomic<bool> flush_thread_terminate_;
   std::thread flush_thread_;
+  std::mutex flush_thread_mutex_;
+  std::condition_variable flush_thread_cv_;
   port::RWMutexWr wal_buffers_rwlock_;
   port::Mutex wal_write_mutex_;
   WriteBatch tmp_batch_;

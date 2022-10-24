@@ -183,36 +183,51 @@ Status SpdbWriteImpl::WriteBatchComplete(void* list,
       db_, batch_write_type, batch, batch_status);
 }
 
-SpdbWriteImpl::SpdbWriteImpl(DBImpl* db) : db_(db) {}
+void SpdbWriteImpl::SpdbFlushWriteThread() {
+  for (;;) {
+    {
+      std::unique_lock<std::mutex> lck(flush_thread_mutex_);
+      auto duration = std::chrono::seconds(5);
 
-SpdbWriteImpl::~SpdbWriteImpl() { Shutdown(); }
-
-void SpdbWriteImpl::Shutdown() { WriteLock wl(&flush_rwlock_); }
-
-bool DBImpl::CheckIfActionNeeded() {
-  InstrumentedMutexLock l(&mutex_);
-
-  if (!single_column_family_mode_ && total_log_size_ > GetMaxTotalWalSize()) {
-    return true;
+      flush_thread_cv_.wait_for(lck, duration);
+      if (flush_thread_terminate_.load()) {
+        break;
+      }
+    }
+    // make sure no on the fly writes
+    {
+      if (db_->ShouldDoAction()) {
+        WriteLock wl(&flush_rwlock_);
+        db_->RegisterFlushOrTrim();
+      }
+    }
   }
+}
 
-  if (write_buffer_manager_->ShouldFlush()) {
-    return true;
+SpdbWriteImpl::SpdbWriteImpl(DBImpl* db)
+    : db_(db),
+      flush_thread_terminate_(false),
+      flush_thread_(&SpdbWriteImpl::SpdbFlushWriteThread, this) {
+#if defined(_GNU_SOURCE) && defined(__GLIBC_PREREQ)
+#if __GLIBC_PREREQ(2, 12)
+  auto thread_handle = flush_thread_.native_handle();
+  pthread_setname_np(thread_handle, "speedb:wf");
+#endif
+#endif
+}
+
+SpdbWriteImpl::~SpdbWriteImpl() {
+  Shutdown();
+  flush_thread_.join();
+}
+
+void SpdbWriteImpl::Shutdown() {
+  { WriteLock wl(&flush_rwlock_); }
+  {
+    std::unique_lock<std::mutex> lck(flush_thread_mutex_);
+    flush_thread_terminate_ = true;
   }
-
-  if (!flush_scheduler_.Empty()) {
-    return true;
-  }
-
-  if (write_controller_.IsStopped() || write_controller_.NeedsDelay()) {
-    return true;
-  }
-
-  if (!trim_history_scheduler_.Empty()) {
-    return true;
-  }
-
-  return false;
+  flush_thread_cv_.notify_one();
 }
 
 Status DBImpl::SpdbDelayWrite() {
@@ -267,6 +282,33 @@ Status DBImpl::SpdbDelayWrite() {
   return s;
 }
 
+bool DBImpl::ShouldDoAction() {
+  WriteContext write_context;
+  InstrumentedMutexLock l(&mutex_);
+
+  if (UNLIKELY(!single_column_family_mode_ &&
+               total_log_size_ > GetMaxTotalWalSize())) {
+    return true;
+  }
+
+  if (UNLIKELY(write_buffer_manager_->ShouldFlush())) {
+    return true;
+  }
+
+  if (UNLIKELY(!flush_scheduler_.Empty())) {
+    return true;
+  }
+  if (UNLIKELY(
+          (write_controller_.IsStopped() || write_controller_.NeedsDelay()))) {
+    return true;
+  }
+
+  if (UNLIKELY(trim_history_scheduler_.Empty())) {
+    return true;
+  }
+  return false;
+}
+
 Status DBImpl::RegisterFlushOrTrim() {
   Status status;
   WriteContext write_context;
@@ -286,7 +328,7 @@ Status DBImpl::RegisterFlushOrTrim() {
   }
   PERF_TIMER_GUARD(write_pre_and_post_process_time);
 
-  if (UNLIKELY(status.ok() && (write_controller_.IsStopped() ||
+  /*if (UNLIKELY(status.ok() && (write_controller_.IsStopped() ||
                                write_controller_.NeedsDelay()))) {
     PERF_TIMER_STOP(write_pre_and_post_process_time);
     PERF_TIMER_GUARD(write_delay_time);
@@ -296,7 +338,7 @@ Status DBImpl::RegisterFlushOrTrim() {
     // Can optimize it if it is an issue.
     status = SpdbDelayWrite();
     PERF_TIMER_START(write_pre_and_post_process_time);
-  }
+  }*/
 
   if (UNLIKELY(status.ok() && !trim_history_scheduler_.Empty())) {
     status = TrimMemtableHistory(&write_context);
@@ -568,17 +610,6 @@ Status DBImpl::SpdbWrite(const WriteOptions& write_options, WriteBatch* batch,
   }
 
   spdb_write_->Unlock(true);
-  if (leader_batch) {
-    if (CheckIfActionNeeded()) {
-      spdb_write_->Lock(false);
-      if (!shutdown_initiated_) {
-        // if the DB in shutdown we dont care about releasing resources
-        RegisterFlushOrTrim();
-      }
-      spdb_write_->Unlock(false);
-    }
-  }
-
   return status;
 }
 

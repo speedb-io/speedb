@@ -11723,14 +11723,14 @@ class ValuesInIteratorRangeGenerator : public ParamGeneratorInterface<T> {
         : base_(base), iterator_(iterator) {}
     virtual ~Iterator() {}
 
-    virtual const ParamGeneratorInterface<T>* BaseGenerator() const {
+    virtual const ParamGeneratorInterface<T>* BaseGenerator() const override {
       return base_;
     }
     virtual void Advance() override {
       ++iterator_;
       value_.reset();
     }
-    virtual ParamIteratorInterface<T>* Clone() const {
+    virtual ParamIteratorInterface<T>* Clone() const override {
       return new Iterator(*this);
     }
     // We need to use cached value referenced by iterator_ because *iterator_
@@ -11740,12 +11740,12 @@ class ValuesInIteratorRangeGenerator : public ParamGeneratorInterface<T> {
     // can advance iterator_ beyond the end of the range, and we cannot
     // detect that fact. The client code, on the other hand, is
     // responsible for not calling Current() on an out-of-range iterator.
-    virtual const T* Current() const {
+    virtual const T* Current() const override {
       if (value_.get() == NULL)
         value_.reset(new T(*iterator_));
       return value_.get();
     }
-    virtual bool Equals(const ParamIteratorInterface<T>& other) const {
+    virtual bool Equals(const ParamIteratorInterface<T>& other) const override {
       // Having the same base generator guarantees that the other
       // iterator is of the same type and we can downcast.
       GTEST_CHECK_(BaseGenerator() == other.BaseGenerator())

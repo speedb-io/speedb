@@ -4131,7 +4131,7 @@ Status DestroyDB(const std::string& dbname, const Options& options,
   ImmutableDBOptions soptions(SanitizeOptions(dbname, options));
   Env* env = soptions.env;
   std::vector<std::string> filenames;
-  bool wal_in_db_path = soptions.IsWalDirSameAsDBPath();
+  const bool wal_in_db_path = soptions.IsWalDirSameAsDBPath(dbname);
 
   // Reset the logger because it holds a handle to the
   // log file and prevents cleanup and directory removal
@@ -4169,15 +4169,50 @@ Status DestroyDB(const std::string& dbname, const Options& options,
     }
 
     std::set<std::string> paths;
+    std::set<std::string> lost_paths{LostDirectory(dbname)};
     for (const DbPath& db_path : options.db_paths) {
       paths.insert(db_path.path);
+      lost_paths.insert(LostDirectory(db_path.path));
     }
     for (const ColumnFamilyDescriptor& cf : column_families) {
       for (const DbPath& cf_path : cf.options.cf_paths) {
         paths.insert(cf_path.path);
+        lost_paths.insert(LostDirectory(cf_path.path));
       }
     }
-    for (const auto& path : paths) {
+    std::vector<std::string> walDirFiles;
+    std::string archivedir = ArchivalDirectory(dbname);
+    bool wal_dir_exists = false;
+    if (!wal_in_db_path) {
+      wal_dir_exists = env->GetChildren(soptions.wal_dir, &walDirFiles).ok();
+      archivedir = ArchivalDirectory(soptions.wal_dir);
+      if (wal_dir_exists) {
+        lost_paths.insert(LostDirectory(soptions.wal_dir));
+      }
+    }
+
+    // Delete lost paths created by database repair
+    for (auto it = lost_paths.rbegin(); it != lost_paths.rend(); ++it) {
+      const auto& path = *it;
+      Status ss = env->GetChildren(path, &filenames);
+      if (ss.ok()) {
+        for (const auto& fname : filenames) {
+          if (ParseFileName(fname, &number, &type)) {
+            std::string file_path = path + "/" + fname;
+            Status del = DeleteDBFile(&soptions, file_path, dbname,
+                                      /*force_bg=*/false, /*force_fg=*/false);
+            if (!del.ok() && result.ok()) {
+              result = del;
+            }
+          }
+        }
+        // TODO: Should we return an error if we cannot delete the directory?
+        env->DeleteDir(path).PermitUncheckedError();
+      }
+    }
+
+    for (auto it = paths.rbegin(); it != paths.rend(); ++it) {
+      const auto& path = *it;
       if (env->GetChildren(path, &filenames).ok()) {
         for (const auto& fname : filenames) {
           if (ParseFileName(fname, &number, &type) &&
@@ -4194,14 +4229,6 @@ Status DestroyDB(const std::string& dbname, const Options& options,
         // TODO: Should we return an error if we cannot delete the directory?
         env->DeleteDir(path).PermitUncheckedError();
       }
-    }
-
-    std::vector<std::string> walDirFiles;
-    std::string archivedir = ArchivalDirectory(dbname);
-    bool wal_dir_exists = false;
-    if (!soptions.IsWalDirSameAsDBPath(dbname)) {
-      wal_dir_exists = env->GetChildren(soptions.wal_dir, &walDirFiles).ok();
-      archivedir = ArchivalDirectory(soptions.wal_dir);
     }
 
     // Archive dir may be inside wal dir or dbname and should be
@@ -4251,7 +4278,6 @@ Status DestroyDB(const std::string& dbname, const Options& options,
 
     // Ignore error in case dir contains other files
     env->DeleteDir(dbname).PermitUncheckedError();
-    ;
   }
   return result;
 }

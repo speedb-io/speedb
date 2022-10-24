@@ -57,6 +57,8 @@ extern std::string ArchivalDirectory(const std::string& dbname);
 extern std::string ArchivedLogFileName(const std::string& dbname,
                                        uint64_t num);
 
+extern std::string LostDirectory(const std::string& dir);
+
 extern std::string MakeTableFileName(const std::string& name, uint64_t number);
 
 extern std::string MakeTableFileName(uint64_t number);

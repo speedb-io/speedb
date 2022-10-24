@@ -28,6 +28,7 @@ static const std::string kRocksDbTFileExt = "sst";
 static const std::string kLevelDbTFileExt = "ldb";
 static const std::string kRocksDBBlobFileExt = "blob";
 static const std::string kArchivalDirName = "archive";
+static const std::string kLostDirName = "lost";
 
 // Given a path, flatten the path name by replacing all chars not in
 // {[0-9,a-z,A-Z,-,_,.]} with _. And append '_LOG\0' at the end.
@@ -106,6 +107,10 @@ std::string ArchivalDirectory(const std::string& dir) {
 std::string ArchivedLogFileName(const std::string& name, uint64_t number) {
   assert(number > 0);
   return MakeFileName(name + "/" + kArchivalDirName, number, "log");
+}
+
+std::string LostDirectory(const std::string& dir) {
+  return dir + "/" + kLostDirName;
 }
 
 std::string MakeTableFileName(const std::string& path, uint64_t number) {

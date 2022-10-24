@@ -665,7 +665,7 @@ class Repairer {
     if (slash != nullptr) {
       new_dir.assign(fname.data(), slash - fname.data());
     }
-    new_dir.append("/lost");
+    new_dir = LostDirectory(new_dir);
     env_->CreateDir(new_dir).PermitUncheckedError();  // Ignore error
     std::string new_file = new_dir;
     new_file.append("/");

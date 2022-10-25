@@ -243,36 +243,36 @@ class HashSpdRep : public MemTableRep {
 
   KeyHandle Allocate(const size_t len, char** buf) override;
 
-  bool InsertInternal(KeyHandle handle, bool check_exist = false);
+  bool InsertInternal(KeyHandle handle, bool concurrently, bool check_exist = false);
 
   void Insert(KeyHandle handle) override {
-    InsertInternal(handle, false);
+    InsertInternal(handle, false, false);
     return;
   }
 
   bool InsertKey(KeyHandle handle) override {
-    return InsertInternal(handle, true);
+    return InsertInternal(handle, false, true);
   }
 
   bool InsertKeyWithHint(KeyHandle handle, void**) override {
-    return InsertInternal(handle, true);
+    return InsertInternal(handle, false, true);
   }
 
   bool InsertKeyWithHintConcurrently(KeyHandle handle, void**) override {
-    return InsertInternal(handle, true);
+    return InsertInternal(handle, true, true);
   }
 
   bool InsertKeyConcurrently(KeyHandle handle) override {
-    return InsertInternal(handle, true);
+    return InsertInternal(handle, true, true);
   }
 
   void InsertWithHintConcurrently(KeyHandle handle, void**) override {
-    InsertInternal(handle, false);
+    InsertInternal(handle, true, false);
     return;
   }
 
   void InsertConcurrently(KeyHandle handle) override {
-    InsertInternal(handle, false);
+    InsertInternal(handle, true, false);
     return;
   }
 
@@ -284,7 +284,7 @@ class HashSpdRep : public MemTableRep {
 
   SpdbKeyHandle* InternalSeek(const char* seek_entry);
 
-  void SetSortBarrier();
+  //void SetSortBarrier();
 
   void Get(const LookupKey& k, void* callback_args,
            bool (*callback_func)(void* arg, const char* entry)) override;
@@ -303,7 +303,7 @@ class HashSpdRep : public MemTableRep {
         const SpdbSortedList<const MemTableRep::KeyComparator&>* list,
         HashSpdRep* rep)
         : iter_(list), rep_(rep) {
-      rep->SetSortBarrier();
+      //rep->SetSortBarrier();
     }
 
     ~SpdbIterator() override {}
@@ -413,7 +413,6 @@ class HashSpdRep : public MemTableRep {
   // sort thread info
   std::atomic<bool> sort_thread_terminate_ = false;
   std::atomic<bool> sort_thread_init_ = false;
-  std::atomic<bool> sort_thread_idle_ = true;
   std::thread sort_thread_;
   std::mutex sort_thread_mutex_;
   std::condition_variable sort_thread_cv_;
@@ -452,7 +451,7 @@ void HashSpdRep::SpdbSortThread() {
   while (!should_exit) {
     {
       std::unique_lock<std::mutex> lck(sort_thread_mutex_);
-      while (!last_loop_item->GetNextSortedItem() &&
+      while (sort_barrier_ == elements_num_.load() &&
              !sort_thread_terminate_.load())
         sort_thread_cv_.wait(lck);
     }
@@ -460,26 +459,22 @@ void HashSpdRep::SpdbSortThread() {
       should_exit = true;
       break;
     }
-    bool do_work = true;
 
-    last_loop_item = last_loop_item->GetNextSortedItem();
-    while (do_work) {
+
+    while (sort_barrier_ < elements_num_.load()) {
+      if (!last_loop_item->GetNextSortedItem()) {
+        continue;
+      }      
+      last_loop_item = last_loop_item->GetNextSortedItem();
       spdb_sort_->spdb_sorted_list_.Insert(last_loop_item->Key());
-      sort_barrier_.fetch_add(1);
       {
         std::unique_lock<std::mutex> notify_lck(notify_sorted_mutex_);
+        sort_barrier_.fetch_add(1);
         notify_sorted_cv_.notify_all();
       }
-
-      if (last_loop_item->GetNextSortedItem()) {
-        last_loop_item = last_loop_item->GetNextSortedItem();
-      } else {
-        if (sort_thread_terminate_.load()) {
-          should_exit = true;
-          break;
-        }
-        sort_thread_idle_.store(true);
-        do_work = false;
+      if (sort_thread_terminate_.load()) {
+        should_exit = true;
+        break;
       }
     }
   }
@@ -515,20 +510,23 @@ KeyHandle HashSpdRep::Allocate(const size_t len, char** buf) {
   return h;
 }
 
-bool HashSpdRep::InsertInternal(KeyHandle handle, bool check_exist) {
+bool HashSpdRep::InsertInternal(KeyHandle handle,  bool concurrently, bool check_exist) {
   SpdbKeyHandle* spdb_handle = static_cast<SpdbKeyHandle*>(handle);
   if (!spdb_hash_table_.Add(spdb_handle, spdb_sort_->compare_, check_exist)) {
     return false;
   }
-  bool sort_thread_idle = sort_thread_idle_.exchange(false);
+  if (concurrently)
+    spdb_sort_->spdb_sorted_list_.InsertConcurrently(spdb_handle->Key());
+  else  
+    spdb_sort_->spdb_sorted_list_.Insert(spdb_handle->Key());
+  elements_num_.fetch_add(1);
 
+  /*
   SpdbKeyHandle* prev_item = last_item_.exchange(spdb_handle);
   prev_item->SetNextSortedItem(spdb_handle);
   elements_num_.fetch_add(1);
-  if (sort_thread_idle) {
-    // should notify the sort thread on work
-    sort_thread_cv_.notify_one();
-  }
+  // should notify the sort thread on work
+  sort_thread_cv_.notify_one();*/
   return true;
 }
 
@@ -536,7 +534,7 @@ bool HashSpdRep::Contains(const char* key) const {
   return spdb_hash_table_.Contains(key, spdb_sort_->compare_);
 }
 
-void HashSpdRep::SetSortBarrier() {
+/*void HashSpdRep::SetSortBarrier() {
   uint64_t sort_barrier = elements_num_.load();
   // should notify the sort thread on work
   sort_thread_cv_.notify_one();
@@ -547,13 +545,7 @@ void HashSpdRep::SetSortBarrier() {
       notify_sorted_cv_.wait(lck);
     }
   }
-  {
-    std::unique_lock<std::mutex> lck(notify_sorted_mutex_);
-    while (sort_barrier > sort_barrier_.load()) {
-      notify_sorted_cv_.wait(lck);
-    }
-  }
-}
+}*/
 
 void HashSpdRep::MarkReadOnly() { immutable_.store(true); }
 

@@ -71,6 +71,8 @@ class SpdbSortedList {
   // REQUIRES: no concurrent calls to any of inserts.
   bool Insert(const char* key);
 
+  bool InsertConcurrently(const char* key); 
+
   template <bool UseCAS>
   bool Insert(const char* key, Splice* splice, bool allow_partial_splice_fix);
 
@@ -676,6 +678,16 @@ SpdbSortedList<Comparator>::AllocateSpliceOnHeap() {
 template <class Comparator>
 bool SpdbSortedList<Comparator>::Insert(const char* key) {
   return Insert<false>(key, seq_splice_, false);
+}
+
+template <class Comparator>
+bool SpdbSortedList<Comparator>::InsertConcurrently(const char* key) {
+  Node* prev[kMaxPossibleHeight];
+  Node* next[kMaxPossibleHeight];
+  Splice splice;
+  splice.prev_ = prev;
+  splice.next_ = next;
+  return Insert<true>(key, &splice, false);
 }
 
 template <class Comparator>

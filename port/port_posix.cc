@@ -161,12 +161,12 @@ RWMutex::RWMutex() {
 RWMutex::~RWMutex() { PthreadCall("destroy mutex", pthread_rwlock_destroy(&mu_)); }
 
 RWMutexWr::RWMutexWr() {
-  PthreadCall("init mutex", pthread_rwlock_init(&mu_, nullptr));
-  /*pthread_rwlockattr_t attr;
+  pthread_rwlockattr_t attr;
   PthreadCall("init attr", pthread_rwlockattr_init(&attr));
   PthreadCall("attr setkind", pthread_rwlockattr_setkind_np(&attr, PTHREAD_RWLOCK_PREFER_WRITER_NONRECURSIVE_NP));
   PthreadCall("init mutex", pthread_rwlock_init(&mu_, &attr));
-  PthreadCall("destroy attr", pthread_rwlockattr_destroy(&attr));*/
+  PthreadCall("destroy attr", pthread_rwlockattr_destroy(&attr));
+
 }
 
 

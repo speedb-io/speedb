@@ -80,16 +80,16 @@ void SpdbWriteImpl::SpdbFlushWriteThread() {
   for (;;) {
     {
       std::unique_lock<std::mutex> lck(flush_thread_mutex_);
-      flush_thread_cv_.wait(lck);
+      flush_thread_cv_.wait_for(lck, std::chrono::seconds(5));
       if (flush_thread_terminate_.load()) {
         break;
       }
     }
-    // make sure no on the fly writes
-    flush_rwlock_.WriteLock();
-    db_->RegisterFlushOrTrim();
-    action_needed_.store(false);
-    flush_rwlock_.WriteUnlock();
+    if (db_->CheckIfActionNeeded()) {    
+      // make sure no on the fly writes
+      WriteLock wl(&flush_rwlock_);
+      db_->RegisterFlushOrTrim();
+    }
   }
 }
 
@@ -119,18 +119,6 @@ void SpdbWriteImpl::Shutdown() {
   flush_thread_cv_.notify_one();
 }
 
-void SpdbWriteImpl::NotifyIfActionNeeded() {
-  bool need_notify = false;
-  if (db_->CheckIfActionNeeded()) {
-    bool tmp = false;
-    std::unique_lock<std::mutex> lck(flush_thread_mutex_);
-    need_notify = action_needed_.compare_exchange_strong(
-        tmp, true, std::memory_order_relaxed);
-  }
-  if (need_notify) {
-    flush_thread_cv_.notify_one();
-  }
-}
 
 bool DBImpl::CheckIfActionNeeded() {
   InstrumentedMutexLock l(&mutex_);
@@ -234,7 +222,6 @@ SpdbWriteImpl::WritesBatchList& SpdbWriteImpl::SwitchBatchGroup() {
 void SpdbWriteImpl::SwitchAndWriteBatchGroup() {
   // take the wal write rw lock from protecting another batch group wal write
   MutexLock l(&wal_write_mutex_);
-  NotifyIfActionNeeded();
   WritesBatchList& batch_group = SwitchBatchGroup();
   if (!batch_group.wal_writes_.empty()) {
     auto const& immutable_db_options = db_->immutable_db_options();

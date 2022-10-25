@@ -230,7 +230,7 @@ function summarize_result {
   # that "Compaction Stats" is written to stdout at least once. If it won't
   # happen then empty output from grep when searching for "Sum" will cause
   # syntax errors.
-  version=$( grep ^RocksDB: $test_out | awk '{ print $3 }' )
+  version=$( grep ^Speedb: $test_out | awk '{ print $3 }' )
   date=$( grep ^Date: $test_out | awk '{ print $6 "-" $3 "-" $4 "T" $5 ".000" }' )
   iso_date=$( month_to_num $date )
   tz=$( date "+%z" )
@@ -259,7 +259,7 @@ function summarize_result {
 
   # if the report TSV (Tab Separate Values) file does not yet exist, create it and write the header row to it
   if [ ! -f "$report" ]; then
-    echo -e "ops_sec\tmb_sec\ttotal_size_gb\tlevel0_size_gb\tsum_gb\twrite_amplification\twrite_mbps\tusec_op\tpercentile_50\tpercentile_75\tpercentile_99\tpercentile_99.9\tpercentile_99.99\tuptime\tstall_time\tstall_percent\ttest_name\ttest_date\trocksdb_version\tjob_id" \
+    echo -e "ops_sec\tmb_sec\ttotal_size_gb\tlevel0_size_gb\tsum_gb\twrite_amplification\twrite_mbps\tusec_op\tpercentile_50\tpercentile_75\tpercentile_99\tpercentile_99.9\tpercentile_99.99\tuptime\tstall_time\tstall_percent\ttest_name\ttest_date\tversion\tjob_id" \
       >> $report
   fi
 

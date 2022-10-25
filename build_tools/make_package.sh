@@ -63,9 +63,9 @@ function gem_install() {
 
 function main() {
   if [[ $# -ne 1 ]]; then
-    fatal "Usage: $0 <rocksdb_version>"
+    fatal "Usage: $0 <speedb_version>"
   else
-    log "using rocksdb version: $1"
+    log "using Speedb version: $1"
   fi
 
   if [[ -d /vagrant ]]; then
@@ -115,13 +115,13 @@ function main() {
     -s dir \
     -t $FPM_OUTPUT \
     -C package \
-    -n rocksdb \
+    -n speedb \
     -v $1 \
-    --url http://rocksdb.org/ \
-    -m rocksdb@fb.com \
-    --license BSD \
-    --vendor Facebook \
-    --description "RocksDB is an embeddable persistent key-value store for fast storage." \
+    --url http://speedb.io/ \
+    -m hello@speedb.io \
+    --license Apache \
+    --vendor Speedb \
+    --description "Speedb is an embeddable persistent key-value store for fast storage based on RocksDB." \
     usr
 }
 

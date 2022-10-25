@@ -34,12 +34,12 @@ Status PromoteL0(DB* db, ColumnFamilyHandle* column_family, int target_level) {
 
 Status SuggestCompactRange(DB* /*db*/, ColumnFamilyHandle* /*column_family*/,
                            const Slice* /*begin*/, const Slice* /*end*/) {
-  return Status::NotSupported("Not supported in RocksDB LITE");
+  return Status::NotSupported("Not supported in LITE mode");
 }
 
 Status PromoteL0(DB* /*db*/, ColumnFamilyHandle* /*column_family*/,
                  int /*target_level*/) {
-  return Status::NotSupported("Not supported in RocksDB LITE");
+  return Status::NotSupported("Not supported in LITE mode");
 }
 
 #endif  // ROCKSDB_LITE

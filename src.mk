@@ -1,4 +1,4 @@
-# These are the sources from which librocksdb.a is built:
+# These are the sources from which libspeedb.a is built:
 LIB_SOURCES =                                                   \
   cache/cache.cc                                                \
   cache/cache_entry_roles.cc                                    \

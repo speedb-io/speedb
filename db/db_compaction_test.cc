@@ -2874,11 +2874,14 @@ TEST_P(DBCompactionTestWithParam, PartialCompactionFailure) {
   options.max_subcompactions = max_subcompactions_;
 
   env_->SetBackgroundThreads(1, Env::HIGH);
-  env_->SetBackgroundThreads(1, Env::LOW);
   // stop the compaction thread until we simulate the file creation failure.
-  test::SleepingBackgroundTask sleeping_task_low;
-  env_->Schedule(&test::SleepingBackgroundTask::DoSleepTask, &sleeping_task_low,
-                 Env::Priority::LOW);
+  std::vector<test::SleepingBackgroundTask> sleeping_task_low(
+      std::max(1, env_->GetBackgroundThreads(Env::Priority::LOW)));
+  for (auto& sleeping_task : sleeping_task_low) {
+    env_->Schedule(&test::SleepingBackgroundTask::DoSleepTask, &sleeping_task,
+                   Env::Priority::LOW);
+    sleeping_task.WaitUntilSleeping();
+  }
 
   options.env = env_;
 
@@ -2908,8 +2911,8 @@ TEST_P(DBCompactionTestWithParam, PartialCompactionFailure) {
 
   // Fail the first file creation.
   env_->non_writable_count_ = 1;
-  sleeping_task_low.WakeUp();
-  sleeping_task_low.WaitUntilDone();
+  sleeping_task_low[0].WakeUp();
+  sleeping_task_low[0].WaitUntilDone();
 
   // Expect compaction to fail here as one file will fail its
   // creation.
@@ -2927,6 +2930,10 @@ TEST_P(DBCompactionTestWithParam, PartialCompactionFailure) {
   }
 
   env_->non_writable_count_ = 0;
+  for (size_t i = 1; i < sleeping_task_low.size(); ++i) {
+    sleeping_task_low[i].WakeUp();
+    sleeping_task_low[i].WaitUntilDone();
+  }
 
   // Make sure RocksDB will not get into corrupted state.
   Reopen(options);
@@ -2969,17 +2976,22 @@ TEST_P(DBCompactionTestWithParam, DeleteMovedFileAfterCompaction) {
     ASSERT_EQ("0,1", FilesPerLevel(0));
 
     // block compactions
-    test::SleepingBackgroundTask sleeping_task;
-    env_->Schedule(&test::SleepingBackgroundTask::DoSleepTask, &sleeping_task,
-                   Env::Priority::LOW);
+    std::vector<test::SleepingBackgroundTask> sleeping_tasks(
+        std::max(1, env_->GetBackgroundThreads(Env::Priority::LOW)));
+    for (auto& task : sleeping_tasks) {
+      env_->Schedule(&test::SleepingBackgroundTask::DoSleepTask, &task,
+                     Env::Priority::LOW);
+    }
 
     options.max_bytes_for_level_base = 1024 * 1024;  // 1 MB
     Reopen(options);
     std::unique_ptr<Iterator> iterator(db_->NewIterator(ReadOptions()));
     ASSERT_EQ("0,1", FilesPerLevel(0));
     // let compactions go
-    sleeping_task.WakeUp();
-    sleeping_task.WaitUntilDone();
+    for (auto& task : sleeping_tasks) {
+      task.WakeUp();
+      task.WaitUntilDone();
+    }
 
     // this should execute L1->L2 (move)
     ASSERT_OK(dbfull()->TEST_WaitForCompact());
@@ -7144,9 +7156,12 @@ TEST_F(DBCompactionTest, DisableManualCompactionThreadQueueFull) {
   Reopen(options);
 
   // Block compaction queue
-  test::SleepingBackgroundTask sleeping_task_low;
-  env_->Schedule(&test::SleepingBackgroundTask::DoSleepTask, &sleeping_task_low,
-                 Env::Priority::LOW);
+  std::vector<test::SleepingBackgroundTask> sleeping_task_low(
+      std::max(1, env_->GetBackgroundThreads(Env::Priority::LOW)));
+  for (auto& sleeping_task : sleeping_task_low) {
+    env_->Schedule(&test::SleepingBackgroundTask::DoSleepTask, &sleeping_task,
+                   Env::Priority::LOW);
+  }
 
   // generate files, but avoid trigger auto compaction
   for (int i = 0; i < kNumL0Files / 2; i++) {
@@ -7181,8 +7196,10 @@ TEST_F(DBCompactionTest, DisableManualCompactionThreadQueueFull) {
   // CompactRange should return before the compaction has the chance to run
   compact_thread.join();
 
-  sleeping_task_low.WakeUp();
-  sleeping_task_low.WaitUntilDone();
+  for (auto& sleeping_task : sleeping_task_low) {
+    sleeping_task.WakeUp();
+    sleeping_task.WaitUntilDone();
+  }
   ASSERT_OK(dbfull()->TEST_WaitForCompact(true));
   ASSERT_EQ("0,1", FilesPerLevel(0));
 }
@@ -7201,9 +7218,12 @@ TEST_F(DBCompactionTest, DisableManualCompactionThreadQueueFullDBClose) {
   Reopen(options);
 
   // Block compaction queue
-  test::SleepingBackgroundTask sleeping_task_low;
-  env_->Schedule(&test::SleepingBackgroundTask::DoSleepTask, &sleeping_task_low,
-                 Env::Priority::LOW);
+  std::vector<test::SleepingBackgroundTask> sleeping_task_low(
+      std::max(1, env_->GetBackgroundThreads(Env::Priority::LOW)));
+  for (auto& sleeping_task : sleeping_task_low) {
+    env_->Schedule(&test::SleepingBackgroundTask::DoSleepTask, &sleeping_task,
+                   Env::Priority::LOW);
+  }
 
   // generate files, but avoid trigger auto compaction
   for (int i = 0; i < kNumL0Files / 2; i++) {
@@ -7243,8 +7263,10 @@ TEST_F(DBCompactionTest, DisableManualCompactionThreadQueueFullDBClose) {
   auto s = db_->Close();
   ASSERT_OK(s);
 
-  sleeping_task_low.WakeUp();
-  sleeping_task_low.WaitUntilDone();
+  for (auto& sleeping_task : sleeping_task_low) {
+    sleeping_task.WakeUp();
+    sleeping_task.WaitUntilDone();
+  }
 }
 
 TEST_F(DBCompactionTest, DBCloseWithManualCompaction) {
@@ -7261,9 +7283,12 @@ TEST_F(DBCompactionTest, DBCloseWithManualCompaction) {
   Reopen(options);
 
   // Block compaction queue
-  test::SleepingBackgroundTask sleeping_task_low;
-  env_->Schedule(&test::SleepingBackgroundTask::DoSleepTask, &sleeping_task_low,
-                 Env::Priority::LOW);
+  std::vector<test::SleepingBackgroundTask> sleeping_task_low(
+      std::max(1, env_->GetBackgroundThreads(Env::Priority::LOW)));
+  for (auto& sleeping_task : sleeping_task_low) {
+    env_->Schedule(&test::SleepingBackgroundTask::DoSleepTask, &sleeping_task,
+                   Env::Priority::LOW);
+  }
 
   // generate files, but avoid trigger auto compaction
   for (int i = 0; i < kNumL0Files / 2; i++) {
@@ -7300,8 +7325,10 @@ TEST_F(DBCompactionTest, DBCloseWithManualCompaction) {
   // manual compaction thread should return with Incomplete().
   compact_thread.join();
 
-  sleeping_task_low.WakeUp();
-  sleeping_task_low.WaitUntilDone();
+  for (auto& sleeping_task : sleeping_task_low) {
+    sleeping_task.WakeUp();
+    sleeping_task.WaitUntilDone();
+  }
 }
 
 TEST_F(DBCompactionTest,

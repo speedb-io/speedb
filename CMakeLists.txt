@@ -6,7 +6,7 @@
 #     Run the build commands from within the Developer Command Prompt window to have paths to the compiler and runtime libraries set.
 #     You must have git.exe in your %PATH% environment variable.
 #
-# To build Rocksdb for Windows is as easy as 1-2-3-4-5:
+# To build Speedb for Windows is as easy as 1-2-3-4-5:
 #
 # 1. Update paths to third-party libraries in thirdparty.inc file
 # 2. Create a new directory for build artifacts
@@ -17,13 +17,13 @@
 #        sample command: cmake -G "Visual Studio 16 2019" -DCMAKE_BUILD_TYPE=Release -DWITH_GFLAGS=1 -DWITH_SNAPPY=1 -DWITH_JEMALLOC=1 -DWITH_JNI=1 ..
 # 4. Then build the project in debug mode (you may want to add /m[:<N>] flag to run msbuild in <N> parallel threads
 #                                          or simply /m to use all avail cores)
-#        msbuild rocksdb.sln
+#        msbuild speedb.sln
 #
-#        rocksdb.sln build features exclusions of test only code in Release. If you build ALL_BUILD then everything
+#        speedb.sln build features exclusions of test only code in Release. If you build ALL_BUILD then everything
 #        will be attempted but test only code does not build in Release mode.
 #
 # 5. And release mode (/m[:<N>] is also supported)
-#        msbuild rocksdb.sln /p:Configuration=Release
+#        msbuild speedb.sln /p:Configuration=Release
 #
 # Linux:
 #
@@ -35,13 +35,11 @@
 cmake_minimum_required(VERSION 3.10)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/modules/")
-include(ReadVersion)
+include(ReadSpeedbVersion)
 include(GoogleTest)
-get_rocksdb_version(rocksdb_VERSION)
-project(rocksdb
-  VERSION ${rocksdb_VERSION}
-  DESCRIPTION "An embeddable persistent key-value store for fast storage"
-  HOMEPAGE_URL https://rocksdb.org/
+get_speedb_version(speedb_VERSION)
+project(speedb
+  VERSION ${speedb_VERSION}
   LANGUAGES CXX C ASM)
 
 if(POLICY CMP0042)
@@ -489,7 +487,7 @@ if(CMAKE_COMPILER_IS_GNUCXX)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-builtin-memcmp")
 endif()
 
-option(ROCKSDB_LITE "Build RocksDBLite version" OFF)
+option(ROCKSDB_LITE "Build LITE version" OFF)
 if(ROCKSDB_LITE)
   add_definitions(-DROCKSDB_LITE)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-exceptions -Os")
@@ -1036,10 +1034,10 @@ if(USE_FOLLY)
     third-party/folly/folly/ScopeGuard.cpp)
 endif()
 
-set(ROCKSDB_STATIC_LIB rocksdb${ARTIFACT_SUFFIX})
-set(ROCKSDB_SHARED_LIB rocksdb-shared${ARTIFACT_SUFFIX})
+set(ROCKSDB_STATIC_LIB ${PROJECT_NAME}${ARTIFACT_SUFFIX})
+set(ROCKSDB_SHARED_LIB ${PROJECT_NAME}-shared${ARTIFACT_SUFFIX})
 
-option(ROCKSDB_BUILD_SHARED "Build shared versions of the RocksDB libraries" ON)
+option(ROCKSDB_BUILD_SHARED "Build shared versions of the libraries" ON)
 
 
 if(WIN32)
@@ -1049,7 +1047,7 @@ else()
 endif()
 
 string(TIMESTAMP TS "%Y-%m-%d %H:%M:%S" UTC)
-set(BUILD_DATE "${TS}" CACHE STRING "the time we first built rocksdb")
+set(BUILD_DATE "${TS}" CACHE STRING "the time we first built Speedb")
 
 find_package(Git)
 
@@ -1093,9 +1091,9 @@ if(ROCKSDB_BUILD_SHARED)
   else()
     set_target_properties(${ROCKSDB_SHARED_LIB} PROPERTIES
                           LINKER_LANGUAGE CXX
-                          VERSION ${rocksdb_VERSION}
-                          SOVERSION ${rocksdb_VERSION_MAJOR}
-                          OUTPUT_NAME "rocksdb${ARTIFACT_SUFFIX}")
+                          VERSION ${PROJECT_VERSION}
+                          SOVERSION ${speedb_VERSION_MAJOR}
+                          OUTPUT_NAME "${PROJECT_NAME}${ARTIFACT_SUFFIX}")
   endif()
 endif()
 
@@ -1138,16 +1136,16 @@ if(NOT WIN32 OR ROCKSDB_INSTALL_ON_WINDOWS)
   include(GNUInstallDirs)
   include(CMakePackageConfigHelpers)
 
-  set(package_config_destination ${CMAKE_INSTALL_LIBDIR}/cmake/rocksdb)
+  set(package_config_destination ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME})
 
   configure_package_config_file(
-    ${CMAKE_CURRENT_LIST_DIR}/cmake/RocksDBConfig.cmake.in RocksDBConfig.cmake
+    ${CMAKE_CURRENT_LIST_DIR}/cmake/SpeedbConfig.cmake.in SpeedbConfig.cmake
     INSTALL_DESTINATION ${package_config_destination}
   )
 
   write_basic_package_version_file(
-    RocksDBConfigVersion.cmake
-    VERSION ${rocksdb_VERSION}
+    SpeedbConfigVersion.cmake
+    VERSION ${PROJECT_VERSION}
     COMPATIBILITY SameMajorVersion
   )
 
@@ -1169,7 +1167,7 @@ if(NOT WIN32 OR ROCKSDB_INSTALL_ON_WINDOWS)
 
   install(
     TARGETS ${ROCKSDB_STATIC_LIB}
-    EXPORT RocksDBTargets
+    EXPORT SpeedbTargets
     COMPONENT devel
     ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     INCLUDES DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
@@ -1178,7 +1176,7 @@ if(NOT WIN32 OR ROCKSDB_INSTALL_ON_WINDOWS)
   if(ROCKSDB_BUILD_SHARED)
     install(
       TARGETS ${ROCKSDB_SHARED_LIB}
-      EXPORT RocksDBTargets
+      EXPORT SpeedbTargets
       COMPONENT runtime
       ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
       RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
@@ -1188,16 +1186,16 @@ if(NOT WIN32 OR ROCKSDB_INSTALL_ON_WINDOWS)
   endif()
 
   install(
-    EXPORT RocksDBTargets
+    EXPORT SpeedbTargets
     COMPONENT devel
     DESTINATION ${package_config_destination}
-    NAMESPACE RocksDB::
+    NAMESPACE Speedb::
   )
 
   install(
     FILES
-    ${CMAKE_CURRENT_BINARY_DIR}/RocksDBConfig.cmake
-    ${CMAKE_CURRENT_BINARY_DIR}/RocksDBConfigVersion.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/SpeedbConfig.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/SpeedbConfigVersion.cmake
     COMPONENT devel
     DESTINATION ${package_config_destination}
   )

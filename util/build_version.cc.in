@@ -77,7 +77,7 @@ std::string GetSpeedbVersionAsString(bool with_patch) {
 }
 
 std::string GetRocksBuildInfoAsString(const std::string& program, bool verbose) {
-  std::string info = program + " (SpeeDB) " + GetSpeedbVersionAsString(true) +
+  std::string info = program + " (Speedb) " + GetSpeedbVersionAsString(true) +
                      " (" + GetRocksVersionAsString(true) + ")";
   if (verbose) {
     for (const auto& it : GetRocksBuildProperties()) {

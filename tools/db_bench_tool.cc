@@ -71,6 +71,7 @@
 #include "rocksdb/utilities/transaction.h"
 #include "rocksdb/utilities/transaction_db.h"
 #include "rocksdb/write_batch.h"
+#include "speedb/version.h"
 #include "test_util/testutil.h"
 #include "test_util/transaction_test_util.h"
 #include "tools/simulated_hybrid_file_system.h"
@@ -731,9 +732,9 @@ DEFINE_int32(random_access_max_buffer_size, 1024 * 1024,
 DEFINE_int32(writable_file_max_buffer_size, 1024 * 1024,
              "Maximum write buffer for Writable File");
 
-DEFINE_int32(bloom_bits, -1,
-             "Bloom filter bits per key. Negative means use default."
-             "Zero disables.");
+DEFINE_double(bloom_bits, -1,
+              "Bloom filter bits per key. Negative means use default."
+              "Zero disables.");
 
 DEFINE_bool(use_ribbon_filter, false, "Use Ribbon instead of Bloom filter");
 
@@ -905,7 +906,7 @@ DEFINE_bool(optimize_filters_for_hits,
             "level of the LSM to reduce metadata that should fit in RAM. ");
 
 DEFINE_bool(paranoid_checks, ROCKSDB_NAMESPACE::Options().paranoid_checks,
-            "RocksDB will aggressively check consistency of the data.");
+            "Aggressively checks for consistency of the data.");
 
 DEFINE_bool(force_consistency_checks,
             ROCKSDB_NAMESPACE::Options().force_consistency_checks,
@@ -961,12 +962,12 @@ DEFINE_uint64(transaction_lock_timeout, 100,
               " milliseconds before failing a transaction waiting on a lock");
 DEFINE_string(
     options_file, "",
-    "The path to a RocksDB options file.  If specified, then db_bench will "
-    "run with the RocksDB options in the default column family of the "
-    "specified options file. "
+    "The path to an options file.  If specified, then db_bench will "
+    "run with the options in the default column family of the specified "
+    "options file. "
     "Note that with this setting, db_bench will ONLY accept the following "
-    "RocksDB options related command-line arguments, all other arguments "
-    "that are related to RocksDB options will be ignored:\n"
+    "database options related command-line arguments, all other arguments "
+    "that are related to database options will be ignored:\n"
     "\t--use_existing_db\n"
     "\t--use_existing_keys\n"
     "\t--statistics\n"
@@ -1085,7 +1086,7 @@ DEFINE_uint64(blob_compaction_readahead_size,
 
 // Secondary DB instance Options
 DEFINE_bool(use_secondary_db, false,
-            "Open a RocksDB secondary instance. A primary instance can be "
+            "Open a secondary database instance. A primary instance can be "
             "running in another db_bench process.");
 
 DEFINE_string(secondary_path, "",
@@ -1146,7 +1147,7 @@ DEFINE_bool(rate_limit_auto_wal_flush, false,
             "false) after the user write operation.");
 
 DEFINE_bool(async_io, false,
-            "When set true, RocksDB does asynchronous reads for internal auto "
+            "When set true, asynchronous reads are used for internal auto "
             "readahead prefetching.");
 
 DEFINE_bool(charge_compression_dictionary_building_buffer, false,
@@ -1249,6 +1250,7 @@ static bool ValidateTableCacheNumshardbits(const char* flagname,
   return true;
 }
 DEFINE_int32(table_cache_numshardbits, 4, "");
+DEFINE_string(filter_uri, "", "URI for registry FilterPolicy");
 
 #ifndef ROCKSDB_LITE
 DEFINE_string(env_uri, "",
@@ -1374,10 +1376,9 @@ DEFINE_double(sine_d, 1,
 DEFINE_bool(rate_limit_bg_reads, false,
             "Use options.rate_limiter on compaction reads");
 
-DEFINE_uint64(
-    benchmark_write_rate_limit, 0,
-    "If non-zero, db_bench will rate-limit the writes going into RocksDB. This "
-    "is the global rate in bytes/second.");
+DEFINE_uint64(benchmark_write_rate_limit, 0,
+              "If non-zero, db_bench will rate-limit the writes going into the "
+              "database. This is the global rate in bytes/second.");
 
 // the parameters of mix_graph
 DEFINE_double(keyrange_dist_a, 0.0,
@@ -1442,7 +1443,7 @@ DEFINE_int64(mix_accesses, -1,
 
 DEFINE_uint64(
     benchmark_read_rate_limit, 0,
-    "If non-zero, db_bench will rate-limit the reads from RocksDB. This "
+    "If non-zero, db_bench will rate-limit the reads from the database. This "
     "is the global rate in ops/second.");
 
 DEFINE_uint64(max_compaction_bytes,
@@ -2803,8 +2804,8 @@ class Benchmark {
 #endif
 
   void PrintEnvironment() {
-    fprintf(stderr, "RocksDB:    version %d.%d\n",
-            kMajorVersion, kMinorVersion);
+    fprintf(stderr, "Speedb:     version %s\n",
+            GetSpeedbVersionAsString(false).c_str());
 
 #if defined(__linux) || defined(__APPLE__) || defined(__FreeBSD__)
     time_t now = time(nullptr);
@@ -3956,7 +3957,7 @@ class Benchmark {
   // options file.
   bool InitializeOptionsFromFile(Options* opts) {
 #ifndef ROCKSDB_LITE
-    printf("Initializing RocksDB Options from the specified file\n");
+    printf("Initializing database Options from the specified file\n");
     DBOptions db_opts;
     std::vector<ColumnFamilyDescriptor> cf_descs;
     if (FLAGS_options_file != "") {
@@ -3978,7 +3979,7 @@ class Benchmark {
   }
 
   void InitializeOptionsFromFlags(Options* opts) {
-    printf("Initializing RocksDB Options from command-line flags\n");
+    printf("Initializing database Options from command-line flags\n");
     Options& options = *opts;
     ConfigOptions config_options(options);
     config_options.ignore_unsupported_options = false;
@@ -4488,29 +4489,46 @@ class Benchmark {
         // block cache, even with OPTIONS file provided.
         table_options->block_cache = cache_;
       }
-      if (table_options->filter_policy == nullptr) {
-        if (FLAGS_bloom_bits < 0) {
-          table_options->filter_policy = BlockBasedTableOptions().filter_policy;
-        } else if (FLAGS_bloom_bits == 0) {
-          table_options->filter_policy.reset();
-        } else if (FLAGS_use_block_based_filter) {
-          // Use back-door way of enabling obsolete block-based Bloom
-          Status s = FilterPolicy::CreateFromString(
-              ConfigOptions(),
-              "rocksdb.internal.DeprecatedBlockBasedBloomFilter:" +
-                  std::to_string(FLAGS_bloom_bits),
-              &table_options->filter_policy);
-          if (!s.ok()) {
-            fprintf(stderr,
-                    "failure creating obsolete block-based filter: %s\n",
-                    s.ToString().c_str());
-            exit(1);
-          }
-        } else {
-          table_options->filter_policy.reset(
-              FLAGS_use_ribbon_filter ? NewRibbonFilterPolicy(FLAGS_bloom_bits)
-                                      : NewBloomFilterPolicy(FLAGS_bloom_bits));
+      std::string bits_str;
+      if (FLAGS_bloom_bits > 0) {
+        bits_str = ":" + ROCKSDB_NAMESPACE::ToString(FLAGS_bloom_bits);
+        fprintf(stderr, "note: appending --bloom-bits (%f) to --filter-uri\n",
+                FLAGS_bloom_bits);
+      }
+      if (!FLAGS_filter_uri.empty()) {
+        ConfigOptions config_options;
+        config_options.ignore_unsupported_options = false;
+        Status s = FilterPolicy::CreateFromString(
+            config_options, FLAGS_filter_uri + bits_str,
+            &table_options->filter_policy);
+        if (!s.ok()) {
+          fprintf(stderr, "failure creating filter policy[%s%s]: %s\n",
+                  FLAGS_filter_uri.c_str(), bits_str.c_str(),
+                  s.ToString().c_str());
+          exit(1);
         }
+      } else if (FLAGS_bloom_bits < 0) {
+        table_options->filter_policy = BlockBasedTableOptions().filter_policy;
+      } else if (FLAGS_bloom_bits == 0) {
+        table_options->filter_policy.reset();
+      } else if (FLAGS_use_block_based_filter) {
+        // Use back-door way of enabling obsolete block-based Bloom
+        Status s = FilterPolicy::CreateFromString(
+            ConfigOptions(),
+            "rocksdb.internal.DeprecatedBlockBasedBloomFilter:" +
+                ROCKSDB_NAMESPACE::ToString(FLAGS_bloom_bits),
+            &table_options->filter_policy);
+        if (!s.ok()) {
+          fprintf(stderr, "failure creating obsolete block-based filter: %s\n",
+                  s.ToString().c_str());
+          exit(1);
+        }
+      } else if (FLAGS_use_ribbon_filter) {
+        table_options->filter_policy.reset(
+            NewRibbonFilterPolicy(FLAGS_bloom_bits));
+      } else {
+        table_options->filter_policy.reset(
+            NewBloomFilterPolicy(FLAGS_bloom_bits));
       }
     }
 

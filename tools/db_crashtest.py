@@ -192,6 +192,7 @@ default_params = {
     "data_block_hash_table_util_ratio": random.randint(0, 100) / 100.0,
     "customopspercent": 0,
     "verify_sst_unique_id_in_manifest": 1,  # always do unique_id verification
+    "filter_uri": lambda: random.choice(["speedb.PairedBloomFilter", ""]),
 }
 
 _TEST_DIR_ENV_VAR = 'TEST_TMPDIR'
@@ -660,6 +661,10 @@ def finalize_and_sanitize(src_params, counter):
       dest_params["sync"] = 0
       dest_params["write_fault_one_in"] = 0
 
+    # make sure bloom_bits is not 0 when filter_uri is used since it fails in CreateFilterPolicy.
+    if dest_params.get("filter_uri") != "":
+        dest_params["bloom_bits"] = random.choice([random.randint(1,19),
+                                         random.lognormvariate(2.3, 1.3)])
     return dest_params
 
 

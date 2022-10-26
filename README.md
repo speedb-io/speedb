@@ -49,6 +49,7 @@ The public interface is in [include](include/rocksdb). Callers should not includ
 Please refer to the file [INSTALL.md](INSTALL.md) for a list of all the
 dependencies and how to install them across different platforms.
 
+
 ## Building Speedb
 
 Debug:
@@ -81,6 +82,13 @@ For development and functional testing, go with the debug version which includes
 more assertions and debug prints. Otherwise, for production or performance
 testing, we recommend building a release version which is more optimized.
 
+
+## Questions 
+
+- For live discussion with the community you can use our official [Discord channel](https://discord.gg/52yzKZ5G9D). 
+- For technical questions and discussions you can use our official [Discourse forum](https://speedb.discourse.group/). 
+
+
 ## Join us
 
 Speedb is committed to a welcoming and inclusive environment where everyone can
@@ -88,6 +96,7 @@ contribute.
 
 
 ## Contributing code
+
 See the [contributing guide](CONTRIBUTING.md).
 
 

@@ -1,73 +1,112 @@
-name: Create release artifact
+name: Create release artifacts
 
 on:
-  workflow_dispatch:
+  push:
+    tags:
+      - 'speedb/v*'
+
+permissions:
+  contents: write # Needed for release assets upload
+  id-token: write # Needed for AWS credentials setting
 
 jobs:
-
-  cleanup:
-    runs-on: [self-hosted, linux, x64, myrunner]
-    container:
-      image: ubuntu:latest
-    steps:
-      - name: Cleaning up the $GITHUB_WORKSPACE as root from a Docker image
-        run: find /__w/${{ github.event.repository.name }}/${{ github.event.repository.name }}/. -name . -o -prune -exec rm -rf -- {} + || true
-        
   build:
-    needs: cleanup
-    runs-on: [self-hosted, linux, x64, myrunner]
+    runs-on: [self-hosted, ubuntu, asrunner]
+
+    container:
+      image: centos:7.9.2009
 
     steps:
-    
+      - name: pre
+        run: |
+          yum install -y centos-release-scl epel-release
+          yum install -y make devtoolset-11-gcc-c++ \
+            coreutils wget unzip which git python3 openssl openssl-devel \
+            libzstd-devel lz4-devel snappy-devel zlib-devel \
+            java-1.8.0-openjdk-devel
+          echo "PATH=/opt/rh/devtoolset-11/root/usr/bin:${PATH}" >> $GITHUB_ENV
+          echo "RELEASE_VERSION=${GITHUB_REF_NAME#speedb/v}" >> $GITHUB_ENV
+
+      - name: Install CMake
+        run: |
+          CMAKE_RELEASE=3.20.1
+          wget https://github.com/Kitware/CMake/releases/download/v${CMAKE_RELEASE}/cmake-${CMAKE_RELEASE}.tar.gz
+          tar xf cmake-${CMAKE_RELEASE}.tar.gz
+          cd cmake-${CMAKE_RELEASE}
+          ./bootstrap
+          make -j$(nproc) && make install
+          cd .. && rm -rf cmake-${CMAKE_RELEASE}*
+
+      - name: Install awscli
+        run: |
+          wget "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -O "awscliv2.zip"
+          unzip awscliv2.zip
+          ./aws/install
+          rm -rf aws awscliv2.zip
+
       - uses: actions/checkout@v3
 
-      - name: install dependencies
+      - run: mkdir "$GITHUB_WORKSPACE/out"
+
+      - name: Build and package release libraries
         run: |
-          echo ~ && sudo apt-get update && sudo apt-get upgrade -y && sudo apt-get install -y docker-ce docker-ce-cli containerd.io unzip curl zip unzip
-          
-      - name: Configure AWS credentials from Test account
+          rm -rf build && mkdir build && cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DPORTABLE=1 -DWITH_GFLAGS=0 -DWITH_SNAPPY=1 -DWITH_LZ4=1 -DWITH_ZLIB=1 -DWITH_ZSTD=1
+          mkdir -p "$GITHUB_WORKSPACE/out/root"
+          DESTDIR="$GITHUB_WORKSPACE/out/root" make -j$(nproc) install
+          ( cd "$GITHUB_WORKSPACE/out/root" && tar czf ../speedb-${RELEASE_VERSION}.tar.gz . )
+          rm -rf "$GITHUB_WORKSPACE/out/root"
+          cd .. && rm -rf build
+
+      - name: Build release Jar
+        run: |
+          make clean
+          LIB_MODE=static DEBUG_LEVEL=0 PORTABLE=1 JAVA_HOME=/usr/lib/jvm/java-openjdk make -j$(nproc) rocksdbjavastatic
+          cp "java/target/speedbjni-${RELEASE_VERSION}-linux64.jar" "$GITHUB_WORKSPACE/out"
+
+      - name: Build db_bench
+        run: |
+          yum install -y gflags-devel
+          rm -rf build && mkdir build && cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DPORTABLE=1 -DWITH_GFLAGS=1 \
+            -DWITH_SNAPPY=1 -DWITH_LZ4=1 -DWITH_ZLIB=1 -DWITH_ZSTD=1 \
+            -DWITH_BENCHMARK_TOOLS=1 -DROCKSDB_BUILD_SHARED=1
+          make -j$(nproc) db_bench
+          tar czf "$GITHUB_WORKSPACE/out/db_bench-speedb-${RELEASE_VERSION}.tar.gz" db_bench
+          cd .. && rm -rf build
+
+      - name: Generate checksums
+        run: |
+          for f in $GITHUB_WORKSPACE/out/*; do
+            sha256sum "$f" > "$f.sha256"
+          done
+
+      - name: Get release date
+        run: |
+          echo "RELEASE_DATE=$(git for-each-ref "--format=%(creatordate:short)" "refs/tags/${GITHUB_REF_NAME}")" >> $GITHUB_ENV
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          generate_release_notes: false
+          name: Speedb ${{ env.RELEASE_VERSION }} (${{ env.RELEASE_DATE }})
+          files: |
+            out/db_bench-speedb-${{ env.RELEASE_VERSION }}.tar.gz
+            out/db_bench-speedb-${{ env.RELEASE_VERSION }}.tar.gz.sha256
+            out/speedb-${{ env.RELEASE_VERSION }}.tar.gz
+            out/speedb-${{ env.RELEASE_VERSION }}.tar.gz.sha256
+            out/speedbjni-${{ env.RELEASE_VERSION }}-linux64.jar
+            out/speedbjni-${{ env.RELEASE_VERSION }}-linux64.jar.sha256
+
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: eu-west-2
 
-      - name: docker run
-        run: |
-          export BUILD_OUTPUT_DIR=~/build
-          echo $BUILD_OUTPUT_DIR
-          rm -rf $BUILD_OUTPUT_DIR
-          mkdir -p $BUILD_OUTPUT_DIR
-          docker build -f ./build_tools/Dockerfile -t spdb-build .
-          docker run --rm -v $(readlink -f ${BUILD_OUTPUT_DIR}):/out -v $GITHUB_WORKSPACE:/speedb -e GITHUB_WORKSPACE=$GITHUB_WORKSPACE spdb-build
-          ls -alFh $BUILD_OUTPUT_DIR
-          zip --junk-paths "Release-$GITHUB_REF_NAME.zip" $BUILD_OUTPUT_DIR/*
-
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref_name }}
-          draft: false
-          prerelease: false
-      - name: Upload Release Asset
-        id: upload-release-asset 
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
-          asset_path: ./Release-${{ github.ref_name}}.zip
-          asset_name: Release-${{ github.ref_name}}.zip
-          asset_content_type: application/zip
-          
       - name: Upload artifacts to S3
         run: |
-          export BUILD_OUTPUT_DIR=~/build
-          echo $BUILD_OUTPUT_DIR
-          aws s3 cp $BUILD_OUTPUT_DIR s3://spdb-github-artifacts/"release-$GITHUB_REF_NAME" --recursive
-          aws s3 ls s3://spdb-github-artifacts/
-          rm -rf $BUILD_OUTPUT_DIR
+          aws s3 cp "$GITHUB_WORKSPACE/out" "s3://spdb-github-artifacts/release-${RELEASE_VERSION}" --recursive
+          rm -rf "$GITHUB_WORKSPACE/out"

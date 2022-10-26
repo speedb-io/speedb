@@ -3,7 +3,7 @@ FROM docker.io/centos:7.9.2009
 # Install required libraries and utilities for building Speedb
 RUN yum install -y centos-release-scl epel-release
 RUN yum install -y make devtoolset-9-gcc-c++ \
-	coreutils wget which git python3 openssl-devel \
+	coreutils wget which git python3 openssl-devel openssl \
 	libzstd-devel lz4-devel snappy-devel zlib-devel \
 	java-1.8.0-openjdk-devel
 ENV PATH="/opt/rh/devtoolset-9/root/usr/bin:${PATH}"

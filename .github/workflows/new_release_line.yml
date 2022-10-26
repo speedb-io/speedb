@@ -5,79 +5,102 @@ on:
     inputs:
       new_branch_major:
         description: "Next release Major version (LEAVE EMPTY FOR AUTO-INCREMENT)"
+        required: false
       new_branch_minor:
         description: "Next release Minor version (LEAVE EMPTY FOR AUTO-INCREMENT)"
+        required: false
+    branches:
+      - main
+      - 'release/*'
 
+permissions:
+  contents: read
 
 jobs:
-  build:
+  tag_version:
     runs-on: [self-hosted, ubuntu, asrunner]
     container:
       image: alpine:3.14
 
+    env:
+      VERSION_FILE: speedb/version.h
+
     steps:
-      - name: pre-run
+      - name: pre
         run: |
           echo "nameserver 8.8.8.8" > /etc/resolv.conf
-          apk update && apk add git
+          apk add git openssh-client
+
+      - name: Verify chosen version
+        run: |
+          if ! echo "${{ inputs.new_branch_major }}" | grep -q "^[0-9]*$"; then
+            echo >&2 "error: major version must be a positive number" && false
+          fi
+          if ! echo "${{ inputs.new_branch_minor }}" | grep -q "^[0-9]*$"; then
+            echo >&2 "error: minor version must be a positive number" && false
+          fi
+
+          if [ "${{ inputs.new_branch_major }}${{ inputs.new_branch_minor }}" != "" ] && [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo >&2 "error: cannot cut a major or a minor release from a branch that isn't main" && false
+          elif [ "$GITHUB_REF" != "refs/heads/main" ] && ! echo "$GITHUB_REF" | grep -q "^refs/heads/release/"; then
+            echo "error: cannot cut a patch release from a non-release branch" && false
+          fi
           
       - uses: actions/checkout@v3
+        with:
+          ssh-key: ${{ secrets.RELEASE_SSH_KEY }}
 
-      - name: Calculate tag
+      - name: Calculate new version
         run: |
-          git config --global --add safe.directory /__w/rocksdb/rocksdb
-          git config user.name "GitHub Actions Bot"
-          git config user.email "<>"
-          git pull
-          major=$(cat $GITHUB_WORKSPACE/include/rocksdb/version.h | grep '#define ROCKSDB_MAJOR' | grep -o '[^,]\+$' | tr ' ' '\n' | tail -n1)
-          minor=$(cat $GITHUB_WORKSPACE/include/rocksdb/version.h | grep '#define ROCKSDB_MINOR' | grep -o '[^,]\+$' | tr ' ' '\n' | tail -n1)
-          patch=$(cat $GITHUB_WORKSPACE/include/rocksdb/version.h | grep '#define ROCKSDB_PATCH' | grep -o '[^,]\+$' | tr ' ' '\n' | tail -n1)
-          new_minor=$(echo $minor + 1 | bc)
-          echo $minor
+          major=$(grep '_MAJOR\s\+[0-9]\+' "$VERSION_FILE" | sed 's/[^0-9]\+//')
+          minor=$(grep '_MINOR\s\+[0-9]\+' "$VERSION_FILE" | sed 's/[^0-9]\+//')
+
+          if [ -n "${{ inputs.new_branch_major }}" ] && [ "${{ inputs.new_branch_major }}" -lt "$major" ]; then
+            echo >&2 "error: the chosen major version is lower than current one" && false
+          elif [ -n "${{ inputs.new_branch_major }}" ] && [ "${{ inputs.new_branch_major }}" -gt "$major" ]; then
+            major=${{ inputs.new_branch_major }}
+            if [ -n "${{ inputs.new_branch_minor }}" ] && [ "${{ inputs.new_branch_minor }}" -ne 0 ]; then
+              echo >&2 "error: cannot bump minor version when bumping major version" && false
+            fi
+            minor=0
+            patch=0
+          elif [ -n "${{ inputs.new_branch_minor }}" ] && [ "${{ inputs.new_branch_minor }}" -lt "$minor" ]; then
+            echo >&2 "error: the chosen minor version is lower than current one" && false
+          elif [ -n "${{ inputs.new_branch_minor }}" ] && [ "${{ inputs.new_branch_minor }}" -gt "$minor" ]; then
+            minor=${{ inputs.new_branch_minor }}
+            patch=0
+          elif [ "$GITHUB_REF" = "refs/heads/main" ]; then
+            minor=$(( $minor + 1 ))
+            patch=0
+          else
+            patch=$(( $(grep '_PATCH\s\+[0-9]\+' "$VERSION_FILE" | sed 's/[^0-9]\+//') + 1 ))
+          fi
+
           echo "major=$major" >> $GITHUB_ENV
           echo "minor=$minor" >> $GITHUB_ENV
-          echo "new_minor=$new_minor" >> $GITHUB_ENV
-          current_version="$major.$minor.99"
-          echo $current_version
-      
-      - name: Create release branch
-        run: |
-          if [ -z "${{ inputs.new_branch_major }}" ]; then
-            echo "empty"
-            new_branch="release/${{ env.major }}.${{ env.minor }}"
-            echo $new_branch
-            git checkout -b $new_branch
-            git push -u origin $new_branch
-          else
-            echo "minor=$new_minor" >> $GITHUB_ENV
-            echo "not empty"
-            new_branch="release/${{ inputs.new_branch_major }}.${{ inputs.new_branch_minor }}"
-            echo $new_branch
-            git checkout -b $new_branch
-            git push -u origin $new_branch
-          fi
+          echo "patch=$patch" >> $GITHUB_ENV
+
       - name: Update version.h
         run: |
-          if [ -z "${{ inputs.new_branch_major }}" ]; then
-            git checkout main
-            git tag "v${{ env.major }}.${{ env.minor }}"
-            git push --tags
-            sed -i -e 's/#define ROCKSDB_MAJOR.*/#define ROCKSDB_MAJOR ${{ env.major }}/' include/rocksdb/version.h
-            sed -i -e 's/#define ROCKSDB_MINOR.*/#define ROCKSDB_MINOR ${{ env.new_minor }}/' include/rocksdb/version.h
-            sed -i -e 's/#define ROCKSDB_PATCH.*/#define ROCKSDB_PATCH 99/' include/rocksdb/version.h
-            cat include/rocksdb/version.h
-            git commit -am "updated version.h version"
-            git push
-          else
-            git checkout main
-            new_minor=$(echo ${{ inputs.new_branch_minor }} + 1 | bc)
-            echo $new_minor
-            git tag "v${{ inputs.new_branch_major }}.${{ inputs.new_branch_minor }}"
-            git push --tags
-            sed -i -e 's/#define ROCKSDB_MAJOR.*/#define ROCKSDB_MAJOR ${{ inputs.new_branch_major }}/' include/rocksdb/version.h
-            sed -i -e "s/#define ROCKSDB_MINOR.*/#define ROCKSDB_MINOR $new_minor/g" include/rocksdb/version.h
-            sed -i -e 's/#define ROCKSDB_PATCH.*/#define ROCKSDB_PATCH 99/' include/rocksdb/version.h
-            cat include/rocksdb/version.h
-            git commit -am "updated version.h version"
-            git push
+          git config user.name "GitHub Runner Bot"
+          git config user.email "<>"
+
+          sed -i -e "s/\(#define [^\s]\+_MAJOR\s\+\)[0-9]\+/\1${major}/" "$VERSION_FILE"
+          sed -i -e "s/\(#define [^\s]\+_MINOR\s\+\)[0-9]\+/\1${minor}/" "$VERSION_FILE"
+          sed -i -e "s/\(#define [^\s]\+_PATCH\s\+\)[0-9]\+/\1${patch}/" "$VERSION_FILE"
+
+          git add "$VERSION_FILE"
+          git commit -m "release: publish version ${major}.${minor}.${patch}"
+          git push origin ${GITHUB_REF#refs/heads/}
+
+      - name: Tag and release
+        run: |
+          # Create a branch if it's a major or a minor release
+          if [ "$patch" -eq 0 ]; then
+            git checkout -b "release/${major}.${minor}"
+            git push -u origin "release/${major}.${minor}"
           fi
+
+          # Create a tag for the release
+          git tag "speedb/v${major}.${minor}.${patch}"
+          git push origin "speedb/v${major}.${minor}.${patch}"

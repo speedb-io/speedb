@@ -52,7 +52,7 @@ Note: Paired bloom filter is recommended to use when the number of bits per key 
 
 
 # Rocksdb Change Log
-## Unreleased
+## 7.7.5 (10/28/2022)
 ### Bug Fixes
 * Fixed an iterator performance regression for delete range users when scanning through a consecutive sequence of range tombstones (#10877).
 

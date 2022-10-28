@@ -52,6 +52,10 @@ Note: Paired bloom filter is recommended to use when the number of bits per key 
 
 
 # Rocksdb Change Log
+## 7.7.4 (10/28/2022)
+### Bug Fixes
+* Fixed a case of calling malloc_usable_size on result of operator new[].
+
 ## 7.7.3 (10/11/2022)
 ### Bug Fixes
 * Fixed a memory safety bug in experimental HyperClockCache (#10768)

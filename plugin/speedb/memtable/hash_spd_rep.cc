@@ -39,10 +39,10 @@ namespace ROCKSDB_NAMESPACE {
 namespace {
 
 struct SpdbKeyHandle {
-  SpdbKeyHandle* GetPrevBucketItem() {
+  SpdbKeyHandle* GetNextBucketItem() {
     return bucket_item_link_.load(std::memory_order_acquire);
   }
-  void SetPrevBucketItem(SpdbKeyHandle* handle) {
+  void SetNextBucketItem(SpdbKeyHandle* handle) {
     bucket_item_link_.store(handle, std::memory_order_release);
   }
   SpdbKeyHandle* GetNextSortedItem() {
@@ -64,7 +64,7 @@ struct SpdbKeyHandle {
         spdb_item_link_(nullptr),
         spdb_sorted_key_(nullptr) {}
 
- private:
+ public:
   // this is for the bucket item list (should be very small), its a prev link
   // for atomic reason
   std::atomic<SpdbKeyHandle*> bucket_item_link_;
@@ -79,63 +79,74 @@ struct SpdbKeyHandle {
 };
 
 struct BucketHeader {
-  // port::Mutex mutex_;  // this mutex probably wont cause delay
-  std::atomic<SpdbKeyHandle*> curr_ = nullptr;
+  port::Mutex mutex_;  // this mutex probably wont cause delay
+  std::atomic<uint32_t> size_ = 0;
+  std::atomic<SpdbKeyHandle*> items_ = nullptr;
 
   BucketHeader() {}
 
-  bool InternalContains(const char* check_key,
-                        const MemTableRep::KeyComparator& comparator,
-                        SpdbKeyHandle** curr_handle) {
-    SpdbKeyHandle* handle = *curr_handle =
-        curr_.load(std::memory_order_acquire);
-    if (handle == nullptr) {
-      return false;
-    }
-    while (handle != nullptr) {
-      const char* key = handle->Key();
-      if (comparator(check_key, key) == 0) {
+  bool Contains(const char* check_key,
+                const MemTableRep::KeyComparator& comparator) {
+    SpdbKeyHandle* anchor = items_.load(std::memory_order_acquire);
+    for (auto k = anchor; k != nullptr; k = k->GetNextBucketItem()) {
+      const int cmp_res = comparator(k->spdb_sorted_key_, check_key);
+      if (cmp_res == 0) {
         return true;
       }
-      handle = handle->GetPrevBucketItem();
+      if (cmp_res > 0) {
+        break;
+      }
     }
     return false;
   }
 
-  bool Contains(const char* check_key,
-                const MemTableRep::KeyComparator& comparator) {
-    SpdbKeyHandle* curr_handle;
-    return InternalContains(check_key, comparator, &curr_handle);
-  }
-
   bool Add(SpdbKeyHandle* handle, const MemTableRep::KeyComparator& comparator,
-           bool check_exist) {
-    bool was_added = false;
-    while (!was_added) {
-      SpdbKeyHandle* curr_handle = curr_.load(std::memory_order_acquire);
-      if (check_exist) {
-        if (InternalContains(handle->Key(), comparator, &curr_handle)) {
-          return false;
-        }
+           bool /*check_exist = false*/) {
+    MutexLock l(&mutex_);
+    SpdbKeyHandle* iter = items_.load(std::memory_order_acquire);
+    SpdbKeyHandle* prev = nullptr;
+
+    for (size_t i = 0; i < size_; i++) {
+      const int cmp_res =
+          comparator(iter->spdb_sorted_key_, handle->spdb_sorted_key_);
+      if (cmp_res == 0) {
+        // exist!
+        return false;
       }
-      handle->SetPrevBucketItem(curr_handle);
-      was_added = curr_.compare_exchange_strong(curr_handle, handle);
+
+      if (cmp_res > 0) {
+        // need to insert before
+        break;
+      }
+      prev = iter;
+      iter = iter->GetNextBucketItem();
     }
+
+    handle->SetNextBucketItem(iter);
+    if (prev) {
+      prev->SetNextBucketItem(handle);
+    } else {
+      items_ = handle;
+    }
+
+    size_++;
+
     return true;
   }
 
   SpdbKeyHandle* InternalSeek(const char* seek_entry,
                               const MemTableRep::KeyComparator& comparator) {
-    SpdbKeyHandle* handle = curr_.load(std::memory_order_acquire);
-    if (handle == nullptr) {
+    uint32_t bucket_size = size_.load(std::memory_order_acquire);
+    if (bucket_size == 0) {
       return nullptr;
     }
-    while (handle != nullptr) {
-      const char* key = handle->Key();
-      if (comparator(key, seek_entry) == 0) {
-        return handle;
+    auto iter = items_.load(std::memory_order_acquire);
+    for (uint32_t i = 0; i < bucket_size;
+         iter = iter->GetNextBucketItem(), i++) {
+      const int cmp_res = comparator(iter->spdb_sorted_key_, seek_entry);
+      if (cmp_res == 0) {
+        return iter;
       }
-      handle = handle->GetPrevBucketItem();
     }
     return nullptr;
   }
@@ -143,21 +154,20 @@ struct BucketHeader {
   void Get(const LookupKey& k, const MemTableRep::KeyComparator& comparator,
            void* callback_args,
            bool (*callback_func)(void* arg, const char* entry)) const {
-    SpdbKeyHandle* handle = curr_.load(std::memory_order_acquire);
-    if (handle == nullptr) {
+    uint32_t bucket_size = size_.load(std::memory_order_acquire);
+    if (bucket_size == 0) {
       return;
     }
-    std::list<const char*> sorted_keys;
-    while (handle != nullptr) {
-      const char* key = handle->Key();
-      if (comparator(key, k.internal_key()) >= 0) {
-        sorted_keys.push_front(key);
+    auto iter = items_.load(std::memory_order_acquire);
+    uint32_t i = 0;
+    for (; i < bucket_size; iter = iter->GetNextBucketItem(), i++) {
+      if (comparator(iter->spdb_sorted_key_, k.internal_key()) >= 0) {
+        break;
       }
-      handle = handle->GetPrevBucketItem();
     }
-    sorted_keys.sort(stl_wrappers::Compare(comparator));
-    for (auto iter = sorted_keys.begin(); iter != sorted_keys.end(); ++iter) {
-      if (!callback_func(callback_args, *iter)) {
+
+    for (; i < bucket_size; iter = iter->GetNextBucketItem(), i++) {
+      if (!callback_func(callback_args, iter->spdb_sorted_key_)) {
         break;
       }
     }
@@ -243,7 +253,8 @@ class HashSpdRep : public MemTableRep {
 
   KeyHandle Allocate(const size_t len, char** buf) override;
 
-  bool InsertInternal(KeyHandle handle, bool concurrently, bool check_exist = false);
+  bool InsertInternal(KeyHandle handle, bool concurrently,
+                      bool check_exist = false);
 
   void Insert(KeyHandle handle) override {
     InsertInternal(handle, false, false);
@@ -284,7 +295,7 @@ class HashSpdRep : public MemTableRep {
 
   SpdbKeyHandle* InternalSeek(const char* seek_entry);
 
-  //void SetSortBarrier();
+  // void SetSortBarrier();
 
   void Get(const LookupKey& k, void* callback_args,
            bool (*callback_func)(void* arg, const char* entry)) override;
@@ -303,7 +314,7 @@ class HashSpdRep : public MemTableRep {
         const SpdbSortedList<const MemTableRep::KeyComparator&>* list,
         HashSpdRep* rep)
         : iter_(list), rep_(rep) {
-      //rep->SetSortBarrier();
+      // rep->SetSortBarrier();
     }
 
     ~SpdbIterator() override {}
@@ -447,24 +458,20 @@ void HashSpdRep::SpdbSortThread() {
   }
   sort_thread_cv_.notify_one();
 
-
   while (!should_exit) {
     {
       std::unique_lock<std::mutex> lck(sort_thread_mutex_);
-      while (sort_barrier_ == elements_num_.load() &&
-             !sort_thread_terminate_.load())
-        sort_thread_cv_.wait(lck);
+      while (!sort_thread_terminate_.load()) sort_thread_cv_.wait(lck);
     }
     if (sort_thread_terminate_.load()) {
       should_exit = true;
       break;
     }
 
-
     while (sort_barrier_ < elements_num_.load()) {
       if (!last_loop_item->GetNextSortedItem()) {
         continue;
-      }      
+      }
       last_loop_item = last_loop_item->GetNextSortedItem();
       spdb_sort_->spdb_sorted_list_.Insert(last_loop_item->Key());
       {
@@ -510,14 +517,15 @@ KeyHandle HashSpdRep::Allocate(const size_t len, char** buf) {
   return h;
 }
 
-bool HashSpdRep::InsertInternal(KeyHandle handle,  bool concurrently, bool check_exist) {
+bool HashSpdRep::InsertInternal(KeyHandle handle, bool concurrently,
+                                bool check_exist) {
   SpdbKeyHandle* spdb_handle = static_cast<SpdbKeyHandle*>(handle);
   if (!spdb_hash_table_.Add(spdb_handle, spdb_sort_->compare_, check_exist)) {
     return false;
   }
   if (concurrently)
     spdb_sort_->spdb_sorted_list_.InsertConcurrently(spdb_handle->Key());
-  else  
+  else
     spdb_sort_->spdb_sorted_list_.Insert(spdb_handle->Key());
   elements_num_.fetch_add(1);
 

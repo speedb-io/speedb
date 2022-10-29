@@ -71,7 +71,7 @@ class SpdbSortedList {
   // REQUIRES: no concurrent calls to any of inserts.
   bool Insert(const char* key);
 
-  bool InsertConcurrently(const char* key); 
+  bool InsertConcurrently(const char* key);
 
   template <bool UseCAS>
   bool Insert(const char* key, Splice* splice, bool allow_partial_splice_fix);

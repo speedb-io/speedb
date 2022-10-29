@@ -109,7 +109,7 @@ struct BucketHeader {
   }
 
   bool Add(SpdbKeyHandle* handle, const MemTableRep::KeyComparator& comparator,
-           bool check_exist) {
+           bool check_exist = false) {
     bool was_added = false;
     while (!was_added) {
       SpdbKeyHandle* curr_handle = curr_.load(std::memory_order_acquire);

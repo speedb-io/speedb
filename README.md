@@ -49,13 +49,14 @@ The public interface is in [include](include/rocksdb). Callers should not includ
 Please refer to the file [INSTALL.md](INSTALL.md) for a list of all the
 dependencies and how to install them across different platforms.
 
-## Building Speedb
+
+## 🔨 Building Speedb 
 
 Debug:
 
     mkdir build && cd build
     cmake .. -DCMAKE_BUILD_TYPE=Debug [cmake options]
-    make rocksdb
+    make speedb
 
 By default the build type is Debug.
 
@@ -63,7 +64,7 @@ Release:
 
     mkdir build && cd build
     cmake .. -DCMAKE_BUILD_TYPE=Release [cmake options]
-    make rocksdb
+    make speedb
 
 This will build the static library. If you want to build the dynamic library,
 use:
@@ -81,13 +82,27 @@ For development and functional testing, go with the debug version which includes
 more assertions and debug prints. Otherwise, for production or performance
 testing, we recommend building a release version which is more optimized.
 
-## Join us
+## 📈 Performance 
+
+We are using DBbench to test performance and progress between the versions. it is available under tools and also in the artifact for direct download.
+In there you can also find a readme with the commands we are using to get you started. 
+
+<img width="769" alt="Screen Shot 2022-10-31 at 15 15 42" src="https://user-images.githubusercontent.com/107058910/199016617-4ecbe279-b281-4a8c-b630-87a509bc09da.png">
+shorturl.at/dlKOY 
+## Questions 
+
+- For live discussion with the community you can use our official [Discord channel](https://discord.gg/52yzKZ5G9D). 
+- For technical questions and discussions you can use our official [Discourse forum](https://speedb.discourse.group/). 
+
+
+## 🌎 Join us 
 
 Speedb is committed to a welcoming and inclusive environment where everyone can
 contribute.
 
 
 ## Contributing code
+
 See the [contributing guide](CONTRIBUTING.md).
 
 

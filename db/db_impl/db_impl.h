@@ -1389,16 +1389,19 @@ class DBImpl : public DB {
   // be made to the descriptor are added to *edit.
   // recovered_seq is set to less than kMaxSequenceNumber if the log's tail is
   // skipped.
+  // recovery_ctx stores the context about version edits and all those
+  // edits are persisted to new Manifest after successfully syncing the new WAL.
   virtual Status Recover(
       const std::vector<ColumnFamilyDescriptor>& column_families,
       bool read_only = false, bool error_if_wal_file_exists = false,
       bool error_if_data_exists_in_wals = false,
-      uint64_t* recovered_seq = nullptr);
+      uint64_t* recovered_seq = nullptr,
+      RecoveryContext* recovery_ctx = nullptr);
 
   virtual bool OwnTablesAndLogs() const { return true; }
 
   // Set DB identity file, and write DB ID to manifest if necessary.
-  Status SetDBId(bool read_only);
+  Status SetDBId(bool read_only, RecoveryContext* recovery_ctx);
 
   // REQUIRES: db mutex held when calling this function, but the db mutex can
   // be released and re-acquired. Db mutex will be held when the function
@@ -1407,12 +1410,15 @@ class DBImpl : public DB {
   // not referenced in the MANIFEST (e.g.
   // 1. It's best effort recovery;
   // 2. The VersionEdits referencing the SST files are appended to
-  // MANIFEST, DB crashes when syncing the MANIFEST, the VersionEdits are
+  // RecoveryContext, DB crashes when syncing the MANIFEST, the VersionEdits are
   // still not synced to MANIFEST during recovery.)
-  // We delete these SST files. In the
+  // It stores the SST files to be deleted in RecoveryContext. In the
   // meantime, we find out the largest file number present in the paths, and
   // bump up the version set's next_file_number_ to be 1 + largest_file_number.
-  Status DeleteUnreferencedSstFiles();
+  // recovery_ctx stores the context about version edits and files to be
+  // deleted. All those edits are persisted to new Manifest after successfully
+  // syncing the new WAL.
+  Status DeleteUnreferencedSstFiles(RecoveryContext* recovery_ctx);
 
   // SetDbSessionId() should be called in the constuctor DBImpl()
   // to ensure that db_session_id_ gets updated every time the DB is opened
@@ -1712,7 +1718,8 @@ class DBImpl : public DB {
   // corrupted_log_found is set to true if we recover from a corrupted log file.
   Status RecoverLogFiles(const std::vector<uint64_t>& log_numbers,
                          SequenceNumber* next_sequence, bool read_only,
-                         bool* corrupted_log_found);
+                         bool* corrupted_log_found,
+                         RecoveryContext* recovery_ctx);
 
   // The following two methods are used to flush a memtable to
   // storage. The first one is used at database RecoveryTime (when the

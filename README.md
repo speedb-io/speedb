@@ -1,10 +1,26 @@
+<div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset=".github/speedb-logo-dark.gif" width="480px" >
+    <img src=".github/speedb-logo.gif" width="480px">
+  </picture>
+</div>
+
+<div align="center">
+
+![GitHub](https://img.shields.io/github/license/speedb-io/speedb)
+![GitHub contributors](https://img.shields.io/github/contributors/speedb-io/speedb?color=blue)
+![GitHub pull requests](https://img.shields.io/github/issues-pr/speedb-io/speedb)
+![GitHub closed pull requests](https://img.shields.io/github/issues-pr-closed/speedb-io/speedb?color=green)
+</div>
+
 # Speedb
-
-![GitHub contributors](https://img.shields.io/github/contributors/speedb-io/speedb)
-
-
 Speedb is a library that provides persistent key-value stores. Keys and values are arbitrary byte arrays. The keys are ordered within the key value store according to a user-specified comparator function.
 It is maintained by Speedb and is forked from Rocksdb, developed by Facebook.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset=".github/speedb-bee-dark.gif" width="80px" >
+  <img src=".github/speedb-bee.gif" width="80px">
+</picture>
 
 
 ## Usage
@@ -33,6 +49,7 @@ The public interface is in [include](include/rocksdb). Callers should not includ
 Please refer to the file [INSTALL.md](INSTALL.md) for a list of all the
 dependencies and how to install them across different platforms.
 
+
 ## Building Speedb
 
 Debug:
@@ -49,7 +66,7 @@ Release:
     cmake .. -DCMAKE_BUILD_TYPE=Release [cmake options]
     make rocksdb
 
-This will build the static library. If you want to build the dynammic library,
+This will build the static library. If you want to build the dynamic library,
 use:
 
     make rocksdb-shared
@@ -65,6 +82,13 @@ For development and functional testing, go with the debug version which includes
 more assertions and debug prints. Otherwise, for production or performance
 testing, we recommend building a release version which is more optimized.
 
+
+## Questions 
+
+- For live discussion with the community you can use our official [Discord channel](https://discord.gg/52yzKZ5G9D). 
+- For technical questions and discussions you can use our official [Discourse forum](https://speedb.discourse.group/). 
+
+
 ## Join us
 
 Speedb is committed to a welcoming and inclusive environment where everyone can
@@ -72,8 +96,12 @@ contribute.
 
 
 ## Contributing code
+
 See the [contributing guide](CONTRIBUTING.md).
 
 
 ## License
 Speedb is open-source and licensed under the [Apache 2.0 License](LICENSE.Apache).
+
+
+<img src=".github/speedb-b.gif" width="200px">

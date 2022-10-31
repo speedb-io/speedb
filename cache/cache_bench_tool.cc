@@ -22,6 +22,7 @@
 #include "rocksdb/secondary_cache.h"
 #include "rocksdb/system_clock.h"
 #include "rocksdb/table_properties.h"
+#include "speedb/version.h"
 #include "table/block_based/block_based_table_reader.h"
 #include "table/block_based/cachable_entry.h"
 #include "util/coding.h"
@@ -591,7 +592,8 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   void PrintEnv() const {
 PERF_MARKER(__PRETTY_FUNCTION__);
-    printf("RocksDB version     : %d.%d\n", kMajorVersion, kMinorVersion);
+    printf("Speedb version      : %s\n",
+           GetSpeedbVersionAsString(false).c_str());
     printf("Number of threads   : %u\n", FLAGS_threads);
     printf("Ops per thread      : %" PRIu64 "\n", FLAGS_ops_per_thread);
     printf("Cache size          : %s\n",

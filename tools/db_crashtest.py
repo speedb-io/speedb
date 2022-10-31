@@ -184,6 +184,7 @@ default_params = {
     "data_block_index_type": random.randint(0, 1),
     "data_block_hash_table_util_ratio": random.randint(0, 100) / 100.0,
     "customopspercent": 0,
+    "filter_uri": lambda: random.choice(["speedb.PairedBloomFilter", ""]),
 }
 
 _TEST_DIR_ENV_VAR = 'TEST_TMPDIR'
@@ -636,6 +637,10 @@ def finalize_and_sanitize(src_params, counter):
         dest_params["memtable_prefix_bloom_size_ratio"] = 0
     if dest_params.get("two_write_queues") == 1:
         dest_params["enable_pipelined_write"] = 0
+    # make sure bloom_bits is not 0 when filter_uri is used since it fails in CreateFilterPolicy.
+    if dest_params.get("filter_uri") != "":
+        dest_params["bloom_bits"] = random.choice([random.randint(1,19),
+                                         random.lognormvariate(2.3, 1.3)])
     return dest_params
 
 
@@ -830,6 +835,8 @@ def narrow_crash_main(args, unknown_args):
         time.sleep(2)  # time to stabilize before the next run
 
     shutil.rmtree(dbname, True)
+    for ctr in range(max(0, counter - 2), counter):
+        shutil.rmtree('{}_{}'.format(dbname, ctr), True)
 
 
 # This script runs and kills db_stress multiple times. It checks consistency
@@ -878,7 +885,7 @@ def blackbox_crash_main(args, unknown_args):
     # we need to clean up after ourselves -- only do this on test success
     shutil.rmtree(dbname, True)
     for ctr in range(max(0, counter - 2), counter):
-        shutil.rmtree('{}_{}'.format(dbname, ctr))
+        shutil.rmtree('{}_{}'.format(dbname, ctr), True)
 
 
 # This python script runs db_stress multiple times. Some runs with
@@ -1031,11 +1038,11 @@ def whitebox_crash_main(args, unknown_args):
                 shutil.rmtree(expected_values_dir)
             expected_values_dir = None
             check_mode = (check_mode + 1) % total_check_mode
-            for ctr in range(max(0, counter - 2), counter):
-                shutil.rmtree('{}_{}'.format(dbname, ctr))
-            counter = 0
 
         time.sleep(1)  # time to stabilize after a kill
+
+    for ctr in range(max(0, counter - 2), counter):
+        shutil.rmtree('{}_{}'.format(dbname, ctr), True)
 
 
 def bool_converter(v):
@@ -1085,7 +1092,7 @@ def main():
     args, unknown_args = parser.parse_known_args()
 
     test_tmpdir = os.environ.get(_TEST_DIR_ENV_VAR)
-    if test_tmpdir is not None and not os.path.isdir(test_tmpdir):
+    if test_tmpdir and not os.path.isdir(test_tmpdir):
         print('%s env var is set to a non-existent directory: %s' %
                 (_TEST_DIR_ENV_VAR, test_tmpdir))
         sys.exit(1)

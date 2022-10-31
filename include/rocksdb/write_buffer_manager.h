@@ -71,7 +71,19 @@ class WriteBufferManager final {
 
   // Returns the total memory used by active memtables.
   size_t mutable_memtable_memory_usage() const {
-    return memory_active_.load(std::memory_order_relaxed);
+    const size_t total = memory_usage();
+    const size_t inactive = memory_inactive_.load(std::memory_order_acquire);
+    return ((inactive >= total) ? 0 : (total - inactive));
+  }
+
+  // Returns the total inactive memory used by memtables.
+  size_t immmutable_memtable_memory_usage() const {
+    return memory_inactive_.load(std::memory_order_relaxed);
+  }
+
+  // Returns the total memory marked to be freed but not yet actually freed
+  size_t memtable_memory_being_freed_usage() const {
+    return memory_being_freed_.load(std::memory_order_relaxed);
   }
 
   size_t dummy_entries_in_cache_usage() const;
@@ -81,9 +93,19 @@ class WriteBufferManager final {
     return buffer_size_.load(std::memory_order_relaxed);
   }
 
+  // Note that the memory_inactive_ and memory_being_freed_ counters
+  // are NOT maintained when the WBM is disabled. In addition, memory_used_ is
+  // maintained only when enabled or cache is provided. Therefore, if switching
+  // from disabled to enabled, these counters will (or may) be invalid or may
+  // wraparound
   void SetBufferSize(size_t new_size) {
+    [[maybe_unused]] auto was_enabled = enabled();
+
     buffer_size_.store(new_size, std::memory_order_relaxed);
     mutable_limit_.store(new_size * 7 / 8, std::memory_order_relaxed);
+
+    assert(was_enabled == enabled());
+
     // Check if stall is active and can be ended.
     MaybeEndWriteStall();
   }
@@ -140,6 +162,17 @@ class WriteBufferManager final {
   // when checking the soft limit.
   void ScheduleFreeMem(size_t mem);
 
+  // Freeing 'mem' bytes has actually started.
+  // The process may complete successfully and FreeMem() will be called to
+  // notifiy successfull completion, or, aborted, and FreeMemCancelled() will be
+  // called to notify that.
+  void FreeMemBegin(size_t mem);
+
+  // Freeing 'mem' bytes was aborted and that memory is no longer in the process
+  // of being freed
+  void FreeMemAborted(size_t mem);
+
+  // Freeing 'mem' bytes completed successfully
   void FreeMem(size_t mem);
 
   // Add the DB instance to the queue and block the DB.
@@ -157,9 +190,11 @@ class WriteBufferManager final {
  private:
   std::atomic<size_t> buffer_size_;
   std::atomic<size_t> mutable_limit_;
-  std::atomic<size_t> memory_used_;
-  // Memory that hasn't been scheduled to free.
-  std::atomic<size_t> memory_active_;
+  std::atomic<size_t> memory_used_ = 0U;
+  // Memory that has been scheduled to free.
+  std::atomic<size_t> memory_inactive_ = 0U;
+  // Memory that in the process of being freed
+  std::atomic<size_t> memory_being_freed_ = 0U;
   std::shared_ptr<CacheReservationManager> cache_res_mgr_;
   // Protects cache_res_mgr_
   std::mutex cache_res_mgr_mu_;

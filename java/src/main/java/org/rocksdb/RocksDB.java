@@ -120,8 +120,7 @@ public class RocksDB extends RocksObject {
       UnsatisfiedLinkError err = null;
       for (final String path : paths) {
         try {
-          System.load(path + "/" +
-              Environment.getJniLibraryFileName("rocksdbjni"));
+          System.load(path + "/" + Environment.getJniLibraryFileName("speedbjni"));
           success = true;
           break;
         } catch (final UnsatisfiedLinkError e) {

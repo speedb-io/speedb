@@ -37,13 +37,13 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 Status SuggestCompactRange(DB* /*db*/, ColumnFamilyHandle* /*column_family*/,
                            const Slice* /*begin*/, const Slice* /*end*/) {
 PERF_MARKER(__PRETTY_FUNCTION__);
-  return Status::NotSupported("Not supported in RocksDB LITE");
+  return Status::NotSupported("Not supported in LITE mode");
 }
 
 Status PromoteL0(DB* /*db*/, ColumnFamilyHandle* /*column_family*/,
                  int /*target_level*/) {
 PERF_MARKER(__PRETTY_FUNCTION__);
-  return Status::NotSupported("Not supported in RocksDB LITE");
+  return Status::NotSupported("Not supported in LITE mode");
 }
 
 #endif  // ROCKSDB_LITE

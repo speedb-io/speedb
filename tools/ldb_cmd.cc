@@ -3872,7 +3872,7 @@ IngestExternalSstFilesCommand::IngestExternalSstFilesCommand(
     if (!write_global_seqno_) {
       fprintf(stderr,
               "Warning: not writing global_seqno to the ingested SST can\n"
-              "prevent older versions of RocksDB from being able to open it\n");
+              "prevent older versions of Speedb from being able to open it\n");
     }
   } else {
     if (write_global_seqno_) {

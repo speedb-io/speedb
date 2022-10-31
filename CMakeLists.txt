@@ -6,7 +6,7 @@
 #     Run the build commands from within the Developer Command Prompt window to have paths to the compiler and runtime libraries set.
 #     You must have git.exe in your %PATH% environment variable.
 #
-# To build Rocksdb for Windows is as easy as 1-2-3-4-5:
+# To build Speedb for Windows is as easy as 1-2-3-4-5:
 #
 # 1. Update paths to third-party libraries in thirdparty.inc file
 # 2. Create a new directory for build artifacts
@@ -17,13 +17,13 @@
 #        sample command: cmake -G "Visual Studio 16 2019" -DCMAKE_BUILD_TYPE=Release -DWITH_GFLAGS=1 -DWITH_SNAPPY=1 -DWITH_JEMALLOC=1 -DWITH_JNI=1 ..
 # 4. Then build the project in debug mode (you may want to add /m[:<N>] flag to run msbuild in <N> parallel threads
 #                                          or simply /m to use all avail cores)
-#        msbuild rocksdb.sln
+#        msbuild speedb.sln
 #
-#        rocksdb.sln build features exclusions of test only code in Release. If you build ALL_BUILD then everything
+#        speedb.sln build features exclusions of test only code in Release. If you build ALL_BUILD then everything
 #        will be attempted but test only code does not build in Release mode.
 #
 # 5. And release mode (/m[:<N>] is also supported)
-#        msbuild rocksdb.sln /p:Configuration=Release
+#        msbuild speedb.sln /p:Configuration=Release
 #
 # Linux:
 #
@@ -35,11 +35,11 @@
 cmake_minimum_required(VERSION 3.10)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/modules/")
-include(ReadVersion)
+include(ReadSpeedbVersion)
 include(GoogleTest)
-get_rocksdb_version(rocksdb_VERSION)
-project(rocksdb
-  VERSION ${rocksdb_VERSION}
+get_speedb_version(speedb_VERSION)
+project(speedb
+  VERSION ${speedb_VERSION}
   LANGUAGES CXX C ASM)
 
 if(POLICY CMP0042)
@@ -490,7 +490,7 @@ if(CMAKE_COMPILER_IS_GNUCXX)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-builtin-memcmp")
 endif()
 
-option(ROCKSDB_LITE "Build RocksDBLite version" OFF)
+option(ROCKSDB_LITE "Build LITE version" OFF)
 if(ROCKSDB_LITE)
   add_definitions(-DROCKSDB_LITE)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-exceptions -Os")
@@ -936,6 +936,16 @@ if( ROCKSDB_PLUGINS )
         ${plugin_root}/${src}
         PROPERTIES COMPILE_FLAGS "${${plugin}_COMPILE_FLAGS}")
     endforeach()
+    get_directory_property(${plugin}_TESTS
+      DIRECTORY ${plugin_root}
+      DEFINITION ${plugin}_TESTS)
+    foreach (test ${${plugin}_TESTS})
+      list(APPEND PLUGIN_TESTS ${plugin_root}/${test})
+      set_source_files_properties(
+        ${plugin_root}/${test}
+        PROPERTIES COMPILE_FLAGS "${${plugin}_COMPILE_FLAGS}")
+    endforeach()
+    
     get_directory_property(${plugin}_INCLUDE_PATHS
       DIRECTORY ${plugin_root}
       DEFINITION ${plugin}_INCLUDE_PATHS)
@@ -1024,10 +1034,10 @@ if(USE_FOLLY)
     third-party/folly/folly/ScopeGuard.cpp)
 endif()
 
-set(ROCKSDB_STATIC_LIB rocksdb${ARTIFACT_SUFFIX})
-set(ROCKSDB_SHARED_LIB rocksdb-shared${ARTIFACT_SUFFIX})
+set(ROCKSDB_STATIC_LIB ${PROJECT_NAME}${ARTIFACT_SUFFIX})
+set(ROCKSDB_SHARED_LIB ${PROJECT_NAME}-shared${ARTIFACT_SUFFIX})
 
-option(ROCKSDB_BUILD_SHARED "Build shared versions of the RocksDB libraries" ON)
+option(ROCKSDB_BUILD_SHARED "Build shared versions of the libraries" ON)
 
 
 if(WIN32)
@@ -1037,7 +1047,7 @@ else()
 endif()
 
 string(TIMESTAMP TS "%Y-%m-%d %H:%M:%S" UTC)
-set(BUILD_DATE "${TS}" CACHE STRING "the time we first built rocksdb")
+set(BUILD_DATE "${TS}" CACHE STRING "the time we first built Speedb")
 
 find_package(Git)
 
@@ -1081,9 +1091,9 @@ if(ROCKSDB_BUILD_SHARED)
   else()
     set_target_properties(${ROCKSDB_SHARED_LIB} PROPERTIES
                           LINKER_LANGUAGE CXX
-                          VERSION ${rocksdb_VERSION}
-                          SOVERSION ${rocksdb_VERSION_MAJOR}
-                          OUTPUT_NAME "rocksdb${ARTIFACT_SUFFIX}")
+                          VERSION ${PROJECT_VERSION}
+                          SOVERSION ${speedb_VERSION_MAJOR}
+                          OUTPUT_NAME "${PROJECT_NAME}${ARTIFACT_SUFFIX}")
   endif()
 endif()
 
@@ -1126,16 +1136,16 @@ if(NOT WIN32 OR ROCKSDB_INSTALL_ON_WINDOWS)
   include(GNUInstallDirs)
   include(CMakePackageConfigHelpers)
 
-  set(package_config_destination ${CMAKE_INSTALL_LIBDIR}/cmake/rocksdb)
+  set(package_config_destination ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME})
 
   configure_package_config_file(
-    ${CMAKE_CURRENT_LIST_DIR}/cmake/RocksDBConfig.cmake.in RocksDBConfig.cmake
+    ${CMAKE_CURRENT_LIST_DIR}/cmake/SpeedbConfig.cmake.in SpeedbConfig.cmake
     INSTALL_DESTINATION ${package_config_destination}
   )
 
   write_basic_package_version_file(
-    RocksDBConfigVersion.cmake
-    VERSION ${rocksdb_VERSION}
+    SpeedbConfigVersion.cmake
+    VERSION ${PROJECT_VERSION}
     COMPATIBILITY SameMajorVersion
   )
 
@@ -1145,7 +1155,7 @@ if(NOT WIN32 OR ROCKSDB_INSTALL_ON_WINDOWS)
 
   install(
     TARGETS ${ROCKSDB_STATIC_LIB}
-    EXPORT RocksDBTargets
+    EXPORT SpeedbTargets
     COMPONENT devel
     ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     INCLUDES DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
@@ -1154,7 +1164,7 @@ if(NOT WIN32 OR ROCKSDB_INSTALL_ON_WINDOWS)
   if(ROCKSDB_BUILD_SHARED)
     install(
       TARGETS ${ROCKSDB_SHARED_LIB}
-      EXPORT RocksDBTargets
+      EXPORT SpeedbTargets
       COMPONENT runtime
       ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
       RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
@@ -1164,16 +1174,16 @@ if(NOT WIN32 OR ROCKSDB_INSTALL_ON_WINDOWS)
   endif()
 
   install(
-    EXPORT RocksDBTargets
+    EXPORT SpeedbTargets
     COMPONENT devel
     DESTINATION ${package_config_destination}
-    NAMESPACE RocksDB::
+    NAMESPACE Speedb::
   )
 
   install(
     FILES
-    ${CMAKE_CURRENT_BINARY_DIR}/RocksDBConfig.cmake
-    ${CMAKE_CURRENT_BINARY_DIR}/RocksDBConfigVersion.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/SpeedbConfig.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/SpeedbConfigVersion.cmake
     COMPONENT devel
     DESTINATION ${package_config_destination}
   )
@@ -1190,6 +1200,20 @@ if(WITH_TESTS OR WITH_BENCHMARK_TOOLS)
 endif()
 
 if(WITH_TESTS)
+  # c_test - doesn't use gtest
+  # env_test - suspicious use of test::TmpDir
+  # deletefile_test - serial because it generates giant temporary files in
+  #   its various tests. Running its tests in parallel can fill up your /dev/shm
+  # db_bloom_filter_test - serial because excessive space usage by instances
+  #   of DBFilterConstructionReserveMemoryTestWithParam can fill up /dev/shm
+  # timer_queue_test - doesn't use gtest
+  set(NON_PARALLEL_TESTS
+    c_test
+    env_test
+    deletefile_test
+    db_bloom_filter_test
+    timer_queue_test
+  )
   set(TESTS
         db/db_basic_test.cc
         env/env_basic_test.cc
@@ -1385,6 +1409,7 @@ if(WITH_TESTS)
         utilities/ttl/ttl_test.cc
         utilities/util_merge_operators_test.cc
         utilities/write_batch_with_index/write_batch_with_index_test.cc
+        ${PLUGIN_TESTS}
     )
   endif()
 
@@ -1396,7 +1421,10 @@ if(WITH_TESTS)
       utilities/cassandra/test_utils.cc
   )
   enable_testing()
-  add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND})
+  add_custom_target(check
+    COMMAND ${CMAKE_COMMAND} -P ${PROJECT_SOURCE_DIR}/cmake/CTestRunner.cmake
+    WORKING_DIRECTORY ${PROJECT_BINARY_DIR}
+    VERBATIM USES_TERMINAL)
   set(TESTUTILLIB testutillib${ARTIFACT_SUFFIX})
   add_library(${TESTUTILLIB} STATIC ${TESTUTIL_SOURCE})
   target_link_libraries(${TESTUTILLIB} ${ROCKSDB_LIB})
@@ -1419,10 +1447,12 @@ if(WITH_TESTS)
         OUTPUT_NAME ${exename}${ARTIFACT_SUFFIX}
       )
       target_link_libraries(${exename}${ARTIFACT_SUFFIX} ${TESTUTILLIB} testharness gtest ${THIRDPARTY_LIBS} ${ROCKSDB_LIB})
-      if(NOT "${exename}" MATCHES "db_sanity_test")
+      if(NOT "${exename}" IN_LIST NON_PARALLEL_TESTS)
         gtest_discover_tests(${exename} DISCOVERY_TIMEOUT 120)
-        add_dependencies(check ${exename}${ARTIFACT_SUFFIX})
+      else()
+        add_test(NAME ${exename} COMMAND ${exename}${ARTIFACT_SUFFIX})
       endif()
+      add_dependencies(check ${exename}${ARTIFACT_SUFFIX})
   endforeach(sourcefile ${TESTS})
 
   if(WIN32)

@@ -119,7 +119,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
 int main(int /*argc*/, char** /*argv*/) {
 PERF_MARKER(__PRETTY_FUNCTION__);
-  printf("Skipped as Options file is not supported in RocksDBLite.\n");
+  printf("Skipped as Options file is not supported in LITE mode.\n");
   return 0;
 }
 #endif  // !ROCKSDB_LITE

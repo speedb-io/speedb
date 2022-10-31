@@ -238,7 +238,7 @@ int main(int argc, char** argv) {
 }
 #else
 int main(int /*argc*/, char** /*argv*/) {
-  fprintf(stderr, "SKIPPED as RocksDBLite does not include utilities.\n");
+  fprintf(stderr, "SKIPPED as LITE mode does not include utilities.\n");
   return 0;
 }
 #endif  // !ROCKSDB_LITE

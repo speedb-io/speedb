@@ -147,6 +147,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   options.memtable_factory.reset(test::NewSpecialSkipListFactory(1));
   Reopen(options);
   env_->SetBackgroundThreads(0, Env::HIGH);
+  env_->SetBackgroundThreads(1, Env::LOW);
 
   std::thread::id tid;
   int num_flushes = 0, num_compactions = 0;
@@ -1708,6 +1709,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   options.create_if_missing = true;
   options.listeners.push_back(listener);
   // Setting max_flush_jobs = max_background_jobs / 4 = 2.
+  options.max_background_flushes = options.max_background_compactions = -1;
   options.max_background_jobs = 8;
   // Allow 2 immutable memtables.
   options.max_write_buffer_number = 3;
@@ -2748,6 +2750,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   options.env = fault_injection_env.get();
   // Set a larger value than default so that RocksDB can schedule concurrent
   // background flush threads.
+  options.max_background_flushes = options.max_background_compactions = -1;
   options.max_background_jobs = 8;
   options.max_write_buffer_number = 8;
   CreateAndReopenWithCF({"pikachu"}, options);

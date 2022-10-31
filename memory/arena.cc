@@ -71,7 +71,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 Arena::~Arena() {
 PERF_MARKER(__PRETTY_FUNCTION__);
   if (tracker_ != nullptr) {
-    assert(tracker_->is_freed());
+    assert(tracker_->IsMemoryFreed());
     tracker_->FreeMem();
   }
   for (const auto& block : blocks_) {

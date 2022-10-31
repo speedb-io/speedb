@@ -631,7 +631,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   if (!IsSupportedFormatVersion(footer.format_version())) {
     return Status::Corruption(
         "Unknown Footer version. Maybe this file was created with newer "
-        "version of RocksDB?");
+        "version of Speedb?");
   }
 
   BlockCacheLookupContext lookup_context{TableReaderCaller::kPrefetch};

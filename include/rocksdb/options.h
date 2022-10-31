@@ -672,10 +672,10 @@ struct DBOptions {
   // LOW priority thread pool. For more information, see
   // Env::SetBackgroundThreads
   //
-  // Default: -1
+  // Default: 8
   //
   // Dynamically changeable through SetDBOptions() API.
-  int max_background_compactions = -1;
+  int max_background_compactions = 8;
 
   // This value represents the maximum number of threads that will
   // concurrently perform a compaction job by breaking it into multiple,
@@ -1513,8 +1513,8 @@ struct ReadOptions {
   bool pin_data;
 
   // If true, when PurgeObsoleteFile is called in CleanupIteratorState, we
-  // schedule a background job in the flush job queue and delete obsolete files
-  // in background.
+  // schedule a background job in the compaction job queue and delete obsolete
+  // files in background.
   // Default: false
   bool background_purge_on_iterator_cleanup;
 

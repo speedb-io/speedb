@@ -10,6 +10,8 @@
 SHELL := $(shell command -v bash || echo $(SHELL))
 include common.mk
 
+PROJECT_NAME := speedb
+
 CLEAN_FILES = # deliberately empty, so we can append below.
 CFLAGS += ${EXTRA_CFLAGS}
 CXXFLAGS += ${EXTRA_CXXFLAGS}
@@ -21,19 +23,19 @@ STRIPFLAGS = -S -x
 # Transform parallel LOG output into something more readable.
 parallel_log_extract = awk \
   'BEGIN{FS="\t"} { \
-  	t=$$9; sub(/if *\[\[ *"/,"",t); sub(/" =.*/,"",t); sub(/ >.*/,"",t); sub(/.*--gtest_filter=/,"",t); \
-  	printf("%7.3f %s %s\n",4,($$7 == 0 ? "PASS" : "FAIL"),t) \
+     t=$$9; sub(/if *\[\[ *"/,"",t); sub(/" =.*/,"",t); sub(/ >.*/,"",t); sub(/.*--gtest_filter=/,"",t); \
+     printf("%7.3f %s %s\n",4,($$7 == 0 ? "PASS" : "FAIL"),t) \
   }'
 
 # DEBUG_LEVEL can have three values:
-# * DEBUG_LEVEL=2; this is the ultimate debug mode. It will compile rocksdb
+# * DEBUG_LEVEL=2; this is the ultimate debug mode. It will compile Speedb
 # without any optimizations. To compile with level 2, issue `make dbg`
 # * DEBUG_LEVEL=1; debug level 1 enables all assertions and debug code, but
-# compiles rocksdb with -O2 optimizations. this is the default debug level.
-# `make all` or `make <binary_target>` compile RocksDB with debug level 1.
-# We use this debug level when developing RocksDB.
+# compiles Speedb with -O2 optimizations. this is the default debug level.
+# `make all` or `make <binary_target>` compile Speedb with debug level 1.
+# We use this debug level when developing Speedb.
 # * DEBUG_LEVEL=0; this is the debug level we use for release. If you're
-# running rocksdb in production you most definitely want to compile RocksDB
+# running Speedb in production you most definitely want to compile Speedb
 # with debug level 0. To compile with level 0, run `make shared_lib`,
 # `make install-shared`, `make static_lib`, `make install-static` or
 # `make install`
@@ -165,7 +167,7 @@ endif
 
 # `USE_LTO=1` enables link-time optimizations. Among other things, this enables
 # more devirtualization opportunities and inlining across translation units.
-# This can save significant overhead introduced by RocksDB's pluggable
+# This can save significant overhead introduced by Speedb's pluggable
 # interfaces/internal abstractions, like in the iterator hierarchy. It works
 # better when combined with profile-guided optimizations (not currently
 # supported natively in Makefile).
@@ -210,11 +212,35 @@ am__v_AR_1 =
 AM_LINK = $(AM_V_CCLD)$(CXX) -L. $(patsubst lib%.a, -l%, $(patsubst lib%.$(PLATFORM_SHARED_EXT), -l%, $^)) $(EXEC_LDFLAGS) -o $@ $(LDFLAGS) $(COVERAGEFLAGS)
 AM_SHARE = $(AM_V_CCLD) $(CXX) $(PLATFORM_SHARED_LDFLAGS)$@ -L. $(patsubst lib%.$(PLATFORM_SHARED_EXT), -l%, $^) $(EXEC_LDFLAGS) $(LDFLAGS) -o $@
 
+# if user didn't config LIBNAME, set the default
+ifeq ($(LIBNAME),)
+  export LIBNAME=lib$(PROJECT_NAME)
+# we should only run Speedb in production with DEBUG_LEVEL 0
+ifneq ($(DEBUG_LEVEL),0)
+  LIBDEBUG=_debug
+endif
+
+endif
+# Only regenerate make_config.mk if it doesn't exists or if we're invoked in a mode
+# that executes target recipes (i.e. not -n or -q)
+ifeq ($(and $(or $(findstring n,$(MAKEFLAGS)),$(findstring q,$(MAKEFLAGS))),$(wildcard make_config.mk)),)
+# Only generate make_config.mk during the main make invocation, not on restarts
+# (restarts are caused by Makefiles being updated during the parsing of the Makefile,
+#  which is exactly what happens when make_config.mk is regenerated and included).
+ifeq ($(MAKE_RESTARTS),)
+# If make_config.mk exists and the make invocation was for a target that doesn't
+# need to regenerate it (because it doesn't build anything), such as `make clean`,
+# don't perform the regeneration since these targets either don't need make_config.mk
+# at all or only need to use the existing configuration in make_config.mk to do
+# their job.
+NO_CONFIG_REGENERATION_TARGETS := clean% jclean uninstall dump-log watch-log tags% format check-format check-buck-targets check-sources package checkout_folly list_all_tests
+ifneq ($(strip $(and $(wildcard make_config.mk),$(filter-out $(NO_CONFIG_REGENERATION_TARGETS),$(MAKECMDGOALS) make_config.mk))),make_config.mk)
+
 # Detect what platform we're building on.
 # Export some common variables that might have been passed as Make variables
 # instead of environment variables.
-dummy := $(shell (export ROCKSDB_ROOT="$(CURDIR)"; \
-                  export CXXFLAGS="$(EXTRA_CXXFLAGS)"; \
+$(info * GEN     make_config.mk)
+dummy := $(shell (export CXXFLAGS="$(EXTRA_CXXFLAGS)"; \
                   export LDFLAGS="$(EXTRA_LDFLAGS)"; \
                   export COMPILE_WITH_ASAN="$(COMPILE_WITH_ASAN)"; \
                   export COMPILE_WITH_TSAN="$(COMPILE_WITH_TSAN)"; \
@@ -222,8 +248,14 @@ dummy := $(shell (export ROCKSDB_ROOT="$(CURDIR)"; \
                   export PORTABLE="$(PORTABLE)"; \
                   export ROCKSDB_NO_FBCODE="$(ROCKSDB_NO_FBCODE)"; \
                   export USE_CLANG="$(USE_CLANG)"; \
+                  export LIBNAME="$(LIBNAME)"; \
                   export LIB_MODE="$(LIB_MODE)"; \
                   "$(CURDIR)/build_tools/build_detect_platform" "$(CURDIR)/make_config.mk"))
+
+endif
+endif
+endif
+
 # this file is generated by the previous line to set build flags and sources
 include make_config.mk
 
@@ -242,6 +274,7 @@ ROCKSDB_PLUGIN_EXTERNS = $(foreach p, $(ROCKSDB_PLUGIN_W_FUNCS), int $($(p)_FUNC
 ROCKSDB_PLUGIN_BUILTINS = $(foreach p, $(ROCKSDB_PLUGIN_W_FUNCS), {\"$(p)\"\, $($(p)_FUNC)}\,)
 ROCKSDB_PLUGIN_LDFLAGS = $(foreach plugin, $(ROCKSDB_PLUGINS), $($(plugin)_LDFLAGS))
 ROCKSDB_PLUGIN_PKGCONFIG_REQUIRES = $(foreach plugin, $(ROCKSDB_PLUGINS), $($(plugin)_PKGCONFIG_REQUIRES))
+ROCKSDB_PLUGIN_TESTS = $(foreach p, $(ROCKSDB_PLUGINS), $(foreach test, $($(p)_TESTS), plugin/$(p)/$(test)))
 
 CXXFLAGS += $(foreach plugin, $(ROCKSDB_PLUGINS), $($(plugin)_CXXFLAGS))
 PLATFORM_LDFLAGS += $(ROCKSDB_PLUGIN_LDFLAGS)
@@ -277,7 +310,7 @@ endif
 endif
 
 export JAVAC_ARGS
-CLEAN_FILES += make_config.mk rocksdb.pc
+CLEAN_FILES += make_config.mk test_config.mk $(PROJECT_NAME).pc
 
 ifeq ($(V), 1)
 $(info $(shell uname -a))
@@ -568,10 +601,12 @@ STRESS_OBJECTS =  $(patsubst %.cc, $(OBJ_DIR)/%.o, $(STRESS_LIB_SOURCES))
 ALL_SOURCES  = $(filter-out util/build_version.cc, $(LIB_SOURCES)) $(TEST_LIB_SOURCES) $(MOCK_LIB_SOURCES) $(GTEST_DIR)/gtest/gtest-all.cc
 ALL_SOURCES += $(TOOL_LIB_SOURCES) $(BENCH_LIB_SOURCES) $(CACHE_BENCH_LIB_SOURCES) $(ANALYZER_LIB_SOURCES) $(STRESS_LIB_SOURCES)
 ALL_SOURCES += $(TEST_MAIN_SOURCES) $(TOOL_MAIN_SOURCES) $(BENCH_MAIN_SOURCES)
-ALL_SOURCES += $(ROCKSDB_PLUGIN_SOURCES)
+ALL_SOURCES += $(ROCKSDB_PLUGIN_SOURCES) $(ROCKSDB_PLUGIN_TESTS)
 
+PLUGIN_TESTS = $(patsubst %.cc, %, $(notdir $(ROCKSDB_PLUGIN_TESTS)))
 TESTS = $(patsubst %.cc, %, $(notdir $(TEST_MAIN_SOURCES)))
 TESTS += $(patsubst %.c, %, $(notdir $(TEST_MAIN_SOURCES_C)))
+TESTS += $(PLUGIN_TESTS)
 
 # `make check-headers` to very that each header file includes its own
 # dependencies
@@ -621,11 +656,14 @@ ROCKSDBTESTS_SUBSET ?= $(TESTS)
 #   its various tests. Parallel can fill up your /dev/shm
 # db_bloom_filter_test - serial because excessive space usage by instances
 #   of DBFilterConstructionReserveMemoryTestWithParam can fill up /dev/shm
+# timer_queue_test - doesn't use gtest
 NON_PARALLEL_TEST = \
 	c_test \
 	env_test \
 	deletefile_test \
 	db_bloom_filter_test \
+	timer_queue_test \
+	$(PLUGIN_TESTS) \
 
 PARALLEL_TEST = $(filter-out $(NON_PARALLEL_TEST), $(TESTS))
 
@@ -677,24 +715,16 @@ else ifeq ($(ROCKSDBTESTS_PLATFORM_DEPENDENT), exclude)
 endif
 
 # bench_tool_analyer main is in bench_tool_analyzer_tool, or this would be simpler...
-TOOLS = $(patsubst %.cc, %, $(notdir $(patsubst %_tool.cc, %.cc, $(TOOLS_MAIN_SOURCES))))
+TOOLS = $(patsubst rocksdb_%, $(PROJECT_NAME)_%,$(patsubst %.cc, %, $(notdir $(patsubst %_tool.cc, %.cc, $(TOOLS_MAIN_SOURCES)))))
 
 TEST_LIBS = \
-	librocksdb_env_basic_test.a
+	lib$(PROJECT_NAME)_env_basic_test.a
 
 # TODO: add back forward_iterator_bench, after making it build in all environemnts.
 BENCHMARKS = $(patsubst %.cc, %, $(notdir $(BENCH_MAIN_SOURCES)))
 
 MICROBENCHS = $(patsubst %.cc, %, $(notdir $(MICROBENCH_SOURCES)))
 
-# if user didn't config LIBNAME, set the default
-ifeq ($(LIBNAME),)
-  LIBNAME=librocksdb
-# we should only run rocksdb in production with DEBUG_LEVEL 0
-ifneq ($(DEBUG_LEVEL),0)
-  LIBDEBUG=_debug
-endif
-endif
 STATIC_LIBRARY = ${LIBNAME}$(LIBDEBUG).a
 STATIC_TEST_LIBRARY =  ${LIBNAME}_test$(LIBDEBUG).a
 STATIC_TOOLS_LIBRARY = ${LIBNAME}_tools$(LIBDEBUG).a
@@ -720,10 +750,6 @@ TEST_LIBRARY=$(STATIC_TEST_LIBRARY)
 TOOLS_LIBRARY=$(STATIC_TOOLS_LIBRARY)
 endif
 STRESS_LIBRARY=$(STATIC_STRESS_LIBRARY)
-
-ROCKSDB_MAJOR = $(shell egrep "ROCKSDB_MAJOR.[0-9]" include/rocksdb/version.h | cut -d ' ' -f 3)
-ROCKSDB_MINOR = $(shell egrep "ROCKSDB_MINOR.[0-9]" include/rocksdb/version.h | cut -d ' ' -f 3)
-ROCKSDB_PATCH = $(shell egrep "ROCKSDB_PATCH.[0-9]" include/rocksdb/version.h | cut -d ' ' -f 3)
 
 # If NO_UPDATE_BUILD_VERSION is set we don't update util/build_version.cc, but
 # the file needs to already exist or else the build will fail
@@ -770,9 +796,9 @@ SHARED3 = $(SHARED1)
 SHARED4 = $(SHARED1)
 SHARED = $(SHARED1)
 else
-SHARED_MAJOR = $(ROCKSDB_MAJOR)
-SHARED_MINOR = $(ROCKSDB_MINOR)
-SHARED_PATCH = $(ROCKSDB_PATCH)
+SHARED_MAJOR = $(VERSION_MAJOR)
+SHARED_MINOR = $(VERSION_MINOR)
+SHARED_PATCH = $(VERSION_PATCH)
 SHARED1 = ${LIBNAME}.$(PLATFORM_SHARED_EXT)
 ifeq ($(PLATFORM), OS_MACOSX)
 SHARED_OSX = $(LIBNAME)$(LIBDEBUG).$(SHARED_MAJOR)
@@ -872,28 +898,25 @@ coverage: clean
 #
 
 parallel_tests = $(patsubst %,parallel_%,$(PARALLEL_TEST))
-.PHONY: gen_parallel_tests $(parallel_tests)
-$(parallel_tests):
-	$(AM_V_at)TEST_BINARY=$(patsubst parallel_%,%,$@); \
+.PHONY: $(parallel_tests)
+$(parallel_tests): $(parallel_tests:parallel_%=%)
+	$(AM_V_at)mkdir -p t; \
+	TEST_BINARY=$(patsubst parallel_%,%,$@); \
   TEST_NAMES=` \
     (./$$TEST_BINARY --gtest_list_tests || echo "  $${TEST_BINARY}__list_tests_failure") \
     | awk '/^[^ ]/ { prefix = $$1 } /^[ ]/ { print prefix $$1 }'`; \
 	echo "  Generating parallel test scripts for $$TEST_BINARY"; \
+	rm -f t/run-$${TEST_BINARY}-*; \
 	for TEST_NAME in $$TEST_NAMES; do \
-		TEST_SCRIPT=t/run-$$TEST_BINARY-$${TEST_NAME//\//-}; \
+		TEST_SCRIPT=run-$${TEST_BINARY}-$${TEST_NAME//\//-}; \
     printf '%s\n' \
       '#!/bin/sh' \
-      "d=\$(TEST_TMPDIR)$$TEST_SCRIPT" \
-      'mkdir -p $$d' \
-      "TEST_TMPDIR=\$$d $(DRIVER) ./$$TEST_BINARY --gtest_filter=$$TEST_NAME" \
-		> $$TEST_SCRIPT; \
-		chmod a=rx $$TEST_SCRIPT; \
+      "d=\"$(TEST_TMPDIR)/$$TEST_SCRIPT\"" \
+      'mkdir -p "$$d"' \
+      "TEST_TMPDIR=\"\$$d\" $(DRIVER) ./$$TEST_BINARY --gtest_filter=$$TEST_NAME && rm -rf \"\$$d\"" \
+		> t/$$TEST_SCRIPT; \
+		chmod a=rx t/$$TEST_SCRIPT; \
 	done
-
-gen_parallel_tests:
-	$(AM_V_at)mkdir -p t
-	$(AM_V_at)$(FIND) t -type f -name 'run-*' -exec rm -f {} \;
-	$(MAKE) $(parallel_tests)
 
 # Reorder input lines (which are one per test) so that the
 # longest-running tests appear first in the output.
@@ -929,6 +952,8 @@ PARALLEL ?= parallel
 PARALLEL_OK := $(shell command -v "$(PARALLEL)" 2>&1 >/dev/null && \
                        ("$(PARALLEL)" --gnu --version 2>/dev/null | grep -q 'Ole Tange') && \
                        echo 1)
+# Use a timeout of 10 minutes per test by default
+TEST_TIMEOUT?=600
 
 # Use this regexp to select the subset of tests whose names match.
 tests-regexp = .
@@ -945,46 +970,56 @@ else
 	parallel_redir = >& t/$(test_log_prefix)log-{/} || bash -c "cat t/$(test_log_prefix)log-{/}; exit $$?"
 endif
 
-.PHONY: check_0
-check_0: gen_parallel_tests
+.PHONY: check_0 check_1
+check_0: $(TESTS) $(parallel_tests)
 	$(AM_V_GEN)printf '%s\n' ''						\
+	  'Running tests in $(TEST_TMPDIR)'		\
 	  'To monitor subtest <duration,pass/fail,name>,'		\
 	  '  run "make watch-log" in a separate window' '';		\
-	{ \
-		printf './%s\n' $(filter-out $(PARALLEL_TEST),$(TESTS)); \
-		find t -name 'run-*' -print; \
-	} \
+		printf './%s\n' $(filter-out $(PARALLEL_TEST),$(TESTS)) $(PARALLEL_TEST:%=t/run-%-*) \
 	  | $(prioritize_long_running_tests)				\
 	  | grep -E '$(tests-regexp)'					\
 	  | grep -E -v '$(EXCLUDE_TESTS_REGEX)'					\
 	  | "$(PARALLEL)" -j$(J) --plain --joblog=LOG --eta --gnu \
-	    --tmpdir=$(TEST_TMPDIR) '{} $(parallel_redir)' ; \
+	    --tmpdir=$(TEST_TMPDIR) --timeout=$(TEST_TIMEOUT) '{} $(parallel_redir)' ; \
 	parallel_retcode=$$? ; \
 	awk '{ if ($$7 != 0 || $$8 != 0) { if ($$7 == "Exitval") { h = $$0; } else { if (!f) print h; print; f = 1 } } } END { if(f) exit 1; }' < LOG ; \
 	awk_retcode=$$?; \
-	if [ $$parallel_retcode -ne 0 ] || [ $$awk_retcode -ne 0 ] ; then exit 1 ; fi
+	if [ $$parallel_retcode -ne 0 ] || [ $$awk_retcode -ne 0 ] ; then exit 1 ; fi;
+
+check_1: $(TESTS)
+	$(AM_V_GEN)for t in $(TESTS); do                          \
+	      echo "===== Running $$t (`date`)"; ./$$t || exit 1; \
+	done;
 
 valgrind-exclude-regexp = InlineSkipTest.ConcurrentInsert|TransactionStressTest.DeadlockStress|DBCompactionTest.SuggestCompactRangeNoTwoLevel0Compactions|BackupableDBTest.RateLimiting|DBTest.CloseSpeedup|DBTest.ThreadStatusFlush|DBTest.RateLimitingTest|DBTest.EncodeDecompressedBlockSizeTest|FaultInjectionTest.UninstalledCompaction|HarnessTest.Randomized|ExternalSSTFileTest.CompactDuringAddFileRandom|ExternalSSTFileTest.IngestFileWithGlobalSeqnoRandomized|MySQLStyleTransactionTest.TransactionStressTest
 
-.PHONY: valgrind_check_0
+.PHONY: valgrind_check_0 valgrind_check_1
 valgrind_check_0: test_log_prefix := valgrind_
-valgrind_check_0: gen_parallel_tests
+valgrind_check_0: $(TESTS) $(parallel_tests)
 	$(AM_V_GEN)printf '%s\n' ''						\
+	  'Running tests in $(TEST_TMPDIR)'		\
 	  'To monitor subtest <duration,pass/fail,name>,'		\
 	  '  run "make watch-log" in a separate window' '';		\
-	{								\
-	  printf './%s\n' $(filter-out $(PARALLEL_TEST) %skiplist_test options_settable_test, $(TESTS));		\
-	  find t -name 'run-*' -print; \
-	}								\
+	  printf './%s\n' $(filter-out $(PARALLEL_TEST) %skiplist_test options_settable_test, $(TESTS)) $(PARALLEL_TEST:%=t/run-%-*) \
 	  | $(prioritize_long_running_tests)				\
 	  | grep -E '$(tests-regexp)'					\
 	  | grep -E -v '$(valgrind-exclude-regexp)'					\
 	  | "$(PARALLEL)" -j$(J) --plain --joblog=LOG --eta --gnu \
-	   --tmpdir=$(TEST_TMPDIR) \
-	   '(if [[ "{}" == "./"* ]] ; then $(DRIVER) {}; else {}; fi) \
+	   --tmpdir=$(TEST_TMPDIR) --timeout=$(TEST_TIMEOUT) \
+	   '(if [[ "{}" == "./"* ]] ; then $(VALGRIND_VER) $(VALGRIND_OPTS) {}; else {}; fi) \
 	  $(parallel_redir)' \
 
-CLEAN_FILES += t LOG $(TEST_TMPDIR)
+valgrind_check_1: $(TESTS)
+	$(AM_V_GEN)for t in $(filter-out %skiplist_test options_settable_test,$(TESTS)); do \
+			$(VALGRIND_VER) $(VALGRIND_OPTS) ./$$t; \
+			ret_code=$$?; \
+			if [ $$ret_code -ne 0 ]; then \
+				exit $$ret_code; \
+			fi; \
+		done;
+
+CLEAN_FILES += t LOG
 
 # When running parallel "make check", you can monitor its progress
 # from another window.
@@ -1000,16 +1035,8 @@ dump-log:
 	tail -n+2 LOG|$(parallel_log_extract)
 
 # If J != 1 and GNU parallel is installed, run the tests in parallel,
-# via the check_0 rule above.  Otherwise, run them sequentially.
-check: all
-	$(AM_V_GEN)if [ "$(J)" != "1" ] && [ "$(PARALLEL_OK)" = "1" ];  \
-	then                                                            \
-	    $(MAKE) T="$$t" check_0;                                    \
-	else                                                            \
-	    for t in $(TESTS); do                                       \
-	      echo "===== Running $$t (`date`)"; ./$$t || exit 1; done;          \
-	fi
-	rm -rf $(TEST_TMPDIR)
+# via the check_0 rule above.  Otherwise, run them sequentially via check_1.
+check: all $(if $(shell [ "$(J)" != "1" ] && [ "$(PARALLEL_OK)" = "1" ] && echo 1),check_0,check_1)
 ifneq ($(PLATFORM), OS_AIX)
 	$(PYTHON) tools/check_all_python.py
 ifeq ($(filter -DROCKSDB_LITE,$(OPT)),)
@@ -1020,9 +1047,9 @@ endif
 endif
 endif
 ifndef SKIP_FORMAT_BUCK_CHECKS
-	$(MAKE) check-format
-	$(MAKE) check-buck-targets
-	$(MAKE) check-sources
+	build_tools/format-diff.sh -c
+	buckifier/check_buck_targets.sh
+	build_tools/check-sources.sh
 endif
 
 # TODO add ldb_tests
@@ -1103,20 +1130,7 @@ valgrind_test:
 valgrind_test_some:
 	ROCKSDB_VALGRIND_RUN=1 DISABLE_JEMALLOC=1 $(MAKE) valgrind_check_some
 
-valgrind_check: $(TESTS)
-	$(AM_V_GEN)if [ "$(J)" != "1" ] && [ "$(PARALLEL_OK)" = "1" ];  \
-	then                                                            \
-	  $(MAKE)                                                       \
-	  DRIVER="$(VALGRIND_VER) $(VALGRIND_OPTS)" valgrind_check_0;   \
-	else                                                            \
-		for t in $(filter-out %skiplist_test options_settable_test,$(TESTS)); do \
-			$(VALGRIND_VER) $(VALGRIND_OPTS) ./$$t; \
-			ret_code=$$?; \
-			if [ $$ret_code -ne 0 ]; then \
-				exit $$ret_code; \
-			fi; \
-		done; \
-	fi
+valgrind_check: $(if $(shell [ "$(J)" != "1" ] && [ "$(PARALLEL_OK)" = "1" ] && echo 1),valgrind_check_0,valgrind_check_1)
 
 valgrind_check_some: $(ROCKSDBTESTS_SUBSET)
 	for t in $(ROCKSDBTESTS_SUBSET); do \
@@ -1160,8 +1174,8 @@ unity_test: $(OBJ_DIR)/db/db_basic_test.o $(OBJ_DIR)/db/db_test_util.o $(TEST_OB
 	$(AM_LINK)
 	./unity_test
 
-rocksdb.h rocksdb.cc: build_tools/amalgamate.py Makefile $(LIB_SOURCES) unity.cc
-	build_tools/amalgamate.py -I. -i./include unity.cc -x include/rocksdb/c.h -H rocksdb.h -o rocksdb.cc
+$(PROJECT_NAME).h $(PROJECT_NAME).cc: build_tools/amalgamate.py Makefile $(LIB_SOURCES) unity.cc
+	build_tools/amalgamate.py -I. -i./include unity.cc -x include/rocksdb/c.h -H $(PROJECT_NAME).h -o $(PROJECT_NAME).cc
 
 clean: clean-ext-libraries-all clean-rocks clean-rocksjava
 
@@ -1213,7 +1227,7 @@ check-sources:
 	build_tools/check-sources.sh
 
 package:
-	bash build_tools/make_package.sh $(SHARED_MAJOR).$(SHARED_MINOR)
+	bash build_tools/make_package.sh $(VERSION_MAJOR).$(VERSION_MINOR)
 
 # ---------------------------------------------------------------------------
 # 	Unit tests and tools
@@ -1246,7 +1260,7 @@ $(SHARED_STRESS_LIBRARY): $(ANALYZE_OBJECTS) $(STRESS_OBJECTS) $(TESTUTIL) $(SHA
 	$(AM_V_AR)rm -f $@ $(STATIC_STRESS_LIBRARY)
 	$(AM_SHARE)
 
-librocksdb_env_basic_test.a: $(OBJ_DIR)/env/env_basic_test.o $(LIB_OBJECTS) $(TESTHARNESS)
+lib$(PROJECT_NAME)_env_basic_test.a: $(OBJ_DIR)/env/env_basic_test.o $(LIB_OBJECTS) $(TESTHARNESS)
 	$(AM_V_AR)rm -f $@
 	$(AM_V_at)$(AR) $(ARFLAGS) $@ $^
 
@@ -1282,6 +1296,14 @@ db_sanity_test: $(OBJ_DIR)/tools/db_sanity_test.o $(LIBRARY)
 
 db_repl_stress: $(OBJ_DIR)/tools/db_repl_stress.o $(LIBRARY)
 	$(AM_LINK)
+
+define MakeTestRule
+$(notdir $(1:%.cc=%)): $(1:%.cc=$$(OBJ_DIR)/%.o) $$(TEST_LIBRARY) $$(LIBRARY)
+	$$(AM_LINK)
+endef
+
+# For each PLUGIN test, create a rule to generate the test executable
+$(foreach test, $(ROCKSDB_PLUGIN_TESTS), $(eval $(call MakeTestRule, $(test))))
 
 arena_test: $(OBJ_DIR)/memory/arena_test.o $(TEST_LIBRARY) $(LIBRARY)
 	$(AM_LINK)
@@ -1676,10 +1698,10 @@ deletefile_test: $(OBJ_DIR)/db/deletefile_test.o $(TEST_LIBRARY) $(LIBRARY)
 obsolete_files_test: $(OBJ_DIR)/db/obsolete_files_test.o $(TEST_LIBRARY) $(LIBRARY)
 	$(AM_LINK)
 
-rocksdb_dump: $(OBJ_DIR)/tools/dump/rocksdb_dump.o $(LIBRARY)
+$(PROJECT_NAME)_dump: $(OBJ_DIR)/tools/dump/rocksdb_dump.o $(LIBRARY)
 	$(AM_LINK)
 
-rocksdb_undump: $(OBJ_DIR)/tools/dump/rocksdb_undump.o $(LIBRARY)
+$(PROJECT_NAME)_undump: $(OBJ_DIR)/tools/dump/rocksdb_undump.o $(LIBRARY)
 	$(AM_LINK)
 
 cuckoo_table_builder_test: $(OBJ_DIR)/table/cuckoo/cuckoo_table_builder_test.o $(TEST_LIBRARY) $(LIBRARY)
@@ -1910,7 +1932,7 @@ uninstall:
 	  $(INSTALL_LIBDIR)/$(SHARED3) \
 	  $(INSTALL_LIBDIR)/$(SHARED2) \
 	  $(INSTALL_LIBDIR)/$(SHARED1) \
-	  $(INSTALL_LIBDIR)/pkgconfig/rocksdb.pc
+	  $(INSTALL_LIBDIR)/pkgconfig/$(PROJECT_NAME).pc
 
 install-headers: gen-pc
 	install -d $(INSTALL_LIBDIR)
@@ -1925,7 +1947,7 @@ install-headers: gen-pc
 		install -d $(DESTDIR)/$(PREFIX)/include/rocksdb/`dirname $$header`; \
 		install -C -m 644 $$header $(DESTDIR)/$(PREFIX)/include/rocksdb/$$header; \
 	done
-	install -C -m 644 rocksdb.pc $(INSTALL_LIBDIR)/pkgconfig/rocksdb.pc
+	install -C -m 644 $(PROJECT_NAME).pc $(INSTALL_LIBDIR)/pkgconfig/$(PROJECT_NAME).pc
 
 install-static: install-headers $(LIBRARY)
 	install -d $(INSTALL_LIBDIR)
@@ -1944,18 +1966,19 @@ install: install-static
 
 # Generate the pkg-config file
 gen-pc:
-	-echo 'prefix=$(PREFIX)' > rocksdb.pc
-	-echo 'exec_prefix=$${prefix}' >> rocksdb.pc
-	-echo 'includedir=$${prefix}/include' >> rocksdb.pc
-	-echo 'libdir=$(LIBDIR)' >> rocksdb.pc
-	-echo '' >> rocksdb.pc
-	-echo 'Name: rocksdb' >> rocksdb.pc
-	-echo 'Description: An embeddable persistent key-value store for fast storage' >> rocksdb.pc
-	-echo Version: $(shell ./build_tools/version.sh full) >> rocksdb.pc
-	-echo 'Libs: -L$${libdir} $(EXEC_LDFLAGS) -lrocksdb' >> rocksdb.pc
-	-echo 'Libs.private: $(PLATFORM_LDFLAGS)' >> rocksdb.pc
-	-echo 'Cflags: -I$${includedir} $(PLATFORM_CXXFLAGS)' >> rocksdb.pc
-	-echo 'Requires: $(subst ",,$(ROCKSDB_PLUGIN_PKGCONFIG_REQUIRES))' >> rocksdb.pc
+	$(AM_V_GEN)printf '%s\n' \
+		'prefix=$(PREFIX)' \
+		'exec_prefix=$${prefix}' \
+		'includedir=$${prefix}/include' \
+		'libdir=$(LIBDIR)' \
+		'' \
+		'Name: $(PROJECT_NAME)' \
+		'Description: An embeddable persistent key-value store for fast storage' \
+		'Version: $(shell ./build_tools/version.sh full)' \
+		'Libs: -L$${libdir} $(EXEC_LDFLAGS) -lrocksdb' \
+		'Libs.private: $(PLATFORM_LDFLAGS)' \
+		'Cflags: -I$${includedir} $(PLATFORM_CXXFLAGS)' \
+		'Requires: $(subst ",,$(ROCKSDB_PLUGIN_PKGCONFIG_REQUIRES))' > $(PROJECT_NAME).pc
 
 #-------------------------------------------------
 
@@ -1987,22 +2010,22 @@ ifneq ($(origin JNI_LIBC), undefined)
   JNI_LIBC_POSTFIX = -$(JNI_LIBC)
 endif
 
-ifeq (,$(ROCKSDBJNILIB))
+ifeq (,$(JNILIBNAME))
 ifneq (,$(filter ppc% s390x arm64 aarch64 sparc64, $(MACHINE)))
-	ROCKSDBJNILIB = librocksdbjni-linux-$(MACHINE)$(JNI_LIBC_POSTFIX).so
+	JNILIBNAME = lib$(PROJECT_NAME)jni-linux-$(MACHINE)$(JNI_LIBC_POSTFIX).so
 else
-	ROCKSDBJNILIB = librocksdbjni-linux$(ARCH)$(JNI_LIBC_POSTFIX).so
+	JNILIBNAME = lib$(PROJECT_NAME)jni-linux$(ARCH)$(JNI_LIBC_POSTFIX).so
 endif
 endif
-ROCKSDB_JAVA_VERSION ?= $(ROCKSDB_MAJOR).$(ROCKSDB_MINOR).$(ROCKSDB_PATCH)
-ROCKSDB_JAR = rocksdbjni-$(ROCKSDB_JAVA_VERSION)-linux$(ARCH)$(JNI_LIBC_POSTFIX).jar
-ROCKSDB_JAR_ALL = rocksdbjni-$(ROCKSDB_JAVA_VERSION).jar
-ROCKSDB_JAVADOCS_JAR = rocksdbjni-$(ROCKSDB_JAVA_VERSION)-javadoc.jar
-ROCKSDB_SOURCES_JAR = rocksdbjni-$(ROCKSDB_JAVA_VERSION)-sources.jar
+LIB_JAVA_VERSION ?= $(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_PATCH)
+LIB_JAR = $(PROJECT_NAME)jni-$(LIB_JAVA_VERSION)-linux$(ARCH)$(JNI_LIBC_POSTFIX).jar
+LIB_JAR_ALL = $(PROJECT_NAME)jni-$(LIB_JAVA_VERSION).jar
+LIB_JAVADOCS_JAR = $(PROJECT_NAME)jni-$(LIB_JAVA_VERSION)-javadoc.jar
+LIB_SOURCES_JAR = $(PROJECT_NAME)jni-$(LIB_JAVA_VERSION)-sources.jar
 SHA256_CMD = sha256sum
 
-ZLIB_VER ?= 1.2.12
-ZLIB_SHA256 ?= 91844808532e5ce316b3c010929493c0244f3d37593afd6de04f71821d5136d9
+ZLIB_VER ?= 1.2.13
+ZLIB_SHA256 ?= b3a24de97a8fdbc835b9833169501030b8977031bcb54b3b3ac13740f846ab30
 ZLIB_DOWNLOAD_BASE ?= http://zlib.net
 BZIP2_VER ?= 1.0.8
 BZIP2_SHA256 ?= ab5a03176ee106d3f0fa90e381da478ddae405918153cca248e682cd0c4a2269
@@ -2019,16 +2042,16 @@ ZSTD_DOWNLOAD_BASE ?= https://github.com/facebook/zstd/archive
 CURL_SSL_OPTS ?= --tlsv1
 
 ifeq ($(PLATFORM), OS_MACOSX)
-ifeq (,$(findstring librocksdbjni-osx,$(ROCKSDBJNILIB)))
+ifeq (,$(findstring lib$(PROJECT_NAME)jni-osx,$(JNILIBNAME)))
 ifeq ($(MACHINE),arm64)
-	ROCKSDBJNILIB = librocksdbjni-osx-arm64.jnilib
+	JNILIBNAME = lib$(PROJECT_NAME)jni-osx-arm64.jnilib
 else ifeq ($(MACHINE),x86_64)
-	ROCKSDBJNILIB = librocksdbjni-osx-x86_64.jnilib
+	JNILIBNAME = lib$(PROJECT_NAME)jni-osx-x86_64.jnilib
 else
-	ROCKSDBJNILIB = librocksdbjni-osx.jnilib
+	JNILIBNAME = lib$(PROJECT_NAME)jni-osx.jnilib
 endif
 endif
-	ROCKSDB_JAR = rocksdbjni-$(ROCKSDB_JAVA_VERSION)-osx.jar
+	LIB_JAR = $(PROJECT_NAME)jni-$(LIB_JAVA_VERSION)-osx.jar
 	SHA256_CMD = openssl sha256 -r
 ifneq ("$(wildcard $(JAVA_HOME)/include/darwin)","")
 	JAVA_INCLUDE = -I$(JAVA_HOME)/include -I $(JAVA_HOME)/include/darwin
@@ -2039,25 +2062,25 @@ endif
 
 ifeq ($(PLATFORM), OS_FREEBSD)
 	JAVA_INCLUDE = -I$(JAVA_HOME)/include -I$(JAVA_HOME)/include/freebsd
-	ROCKSDBJNILIB = librocksdbjni-freebsd$(ARCH).so
-	ROCKSDB_JAR = rocksdbjni-$(ROCKSDB_JAVA_VERSION)-freebsd$(ARCH).jar
+	JNILIBNAME = lib$(PROJECT_NAME)jni-freebsd$(ARCH).so
+	LIB_JAR = $(PROJECT_NAME)jni-$(LIB_JAVA_VERSION)-freebsd$(ARCH).jar
 endif
 ifeq ($(PLATFORM), OS_SOLARIS)
-	ROCKSDBJNILIB = librocksdbjni-solaris$(ARCH).so
-	ROCKSDB_JAR = rocksdbjni-$(ROCKSDB_MAJOR).$(ROCKSDB_MINOR).$(ROCKSDB_PATCH)-solaris$(ARCH).jar
+	JNILIBNAME = lib$(PROJECT_NAME)jni-solaris$(ARCH).so
+	LIB_JAR = $(PROJECT_NAME)jni-$(LIB_JAVA_VERSION)-solaris$(ARCH).jar
 	JAVA_INCLUDE = -I$(JAVA_HOME)/include/ -I$(JAVA_HOME)/include/solaris
 	SHA256_CMD = digest -a sha256
 endif
 ifeq ($(PLATFORM), OS_AIX)
 	JAVA_INCLUDE = -I$(JAVA_HOME)/include/ -I$(JAVA_HOME)/include/aix
-	ROCKSDBJNILIB = librocksdbjni-aix.so
+	JNILIBNAME = lib$(PROJECT_NAME)jni-aix.so
 	EXTRACT_SOURCES = gunzip < TAR_GZ | tar xvf -
 	SNAPPY_MAKE_TARGET = libsnappy.la
 endif
 ifeq ($(PLATFORM), OS_OPENBSD)
 	JAVA_INCLUDE = -I$(JAVA_HOME)/include -I$(JAVA_HOME)/include/openbsd
-	ROCKSDBJNILIB = librocksdbjni-openbsd$(ARCH).so
-	ROCKSDB_JAR = rocksdbjni-$(ROCKSDB_JAVA_VERSION)-openbsd$(ARCH).jar
+	JNILIBNAME = lib$(PROJECT_NAME)jni-openbsd$(ARCH).so
+	LIB_JAR = $(PROJECT_NAME)jni-$(LIB_JAVA_VERSION)-openbsd$(ARCH).jar
 endif
 
 zlib-$(ZLIB_VER).tar.gz:
@@ -2157,17 +2180,17 @@ endif
 	$(MAKE) rocksdbjava_jar
 
 rocksdbjavastaticosx: rocksdbjavastaticosx_archs
-	cd java; $(JAR_CMD)  -cf target/$(ROCKSDB_JAR) HISTORY*.md
-	cd java/target; $(JAR_CMD) -uf $(ROCKSDB_JAR) librocksdbjni-osx-x86_64.jnilib librocksdbjni-osx-arm64.jnilib
-	cd java/target/classes; $(JAR_CMD) -uf ../$(ROCKSDB_JAR) org/rocksdb/*.class org/rocksdb/util/*.class
-	openssl sha1 java/target/$(ROCKSDB_JAR) | sed 's/.*= \([0-9a-f]*\)/\1/' > java/target/$(ROCKSDB_JAR).sha1
+	cd java; $(JAR_CMD)  -cf target/$(LIB_JAR) HISTORY*.md
+	cd java/target; $(JAR_CMD) -uf $(LIB_JAR) lib$(PROJECT_NAME)jni-osx-x86_64.jnilib lib$(PROJECT_NAME)jni-osx-arm64.jnilib
+	cd java/target/classes; $(JAR_CMD) -uf ../$(LIB_JAR) org/rocksdb/*.class org/rocksdb/util/*.class
+	openssl sha1 java/target/$(LIB_JAR) | sed 's/.*= \([0-9a-f]*\)/\1/' > java/target/$(LIB_JAR).sha1
 
 rocksdbjavastaticosx_ub: rocksdbjavastaticosx_archs
-	cd java/target; lipo -create -output librocksdbjni-osx.jnilib librocksdbjni-osx-x86_64.jnilib librocksdbjni-osx-arm64.jnilib
-	cd java; $(JAR_CMD)  -cf target/$(ROCKSDB_JAR) HISTORY*.md
-	cd java/target; $(JAR_CMD) -uf $(ROCKSDB_JAR) librocksdbjni-osx.jnilib
-	cd java/target/classes; $(JAR_CMD) -uf ../$(ROCKSDB_JAR) org/rocksdb/*.class org/rocksdb/util/*.class
-	openssl sha1 java/target/$(ROCKSDB_JAR) | sed 's/.*= \([0-9a-f]*\)/\1/' > java/target/$(ROCKSDB_JAR).sha1
+	cd java/target; lipo -create -output lib$(PROJECT_NAME)jni-osx.jnilib lib$(PROJECT_NAME)jni-osx-x86_64.jnilib lib$(PROJECT_NAME)jni-osx-arm64.jnilib
+	cd java; $(JAR_CMD)  -cf target/$(LIB_JAR) HISTORY*.md
+	cd java/target; $(JAR_CMD) -uf $(LIB_JAR) lib$(PROJECT_NAME)jni-osx.jnilib
+	cd java/target/classes; $(JAR_CMD) -uf ../$(LIB_JAR) org/rocksdb/*.class org/rocksdb/util/*.class
+	openssl sha1 java/target/$(LIB_JAR) | sed 's/.*= \([0-9a-f]*\)/\1/' > java/target/$(LIB_JAR).sha1
 
 rocksdbjavastaticosx_archs:
 	$(MAKE) rocksdbjavastaticosx_arch_x86_64
@@ -2181,7 +2204,7 @@ endif
 	$(MAKE) clean-rocks
 	ARCHFLAG="-arch $*" $(MAKE) rocksdbjavastatic_deps
 	ARCHFLAG="-arch $*" $(MAKE) rocksdbjavastatic_libobjects
-	ARCHFLAG="-arch $*" ROCKSDBJNILIB="librocksdbjni-osx-$*.jnilib" $(MAKE) rocksdbjavastatic_javalib
+	ARCHFLAG="-arch $*" JNILIBNAME="lib$(PROJECT_NAME)jni-osx-$*.jnilib" $(MAKE) rocksdbjavastatic_javalib
 
 ifeq ($(JAR_CMD),)
 ifneq ($(JAVA_HOME),)
@@ -2192,28 +2215,28 @@ endif
 endif
 rocksdbjavastatic_javalib:
 	cd java; SHA256_CMD='$(SHA256_CMD)' $(MAKE) javalib
-	rm -f java/target/$(ROCKSDBJNILIB)
+	rm -f java/target/$(JNILIBNAME)
 	$(CXX) $(CXXFLAGS) -I./java/. $(JAVA_INCLUDE) -shared -fPIC \
-	  -o ./java/target/$(ROCKSDBJNILIB) $(ALL_JNI_NATIVE_SOURCES) \
+	  -o ./java/target/$(JNILIBNAME) $(ALL_JNI_NATIVE_SOURCES) \
 	  $(LIB_OBJECTS) $(COVERAGEFLAGS) \
 	  $(JAVA_COMPRESSIONS) $(JAVA_STATIC_LDFLAGS)
 	cd java/target;if [ "$(DEBUG_LEVEL)" == "0" ]; then \
-		strip $(STRIPFLAGS) $(ROCKSDBJNILIB); \
+		strip $(STRIPFLAGS) $(JNILIBNAME); \
 	fi
 
 rocksdbjava_jar:
-	cd java; $(JAR_CMD)  -cf target/$(ROCKSDB_JAR) HISTORY*.md
-	cd java/target; $(JAR_CMD) -uf $(ROCKSDB_JAR) $(ROCKSDBJNILIB)
-	cd java/target/classes; $(JAR_CMD) -uf ../$(ROCKSDB_JAR) org/rocksdb/*.class org/rocksdb/util/*.class
-	openssl sha1 java/target/$(ROCKSDB_JAR) | sed 's/.*= \([0-9a-f]*\)/\1/' > java/target/$(ROCKSDB_JAR).sha1
+	cd java; $(JAR_CMD)  -cf target/$(LIB_JAR) HISTORY*.md
+	cd java/target; $(JAR_CMD) -uf $(LIB_JAR) $(JNILIBNAME)
+	cd java/target/classes; $(JAR_CMD) -uf ../$(LIB_JAR) org/rocksdb/*.class org/rocksdb/util/*.class
+	openssl sha1 java/target/$(LIB_JAR) | sed 's/.*= \([0-9a-f]*\)/\1/' > java/target/$(LIB_JAR).sha1
 
 rocksdbjava_javadocs_jar:
-	cd java/target/apidocs; $(JAR_CMD) -cf ../$(ROCKSDB_JAVADOCS_JAR) *
-	openssl sha1 java/target/$(ROCKSDB_JAVADOCS_JAR) | sed 's/.*= \([0-9a-f]*\)/\1/' > java/target/$(ROCKSDB_JAVADOCS_JAR).sha1
+	cd java/target/apidocs; $(JAR_CMD) -cf ../$(LIB_JAVADOCS_JAR) *
+	openssl sha1 java/target/$(LIB_JAVADOCS_JAR) | sed 's/.*= \([0-9a-f]*\)/\1/' > java/target/$(LIB_JAVADOCS_JAR).sha1
 
 rocksdbjava_sources_jar:
-	cd java/src/main/java; $(JAR_CMD) -cf ../../../target/$(ROCKSDB_SOURCES_JAR) org
-	openssl sha1 java/target/$(ROCKSDB_SOURCES_JAR) | sed 's/.*= \([0-9a-f]*\)/\1/' > java/target/$(ROCKSDB_SOURCES_JAR).sha1
+	cd java/src/main/java; $(JAR_CMD) -cf ../../../target/$(LIB_SOURCES_JAR) org
+	openssl sha1 java/target/$(LIB_SOURCES_JAR) | sed 's/.*= \([0-9a-f]*\)/\1/' > java/target/$(LIB_SOURCES_JAR).sha1
 
 rocksdbjavastatic_deps: $(JAVA_COMPRESSIONS)
 
@@ -2221,16 +2244,16 @@ rocksdbjavastatic_libobjects: $(LIB_OBJECTS)
 
 rocksdbjavastaticrelease: rocksdbjavastaticosx rocksdbjava_javadocs_jar rocksdbjava_sources_jar
 	cd java/crossbuild && (vagrant destroy -f || true) && vagrant up linux32 && vagrant halt linux32 && vagrant up linux64 && vagrant halt linux64 && vagrant up linux64-musl && vagrant halt linux64-musl
-	cd java; $(JAR_CMD) -cf target/$(ROCKSDB_JAR_ALL) HISTORY*.md
-	cd java/target; $(JAR_CMD) -uf $(ROCKSDB_JAR_ALL) librocksdbjni-*.so librocksdbjni-*.jnilib
-	cd java/target/classes; $(JAR_CMD) -uf ../$(ROCKSDB_JAR_ALL) org/rocksdb/*.class org/rocksdb/util/*.class
-	openssl sha1 java/target/$(ROCKSDB_JAR_ALL) | sed 's/.*= \([0-9a-f]*\)/\1/' > java/target/$(ROCKSDB_JAR_ALL).sha1
+	cd java; $(JAR_CMD) -cf target/$(LIB_JAR_ALL) HISTORY*.md
+	cd java/target; $(JAR_CMD) -uf $(LIB_JAR_ALL) lib$(PROJECT_NAME)jni-*.so lib$(PROJECT_NAME)jni-*.jnilib
+	cd java/target/classes; $(JAR_CMD) -uf ../$(LIB_JAR_ALL) org/rocksdb/*.class org/rocksdb/util/*.class
+	openssl sha1 java/target/$(LIB_JAR_ALL) | sed 's/.*= \([0-9a-f]*\)/\1/' > java/target/$(LIB_JAR_ALL).sha1
 
 rocksdbjavastaticreleasedocker: rocksdbjavastaticosx rocksdbjavastaticdockerx86 rocksdbjavastaticdockerx86_64 rocksdbjavastaticdockerx86musl rocksdbjavastaticdockerx86_64musl rocksdbjava_javadocs_jar rocksdbjava_sources_jar
-	cd java; $(JAR_CMD) -cf target/$(ROCKSDB_JAR_ALL) HISTORY*.md
-	cd java/target; $(JAR_CMD) -uf $(ROCKSDB_JAR_ALL) librocksdbjni-*.so librocksdbjni-*.jnilib
-	cd java/target/classes; $(JAR_CMD) -uf ../$(ROCKSDB_JAR_ALL) org/rocksdb/*.class org/rocksdb/util/*.class
-	openssl sha1 java/target/$(ROCKSDB_JAR_ALL) | sed 's/.*= \([0-9a-f]*\)/\1/' > java/target/$(ROCKSDB_JAR_ALL).sha1
+	cd java; $(JAR_CMD) -cf target/$(LIB_JAR_ALL) HISTORY*.md
+	cd java/target; $(JAR_CMD) -uf $(LIB_JAR_ALL) lib$(PROJECT_NAME)jni-*.so lib$(PROJECT_NAME)jni-*.jnilib
+	cd java/target/classes; $(JAR_CMD) -uf ../$(LIB_JAR_ALL) org/rocksdb/*.class org/rocksdb/util/*.class
+	openssl sha1 java/target/$(LIB_JAR_ALL) | sed 's/.*= \([0-9a-f]*\)/\1/' > java/target/$(LIB_JAR_ALL).sha1
 
 rocksdbjavastaticdockerx86:
 	mkdir -p java/target
@@ -2276,29 +2299,29 @@ rocksdbjavastaticpublish: rocksdbjavastaticrelease rocksdbjavastaticpublishcentr
 
 rocksdbjavastaticpublishdocker: rocksdbjavastaticreleasedocker rocksdbjavastaticpublishcentral
 
-ROCKSDB_JAVA_RELEASE_CLASSIFIERS = javadoc sources linux64 linux32 linux64-musl linux32-musl osx win64
+LIB_JAVA_RELEASE_CLASSIFIERS = javadoc sources linux64 linux32 linux64-musl linux32-musl osx win64
 
 rocksdbjavastaticpublishcentral: rocksdbjavageneratepom
-	mvn gpg:sign-and-deploy-file -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2/ -DrepositoryId=sonatype-nexus-staging -DpomFile=java/pom.xml -Dfile=java/target/rocksdbjni-$(ROCKSDB_JAVA_VERSION).jar
-	$(foreach classifier, $(ROCKSDB_JAVA_RELEASE_CLASSIFIERS), mvn gpg:sign-and-deploy-file -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2/ -DrepositoryId=sonatype-nexus-staging -DpomFile=java/pom.xml -Dfile=java/target/rocksdbjni-$(ROCKSDB_JAVA_VERSION)-$(classifier).jar -Dclassifier=$(classifier);)
+	mvn gpg:sign-and-deploy-file -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2/ -DrepositoryId=sonatype-nexus-staging -DpomFile=java/pom.xml -Dfile=java/target/rocksdbjni-$(LIB_JAVA_VERSION).jar
+	$(foreach classifier, $(LIB_JAVA_RELEASE_CLASSIFIERS), mvn gpg:sign-and-deploy-file -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2/ -DrepositoryId=sonatype-nexus-staging -DpomFile=java/pom.xml -Dfile=java/target/$(PROJECT_NAME)jni-$(LIB_JAVA_VERSION)-$(classifier).jar -Dclassifier=$(classifier);)
 
 rocksdbjavageneratepom:
-	cd java;cat pom.xml.template | sed 's/\$${ROCKSDB_JAVA_VERSION}/$(ROCKSDB_JAVA_VERSION)/' > pom.xml
+	cd java;cat pom.xml.template | sed 's/\$${LIB_JAVA_VERSION}/$(LIB_JAVA_VERSION)/' > pom.xml
 
 rocksdbjavastaticnexusbundlejar: rocksdbjavageneratepom
 	openssl sha1 -r java/pom.xml | awk '{  print $$1 }' > java/target/pom.xml.sha1
-	openssl sha1 -r java/target/rocksdbjni-$(ROCKSDB_JAVA_VERSION).jar | awk '{  print $$1 }' > java/target/rocksdbjni-$(ROCKSDB_JAVA_VERSION).jar.sha1
-	$(foreach classifier, $(ROCKSDB_JAVA_RELEASE_CLASSIFIERS), openssl sha1 -r java/target/rocksdbjni-$(ROCKSDB_JAVA_VERSION)-$(classifier).jar | awk '{  print $$1 }' > java/target/rocksdbjni-$(ROCKSDB_JAVA_VERSION)-$(classifier).jar.sha1;)
+	openssl sha1 -r java/target/$(PROJECT_NAME)jni-$(LIB_JAVA_VERSION).jar | awk '{  print $$1 }' > java/target/$(PROJECT_NAME)jni-$(LIB_JAVA_VERSION).jar.sha1
+	$(foreach classifier, $(LIB_JAVA_RELEASE_CLASSIFIERS), openssl sha1 -r java/target/$(PROJECT_NAME)jni-$(LIB_JAVA_VERSION)-$(classifier).jar | awk '{  print $$1 }' > java/target/$(PROJECT_NAME)jni-$(LIB_JAVA_VERSION)-$(classifier).jar.sha1;)
 	gpg --yes --output java/target/pom.xml.asc -ab java/pom.xml
-	gpg --yes -ab java/target/rocksdbjni-$(ROCKSDB_JAVA_VERSION).jar
-	$(foreach classifier, $(ROCKSDB_JAVA_RELEASE_CLASSIFIERS), gpg --yes -ab java/target/rocksdbjni-$(ROCKSDB_JAVA_VERSION)-$(classifier).jar;)
-	$(JAR_CMD) cvf java/target/nexus-bundle-rocksdbjni-$(ROCKSDB_JAVA_VERSION).jar -C java pom.xml -C java/target pom.xml.sha1 -C java/target pom.xml.asc -C java/target rocksdbjni-$(ROCKSDB_JAVA_VERSION).jar -C java/target rocksdbjni-$(ROCKSDB_JAVA_VERSION).jar.sha1 -C java/target rocksdbjni-$(ROCKSDB_JAVA_VERSION).jar.asc
-	$(foreach classifier, $(ROCKSDB_JAVA_RELEASE_CLASSIFIERS), $(JAR_CMD) uf java/target/nexus-bundle-rocksdbjni-$(ROCKSDB_JAVA_VERSION).jar -C java/target rocksdbjni-$(ROCKSDB_JAVA_VERSION)-$(classifier).jar -C java/target rocksdbjni-$(ROCKSDB_JAVA_VERSION)-$(classifier).jar.sha1 -C java/target rocksdbjni-$(ROCKSDB_JAVA_VERSION)-$(classifier).jar.asc;)
+	gpg --yes -ab java/target/$(PROJECT_NAME)jni-$(LIB_JAVA_VERSION).jar
+	$(foreach classifier, $(LIB_JAVA_RELEASE_CLASSIFIERS), gpg --yes -ab java/target/$(PROJECT_NAME)jni-$(LIB_JAVA_VERSION)-$(classifier).jar;)
+	$(JAR_CMD) cvf java/target/nexus-bundle-$(PROJECT_NAME)jni-$(LIB_JAVA_VERSION).jar -C java pom.xml -C java/target pom.xml.sha1 -C java/target pom.xml.asc -C java/target $(PROJECT_NAME)jni-$(LIB_JAVA_VERSION).jar -C java/target $(PROJECT_NAME)jni-$(LIB_JAVA_VERSION).jar.sha1 -C java/target $(PROJECT_NAME)jni-$(LIB_JAVA_VERSION).jar.asc
+	$(foreach classifier, $(LIB_JAVA_RELEASE_CLASSIFIERS), $(JAR_CMD) uf java/target/nexus-bundle-$(PROJECT_NAME)jni-$(LIB_JAVA_VERSION).jar -C java/target $(PROJECT_NAME)jni-$(LIB_JAVA_VERSION)-$(classifier).jar -C java/target $(PROJECT_NAME)jni-$(LIB_JAVA_VERSION)-$(classifier).jar.sha1 -C java/target $(PROJECT_NAME)jni-$(LIB_JAVA_VERSION)-$(classifier).jar.asc;)
 
 
 # A version of each $(LIBOBJECTS) compiled with -fPIC
 
-jl/%.o: %.cc
+jl/%.o: %.cc make_config.mk
 	$(AM_V_CC)mkdir -p $(@D) && $(CXX) $(CXXFLAGS) -fPIC -c $< -o $@ $(COVERAGEFLAGS)
 
 rocksdbjava: $(LIB_OBJECTS)
@@ -2306,12 +2329,12 @@ ifeq ($(JAVA_HOME),)
 	$(error JAVA_HOME is not set)
 endif
 	$(AM_V_GEN)cd java; SHA256_CMD='$(SHA256_CMD)' $(MAKE) javalib;
-	$(AM_V_at)rm -f ./java/target/$(ROCKSDBJNILIB)
-	$(AM_V_at)$(CXX) $(CXXFLAGS) -I./java/. -I./java/rocksjni $(JAVA_INCLUDE) $(ROCKSDB_PLUGIN_JNI_CXX_INCLUDEFLAGS) -shared -fPIC -o ./java/target/$(ROCKSDBJNILIB) $(ALL_JNI_NATIVE_SOURCES) $(LIB_OBJECTS) $(JAVA_LDFLAGS) $(COVERAGEFLAGS)
-	$(AM_V_at)cd java; $(JAR_CMD) -cf target/$(ROCKSDB_JAR) HISTORY*.md
-	$(AM_V_at)cd java/target; $(JAR_CMD) -uf $(ROCKSDB_JAR) $(ROCKSDBJNILIB)
-	$(AM_V_at)cd java/target/classes; $(JAR_CMD) -uf ../$(ROCKSDB_JAR) org/rocksdb/*.class org/rocksdb/util/*.class
-	$(AM_V_at)openssl sha1 java/target/$(ROCKSDB_JAR) | sed 's/.*= \([0-9a-f]*\)/\1/' > java/target/$(ROCKSDB_JAR).sha1
+	$(AM_V_at)rm -f ./java/target/$(JNILIBNAME)
+	$(AM_V_at)$(CXX) $(CXXFLAGS) -I./java/. -I./java/rocksjni $(JAVA_INCLUDE) $(ROCKSDB_PLUGIN_JNI_CXX_INCLUDEFLAGS) -shared -fPIC -o ./java/target/$(JNILIBNAME) $(ALL_JNI_NATIVE_SOURCES) $(LIB_OBJECTS) $(JAVA_LDFLAGS) $(COVERAGEFLAGS)
+	$(AM_V_at)cd java; $(JAR_CMD) -cf target/$(LIB_JAR) HISTORY*.md
+	$(AM_V_at)cd java/target; $(JAR_CMD) -uf $(LIB_JAR) $(JNILIBNAME)
+	$(AM_V_at)cd java/target/classes; $(JAR_CMD) -uf ../$(LIB_JAR) org/rocksdb/*.class org/rocksdb/util/*.class
+	$(AM_V_at)openssl sha1 java/target/$(LIB_JAR) | sed 's/.*= \([0-9a-f]*\)/\1/' > java/target/$(LIB_JAR).sha1
 
 jclean:
 	cd java;$(MAKE) clean;
@@ -2379,19 +2402,19 @@ IOSVERSION=$(shell defaults read $(PLATFORMSROOT)/iPhoneOS.platform/version CFBu
 
 else
 ifeq ($(HAVE_POWER8),1)
-$(OBJ_DIR)/util/crc32c_ppc.o: util/crc32c_ppc.c
+$(OBJ_DIR)/util/crc32c_ppc.o: util/crc32c_ppc.c make_config.mk
 	$(AM_V_CC)$(CC) $(CFLAGS) -c $< -o $@
 
-$(OBJ_DIR)/util/crc32c_ppc_asm.o: util/crc32c_ppc_asm.S
+$(OBJ_DIR)/util/crc32c_ppc_asm.o: util/crc32c_ppc_asm.S make_config.mk
 	$(AM_V_CC)$(CC) $(CFLAGS) -c $< -o $@
 endif
-$(OBJ_DIR)/%.o: %.cc
+$(OBJ_DIR)/%.o: %.cc make_config.mk
 	$(AM_V_CC)mkdir -p $(@D) && $(CXX) $(CXXFLAGS) -c $< -o $@ $(COVERAGEFLAGS)
 
-$(OBJ_DIR)/%.o: %.cpp
+$(OBJ_DIR)/%.o: %.cpp make_config.mk
 	$(AM_V_CC)mkdir -p $(@D) && $(CXX) $(CXXFLAGS) -c $< -o $@ $(COVERAGEFLAGS)
 
-$(OBJ_DIR)/%.o: %.c
+$(OBJ_DIR)/%.o: %.c make_config.mk
 	$(AM_V_CC)$(CC) $(CFLAGS) -c $< -o $@
 endif
 
@@ -2412,12 +2435,12 @@ endif
 
 # The .d file indicates .cc file's dependencies on .h files. We generate such
 # dependency by g++'s -MM option, whose output is a make dependency rule.
-$(OBJ_DIR)/%.cc.d: %.cc
+$(OBJ_DIR)/%.cc.d: %.cc make_config.mk
 	@mkdir -p $(@D) && $(CXX) $(CXXFLAGS) $(PLATFORM_SHARED_CFLAGS) \
 	  -MM -MT'$@' -MT'$(<:.cc=.o)' -MT'$(<:%.cc=$(OBJ_DIR)/%.o)' \
           "$<" -o '$@'
 
-$(OBJ_DIR)/%.cpp.d: %.cpp
+$(OBJ_DIR)/%.cpp.d: %.cpp make_config.mk
 	@mkdir -p $(@D) && $(CXX) $(CXXFLAGS) $(PLATFORM_SHARED_CFLAGS) \
 	  -MM -MT'$@' -MT'$(<:.cpp=.o)' -MT'$(<:%.cpp=$(OBJ_DIR)/%.o)' \
           "$<" -o '$@'
@@ -2426,11 +2449,11 @@ ifeq ($(HAVE_POWER8),1)
 DEPFILES_C = $(patsubst %.c, $(OBJ_DIR)/%.c.d, $(LIB_SOURCES_C))
 DEPFILES_ASM = $(patsubst %.S, $(OBJ_DIR)/%.S.d, $(LIB_SOURCES_ASM))
 
-$(OBJ_DIR)/%.c.d: %.c
+$(OBJ_DIR)/%.c.d: %.c make_config.mk
 	@$(CXX) $(CXXFLAGS) $(PLATFORM_SHARED_CFLAGS) \
 	  -MM -MT'$@' -MT'$(<:.c=.o)' "$<" -o '$@'
 
-$(OBJ_DIR)/%.S.d: %.S
+$(OBJ_DIR)/%.S.d: %.S make_config.mk
 	@$(CXX) $(CXXFLAGS) $(PLATFORM_SHARED_CFLAGS) \
 	  -MM -MT'$@' -MT'$(<:.S=.o)' "$<" -o '$@'
 

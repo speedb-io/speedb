@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/sh
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 if [ "$#" = "0" ]; then
   echo "Usage: $0 major|minor|patch|full"
@@ -6,18 +6,18 @@ if [ "$#" = "0" ]; then
 fi
 
 if [ "$1" = "major" ]; then
-  cat include/rocksdb/version.h  | grep MAJOR | head -n1 | awk '{print $3}'
+  grep MAJOR speedb/version.h | head -n1 | awk '{print $3}'
 fi
 if [ "$1" = "minor" ]; then
-  cat include/rocksdb/version.h  | grep MINOR | head -n1 | awk '{print $3}'
+  grep MINOR speedb/version.h | head -n1 | awk '{print $3}'
 fi
 if [ "$1" = "patch" ]; then
-  cat include/rocksdb/version.h  | grep PATCH | head -n1 | awk '{print $3}'
+  grep PATCH speedb/version.h | head -n1 | awk '{print $3}'
 fi
 if [ "$1" = "full" ]; then
-  awk '/#define ROCKSDB/ { env[$2] = $3 }
-       END { printf "%s.%s.%s\n", env["ROCKSDB_MAJOR"],
-                                  env["ROCKSDB_MINOR"],
-                                  env["ROCKSDB_PATCH"] }'  \
-      include/rocksdb/version.h
+  awk '/#define SPEEDB/ { env[$2] = $3 }
+       END { printf "%s.%s.%s\n", env["SPEEDB_MAJOR"],
+                                  env["SPEEDB_MINOR"],
+                                  env["SPEEDB_PATCH"] }'  \
+      speedb/version.h
 fi

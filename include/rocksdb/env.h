@@ -1273,7 +1273,8 @@ class StackProfiler{
     std::thread m_writtingQThread;
     std::queue<std::shared_ptr<DataQueue>> m_QQ;
     std::mutex m_qqmutex;
-    
+    const std::string m_sStackProfilerOutputLocation = "/tmp/perfdata/"; // folder should be created before use
+    const int m_nStackProfilerOutputFileSize = 5e8; //500 MB max file size
 /**************************************************************************/
 };
 

@@ -975,9 +975,9 @@ void RotatingFileWrapper::write(std::stringstream &ss){
 
   CompressionInfo _info(copts, context, CompressionDict::GetEmptyDict(), kZlibCompression, sample_for_compression);
   if (!Zlib_Compress(_info, 1, input.data(), input.size(), &output)) {
-   if( !Snappy_Compress(_info, input.data(), input.size(), &output)) {
+  //  if( !Snappy_Compress(_info, input.data(), input.size(), &output)) {   // currently not supported in parsing script
     output = std::move(input);
-   }
+  //  }
   }
   m_dumpFileMutex.lock();
   m_files[m_nCurrentFileIndex].file.write(output.data(), output.size());
@@ -1159,8 +1159,8 @@ void StackProfiler::Init(){
   m_bIsRunning = true;
   m_bIsRunningQ = true;
 
-  m_fileHandle = std::unique_ptr<RotatingFileWrapper>(new RotatingFileWrapper("/tmp/perfdata/"));
-  m_fileHandle->setMaxFileSize(5e8);
+  m_fileHandle = std::unique_ptr<RotatingFileWrapper>(new RotatingFileWrapper(m_sStackProfilerOutputLocation));
+  m_fileHandle->setMaxFileSize(m_nStackProfilerOutputFileSize); // 500MB per file in init
   m_fileHandle->open_file();
 
   if (m_fileHandle->is_open()){

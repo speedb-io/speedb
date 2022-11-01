@@ -12,10 +12,12 @@
 #include <array>
 #include <climits>
 #include <cstring>
+#include <deque>
 #include <limits>
 #include <memory>
 
 #include "cache/cache_entry_roles.h"
+#include "cache/cache_reservation_manager.h"
 #include "logging/logging.h"
 #include "port/lang.h"
 #include "rocksdb/convenience.h"
@@ -231,49 +233,6 @@ Status XXPH3FilterBitsBuilder::MaybeVerifyHashEntriesChecksum() {
     return Status::Corruption("Filter's hash entries checksum mismatched");
   }
 }
-  // For reserving memory used in (new) Bloom and Ribbon Filter construction
-  std::shared_ptr<CacheReservationManager> cache_res_mgr_;
-
-  // For managing cache charge for final filter in (new) Bloom and Ribbon
-  // Filter construction
-  std::deque<std::unique_ptr<CacheReservationManager::CacheReservationHandle>>
-      final_filter_cache_res_handles_;
-
-  bool detect_filter_construct_corruption_;
-
-  struct HashEntriesInfo {
-    // A deque avoids unnecessary copying of already-saved values
-    // and has near-minimal peak memory use.
-    std::deque<uint64_t> entries;
-
-    // If cache_res_mgr_ != nullptr,
-    // it manages cache charge for buckets of hash entries in (new) Bloom
-    // or Ribbon Filter construction.
-    // Otherwise, it is empty.
-    std::deque<std::unique_ptr<CacheReservationManager::CacheReservationHandle>>
-        cache_res_bucket_handles;
-
-    // If detect_filter_construct_corruption_ == true,
-    // it records the xor checksum of hash entries.
-    // Otherwise, it is 0.
-    uint64_t xor_checksum = 0;
-
-    void Swap(HashEntriesInfo* other) {
-      assert(other != nullptr);
-      std::swap(entries, other->entries);
-      std::swap(cache_res_bucket_handles, other->cache_res_bucket_handles);
-      std::swap(xor_checksum, other->xor_checksum);
-    }
-
-    void Reset() {
-      entries.clear();
-      cache_res_bucket_handles.clear();
-      xor_checksum = 0;
-    }
-  };
-
-  HashEntriesInfo hash_entries_info_;
-};
 
 // #################### FastLocalBloom implementation ################## //
 // ############## also known as format_version=5 Bloom filter ########## //
@@ -1522,7 +1481,7 @@ BloomLikeFilterPolicy::GetStandard128RibbonBuilderWithContext(
 }
 
 std::string BloomLikeFilterPolicy::GetBitsPerKeySuffix(int millibits_per_key) {
-  std::string rv = ":" + ROCKSDB_NAMESPACE::ToString(millibits_per_key / 1000);
+  std::string rv = ":" + std::to_string(millibits_per_key / 1000);
   int frac = millibits_per_key % 1000;
   if (frac > 0) {
     rv.push_back('.');

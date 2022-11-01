@@ -52,13 +52,20 @@ FilterBitsBuilder* SpdbPairedBloomFilterPolicy::GetBuilderWithContext(
   // BloomLikeFilterPolicy::GetFastLocalBloomBuilderWithContext
   // TODO: See if it may be refactored to a static method
   bool offm = context.table_options.optimize_filters_for_memory;
+  const auto options_overrides_iter =
+      context.table_options.cache_usage_options.options_overrides.find(
+          CacheEntryRole::kFilterConstruction);
+  const auto filter_construction_charged =
+      options_overrides_iter !=
+              context.table_options.cache_usage_options.options_overrides.end()
+          ? options_overrides_iter->second.charged
+          : context.table_options.cache_usage_options.options.charged;
 
   // TODO: Refactor this to a static method of BloomLikeFilterPolicy
-  bool reserve_filter_construction_mem =
-      (context.table_options.reserve_table_builder_memory &&
-       context.table_options.block_cache);
   std::shared_ptr<CacheReservationManager> cache_res_mgr;
-  if (reserve_filter_construction_mem) {
+  if (context.table_options.block_cache &&
+      filter_construction_charged ==
+          CacheEntryRoleOptions::Decision::kEnabled) {
     cache_res_mgr = std::make_shared<
         CacheReservationManagerImpl<CacheEntryRole::kFilterConstruction>>(
         context.table_options.block_cache);

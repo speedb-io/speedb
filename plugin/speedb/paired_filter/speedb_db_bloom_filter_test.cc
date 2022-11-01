@@ -955,18 +955,20 @@ using FilterConstructionReserveMemoryHash = uint64_t;
 
 class DBFilterConstructionReserveMemoryTestWithParam
     : public DBTestBase,
-      public testing::WithParamInterface<std::tuple<bool, bool, bool>> {
+      public testing::WithParamInterface<
+          std::tuple<CacheEntryRoleOptions::Decision, bool, bool>> {
  public:
   DBFilterConstructionReserveMemoryTestWithParam()
       : DBTestBase("db_bloom_filter_tests",
                    /*env_do_fsync=*/true),
         num_key_(0),
-        reserve_table_builder_memory_(std::get<0>(GetParam())),
+        charge_filter_construction_(std::get<0>(GetParam())),
         partition_filters_(std::get<1>(GetParam())),
         detect_filter_construct_corruption_(std::get<2>(GetParam())) {
-    if (!reserve_table_builder_memory_) {
+    if (charge_filter_construction_ ==
+        CacheEntryRoleOptions::Decision::kDisabled) {
       // For these cases, we only interested in whether filter construction
-      // cache resevation happens instead of its accuracy. Therefore we don't
+      // cache reservation happens instead of its accuracy. Therefore we don't
       // need many keys.
       num_key_ = 5;
     } else if (partition_filters_) {
@@ -1003,7 +1005,9 @@ class DBFilterConstructionReserveMemoryTestWithParam
     // calculation.
     constexpr std::size_t kCacheCapacity = 100 * 1024 * 1024;
 
-    table_options.reserve_table_builder_memory = reserve_table_builder_memory_;
+    table_options.cache_usage_options.options_overrides.insert(
+        {CacheEntryRole::kFilterConstruction,
+         {/*.charged = */ charge_filter_construction_}});
     table_options.filter_policy = Create(10, kSpdbPairedBloom);
     table_options.partition_filters = partition_filters_;
     if (table_options.partition_filters) {
@@ -1030,7 +1034,9 @@ class DBFilterConstructionReserveMemoryTestWithParam
 
   std::size_t GetNumKey() { return num_key_; }
 
-  bool ReserveTableBuilderMemory() { return reserve_table_builder_memory_; }
+  CacheEntryRoleOptions::Decision ChargeFilterConstructMemory() {
+    return charge_filter_construction_;
+  }
 
   bool PartitionFilters() { return partition_filters_; }
 
@@ -1041,18 +1047,22 @@ class DBFilterConstructionReserveMemoryTestWithParam
 
  private:
   std::size_t num_key_;
-  bool reserve_table_builder_memory_;
+  CacheEntryRoleOptions::Decision charge_filter_construction_;
   bool partition_filters_;
   std::shared_ptr<FilterConstructResPeakTrackingCache> cache_;
   bool detect_filter_construct_corruption_;
 };
 
-INSTANTIATE_TEST_CASE_P(DBFilterConstructionReserveMemoryTestWithParam,
-                        DBFilterConstructionReserveMemoryTestWithParam,
-                        ::testing::Values(std::make_tuple(true, false, false),
-                                          std::make_tuple(true, false, true),
-                                          std::make_tuple(true, true, false),
-                                          std::make_tuple(true, true, true)));
+INSTANTIATE_TEST_CASE_P(
+    DBFilterConstructionReserveMemoryTestWithParam,
+    DBFilterConstructionReserveMemoryTestWithParam,
+    ::testing::Values(
+        std::make_tuple(CacheEntryRoleOptions::Decision::kEnabled, false,
+                        false),
+        std::make_tuple(CacheEntryRoleOptions::Decision::kEnabled, false, true),
+        std::make_tuple(CacheEntryRoleOptions::Decision::kEnabled, true, false),
+        std::make_tuple(CacheEntryRoleOptions::Decision::kEnabled, true,
+                        true)));
 
 // TODO: Speed up this test, and reduce disk space usage (~700MB)
 // The current test inserts many keys (on the scale of dummy entry size)

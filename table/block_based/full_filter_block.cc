@@ -119,8 +119,7 @@ Slice FullFilterBlockBuilder::Finish(
 FullFilterBlockReader::FullFilterBlockReader(
     const BlockBasedTable* t,
     CachableEntry<ParsedFullFilterBlock>&& filter_block)
-    : FilterBlockReaderCommon(t, std::move(filter_block)) {
-}
+    : FilterBlockReaderCommon(t, std::move(filter_block)) {}
 
 bool FullFilterBlockReader::KeyMayMatch(
     const Slice& key, const SliceTransform* /*prefix_extractor*/,

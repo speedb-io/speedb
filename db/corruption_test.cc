@@ -356,7 +356,6 @@ TEST_F(CorruptionTest, PostPITRCorruptionWALsRetained) {
     ASSERT_OK(DB::Open(options_, dbname_, cf_descs, &cfhs, &db_));
     assert(db_ != nullptr);  // suppress false clang-analyze report
 
-
     ASSERT_OK(db_->Put(WriteOptions(), cfhs[0], "k", "v"));
     ASSERT_OK(db_->Put(WriteOptions(), cfhs[1], "k", "v"));
     ASSERT_OK(db_->Put(WriteOptions(), cfhs[0], "k2", "v2"));

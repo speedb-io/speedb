@@ -650,7 +650,7 @@ Status DBImpl::Recover(
 
       bool corrupted_wal_found = false;
       s = RecoverLogFiles(wals, &next_sequence, read_only, &corrupted_wal_found,
-			  recovery_ctx);
+                          recovery_ctx);
       if (corrupted_wal_found && recovered_seq != nullptr) {
         *recovered_seq = next_sequence;
       }

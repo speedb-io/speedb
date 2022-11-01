@@ -2379,7 +2379,6 @@ void StressTest::Open(SharedState* shared) {
   options_.memtable_factory = std::move(factory);
   if (FLAGS_prefix_size == 0 &&
       options_.memtable_factory->IsInstanceOf("prefix_hash")) {
-
     fprintf(stderr,
             "prefix_size cannot be zero if memtablerep == prefix_hash\n");
     exit(1);

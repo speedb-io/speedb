@@ -131,6 +131,7 @@ class FullFilterBlockReader
                         uint64_t block_offset, const bool no_io,
                         BlockCacheLookupContext* lookup_context) override;
   size_t ApproximateMemoryUsage() const override;
+
  private:
   bool MayMatch(const Slice& entry, bool no_io, GetContext* get_context,
                 BlockCacheLookupContext* lookup_context) const;

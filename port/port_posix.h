@@ -222,5 +222,5 @@ int64_t GetProcessID();
 // true on success or false on failure.
 bool GenerateRfcUuid(std::string* output);
 
-} // namespace port
+}  // namespace port
 }  // namespace ROCKSDB_NAMESPACE

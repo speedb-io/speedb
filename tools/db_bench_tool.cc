@@ -4491,7 +4491,7 @@ class Benchmark {
       }
       std::string bits_str;
       if (FLAGS_bloom_bits > 0) {
-        bits_str = ":" + ROCKSDB_NAMESPACE::ToString(FLAGS_bloom_bits);
+        bits_str = ":" + std::to_string(FLAGS_bloom_bits);
         fprintf(stderr, "note: appending --bloom-bits (%f) to --filter-uri\n",
                 FLAGS_bloom_bits);
       }
@@ -4516,7 +4516,7 @@ class Benchmark {
         Status s = FilterPolicy::CreateFromString(
             ConfigOptions(),
             "rocksdb.internal.DeprecatedBlockBasedBloomFilter:" +
-                ROCKSDB_NAMESPACE::ToString(FLAGS_bloom_bits),
+                std::to_string(FLAGS_bloom_bits),
             &table_options->filter_policy);
         if (!s.ok()) {
           fprintf(stderr, "failure creating obsolete block-based filter: %s\n",

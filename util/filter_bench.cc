@@ -806,7 +806,7 @@ int main(int argc, char **argv) {
     config_options.ignore_unsupported_options = false;
     std::string bits_str;
     if (FLAGS_bits_per_key > 0) {
-      bits_str = ":" + ROCKSDB_NAMESPACE::ToString(FLAGS_bits_per_key);
+      bits_str = ":" + std::to_string(FLAGS_bits_per_key);
     }
     auto s = ROCKSDB_NAMESPACE::FilterPolicy::CreateFromString(
         config_options, FLAGS_impl + bits_str, &policy);

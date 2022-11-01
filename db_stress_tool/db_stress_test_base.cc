@@ -3017,25 +3017,6 @@ void InitializeOptionsFromFlags(
   options.wal_compression =
       StringToCompressionType(FLAGS_wal_compression.c_str());
 
-  switch (FLAGS_rep_factory) {
-    case kSkipList:
-      // no need to do anything
-      break;
-#ifndef ROCKSDB_LITE
-    case kHashSkipList:
-      options.memtable_factory.reset(NewHashSkipListRepFactory(10000));
-      break;
-    case kVectorRep:
-      options.memtable_factory.reset(new VectorRepFactory());
-      break;
-#else
-    default:
-      fprintf(stderr,
-              "RocksdbLite only supports skip list mem table. Skip "
-              "--rep_factory\n");
-#endif  // ROCKSDB_LITE
-  }
-
   if (FLAGS_use_full_merge_v1) {
     options.merge_operator = MergeOperators::CreateDeprecatedPutOperator();
   } else {

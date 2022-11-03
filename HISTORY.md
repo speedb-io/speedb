@@ -52,7 +52,7 @@ Note: Paired bloom filter is recommended to use when the number of bits per key 
 
 
 # Rocksdb Change Log
-## Unreleased
+## 7.7.6 (11/03/2022)
 ### Bug Fixes
 * Fix memory corruption error in scans if async_io is enabled. Memory corruption happened if there is IOError while reading the data leading to empty buffer and other buffer already in progress of async read goes again for reading.
 

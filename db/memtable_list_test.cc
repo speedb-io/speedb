@@ -690,9 +690,10 @@ TEST_F(MemTableListTest, FlushPendingTest) {
     ASSERT_EQ(0, to_delete.size());
     auto expected_mutable_memory_usage =
         tables_reserved_mem[0] + tables_reserved_mem[1];
-    ValidateWbmUsedCounters(wb,
-                            total_reserved_mem - expected_mutable_memory_usage,
-                            expected_mutable_memory_usage, 0U);
+    auto expected_being_freed = 0U;
+    ValidateWbmUsedCounters(
+        wb, total_reserved_mem - expected_mutable_memory_usage,
+        expected_mutable_memory_usage, expected_being_freed);
 
     // Even though we have less than the minimum to flush, a flush is
     // pending since we had previously requested a flush and never called
@@ -707,17 +708,19 @@ TEST_F(MemTableListTest, FlushPendingTest) {
     ASSERT_EQ(2, list.NumNotFlushed());
     ASSERT_FALSE(list.IsFlushPending());
     ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
+    expected_being_freed += tables_reserved_mem[0] + tables_reserved_mem[1];
     ValidateWbmUsedCounters(
         wb, total_reserved_mem - expected_mutable_memory_usage,
-        expected_mutable_memory_usage, expected_mutable_memory_usage);
+        expected_mutable_memory_usage, expected_being_freed);
 
     // Revert flush
     list.RollbackMemtableFlush(to_flush, 0);
     ASSERT_FALSE(list.IsFlushPending());
     ASSERT_TRUE(list.imm_flush_needed.load(std::memory_order_acquire));
-    ValidateWbmUsedCounters(wb,
-                            total_reserved_mem - expected_mutable_memory_usage,
-                            expected_mutable_memory_usage, 0U);
+    expected_being_freed -= tables_reserved_mem[0] + tables_reserved_mem[1];
+    ValidateWbmUsedCounters(
+        wb, total_reserved_mem - expected_mutable_memory_usage,
+        expected_mutable_memory_usage, expected_being_freed);
     to_flush.clear();
 
     // Add another table
@@ -728,9 +731,9 @@ TEST_F(MemTableListTest, FlushPendingTest) {
     ASSERT_TRUE(list.imm_flush_needed.load(std::memory_order_acquire));
     ASSERT_EQ(0, to_delete.size());
     expected_mutable_memory_usage += tables_reserved_mem[2];
-    ValidateWbmUsedCounters(wb,
-                            total_reserved_mem - expected_mutable_memory_usage,
-                            expected_mutable_memory_usage, 0U);
+    ValidateWbmUsedCounters(
+        wb, total_reserved_mem - expected_mutable_memory_usage,
+        expected_mutable_memory_usage, expected_being_freed);
 
     // Pick tables to flush
     list.PickMemtablesToFlush(
@@ -739,9 +742,11 @@ TEST_F(MemTableListTest, FlushPendingTest) {
     ASSERT_EQ(3, list.NumNotFlushed());
     ASSERT_FALSE(list.IsFlushPending());
     ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
+    expected_being_freed += tables_reserved_mem[0] + tables_reserved_mem[1] +
+                            tables_reserved_mem[2];
     ValidateWbmUsedCounters(
         wb, total_reserved_mem - expected_mutable_memory_usage,
-        expected_mutable_memory_usage, expected_mutable_memory_usage);
+        expected_mutable_memory_usage, expected_being_freed);
 
     // Pick tables to flush again
     autovector<MemTable*> to_flush2;
@@ -753,7 +758,7 @@ TEST_F(MemTableListTest, FlushPendingTest) {
     ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
     ValidateWbmUsedCounters(
         wb, total_reserved_mem - expected_mutable_memory_usage,
-        expected_mutable_memory_usage, expected_mutable_memory_usage);
+        expected_mutable_memory_usage, expected_being_freed);
 
     // Add another table
     list.Add(tables[3], &to_delete);
@@ -763,8 +768,7 @@ TEST_F(MemTableListTest, FlushPendingTest) {
     expected_mutable_memory_usage += tables_reserved_mem[3];
     ValidateWbmUsedCounters(
         wb, total_reserved_mem - expected_mutable_memory_usage,
-        expected_mutable_memory_usage,
-        expected_mutable_memory_usage - tables_reserved_mem[3]);
+        expected_mutable_memory_usage, expected_being_freed);
 
     // Request a flush again
     list.FlushRequested();
@@ -778,9 +782,10 @@ TEST_F(MemTableListTest, FlushPendingTest) {
     ASSERT_EQ(4, list.NumNotFlushed());
     ASSERT_FALSE(list.IsFlushPending());
     ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
+    expected_being_freed += tables_reserved_mem[3];
     ValidateWbmUsedCounters(
         wb, total_reserved_mem - expected_mutable_memory_usage,
-        expected_mutable_memory_usage, expected_mutable_memory_usage);
+        expected_mutable_memory_usage, expected_being_freed);
 
     // Rollback first pick of tables
     list.RollbackMemtableFlush(to_flush, 0);
@@ -788,9 +793,11 @@ TEST_F(MemTableListTest, FlushPendingTest) {
     ASSERT_TRUE(list.imm_flush_needed.load(std::memory_order_acquire));
     // table3 was NOT rolled back (to_flush (tables 0, 1, 2) was rolled back,
     // to_flush2 contains table 3)
+    expected_being_freed -= tables_reserved_mem[0] + tables_reserved_mem[1] +
+                            tables_reserved_mem[2];
     ValidateWbmUsedCounters(
         wb, total_reserved_mem - expected_mutable_memory_usage,
-        expected_mutable_memory_usage, tables_reserved_mem[3]);
+        expected_mutable_memory_usage, expected_being_freed);
     to_flush.clear();
 
     // Add another tables
@@ -808,35 +815,50 @@ TEST_F(MemTableListTest, FlushPendingTest) {
     // Pick tables to flush
     list.PickMemtablesToFlush(
         std::numeric_limits<uint64_t>::max() /* memtable_id */, &to_flush);
-    // Should pick 4 of 5 since 1 table has been picked in to_flush2
-    ASSERT_EQ(4, to_flush.size());
+    // Picks three oldest memtables. The fourth oldest is picked in `to_flush2`
+    // so must be excluded. The newest (fifth oldest) is non-consecutive with
+    // the three oldest due to omitting the fourth oldest so must not be picked.
+    ASSERT_EQ(3, to_flush.size());
     ASSERT_EQ(5, list.NumNotFlushed());
     ASSERT_FALSE(list.IsFlushPending());
-    ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
+    ASSERT_TRUE(list.imm_flush_needed.load(std::memory_order_acquire));
     // Now all of the immutables tables are being freed (undergoing flush)
+    expected_being_freed += tables_reserved_mem[0] + tables_reserved_mem[1] +
+                            tables_reserved_mem[2];
     ValidateWbmUsedCounters(
         wb, total_reserved_mem - expected_mutable_memory_usage,
-        expected_mutable_memory_usage, expected_mutable_memory_usage);
+        expected_mutable_memory_usage, expected_being_freed);
 
     // Pick tables to flush again
     autovector<MemTable*> to_flush3;
     list.PickMemtablesToFlush(
         std::numeric_limits<uint64_t>::max() /* memtable_id */, &to_flush3);
-    ASSERT_EQ(0, to_flush3.size());  // nothing not in progress of being flushed
+    // Picks newest (fifth oldest)
+    ASSERT_EQ(1, to_flush3.size());
     ASSERT_EQ(5, list.NumNotFlushed());
     ASSERT_FALSE(list.IsFlushPending());
     ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
+    expected_being_freed += tables_reserved_mem[4];
     ValidateWbmUsedCounters(
         wb, total_reserved_mem - expected_mutable_memory_usage,
-        expected_mutable_memory_usage, expected_mutable_memory_usage);
+        expected_mutable_memory_usage, expected_being_freed);
 
-    // Flush the 4 memtables that were picked in to_flush
+    // Nothing left to flush
+    autovector<MemTable*> to_flush4;
+    list.PickMemtablesToFlush(
+        std::numeric_limits<uint64_t>::max() /* memtable_id */, &to_flush4);
+    ASSERT_EQ(0, to_flush4.size());
+    ASSERT_EQ(5, list.NumNotFlushed());
+    ASSERT_FALSE(list.IsFlushPending());
+    ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
+
+    // Flush the 3 memtables that were picked in to_flush
     s = Mock_InstallMemtableFlushResults(&list, mutable_cf_options, to_flush,
                                          &to_delete);
     ASSERT_OK(s);
 
-    // Note:  now to_flush contains tables[0,1,2,4].  to_flush2 contains
-    // tables[3].
+    // Note:  now to_flush contains tables[0,1,2].  to_flush2 contains
+    // tables[3]. to_flush3 contains tables[4].
     // Current implementation will only commit memtables in the order they were
     // created. So TryInstallMemtableFlushResults will install the first 3
     // tables in to_flush and stop when it encounters a table not yet flushed.
@@ -849,14 +871,24 @@ TEST_F(MemTableListTest, FlushPendingTest) {
     // None of the 5 tables has been freed => no change in the counters
     ValidateWbmUsedCounters(
         wb, total_reserved_mem - expected_mutable_memory_usage,
-        expected_mutable_memory_usage, expected_mutable_memory_usage);
+        expected_mutable_memory_usage, expected_being_freed);
 
     // Request a flush again. Should be nothing to flush
     list.FlushRequested();
     ASSERT_FALSE(list.IsFlushPending());
     ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
 
-    // Flush the 1 memtable that was picked in to_flush2
+    // Flush the 1 memtable (tables[4]) that was picked in to_flush3
+    s = MemTableListTest::Mock_InstallMemtableFlushResults(
+        &list, mutable_cf_options, to_flush3, &to_delete);
+    ASSERT_OK(s);
+
+    // This will install 0 tables since tables[4] flushed while tables[3] has
+    // not yet flushed.
+    ASSERT_EQ(2, list.NumNotFlushed());
+    ASSERT_EQ(0, to_delete.size());
+
+    // Flush the 1 memtable (tables[3]) that was picked in to_flush2
     s = MemTableListTest::Mock_InstallMemtableFlushResults(
         &list, mutable_cf_options, to_flush2, &to_delete);
     ASSERT_OK(s);
@@ -872,7 +904,7 @@ TEST_F(MemTableListTest, FlushPendingTest) {
     // None of the 5 tables has been freed => no change in the counters
     ValidateWbmUsedCounters(
         wb, total_reserved_mem - expected_mutable_memory_usage,
-        expected_mutable_memory_usage, expected_mutable_memory_usage);
+        expected_mutable_memory_usage, expected_being_freed);
 
     // This loop will actually do nothing since to_delete is empty
     ASSERT_TRUE(to_delete.empty());
@@ -892,17 +924,16 @@ TEST_F(MemTableListTest, FlushPendingTest) {
     ASSERT_EQ(5, list.GetLatestMemTableID());
     ValidateWbmUsedCounters(
         wb, total_reserved_mem - expected_mutable_memory_usage,
-        expected_mutable_memory_usage,
-        expected_mutable_memory_usage - tables_reserved_mem[5]);
+        expected_mutable_memory_usage, expected_being_freed);
 
     memtable_id = 4;
     // Pick tables to flush. The tables to pick must have ID smaller than or
     // equal to 4. Therefore, no table will be selected in this case.
-    autovector<MemTable*> to_flush4;
+    autovector<MemTable*> to_flush5;
     list.FlushRequested();
     ASSERT_TRUE(list.HasFlushRequested());
-    list.PickMemtablesToFlush(memtable_id, &to_flush4);
-    ASSERT_TRUE(to_flush4.empty());
+    list.PickMemtablesToFlush(memtable_id, &to_flush5);
+    ASSERT_TRUE(to_flush5.empty());
     ASSERT_EQ(1, list.NumNotFlushed());
     ASSERT_TRUE(list.imm_flush_needed.load(std::memory_order_acquire));
     ASSERT_FALSE(list.IsFlushPending());
@@ -910,22 +941,22 @@ TEST_F(MemTableListTest, FlushPendingTest) {
     // No change
     ValidateWbmUsedCounters(
         wb, total_reserved_mem - expected_mutable_memory_usage,
-        expected_mutable_memory_usage,
-        expected_mutable_memory_usage - tables_reserved_mem[5]);
+        expected_mutable_memory_usage, expected_being_freed);
 
     // Pick tables to flush. The tables to pick must have ID smaller than or
     // equal to 5. Therefore, only tables[5] will be selected.
     memtable_id = 5;
     list.FlushRequested();
-    list.PickMemtablesToFlush(memtable_id, &to_flush4);
-    ASSERT_EQ(1, static_cast<int>(to_flush4.size()));
+    list.PickMemtablesToFlush(memtable_id, &to_flush5);
+    ASSERT_EQ(1, static_cast<int>(to_flush5.size()));
     ASSERT_EQ(1, list.NumNotFlushed());
     ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
     ASSERT_FALSE(list.IsFlushPending());
     // All tables are now flushed or being flushed, but none was deleted
+    expected_being_freed += tables_reserved_mem[5];
     ValidateWbmUsedCounters(
         wb, total_reserved_mem - expected_mutable_memory_usage,
-        expected_mutable_memory_usage, expected_mutable_memory_usage);
+        expected_mutable_memory_usage, expected_being_freed);
     to_delete.clear();
 
     list.current()->Unref(&to_delete);

@@ -100,6 +100,10 @@ const std::string LDBCommand::ARG_BLOB_GARBAGE_COLLECTION_FORCE_THRESHOLD =
     "blob_garbage_collection_force_threshold";
 const std::string LDBCommand::ARG_BLOB_COMPACTION_READAHEAD_SIZE =
     "blob_compaction_readahead_size";
+const std::string LDBCommand::ARG_BLOB_FILE_STARTING_LEVEL =
+    "blob_file_starting_level";
+const std::string LDBCommand::ARG_PREPOPULATE_BLOB_CACHE =
+    "prepopulate_blob_cache";
 const std::string LDBCommand::ARG_DECODE_BLOB_INDEX = "decode_blob_index";
 const std::string LDBCommand::ARG_DUMP_UNCOMPRESSED_BLOBS =
     "dump_uncompressed_blobs";
@@ -113,7 +117,8 @@ void DumpWalFile(Options options, std::string wal_file, bool print_header,
                  LDBCommandExecuteResult* exec_state);
 
 void DumpSstFile(Options options, std::string filename, bool output_hex,
-                 bool show_properties, bool decode_blob_index);
+                 bool show_properties, bool decode_blob_index,
+                 std::string from_key = "", std::string to_key = "");
 
 void DumpBlobFile(const std::string& filename, bool is_key_hex,
                   bool is_value_hex, bool dump_uncompressed_blobs);
@@ -509,6 +514,8 @@ void LDBCommand::CloseDB() {
     for (auto& pair : cf_handles_) {
       delete pair.second;
     }
+    Status s = db_->Close();
+    s.PermitUncheckedError();
     delete db_;
     db_ = nullptr;
   }
@@ -551,6 +558,8 @@ std::vector<std::string> LDBCommand::BuildCmdLineOptions(
                                   ARG_BLOB_GARBAGE_COLLECTION_AGE_CUTOFF,
                                   ARG_BLOB_GARBAGE_COLLECTION_FORCE_THRESHOLD,
                                   ARG_BLOB_COMPACTION_READAHEAD_SIZE,
+                                  ARG_BLOB_FILE_STARTING_LEVEL,
+                                  ARG_PREPOPULATE_BLOB_CACHE,
                                   ARG_IGNORE_UNKNOWN_OPTIONS,
                                   ARG_CF_NAME};
   ret.insert(ret.end(), options.begin(), options.end());
@@ -814,6 +823,34 @@ void LDBCommand::OverrideBaseCFOptions(ColumnFamilyOptions* cf_opts) {
     } else {
       exec_state_ = LDBCommandExecuteResult::Failed(
           ARG_BLOB_COMPACTION_READAHEAD_SIZE + " must be > 0.");
+    }
+  }
+
+  int blob_file_starting_level;
+  if (ParseIntOption(option_map_, ARG_BLOB_FILE_STARTING_LEVEL,
+                     blob_file_starting_level, exec_state_)) {
+    if (blob_file_starting_level >= 0) {
+      cf_opts->blob_file_starting_level = blob_file_starting_level;
+    } else {
+      exec_state_ = LDBCommandExecuteResult::Failed(
+          ARG_BLOB_FILE_STARTING_LEVEL + " must be >= 0.");
+    }
+  }
+
+  int prepopulate_blob_cache;
+  if (ParseIntOption(option_map_, ARG_PREPOPULATE_BLOB_CACHE,
+                     prepopulate_blob_cache, exec_state_)) {
+    switch (prepopulate_blob_cache) {
+      case 0:
+        cf_opts->prepopulate_blob_cache = PrepopulateBlobCache::kDisable;
+        break;
+      case 1:
+        cf_opts->prepopulate_blob_cache = PrepopulateBlobCache::kFlushOnly;
+        break;
+      default:
+        exec_state_ = LDBCommandExecuteResult::Failed(
+            ARG_PREPOPULATE_BLOB_CACHE +
+            " must be 0 (disable) or 1 (flush only).");
     }
   }
 
@@ -1290,7 +1327,7 @@ void DumpManifestFile(Options options, std::string file, bool verbose, bool hex,
   ImmutableDBOptions immutable_db_options(options);
   VersionSet versions(dbname, &immutable_db_options, sopt, tc.get(), &wb, &wc,
                       /*block_cache_tracer=*/nullptr, /*io_tracer=*/nullptr,
-                      /*db_session_id*/ "");
+                      /*db_id*/ "", /*db_session_id*/ "");
   Status s = versions.DumpManifest(options, file, verbose, hex, json);
   if (!s.ok()) {
     fprintf(stderr, "Error in processing file %s %s\n", file.c_str(),
@@ -1432,7 +1469,7 @@ Status GetLiveFilesChecksumInfoFromVersionSet(Options options,
   ImmutableDBOptions immutable_db_options(options);
   VersionSet versions(dbname, &immutable_db_options, sopt, tc.get(), &wb, &wc,
                       /*block_cache_tracer=*/nullptr, /*io_tracer=*/nullptr,
-                      /*db_session_id*/ "");
+                      /*db_id*/ "", /*db_session_id*/ "");
   std::vector<std::string> cf_name_list;
   s = versions.ListColumnFamilies(&cf_name_list, db_path,
                                   immutable_db_options.fs.get());
@@ -2009,7 +2046,7 @@ void DBDumperCommand::DoCommand() {
         break;
       case kTableFile:
         DumpSstFile(options_, path_, is_key_hex_, /* show_properties */ true,
-                    decode_blob_index_);
+                    decode_blob_index_, from_, to_);
         break;
       case kDescriptorFile:
         DumpManifestFile(options_, path_, /* verbose_ */ false, is_key_hex_,
@@ -2239,7 +2276,7 @@ Status ReduceDBLevelsCommand::GetOldNumOfLevels(Options& opt,
   WriteBufferManager wb(opt.db_write_buffer_size);
   VersionSet versions(db_path_, &db_options, soptions, tc.get(), &wb, &wc,
                       /*block_cache_tracer=*/nullptr, /*io_tracer=*/nullptr,
-                      /*db_session_id*/ "");
+                      /*db_id*/ "", /*db_session_id*/ "");
   std::vector<ColumnFamilyDescriptor> dummy;
   ColumnFamilyDescriptor dummy_descriptor(kDefaultColumnFamilyName,
                                           ColumnFamilyOptions(opt));
@@ -2578,8 +2615,9 @@ void DumpWalFile(Options options, std::string wal_file, bool print_header,
   const auto& fs = options.env->GetFileSystem();
   FileOptions soptions(options);
   std::unique_ptr<SequentialFileReader> wal_file_reader;
-  Status status = SequentialFileReader::Create(fs, wal_file, soptions,
-                                               &wal_file_reader, nullptr);
+  Status status = SequentialFileReader::Create(
+      fs, wal_file, soptions, &wal_file_reader, nullptr /* dbg */,
+      nullptr /* rate_limiter */);
   if (!status.ok()) {
     if (exec_state) {
       *exec_state = LDBCommandExecuteResult::Failed("Failed to open WAL file " +
@@ -3567,9 +3605,8 @@ void RestoreCommand::DoCommand() {
 namespace {
 
 void DumpSstFile(Options options, std::string filename, bool output_hex,
-                 bool show_properties, bool decode_blob_index) {
-  std::string from_key;
-  std::string to_key;
+                 bool show_properties, bool decode_blob_index,
+                 std::string from_key, std::string to_key) {
   if (filename.length() <= 4 ||
       filename.rfind(".sst") != filename.length() - 4) {
     std::cout << "Invalid sst file name." << std::endl;
@@ -3581,9 +3618,8 @@ void DumpSstFile(Options options, std::string filename, bool output_hex,
       2 * 1024 * 1024 /* readahead_size */,
       /* verify_checksum */ false, output_hex, decode_blob_index);
   Status st = dumper.ReadSequential(true, std::numeric_limits<uint64_t>::max(),
-                                    false,            // has_from
-                                    from_key, false,  // has_to
-                                    to_key);
+                                    !from_key.empty(), from_key,
+                                    !to_key.empty(), to_key);
   if (!st.ok()) {
     std::cerr << "Error in reading SST file " << filename << st.ToString()
               << std::endl;
@@ -4162,7 +4198,12 @@ void UnsafeRemoveSstFileCommand::DoCommand() {
     VersionEdit edit;
     edit.SetColumnFamily(cfd->GetID());
     edit.DeleteFile(level, sst_file_number_);
-    s = w.LogAndApply(cfd, &edit);
+    std::unique_ptr<FSDirectory> db_dir;
+    s = options_.env->GetFileSystem()->NewDirectory(db_path_, IOOptions(),
+                                                    &db_dir, nullptr);
+    if (s.ok()) {
+      s = w.LogAndApply(cfd, &edit, db_dir.get());
+    }
   }
 
   if (!s.ok()) {

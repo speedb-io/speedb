@@ -22,6 +22,7 @@ int main() {
 #include "port/stack_trace.h"
 #include "rocksdb/cache.h"
 #include "rocksdb/convenience.h"
+#include "rocksdb/env.h"
 #include "rocksdb/system_clock.h"
 #include "rocksdb/table.h"
 #include "table/block_based/filter_policy_internal.h"
@@ -86,8 +87,7 @@ DEFINE_bool(new_builder, false,
 
 DEFINE_string(impl, "0",
               "Select filter implementation. Without -use_plain_table_bloom:"
-              "0 = legacy full Bloom filter, 1 = block-based Bloom filter, "
-              "2 = format_version 5 Bloom filter, 3 = Ribbon128 filter, "
+              "1 = format_version 5 Bloom filter, 2 = Ribbon128 filter. "
               "name and options of the filter to use.  With "
               "-use_plain_table_bloom: 0 = no locality, 1 = locality.");
 
@@ -305,6 +305,15 @@ struct FilterBench : public mock::MockBlockBasedTableTester {
 };
 
 void FilterBench::Go() {
+  if (FLAGS_use_plain_table_bloom && FLAGS_use_full_block_reader) {
+    throw std::runtime_error(
+        "Can't combine -use_plain_table_bloom and -use_full_block_reader");
+  }
+
+  if (FLAGS_vary_key_count_ratio < 0.0 || FLAGS_vary_key_count_ratio > 1.0) {
+    throw std::runtime_error("-vary_key_count_ratio must be >= 0.0 and <= 1.0");
+  }
+
   // For example, average_keys_per_filter = 100, vary_key_count_ratio = 0.1.
   // Varys up to +/- 10 keys. variance_range = 21 (generating value 0..20).
   // variance_offset = 10, so value - offset average value is always 0.
@@ -662,11 +671,9 @@ double FilterBench::RandomQueryTest(uint32_t inside_threshold, bool dry_run,
           } else {
             may_match = info.full_block_reader_->KeyMayMatch(
                 batch_slices[i],
-                /*prefix_extractor=*/nullptr,
-                /*block_offset=*/ROCKSDB_NAMESPACE::kNotValid,
                 /*no_io=*/false, /*const_ikey_ptr=*/nullptr,
                 /*get_context=*/nullptr,
-                /*lookup_context=*/nullptr);
+                /*lookup_context=*/nullptr, Env::IO_TOTAL);
           }
         } else {
           if (dry_run) {

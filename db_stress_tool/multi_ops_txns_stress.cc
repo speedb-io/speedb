@@ -416,8 +416,7 @@ Status MultiOpsTxnsStressTest::TestPut(ThreadState* /*thread*/,
                                        const ReadOptions& /*read_opts*/,
                                        const std::vector<int>& /*cf_ids*/,
                                        const std::vector<int64_t>& /*keys*/,
-                                       char (&value)[100],
-                                       std::unique_ptr<MutexLock>& /*lock*/) {
+                                       char (&value)[100]) {
   (void)value;
   return Status::NotSupported();
 }
@@ -426,8 +425,7 @@ Status MultiOpsTxnsStressTest::TestPut(ThreadState* /*thread*/,
 Status MultiOpsTxnsStressTest::TestDelete(
     ThreadState* /*thread*/, WriteOptions& /*write_opts*/,
     const std::vector<int>& /*rand_column_families*/,
-    const std::vector<int64_t>& /*rand_keys*/,
-    std::unique_ptr<MutexLock>& /*lock*/) {
+    const std::vector<int64_t>& /*rand_keys*/) {
   return Status::NotSupported();
 }
 
@@ -435,15 +433,13 @@ Status MultiOpsTxnsStressTest::TestDelete(
 Status MultiOpsTxnsStressTest::TestDeleteRange(
     ThreadState* /*thread*/, WriteOptions& /*write_opts*/,
     const std::vector<int>& /*rand_column_families*/,
-    const std::vector<int64_t>& /*rand_keys*/,
-    std::unique_ptr<MutexLock>& /*lock*/) {
+    const std::vector<int64_t>& /*rand_keys*/) {
   return Status::NotSupported();
 }
 
 void MultiOpsTxnsStressTest::TestIngestExternalFile(
     ThreadState* thread, const std::vector<int>& rand_column_families,
-    const std::vector<int64_t>& /*rand_keys*/,
-    std::unique_ptr<MutexLock>& /*lock*/) {
+    const std::vector<int64_t>& /*rand_keys*/) {
   // TODO (yanqin)
   (void)thread;
   (void)rand_column_families;
@@ -670,7 +666,7 @@ Status MultiOpsTxnsStressTest::PrimaryKeyUpdateTxn(ThreadState* thread,
     return s;
   }
 
-  s = txn->Commit();
+  s = CommitAndCreateTimestampedSnapshotIfNeeded(thread, *txn);
 
   auto& key_gen = key_gen_for_a_.at(thread->tid);
   if (s.ok()) {
@@ -876,7 +872,7 @@ Status MultiOpsTxnsStressTest::SecondaryKeyUpdateTxn(ThreadState* thread,
     return s;
   }
 
-  s = txn->Commit();
+  s = CommitAndCreateTimestampedSnapshotIfNeeded(thread, *txn);
 
   if (s.ok()) {
     delete txn;
@@ -968,7 +964,8 @@ Status MultiOpsTxnsStressTest::UpdatePrimaryIndexValueTxn(ThreadState* thread,
     return s;
   }
 
-  s = txn->Commit();
+  s = CommitAndCreateTimestampedSnapshotIfNeeded(thread, *txn);
+
   if (s.ok()) {
     delete txn;
   }
@@ -1011,8 +1008,8 @@ Status MultiOpsTxnsStressTest::PointLookupTxn(ThreadState* thread,
     RollbackTxn(txn).PermitUncheckedError();
   });
 
-  txn->SetSnapshot();
-  ropts.snapshot = txn->GetSnapshot();
+  std::shared_ptr<const Snapshot> snapshot;
+  SetupSnapshot(thread, ropts, *txn, snapshot);
 
   if (FLAGS_delay_snapshot_read_one_in > 0 &&
       thread->rand.OneIn(FLAGS_delay_snapshot_read_one_in)) {
@@ -1062,8 +1059,8 @@ Status MultiOpsTxnsStressTest::RangeScanTxn(ThreadState* thread,
     RollbackTxn(txn).PermitUncheckedError();
   });
 
-  txn->SetSnapshot();
-  ropts.snapshot = txn->GetSnapshot();
+  std::shared_ptr<const Snapshot> snapshot;
+  SetupSnapshot(thread, ropts, *txn, snapshot);
 
   if (FLAGS_delay_snapshot_read_one_in > 0 &&
       thread->rand.OneIn(FLAGS_delay_snapshot_read_one_in)) {
@@ -1248,7 +1245,19 @@ void MultiOpsTxnsStressTest::VerifyDb(ThreadState* thread) const {
   }
 }
 
+// VerifyPkSkFast() can be called by MultiOpsTxnsStressListener's callbacks
+// which can be called before TransactionDB::Open() returns to caller.
+// Therefore, at that time, db_ and txn_db_  may still be nullptr.
+// Caller has to make sure that the race condition does not happen.
 void MultiOpsTxnsStressTest::VerifyPkSkFast(int job_id) {
+  DB* const db = db_aptr_.load(std::memory_order_acquire);
+  if (db == nullptr) {
+    return;
+  }
+
+  assert(db_ == db);
+  assert(db_ != nullptr);
+
   const Snapshot* const snapshot = db_->GetSnapshot();
   assert(snapshot);
   ManagedSnapshot snapshot_guard(db_, snapshot);
@@ -1356,6 +1365,42 @@ Status MultiOpsTxnsStressTest::WriteToCommitTimeWriteBatch(Transaction& txn) {
   EncodeFixed64(val_buf, counter_val);
   return ctwb->Put(Slice(key_buf, sizeof(key_buf)),
                    Slice(val_buf, sizeof(val_buf)));
+}
+
+Status MultiOpsTxnsStressTest::CommitAndCreateTimestampedSnapshotIfNeeded(
+    ThreadState* thread, Transaction& txn) {
+  Status s;
+  if (FLAGS_create_timestamped_snapshot_one_in > 0 &&
+      thread->rand.OneInOpt(FLAGS_create_timestamped_snapshot_one_in)) {
+    uint64_t ts = db_stress_env->NowNanos();
+    std::shared_ptr<const Snapshot> snapshot;
+    s = txn.CommitAndTryCreateSnapshot(/*notifier=*/nullptr, ts, &snapshot);
+  } else {
+    s = txn.Commit();
+  }
+  assert(txn_db_);
+  if (FLAGS_create_timestamped_snapshot_one_in > 0 &&
+      thread->rand.OneInOpt(50000)) {
+    uint64_t now = db_stress_env->NowNanos();
+    constexpr uint64_t time_diff = static_cast<uint64_t>(1000) * 1000 * 1000;
+    txn_db_->ReleaseTimestampedSnapshotsOlderThan(now - time_diff);
+  }
+  return s;
+}
+
+void MultiOpsTxnsStressTest::SetupSnapshot(
+    ThreadState* thread, ReadOptions& read_opts, Transaction& txn,
+    std::shared_ptr<const Snapshot>& snapshot) {
+  if (thread->rand.OneInOpt(2)) {
+    snapshot = txn_db_->GetLatestTimestampedSnapshot();
+  }
+
+  if (snapshot) {
+    read_opts.snapshot = snapshot.get();
+  } else {
+    txn.SetSnapshot();
+    read_opts.snapshot = txn.GetSnapshot();
+  }
 }
 #endif  // !ROCKSDB_LITE
 
@@ -1721,6 +1766,15 @@ void CheckAndSetOptionsForMultiOpsTxnStressTest() {
             "Must specify a file to store ranges of A and C via "
             "-key_spaces_path\n");
     exit(1);
+  }
+  if (FLAGS_create_timestamped_snapshot_one_in > 0) {
+    if (FLAGS_txn_write_policy !=
+        static_cast<uint64_t>(TxnDBWritePolicy::WRITE_COMMITTED)) {
+      fprintf(stderr,
+              "Timestamped snapshot is not yet supported by "
+              "write-prepared/write-unprepared transactions\n");
+      exit(1);
+    }
   }
 #else
   fprintf(stderr, "-test_multi_ops_txns not supported in ROCKSDB_LITE mode\n");

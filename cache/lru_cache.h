@@ -17,6 +17,7 @@
 #include "port/port.h"
 #include "rocksdb/secondary_cache.h"
 #include "util/autovector.h"
+#include "util/distributed_mutex.h"
 
 namespace ROCKSDB_NAMESPACE {
 namespace lru_cache {
@@ -39,8 +40,11 @@ namespace lru_cache {
 //    In that case the entry is not in the LRU list and not in hash table.
 //    The entry can be freed when refs becomes 0.
 //    (refs >= 1 && in_cache == false)
-//
-// All newly created LRUHandles are in state 1. If you call
+// 4. The handle is never inserted into the LRUCache (both hash table and LRU
+//    list) and it doesn't experience the above three states.
+//    The entry can be freed when refs becomes 0.
+//    (refs >= 1 && in_cache == false && IS_STANDALONE == true)
+// All newly created LRUHandles are in state 1 or 4. If you call
 // LRUCacheShard::Release on entry in state 1, it will go into state 2.
 // To move from state 1 to state 3, either call LRUCacheShard::Erase or
 // LRUCacheShard::Insert with the same key (but possibly different value).
@@ -66,14 +70,14 @@ struct LRUHandle {
   };
   LRUHandle* next;
   LRUHandle* prev;
-  size_t charge;  // TODO(opt): Only allow uint32_t?
+  size_t total_charge;  // TODO(opt): Only allow uint32_t?
   size_t key_length;
   // The hash of key(). Used for fast sharding and comparisons.
   uint32_t hash;
   // The number of external refs to this entry. The cache itself is not counted.
   uint32_t refs;
 
-  enum Flags : uint8_t {
+  enum Flags : uint16_t {
     // Whether this entry is referenced by the hash table.
     IN_CACHE = (1 << 0),
     // Whether this entry is high priority entry.
@@ -88,9 +92,16 @@ struct LRUHandle {
     IS_PENDING = (1 << 5),
     // Whether this handle is still in a lower tier
     IS_IN_SECONDARY_CACHE = (1 << 6),
+    // Whether this entry is low priority entry.
+    IS_LOW_PRI = (1 << 7),
+    // Whether this entry is in low-pri pool.
+    IN_LOW_PRI_POOL = (1 << 8),
+    // Whether this entry is not inserted into the cache (both hash table and
+    // LRU list).
+    IS_STANDALONE = (1 << 9),
   };
 
-  uint8_t flags;
+  uint16_t flags;
 
 #ifdef __SANITIZE_THREAD__
   // TSAN can report a false data race on flags, where one thread is writing
@@ -121,6 +132,8 @@ struct LRUHandle {
   bool InCache() const { return flags & IN_CACHE; }
   bool IsHighPri() const { return flags & IS_HIGH_PRI; }
   bool InHighPriPool() const { return flags & IN_HIGH_PRI_POOL; }
+  bool IsLowPri() const { return flags & IS_LOW_PRI; }
+  bool InLowPriPool() const { return flags & IN_LOW_PRI_POOL; }
   bool HasHit() const { return flags & HAS_HIT; }
   bool IsSecondaryCacheCompatible() const {
 #ifdef __SANITIZE_THREAD__
@@ -131,6 +144,7 @@ struct LRUHandle {
   }
   bool IsPending() const { return flags & IS_PENDING; }
   bool IsInSecondaryCache() const { return flags & IS_IN_SECONDARY_CACHE; }
+  bool IsStandalone() const { return flags & IS_STANDALONE; }
 
   void SetInCache(bool in_cache) {
     if (in_cache) {
@@ -143,8 +157,13 @@ struct LRUHandle {
   void SetPriority(Cache::Priority priority) {
     if (priority == Cache::Priority::HIGH) {
       flags |= IS_HIGH_PRI;
+      flags &= ~IS_LOW_PRI;
+    } else if (priority == Cache::Priority::LOW) {
+      flags &= ~IS_HIGH_PRI;
+      flags |= IS_LOW_PRI;
     } else {
       flags &= ~IS_HIGH_PRI;
+      flags &= ~IS_LOW_PRI;
     }
   }
 
@@ -153,6 +172,14 @@ struct LRUHandle {
       flags |= IN_HIGH_PRI_POOL;
     } else {
       flags &= ~IN_HIGH_PRI_POOL;
+    }
+  }
+
+  void SetInLowPriPool(bool in_low_pri_pool) {
+    if (in_low_pri_pool) {
+      flags |= IN_LOW_PRI_POOL;
+    } else {
+      flags &= ~IN_LOW_PRI_POOL;
     }
   }
 
@@ -185,6 +212,14 @@ struct LRUHandle {
     }
   }
 
+  void SetIsStandalone(bool is_standalone) {
+    if (is_standalone) {
+      flags |= IS_STANDALONE;
+    } else {
+      flags &= ~IS_STANDALONE;
+    }
+  }
+
   void Free() {
     assert(refs == 0);
 #ifdef __SANITIZE_THREAD__
@@ -209,19 +244,32 @@ struct LRUHandle {
     delete[] reinterpret_cast<char*>(this);
   }
 
-  // Calculate the memory usage by metadata.
-  inline size_t CalcTotalCharge(
-      CacheMetadataChargePolicy metadata_charge_policy) {
-    size_t meta_charge = 0;
-    if (metadata_charge_policy == kFullChargeCacheMetadata) {
+  inline size_t CalcuMetaCharge(
+      CacheMetadataChargePolicy metadata_charge_policy) const {
+    if (metadata_charge_policy != kFullChargeCacheMetadata) {
+      return 0;
+    } else {
 #ifdef ROCKSDB_MALLOC_USABLE_SIZE
-      meta_charge += malloc_usable_size(static_cast<void*>(this));
+      return malloc_usable_size(
+          const_cast<void*>(static_cast<const void*>(this)));
 #else
       // This is the size that is used when a new handle is created.
-      meta_charge += sizeof(LRUHandle) - 1 + key_length;
+      return sizeof(LRUHandle) - 1 + key_length;
 #endif
     }
-    return charge + meta_charge;
+  }
+
+  // Calculate the memory usage by metadata.
+  inline void CalcTotalCharge(
+      size_t charge, CacheMetadataChargePolicy metadata_charge_policy) {
+    total_charge = charge + CalcuMetaCharge(metadata_charge_policy);
+  }
+
+  inline size_t GetCharge(
+      CacheMetadataChargePolicy metadata_charge_policy) const {
+    size_t meta_charge = CalcuMetaCharge(metadata_charge_policy);
+    assert(total_charge >= meta_charge);
+    return total_charge - meta_charge;
   }
 };
 
@@ -257,6 +305,8 @@ class LRUHandleTable {
 
   int GetLengthBits() const { return length_bits_; }
 
+  size_t GetOccupancyCount() const { return elems_; }
+
  private:
   // Return a pointer to slot that points to a cache entry that
   // matches key/hash.  If there is no such cache entry, return a
@@ -284,7 +334,8 @@ class LRUHandleTable {
 class ALIGN_AS(CACHE_LINE_SIZE) LRUCacheShard final : public CacheShard {
  public:
   LRUCacheShard(size_t capacity, bool strict_capacity_limit,
-                double high_pri_pool_ratio, bool use_adaptive_mutex,
+                double high_pri_pool_ratio, double low_pri_pool_ratio,
+                bool use_adaptive_mutex,
                 CacheMetadataChargePolicy metadata_charge_policy,
                 int max_upper_hash_bits,
                 const std::shared_ptr<SecondaryCache>& secondary_cache);
@@ -300,6 +351,9 @@ class ALIGN_AS(CACHE_LINE_SIZE) LRUCacheShard final : public CacheShard {
 
   // Set percentage of capacity reserved for high-pri cache entries.
   void SetHighPriorityPoolRatio(double high_pri_pool_ratio);
+
+  // Set percentage of capacity reserved for low-pri cache entries.
+  void SetLowPriorityPoolRatio(double low_pri_pool_ratio);
 
   // Like Cache methods, but with an extra "hash" parameter.
   virtual Status Insert(const Slice& key, uint32_t hash, void* value,
@@ -342,6 +396,8 @@ class ALIGN_AS(CACHE_LINE_SIZE) LRUCacheShard final : public CacheShard {
 
   virtual size_t GetUsage() const override;
   virtual size_t GetPinnedUsage() const override;
+  virtual size_t GetOccupancyCount() const override;
+  virtual size_t GetTableAddressCount() const override;
 
   virtual void ApplyToSomeEntries(
       const std::function<void(const Slice& key, void* value, size_t charge,
@@ -352,14 +408,18 @@ class ALIGN_AS(CACHE_LINE_SIZE) LRUCacheShard final : public CacheShard {
 
   virtual std::string GetPrintableOptions() const override;
 
-  void TEST_GetLRUList(LRUHandle** lru, LRUHandle** lru_low_pri);
+  void TEST_GetLRUList(LRUHandle** lru, LRUHandle** lru_low_pri,
+                       LRUHandle** lru_bottom_pri);
 
-  //  Retrieves number of elements in LRU, for unit test purpose only.
-  //  Not threadsafe.
+  // Retrieves number of elements in LRU, for unit test purpose only.
+  // Not threadsafe.
   size_t TEST_GetLRUSize();
 
-  //  Retrieves high pri pool ratio
+  // Retrieves high pri pool ratio
   double GetHighPriPoolRatio();
+
+  // Retrieves low pri pool ratio
+  double GetLowPriPoolRatio();
 
  private:
   friend class LRUCache;
@@ -394,11 +454,17 @@ class ALIGN_AS(CACHE_LINE_SIZE) LRUCacheShard final : public CacheShard {
   // holding the mutex_.
   void EvictFromLRU(size_t charge, autovector<LRUHandle*>* deleted);
 
+  // Try to insert the evicted handles into the secondary cache.
+  void TryInsertIntoSecondaryCache(autovector<LRUHandle*> evicted_handles);
+
   // Initialized before use.
   size_t capacity_;
 
   // Memory size for entries in high-pri pool.
   size_t high_pri_pool_usage_;
+
+  // Memory size for entries in low-pri pool.
+  size_t low_pri_pool_usage_;
 
   // Whether to reject insertion if cache reaches its full capacity.
   bool strict_capacity_limit_;
@@ -410,6 +476,13 @@ class ALIGN_AS(CACHE_LINE_SIZE) LRUCacheShard final : public CacheShard {
   // Remember the value to avoid recomputing each time.
   double high_pri_pool_capacity_;
 
+  // Ratio of capacity reserved for low priority cache entries.
+  double low_pri_pool_ratio_;
+
+  // Low-pri pool size, equals to capacity * low_pri_pool_ratio.
+  // Remember the value to avoid recomputing each time.
+  double low_pri_pool_capacity_;
+
   // Dummy head of LRU list.
   // lru.prev is newest entry, lru.next is oldest entry.
   // LRU contains items which can be evicted, ie reference only by cache
@@ -417,6 +490,9 @@ class ALIGN_AS(CACHE_LINE_SIZE) LRUCacheShard final : public CacheShard {
 
   // Pointer to head of low-pri pool in LRU list.
   LRUHandle* lru_low_pri_;
+
+  // Pointer to head of bottom-pri pool in LRU list.
+  LRUHandle* lru_bottom_pri_;
 
   // ------------^^^^^^^^^^^^^-----------
   // Not frequently modified data members
@@ -440,7 +516,7 @@ class ALIGN_AS(CACHE_LINE_SIZE) LRUCacheShard final : public CacheShard {
   // mutex_ protects the following state.
   // We don't count mutex_ as the cache's internal state so semantically we
   // don't mind mutex_ invoking the non-const actions.
-  mutable port::Mutex mutex_;
+  mutable DMutex mutex_;
 
   std::shared_ptr<SecondaryCache> secondary_cache_;
 };
@@ -452,7 +528,7 @@ class LRUCache
     : public ShardedCache {
  public:
   LRUCache(size_t capacity, int num_shard_bits, bool strict_capacity_limit,
-           double high_pri_pool_ratio,
+           double high_pri_pool_ratio, double low_pri_pool_ratio,
            std::shared_ptr<MemoryAllocator> memory_allocator = nullptr,
            bool use_adaptive_mutex = kDefaultToAdaptiveMutex,
            CacheMetadataChargePolicy metadata_charge_policy =
@@ -468,10 +544,11 @@ class LRUCache
   virtual DeleterFn GetDeleter(Handle* handle) const override;
   virtual void DisownData() override;
   virtual void WaitAll(std::vector<Handle*>& handles) override;
+  std::string GetPrintableOptions() const override;
 
-  //  Retrieves number of elements in LRU, for unit test purpose only.
+  // Retrieves number of elements in LRU, for unit test purpose only.
   size_t TEST_GetLRUSize();
-  //  Retrieves high pri pool ratio.
+  // Retrieves high pri pool ratio.
   double GetHighPriPoolRatio();
 
  private:

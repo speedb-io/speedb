@@ -43,7 +43,7 @@ class Status {
 #ifdef ROCKSDB_ASSERT_STATUS_CHECKED
     if (!checked_) {
       PrintFailure();
-      abort();
+      std::abort();
     }
 #endif  // ROCKSDB_ASSERT_STATUS_CHECKED
   }
@@ -51,16 +51,8 @@ class Status {
   // Copy the specified status.
   Status(const Status& s);
   Status& operator=(const Status& s);
-  Status(Status&& s)
-#if !(defined _MSC_VER) || ((defined _MSC_VER) && (_MSC_VER >= 1900))
-      noexcept
-#endif
-      ;
-  Status& operator=(Status&& s)
-#if !(defined _MSC_VER) || ((defined _MSC_VER) && (_MSC_VER >= 1900))
-      noexcept
-#endif
-      ;
+  Status(Status&& s) noexcept;
+  Status& operator=(Status&& s) noexcept;
   bool operator==(const Status& rhs) const;
   bool operator!=(const Status& rhs) const;
 
@@ -535,20 +527,12 @@ inline Status& Status::operator=(const Status& s) {
   return *this;
 }
 
-inline Status::Status(Status&& s)
-#if !(defined _MSC_VER) || ((defined _MSC_VER) && (_MSC_VER >= 1900))
-    noexcept
-#endif
-    : Status() {
+inline Status::Status(Status&& s) noexcept : Status() {
   s.MarkChecked();
   *this = std::move(s);
 }
 
-inline Status& Status::operator=(Status&& s)
-#if !(defined _MSC_VER) || ((defined _MSC_VER) && (_MSC_VER >= 1900))
-    noexcept
-#endif
-{
+inline Status& Status::operator=(Status&& s) noexcept {
   if (this != &s) {
     s.MarkChecked();
     MustCheck();

@@ -72,9 +72,9 @@ class WriteBufferManager final {
   //   memory usage to drop down.
   explicit WriteBufferManager(
       size_t _buffer_size, std::shared_ptr<Cache> cache = {},
-      bool allow_stall = false, bool initiate_flushes = false,
+      // // bool allow_stall = false, bool initiate_flushes = false,
       // Setting initiate_flushes==true by default for QA / performance testing
-      // // bool initiate_flushes = true,
+      bool allow_stall = false, bool initiate_flushes = true,
       const FlushInitiationOptions& flush_initiation_options =
           FlushInitiationOptions());
 

@@ -203,7 +203,7 @@ default_params = {
     "num_iterations": lambda: random.randint(0, 100),
     "sync_wal_one_in": 100000,
     "data_block_index_type": random.randint(0, 1),
-    "data_block_hash_table_util_ratio": random.randint(0, 100) / 100.0,
+    "data_block_hash_table_util_ratio": random.randint(1, 100) / 100.0,
     "customopspercent": 0,
     "filter_uri": lambda: random.choice(["speedb.PairedBloomFilter", ""]),
 }

@@ -328,9 +328,9 @@ DEFINE_int64(max_scan_distance, 0,
 
 DEFINE_bool(use_uint64_comparator, false, "use Uint64 user comparator");
 
-DEFINE_bool(allow_wbm_delays_and_stalls, true,
+DEFINE_bool(allow_wbm_stalls, false,
             "Enable WBM write stalls and delays ");
-DEFINE_bool(initiate_wbm_flushes, true,
+DEFINE_bool(initiate_wbm_flushes, false,
             "WBM will proactively initiate flushes (Speedb)."
             "If false, WBM-related flushes will be initiated using the "
             "ShouldFlush() service "
@@ -4309,7 +4309,7 @@ class Benchmark {
       }
 
       options.write_buffer_manager.reset(new WriteBufferManager(
-          FLAGS_db_write_buffer_size, cache_, FLAGS_allow_wbm_delays_and_stalls,
+          FLAGS_db_write_buffer_size, cache_, FLAGS_allow_wbm_stalls,
           FLAGS_initiate_wbm_flushes, flush_initiation_options));
     }
 

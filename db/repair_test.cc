@@ -428,6 +428,7 @@ TEST_F(RepairTest, DbNameContainsTrailingSlash) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+  ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   return RUN_ALL_TESTS();

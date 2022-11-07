@@ -100,27 +100,31 @@ struct ShardedCacheOptions {
 };
 
 struct LRUCacheOptions : public ShardedCacheOptions {
-  // Percentage of cache reserved for high priority entries.
-  // If greater than zero, the LRU list will be split into a high-pri
-  // list and a low-pri list. High-pri entries will be inserted to the
-  // tail of high-pri list, while low-pri entries will be first inserted to
-  // the low-pri list (the midpoint). This is referred to as
-  // midpoint insertion strategy to make entries that never get hit in cache
-  // age out faster.
+  // Ratio of cache reserved for high-priority and low-priority entries,
+  // respectively. (See Cache::Priority below more information on the levels.)
+  // Valid values are between 0 and 1 (inclusive), and the sum of the two
+  // values cannot exceed 1.
   //
-  // See also
-  // BlockBasedTableOptions::cache_index_and_filter_blocks_with_high_priority.
+  // If high_pri_pool_ratio is greater than zero, a dedicated high-priority LRU
+  // list is maintained by the cache. Similarly, if low_pri_pool_ratio is
+  // greater than zero, a dedicated low-priority LRU list is maintained.
+  // There is also a bottom-priority LRU list, which is always enabled and not
+  // explicitly configurable. Entries are spilled over to the next available
+  // lower-priority pool if a certain pool's capacity is exceeded.
+  //
+  // Entries with cache hits are inserted into the highest priority LRU list
+  // available regardless of the entry's priority. Entries without hits
+  // are inserted into highest priority LRU list available whose priority
+  // does not exceed the entry's priority. (For example, high-priority items
+  // with no hits are placed in the high-priority pool if available;
+  // otherwise, they are placed in the low-priority pool if available;
+  // otherwise, they are placed in the bottom-priority pool.) This results
+  // in lower-priority entries without hits getting evicted from the cache
+  // sooner.
+  //
+  // Default values: high_pri_pool_ratio = 0.5 (which is referred to as
+  // "midpoint insertion"), low_pri_pool_ratio = 0
   double high_pri_pool_ratio = 0.5;
-
-  // Percentage of cache reserved for low priority entries.
-  // If greater than zero, the LRU list will be split into a high-pri list, a
-  // low-pri list and a bottom-pri list. High-pri entries will be inserted to
-  // the tail of high-pri list, while low-pri entries will be first inserted to
-  // the low-pri list (the midpoint) and bottom-pri entries will be first
-  // inserted to the bottom-pri list.
-  //
-  //
-  // See also high_pri_pool_ratio.
   double low_pri_pool_ratio = 0.0;
 
   // Whether to use adaptive mutexes for cache shards. Note that adaptive
@@ -290,18 +294,15 @@ extern std::shared_ptr<Cache> NewClockCache(
 
 class Cache {
  public:
-  // Depending on implementation, cache entries with high priority could be less
-  // likely to get evicted than low priority entries.
-  //
-  // The BOTTOM priority is mainly used for blob caching. Blobs are typically
-  // lower-value targets for caching than data blocks, since 1) with BlobDB,
-  // data blocks containing blob references conceptually form an index structure
-  // which has to be consulted before we can read the blob value, and 2) cached
-  // blobs represent only a single key-value, while cached data blocks generally
-  // contain multiple KVs. Since we would like to make it possible to use the
-  // same backing cache for the block cache and the blob cache, it would make
-  // sense to add a new, bottom cache priority level for blobs so data blocks
-  // are prioritized over them.
+  // Depending on implementation, cache entries with higher priority levels
+  // could be less likely to get evicted than entries with lower priority
+  // levels. The "high" priority level applies to certain SST metablocks (e.g.
+  // index and filter blocks) if the option
+  // cache_index_and_filter_blocks_with_high_priority is set. The "low" priority
+  // level is used for other kinds of SST blocks (most importantly, data
+  // blocks), as well as the above metablocks in case
+  // cache_index_and_filter_blocks_with_high_priority is
+  // not set. The "bottom" priority level is for BlobDB's blob values.
   enum class Priority { HIGH, LOW, BOTTOM };
 
   // A set of callbacks to allow objects in the primary block cache to be
@@ -568,9 +569,11 @@ class Cache {
   // over time.
 
   // Insert a mapping from key->value into the cache and assign it
-  // the specified charge against the total cache capacity.
-  // If strict_capacity_limit is true and cache reaches its full capacity,
-  // return Status::MemoryLimit.
+  // the specified charge against the total cache capacity. If
+  // strict_capacity_limit is true and cache reaches its full capacity,
+  // return Status::MemoryLimit. `value` must be non-nullptr for this
+  // Insert() because Value() == nullptr is reserved for indicating failure
+  // with secondary-cache-compatible mappings.
   //
   // The helper argument is saved by the cache and will be used when the
   // inserted object is evicted or promoted to the secondary cache. It,
@@ -618,11 +621,31 @@ class Cache {
   // saved and used later when the object is evicted. Therefore, it must
   // outlive the cache.
   //
-  // The handle returned may not be ready. The caller should call IsReady()
-  // to check if the item value is ready, and call Wait() or WaitAll() if
-  // its not ready. The caller should then call Value() to check if the
-  // item was successfully retrieved. If unsuccessful (perhaps due to an
-  // IO error), Value() will return nullptr.
+  // ======================== Async Lookup (wait=false) ======================
+  // When wait=false, the handle returned might be in any of three states:
+  // * Present - If Value() != nullptr, then the result is present and
+  // the handle can be used just as if wait=true.
+  // * Pending, not ready (IsReady() == false) - secondary cache is still
+  // working to retrieve the value. Might become ready any time.
+  // * Pending, ready (IsReady() == true) - secondary cache has the value
+  // but it has not been loaded into primary cache. Call to Wait()/WaitAll()
+  // will not block.
+  //
+  // IMPORTANT: Pending handles are not thread-safe, and only these functions
+  // are allowed on them: Value(), IsReady(), Wait(), WaitAll(). Even Release()
+  // can only come after Wait() or WaitAll() even though a reference is held.
+  //
+  // Only Wait()/WaitAll() gets a Handle out of a Pending state. (Waiting is
+  // safe and has no effect on other handle states.) After waiting on a Handle,
+  // it is in one of two states:
+  // * Present - if Value() != nullptr
+  // * Failed - if Value() == nullptr, such as if the secondary cache
+  // initially thought it had the value but actually did not.
+  //
+  // Note that given an arbitrary Handle, the only way to distinguish the
+  // Pending+ready state from the Failed state is to Wait() on it. A cache
+  // entry not compatible with secondary cache can also have Value()==nullptr
+  // like the Failed state, but this is not generally a concern.
   virtual Handle* Lookup(const Slice& key, const CacheItemHelper* /*helper_cb*/,
                          const CreateCallback& /*create_cb*/,
                          Priority /*priority*/, bool /*wait*/,
@@ -633,27 +656,31 @@ class Cache {
   // Release a mapping returned by a previous Lookup(). The "useful"
   // parameter specifies whether the data was actually used or not,
   // which may be used by the cache implementation to decide whether
-  // to consider it as a hit for retention purposes.
+  // to consider it as a hit for retention purposes. As noted elsewhere,
+  // "pending" handles require Wait()/WaitAll() before Release().
   virtual bool Release(Handle* handle, bool /*useful*/,
                        bool erase_if_last_ref) {
     return Release(handle, erase_if_last_ref);
   }
 
-  // Determines if the handle returned by Lookup() has a valid value yet. The
-  // call is not thread safe and should be called only by someone holding a
-  // reference to the handle.
+  // Determines if the handle returned by Lookup() can give a value without
+  // blocking, though Wait()/WaitAll() might be required to publish it to
+  // Value(). See secondary cache compatible Lookup() above for details.
+  // This call is not thread safe on "pending" handles.
   virtual bool IsReady(Handle* /*handle*/) { return true; }
 
-  // If the handle returned by Lookup() is not ready yet, wait till it
-  // becomes ready.
-  // Note: A ready handle doesn't necessarily mean it has a valid value. The
-  // user should call Value() and check for nullptr.
+  // Convert a "pending" handle into a full thread-shareable handle by
+  // * If necessary, wait until secondary cache finishes loading the value.
+  // * Construct the value for primary cache and set it in the handle.
+  // Even after Wait() on a pending handle, the caller must check for
+  // Value() == nullptr in case of failure. This call is not thread-safe
+  // on pending handles. This call has no effect on non-pending handles.
+  // See secondary cache compatible Lookup() above for details.
   virtual void Wait(Handle* /*handle*/) {}
 
   // Wait for a vector of handles to become ready. As with Wait(), the user
   // should check the Value() of each handle for nullptr. This call is not
-  // thread safe and should only be called by the caller holding a reference
-  // to each of the handles.
+  // thread-safe on pending handles.
   virtual void WaitAll(std::vector<Handle*>& /*handles*/) {}
 
  private:

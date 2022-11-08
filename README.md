@@ -105,7 +105,7 @@ We have added a column with items that are awaiting community feedback. We invit
 ## ❔ Questions 
 
 - For live discussion with the community you can use our official [Discord channel](https://discord.gg/5fVUUtM2cG). 
-- For technical questions and discussions you can use our official [Discourse forum](https://speedb.discourse.group/). 
+- For technical questions and discussions you can use our official [Discourse forum](https://forum.speedb.dev). 
 
 
 ## 🌎 Join us 

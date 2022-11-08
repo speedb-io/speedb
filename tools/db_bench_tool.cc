@@ -1700,7 +1700,8 @@ DEFINE_bool(use_plain_table, false, "if use plain table "
             "instead of block-based table format");
 DEFINE_bool(use_cuckoo_table, false, "if use cuckoo table format");
 DEFINE_double(cuckoo_hash_ratio, 0.9, "Hash ratio for Cuckoo SST table.");
-DEFINE_bool(use_hash_search, false, "if use kHashSearch "
+DEFINE_bool(use_hash_search, false,
+            "if use kHashSearch "
             "instead of kBinarySearch. "
             "This is valid if only we use BlockTable");
 DEFINE_string(merge_operator, "", "The merge operator to use with the database."
@@ -4733,12 +4734,12 @@ class Benchmark {
         table_options->block_cache = cache_;
       }
       if (!FLAGS_filter_uri.empty()) {
-	std::string bits_str;
-	if (FLAGS_bloom_bits > 0) {
-	  bits_str = ":" + std::to_string(FLAGS_bloom_bits);
-	  fprintf(stderr, "note: appending --bloom-bits (%f) to --filter-uri\n",
-		  FLAGS_bloom_bits);
-	}
+        std::string bits_str;
+        if (FLAGS_bloom_bits > 0) {
+          bits_str = ":" + std::to_string(FLAGS_bloom_bits);
+          fprintf(stderr, "note: appending --bloom-bits (%f) to --filter-uri\n",
+                  FLAGS_bloom_bits);
+        }
         ConfigOptions config_options;
         config_options.ignore_unsupported_options = false;
         Status s = FilterPolicy::CreateFromString(
@@ -4749,7 +4750,7 @@ class Benchmark {
                   FLAGS_filter_uri.c_str(), bits_str.c_str(),
                   s.ToString().c_str());
           exit(1);
-	}
+        }
       } else if (table_options->filter_policy == nullptr) {
         if (FLAGS_bloom_bits < 0) {
           table_options->filter_policy = BlockBasedTableOptions().filter_policy;
@@ -4760,28 +4761,6 @@ class Benchmark {
               FLAGS_use_ribbon_filter ? NewRibbonFilterPolicy(FLAGS_bloom_bits)
                                       : NewBloomFilterPolicy(FLAGS_bloom_bits));
         }
-      } else if (FLAGS_bloom_bits < 0) {
-        table_options->filter_policy = BlockBasedTableOptions().filter_policy;
-      } else if (FLAGS_bloom_bits == 0) {
-        table_options->filter_policy.reset();
-      } else if (FLAGS_use_block_based_filter) {
-        // Use back-door way of enabling obsolete block-based Bloom
-        Status s = FilterPolicy::CreateFromString(
-            ConfigOptions(),
-            "rocksdb.internal.DeprecatedBlockBasedBloomFilter:" +
-                std::to_string(FLAGS_bloom_bits),
-            &table_options->filter_policy);
-        if (!s.ok()) {
-          fprintf(stderr, "failure creating obsolete block-based filter: %s\n",
-                  s.ToString().c_str());
-          exit(1);
-        }
-      } else if (FLAGS_use_ribbon_filter) {
-        table_options->filter_policy.reset(
-            NewRibbonFilterPolicy(FLAGS_bloom_bits));
-      } else {
-        table_options->filter_policy.reset(
-            NewBloomFilterPolicy(FLAGS_bloom_bits));
       }
     }
 

@@ -1537,14 +1537,6 @@ class DBImpl : public DB {
                                           Status& status, bool& stop_replay,
                                           WriteBatch& batch);
 
-  // recovery_ctx stores the context about version edits and
-  // LogAndApplyForRecovery persist all those edits to new Manifest after
-  // successfully syncing new WAL.
-  // LogAndApplyForRecovery should be called only once during recovery and it
-  // should be called when RocksDB writes to a first new MANIFEST since this
-  // recovery.
-  Status LogAndApplyForRecovery(const RecoveryContext& recovery_ctx);
-
  private:
   friend class DB;
   friend class ErrorHandler;

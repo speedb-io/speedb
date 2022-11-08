@@ -2085,8 +2085,7 @@ Status DBImpl::Open(const DBOptions& db_options, const std::string& dbname,
                    "DB::Open() failed: %s", s.ToString().c_str());
   }
   if (s.ok()) {
-    s = impl->StartPeriodicWorkScheduler();
-    *dbptr = impl.release();
+    s = impl->StartPeriodicTaskScheduler();
   }
 
   if (s.ok()) {
@@ -2097,7 +2096,10 @@ Status DBImpl::Open(const DBOptions& db_options, const std::string& dbname,
       delete h;
     }
     handles->clear();
+  } else {
+    *dbptr = impl.release();
   }
+
   return s;
 }
 }  // namespace ROCKSDB_NAMESPACE

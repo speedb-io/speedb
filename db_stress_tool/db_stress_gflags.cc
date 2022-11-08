@@ -1030,10 +1030,6 @@ DEFINE_bool(
 DEFINE_string(wal_compression, "none",
               "Algorithm to use for WAL compression. none to disable.");
 
-DEFINE_int32(data_block_index_type, 1,
-             "The index type that will be used for the data block "
-             "0 for kDataBlockBinarySearch and 1 for kDataBlockBinaryAndHash.");
-
 DEFINE_double(data_block_hash_table_util_ratio, 0.75,
               "util ratio for data block hash index table. "
               "This is only valid if use_data_block_hash_index is "

@@ -393,7 +393,6 @@ class RibbonFilterPolicy : public BloomLikeFilterPolicy {
   const int bloom_before_level_;
 };
 
-
 class AlwaysTrueFilter : public BuiltinFilterBitsReader {
  public:
   bool MayMatch(const Slice&) override { return true; }

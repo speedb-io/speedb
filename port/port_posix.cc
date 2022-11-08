@@ -160,6 +160,16 @@ RWMutex::RWMutex() {
 
 RWMutex::~RWMutex() { PthreadCall("destroy mutex", pthread_rwlock_destroy(&mu_)); }
 
+RWMutexWr::RWMutexWr() {
+  pthread_rwlockattr_t attr;
+  PthreadCall("init attr", pthread_rwlockattr_init(&attr));
+  PthreadCall("attr setkind",
+              pthread_rwlockattr_setkind_np(
+                  &attr, PTHREAD_RWLOCK_PREFER_WRITER_NONRECURSIVE_NP));
+  PthreadCall("init mutex", pthread_rwlock_init(&mu_, &attr));
+  PthreadCall("destroy attr", pthread_rwlockattr_destroy(&attr));
+}
+
 void RWMutex::ReadLock() { PthreadCall("read lock", pthread_rwlock_rdlock(&mu_)); }
 
 void RWMutex::WriteLock() { PthreadCall("write lock", pthread_rwlock_wrlock(&mu_)); }
@@ -167,36 +177,6 @@ void RWMutex::WriteLock() { PthreadCall("write lock", pthread_rwlock_wrlock(&mu_
 void RWMutex::ReadUnlock() { PthreadCall("read unlock", pthread_rwlock_unlock(&mu_)); }
 
 void RWMutex::WriteUnlock() { PthreadCall("write unlock", pthread_rwlock_unlock(&mu_)); }
-
-RWMutexWr::RWMutexWr() { m_wr_pending.store(0); }
-
-void RWMutexWr::ReadLock() {
-  // first without the cv mutex...
-  if (m_wr_pending.load()) {
-    std::unique_lock<std::mutex> wr_pending_wait_lck(wr_pending_mutex_);
-    while (m_wr_pending.load()) {
-      wr_pending_cv_.wait(wr_pending_wait_lck);
-    }
-  }
-  PthreadCall("read lock", pthread_rwlock_rdlock(&mu_));
-}
-
-void RWMutexWr::WriteLock() {
-  {
-    std::unique_lock<std::mutex> wr_pending_wait_lck(wr_pending_mutex_);
-    m_wr_pending.fetch_add(1, std::memory_order_release);
-  }
-  PthreadCall("write lock", pthread_rwlock_wrlock(&mu_));
-  bool should_notify = false;
-  {
-    std::unique_lock<std::mutex> wr_pending_wait_lck(wr_pending_mutex_);
-    m_wr_pending.fetch_sub(1, std::memory_order_release);
-    should_notify = (m_wr_pending.load() == 0);
-  }
-  if (should_notify) {
-    wr_pending_cv_.notify_all();
-  }
-}
 
 int PhysicalCoreID() {
 #if defined(ROCKSDB_SCHED_GETCPU_PRESENT) && defined(__x86_64__) && \

@@ -151,12 +151,10 @@ class RWMutex {
   void WriteUnlock();
   void AssertHeld() { }
 
- private:
+ protected:
   pthread_rwlock_t mu_; // the underlying platform mutex
 };
 
-<<<<<<< HEAD
-=======
 // RWLock with write preference
 class RWMutexWr : public RWMutex {
  public:
@@ -170,7 +168,6 @@ class RWMutexWr : public RWMutex {
   std::condition_variable wr_pending_cv_;
 };
 
->>>>>>> parent of a5cac97d4 (rw lock)
 class CondVar {
  public:
   explicit CondVar(Mutex* mu);

@@ -105,7 +105,7 @@ def get_branch_name(remote, ref, hint=None):
                     -1.0
                     for c in remote_candidates
                     if is_ancestor_of(
-                        "{}/{}".format(remote, c), "{}/{}".format(remote, target)
+                        "{}/{}".format(remote, target), "{}/{}".format(remote, c)
                     )
                 ),
                 (False, target),
@@ -116,7 +116,7 @@ def get_branch_name(remote, ref, hint=None):
         all_candidates.append(
             (
                 boost
-                + sum(-1.0 for c in local_candidates if is_ancestor_of(c, target)),
+                + sum(-1.0 for c in local_candidates if is_ancestor_of(target, c)),
                 (True, target),
             )
         )
@@ -138,6 +138,25 @@ def is_ancestor_of(ancestor, ref):
         return True
 
 
+def get_refs_since(base_ref, head_ref):
+    try:
+        return tuple(
+            split_nonempty_lines(
+                check_output(
+                    [
+                        "git",
+                        "rev-list",
+                        "--ancestry-path",
+                        "--first-parent",
+                        "{}..{}".format(base_ref, head_ref),
+                    ]
+                )
+            )
+        )
+    except subprocess.CalledProcessError:
+        return ()
+
+
 def get_remote_tags_for_ref(remote, from_ref):
     tag_ref_prefix = "refs/tags/"
     tags = {}
@@ -145,9 +164,17 @@ def get_remote_tags_for_ref(remote, from_ref):
         check_output(["git", "ls-remote", "--tags", "--refs", remote])
     ):
         h, tag = line.split(None, 1)
-        if not tag.startswith(tag_ref_prefix) or not is_ancestor_of(h, from_ref):
+        if not tag.startswith(tag_ref_prefix):
             continue
-        tags[h] = tag[len(tag_ref_prefix):]
+        # Make sure we have this commit locally
+        try:
+            check_output(["git", "cat-file", "commit", h], with_stderr=False)
+        except subprocess.CalledProcessError:
+            continue
+        # Don't include a tag if there isn't an ancestry path to the tag
+        if h != from_ref and not get_refs_since(h, from_ref):
+            continue
+        tags[h] = tag[len(tag_ref_prefix) :]
     return tags
 
 
@@ -165,6 +192,8 @@ def get_local_tags_for_ref(from_ref):
         )
     ):
         h, tag = line.split(None, 1)
+        if h != from_ref and not get_refs_since(h, from_ref):
+            continue
         tags[h] = tag
     return tags
 
@@ -176,35 +205,43 @@ def get_speedb_version_tags(remote, head_ref):
         warning("failed to fetch remote tags, falling back on local tags")
         tags = get_local_tags_for_ref(head_ref)
 
-    version_tags = {
-        h: n for h, n in tags.items() if TAG_VERSION_PATTERN.match(n)
-    }
+    version_tags = {h: n for h, n in tags.items() if TAG_VERSION_PATTERN.match(n)}
 
     return version_tags
 
 
 def get_branches_for_revlist(remote, base_ref, head_ref):
-    refs_since = tuple(
-        split_nonempty_lines(
-            check_output(["git", "rev-list", "{}..{}".format(base_ref, head_ref)])
-        )
-    )
-
+    refs_since = get_refs_since(base_ref, head_ref)
     branches = []
     last_branch, last_count = None, 0
+    branch_map = {}
     for i, cur_ref in enumerate(refs_since):
         cur_branch = get_branch_name(remote, cur_ref, last_branch)
 
         if cur_branch != last_branch:
-            if last_count > 0:
-                branches.append((last_branch, last_count))
-
-            # All versions are rooted in main, so there's no point to continue
-            # iterating after hitting it
-            if cur_branch == ("", "main"):
-                last_branch, last_count = cur_branch, len(refs_since) - i
-                break
+            prev_idx = branch_map.get(cur_branch)
+            # We might sometimes choose an incorrect candidate branch because
+            # the heuristics may fail around merge commits, but this can be detected
+            # by checking if we already encountered the current branch previously
+            if prev_idx is not None:
+                # Add the commit count of all of the branches in between
+                while len(branches) > prev_idx:
+                    bname, bcount = branches[-1]
+                    last_count += bcount
+                    del branch_map[bname]
+                    del branches[-1]
+                last_branch = cur_branch
             else:
+                if last_count > 0:
+                    branch_map[last_branch] = len(branches)
+                    branches.append((last_branch, last_count))
+
+                # All versions are rooted in main, so there's no point to continue
+                # iterating after hitting it
+                if cur_branch == (False, "main"):
+                    last_branch, last_count = cur_branch, len(refs_since) - i
+                    break
+
                 last_branch, last_count = cur_branch, 1
         else:
             last_count += 1
@@ -306,9 +343,25 @@ def main():
     except subprocess.CalledProcessError:
         exit_unknown("not a git repository")
 
+    head_ref = check_output(["git", "rev-parse", "HEAD"]).strip()
+
     components = []
     if is_dirty_worktree():
         components.append("*")
+
+    # Check if we can return a cached build tag without trying to recalculate
+    try:
+        with open(os.path.join(git_dir, ".spdb_head"), "r") as inf:
+            h, build_tag = inf.readline().split(":", 1)
+            if h == head_ref:
+                if components:
+                    if build_tag:
+                        components.append(build_tag)
+                    build_tag = "-".join(components)
+                print(build_tag)
+                raise SystemExit()
+    except (OSError, IOError, ValueError):
+        pass
 
     if os.path.isfile(os.path.join(git_dir, "shallow")):
         exit_unknown("can't calculate build tag in a shallow repository", components)
@@ -317,7 +370,6 @@ def main():
     if not remote:
         exit_unknown("no suitable remote found", components)
 
-    head_ref = check_output(["git", "rev-parse", "HEAD"]).strip()
     version_tags = get_speedb_version_tags(remote, head_ref)
 
     if not version_tags:
@@ -328,7 +380,7 @@ def main():
     tag_ver = ".".join(TAG_VERSION_PATTERN.match(release_name).groups())
     if current_ver != tag_ver:
         warning(
-            "current version doesn't match latest release tag (current={}, tag={})".format(
+            "current version doesn't match base release tag (current={}, tag={})".format(
                 current_ver, tag_ver
             )
         )
@@ -348,7 +400,15 @@ def main():
             )
         )
 
-    print("-".join(components))
+    build_tag = "-".join(components)
+    print(build_tag)
+
+    # Cache the tag for later
+    try:
+        with open(os.path.join(git_dir, ".spdb_head"), "w") as of:
+            of.write("{}:{}".format(head_ref, build_tag.lstrip("*-")))
+    except (OSError, IOError):
+        pass
 
 
 if __name__ == "__main__":

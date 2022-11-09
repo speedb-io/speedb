@@ -18,7 +18,7 @@ Speedb is a library that provides a high performance, persistent key-value store
 This is a community led project that focuses on high performance, optimized for modern storage hardware, on-premise and in the cloud.
 It is maintained by Speedb and is forked from Rocksdb, developed by Facebook.
 
-**Jois us to build the next generation data engine!**
+**Join us to build the next generation data engine!**
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset=".github/new-bee-mascot-dark.gif" width="80px" >

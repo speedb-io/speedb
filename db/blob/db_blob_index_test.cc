@@ -393,7 +393,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   };
 
   for (auto tier : {Tier::kMemtable} /*kAllTiers*/) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     // Avoid values from being purged.
     std::vector<const Snapshot*> snapshots;
     DestroyAndReopen(GetTestOptions());

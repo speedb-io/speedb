@@ -185,7 +185,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 TEST_F(DBBloomFilterTest, GetFilterByPrefixBloomCustomPrefixExtractor) {
 PERF_MARKER(__PRETTY_FUNCTION__);
   for (bool partition_filters : {true, false}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     Options options = last_options_;
     options.prefix_extractor =
         std::make_shared<SliceTransformLimitedDomainGeneric>();
@@ -266,7 +265,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 TEST_F(DBBloomFilterTest, GetFilterByPrefixBloom) {
 PERF_MARKER(__PRETTY_FUNCTION__);
   for (bool partition_filters : {true, false}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     Options options = last_options_;
     options.prefix_extractor.reset(NewFixedPrefixTransform(8));
     options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
@@ -331,7 +329,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 TEST_F(DBBloomFilterTest, WholeKeyFilterProp) {
 PERF_MARKER(__PRETTY_FUNCTION__);
   for (bool partition_filters : {true, false}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     Options options = last_options_;
     options.prefix_extractor.reset(NewFixedPrefixTransform(3));
     options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
@@ -956,7 +953,6 @@ class FilterConstructResPeakTrackingCache : public CacheWrapper {
   std::deque<std::size_t> GetReservedCachePeaks() { return cache_res_peaks_; }
 
   std::size_t GetReservedCacheIncrementSum() {
-PERF_MARKER(__PRETTY_FUNCTION__);
     return cache_res_increments_sum_;
   }
 
@@ -992,7 +988,6 @@ class DBFilterConstructionReserveMemoryTestWithParam
         policy_(std::get<1>(GetParam())),
         partition_filters_(std::get<2>(GetParam())),
         detect_filter_construct_corruption_(std::get<3>(GetParam())) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     if (!reserve_table_builder_memory_ || policy_ == kDeprecatedBlock ||
         policy_ == kLegacyBloom) {
       // For these cases, we only interested in whether filter construction
@@ -1723,7 +1718,6 @@ class TestingContextCustomFilterPolicy
   explicit TestingContextCustomFilterPolicy(int bpk_fifo, int bpk_l0_other,
                                             int bpk_otherwise)
       : LevelAndStyleCustomFilterPolicy(bpk_fifo, bpk_l0_other, bpk_otherwise) {
-PERF_MARKER(__PRETTY_FUNCTION__);
   }
 
   FilterBitsBuilder* GetBuilderWithContext(
@@ -1747,7 +1741,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   }
 
   std::string DumpTestReport() {
-PERF_MARKER(__PRETTY_FUNCTION__);
     std::string rv;
     std::swap(rv, test_report_);
     return rv;
@@ -1763,7 +1756,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   auto policy = std::make_shared<TestingContextCustomFilterPolicy>(15, 8, 5);
   Options options;
   for (bool fifo : {true, false}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     options = CurrentOptions();
     options.max_open_files = fifo ? -1 : options.max_open_files;
     options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
@@ -2150,7 +2142,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   // And that spread out keys load many partition filters.
   // In both cases, mix present vs. not present keys.
   for (uint32_t stride : {uint32_t{1}, (N / Q) | 1}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     for (uint32_t i = 0; i < Q; ++i) {
       keys[i] = UKey(i * stride);
       key_slices[i] = Slice(keys[i]);

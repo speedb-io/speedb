@@ -180,7 +180,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       SimpleConfigurable::Create("simple", TestConfigMode::kAllOptMode));
   int i = 11;
   for (auto opt : {"", "shared.", "unique.", "pointer."}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     std::string value;
     std::string expected = ToString(i);
     std::string opt_name = opt;

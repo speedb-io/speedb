@@ -468,7 +468,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   for (size_t huge_page_tlb_size = 0; huge_page_tlb_size <= 2 * 1024 * 1024;
        huge_page_tlb_size += 2 * 1024 * 1024) {
     for (EncodingType encoding_type : {kPlain, kPrefix}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     for (int bloom = -1; bloom <= 117; bloom += 117) {
       const int bloom_bits = std::max(bloom, 0);
       const bool full_scan_mode = bloom < 0;
@@ -572,7 +571,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   for (size_t huge_page_tlb_size = 0; huge_page_tlb_size <= 2 * 1024 * 1024;
        huge_page_tlb_size += 2 * 1024 * 1024) {
     for (EncodingType encoding_type : {kPlain, kPrefix}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     for (int bloom_bits = 0; bloom_bits <= 117; bloom_bits += 117) {
       for (int total_order = 0; total_order <= 1; total_order++) {
         for (int store_index_in_file = 0; store_index_in_file <= 1;
@@ -653,7 +651,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 TEST_P(PlainTableDBTest, Immortal) {
 PERF_MARKER(__PRETTY_FUNCTION__);
   for (EncodingType encoding_type : {kPlain, kPrefix}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     Options options = CurrentOptions();
     options.create_if_missing = true;
     options.max_open_files = -1;
@@ -701,7 +698,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   for (size_t huge_page_tlb_size = 0; huge_page_tlb_size <= 2 * 1024 * 1024;
        huge_page_tlb_size += 2 * 1024 * 1024) {
     for (EncodingType encoding_type : {kPlain, kPrefix}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     for (int bloom_bits = 0; bloom_bits <= 117; bloom_bits += 117) {
       for (int total_order = 0; total_order <= 1; total_order++) {
         if (encoding_type == kPrefix && total_order == 1) {

@@ -1873,7 +1873,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   std::map<std::string, std::string> true_data;
 
   for (int k : {10, 20, 40, 80}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_OK(Put(Key(k), "memtable"));
     true_data[Key(k)] = "memtable";
   }
@@ -1900,7 +1899,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   ASSERT_EQ(entries_in_memtable, 0);
 
   for (int k : {200, 201, 205, 206}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_OK(Put(Key(k), "memtable"));
     true_data[Key(k)] = "memtable";
   }

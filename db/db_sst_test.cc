@@ -1421,7 +1421,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 TEST_F(DBSSTTest, OpenDBWithInfiniteMaxOpenFilesSubjectToMemoryLimit) {
 PERF_MARKER(__PRETTY_FUNCTION__);
   for (bool reserve_table_builder_memory : {true, false}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     // Open DB with infinite max open files
     //  - First iteration use 1 thread to open files
     //  - Second iteration use 5 threads to open files

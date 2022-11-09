@@ -1279,7 +1279,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 //
 // #ifndef ROCKSDB_LITE  // Cuckoo is not supported in lite
 //   TEST_P(ColumnFamilyTest, MemtableNotSupportSnapshot) {
-PERF_MARKER(__PRETTY_FUNCTION__);
 //   db_options_.allow_concurrent_memtable_write = false;
 //   Open();
 //   auto* s1 = dbfull()->GetSnapshot();

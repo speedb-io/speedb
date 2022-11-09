@@ -4013,9 +4013,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   const int kNumL0Files = 4;
 
   for (int compaction_readahead_size : {0, 32 << 10}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     for (auto use_direct_io : {false, true}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
       if (use_direct_io && !IsDirectIOSupported()) {
         continue;
       }
@@ -4859,7 +4857,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   for (IteratorSeekQueryTraceRecord::SeekType seekType :
        {IteratorSeekQueryTraceRecord::kSeek,
         IteratorSeekQueryTraceRecord::kSeekForPrev}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     // Seek to an existing key.
     record.reset(new IteratorSeekQueryTraceRecord(
         seekType, handles[0]->GetID(), "trace-record-write1", fake_ts++));
@@ -6197,7 +6194,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 TEST_F(DBTest2, ChangePrefixExtractor) {
 PERF_MARKER(__PRETTY_FUNCTION__);
   for (bool use_partitioned_filter : {true, false}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     // create a DB with block prefix index
     BlockBasedTableOptions table_options;
     Options options = CurrentOptions();

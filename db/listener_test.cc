@@ -369,7 +369,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   options.enable_thread_tracking = true;
 #endif  // ROCKSDB_USING_THREAD_STATUS
   for (auto atomic_flush : {false, true}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     options.atomic_flush = atomic_flush;
     options.create_if_missing = true;
     DestroyAndReopen(options);

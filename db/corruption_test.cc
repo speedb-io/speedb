@@ -814,7 +814,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   options.paranoid_file_checks = true;
   options.create_if_missing = true;
   for (bool do_flush : {true, false}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     delete db_;
     db_ = nullptr;
     ASSERT_OK(DestroyDB(dbname_, options));
@@ -849,7 +848,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   options.paranoid_file_checks = true;
   options.create_if_missing = true;
   for (bool do_flush : {true, false}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     delete db_;
     db_ = nullptr;
     ASSERT_OK(DestroyDB(dbname_, options));
@@ -887,7 +885,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   options.paranoid_file_checks = true;
   options.create_if_missing = true;
   for (bool do_flush : {true, false}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     delete db_;
     db_ = nullptr;
     ASSERT_OK(DestroyDB(dbname_, options));

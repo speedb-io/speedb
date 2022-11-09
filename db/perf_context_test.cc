@@ -601,7 +601,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   int stats_code[] = {0, static_cast<int>(DB_MUTEX_WAIT_MICROS)};
   for (PerfLevel perf_level_test :
        {PerfLevel::kEnableTimeExceptForMutex, PerfLevel::kEnableTime}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     for (int c = 0; c < 2; ++c) {
       InstrumentedMutex mutex(nullptr, SystemClock::Default().get(),
                               stats_code[c]);

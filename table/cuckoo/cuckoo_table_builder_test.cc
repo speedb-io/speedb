@@ -190,7 +190,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 TEST_F(CuckooBuilderTest, WriteSuccessNoCollisionFullKey) {
 PERF_MARKER(__PRETTY_FUNCTION__);
   for (auto type : {kTypeValue, kTypeDeletion}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     uint32_t num_hash_fun = 4;
     std::vector<std::string> user_keys = {"key01", "key02", "key03", "key04"};
     std::vector<std::string> values;

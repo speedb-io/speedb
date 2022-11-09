@@ -415,7 +415,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
        {CompactionStyle::kCompactionStyleLevel,
         CompactionStyle::kCompactionStyleUniversal,
         CompactionStyle::kCompactionStyleNone}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     DestroyDB(db_name_, Options());
     Options options;
     options.compaction_style = compaction_style;

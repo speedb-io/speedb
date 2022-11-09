@@ -1537,7 +1537,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       std::make_shared<BlockCountingTablePropertiesCollectorFactory>());
 
   for (bool sample_for_compression : {false, true}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     // For simplicity/determinism, sample 100% when enabled, or 0% when disabled
     options.sample_for_compression = sample_for_compression ? 1 : 0;
 
@@ -1672,7 +1671,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   // "rocksdb.estimate-oldest-key-time" only available to fifo compaction.
   for (auto compaction : {kCompactionStyleLevel, kCompactionStyleUniversal,
                           kCompactionStyleNone}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     options.compaction_style = compaction;
     options.create_if_missing = true;
     DestroyAndReopen(options);

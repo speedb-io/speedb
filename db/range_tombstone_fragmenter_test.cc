@@ -254,7 +254,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   FragmentedRangeTombstoneIterator iter5(&fragment_list, bytewise_icmp,
                                          3 /* upper_bound */);
   for (auto* iter : {&iter1, &iter2, &iter3, &iter4, &iter5}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     VerifyFragmentedRangeDels(iter, {{"a", "c", 10},
                                      {"c", "e", 10},
                                      {"c", "e", 8},

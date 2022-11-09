@@ -231,9 +231,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   CreateAndReopenWithCF({"pikachu"}, options);
 
   for (bool sync : {true, false}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     for (bool disableWAL : {true, false}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
       if (sync && disableWAL) {
         // sync and disableWAL is incompatible.
         continue;
@@ -4317,9 +4315,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   WriteOptions wopt;
   ReadOptions ropt;
   for (bool two_write_queues : {false, true}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     for (bool manual_wal_flush : {false, true}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
       options.two_write_queues = two_write_queues;
       options.manual_wal_flush = manual_wal_flush;
       options.create_if_missing = true;

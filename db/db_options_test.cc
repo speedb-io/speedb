@@ -295,7 +295,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   options.create_if_missing = true;
   // Try with fail_if_options_file_error=false/true to update the options
   for (bool on_error : {false, true}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     options.fail_if_options_file_error = on_error;
     options.env = env_;
     options.disable_auto_compactions = false;

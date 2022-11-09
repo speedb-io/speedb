@@ -1412,7 +1412,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   // prefixes that exist
   for (const std::string prefix : {"num.111", "num.333", "num.555"}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     int num = 0;
     for (auto pos = props.lower_bound(prefix);
          pos != props.end() &&
@@ -1429,7 +1428,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   // prefixes that don't exist
   for (const std::string prefix :
        {"num.000", "num.222", "num.444", "num.666"}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     auto pos = props.lower_bound(prefix);
     ASSERT_TRUE(pos == props.end() ||
                 pos->first.compare(0, prefix.size(), prefix) != 0);

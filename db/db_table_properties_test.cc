@@ -134,7 +134,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   // It's not practical to prevent table file read on Open, so we
   // corrupt after open and after purging table cache.
   for (bool direct : {true, false}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     Reopen(options);
     // Clear out auto-opened files
     dbfull()->TEST_table_cache()->EraseUnRefEntries();

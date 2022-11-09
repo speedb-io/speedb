@@ -451,18 +451,12 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   bool trace = FLAGS_verbose;
 
   for (int num_entries : {5, 10, 100}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     for (double key_space : {0.1, 1.0, 3.0}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
       for (ValueType prevalent_entry_type :
            {kTypeValue, kTypeDeletion, kTypeMerge}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         for (double error_probability : {0.01, 0.1}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
           for (double mutation_probability : {0.01, 0.5}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
             for (double target_hidden_fraction : {0.1, 0.5}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
               std::string trace_str =
                   "entries: " + ToString(num_entries) +
                   ", key_space: " + ToString(key_space) +

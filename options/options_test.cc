@@ -1339,7 +1339,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       CustomEnv::kClassName(),
       [](const std::string& /*name*/, std::unique_ptr<Env>* /*env_guard*/,
          std::string* /* errmsg */) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         static CustomEnv env(Env::Default());
         return &env;
       });
@@ -2149,7 +2148,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
           [](const std::string& name,
              std::unique_ptr<TablePropertiesCollectorFactory>* guard,
              std::string* /* errmsg */) {
-PERF_MARKER(__PRETTY_FUNCTION__);
             std::string id = name.substr(
                 strlen(TestTablePropertiesCollectorFactory::kClassName()) + 1);
             guard->reset(new TestTablePropertiesCollectorFactory(id));
@@ -2224,7 +2222,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       "Test" + arg,
       [](const std::string& name, std::unique_ptr<EventListener>* guard,
          std::string* /* errmsg */) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         guard->reset(new TestEventListener(name.substr(4)));
         return guard->get();
       });
@@ -2232,7 +2229,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       "TestConfig" + arg,
       [](const std::string& name, std::unique_ptr<EventListener>* guard,
          std::string* /* errmsg */) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         guard->reset(new TestConfigEventListener(name.substr(10)));
         return guard->get();
       });
@@ -2269,7 +2265,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   library.AddFactory<Env>(
       arg, [](const std::string& /*name*/, std::unique_ptr<Env>* /*env_guard*/,
               std::string* /* errmsg */) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         static CustomEnv env(Env::Default());
         return &env;
       });
@@ -3076,7 +3071,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       "CustomEnvDefault",
       [](const std::string& /*name*/, std::unique_ptr<Env>* /*env_guard*/,
          std::string* /* errmsg */) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         static CustomEnv env(Env::Default());
         return &env;
       });
@@ -4334,7 +4328,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
                            OptionTypeFlags::kNone,
                            [](const ConfigOptions&, const std::string&,
                               const std::string& value, void* addr) {
-PERF_MARKER(__PRETTY_FUNCTION__);
                              auto ptr = static_cast<int*>(addr);
                              *ptr = ParseInt(value);
                              return Status::OK();
@@ -4350,7 +4343,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       OptionTypeFlags::kNone,
       [](const ConfigOptions& /*opts*/, const std::string& name,
          const std::string& value, void* addr) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         auto ptr = static_cast<std::string*>(addr);
         if (name == "Oops") {
           return Status::InvalidArgument(value);
@@ -4373,7 +4365,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       OptionTypeFlags::kNone, nullptr,
       [](const ConfigOptions& /*opts*/, const std::string& name,
          const void* /*addr*/, std::string* value) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         if (name == "Oops") {
           return Status::InvalidArgument(name);
         } else {
@@ -4397,7 +4388,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       OptionTypeFlags::kNone, nullptr, nullptr,
       [](const ConfigOptions& /*opts*/, const std::string& name,
          const void* addr1, const void* addr2, std::string* mismatch) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         auto i1 = *(static_cast<const int*>(addr1));
         auto i2 = *(static_cast<const int*>(addr2));
         if (name == "LT") {

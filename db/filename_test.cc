@@ -53,7 +53,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       {"18446744073709551615.log", 18446744073709551615ull, kWalFile, kAllMode},
   };
   for (char mode : {kDifferentInfoLogDir, kDefautInfoLogDir, kNoCheckLogDir}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     for (unsigned int i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
       InfoLogPrefix info_log_prefix(mode != kDefautInfoLogDir, "/rocksdb/dir");
       if (cases[i].mode & mode) {

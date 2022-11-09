@@ -342,7 +342,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   // Test properties collectors with internal keys or regular keys
   // for block based table
   for (bool encode_as_internal : { true, false }) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     Options options;
     BlockBasedTableOptions table_options;
     table_options.flush_block_policy_factory =

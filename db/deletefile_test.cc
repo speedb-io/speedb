@@ -526,7 +526,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   it->SeekToFirst();
   int numKeysIterated = 0;
   while(it->Valid()) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     numKeysIterated++;
     it->Next();
   }

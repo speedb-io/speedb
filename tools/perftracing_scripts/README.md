@@ -46,12 +46,3 @@ for marker in markers:
             True - function Finished (had end time stamp)
             False - function did not finish or (end time stamp does not exist)
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
- ## addMarkers
-A Helper script that adds markers in the actual code (.cc files)
-**This script is does not guarantee compilable code after usage, some manual editting might be required.**
-usage:
-```bash
-python3 addMarkers.py file.cc
-python3 addMarkers.py directory_containing_cc_files
-```

@@ -931,7 +931,6 @@ void RotatingFileWrapper::close(){
 }
 
 void RotatingFileWrapper::open_file(){
-  int prev_index = m_nCurrentFileIndex;
 
   m_nCurrentFileIndex++;
 

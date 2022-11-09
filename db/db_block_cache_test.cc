@@ -862,7 +862,6 @@ uint32_t MockCache::low_pri_insert_count = 0;
 TEST_F(DBBlockCacheTest, IndexAndFilterBlocksCachePriority) {
 PERF_MARKER(__PRETTY_FUNCTION__);
   for (auto priority : {Cache::Priority::LOW, Cache::Priority::HIGH}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     Options options = CurrentOptions();
     options.create_if_missing = true;
     options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
@@ -957,7 +956,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   for (std::shared_ptr<Cache> base_cache :
        {NewLRUCache(capacity, num_shard_bits),
         NewClockCache(capacity, num_shard_bits)}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     if (!base_cache) {
       // Skip clock cache when not supported
       continue;
@@ -1315,10 +1313,8 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   const size_t capacity = size_t{1} << 25;
   int iterations_tested = 0;
   for (bool partition : {false, true}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     for (std::shared_ptr<Cache> cache :
          {NewLRUCache(capacity), NewClockCache(capacity)}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
       if (!cache) {
         // Skip clock cache when not supported
         continue;

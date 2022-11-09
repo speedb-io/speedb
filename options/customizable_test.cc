@@ -191,7 +191,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       ObjectLibrary::PatternEntry("A", true).AddSeparator("_"),
       [](const std::string& name, std::unique_ptr<TestCustomizable>* guard,
          std::string* /* msg */) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         guard->reset(new ACustomizable(name));
         A_count++;
         return guard->get();
@@ -284,7 +283,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   return LoadUniqueObject<TestCustomizable>(
       config_options, value,
       [](const std::string& id, std::unique_ptr<TestCustomizable>* u) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         if (id == "B") {
           u->reset(new BCustomizable(id));
           return true;
@@ -305,7 +303,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   return LoadStaticObject<TestCustomizable>(
       config_options, value,
       [](const std::string& id, TestCustomizable** ptr) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         if (id == "B") {
           *ptr = new BCustomizable(id);
           return true;
@@ -346,7 +343,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       ObjectLibrary::PatternEntry("TEST", false).AddSeparator("_"),
       [](const std::string& name, std::unique_ptr<TestCustomizable>* guard,
          std::string* /* msg */) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         guard->reset(new TestCustomizable(name));
         return guard->get();
       });
@@ -525,7 +521,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       "failing",
       [](const std::string& /*uri*/,
          std::unique_ptr<TestCustomizable>* /*guard */, std::string* errmsg) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         *errmsg = "Bad Factory";
         return nullptr;
       });
@@ -641,7 +636,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       "P",
       [](const std::string& /*name*/, std::unique_ptr<TestCustomizable>* guard,
          std::string* /* msg */) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         guard->reset(new PrepareCustomizable());
         return guard->get();
       });
@@ -1121,7 +1115,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       ObjectLibrary::PatternEntry("Z", false).AddSeparator(""),
       [](const std::string& name, std::unique_ptr<TestCustomizable>* guard,
          std::string* /* msg */) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         guard->reset(new TestCustomizable(name));
         return guard->get();
       });
@@ -1271,7 +1264,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
     static Status CreateFromString(
         const ConfigOptions& opts, const std::string& value,
         std::shared_ptr<ManagedCustomizable>* result) {
-PERF_MARKER(__PRETTY_FUNCTION__);
       return LoadManagedObject<ManagedCustomizable>(opts, value, result);
     }
 
@@ -1286,7 +1278,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
           [](const std::string& /*name*/,
              std::unique_ptr<ManagedCustomizable>* guard,
              std::string* /* msg */) {
-PERF_MARKER(__PRETTY_FUNCTION__);
             guard->reset(new ManagedCustomizable());
             return guard->get();
           });
@@ -1561,7 +1552,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       mock::MockTableFactory::kClassName(),
       [](const std::string& /*uri*/, std::unique_ptr<TableFactory>* guard,
          std::string* /* errmsg */) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         guard->reset(new mock::MockTableFactory());
         return guard->get();
       });
@@ -1569,7 +1559,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       OnFileDeletionListener::kClassName(),
       [](const std::string& /*uri*/, std::unique_ptr<EventListener>* guard,
          std::string* /* errmsg */) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         guard->reset(new OnFileDeletionListener());
         return guard->get();
       });
@@ -1577,7 +1566,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       FlushCounterListener::kClassName(),
       [](const std::string& /*uri*/, std::unique_ptr<EventListener>* guard,
          std::string* /* errmsg */) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         guard->reset(new FlushCounterListener());
         return guard->get();
       });
@@ -1587,7 +1575,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       [](const std::string& /*uri*/,
          std::unique_ptr<const SliceTransform>* guard,
          std::string* /* errmsg */) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         guard->reset(new MockSliceTransform());
         return guard->get();
       });
@@ -1595,7 +1582,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       TestStatistics::kClassName(),
       [](const std::string& /*uri*/, std::unique_ptr<Statistics>* guard,
          std::string* /* errmsg */) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         guard->reset(new TestStatistics());
         return guard->get();
       });
@@ -1605,7 +1591,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
           .AddSuffix("://test"),
       [](const std::string& uri, std::unique_ptr<EncryptionProvider>* guard,
          std::string* /* errmsg */) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         guard->reset(new MockEncryptionProvider(uri));
         return guard->get();
       });
@@ -1613,7 +1598,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       "Mock",
       [](const std::string& /*uri*/, std::unique_ptr<BlockCipher>* guard,
          std::string* /* errmsg */) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         guard->reset(new MockCipher());
         return guard->get();
       });
@@ -1621,7 +1605,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       MockMemoryAllocator::kClassName(),
       [](const std::string& /*uri*/, std::unique_ptr<MemoryAllocator>* guard,
          std::string* /* errmsg */) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         guard->reset(new MockMemoryAllocator());
         return guard->get();
       });
@@ -1630,7 +1613,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       [](const std::string& /*uri*/,
          std::unique_ptr<FlushBlockPolicyFactory>* guard,
          std::string* /* errmsg */) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         guard->reset(new TestFlushBlockPolicyFactory());
         return guard->get();
       });
@@ -1639,7 +1621,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       TestSecondaryCache::kClassName(),
       [](const std::string& /*uri*/, std::unique_ptr<SecondaryCache>* guard,
          std::string* /* errmsg */) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         guard->reset(new TestSecondaryCache());
         return guard->get();
       });
@@ -1648,7 +1629,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       DummyFileSystem::kClassName(),
       [](const std::string& /*uri*/, std::unique_ptr<FileSystem>* guard,
          std::string* /* errmsg */) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         guard->reset(new DummyFileSystem(nullptr));
         return guard->get();
       });
@@ -1658,7 +1638,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       [](const std::string& /*uri*/,
          std::unique_ptr<SstPartitionerFactory>* guard,
          std::string* /* errmsg */) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         guard->reset(new MockSstPartitionerFactory());
         return guard->get();
       });
@@ -1668,7 +1647,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       [](const std::string& /*uri*/,
          std::unique_ptr<FileChecksumGenFactory>* guard,
          std::string* /* errmsg */) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         guard->reset(new MockFileChecksumGenFactory());
         return guard->get();
       });
@@ -1678,7 +1656,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       [](const std::string& /*uri*/,
          std::unique_ptr<TablePropertiesCollectorFactory>* guard,
          std::string* /* errmsg */) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         guard->reset(new MockTablePropertiesCollectorFactory());
         return guard->get();
       });
@@ -1687,7 +1664,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       MockRateLimiter::kClassName(),
       [](const std::string& /*uri*/, std::unique_ptr<RateLimiter>* guard,
          std::string* /* errmsg */) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         guard->reset(new MockRateLimiter());
         return guard->get();
       });
@@ -1696,7 +1672,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
       MockFilterPolicy::kClassName(),
       [](const std::string& /*uri*/, std::unique_ptr<const FilterPolicy>* guard,
          std::string* /* errmsg */) {
-PERF_MARKER(__PRETTY_FUNCTION__);
         guard->reset(new MockFilterPolicy());
         return guard->get();
       });

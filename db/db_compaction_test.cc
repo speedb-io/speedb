@@ -1074,7 +1074,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   // create first file and flush to l0
   for (auto& key : {"1", "2", "3", "3", "3", "3"}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_OK(Put(key, std::string(key_len, 'A')));
     snaps.push_back(dbfull()->GetSnapshot());
   }
@@ -1083,7 +1082,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   // create second file and flush to l0
   for (auto& key : {"3", "4", "5", "6", "7", "8"}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_OK(Put(key, std::string(key_len, 'A')));
     snaps.push_back(dbfull()->GetSnapshot());
   }
@@ -3514,7 +3512,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   const int kNumFilesTrigger = 3;
   Env::Default()->SetBackgroundThreads(1, Env::Priority::BOTTOM);
   for (bool use_universal_compaction : {false, true}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     Options options = CurrentOptions();
     if (use_universal_compaction) {
       options.compaction_style = kCompactionStyleUniversal;
@@ -3965,9 +3962,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   const int kValueSize = 100;
 
   for (bool if_restart : {false, true}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     for (bool if_open_all_files : {false, true}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
       Options options = CurrentOptions();
       options.compression = kNoCompression;
       options.ttl = 24 * 60 * 60;  // 24 hours
@@ -4117,9 +4112,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   const int kValueSize = 100;
 
   for (bool if_restart : {false, true}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     for (bool if_open_all_files : {false, true}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
       Options options = CurrentOptions();
       options.periodic_compaction_seconds = 48 * 60 * 60;  // 2 days
       if (if_open_all_files) {
@@ -4470,7 +4463,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   for (CompactionFilterType comp_filter_type :
        {kUseCompactionFilter, kUseCompactionFilterFactory}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     // Assert that periodic compactions are not enabled.
     ASSERT_EQ(port::kMaxUint64 - 1, options.periodic_compaction_seconds);
 

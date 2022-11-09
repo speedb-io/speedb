@@ -35,7 +35,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   // RangeDelAggregator. Ideally it would be supported; otherwise it should at
   // least be explicitly unsupported.
   for (auto config : {kPlainTableAllBytesPrefix, /* kWalDirAndMmapReads */}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     option_config_ = config;
     DestroyAndReopen(CurrentOptions());
     ASSERT_TRUE(db_->DeleteRange(WriteOptions(), db_->DefaultColumnFamily(),
@@ -826,7 +825,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   ReadOptions read_opts;
   read_opts.ignore_range_deletions = true;
   for (std::string key : {"sst_key", "imm_key", "mem_key"}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     std::string value;
     ASSERT_OK(db_->Get(read_opts, key, &value));
   }
@@ -1614,7 +1612,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 
   Random rnd(301);
   for (char first_char : {'a', 'b', 'c'}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     for (int i = 0; i < kFileBytes / kValueBytes; ++i) {
       std::string key(1, first_char);
       key.append(Key(i));
@@ -1777,7 +1774,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   // Refreshing an iterator after a range tombstone is added should cause the
   // deleted range of keys to disappear.
   for (bool sv_changed : {false, true}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_OK(db_->Put(WriteOptions(), "key1", "value1"));
     ASSERT_OK(db_->Put(WriteOptions(), "key2", "value2"));
 

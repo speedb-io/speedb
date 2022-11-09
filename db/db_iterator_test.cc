@@ -1145,7 +1145,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
 TEST_P(DBIteratorTest, DBIteratorBoundOptimizationTest) {
 PERF_MARKER(__PRETTY_FUNCTION__);
   for (auto format_version : {2, 3, 4}) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     int upper_bound_hits = 0;
     Options options = CurrentOptions();
     ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
@@ -2672,7 +2671,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   iter = NewIterator(ro);
   count = 0;
   for(iter->Seek("aa"); iter->Valid(); iter->Next()) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_OK(iter->status());
     count++;
   }
@@ -2684,7 +2682,6 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   iter = NewIterator(ro);
   count = 0;
   for(iter->SeekToLast(); iter->Valid(); iter->Prev()) {
-PERF_MARKER(__PRETTY_FUNCTION__);
     ASSERT_OK(iter->status());
     count++;
   }

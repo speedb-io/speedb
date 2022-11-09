@@ -21,7 +21,7 @@ It is maintained by Speedb and is forked from Rocksdb, developed by Facebook.
 **Jois us to build the next generation data engine!**
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset=".github/new-bee-mascot.gif" width="80px" >
+  <source media="(prefers-color-scheme: dark)" srcset=".github/new-bee-mascot-dark.gif" width="80px" >
   <img src=".github/new-bee-mascot.gif" width="80px">
 </picture>
 

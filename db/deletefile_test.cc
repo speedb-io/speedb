@@ -363,6 +363,16 @@ PERF_MARKER(__PRETTY_FUNCTION__);
     TEST_SYNC_POINT("DeleteFileTest::BackgroundPurgeCFDropTest:1");
 
     // Execute background purges.
+    sleeping_task_after[0].WakeUp();
+    sleeping_task_after[0].WaitUntilDone();
+
+    // Schedule a sleeping task in order to ensure background purge completed
+    sleeping_task_after[0].Reset();
+    env_->Schedule(&test::SleepingBackgroundTask::DoSleepTask,
+                   &sleeping_task_after[0], Env::Priority::LOW);
+    sleeping_task_after[0].WaitUntilSleeping();
+
+    // Release all sleeping tasks
     for (auto& sleeping_task : sleeping_task_after) {
       sleeping_task.WakeUp();
       sleeping_task.WaitUntilDone();

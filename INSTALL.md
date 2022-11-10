@@ -11,9 +11,9 @@ depend on newer gcc/clang with C++17 support (GCC >= 7, Clang >= 5).
 There are few options when compiling Speedb:
 
 -   [recommended] `make static_lib` will compile the Speedb static library
-    (`librocksdb.a`) in release mode.
+    (`libspeedb.a`) in release mode.
 
--   `make shared_lib` will compile the Speedb shared library (`librocksdb.so`)
+-   `make shared_lib` will compile the Speedb shared library (`libspeedb.so`)
     in release mode.
 
 -   `make check` will compile and run all the unit tests. `make check` will

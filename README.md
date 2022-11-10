@@ -72,7 +72,7 @@ Release:
 This will build the static library. If you want to build the dynamic library,
 use:
 
-    make rocksdb-shared
+    make speedb-shared
 
 If you want `make` to increase the number of cores used for building, simply use
 the `-j` option.

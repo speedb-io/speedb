@@ -51,7 +51,7 @@ jobs:
       - name: Build and package release libraries
         run: |
           rm -rf build && mkdir build && cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release -DPORTABLE=1 -DWITH_GFLAGS=0 -DWITH_SNAPPY=1 -DWITH_LZ4=1 -DWITH_ZLIB=1 -DWITH_ZSTD=1
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DSPDB_RELEASE_BUILD=1 -DPORTABLE=1 -DWITH_GFLAGS=0 -DWITH_SNAPPY=1 -DWITH_LZ4=1 -DWITH_ZLIB=1 -DWITH_ZSTD=1
           mkdir -p "$GITHUB_WORKSPACE/out/root"
           DESTDIR="$GITHUB_WORKSPACE/out/root" make -j$(nproc) install
           ( cd "$GITHUB_WORKSPACE/out/root" && tar czf ../speedb-${RELEASE_VERSION}.tar.gz . )
@@ -61,14 +61,14 @@ jobs:
       - name: Build release Jar
         run: |
           make clean
-          LIB_MODE=static DEBUG_LEVEL=0 PORTABLE=1 JAVA_HOME=/usr/lib/jvm/java-openjdk make -j$(nproc) rocksdbjavastatic
+          SPDB_RELEASE_BUILD=1 LIB_MODE=static DEBUG_LEVEL=0 PORTABLE=1 JAVA_HOME=/usr/lib/jvm/java-openjdk make -j$(nproc) rocksdbjavastatic
           cp "java/target/speedbjni-${RELEASE_VERSION}-linux64.jar" "$GITHUB_WORKSPACE/out"
 
       - name: Build db_bench
         run: |
           yum install -y gflags-devel
           rm -rf build && mkdir build && cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release -DPORTABLE=1 -DWITH_GFLAGS=1 \
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DSPDB_RELEASE_BUILD=1 -DPORTABLE=1 -DWITH_GFLAGS=1 \
             -DWITH_SNAPPY=1 -DWITH_LZ4=1 -DWITH_ZLIB=1 -DWITH_ZSTD=1 \
             -DWITH_BENCHMARK_TOOLS=1 -DROCKSDB_BUILD_SHARED=1
           make -j$(nproc) db_bench

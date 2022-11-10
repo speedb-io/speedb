@@ -42,6 +42,7 @@ db_with_timestamp_basic_test
 tools/block_cache_analyzer/*.pyc
 column_aware_encoding_exp
 util/build_version.cc
+plugin/plugin_registry.cc
 build_tools/VALGRIND_LOGS/
 coverage/COVERAGE_REPORT
 .gdbhistory

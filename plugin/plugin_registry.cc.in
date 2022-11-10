@@ -1,0 +1,17 @@
+#include "rocksdb/utilities/object_registry.h"
+
+#ifndef ROCKSDB_LITE
+
+extern "C" {
+@ROCKSDB_PLUGIN_EXTERNS@
+} // extern "C"
+
+namespace ROCKSDB_NAMESPACE {
+
+std::unordered_map<std::string, RegistrarFunc> ObjectRegistry::builtins_ = {
+  @ROCKSDB_PLUGIN_BUILTINS@                                                                        
+};
+
+} // namespace ROCKSDB_NAMESPACE
+
+#endif // ROCKSDB_LITE

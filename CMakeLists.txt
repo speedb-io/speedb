@@ -32,7 +32,7 @@
 # 3. cmake ..
 # 4. make -j
 
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.12)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/modules/")
 include(ReadSpeedbVersion)
@@ -47,12 +47,12 @@ if(POLICY CMP0042)
 endif()
 
 if(NOT CMAKE_BUILD_TYPE)
-  if(EXISTS "${CMAKE_SOURCE_DIR}/.git")
-    set(default_build_type "Debug")
+  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.git")
+    set(default_build_type Debug)
   else()
-    set(default_build_type "RelWithDebInfo")
+    set(default_build_type RelWithDebInfo)
   endif()
-  set(CMAKE_BUILD_TYPE "${default_build_type}" CACHE STRING
+  set(CMAKE_BUILD_TYPE ${default_build_type} CACHE STRING
     "Default BUILD_TYPE is ${default_build_type}" FORCE)
 endif()
 
@@ -68,12 +68,6 @@ else()
   endif(CCACHE_FOUND)
 endif()
 
-option(WITH_JEMALLOC "build with JeMalloc" OFF)
-option(WITH_LIBURING "build with liburing" ON)
-option(WITH_SNAPPY "build with SNAPPY" OFF)
-option(WITH_LZ4 "build with lz4" OFF)
-option(WITH_ZLIB "build with zlib" OFF)
-option(WITH_ZSTD "build with zstd" OFF)
 option(WITH_WINDOWS_UTF8_FILENAMES "use UTF8 as characterset for opening files, regardles of the system code page" OFF)
 if (WITH_WINDOWS_UTF8_FILENAMES)
   add_definitions(-DROCKSDB_WINDOWS_UTF8_FILENAMES)
@@ -90,109 +84,113 @@ endif()
 
 include(CMakeDependentOption)
 
-if(MSVC)
-  option(WITH_GFLAGS "build with GFlags" OFF)
-  option(WITH_XPRESS "build with windows built in compression" OFF)
-  include(${CMAKE_CURRENT_SOURCE_DIR}/thirdparty.inc)
-else()
-  if(CMAKE_SYSTEM_NAME MATCHES "FreeBSD" AND NOT CMAKE_SYSTEM_NAME MATCHES "kFreeBSD")
-    # FreeBSD has jemalloc as default malloc
-    # but it does not have all the jemalloc files in include/...
-    set(WITH_JEMALLOC ON)
-  else()
-    if(WITH_JEMALLOC)
-      find_package(JeMalloc REQUIRED)
-      add_definitions(-DROCKSDB_JEMALLOC -DJEMALLOC_NO_DEMANGLE)
-      list(APPEND THIRDPARTY_LIBS JeMalloc::JeMalloc)
-    endif()
+option(WITH_JEMALLOC "build with JeMalloc" OFF)
+set(ARTIFACT_SUFFIX)
+if(CMAKE_SYSTEM_NAME MATCHES "FreeBSD" AND NOT CMAKE_SYSTEM_NAME MATCHES "kFreeBSD")
+  # FreeBSD has jemalloc as default malloc
+  # but it does not have all the jemalloc files in include/...
+  set(WITH_JEMALLOC ON)
+elseif(WITH_JEMALLOC)
+  if(MSVC)
+    set(ARTIFACT_SUFFIX "_je")
+    add_definitions(-DJEMALLOC_EXPORT= -DJEMALLOC_NO_RENAME)
   endif()
 
-  if(MINGW)
-    option(WITH_GFLAGS "build with GFlags" OFF)
-  else()
-    option(WITH_GFLAGS "build with GFlags" ON)
-  endif()
-  set(GFLAGS_LIB)
-  if(WITH_GFLAGS)
-    # Config with namespace available since gflags 2.2.2
-    option(GFLAGS_USE_TARGET_NAMESPACE "Use gflags import target with namespace." ON)
-    find_package(gflags CONFIG)
-    if(gflags_FOUND)
-      if(TARGET ${GFLAGS_TARGET})
-        # Config with GFLAGS_TARGET available since gflags 2.2.0
-        set(GFLAGS_LIB ${GFLAGS_TARGET})
-      else()
-        # Config with GFLAGS_LIBRARIES available since gflags 2.1.0
-        set(GFLAGS_LIB ${gflags_LIBRARIES})
-      endif()
+  find_package(JeMalloc REQUIRED)
+  add_definitions(-DROCKSDB_JEMALLOC -DJEMALLOC_NO_DEMANGLE)
+  list(APPEND THIRDPARTY_LIBS JeMalloc::JeMalloc)
+endif()
+set(LIB_ARTIFACT_SUFFIX "${ARTIFACT_SUFFIX}")
+
+cmake_dependent_option(WITH_GFLAGS "build with benchmarks" ON "NOT MSVC AND NOT MINGW" OFF)
+set(GFLAGS_LIB)
+if(WITH_GFLAGS)
+  set(GFLAGS_LIB "gflags_interface")
+  add_library(${GFLAGS_LIB} INTERFACE)
+
+  # Config with namespace available since gflags 2.2.2
+  set(GFLAGS_USE_TARGET_NAMESPACE ON)
+  find_package(gflags CONFIG)
+  if(gflags_FOUND)
+    if(TARGET ${GFLAGS_TARGET})
+      # Config with GFLAGS_TARGET available since gflags 2.2.0
+      target_link_libraries(${GFLAGS_LIB} INTERFACE ${GFLAGS_TARGET})
     else()
-      find_package(gflags REQUIRED)
-      set(GFLAGS_LIB gflags::gflags)
+      # Config with GFLAGS_LIBRARIES available since gflags 2.1.0
+      target_link_libraries(${GFLAGS_LIB} INTERFACE ${gflags_LIBRARIES})
     endif()
-    if(DEFINED gflags_VERSION AND gflags_VERSION MATCHES "^2\.1\.[0-9]+")
-      add_definitions(-DGFLAGS_NAMESPACE=gflags)
-    endif()
-    include_directories(${GFLAGS_INCLUDE_DIR})
-    list(APPEND THIRDPARTY_LIBS ${GFLAGS_LIB})
-    add_definitions(-DGFLAGS=1)
+  else()
+    find_package(gflags REQUIRED)
+    target_link_libraries(${GFLAGS_LIB} INTERFACE gflags::gflags)
   endif()
-
-  if(WITH_SNAPPY)
-    find_package(Snappy CONFIG)
-    if(NOT Snappy_FOUND)
-      find_package(Snappy REQUIRED)
-    endif()
-    add_definitions(-DSNAPPY)
-    list(APPEND THIRDPARTY_LIBS Snappy::snappy)
+  if(DEFINED gflags_VERSION AND gflags_VERSION MATCHES "^2\.1\.[0-9]+")
+    target_compile_definitions(${GFLAGS_LIB} INTERFACE -DGFLAGS_NAMESPACE=gflags)
   endif()
-
-  if(WITH_ZLIB)
-    find_package(ZLIB REQUIRED)
-    add_definitions(-DZLIB)
-    list(APPEND THIRDPARTY_LIBS ZLIB::ZLIB)
-  endif()
-
-  option(WITH_BZ2 "build with bzip2" OFF)
-  if(WITH_BZ2)
-    find_package(BZip2 REQUIRED)
-    add_definitions(-DBZIP2)
-    if(BZIP2_INCLUDE_DIRS)
-      include_directories(${BZIP2_INCLUDE_DIRS})
-    else()
-      include_directories(${BZIP2_INCLUDE_DIR})
-    endif()
-    list(APPEND THIRDPARTY_LIBS ${BZIP2_LIBRARIES})
-  endif()
-
-  if(WITH_LZ4)
-    find_package(lz4 REQUIRED)
-    add_definitions(-DLZ4)
-    list(APPEND THIRDPARTY_LIBS lz4::lz4)
-  endif()
-
-  if(WITH_ZSTD)
-    find_package(zstd REQUIRED)
-    add_definitions(-DZSTD)
-    include_directories(${ZSTD_INCLUDE_DIR})
-    list(APPEND THIRDPARTY_LIBS zstd::zstd)
-  endif()
+  target_compile_definitions(${GFLAGS_LIB} INTERFACE -DGFLAGS=1)
+  target_include_directories(${GFLAGS_LIB} INTERFACE ${GFLAGS_INCLUDE_DIR})
 endif()
 
-option(WITH_MD_LIBRARY "build with MD" ON)
+option(WITH_SNAPPY "build with SNAPPY" OFF)
+if(WITH_SNAPPY)
+  find_package(Snappy CONFIG)
+  if(NOT Snappy_FOUND)
+    find_package(Snappy REQUIRED)
+  endif()
+  add_definitions(-DSNAPPY)
+  list(APPEND COMPRESSION_LIBS Snappy::snappy)
+endif()
+
+option(WITH_ZLIB "build with zlib" OFF)
+if(WITH_ZLIB)
+  find_package(ZLIB REQUIRED)
+  add_definitions(-DZLIB)
+  list(APPEND COMPRESSION_LIBS ZLIB::ZLIB)
+endif()
+
+option(WITH_BZ2 "build with bzip2" OFF)
+if(WITH_BZ2)
+  find_package(BZip2 REQUIRED)
+  add_definitions(-DBZIP2)
+  if(BZIP2_INCLUDE_DIRS)
+    include_directories(${BZIP2_INCLUDE_DIRS})
+  else()
+    include_directories(${BZIP2_INCLUDE_DIR})
+  endif()
+  list(APPEND COMPRESSION_LIBS ${BZIP2_LIBRARIES})
+endif()
+
+option(WITH_LZ4 "build with lz4" OFF)
+if(WITH_LZ4)
+  find_package(lz4 REQUIRED)
+  add_definitions(-DLZ4)
+  list(APPEND COMPRESSION_LIBS lz4::lz4)
+endif()
+
+option(WITH_ZSTD "build with zstd" OFF)
+if(WITH_ZSTD)
+  find_package(zstd REQUIRED)
+  add_definitions(PRIVATE -DZSTD)
+  include_directories(${ZSTD_INCLUDE_DIR})
+  list(APPEND COMPRESSION_LIBS zstd::zstd)
+endif()
+
 if(WIN32 AND MSVC)
-  if(WITH_MD_LIBRARY)
-    set(RUNTIME_LIBRARY "MD")
-  else()
-    set(RUNTIME_LIBRARY "MT")
+  option(WITH_XPRESS "build with windows built in compression" OFF)
+  if(WITH_XPRESS)
+    add_definitions(-DXPRESS)
+    # We are using the implementation provided by the system
+    list(APPEND COMPRESSION_LIBS Cabinet.lib)
   endif()
 endif()
 
+list(APPEND THIRDPARTY_LIBS ${COMPRESSION_LIBS})
+
 if(MSVC)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /Zi /nologo /EHsc /GS /Gd /GR /GF /fp:precise /Zc:wchar_t /Zc:forScope /errorReport:queue")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /FC /d2Zi+ /W4 /wd4127 /wd4800 /wd4996 /wd4351 /wd4100 /wd4204 /wd4324")
+  add_compile_options(/nologo /EHsc /GS /Gd /GR /GF /fp:precise /Zc:wchar_t /Zc:forScope /errorReport:queue)
+  add_compile_options(/FC /d2Zi+ /W4 /wd4127 /wd4800 /wd4996 /wd4351 /wd4100 /wd4204 /wd4324)
 else()
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -W -Wextra -Wall -pthread")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wsign-compare -Wshadow -Wno-unused-parameter -Wno-unused-variable -Woverloaded-virtual -Wnon-virtual-dtor -Wno-missing-field-initializers -Wno-strict-aliasing -Wno-invalid-offsetof")
+  add_compile_options(-W -Wextra -Wall -pthread)
+  add_compile_options(-Wsign-compare -Wshadow -Wno-unused-parameter -Wno-unused-variable -Woverloaded-virtual -Wnon-virtual-dtor -Wno-missing-field-initializers -Wno-strict-aliasing -Wno-invalid-offsetof)
   if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wstrict-prototypes")
   endif()
@@ -201,11 +199,11 @@ else()
     add_definitions(-D_POSIX_C_SOURCE=1)
   endif()
   if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-omit-frame-pointer")
+    add_compile_options(-fno-omit-frame-pointer)
     include(CheckCXXCompilerFlag)
     CHECK_CXX_COMPILER_FLAG("-momit-leaf-frame-pointer" HAVE_OMIT_LEAF_FRAME_POINTER)
     if(HAVE_OMIT_LEAF_FRAME_POINTER)
-      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -momit-leaf-frame-pointer")
+      add_compile_options(-momit-leaf-frame-pointer)
     endif()
   endif()
 endif()
@@ -214,38 +212,34 @@ include(CheckCCompilerFlag)
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(powerpc|ppc)64")
   CHECK_C_COMPILER_FLAG("-mcpu=power9" HAS_POWER9)
   if(HAS_POWER9)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mcpu=power9 -mtune=power9")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mcpu=power9 -mtune=power9")
+    add_compile_options(-mcpu=power9 -mtune=power9)
   else()
     CHECK_C_COMPILER_FLAG("-mcpu=power8" HAS_POWER8)
     if(HAS_POWER8)
-      set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mcpu=power8 -mtune=power8")
-      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mcpu=power8 -mtune=power8")
-    endif(HAS_POWER8)
-  endif(HAS_POWER9)
+      add_compile_options(-mcpu=power8 -mtune=power8)
+    endif()
+  endif()
   CHECK_C_COMPILER_FLAG("-maltivec" HAS_ALTIVEC)
   if(HAS_ALTIVEC)
     message(STATUS " HAS_ALTIVEC yes")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -maltivec")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -maltivec")
-  endif(HAS_ALTIVEC)
-endif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(powerpc|ppc)64")
+    add_compile_options(-maltivec)
+  endif()
+endif()
 
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64|AARCH64")
         CHECK_C_COMPILER_FLAG("-march=armv8-a+crc+crypto" HAS_ARMV8_CRC)
   if(HAS_ARMV8_CRC)
     message(STATUS " HAS_ARMV8_CRC yes")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=armv8-a+crc+crypto -Wno-unused-function")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=armv8-a+crc+crypto -Wno-unused-function")
-  endif(HAS_ARMV8_CRC)
-endif(CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64|AARCH64")
+    add_compile_options(-march=armv8-a+crc+crypto -Wno-unused-function)
+  endif()
+endif()
 
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "s390x")
   CHECK_C_COMPILER_FLAG("-march=native" HAS_S390X_MARCH_NATIVE)
   if(HAS_S390X_MARCH_NATIVE)
     message(STATUS " HAS_S390X_MARCH_NATIVE yes")
-  endif(HAS_S390X_MARCH_NATIVE)
-endif(CMAKE_SYSTEM_PROCESSOR MATCHES "s390x")
+  endif()
+endif()
 
 option(PORTABLE "build a portable binary" OFF)
 option(FORCE_SSE42 "force building with SSE4.2, even when PORTABLE=ON" OFF)
@@ -255,35 +249,35 @@ if(PORTABLE)
   # MSVC does not need a separate compiler flag to enable SSE4.2; if nmmintrin.h
   # is available, it is available by default.
   if(FORCE_SSE42 AND NOT MSVC)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -msse4.2 -mpclmul")
+    add_compile_options(-msse4.2 -mpclmul)
   endif()
   if(MSVC)
     if(FORCE_AVX)
-      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /arch:AVX")
+      add_compile_options(/arch:AVX)
     endif()
     # MSVC automatically enables BMI / lzcnt with AVX2.
     if(FORCE_AVX2)
-      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /arch:AVX2")
+      add_compile_options(/arch:AVX2)
     endif()
   else()
     if(FORCE_AVX)
-      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx")
+      add_compile_options(-mavx)
     endif()
     if(FORCE_AVX2)
-      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx2 -mbmi -mlzcnt")
+      add_compile_options(-mavx2 -mbmi -mlzcnt)
     endif()
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "^s390x")
-      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=z196")
+      add_compile_options(-march=z196)
     endif()
   endif()
 else()
   if(MSVC)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /arch:AVX2")
+    add_compile_options(/arch:AVX2)
   else()
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "^s390x" AND NOT HAS_S390X_MARCH_NATIVE)
-      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=z196")
+      add_compile_options(-march=z196)
     elseif(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "^(powerpc|ppc)64" AND NOT HAS_ARMV8_CRC)
-      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
+      add_compile_options(-march=native)
     endif()
   endif()
 endif()
@@ -333,11 +327,14 @@ int main() {
   endif()
 endif()
 
-if (WITH_LIBURING)
-  find_package(uring)
-  if (uring_FOUND)
-    add_definitions(-DROCKSDB_IOURING_PRESENT)
-    list(APPEND THIRDPARTY_LIBS uring::uring)
+if(CMAKE_SYSTEM_NAME MATCHES "Linux")
+  option(WITH_LIBURING "build with liburing" ON)
+  if (WITH_LIBURING)
+    find_package(uring)
+    if (uring_FOUND)
+      add_definitions(-DROCKSDB_IOURING_PRESENT)
+      list(APPEND THIRDPARTY_LIBS uring::uring)
+    endif()
   endif()
 endif()
 
@@ -360,17 +357,16 @@ endif()
 option(FAIL_ON_WARNINGS "Treat compile warnings as errors" ON)
 if(FAIL_ON_WARNINGS)
   if(MSVC)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /WX")
+    add_compile_options(/WX)
   else() # assume GCC
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror")
+    add_compile_options(-Werror)
   endif()
 endif()
 
 option(WITH_ASAN "build with ASAN" OFF)
 if(WITH_ASAN)
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address")
+  add_compile_options(-fsanitize=address)
   if(WITH_JEMALLOC)
     message(FATAL "ASAN does not work well with JeMalloc")
   endif()
@@ -379,8 +375,7 @@ endif()
 option(WITH_TSAN "build with TSAN" OFF)
 if(WITH_TSAN)
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=thread -Wl,-pie")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=thread -fPIC")
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=thread -fPIC")
+  add_compile_options(-fsanitize=thread -fPIC)
   if(WITH_JEMALLOC)
     message(FATAL "TSAN does not work well with JeMalloc")
   endif()
@@ -390,8 +385,7 @@ option(WITH_UBSAN "build with UBSAN" OFF)
 if(WITH_UBSAN)
   add_definitions(-DROCKSDB_UBSAN_RUN)
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=undefined")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=undefined")
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=undefined")
+  add_compile_options(-fsanitize=undefined)
   if(WITH_JEMALLOC)
     message(FATAL "UBSAN does not work well with JeMalloc")
   endif()
@@ -442,25 +436,20 @@ if(USE_RTTI STREQUAL "AUTO")
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fno-rtti")
   endif()
 elseif(USE_RTTI)
-  message(STATUS "Enabling RTTI in all builds")
-  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DROCKSDB_USE_RTTI")
-  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -DROCKSDB_USE_RTTI")
+  message(STATUS "Enabling RTTI")
+  add_definitions(-DROCKSDB_USE_RTTI)
 else()
+  message(STATUS "Disabling RTTI")
   if(MSVC)
-    message(STATUS "Disabling RTTI in Release builds. Always on in Debug.")
-    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DROCKSDB_USE_RTTI")
-    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /GR-")
+    add_compile_options(/GR-)
   else()
-    message(STATUS "Disabling RTTI in all builds")
-    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-rtti")
-    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fno-rtti")
+    add_compile_options(-fno-rtti)
   endif()
 endif()
 
-# Used to run CI build and tests so we can run faster
-option(OPTDBG "Build optimized debug build with MSVC" OFF)
-option(WITH_RUNTIME_DEBUG "build with debug version of runtime library" ON)
 if(MSVC)
+  # Used to run CI build and tests so we can run faster
+  option(OPTDBG "Build optimized debug build with MSVC" OFF)
   if(OPTDBG)
     message(STATUS "Debug optimization is enabled")
     set(CMAKE_CXX_FLAGS_DEBUG "/Oxt")
@@ -473,31 +462,43 @@ if(MSVC)
     else()
       set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /Gm")
     endif()
-
   endif()
+
+  option(WITH_MD_LIBRARY "build with MD" ON)
+  if(WITH_MD_LIBRARY)
+    set(RUNTIME_LIBRARY "MD")
+  else()
+    set(RUNTIME_LIBRARY "MT")
+  endif()
+
+  option(WITH_RUNTIME_DEBUG "build with debug version of runtime library" ON)
   if(WITH_RUNTIME_DEBUG)
+    set(LIB_ARTIFACT_SUFFIX "${LIB_ARTIFACT_SUFFIX}d")
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /${RUNTIME_LIBRARY}d")
   else()
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /${RUNTIME_LIBRARY}")
   endif()
   set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /Oxt /Zp8 /Gm- /Gy /${RUNTIME_LIBRARY}")
 
-  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /DEBUG")
-  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /DEBUG")
+  if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+    add_compile_options(/Zi)
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /DEBUG")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /DEBUG")
+  endif()
 endif()
 
 if(CMAKE_COMPILER_IS_GNUCXX)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-builtin-memcmp")
+  add_compile_options(-fno-builtin-memcmp)
 endif()
 
 option(ROCKSDB_LITE "Build LITE version" OFF)
 if(ROCKSDB_LITE)
   add_definitions(-DROCKSDB_LITE)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-exceptions -Os")
+  add_compile_options(-fno-exceptions -Os)
 endif()
 
 if(CMAKE_SYSTEM_NAME MATCHES "Cygwin")
-  add_definitions(-fno-builtin-memcmp -DCYGWIN)
+  add_definitions(-DCYGWIN)
 elseif(CMAKE_SYSTEM_NAME MATCHES "Darwin")
   add_definitions(-DOS_MACOSX)
 elseif(CMAKE_SYSTEM_NAME MATCHES "Linux")
@@ -588,12 +589,9 @@ if(HAVE_FULLFSYNC)
   add_definitions(-DHAVE_FULLFSYNC)
 endif()
 
-include_directories(${PROJECT_SOURCE_DIR})
-include_directories(${PROJECT_SOURCE_DIR}/include)
-if(USE_FOLLY)
-  include_directories(${PROJECT_SOURCE_DIR}/third-party/folly)
-  add_definitions(-DUSE_FOLLY -DFOLLY_NO_CONFIG)
-endif()
+include_directories(.)
+include_directories(include)
+
 find_package(Threads REQUIRED)
 
 # Main library source code
@@ -907,82 +905,6 @@ list(APPEND SOURCES
   utilities/transactions/lock/range/range_tree/lib/util/dbt.cc
   utilities/transactions/lock/range/range_tree/lib/util/memarena.cc)
 
-if (ROCKSDB_PLUGINS)
-  separate_arguments(ROCKSDB_PLUGINS)
-endif()
-if (NOT ROCKSDB_PLUGINS OR NOT "speedb" IN_LIST ROCKSDB_PLUGINS)
-  list(APPEND ROCKSDB_PLUGINS speedb)
-endif()
-set(ROCKSDB_PLUGIN_EXTERNS "")
-set(ROCKSDB_PLUGIN_BUILTINS "")
-message(STATUS "ROCKSDB_PLUGINS: ${ROCKSDB_PLUGINS}")
-if( ROCKSDB_PLUGINS )
-  foreach (plugin ${ROCKSDB_PLUGINS})
-    set(plugin_root "plugin/${plugin}/")
-    add_subdirectory(${plugin_root})
-    # Use get_directory_property() to avoid having to declare the variables
-    # with PARENT_SCOPE in the plugin CMakeLists.txt
-    # TODO: Change the plugin support here so that a plugin would simply define
-    # a target that we'll link to.
-    get_directory_property(${plugin}_SOURCES
-      DIRECTORY ${plugin_root}
-      DEFINITION ${plugin}_SOURCES)
-    get_directory_property(${plugin}_COMPILE_FLAGS
-      DIRECTORY ${plugin_root}
-      DEFINITION ${plugin}_COMPILE_FLAGS)
-    foreach (src ${${plugin}_SOURCES})
-      list(APPEND SOURCES ${plugin_root}/${src})
-      set_source_files_properties(
-        ${plugin_root}/${src}
-        PROPERTIES COMPILE_FLAGS "${${plugin}_COMPILE_FLAGS}")
-    endforeach()
-    get_directory_property(${plugin}_TESTS
-      DIRECTORY ${plugin_root}
-      DEFINITION ${plugin}_TESTS)
-    foreach (test ${${plugin}_TESTS})
-      list(APPEND PLUGIN_TESTS ${plugin_root}/${test})
-      set_source_files_properties(
-        ${plugin_root}/${test}
-        PROPERTIES COMPILE_FLAGS "${${plugin}_COMPILE_FLAGS}")
-    endforeach()
-    
-    get_directory_property(${plugin}_INCLUDE_PATHS
-      DIRECTORY ${plugin_root}
-      DEFINITION ${plugin}_INCLUDE_PATHS)
-    foreach (path ${${plugin}_INCLUDE_PATHS})
-      include_directories(${path})
-    endforeach()
-    get_directory_property(${plugin}_LIBS
-      DIRECTORY ${plugin_root}
-      DEFINITION ${plugin}_LIBS)
-    foreach (lib ${${plugin}_LIBS})
-      list(APPEND THIRDPARTY_LIBS ${lib})
-    endforeach()
-    get_directory_property(${plugin}_LINK_PATHS
-      DIRECTORY ${plugin_root}
-      DEFINITION ${plugin}_LINK_PATHS)
-    foreach (link_path ${${plugin}_LINK_PATHS})
-      link_directories(AFTER ${link_path})
-    endforeach()
-    get_directory_property(${plugin}_FUNC
-      DIRECTORY ${plugin_root}
-      DEFINITION ${plugin}_FUNC)
-    string(STRIP "${${plugin}_FUNC}" ${plugin}_FUNC)
-    if (NOT "${plugin}_FUNC" STREQUAL "")
-      string(APPEND ROCKSDB_PLUGIN_BUILTINS "{\"${plugin}\", ${${plugin}_FUNC} },")
-      string(APPEND ROCKSDB_PLUGIN_EXTERNS "int ${${plugin}_FUNC} (ROCKSDB_NAMESPACE::ObjectLibrary&, const std::string&); ")
-    endif()
-    get_directory_property(${plugin}_CMAKE_SHARED_LINKER_FLAGS
-      DIRECTORY ${plugin_root}
-      DEFINITION ${plugin}_CMAKE_SHARED_LINKER_FLAGS)
-    get_directory_property(${plugin}_CMAKE_EXE_LINKER_FLAGS
-      DIRECTORY ${plugin_root}
-      DEFINITION ${plugin}_CMAKE_EXE_LINKER_FLAGS)
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${${plugin}_CMAKE_SHARED_LINKER_FLAGS}")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${${plugin}_CMAKE_EXE_LINKER_FLAGS}")
-  endforeach()
-endif()
-
 if(HAVE_SSE42 AND NOT MSVC)
   set_source_files_properties(
     util/crc32c.cc
@@ -993,12 +915,12 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(powerpc|ppc)64")
   list(APPEND SOURCES
     util/crc32c_ppc.c
     util/crc32c_ppc_asm.S)
-endif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(powerpc|ppc)64")
+endif()
 
 if(HAS_ARMV8_CRC)
   list(APPEND SOURCES
     util/crc32c_arm64.cc)
-endif(HAS_ARMV8_CRC)
+endif()
 
 if(WIN32)
   list(APPEND SOURCES
@@ -1008,16 +930,16 @@ if(WIN32)
     port/win/port_win.cc
     port/win/win_logger.cc
     port/win/win_thread.cc)
-if(WITH_XPRESS)
-  list(APPEND SOURCES
-    port/win/xpress_win.cc)
-endif()
 
-if(WITH_JEMALLOC)
-  list(APPEND SOURCES
-    port/win/win_jemalloc.cc)
-endif()
+  if(WITH_XPRESS)
+    list(APPEND SOURCES
+      port/win/xpress_win.cc)
+  endif()
 
+  if(WITH_JEMALLOC)
+    list(APPEND SOURCES
+      port/win/win_jemalloc.cc)
+  endif()
 else()
   list(APPEND SOURCES
     port/port_posix.cc
@@ -1032,18 +954,13 @@ if(USE_FOLLY)
     third-party/folly/folly/lang/SafeAssert.cpp
     third-party/folly/folly/lang/ToAscii.cpp
     third-party/folly/folly/ScopeGuard.cpp)
+
+  include_directories(third-party/folly)
+  add_definitions(-DUSE_FOLLY -DFOLLY_NO_CONFIG)
 endif()
 
-set(ROCKSDB_STATIC_LIB ${PROJECT_NAME}${ARTIFACT_SUFFIX})
-set(ROCKSDB_SHARED_LIB ${PROJECT_NAME}-shared${ARTIFACT_SUFFIX})
-
-option(ROCKSDB_BUILD_SHARED "Build shared versions of the libraries" ON)
-
-
-if(WIN32)
-  set(SYSTEM_LIBS ${SYSTEM_LIBS} shlwapi.lib rpcrt4.lib)
-else()
-  set(SYSTEM_LIBS ${CMAKE_THREAD_LIBS_INIT})
+if(DEFINED ROCKSDB_BUILD_SHARED)
+   set(BUILD_SHARED_LIBS "${ROCKSDB_BUILD_SHARED}")
 endif()
 
 string(TIMESTAMP TS "%Y-%m-%d %H:%M:%S" UTC)
@@ -1052,7 +969,7 @@ set(BUILD_DATE "${TS}" CACHE STRING "the time we first built Speedb")
 find_package(Git)
 
 if(GIT_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.git")
-  execute_process(WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" OUTPUT_VARIABLE GIT_SHA COMMAND "${GIT_EXECUTABLE}" rev-parse HEAD )
+  execute_process(WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" OUTPUT_VARIABLE GIT_SHA COMMAND "${GIT_EXECUTABLE}" rev-parse HEAD)
   execute_process(WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" RESULT_VARIABLE GIT_MOD COMMAND "${GIT_EXECUTABLE}" diff-index HEAD --quiet)
   execute_process(WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" OUTPUT_VARIABLE GIT_DATE COMMAND "${GIT_EXECUTABLE}" log -1 --date=iso --format="%ad")
   string(REGEX MATCH "[-0-9]+ [:0-9]+" GIT_DATE ${GIT_DATE})
@@ -1087,57 +1004,35 @@ endif()
 
 set(BUILD_VERSION_CC ${CMAKE_BINARY_DIR}/build_version.cc)
 configure_file(util/build_version.cc.in ${BUILD_VERSION_CC} @ONLY)
+list(APPEND SOURCES ${BUILD_VERSION_CC})
 
-add_library(${ROCKSDB_STATIC_LIB} STATIC ${SOURCES} ${BUILD_VERSION_CC})
-target_link_libraries(${ROCKSDB_STATIC_LIB} PRIVATE
-  ${THIRDPARTY_LIBS} ${SYSTEM_LIBS})
+add_subdirectory(plugin)
 
-if(ROCKSDB_BUILD_SHARED)
-  add_library(${ROCKSDB_SHARED_LIB} SHARED ${SOURCES} ${BUILD_VERSION_CC})
-  target_link_libraries(${ROCKSDB_SHARED_LIB} PRIVATE
-    ${THIRDPARTY_LIBS} ${SYSTEM_LIBS})
+add_library(${PROJECT_NAME} ${SOURCES} $<TARGET_OBJECTS:${PROJECT_NAME}_plugins>)
+target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
 
-  if(WIN32)
-    set_target_properties(${ROCKSDB_SHARED_LIB} PROPERTIES
-      COMPILE_DEFINITIONS "ROCKSDB_DLL;ROCKSDB_LIBRARY_EXPORTS")
-    if(MSVC)
-      set_target_properties(${ROCKSDB_STATIC_LIB} PROPERTIES
-        COMPILE_FLAGS "/Fd${CMAKE_CFG_INTDIR}/${ROCKSDB_STATIC_LIB}.pdb")
-      set_target_properties(${ROCKSDB_SHARED_LIB} PROPERTIES
-        COMPILE_FLAGS "/Fd${CMAKE_CFG_INTDIR}/${ROCKSDB_SHARED_LIB}.pdb")
-    endif()
-  else()
-    set_target_properties(${ROCKSDB_SHARED_LIB} PROPERTIES
-                          LINKER_LANGUAGE CXX
-                          VERSION ${PROJECT_VERSION}
-                          SOVERSION ${speedb_VERSION_MAJOR}
-                          OUTPUT_NAME "${PROJECT_NAME}${ARTIFACT_SUFFIX}")
+if(WIN32)
+  if(BUILD_SHARED_LIBS)
+    target_compile_definitions(${PROJECT_NAME} PUBLIC -DROCKSDB_DLL -DROCKSDB_LIBRARY_EXPORTS)
   endif()
-endif()
-
-if(ROCKSDB_BUILD_SHARED AND NOT WIN32)
-  set(ROCKSDB_LIB ${ROCKSDB_SHARED_LIB})
+  set(SYSTEM_LIBS ${SYSTEM_LIBS} shlwapi.lib rpcrt4.lib)
 else()
-  set(ROCKSDB_LIB ${ROCKSDB_STATIC_LIB})
+  set(SYSTEM_LIBS ${CMAKE_THREAD_LIBS_INIT})
 endif()
 
-option(WITH_JNI "build with JNI" OFF)
-# Tests are excluded from Release builds
-CMAKE_DEPENDENT_OPTION(WITH_TESTS "build with tests" ON
-  "CMAKE_BUILD_TYPE STREQUAL Debug" OFF)
-option(WITH_BENCHMARK_TOOLS "build with benchmarks" ON)
-option(WITH_CORE_TOOLS "build with ldb and sst_dump" ON)
-option(WITH_TOOLS "build with tools" ON)
-
-if(WITH_TESTS OR WITH_BENCHMARK_TOOLS OR WITH_TOOLS OR WITH_JNI OR JNI)
-  include_directories(SYSTEM ${PROJECT_SOURCE_DIR}/third-party/gtest-1.8.1/fused-src)
-endif()
-if(WITH_JNI OR JNI)
-  message(STATUS "JNI library is enabled")
-  add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/java)
+if(BUILD_SHARED_LIBS)
+  target_link_libraries(${PROJECT_NAME} PRIVATE ${THIRDPARTY_LIBS} ${SYSTEM_LIBS})
 else()
-  message(STATUS "JNI library is disabled")
+  target_link_libraries(${PROJECT_NAME} PUBLIC ${THIRDPARTY_LIBS} ${SYSTEM_LIBS})
 endif()
+
+set_target_properties(${PROJECT_NAME} PROPERTIES
+                      LINKER_LANGUAGE CXX
+                      VERSION ${PROJECT_VERSION}
+                      SOVERSION ${PROJECT_VERSION_MAJOR}
+                      OUTPUT_NAME ${PROJECT_NAME}${LIB_ARTIFACT_SUFFIX}
+                      COMPILE_PDB_OUTPUT_DIRECTORY ${CMAKE_CFG_INTDIR}
+                      COMPILE_PDB_NAME ${PROJECT_NAME}${LIB_ARTIFACT_SUFFIX}.pdb)
 
 # Installation and packaging
 if(WIN32)
@@ -1171,17 +1066,17 @@ if(NOT WIN32 OR ROCKSDB_INSTALL_ON_WINDOWS)
 
   install(DIRECTORY "${PROJECT_SOURCE_DIR}/cmake/modules" COMPONENT devel DESTINATION ${package_config_destination})
 
-  install(
-    TARGETS ${ROCKSDB_STATIC_LIB}
-    EXPORT SpeedbTargets
-    COMPONENT devel
-    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-    INCLUDES DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
-  )
-
-  if(ROCKSDB_BUILD_SHARED)
+  if(NOT BUILD_SHARED_LIBS)
     install(
-      TARGETS ${ROCKSDB_SHARED_LIB}
+      TARGETS ${PROJECT_NAME}
+      EXPORT SpeedbTargets
+      COMPONENT devel
+      ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+      INCLUDES DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+    )
+  else()
+    install(
+      TARGETS ${PROJECT_NAME}
       EXPORT SpeedbTargets
       COMPONENT runtime
       ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
@@ -1207,14 +1102,33 @@ if(NOT WIN32 OR ROCKSDB_INSTALL_ON_WINDOWS)
   )
 endif()
 
-option(WITH_ALL_TESTS "Build all test, rather than a small subset" ON)
+# Tests are excluded from Release builds
+cmake_dependent_option(WITH_TESTS "build with tests" ON
+  "CMAKE_BUILD_TYPE STREQUAL Debug" OFF)
+cmake_dependent_option(WITH_BENCHMARK_TOOLS "build with benchmarks" ON "WITH_GFLAGS" OFF)
+cmake_dependent_option(WITH_CORE_TOOLS "build with ldb and sst_dump" ON "WITH_GFLAGS" OFF)
+cmake_dependent_option(WITH_TOOLS "build with tools" ON "WITH_GFLAGS" OFF)
+
+if(WITH_TESTS)
+  enable_testing()
+  add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND})
+endif()
+
+option(WITH_JNI "build with JNI" OFF)
+if(WITH_JNI OR JNI)
+  message(STATUS "JNI library is enabled")
+  add_subdirectory(java)
+else()
+  message(STATUS "JNI library is disabled")
+endif()
 
 if(WITH_TESTS OR WITH_BENCHMARK_TOOLS)
+  include_directories(SYSTEM third-party/gtest-1.8.1/fused-src)
   add_subdirectory(third-party/gtest-1.8.1/fused-src/gtest)
   add_library(testharness STATIC
-  test_util/mock_time_env.cc
-  test_util/testharness.cc)
-  target_link_libraries(testharness gtest)
+    test_util/mock_time_env.cc
+    test_util/testharness.cc)
+  target_link_libraries(testharness PRIVATE gtest)
 endif()
 
 if(WITH_TESTS)
@@ -1233,9 +1147,11 @@ if(WITH_TESTS)
     timer_queue_test
   )
   set(TESTS
-        db/db_basic_test.cc
-        env/env_basic_test.cc
+    db/db_basic_test.cc
+    env/env_basic_test.cc
   )
+
+  cmake_dependent_option(WITH_ALL_TESTS "Build all test, rather than a small subset" ON "WITH_GFLAGS" OFF)
   if(WITH_ALL_TESTS)
     list(APPEND TESTS
         cache/cache_reservation_manager_test.cc
@@ -1443,16 +1359,16 @@ if(WITH_TESTS)
     COMMAND ${CMAKE_COMMAND} -P ${PROJECT_SOURCE_DIR}/cmake/CTestRunner.cmake
     WORKING_DIRECTORY ${PROJECT_BINARY_DIR}
     VERBATIM USES_TERMINAL)
-  set(TESTUTILLIB testutillib${ARTIFACT_SUFFIX})
+  set(TESTUTILLIB testutillib${LIB_ARTIFACT_SUFFIX})
   add_library(${TESTUTILLIB} STATIC ${TESTUTIL_SOURCE})
-  target_link_libraries(${TESTUTILLIB} ${ROCKSDB_LIB})
+  target_link_libraries(${TESTUTILLIB} ${PROJECT_NAME})
   if(MSVC)
-    set_target_properties(${TESTUTILLIB} PROPERTIES COMPILE_FLAGS "/Fd${CMAKE_CFG_INTDIR}/${TESTUTILLIB}.pdb")
+    target_compile_options(${TESTUTILLIB} PRIVATE "/Fd${CMAKE_CFG_INTDIR}/${TESTUTILLIB}.pdb")
   endif()
   set_target_properties(${TESTUTILLIB}
-        PROPERTIES EXCLUDE_FROM_DEFAULT_BUILD_RELEASE 1
-        EXCLUDE_FROM_DEFAULT_BUILD_MINRELEASE 1
-        EXCLUDE_FROM_DEFAULT_BUILD_RELWITHDEBINFO 1
+    PROPERTIES EXCLUDE_FROM_DEFAULT_BUILD_RELEASE 1
+    EXCLUDE_FROM_DEFAULT_BUILD_MINRELEASE 1
+    EXCLUDE_FROM_DEFAULT_BUILD_RELWITHDEBINFO 1
   )
 
   foreach(sourcefile ${TESTS})
@@ -1480,17 +1396,13 @@ if(WITH_TESTS)
     else()
       set(ROCKSDB_LIB_FOR_C OFF)
     endif()
-  else()
-    set(ROCKSDB_LIB_FOR_C ${ROCKSDB_LIB})
-  endif()
+  endforeach()
 
-  if(ROCKSDB_LIB_FOR_C)
-    set(C_TESTS db/c_test.c)
-    add_executable(c_test db/c_test.c)
-    target_link_libraries(c_test ${ROCKSDB_LIB_FOR_C} testharness)
-    add_test(NAME c_test COMMAND c_test${ARTIFACT_SUFFIX})
-    add_dependencies(check c_test)
-  endif()
+  set(C_TESTS db/c_test.c)
+  add_executable(c_test db/c_test.c)
+  target_link_libraries(c_test ${PROJECT_NAME} testharness)
+  add_test(NAME c_test COMMAND c_test${ARTIFACT_SUFFIX})
+  add_dependencies(check c_test)
 endif()
 
 if(WITH_BENCHMARK_TOOLS)
@@ -1499,38 +1411,38 @@ if(WITH_BENCHMARK_TOOLS)
     tools/db_bench.cc
     tools/db_bench_tool.cc)
   target_link_libraries(db_bench${ARTIFACT_SUFFIX}
-    ${ROCKSDB_LIB} ${THIRDPARTY_LIBS})
+    ${PROJECT_NAME} ${THIRDPARTY_LIBS} ${GFLAGS_LIB})
 
   add_executable(cache_bench${ARTIFACT_SUFFIX}
     cache/cache_bench.cc
     cache/cache_bench_tool.cc)
   target_link_libraries(cache_bench${ARTIFACT_SUFFIX}
-    ${ROCKSDB_LIB} ${GFLAGS_LIB})
+    ${PROJECT_NAME} ${GFLAGS_LIB})
 
   add_executable(memtablerep_bench${ARTIFACT_SUFFIX}
     memtable/memtablerep_bench.cc)
   target_link_libraries(memtablerep_bench${ARTIFACT_SUFFIX}
-    ${ROCKSDB_LIB} ${GFLAGS_LIB})
+    ${PROJECT_NAME} ${GFLAGS_LIB})
 
   add_executable(range_del_aggregator_bench${ARTIFACT_SUFFIX}
     db/range_del_aggregator_bench.cc)
   target_link_libraries(range_del_aggregator_bench${ARTIFACT_SUFFIX}
-    ${ROCKSDB_LIB} ${GFLAGS_LIB})
+    ${PROJECT_NAME} ${GFLAGS_LIB})
 
   add_executable(table_reader_bench${ARTIFACT_SUFFIX}
     table/table_reader_bench.cc)
   target_link_libraries(table_reader_bench${ARTIFACT_SUFFIX}
-    ${ROCKSDB_LIB} testharness ${GFLAGS_LIB})
+    ${PROJECT_NAME} testharness ${GFLAGS_LIB})
 
   add_executable(filter_bench${ARTIFACT_SUFFIX}
     util/filter_bench.cc)
   target_link_libraries(filter_bench${ARTIFACT_SUFFIX}
-    ${ROCKSDB_LIB} ${GFLAGS_LIB})
+    ${PROJECT_NAME} ${GFLAGS_LIB})
 
   add_executable(hash_table_bench${ARTIFACT_SUFFIX}
     utilities/persistent_cache/hash_table_bench.cc)
   target_link_libraries(hash_table_bench${ARTIFACT_SUFFIX}
-    ${ROCKSDB_LIB} ${GFLAGS_LIB})
+    ${PROJECT_NAME} ${GFLAGS_LIB})
 endif()
 
 if(WITH_CORE_TOOLS OR WITH_TOOLS)
@@ -1552,5 +1464,5 @@ endif()
 
 option(WITH_BENCHMARK "build benchmark tests" OFF)
 if(WITH_BENCHMARK)
-  add_subdirectory(${PROJECT_SOURCE_DIR}/microbench/)
+  add_subdirectory(microbench)
 endif()

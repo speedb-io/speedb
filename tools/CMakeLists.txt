@@ -5,7 +5,7 @@ foreach(src ${CORE_TOOLS})
   get_filename_component(exename ${src} NAME_WE)
   add_executable(${exename}${ARTIFACT_SUFFIX}
     ${src})
-  target_link_libraries(${exename}${ARTIFACT_SUFFIX} ${ROCKSDB_LIB})
+  target_link_libraries(${exename}${ARTIFACT_SUFFIX} ${GFLAGS_LIB} ${ROCKSDB_LIB})
   list(APPEND core_tool_deps ${exename})
 endforeach()
 
@@ -21,7 +21,7 @@ if(WITH_TOOLS)
     string(REPLACE rocksdb speedb exename ${exename})
     add_executable(${exename}${ARTIFACT_SUFFIX}
       ${src})
-    target_link_libraries(${exename}${ARTIFACT_SUFFIX} ${ROCKSDB_LIB} ${THIRDPARTY_LIBS})
+    target_link_libraries(${exename}${ARTIFACT_SUFFIX} ${ROCKSDB_LIB} ${THIRDPARTY_LIBS} ${GFLAGS_LIB})
     list(APPEND tool_deps ${exename})
   endforeach()
 

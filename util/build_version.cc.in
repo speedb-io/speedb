@@ -4,7 +4,6 @@
 
 #include "rocksdb/version.h"
 #include "speedb/version.h"
-#include "rocksdb/utilities/object_registry.h"
 #include "util/string_util.h"
 
 // The build script may replace these values with real values based
@@ -24,16 +23,6 @@ static const std::string speedb_build_date = "speedb_build_date:@BUILD_DATE@";
 
 #define SPDB_BUILD_TAG "@SPDB_BUILD_TAG@"
 static const std::string speedb_build_tag = "speedb_build_tag:" SPDB_BUILD_TAG;
-
-#ifndef ROCKSDB_LITE
-extern "C" {
-@ROCKSDB_PLUGIN_EXTERNS@
-} // extern "C"
-
-std::unordered_map<std::string, ROCKSDB_NAMESPACE::RegistrarFunc> ROCKSDB_NAMESPACE::ObjectRegistry::builtins_ = {
-  @ROCKSDB_PLUGIN_BUILTINS@                                                                        
-};
-#endif //ROCKSDB_LITE
 
 namespace ROCKSDB_NAMESPACE {
 static void AddProperty(std::unordered_map<std::string, std::string> *props, const std::string& name) {

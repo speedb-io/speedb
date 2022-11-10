@@ -598,7 +598,7 @@ ANALYZE_OBJECTS = $(patsubst %.cc, $(OBJ_DIR)/%.o, $(ANALYZER_LIB_SOURCES))
 STRESS_OBJECTS =  $(patsubst %.cc, $(OBJ_DIR)/%.o, $(STRESS_LIB_SOURCES))
 
 # Exclude build_version.cc -- a generated source file -- from all sources.  Not needed for dependencies
-ALL_SOURCES  = $(filter-out util/build_version.cc, $(LIB_SOURCES)) $(TEST_LIB_SOURCES) $(MOCK_LIB_SOURCES) $(GTEST_DIR)/gtest/gtest-all.cc
+ALL_SOURCES  = $(filter-out util/build_version.cc plugin/plugin_registry.cc, $(LIB_SOURCES)) $(TEST_LIB_SOURCES) $(MOCK_LIB_SOURCES) $(GTEST_DIR)/gtest/gtest-all.cc
 ALL_SOURCES += $(TOOL_LIB_SOURCES) $(BENCH_LIB_SOURCES) $(CACHE_BENCH_LIB_SOURCES) $(ANALYZER_LIB_SOURCES) $(STRESS_LIB_SOURCES)
 ALL_SOURCES += $(TEST_MAIN_SOURCES) $(TOOL_MAIN_SOURCES) $(BENCH_MAIN_SOURCES)
 ALL_SOURCES += $(ROCKSDB_PLUGIN_SOURCES) $(ROCKSDB_PLUGIN_TESTS)
@@ -779,7 +779,7 @@ ifneq (${SPDB_RELEASE_BUILD},1)
 		SPDB_BUILD_TAG := ?
 	endif
 endif
-gen_build_version = sed -e s/@GIT_SHA@/$(git_sha)/ -e s:@GIT_TAG@:"$(git_tag)": -e s/@GIT_MOD@/"$(git_mod)"/ -e s/@BUILD_DATE@/"$(build_date)"/ -e s/@GIT_DATE@/"$(git_date)"/ -e 's!@SPDB_BUILD_TAG@!$(SPDB_BUILD_TAG:!=\!)!' -e s/@ROCKSDB_PLUGIN_BUILTINS@/'$(ROCKSDB_PLUGIN_BUILTINS)'/ -e s/@ROCKSDB_PLUGIN_EXTERNS@/"$(ROCKSDB_PLUGIN_EXTERNS)"/ util/build_version.cc.in
+gen_build_version = sed -e s/@GIT_SHA@/$(git_sha)/ -e s:@GIT_TAG@:"$(git_tag)": -e s/@GIT_MOD@/"$(git_mod)"/ -e s/@BUILD_DATE@/"$(build_date)"/ -e s/@GIT_DATE@/"$(git_date)"/ -e 's!@SPDB_BUILD_TAG@!$(SPDB_BUILD_TAG:!=\!)!' util/build_version.cc.in
 
 # Record the version of the source that we are compiling.
 # We keep a record of the git revision in this file.  It is then built
@@ -791,6 +791,12 @@ util/build_version.cc: $(filter-out $(OBJ_DIR)/util/build_version.o, $(LIB_OBJEC
 	$(AM_V_at)$(gen_build_version) > $@
 endif
 CLEAN_FILES += util/build_version.cc
+
+gen_plugin_registry = sed -e s/@ROCKSDB_PLUGIN_BUILTINS@/'$(ROCKSDB_PLUGIN_BUILTINS)'/ -e s/@ROCKSDB_PLUGIN_EXTERNS@/"$(ROCKSDB_PLUGIN_EXTERNS)"/ plugin/plugin_registry.cc.in
+plugin/plugin_registry.cc: $(filter-out $(OBJ_DIR)/plugin/plugin_registry.o, $(LIB_OBJECTS)) plugin/plugin_registry.cc.in
+	$(AM_V_GEN)rm -f $@-t
+	$(AM_V_at)$(gen_plugin_registry) > $@
+CLEAN_FILES += plugin/plugin_registry.cc
 
 default: all
 
@@ -1165,9 +1171,10 @@ analyze_incremental:
 		$(MAKE) SKIP_LINK=1 dbg
 
 CLEAN_FILES += unity.cc
-unity.cc: Makefile util/build_version.cc.in
+unity.cc: Makefile util/build_version.cc.in plugin/plugin_registry.cc.in
 	rm -f $@ $@-t
 	$(AM_V_at)$(gen_build_version) > util/build_version.cc
+	$(AM_V_at)$(gen_plugin_registry) > plugin/plugin_registry.cc
 	for source_file in $(LIB_SOURCES); do \
 		echo "#include \"$$source_file\"" >> $@-t; \
 	done
@@ -2316,7 +2323,7 @@ rocksdbjavastaticpublishcentral: rocksdbjavageneratepom
 	$(foreach classifier, $(LIB_JAVA_RELEASE_CLASSIFIERS), mvn gpg:sign-and-deploy-file -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2/ -DrepositoryId=sonatype-nexus-staging -DpomFile=java/pom.xml -Dfile=java/target/$(PROJECT_NAME)jni-$(LIB_JAVA_VERSION)-$(classifier).jar -Dclassifier=$(classifier);)
 
 rocksdbjavageneratepom:
-	cd java;cat pom.xml.template | sed 's/\$${LIB_JAVA_VERSION}/$(LIB_JAVA_VERSION)/' > pom.xml
+	cd java;cat pom.xml.template | sed 's/@PROJECT_VERSION@/$(ROCKSDB_JAVA_VERSION)/' > pom.xml
 
 rocksdbjavastaticnexusbundlejar: rocksdbjavageneratepom
 	openssl sha1 -r java/pom.xml | awk '{  print $$1 }' > java/target/pom.xml.sha1

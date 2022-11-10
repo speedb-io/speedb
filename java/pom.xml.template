@@ -4,7 +4,7 @@
 
     <groupId>org.rocksdb</groupId>
     <artifactId>speedbjni</artifactId>
-    <version>${LIB_JAVA_VERSION}</version>  <!-- this will be replaced by the Makefile's rocksdbjavageneratepom target -->
+    <version>@PROJECT_VERSION@</version>  <!-- this will be replaced by the Makefile's rocksdbjavageneratepom target -->
 
     <name>Speedb JNI</name>
     <description>Speedb fat jar that contains .so files for linux32 and linux64 (glibc and musl-libc), jnilib files
@@ -113,7 +113,7 @@
                                 <name>Xenu</name>
                             </defaults>
                             <source>
-                                String version = "${LIB_JAVA_VERSION}"
+                                String version = "@PROJECT_VERSION@"
                                 // Set version to be used in pom.properties
                                 project.version = version
                                 // Set version to be set as jar name

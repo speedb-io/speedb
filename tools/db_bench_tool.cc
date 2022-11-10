@@ -3207,8 +3207,8 @@ class Benchmark {
     if (db_.db != nullptr) {
       db_.DeleteDBs();
     }
-    for (const DBWithColumnFamilies& dbwcf : multi_dbs_) {
-      delete dbwcf.db;
+    for (DBWithColumnFamilies& dbwcf : multi_dbs_) {
+      dbwcf.DeleteDBs();
     }
   }
 

@@ -23,7 +23,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   return ret;
 }
 
-std::string Timestamp(uint64_t ts) {
+std::string TimestampFn(uint64_t ts) {
 PERF_MARKER(__PRETTY_FUNCTION__);
   std::string ret;
   PutFixed64(&ret, ts);
@@ -39,7 +39,7 @@ class TimestampCompatibleCompactionTest : public DBTestBase {
   std::string Get(const std::string& key, uint64_t ts) {
 PERF_MARKER(__PRETTY_FUNCTION__);
     ReadOptions read_opts;
-    std::string ts_str = Timestamp(ts);
+    std::string ts_str = TimestampFn(ts);
     Slice ts_slice = ts_str;
     read_opts.timestamp = &ts_slice;
     std::string value;
@@ -81,7 +81,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t key = 0;
   WriteOptions write_opts;
   for (; key < kNumKeysPerFile - 1; ++key, ++ts) {
-    std::string ts_str = Timestamp(ts);
+    std::string ts_str = TimestampFn(ts);
     ASSERT_OK(
         db_->Put(write_opts, Key1(key), ts_str, "foo_" + std::to_string(key)));
   }
@@ -90,7 +90,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t saved_read_ts1 = ts++;
   key = 99;
   for (int i = 0; i < 4; ++i, ++ts) {
-    std::string ts_str = Timestamp(ts);
+    std::string ts_str = TimestampFn(ts);
     ASSERT_OK(
         db_->Put(write_opts, Key1(key), ts_str, "bar_" + std::to_string(key)));
   }
@@ -98,7 +98,7 @@ PERF_MARKER(__PRETTY_FUNCTION__);
   uint64_t saved_read_ts2 = ts++;
   // Write another L0 with keys 99, 100, 101, ..., 150
   for (; key <= 150; ++key, ++ts) {
-    std::string ts_str = Timestamp(ts);
+    std::string ts_str = TimestampFn(ts);
     ASSERT_OK(
         db_->Put(write_opts, Key1(key), ts_str, "foo1_" + std::to_string(key)));
   }

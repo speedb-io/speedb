@@ -69,6 +69,15 @@ const std::unordered_map<std::string, std::string>& GetRocksBuildProperties() {
 std::string GetRocksVersionAsString(bool with_patch) {
   std::string version = ToString(ROCKSDB_MAJOR) + "." + ToString(ROCKSDB_MINOR);
   if (with_patch) {
+    return version + "." + ToString(ROCKSDB_PATCH);
+  } else {
+    return version;
+  }
+}
+
+std::string GetSpeedbVersionAsString(bool with_patch) {
+  std::string version = ToString(SPEEDB_MAJOR) + "." + ToString(SPEEDB_MINOR);
+  if (with_patch) {
     version += "." + ToString(SPEEDB_PATCH);
     // Only add a build tag if it was specified (e.g. not a release build)
     if (SPDB_BUILD_TAG[0] != '\0') {
@@ -81,15 +90,6 @@ std::string GetRocksVersionAsString(bool with_patch) {
     }
   }
   return version;
-}
-
-std::string GetSpeedbVersionAsString(bool with_patch) {
-  std::string version = ToString(SPEEDB_MAJOR) + "." + ToString(SPEEDB_MINOR);
-  if (with_patch) {
-    return version + "." + ToString(SPEEDB_PATCH);
-  } else {
-    return version;
-  }
 }
 
 std::string GetRocksBuildInfoAsString(const std::string& program, bool verbose) {

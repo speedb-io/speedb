@@ -5763,6 +5763,7 @@ TEST_F(DBTest2, BackgroundPurgeTest) {
   test::SleepingBackgroundTask sleeping_task_after;
   db_->GetEnv()->Schedule(&test::SleepingBackgroundTask::DoSleepTask,
                           &sleeping_task_after, Env::Priority::LOW);
+  sleeping_task_after.WaitUntilSleeping();
   delete iter;
 
   Env::Default()->SleepForMicroseconds(100000);

@@ -93,7 +93,7 @@ Here is a graph comparing Speedb's paired bloom filter with the default bloom fi
 
 <img width="769" alt="Screen Shot 2022-10-31 at 15 15 42" src="https://user-images.githubusercontent.com/107058910/199016617-4ecbe279-b281-4a8c-b630-87a509bc09da.png">
 
-For additional info see: [Paired Bloom Filter](https://app.gitbook.com/o/o2rbZPVFSai2q6o8Il3m/s/9jcjg12ODKbmmsnY7Cma/speedb-features/paired-bloom-filter).
+For additional info see: [Paired Bloom Filter](https://docs.speedb.dev/documentation/speedb-features/paired-bloom-filter).
 
 ## Documentation
 

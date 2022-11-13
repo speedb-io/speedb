@@ -285,7 +285,8 @@ class DBImpl : public DB {
   virtual void ReleaseSnapshot(const Snapshot* snapshot) override {
     ReleaseSnapshotImpl(snapshot, true);
   }
-  void ReleaseSnapshotImpl(const Snapshot* snapshot, bool lock);
+  void ReleaseSnapshotImpl(const Snapshot* snapshot, bool lock,
+                           bool keep_snapshot = false);
 
   using DB::GetProperty;
   virtual bool GetProperty(ColumnFamilyHandle* column_family,
@@ -1280,94 +1281,6 @@ class DBImpl : public DB {
   void NotifyOnMemTableSealed(ColumnFamilyData* cfd,
                               const MemTableInfo& mem_table_info);
 
-  // This is essentially an atomic shared pointer, which is currently only
-  // implemented for the needs of snapshots, but can be extended to support
-  // the standard library's shared_ptr<T> if we implement access to the ref
-  // block counter and can manipulate it directly
-  class SnapshotHolder {
-    static_assert((alignof(SnapshotImpl) & (alignof(SnapshotImpl) - 1)) == 0,
-                  "Alignment of SnapshotImpl must be a power of 2");
-    static_assert(sizeof(uintptr_t) <= sizeof(uint64_t),
-                  "Pointer size must be smaller or equal to that of uint64_t");
-
-    // ARMv8 cores have 55 bits in use when pointer authentication is used,
-    // leaving 9 bits free, but latest Intel CPUs have 5-level paging which
-    // results in 56 bits being used, leaving only 8 bits free.
-    static constexpr size_t FREE_UPPER_BITS =
-        (std::numeric_limits<uintptr_t>::digits == 64 ? 8 : 0) +
-        (CeiledLog2<std::numeric_limits<uint64_t>::max()>::value -
-         CeiledLog2<std::numeric_limits<uintptr_t>::max()>::value);
-    static constexpr size_t FREE_LOWER_BITS =
-        CeiledLog2<alignof(SnapshotImpl)>::value - 1;
-
-    // We need at least 9 free bits to have a menaingful improvement over simple
-    // mutual exclusion, otherwise we'll have too much cache-line bouncing due
-    // to failed CASs when moving references stored on the pointer to the type's
-    // reference counter (we'll also overflow the counter too quickly into the
-    // pointer value, depending on the amount of concurrent readers and cores
-    // used on the specific machine)
-    static constexpr size_t LAST_SNAPSHOT_CTR_BITS_MIN = 9;
-    static constexpr size_t LAST_SNAPSHOT_CTR_BITS =
-        FREE_UPPER_BITS + FREE_LOWER_BITS;
-
-    static_assert(LAST_SNAPSHOT_CTR_BITS >= LAST_SNAPSHOT_CTR_BITS_MIN,
-                  "Not enough free bits to store the reference counter");
-
-    // The mask for obtaining the references stored in the pointer's free bits
-    static constexpr size_t LAST_SNAPSHOT_CTR_MASK =
-        ((1ul << LAST_SNAPSHOT_CTR_BITS) - 1);
-    // How many references we keep on the pointer before we move them to the
-    // reference counter of the enclosed type
-    static constexpr uint32_t BATCH_SIZE =
-        LAST_SNAPSHOT_CTR_BITS <= 32 ? (LAST_SNAPSHOT_CTR_MASK + 1) >> 1
-                                     : 0x80000000;
-
-    // The mask and shift amount needed to obtain the actual pointer value from
-    // the compound pointer+counter
-    static constexpr uint64_t LAST_SNAPSHOT_PTR_SHIFT = FREE_UPPER_BITS;
-    static constexpr uint64_t LAST_SNAPSHOT_PTR_MASK =
-        std::numeric_limits<uint64_t>::max() ^ ((1ul << FREE_LOWER_BITS) - 1);
-
-    // Initial reference count set in the enclosed type's reference counter to
-    // prevent it from being freed from under us when there are still active
-    // references stored on the pointer
-    static constexpr uint32_t INIT_REF = 0xffffffff;
-
-   public:
-    SnapshotHolder(const DBImpl* db) : db_(db) {}
-
-    ~SnapshotHolder() { reset(); }
-
-    // REQUIRES: DB mutex held
-    void reset(SnapshotImpl* s = nullptr);
-
-    SnapshotImpl* ref();
-
-    // REQUIRES: DB mutex held
-    inline SnapshotImpl* get() {
-      return from_intptr(snapshot_.load(std::memory_order_acquire));
-    }
-
-   private:
-    static inline SnapshotImpl* from_intptr(int64_t n) {
-      return reinterpret_cast<SnapshotImpl*>((n >> LAST_SNAPSHOT_PTR_SHIFT) &
-                                             LAST_SNAPSHOT_PTR_MASK);
-    }
-
-    static inline int64_t to_intptr(const SnapshotImpl* s, uint16_t n = 0) {
-      return static_cast<int64_t>(
-          ((reinterpret_cast<uint64_t>(s) & LAST_SNAPSHOT_PTR_MASK)
-           << LAST_SNAPSHOT_PTR_SHIFT) |
-          n);
-    }
-
-    std::atomic<int64_t> snapshot_{0};
-    const DBImpl* db_;
-  };
-
-  // support parallel snapshots
-  SnapshotHolder last_snapshot_;
-
 #ifndef ROCKSDB_LITE
   void NotifyOnExternalFileIngested(
       ColumnFamilyData* cfd, const ExternalSstFileIngestionJob& ingestion_job);
@@ -2151,6 +2064,15 @@ class DBImpl : public DB {
 
   Status IncreaseFullHistoryTsLowImpl(ColumnFamilyData* cfd,
                                       std::string ts_low);
+
+  // Recalculates the bottom-most file mark threshold after releasing a snapshot
+  // that should cause a threshold bump.
+  // REQUIRES: DB mutex held
+  void RecalculateSnapshotMarkThreshold();
+
+  // A flag indicating that the sequence number has been incremented and that
+  // the cached snapshot is now stale and should be released.
+  std::atomic<bool> release_cached_snapshot_requested_{false};
 
   // Lock over the persistent DB state.  Non-nullptr iff successfully acquired.
   FileLock* db_lock_;

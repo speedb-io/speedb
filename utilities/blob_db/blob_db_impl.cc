@@ -1825,7 +1825,7 @@ bool BlobDBImpl::VisibleToActiveSnapshot(
     InstrumentedMutexLock l(db_impl_->mutex());
     auto& snapshots = db_impl_->snapshots();
     if (!snapshots.empty()) {
-      oldest_snapshot = snapshots.oldest()->GetSequenceNumber();
+      oldest_snapshot = snapshots.oldest()->number;
     }
   }
   bool visible = oldest_snapshot < obsolete_sequence;

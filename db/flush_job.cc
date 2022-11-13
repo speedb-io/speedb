@@ -642,7 +642,6 @@ bool FlushJob::MemPurgeDecider() {
   // when iterating over the sampled entries.
   Slice key_slice, value_slice;
   ParsedInternalKey res;
-  SnapshotImpl min_snapshot;
   std::string vget;
   Status mget_s, parse_s;
   MergeContext merge_context;
@@ -712,7 +711,7 @@ bool FlushJob::MemPurgeDecider() {
           min_seqno_snapshot = seq_num;
         }
       }
-      min_snapshot.number_ = min_seqno_snapshot;
+      SnapshotImpl min_snapshot(min_seqno_snapshot);
       ro.snapshot =
           min_seqno_snapshot < kMaxSequenceNumber ? &min_snapshot : nullptr;
 

@@ -1771,8 +1771,7 @@ class MemTableInserter : public WriteBatch::Handler {
       ret_status = mem->UpdateCallback(sequence_, key, value, kv_prot_info);
       if (ret_status.IsNotFound()) {
         // key not found in memtable. Do sst get, update, add
-        SnapshotImpl read_from_snapshot;
-        read_from_snapshot.number_ = sequence_;
+        SnapshotImpl read_from_snapshot(sequence_);
         ReadOptions ropts;
         // it's going to be overwritten for sure, so no point caching data block
         // containing the old version
@@ -2159,8 +2158,7 @@ class MemTableInserter : public WriteBatch::Handler {
 
       // Pass in the sequence number so that we also include previous merge
       // operations in the same batch.
-      SnapshotImpl read_from_snapshot;
-      read_from_snapshot.number_ = sequence_;
+      SnapshotImpl read_from_snapshot(sequence_);
       ReadOptions read_options;
       read_options.snapshot = &read_from_snapshot;
 

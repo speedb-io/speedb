@@ -174,7 +174,6 @@ DBImpl::DBImpl(const DBOptions& options, const std::string& dbname,
       batch_per_txn_(batch_per_txn),
       next_job_id_(1),
       shutting_down_(false),
-      last_snapshot_(this),
       db_lock_(nullptr),
       manual_compaction_paused_(false),
       bg_cv_(&mutex_),
@@ -259,10 +258,32 @@ DBImpl::DBImpl(const DBOptions& options, const std::string& dbname,
   SetDbSessionId();
   assert(!db_session_id_.empty());
 
-  versions_.reset(new VersionSet(dbname_, &immutable_db_options_, file_options_,
-                                 table_cache_.get(), write_buffer_manager_,
-                                 &write_controller_, &block_cache_tracer_,
-                                 io_tracer_, db_session_id_));
+  auto seq_num_callback = [this](VersionSet::SequenceNumberType type,
+                                 SequenceNumber new_seq) {
+    switch (type) {
+      case VersionSet::SequenceNumberType::kAllocatedSequence:
+        break;
+      case VersionSet::SequenceNumberType::kLastSequence:
+        if (last_seq_same_as_publish_seq_) {
+          release_cached_snapshot_requested_.store(true,
+                                                   std::memory_order_release);
+        }
+        break;
+      case VersionSet::SequenceNumberType::kPublishedSequence:
+        if (!last_seq_same_as_publish_seq_) {
+          release_cached_snapshot_requested_.store(true,
+                                                   std::memory_order_release);
+        }
+        break;
+      default:
+        assert(false);
+        break;
+    }
+  };
+  versions_.reset(new VersionSet(
+      dbname_, &immutable_db_options_, file_options_, table_cache_.get(),
+      write_buffer_manager_, &write_controller_, &block_cache_tracer_,
+      io_tracer_, db_session_id_, std::move(seq_num_callback)));
   column_family_memtables_.reset(
       new ColumnFamilyMemTablesImpl(versions_->GetColumnFamilySet()));
 
@@ -561,7 +582,7 @@ Status DBImpl::CloseHelper() {
   EraseThreadStatusDbInfo();
   flush_scheduler_.Clear();
   trim_history_scheduler_.Clear();
-  last_snapshot_.reset();
+  snapshots_.ResetCached();
 
   // For now, simply trigger a manual flush at close time
   // on all the column families.
@@ -1788,8 +1809,7 @@ Status DBImpl::GetImpl(const ReadOptions& read_options, const Slice& key,
       // Already calculated based on read_options.snapshot
       snapshot = get_impl_options.callback->max_visible_seq();
     } else {
-      snapshot =
-          reinterpret_cast<const SnapshotImpl*>(read_options.snapshot)->number_;
+      snapshot = read_options.snapshot->GetSequenceNumber();
     }
   } else {
     // Note that the snapshot is assigned AFTER referencing the super
@@ -2178,8 +2198,7 @@ bool DBImpl::MultiCFSnapshot(
       // In WriteUnprepared, we cannot set snapshot in the lookup key because we
       // may skip uncommitted data that should be visible to the transaction for
       // reading own writes.
-      *snapshot =
-          static_cast<const SnapshotImpl*>(read_options.snapshot)->number_;
+      *snapshot = read_options.snapshot->GetSequenceNumber();
       if (callback) {
         *snapshot = std::max(*snapshot, callback->max_visible_seq());
       }
@@ -2235,9 +2254,7 @@ bool DBImpl::MultiCFSnapshot(
           *snapshot = versions_->LastPublishedSequence();
         }
       } else {
-        *snapshot =
-            static_cast_with_check<const SnapshotImpl>(read_options.snapshot)
-                ->number_;
+        *snapshot = read_options.snapshot->GetSequenceNumber();
       }
       for (auto cf_iter = cf_list->begin(); cf_iter != cf_list->end();
            ++cf_iter) {
@@ -3150,56 +3167,6 @@ Status DBImpl::NewIterators(
   return Status::OK();
 }
 
-// REQUIRES: DB mutex held
-void DBImpl::SnapshotHolder::reset(SnapshotImpl* s) {
-  if (s != nullptr) {
-    s->ref(INIT_REF);
-  }
-  const int64_t olds =
-      snapshot_.exchange(to_intptr(s), std::memory_order_release);
-  const SnapshotImpl* old = from_intptr(olds);
-  if (old != nullptr) {
-    // Truncating here is OK, as we can never have that many active readers
-    // anyway (can only happen on 32-bit systems, where we use all of the upper
-    // 32-bits, and with types that have an alignment bigger than 1, but we
-    // limit BATCH_SIZE to 31-bits so it never exceeds INIT_REF).
-    const uint32_t active = uint32_t(olds & LAST_SNAPSHOT_CTR_MASK);
-    old->unref(INIT_REF - active);
-    const_cast<DBImpl*>(db_)->ReleaseSnapshotImpl(old, false);
-  }
-}
-
-SnapshotImpl* DBImpl::SnapshotHolder::ref() {
-  const int64_t cur_s = snapshot_.fetch_add(1, std::memory_order_acquire);
-  SnapshotImpl* snapshot = from_intptr(cur_s);
-
-  if (snapshot != nullptr) {
-    // Move references to the internal snapshot counter every BATCH_SIZE
-    if ((cur_s & LAST_SNAPSHOT_CTR_MASK) > BATCH_SIZE) {
-      snapshot->ref(BATCH_SIZE);
-      int64_t new_c = snapshot_.load(std::memory_order_acquire);
-      for (;;) {
-        const size_t active = new_c & LAST_SNAPSHOT_CTR_MASK;
-        const SnapshotImpl* nsnap = from_intptr(new_c);
-
-        if (nsnap != snapshot || active <= BATCH_SIZE) {
-          snapshot->unref(BATCH_SIZE);
-          break;
-        }
-
-        const int64_t updated = to_intptr(snapshot, active - BATCH_SIZE);
-
-        if (snapshot_.compare_exchange_weak(new_c, updated,
-                                            std::memory_order_release)) {
-          break;
-        }
-      }
-    }
-  }
-
-  return snapshot;
-}
-
 const Snapshot* DBImpl::GetSnapshot() { return GetSnapshotImpl(false); }
 
 #ifndef ROCKSDB_LITE
@@ -3210,70 +3177,44 @@ const Snapshot* DBImpl::GetSnapshotForWriteConflictBoundary() {
 
 SnapshotImpl* DBImpl::GetSnapshotImpl(bool is_write_conflict_boundary,
                                       bool lock) {
-  const auto is_valid_cached_snapshot = [this, is_write_conflict_boundary](
-                                            const SnapshotImpl* snapshot,
-                                            uint64_t seq = 0) {
-    if (!is_write_conflict_boundary || snapshot->is_write_conflict_boundary()) {
-      if (seq == 0) {
-        seq = last_seq_same_as_publish_seq_
-                  ? versions_->LastSequence()
-                  : versions_->LastPublishedSequence();
-      }
-
-      if (seq == snapshot->number_) {
-        return true;
-      }
-    }
-
-    return false;
-  };
-
-  SnapshotImpl* snapshot = last_snapshot_.ref();
-
-  if (snapshot != nullptr && !is_valid_cached_snapshot(snapshot)) {
-    ReleaseSnapshotImpl(snapshot, lock);
-    snapshot = nullptr;
-  }
-
   // returns null if the underlying memtable does not support snapshot.
   if (!is_snapshot_supported_.load(std::memory_order_acquire)) {
-    if (snapshot != nullptr) {
-      ReleaseSnapshotImpl(snapshot, lock);
-    }
     return nullptr;
   }
 
-  if (snapshot != nullptr) {
-    return snapshot;
+  SnapshotImpl* snapshot = new SnapshotImpl(is_write_conflict_boundary);
+  if (lock) {
+    // Try to get a snapshot without taking a lock
+    if (snapshots_.RefCached(snapshot,
+                             last_seq_same_as_publish_seq_
+                                 ? versions_->LastSequence()
+                                 : versions_->LastPublishedSequence())) {
+      return snapshot;
+    }
+
+    // We failed to get a good snapshot (either because we didn't have a cached
+    // snapshot, or because the cached snapshot didn't match the sequence number
+    // or the write boundary requirement), but we might be holding a reference to
+    // a cached snapshot record, so let's release it (while keeping our instace of
+    // SnapshotImpl alive).
+    ReleaseSnapshotImpl(snapshot, lock, true);
+
+    mutex_.Lock();
   }
 
   int64_t unix_time = 0;
   immutable_db_options_.clock->GetCurrentTime(&unix_time)
       .PermitUncheckedError();  // Ignore error
 
-  std::unique_ptr<SnapshotImpl> s(
-      new SnapshotImpl(unix_time, is_write_conflict_boundary));
-
-  if (lock) {
-    mutex_.Lock();
-  }
-
   if (is_snapshot_supported_.load(std::memory_order_acquire)) {
-    snapshot = last_snapshot_.get();
-
     const auto snapshot_seq = last_seq_same_as_publish_seq_
                                   ? versions_->LastSequence()
                                   : versions_->LastPublishedSequence();
-
-    // Retry getting a snapshot here, in case someone updated last_snapshot_ in
-    // the mean time
-    if (snapshot == nullptr ||
-        !is_valid_cached_snapshot(snapshot, snapshot_seq)) {
-      snapshot = snapshots_.New(s.release(), snapshot_seq);
-      last_snapshot_.reset(snapshot);
+    if (snapshots_.New(snapshot, snapshot_seq, unix_time)) {
+      // Need to recalculate the snapshot mark threashold if we released the
+      // oldest snapshot
+      RecalculateSnapshotMarkThreshold();
     }
-
-    snapshot->ref();
   }
 
   if (lock) {
@@ -3295,12 +3236,8 @@ bool CfdListContains(const CfdList& list, ColumnFamilyData* cfd) {
 }
 }  //  namespace
 
-void DBImpl::ReleaseSnapshotImpl(const Snapshot* s, bool lock) {
-  const SnapshotImpl* casted_s = static_cast<const SnapshotImpl*>(s);
-  if (casted_s->unref() != 0) {
-    return;
-  }
-
+void DBImpl::ReleaseSnapshotImpl(const Snapshot* s, bool lock,
+                                 bool keep_snapshot) {
   if (s == nullptr) {
     // DBImpl::GetSnapshot() can return nullptr when snapshot
     // not supported by specifying the condition:
@@ -3308,11 +3245,33 @@ void DBImpl::ReleaseSnapshotImpl(const Snapshot* s, bool lock) {
     return;
   }
 
+  std::unique_ptr<const SnapshotImpl> release_guard;
+
+  const SnapshotImpl* casted_s = static_cast<const SnapshotImpl*>(s);
+  if (!keep_snapshot) {
+    release_guard.reset(casted_s);
+  }
+
+  if (!snapshots_.Unref(casted_s)) {
+    return;
+  }
+
   if (lock) {
     mutex_.Lock();
   }
 
-  snapshots_.Delete(casted_s);
+  if (snapshots_.Delete(casted_s)) {
+    RecalculateSnapshotMarkThreshold();
+  }
+
+  if (lock) {
+    mutex_.Unlock();
+  }
+}
+
+void DBImpl::RecalculateSnapshotMarkThreshold() {
+  mutex_.AssertHeld();
+
   uint64_t oldest_snapshot;
   if (snapshots_.empty()) {
     if (last_seq_same_as_publish_seq_) {
@@ -3321,7 +3280,7 @@ void DBImpl::ReleaseSnapshotImpl(const Snapshot* s, bool lock) {
       oldest_snapshot = versions_->LastPublishedSequence();
     }
   } else {
-    oldest_snapshot = snapshots_.oldest()->number_;
+    oldest_snapshot = snapshots_.oldest()->number;
   }
   // Avoid to go through every column family by checking a global threshold
   // first.
@@ -3353,12 +3312,6 @@ void DBImpl::ReleaseSnapshotImpl(const Snapshot* s, bool lock) {
     }
     bottommost_files_mark_threshold_ = new_bottommost_files_mark_threshold;
   }
-
-  if (lock) {
-    mutex_.Unlock();
-  }
-
-  delete casted_s;
 }
 
 #ifndef ROCKSDB_LITE
@@ -4216,6 +4169,7 @@ Status DBImpl::Close() {
   }
   {
     InstrumentedMutexLock l(&mutex_);
+    snapshots_.ResetCached();
     // If there is unreleased snapshot, fail the close call
     if (!snapshots_.empty()) {
       return Status::Aborted("Cannot close DB with unreleased snapshot.");

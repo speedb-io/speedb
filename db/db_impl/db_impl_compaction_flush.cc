@@ -2401,6 +2401,11 @@ void DBImpl::MaybeScheduleFlushOrCompaction() {
     // Compaction may introduce data race to DB open
     return;
   }
+  if (release_cached_snapshot_requested_.exchange(false,
+                                                  std::memory_order_acquire) &&
+      snapshots_.ResetCached()) {
+    RecalculateSnapshotMarkThreshold();
+  }
   if (bg_work_paused_ > 0) {
     // we paused the background work
     return;

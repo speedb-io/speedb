@@ -65,8 +65,7 @@ struct SpdbKeyHandle {
         spdb_sorted_key_(nullptr) {}
 
  public:
-  // this is for the bucket item list (should be very small), its a prev link
-  // for atomic reason
+  // this is for the bucket item list (should be very small)
   std::atomic<SpdbKeyHandle*> bucket_item_link_;
   // this is for the spdb item list its a next link
   std::atomic<SpdbKeyHandle*> spdb_item_link_;
@@ -100,8 +99,7 @@ struct BucketHeader {
     return false;
   }
 
-  bool Add(SpdbKeyHandle* handle, const MemTableRep::KeyComparator& comparator,
-           bool /*check_exist = false*/) {
+  bool Add(SpdbKeyHandle* handle, const MemTableRep::KeyComparator& comparator) {
     MutexLock l(&mutex_);
     SpdbKeyHandle* iter = items_.load(std::memory_order_acquire);
     SpdbKeyHandle* prev = nullptr;
@@ -179,10 +177,9 @@ struct SpdbHashTable {
 
   SpdbHashTable(size_t n_buckets) : buckets_(n_buckets) {}
 
-  bool Add(SpdbKeyHandle* val, const MemTableRep::KeyComparator& comparator,
-           bool check_exist) {
+  bool Add(SpdbKeyHandle* val, const MemTableRep::KeyComparator& comparator) {
     BucketHeader* bucket = GetBucket(val->Key(), comparator);
-    return bucket->Add(val, comparator, check_exist);
+    return bucket->Add(val, comparator);
   }
 
   bool Contains(const char* check_key,
@@ -515,10 +512,9 @@ KeyHandle HashSpdRep::Allocate(const size_t len, char** buf) {
   return h;
 }
 
-bool HashSpdRep::InsertInternal(KeyHandle handle, bool concurrently,
-                                bool check_exist) {
+bool HashSpdRep::InsertInternal(KeyHandle handle, bool concurrently) {
   SpdbKeyHandle* spdb_handle = static_cast<SpdbKeyHandle*>(handle);
-  if (!spdb_hash_table_.Add(spdb_handle, spdb_sort_->compare_, check_exist)) {
+  if (!spdb_hash_table_.Add(spdb_handle, spdb_sort_->compare_)) {
     return false;
   }
   spdb_sort_->spdb_sorted_list_.InsertConcurrently(spdb_handle->Key(), concurrently);

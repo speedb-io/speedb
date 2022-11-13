@@ -69,18 +69,13 @@ class SpdbSortedList {
   //
   // REQUIRES: nothing that compares equal to key is currently in the list.
   // REQUIRES: no concurrent calls to any of inserts.
-  bool Insert(const char* key);
-
-  bool InsertConcurrently(const char* key);
+  bool Insert(const char* key, bool concurrently);
 
   template <bool UseCAS>
   bool Insert(const char* key, Splice* splice, bool allow_partial_splice_fix);
 
   // Return estimated number of entries smaller than `key`.
   uint64_t EstimateCount(const char* key) const;
-
-  // Validate correctness of the spdbsortedlist.
-  void TEST_Validate() const;
 
   // Iteration over the contents of a spdbsortedlist
   class Iterator {
@@ -676,18 +671,15 @@ SpdbSortedList<Comparator>::AllocateSpliceOnHeap() {
 }
 
 template <class Comparator>
-bool SpdbSortedList<Comparator>::Insert(const char* key) {
-  return Insert<false>(key, seq_splice_, false);
-}
-
-template <class Comparator>
-bool SpdbSortedList<Comparator>::InsertConcurrently(const char* key) {
-  Node* prev[kMaxPossibleHeight];
-  Node* next[kMaxPossibleHeight];
-  Splice splice;
-  splice.prev_ = prev;
-  splice.next_ = next;
-  return Insert<true>(key, &splice, false);
+bool SpdbSortedList<Comparator>::Insert(const char* key, bool concurrently) {
+  if (concurrently) {
+    Node* prev[kMaxPossibleHeight];
+    Node* next[kMaxPossibleHeight];
+    Splice splice;
+    splice.prev_ = prev;
+    splice.next_ = next;    
+  }
+  return Insert<concurrently>(key, seq_splice_, false);
 }
 
 template <class Comparator>
@@ -931,45 +923,6 @@ bool SpdbSortedList<Comparator>::Insert(const char* key, Splice* splice,
   return true;
 }
 
-template <class Comparator>
-void SpdbSortedList<Comparator>::TEST_Validate() const {
-  // Interate over all levels at the same time, and verify nodes appear in
-  // the right order, and nodes appear in upper level also appear in lower
-  // levels.
-  Node* nodes[kMaxPossibleHeight];
-  int max_height = GetMaxHeight();
-  assert(max_height > 0);
-  for (int i = 0; i < max_height; i++) {
-    nodes[i] = head_;
-  }
-  while (nodes[0] != nullptr) {
-    Node* l0_next = nodes[0]->Next(0);
-    if (l0_next == nullptr) {
-      break;
-    }
-    assert(nodes[0] == head_ || compare_(nodes[0]->Key(), l0_next->Key()) < 0);
-    nodes[0] = l0_next;
 
-    int i = 1;
-    while (i < max_height) {
-      Node* next = nodes[i]->Next(i);
-      if (next == nullptr) {
-        break;
-      }
-      auto cmp = compare_(nodes[0]->Key(), next->Key());
-      assert(cmp <= 0);
-      if (cmp == 0) {
-        assert(next == nodes[0]);
-        nodes[i] = next;
-      } else {
-        break;
-      }
-      i++;
-    }
-  }
-  for (int i = 1; i < max_height; i++) {
-    assert(nodes[i] != nullptr && nodes[i]->Next(i) == nullptr);
-  }
-}
 
 }  // namespace ROCKSDB_NAMESPACE

@@ -295,7 +295,6 @@ class HashSpdRep : public MemTableRep {
 
   SpdbKeyHandle* InternalSeek(const char* seek_entry);
 
-  // void SetSortBarrier();
 
   void Get(const LookupKey& k, void* callback_args,
            bool (*callback_func)(void* arg, const char* entry)) override;
@@ -314,7 +313,6 @@ class HashSpdRep : public MemTableRep {
         const SpdbSortedList<const MemTableRep::KeyComparator&>* list,
         HashSpdRep* rep)
         : iter_(list), rep_(rep) {
-      // rep->SetSortBarrier();
     }
 
     ~SpdbIterator() override {}
@@ -508,11 +506,11 @@ void HashSpdRep::PostCreate(const MemTableRep::KeyComparator& compare,
 
 KeyHandle HashSpdRep::Allocate(const size_t len, char** buf) {
   char* spdb_sorted_key;
-  SpdbKeyHandle* h = reinterpret_cast<SpdbKeyHandle*>(
+  SpdbKeyHandle* handle = reinterpret_cast<SpdbKeyHandle*>(
       spdb_sort_->spdb_sorted_list_.AllocateSpdbItem(len, sizeof(SpdbKeyHandle),
                                                      &spdb_sorted_key));
-  h->Init();
-  h->SetKey(spdb_sorted_key);
+  handle->Init();
+  handle->SetKey(spdb_sorted_key);
   *buf = spdb_sorted_key;
   return h;
 }
@@ -523,18 +521,8 @@ bool HashSpdRep::InsertInternal(KeyHandle handle, bool concurrently,
   if (!spdb_hash_table_.Add(spdb_handle, spdb_sort_->compare_, check_exist)) {
     return false;
   }
-  if (concurrently)
-    spdb_sort_->spdb_sorted_list_.InsertConcurrently(spdb_handle->Key());
-  else
-    spdb_sort_->spdb_sorted_list_.Insert(spdb_handle->Key());
+  spdb_sort_->spdb_sorted_list_.InsertConcurrently(spdb_handle->Key(), concurrently);
   elements_num_.fetch_add(1);
-
-  /*
-  SpdbKeyHandle* prev_item = last_item_.exchange(spdb_handle);
-  prev_item->SetNextSortedItem(spdb_handle);
-  elements_num_.fetch_add(1);
-  // should notify the sort thread on work
-  sort_thread_cv_.notify_one();*/
   return true;
 }
 
@@ -542,18 +530,7 @@ bool HashSpdRep::Contains(const char* key) const {
   return spdb_hash_table_.Contains(key, spdb_sort_->compare_);
 }
 
-/*void HashSpdRep::SetSortBarrier() {
-  uint64_t sort_barrier = elements_num_.load();
-  // should notify the sort thread on work
-  sort_thread_cv_.notify_one();
 
-  {
-    std::unique_lock<std::mutex> lck(notify_sorted_mutex_);
-    while (sort_barrier > sort_barrier_.load()) {
-      notify_sorted_cv_.wait(lck);
-    }
-  }
-}*/
 
 void HashSpdRep::MarkReadOnly() { immutable_.store(true); }
 

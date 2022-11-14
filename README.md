@@ -14,12 +14,15 @@
 </div>
 
 # Speedb
-Speedb is a library that provides persistent key-value stores. Keys and values are arbitrary byte arrays. The keys are ordered within the key value store according to a user-specified comparator function.
+Speedb is a library that provides a high performance, persistent key-value store. 
+This is a community led project that focuses on high performance, optimized for modern storage hardware, on-premise and in the cloud.
 It is maintained by Speedb and is forked from Rocksdb, developed by Facebook.
 
+**Join us to build the next generation data engine!**
+
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset=".github/speedb-bee-dark.gif" width="80px" >
-  <img src=".github/speedb-bee.gif" width="80px">
+  <source media="(prefers-color-scheme: dark)" srcset=".github/new-bee-mascot-dark.gif" width="80px" >
+  <img src=".github/new-bee-mascot.gif" width="80px">
 </picture>
 
 
@@ -69,7 +72,7 @@ Release:
 This will build the static library. If you want to build the dynamic library,
 use:
 
-    make rocksdb-shared
+    make speedb-shared
 
 If you want `make` to increase the number of cores used for building, simply use
 the `-j` option.
@@ -84,15 +87,30 @@ testing, we recommend building a release version which is more optimized.
 
 ## 📈 Performance 
 
-We are using DBbench to test performance and progress between the versions. it is available under tools and also in the artifact for direct download.
+We are using DBbench to test performance and progress between the versions. It is available under tools and also in the artifact for direct download.
 In there you can also find a readme with the commands we are using to get you started. 
+Here is a graph comparing Speedb's paired bloom filter with the default bloom filter. 
 
 <img width="769" alt="Screen Shot 2022-10-31 at 15 15 42" src="https://user-images.githubusercontent.com/107058910/199016617-4ecbe279-b281-4a8c-b630-87a509bc09da.png">
-shorturl.at/dlKOY 
-## Questions 
 
-- For live discussion with the community you can use our official [Discord channel](https://discord.gg/52yzKZ5G9D). 
-- For technical questions and discussions you can use our official [Discourse forum](https://speedb.discourse.group/). 
+For additional info see: [Paired Bloom Filter](https://docs.speedb.dev/documentation/speedb-features/paired-bloom-filter).
+
+## Documentation
+
+You can find a detailed description of all Speedb features [here](https://speedb.gitbook.io/documentation/).
+
+[Speedb's documentation repository](https://github.com/speedb-io/book) allows you to enhance, add content and fix issues. 
+
+## 🛣️ Roadmap
+
+The [product roadmap](https://github.com/orgs/speedb-io/projects/4/views/1) provides a snapshot of the features we are currently developing, what we are planning for the future, and the items that have already been delivered.
+
+We have added a column with items that are awaiting community feedback. We invite you to participate in our polls inside, share your thoughts about topics that are important to you, and let us know if there is anything else you would like to see on the list.
+
+## ❔ Questions 
+
+- For live discussion with the community you can use our official [Discord channel](https://discord.gg/5fVUUtM2cG). 
+- For technical questions and discussions you can use our official [Discourse forum](https://forum.speedb.dev). 
 
 
 ## 🌎 Join us 

@@ -226,6 +226,7 @@ default_params = {
     "num_file_reads_for_auto_readahead": lambda: random.choice([0, 1, 2]),
     "min_write_buffer_number_to_merge": lambda: random.choice([1, 2]),
     "preserve_internal_time_seconds": lambda: random.choice([0, 60, 3600, 36000]),
+    "memtablerep": lambda: random.choice(["skip_list", "speedb.HashSpdRepFactory"]),
 }
 
 _TEST_DIR_ENV_VAR = "TEST_TMPDIR"
@@ -542,9 +543,6 @@ def finalize_and_sanitize(src_params):
         dest_params["compression_max_dict_buffer_bytes"] = 0
     if dest_params.get("compression_type") != "zstd":
         dest_params["compression_zstd_max_train_bytes"] = 0
-    if dest_params.get("allow_concurrent_memtable_write", 1) == 1:
-        # TODO: yuval- add hash_spd memtable
-        dest_params["memtablerep"] = "skip_list"
     if dest_params["mmap_read"] == 1:
         dest_params["use_direct_io_for_flush_and_compaction"] = 0
         dest_params["use_direct_reads"] = 0
@@ -603,6 +601,12 @@ def finalize_and_sanitize(src_params):
     if dest_params.get("unordered_write", 0) == 1:
         dest_params["txn_write_policy"] = 1
         dest_params["allow_concurrent_memtable_write"] = 1
+    if dest_params.get("allow_concurrent_memtable_write", 0) == 1:
+        if (dest_params.get("memtablerep") != "skip_list" or 
+            dest_params.get("memtablerep") != "speedb.HashSpdRepFactory"):
+                dest_params["memtablerep"] = random.choice(
+                    ["skip_list", "speedb.HashSpdRepFactory"]
+                )
     if dest_params.get("disable_wal", 0) == 1:
         dest_params["atomic_flush"] = 1
         dest_params["sync"] = 0

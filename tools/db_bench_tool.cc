@@ -1695,7 +1695,7 @@ DEFINE_int64(multiread_stride, 0,
              "Stride length for the keys in a MultiGet batch");
 DEFINE_bool(multiread_batched, false, "Use the new MultiGet API");
 
-DEFINE_string(memtablerep, "skip_list", "");
+DEFINE_string(memtablerep, "speedb.HashSpdRepFactory", "");
 DEFINE_int64(hash_bucket_count, 1024 * 1024, "hash bucket count");
 DEFINE_bool(use_plain_table, false,
             "if use plain table instead of block-based table format");

@@ -120,6 +120,7 @@ DEFINE_string(
     "seekrandomwriterandom,"
     "seekrandomwhilewriting,"
     "seekrandomwhilemerging,"
+    "seektodeletedranges,"
     "readseq,"
     "readreverse,"
     "compact,"
@@ -210,6 +211,19 @@ DEFINE_string(
     "overwrite\n"
     "\tseekrandomwhilemerging -- seekrandom and 1 thread doing "
     "merge\n"
+    "\tseektodeletedranges -- create fillup_ranges of ranges_len length, "
+    "then start deleting the ranges in the same thread while still "
+    "creating new ranges. Once start_seek_del_ranges have been deleted, "
+    "start seeking to the beginning of the recently deleted ranges in "
+    "separate threads, tuned with num_recent_deleted_to_seek. "
+    "Other params to tune the workload are num_ranges_to_keep, "
+    "delete_range_every_n_ranges and delete_mode. "
+    "Will perform num/1000 seeks if neither reads nor duration are specified "
+    "Duration only starts when the seek starts and is checked every 100 ops. "
+    "We could be seeking to data which is still in the memtable depending on "
+    "memtable size, delete_range_every_n_ranges, range size and more. "
+    "The most recent deleted ranges will be more likely to be in the memtable "
+    "so take these into consideration while tuning the parameters\n"
     "\tcrc32c        -- repeated crc32c of <block size> data\n"
     "\txxhash        -- repeated xxHash of <block size> data\n"
     "\txxhash64      -- repeated xxHash64 of <block size> data\n"
@@ -324,6 +338,38 @@ DEFINE_bool(auto_prefix_mode, false, "Set auto_prefix_mode for seek benchmark");
 DEFINE_int64(max_scan_distance, 0,
              "Used to define iterate_upper_bound (or iterate_lower_bound "
              "if FLAGS_reverse_iterator is set to true) when value is nonzero");
+
+DEFINE_uint64(ranges_len, 10000,
+              "Length of ranges created. "
+              "only relevant for seektodeletedranges");
+
+DEFINE_uint64(fillup_ranges, 50,
+              "Number of accumulated ranges until we start deleting them. "
+              "only relevant for seektodeletedranges");
+
+DEFINE_uint64(start_seek_del_ranges, 5,
+              "Start seeking after this many deleted ranges. "
+              "only relevant for seektodeletedranges");
+
+DEFINE_uint64(num_recent_deleted_to_seek, 10,
+              "Number of recently deleted ranges to seek to. "
+              "only relevant for seektodeletedranges");
+
+DEFINE_uint64(num_ranges_to_keep, 40,
+              "Number of ranges which are not deleted. "
+              "only relevant for seektodeletedranges");
+
+DEFINE_uint64(delete_range_every_n_ranges, 4,
+              "Create this many ranges, then delete one. "
+              "only relevant for seektodeletedranges");
+
+DEFINE_int32(delete_mode, 0,
+             "How ranges are deleted. "
+             "0 - generate the same keys and delete them"
+             "1 - seek to start key then iterate and delete"
+             "2 - use DeleteRange()"
+             "3 - use SingleDelete()"
+             "only relevant for seektodeletedranges");
 
 DEFINE_bool(use_uint64_comparator, false, "use Uint64 user comparator");
 
@@ -1797,6 +1843,15 @@ static Status CreateMemTableRepFactory(
 
 }  // namespace
 
+enum DeleteMode {
+  DELETE_KEYS = 0,
+  SEEK_AND_DELETE,
+  DELETE_RANGE,
+  SINGLE_DELETE
+};
+
+static enum DeleteMode FLAGS_delete_mode_e = DELETE_KEYS;
+
 enum DistributionType : unsigned char { kFixed = 0, kUniform, kNormal };
 
 static enum DistributionType FLAGS_value_size_distribution_type_e = kFixed;
@@ -2714,6 +2769,12 @@ class Benchmark {
   bool use_blob_db_;    // Stacked BlobDB
   bool read_operands_;  // read via GetMergeOperands()
   std::vector<std::string> keys_;
+  uint64_t total_ranges_written_;
+  // the next range to delete
+  std::atomic<uint64_t> delete_index_;
+  std::condition_variable cond_;
+  std::mutex mutex_;
+  bool seek_started_;
 
   class ErrorHandlerListener : public EventListener {
    public:
@@ -3151,7 +3212,10 @@ class Benchmark {
         merge_keys_(FLAGS_merge_keys < 0 ? FLAGS_num : FLAGS_merge_keys),
         report_file_operations_(FLAGS_report_file_operations),
         use_blob_db_(FLAGS_use_blob_db),  // Stacked BlobDB
-        read_operands_(false) {
+        read_operands_(false),
+        total_ranges_written_(0),
+        delete_index_(FLAGS_num_ranges_to_keep),
+        seek_started_(false) {
     // use simcache instead of cache
     if (FLAGS_simcache_size >= 0) {
       if (FLAGS_cache_numshardbits >= 1) {
@@ -3228,11 +3292,14 @@ class Benchmark {
     }
   }
 
-  Slice AllocateKey(std::unique_ptr<const char[]>* key_guard) {
-    char* data = new char[key_size_];
+  Slice AllocateKey(std::unique_ptr<const char[]>* key_guard, int size = 0) {
+    if (size == 0) {
+      size = key_size_;
+    }
+    char* data = new char[size];
     const char* const_data = data;
     key_guard->reset(const_data);
-    return Slice(key_guard->get(), key_size_);
+    return Slice(key_guard->get(), size);
   }
 
   // Generate key according to the given specification and random number.
@@ -3249,7 +3316,12 @@ class Benchmark {
   //     ----------------------------
   //     |        key 00000         |
   //     ----------------------------
-  void GenerateKeyFromInt(uint64_t v, int64_t num_keys, Slice* key) {
+  void GenerateKeyFromInt(uint64_t v, int64_t num_keys, Slice* key,
+                          int size = 0) {
+    if (size == 0) {
+      size = key_size_;
+    }
+
     if (!keys_.empty()) {
       assert(FLAGS_use_existing_keys);
       assert(keys_.size() == static_cast<size_t>(num_keys));
@@ -3277,7 +3349,7 @@ class Benchmark {
       pos += prefix_size_;
     }
 
-    int bytes_to_fill = std::min(key_size_ - static_cast<int>(pos - start), 8);
+    int bytes_to_fill = std::min(size - static_cast<int>(pos - start), 8);
     if (port::kLittleEndian) {
       for (int i = 0; i < bytes_to_fill; ++i) {
         pos[i] = (v >> ((bytes_to_fill - i - 1) << 3)) & 0xFF;
@@ -3286,8 +3358,8 @@ class Benchmark {
       memcpy(pos, static_cast<void*>(&v), bytes_to_fill);
     }
     pos += bytes_to_fill;
-    if (key_size_ > pos - start) {
-      memset(pos, '0', key_size_ - (pos - start));
+    if (size > pos - start) {
+      memset(pos, '0', size - (pos - start));
     }
   }
 
@@ -3563,6 +3635,39 @@ class Benchmark {
         method = &Benchmark::ReadWhileScanning;
       } else if (name == "readrandomwriterandom") {
         method = &Benchmark::ReadRandomWriteRandom;
+      } else if (name == "seektodeletedranges") {
+        method = &Benchmark::SeekToDeletedRanges;
+        if (num_threads < 2) {
+          fprintf(stdout,
+                  "seektodeletedranges needs more than one thread. "
+                  "setting num_threads = 2 \n");
+          num_threads = 2;
+        }
+        if (FLAGS_num_ranges_to_keep > FLAGS_fillup_ranges) {
+          fprintf(stdout,
+                  "fillup_ranges needs to be >= than num_ranges_to_keep. "
+                  "setting fillup_ranges = num_ranges_to_keep \n");
+          FLAGS_fillup_ranges = FLAGS_num_ranges_to_keep;
+        }
+        if (FLAGS_delete_range_every_n_ranges < 1) {
+          fprintf(stdout,
+                  "delete_range_every_n_ranges needs to be >= 0. "
+                  "setting delete_range_every_n_ranges = 1 \n");
+          FLAGS_delete_range_every_n_ranges = 1;
+        }
+        if (FLAGS_delete_mode < 0 || FLAGS_delete_mode > 3) {
+          fprintf(stderr, "delete_mode needs to be either 0,1,2,3 .");
+          ErrorExit();
+        }
+        prefix_size_ = prefix_size_ ? prefix_size_ : 8;
+        if (!((key_size_ - prefix_size_) >= 4)) {
+          fprintf(
+              stderr,
+              "key_size needs to be at least 4 bytes larger than prefix_size.");
+          ErrorExit();
+        }
+        // seeks may take very long so reduce the time between checks.
+        FLAGS_ops_between_duration_checks = 100;
       } else if (name == "readrandommergerandom") {
         if (FLAGS_merge_operator.empty()) {
           fprintf(stdout, "%-12s : skipped (--merge_operator is unknown)\n",
@@ -7098,6 +7203,225 @@ class Benchmark {
     thread->stats.AddBytes(bytes);
   }
 
+  // deterministically turns range_num to unsigned int
+  uint64_t range_num_to_rand(uint64_t range_num) {
+    std::string str = std::to_string(range_num);
+    unsigned int xxh64 = XXH64(str.data(), str.length(), 0);
+    // % num_ since the rand num will be used to make keys which are expected in
+    // that range
+    return xxh64 % num_;
+  }
+
+  void SeekToDeletedRanges(ThreadState* thread) {
+    if (thread->tid == 0) {
+      fprintf(stdout, "Started Initial fillup of ranges \n");
+      CreateRanges(thread, FLAGS_fillup_ranges);
+      fprintf(stdout, "Initial fillup of ranges completed, deletion started\n");
+
+      int iteration = 1;
+      while (true) {
+        CreateRanges(thread, 1);
+        if (iteration % FLAGS_delete_range_every_n_ranges == 0) {
+          DeleteRanges(1);
+        }
+        // check if seek finished.
+        // means all other threads have finished besides this one.
+        if (thread->shared->num_done == thread->shared->total - 1) {
+          break;
+        }
+        iteration++;
+      }
+    } else {
+      SeekToTheDeletedRanges(thread);
+    }
+  }
+
+  void CreateRanges(ThreadState* thread, uint64_t num_ranges) {
+    RandomGenerator gen;
+    int64_t bytes = 0;
+
+    int serial_size = key_size_ - prefix_size_;
+    std::unique_ptr<const char[]> prefix_key_guard;
+    Slice prefix_key = AllocateKey(&prefix_key_guard, prefix_size_);
+    std::unique_ptr<const char[]> key_guard;
+    Slice serial_key = AllocateKey(&key_guard, serial_size);
+
+    for (uint64_t i = 0; i < num_ranges; ++i) {
+      // rand_num used to pick a cf is the same to create a prefix.
+      // since a range should be in one cf. later, this makes it possible
+      // to find the cf based on a range.
+      uint64_t rand_num = range_num_to_rand(total_ranges_written_);
+      DBWithColumnFamilies* db_with_cfh = SelectDBWithCfh(rand_num);
+
+      GenerateKeyFromInt(rand_num, FLAGS_num, &prefix_key, prefix_size_);
+
+      for (uint64_t j = 0; j < FLAGS_ranges_len; j++) {
+        GenerateKeyFromInt(j, FLAGS_num, &serial_key, serial_size);
+        Slice val = gen.Generate();
+        db_with_cfh->db->Put(
+            write_options_, db_with_cfh->GetCfh(rand_num),
+            Slice(prefix_key.ToString() + serial_key.ToString()), val);
+
+        bytes += val.size() + key_size_;
+      }
+      total_ranges_written_++;
+      // TODO: yuval - add rate_limiter support
+      thread->stats.AddBytes(bytes);
+      thread->stats.FinishedOps(db_with_cfh, db_with_cfh->db, FLAGS_ranges_len,
+                                kWrite);
+    }
+  }
+
+  // can delete the ranges in a couple of ways:
+  // 1. generate the same keys and delete them - DELETE_KEYS
+  // 2. seek to start key then iterate and delete - SEEK_AND_DELETE
+  // 3. DeleteRange - DELETE_RANGE
+  // 4. SingleDelete - SINGLE_DELETE
+  void DeleteRanges(uint64_t num_ranges) {
+    int serial_size = key_size_ - prefix_size_;
+    std::unique_ptr<const char[]> prefix_key_guard;
+    Slice prefix_key = AllocateKey(&prefix_key_guard, prefix_size_);
+    std::unique_ptr<const char[]> key_guard;
+    Slice serial_key = AllocateKey(&key_guard, serial_size);
+
+    for (uint64_t i = 0; i < num_ranges; ++i) {
+      uint64_t rand_num = range_num_to_rand(delete_index_.load());
+      DBWithColumnFamilies* db_with_cfh = SelectDBWithCfh(rand_num);
+      ColumnFamilyHandle* cf = db_with_cfh->GetCfh(rand_num);
+      // create prefix
+      GenerateKeyFromInt(rand_num, FLAGS_num, &prefix_key, prefix_size_);
+
+      switch (FLAGS_delete_mode_e) {
+        case DELETE_KEYS: {
+          for (uint64_t j = 0; j < FLAGS_ranges_len; j++) {
+            GenerateKeyFromInt(j, FLAGS_num, &serial_key, serial_size);
+            db_with_cfh->db->Delete(
+                write_options_, cf,
+                Slice(prefix_key.ToString() + serial_key.ToString()));
+          }
+          break;
+        }
+        case SEEK_AND_DELETE: {
+          GenerateKeyFromInt(0, FLAGS_num, &serial_key, serial_size);
+          std::unique_ptr<Iterator> iter;
+          iter.reset(db_with_cfh->db->NewIterator(read_options_, cf));
+          iter->Seek(Slice(prefix_key.ToString() + serial_key.ToString()));
+          for (uint64_t j = 0; j < FLAGS_ranges_len && iter->Valid();
+               ++j, iter->Next()) {
+            db_with_cfh->db->Delete(write_options_, iter->key());
+          }
+          if (!iter->status().ok()) {
+            fprintf(stderr, "iter error: %s\n",
+                    iter->status().ToString().c_str());
+            exit(1);
+          }
+          break;
+        }
+        case DELETE_RANGE: {
+          GenerateKeyFromInt(0, FLAGS_num, &serial_key, serial_size);
+          std::string total_str = prefix_key.ToString() + serial_key.ToString();
+          Slice begin_key = Slice(total_str);
+          // since end is exclusive [begin, end) we need to delete past the last
+          // key.
+          GenerateKeyFromInt(FLAGS_ranges_len, FLAGS_num, &serial_key,
+                             serial_size);
+
+          db_with_cfh->db->DeleteRange(
+              write_options_, cf, begin_key,
+              Slice(prefix_key.ToString() + serial_key.ToString()));
+          break;
+        }
+        case SINGLE_DELETE: {
+          for (uint64_t j = 0; j < FLAGS_ranges_len; j++) {
+            GenerateKeyFromInt(j, FLAGS_num, &serial_key, serial_size);
+            db_with_cfh->db->SingleDelete(
+                write_options_, cf,
+                Slice(prefix_key.ToString() + serial_key.ToString()));
+          }
+          break;
+        }
+        default:
+          assert(false);
+      }
+
+      delete_index_.fetch_add(1);
+
+      if (delete_index_.load() - FLAGS_num_ranges_to_keep >
+              FLAGS_start_seek_del_ranges &&
+          !seek_started_) {
+        std::lock_guard<std::mutex> guard(mutex_);
+        seek_started_ = true;
+        cond_.notify_all();
+      }
+    }
+  }
+
+  void SeekToTheDeletedRanges(ThreadState* thread) {
+    {
+      std::unique_lock<std::mutex> lock(mutex_);
+      cond_.wait(lock, [&] { return seek_started_; });
+    }
+    if (thread->tid == 1) {
+      fprintf(stdout, "Started Seeking to deleted ranges\n");
+    }
+    int64_t read = 0;
+    int64_t found = 0;
+
+    int serial_size = key_size_ - prefix_size_;
+    std::unique_ptr<const char[]> prefix_key_guard;
+    Slice prefix_key = AllocateKey(&prefix_key_guard, prefix_size_);
+    std::unique_ptr<const char[]> key_guard;
+    Slice serial_key = AllocateKey(&key_guard, serial_size);
+
+    int64_t ops = FLAGS_reads > 0 ? FLAGS_reads : FLAGS_num / 1000;
+    Duration duration(FLAGS_duration, ops);
+    while (!duration.Done(1)) {
+      auto cur_delete_index = delete_index_.load();
+      uint64_t num_ranges_deleted = cur_delete_index - FLAGS_num_ranges_to_keep;
+      int64_t range_for_seek =
+          std::min(num_ranges_deleted, FLAGS_num_recent_deleted_to_seek);
+      // pick a random range from the deleted ranges.
+      int64_t rand_pos =
+          cur_delete_index - 1 - (thread->rand.Next() % range_for_seek);
+      // TODO: yuval - dont seek to most recent deleted ranges since they will
+      // more likely be in the memtable
+      uint64_t rand_num = range_num_to_rand(rand_pos);
+      DBWithColumnFamilies* db_with_cfh = SelectDBWithCfh(rand_num);
+
+      GenerateKeyFromInt(rand_num, FLAGS_num, &prefix_key, prefix_size_);
+      // seek to the first key in that range.
+      GenerateKeyFromInt(0, FLAGS_num, &serial_key, serial_size);
+
+      std::string total_str = prefix_key.ToString() + serial_key.ToString();
+      Slice key = Slice(total_str);
+
+      std::unique_ptr<Iterator> iter;
+      iter.reset(db_with_cfh->db->NewIterator(read_options_,
+                                              db_with_cfh->GetCfh(rand_num)));
+      iter->Seek(key);
+      read++;
+      if (iter->Valid() && iter->key().compare(key) == 0) {
+        found++;
+      }
+
+      for (int j = 0; j < FLAGS_seek_nexts && iter->Valid(); ++j) {
+        if (!FLAGS_reverse_iterator) {
+          iter->Next();
+        } else {
+          iter->Prev();
+        }
+        assert(iter->status().ok());
+      }
+
+      thread->stats.FinishedOps(db_with_cfh, db_with_cfh->db, 1, kSeek);
+    }
+
+    char msg[100];
+    snprintf(msg, sizeof(msg), "(%" PRIu64 " of %" PRIu64 " found)\n", found,
+             read);
+    thread->stats.AddMessage(msg);
+  }
+
   void ReadWhileScanning(ThreadState* thread) {
     if (thread->tid > 0) {
       ReadRandom(thread);
@@ -8750,6 +9074,7 @@ int db_bench_tool(int argc, char** argv) {
   ParseCommandLineFlags(&argc, &argv, true);
   FLAGS_compaction_style_e =
       (ROCKSDB_NAMESPACE::CompactionStyle)FLAGS_compaction_style;
+  FLAGS_delete_mode_e = (DeleteMode)FLAGS_delete_mode;
   if (FLAGS_statistics && !FLAGS_statistics_string.empty()) {
     fprintf(stderr,
             "Cannot provide both --statistics and --statistics_string.\n");

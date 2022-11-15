@@ -604,60 +604,72 @@ def find_tests(binaries, additional_args, options, times):
   tasks = []
   for test_binary in binaries:
     command = [test_binary] + additional_args
-    if options.gtest_also_run_disabled_tests:
-      command += ['--gtest_also_run_disabled_tests']
-
-    list_command = command + ['--gtest_list_tests']
-    if options.gtest_filter != '':
-      list_command += ['--gtest_filter=' + options.gtest_filter]
-
-    try:
-      test_list = subprocess.check_output(list_command,
-                                          stderr=subprocess.STDOUT)
-    except subprocess.CalledProcessError as e:
-      sys.exit("%s: %s\n%s" % (test_binary, str(e), e.output))
-
-    try:
-      test_list = test_list.split('\n')
-    except TypeError:
-      # subprocess.check_output() returns bytes in python3
-      test_list = test_list.decode(sys.stdout.encoding).split('\n')
-
-    command += ['--gtest_color=' + options.gtest_color]
-
-    test_group = ''
-    for line in test_list:
-      if not line.strip():
-        continue
-      if line[0] != " ":
-        # Remove comments for typed tests and strip whitespace.
-        test_group = line.split('#')[0].strip()
-        continue
-      # Remove comments for parameterized tests and strip whitespace.
-      line = line.split('#')[0].strip()
-      if not line:
-        continue
-
-      test_name = test_group + line
-      if not options.gtest_also_run_disabled_tests and 'DISABLED_' in test_name:
-        continue
-
-      # Skip PRE_ tests which are used by Chromium.
-      if '.PRE_' in test_name:
-        continue
-
+    if options.non_gtest_tests and test_binary in options.non_gtest_tests:
+      test_name = os.path.basename(test_binary)
       last_execution_time = times.get_test_time(test_binary, test_name)
       if options.failed and last_execution_time is not None:
         continue
-
-      test_command = command + ['--gtest_filter=' + test_name]
       if (test_count - options.shard_index) % options.shard_count == 0:
-        for execution_number in range(options.repeat):
-          tasks.append(
-              Task(test_binary, test_name, test_command, execution_number + 1,
-                   last_execution_time, options.output_dir))
-
+          for execution_number in range(options.repeat):
+            tasks.append(
+                Task(test_binary, test_name, command, execution_number + 1,
+                    last_execution_time, options.output_dir))
       test_count += 1
+
+    else:
+      if options.gtest_also_run_disabled_tests:
+        command += ['--gtest_also_run_disabled_tests']
+      list_command = command + ['--gtest_list_tests']
+      if options.gtest_filter != '':
+        list_command += ['--gtest_filter=' + options.gtest_filter]
+
+      try:
+        test_list = subprocess.check_output(list_command,
+                                            stderr=subprocess.STDOUT)
+      except subprocess.CalledProcessError as e:
+        sys.exit("%s: %s\n%s" % (test_binary, str(e), e.output))
+
+      try:
+        test_list = test_list.split('\n')
+      except TypeError:
+        # subprocess.check_output() returns bytes in python3
+        test_list = test_list.decode(sys.stdout.encoding).split('\n')
+
+      command += ['--gtest_color=' + options.gtest_color]
+
+      test_group = ''
+      for line in test_list:
+        if not line.strip():
+          continue
+        if line[0] != " ":
+          # Remove comments for typed tests and strip whitespace.
+          test_group = line.split('#')[0].strip()
+          continue
+        # Remove comments for parameterized tests and strip whitespace.
+        line = line.split('#')[0].strip()
+        if not line:
+          continue
+
+        test_name = test_group + line
+        if not options.gtest_also_run_disabled_tests and 'DISABLED_' in test_name:
+          continue
+
+        # Skip PRE_ tests which are used by Chromium.
+        if '.PRE_' in test_name:
+          continue
+
+        last_execution_time = times.get_test_time(test_binary, test_name)
+        if options.failed and last_execution_time is not None:
+          continue
+
+        test_command = command + ['--gtest_filter=' + test_name]
+        if (test_count - options.shard_index) % options.shard_count == 0:
+          for execution_number in range(options.repeat):
+            tasks.append(
+                Task(test_binary, test_name, test_command, execution_number + 1,
+                    last_execution_time, options.output_dir))
+
+        test_count += 1
 
   # Sort the tasks to run the slowest tests first, so that faster ones can be
   # finished in parallel.
@@ -721,6 +733,10 @@ def execute_tasks(tasks, pool_size, task_manager, timeout_seconds,
       for task in list(task_manager.started.values()):
         task.runtime_ms = timeout_seconds * 1000
         task_manager.register_exit(task)
+
+
+def list_non_gtest_tests(option, opt, value, parser):
+  setattr(parser.values, option.dest, value.split(','))
 
 
 def default_options_parser():
@@ -797,6 +813,13 @@ def default_options_parser():
                     default=False,
                     help='Do not run tests from the same test '
                     'case in parallel.')
+  parser.add_option('--non_gtest_tests',
+                    type='string',
+                    action='callback',
+                    callback=list_non_gtest_tests,
+                    dest='non_gtest_tests',
+                    help='A list of comma separated tests that do not use '
+                    'gtest, that should also be run')
   return parser
 
 
@@ -823,6 +846,9 @@ def main():
   # and clean that directory out on startup, instead of nuking Docs/.
   if options.output_dir:
     options.output_dir = os.path.join(options.output_dir, 'gtest-parallel-logs')
+
+  if options.non_gtest_tests:
+    binaries += options.non_gtest_tests
 
   if binaries == []:
     parser.print_usage()

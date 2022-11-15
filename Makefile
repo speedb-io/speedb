@@ -20,13 +20,6 @@ MACHINE ?= $(shell uname -m)
 ARFLAGS = ${EXTRA_ARFLAGS} rs
 STRIPFLAGS = -S -x
 
-# Transform parallel LOG output into something more readable.
-parallel_log_extract = awk \
-  'BEGIN{FS="\t"} { \
-     t=$$9; sub(/if *\[\[ *"/,"",t); sub(/" =.*/,"",t); sub(/ >.*/,"",t); sub(/.*--gtest_filter=/,"",t); \
-     printf("%7.3f %s %s\n",4,($$7 == 0 ? "PASS" : "FAIL"),t) \
-  }'
-
 # DEBUG_LEVEL can have three values:
 # * DEBUG_LEVEL=2; this is the ultimate debug mode. It will compile Speedb
 # without any optimizations. To compile with level 2, issue `make dbg`
@@ -942,122 +935,29 @@ coverage: clean
 	# Delete intermediate files
 	$(FIND) . -type f \( -name "*.gcda" -o -name "*.gcno" \) -exec rm -f {} \;
 
-# Run all tests in parallel, accumulating per-test logs in t/log-*.
-#
-# Each t/run-* file is a tiny generated bourne shell script that invokes one of
-# sub-tests. Why use a file for this?  Because that makes the invocation of
-# parallel below simpler, which in turn makes the parsing of parallel's
-# LOG simpler (the latter is for live monitoring as parallel
-# tests run).
-#
-# Test names are extracted by running tests with --gtest_list_tests.
-# This filter removes the "#"-introduced comments, and expands to
-# fully-qualified names by changing input like this:
-#
-#   DBTest.
-#     Empty
-#     WriteEmptyBatch
-#   MultiThreaded/MultiThreadedDBTest.
-#     MultiThreaded/0  # GetParam() = 0
-#     MultiThreaded/1  # GetParam() = 1
-#
-# into this:
-#
-#   DBTest.Empty
-#   DBTest.WriteEmptyBatch
-#   MultiThreaded/MultiThreadedDBTest.MultiThreaded/0
-#   MultiThreaded/MultiThreadedDBTest.MultiThreaded/1
-#
-
-parallel_tests = $(patsubst %,parallel_%,$(PARALLEL_TEST))
-.PHONY: $(parallel_tests)
-$(parallel_tests): $(parallel_tests:parallel_%=%)
-	$(AM_V_at)mkdir -p t; \
-	TEST_BINARY=$(patsubst parallel_%,%,$@); \
-  TEST_NAMES=` \
-    (./$$TEST_BINARY --gtest_list_tests || echo "  $${TEST_BINARY}__list_tests_failure") \
-    | awk '/^[^ ]/ { prefix = $$1 } /^[ ]/ { print prefix $$1 }'`; \
-	echo "  Generating parallel test scripts for $$TEST_BINARY"; \
-	rm -f t/run-$${TEST_BINARY}-*; \
-	for TEST_NAME in $$TEST_NAMES; do \
-		TEST_SCRIPT=run-$${TEST_BINARY}-$${TEST_NAME//\//-}; \
-    printf '%s\n' \
-      '#!/bin/sh' \
-      "d=\"$(TEST_TMPDIR)/$$TEST_SCRIPT\"" \
-      'mkdir -p "$$d"' \
-      "TEST_TMPDIR=\"\$$d\" $(DRIVER) ./$$TEST_BINARY --gtest_filter=$$TEST_NAME && rm -rf \"\$$d\"" \
-		> t/$$TEST_SCRIPT; \
-		chmod a=rx t/$$TEST_SCRIPT; \
-	done
-
-# Reorder input lines (which are one per test) so that the
-# longest-running tests appear first in the output.
-# Do this by prefixing each selected name with its duration,
-# sort the resulting names, and remove the leading numbers.
-# FIXME: the "100" we prepend is a fake time, for now.
-# FIXME: squirrel away timings from each run and use them
-# (when present) on subsequent runs to order these tests.
-#
-# Without this reordering, these two tests would happen to start only
-# after almost all other tests had completed, thus adding 100 seconds
-# to the duration of parallel "make check".  That's the difference
-# between 4 minutes (old) and 2m20s (new).
-#
-# 152.120 PASS t/DBTest.FileCreationRandomFailure
-# 107.816 PASS t/DBTest.EncodeDecompressedBlockSizeTest
-#
-slow_test_regexp = \
-	^.*MySQLStyleTransactionTest.*$$\|^.*SnapshotConcurrentAccessTest.*$$\|^.*SeqAdvanceConcurrentTest.*$$\|^t/run-table_test-HarnessTest.Randomized$$\|^t/run-db_test-.*FileCreationRandomFailure$$\|^t/run-db_test-.*EncodeDecompressedBlockSizeTest$$\|^.*RecoverFromCorruptedWALWithoutFlush$$
-prioritize_long_running_tests =						\
-  sed 's,\($(slow_test_regexp)\),100 \1,'				\
-    | sort -k1,1gr							\
-    | sed 's/^[.0-9]* //'
-
 # "make check" uses
 # Run with "make J=1 check" to disable parallelism in "make check".
-# Run with "make J=200% check" to run two parallel jobs per core.
-# The default is to run one job per core (J=100%).
-# See "man parallel" for its "-j ..." option.
-J ?= 100%
-
-PARALLEL ?= parallel
-PARALLEL_OK := $(shell command -v "$(PARALLEL)" 2>&1 >/dev/null && \
-                       ("$(PARALLEL)" --gnu --version 2>/dev/null | grep -q 'Ole Tange') && \
-                       echo 1)
-# Use a timeout of 10 minutes per test by default
-TEST_TIMEOUT?=600
-
-# Use this regexp to select the subset of tests whose names match.
-tests-regexp = .
-EXCLUDE_TESTS_REGEX ?= "^$$"
-
-ifeq ($(PRINT_PARALLEL_OUTPUTS), 1)
-	parallel_redir =
-else ifeq ($(QUIET_PARALLEL_TESTS), 1)
-	parallel_redir = >& t/$(test_log_prefix)log-{/}
-else
-# Default: print failure output only, as it happens
-# Note: parallel --eta is now always used because CircleCI will
-# kill a job if no output for 10min.
-	parallel_redir = >& t/$(test_log_prefix)log-{/} || bash -c "cat t/$(test_log_prefix)log-{/}; exit $$?"
+# Run with "make J=<N> check" to run N jobs at once, for example "make J=16 check".
+# The default is to run one job per core (J=number of physical cores).
+ifeq ($(PLATFORM), OS_MACOSX)
+J ?= $(shell sysctl -n hw.physicalcpu)
+else # Unix
+J ?= $(shell nproc)
 endif
-
+CURRENT_DIR = $(shell pwd)
+NON_PARALLEL_TESTS_LIST := $(foreach test,$(NON_PARALLEL_TEST),$(CURRENT_DIR)/$(test))
+space := $(subst ,, )
+comma := ,
+NON_PARALLEL_TESTS_LIST := $(subst $(space),$(comma),$(NON_PARALLEL_TESTS_LIST))
+PARALLEL_TESTS_LIST := $(foreach test,$(PARALLEL_TEST),$(CURRENT_DIR)/$(test))
+# All logs are available under gtest-parallel-logs/.
+# If OUTPUT_DIR is not set, by default the logs will be
+# under /tmp/gtest-parallel-logs/.
+# Run with OUTPUT_DIR=<dir> to replace the default directory. 
+OUTPUT_DIR ?= /tmp
 .PHONY: check_0 check_1
-check_0: $(TESTS) $(parallel_tests)
-	$(AM_V_GEN)printf '%s\n' ''						\
-	  'Running tests in $(TEST_TMPDIR)'		\
-	  'To monitor subtest <duration,pass/fail,name>,'		\
-	  '  run "make watch-log" in a separate window' '';		\
-		printf './%s\n' $(filter-out $(PARALLEL_TEST),$(TESTS)) $(PARALLEL_TEST:%=t/run-%-*) \
-	  | $(prioritize_long_running_tests)				\
-	  | grep -E '$(tests-regexp)'					\
-	  | grep -E -v '$(EXCLUDE_TESTS_REGEX)'					\
-	  | "$(PARALLEL)" -j$(J) --plain --joblog=LOG --eta --gnu \
-	    --tmpdir=$(TEST_TMPDIR) --timeout=$(TEST_TIMEOUT) '{} $(parallel_redir)' ; \
-	parallel_retcode=$$? ; \
-	awk '{ if ($$7 != 0 || $$8 != 0) { if ($$7 == "Exitval") { h = $$0; } else { if (!f) print h; print; f = 1 } } } END { if(f) exit 1; }' < LOG ; \
-	awk_retcode=$$?; \
-	if [ $$parallel_retcode -ne 0 ] || [ $$awk_retcode -ne 0 ] ; then exit 1 ; fi;
+check_0: $(TESTS)
+	$(AM_V_GEN)./build_tools/gtest-parallel --output_dir=$(OUTPUT_DIR) --workers=$(J) --non_gtest_tests $(NON_PARALLEL_TESTS_LIST) $(PARALLEL_TESTS_LIST)
 
 check_1: $(TESTS)
 	$(AM_V_GEN)for t in $(TESTS); do                          \
@@ -1067,20 +967,8 @@ check_1: $(TESTS)
 valgrind-exclude-regexp = InlineSkipTest.ConcurrentInsert|TransactionStressTest.DeadlockStress|DBCompactionTest.SuggestCompactRangeNoTwoLevel0Compactions|BackupableDBTest.RateLimiting|DBTest.CloseSpeedup|DBTest.ThreadStatusFlush|DBTest.RateLimitingTest|DBTest.EncodeDecompressedBlockSizeTest|FaultInjectionTest.UninstalledCompaction|HarnessTest.Randomized|ExternalSSTFileTest.CompactDuringAddFileRandom|ExternalSSTFileTest.IngestFileWithGlobalSeqnoRandomized|MySQLStyleTransactionTest.TransactionStressTest
 
 .PHONY: valgrind_check_0 valgrind_check_1
-valgrind_check_0: test_log_prefix := valgrind_
-valgrind_check_0: $(TESTS) $(parallel_tests)
-	$(AM_V_GEN)printf '%s\n' ''						\
-	  'Running tests in $(TEST_TMPDIR)'		\
-	  'To monitor subtest <duration,pass/fail,name>,'		\
-	  '  run "make watch-log" in a separate window' '';		\
-	  printf './%s\n' $(filter-out $(PARALLEL_TEST) %skiplist_test options_settable_test, $(TESTS)) $(PARALLEL_TEST:%=t/run-%-*) \
-	  | $(prioritize_long_running_tests)				\
-	  | grep -E '$(tests-regexp)'					\
-	  | grep -E -v '$(valgrind-exclude-regexp)'					\
-	  | "$(PARALLEL)" -j$(J) --plain --joblog=LOG --eta --gnu \
-	   --tmpdir=$(TEST_TMPDIR) --timeout=$(TEST_TIMEOUT) \
-	   '(if [[ "{}" == "./"* ]] ; then $(VALGRIND_VER) $(VALGRIND_OPTS) {}; else {}; fi) \
-	  $(parallel_redir)' \
+valgrind_check_0: $(TESTS)
+	$(AM_V_GEN) $(VALGRIND_VER) $(VALGRIND_OPTS) ./build_tools/gtest-parallel --output_dir=$(OUTPUT_DIR) --workers=$(J) --non_gtest_tests $(NON_PARALLEL_TESTS_LIST) $(PARALLEL_TESTS_LIST) 
 
 valgrind_check_1: $(TESTS)
 	$(AM_V_GEN)for t in $(filter-out %skiplist_test options_settable_test,$(TESTS)); do \
@@ -1093,22 +981,9 @@ valgrind_check_1: $(TESTS)
 
 CLEAN_FILES += t LOG
 
-# When running parallel "make check", you can monitor its progress
-# from another window.
-# Run "make watch_LOG" to show the duration,PASS/FAIL,name of parallel
-# tests as they are being run.  We sort them so that longer-running ones
-# appear at the top of the list and any failing tests remain at the top
-# regardless of their duration. As with any use of "watch", hit ^C to
-# interrupt.
-watch-log:
-	$(WATCH) --interval=0 'tail -n+2 LOG|sort -k7,7nr -k4,4gr|$(subst ','\'',$(parallel_log_extract))'
-
-dump-log:
-	tail -n+2 LOG|$(parallel_log_extract)
-
-# If J != 1 and GNU parallel is installed, run the tests in parallel,
+# If J != 1, run the tests in parallel using gtest-parallel,
 # via the check_0 rule above.  Otherwise, run them sequentially via check_1.
-check: all $(if $(shell [ "$(J)" != "1" ] && [ "$(PARALLEL_OK)" = "1" ] && echo 1),check_0,check_1)
+check: all $(if $(shell [ "$(J)" != "1" ] && echo 1),check_0,check_1)
 ifneq ($(PLATFORM), OS_AIX)
 	$(PYTHON) tools/check_all_python.py
 ifndef ASSERT_STATUS_CHECKED # not yet working with these tests

@@ -132,3 +132,5 @@ jobs:
       - name: clear s3 bucket
         run: |
           aws s3 rm s3://spdb-github-ci/ --recursive --include "*"
+
+#keep

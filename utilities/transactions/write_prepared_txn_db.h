@@ -668,7 +668,7 @@ class WritePreparedTxnDB : public PessimisticTransactionDB {
   inline void EnhanceSnapshot(SnapshotImpl* snapshot,
                               SequenceNumber min_uncommitted) {
     assert(snapshot);
-    assert(min_uncommitted <= snapshot->number_ + 1);
+    assert(min_uncommitted <= snapshot->GetSequenceNumber() + 1);
     snapshot->min_uncommitted_ = min_uncommitted;
   }
 
@@ -795,7 +795,7 @@ class WritePreparedTxnDB : public PessimisticTransactionDB {
   // safe to read it concurrently
   std::shared_ptr<std::map<uint32_t, ColumnFamilyHandle*>> handle_map_;
   // A dummy snapshot object that refers to kMaxSequenceNumber
-  SnapshotImpl dummy_max_snapshot_;
+  SnapshotImpl dummy_max_snapshot_{kMaxSequenceNumber};
 };
 
 class WritePreparedTxnReadCallback : public ReadCallback {
@@ -1080,7 +1080,7 @@ SnapshotBackup WritePreparedTxnDB::AssignMinMaxSeqs(const Snapshot* snapshot,
   if (snapshot != nullptr) {
     *min =
         static_cast_with_check<const SnapshotImpl>(snapshot)->min_uncommitted_;
-    *max = static_cast_with_check<const SnapshotImpl>(snapshot)->number_;
+    *max = snapshot->GetSequenceNumber();
     // A duplicate of the check in EnhanceSnapshot().
     assert(*min <= *max + 1);
     return kBackedByDBSnapshot;

@@ -348,8 +348,7 @@ void TableCache::CreateRowCacheKeyPrefix(const ReadOptions& options,
   // Maybe we can include the whole file ifsnapshot == fd.largest_seqno.
   if (options.snapshot != nullptr &&
       (get_context->has_callback() ||
-       static_cast_with_check<const SnapshotImpl>(options.snapshot)
-               ->GetSequenceNumber() <= fd.largest_seqno)) {
+       options.snapshot->GetSequenceNumber() <= fd.largest_seqno)) {
     // We should consider to use options.snapshot->GetSequenceNumber()
     // instead of GetInternalKeySeqno(k), which will make the code
     // easier to understand.

@@ -282,7 +282,12 @@ class DBImpl : public DB {
       std::vector<Iterator*>* iterators) override;
 
   virtual const Snapshot* GetSnapshot() override;
-  virtual void ReleaseSnapshot(const Snapshot* snapshot) override;
+  virtual void ReleaseSnapshot(const Snapshot* snapshot) override {
+    ReleaseSnapshotImpl(snapshot, true);
+  }
+  void ReleaseSnapshotImpl(const Snapshot* snapshot, bool lock,
+                           bool keep_snapshot = false);
+
   using DB::GetProperty;
   virtual bool GetProperty(ColumnFamilyHandle* column_family,
                            const Slice& property, std::string* value) override;
@@ -2060,6 +2065,15 @@ class DBImpl : public DB {
   Status IncreaseFullHistoryTsLowImpl(ColumnFamilyData* cfd,
                                       std::string ts_low);
 
+  // Recalculates the bottom-most file mark threshold after releasing a snapshot
+  // that should cause a threshold bump.
+  // REQUIRES: DB mutex held
+  void RecalculateSnapshotMarkThreshold();
+
+  // A flag indicating that the sequence number has been incremented and that
+  // the cached snapshot is now stale and should be released.
+  std::atomic<bool> release_cached_snapshot_requested_{false};
+
   // Lock over the persistent DB state.  Non-nullptr iff successfully acquired.
   FileLock* db_lock_;
 
@@ -2155,7 +2169,7 @@ class DBImpl : public DB {
   // threads. Protected by db mutex.
   autovector<log::Writer*> logs_to_free_;
 
-  bool is_snapshot_supported_;
+  std::atomic<bool> is_snapshot_supported_;
 
   std::map<uint64_t, std::map<std::string, uint64_t>> stats_history_;
 

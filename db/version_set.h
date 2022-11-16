@@ -51,6 +51,7 @@
 #include "port/port.h"
 #include "rocksdb/env.h"
 #include "rocksdb/file_checksum.h"
+#include "rocksdb/types.h"
 #include "table/get_context.h"
 #include "table/multiget_context.h"
 #include "trace_replay/block_cache_tracer.h"
@@ -984,13 +985,23 @@ class AtomicGroupReadBuffer {
 // column families via ColumnFamilySet, i.e. set of the column families.
 class VersionSet {
  public:
+  enum class SequenceNumberType {
+    kAllocatedSequence,
+    kLastSequence,
+    kPublishedSequence,
+  };
+
+  using SequenceNumberChangedCallback =
+      std::function<void(SequenceNumberType, SequenceNumber)>;
+
   VersionSet(const std::string& dbname, const ImmutableDBOptions* db_options,
              const FileOptions& file_options, Cache* table_cache,
              WriteBufferManager* write_buffer_manager,
              WriteController* write_controller,
              BlockCacheTracer* const block_cache_tracer,
              const std::shared_ptr<IOTracer>& io_tracer,
-             const std::string& db_session_id);
+             const std::string& db_session_id,
+             SequenceNumberChangedCallback seq_num_callback = nullptr);
   // No copying allowed
   VersionSet(const VersionSet&) = delete;
   void operator=(const VersionSet&) = delete;
@@ -1166,23 +1177,38 @@ class VersionSet {
     // Last visible sequence must always be less than last written seq
     assert(!db_options_->two_write_queues || s <= last_allocated_sequence_);
     last_sequence_.store(s, std::memory_order_release);
+    if (seq_num_callback_) {
+      seq_num_callback_(SequenceNumberType::kLastSequence, s);
+    }
   }
 
   // Note: memory_order_release must be sufficient
   void SetLastPublishedSequence(uint64_t s) {
     assert(s >= last_published_sequence_);
     last_published_sequence_.store(s, std::memory_order_seq_cst);
+    if (seq_num_callback_) {
+      seq_num_callback_(SequenceNumberType::kPublishedSequence, s);
+    }
   }
 
   // Note: memory_order_release must be sufficient
   void SetLastAllocatedSequence(uint64_t s) {
     assert(s >= last_allocated_sequence_);
     last_allocated_sequence_.store(s, std::memory_order_seq_cst);
+    if (seq_num_callback_) {
+      seq_num_callback_(SequenceNumberType::kAllocatedSequence, s);
+    }
   }
 
   // Note: memory_order_release must be sufficient
   uint64_t FetchAddLastAllocatedSequence(uint64_t s) {
-    return last_allocated_sequence_.fetch_add(s, std::memory_order_seq_cst);
+    const uint64_t allocated_before =
+        last_allocated_sequence_.fetch_add(s, std::memory_order_seq_cst);
+    if (seq_num_callback_) {
+      seq_num_callback_(SequenceNumberType::kAllocatedSequence,
+                        allocated_before + s);
+    }
+    return allocated_before;
   }
 
   // Mark the specified file number as used.
@@ -1465,6 +1491,8 @@ class VersionSet {
   std::shared_ptr<IOTracer> io_tracer_;
 
   std::string db_session_id_;
+
+  SequenceNumberChangedCallback seq_num_callback_;
 
  private:
   // REQUIRES db mutex at beginning. may release and re-acquire db mutex

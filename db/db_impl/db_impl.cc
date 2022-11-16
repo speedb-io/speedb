@@ -258,10 +258,32 @@ DBImpl::DBImpl(const DBOptions& options, const std::string& dbname,
   SetDbSessionId();
   assert(!db_session_id_.empty());
 
-  versions_.reset(new VersionSet(dbname_, &immutable_db_options_, file_options_,
-                                 table_cache_.get(), write_buffer_manager_,
-                                 &write_controller_, &block_cache_tracer_,
-                                 io_tracer_, db_session_id_));
+  auto seq_num_callback = [this](VersionSet::SequenceNumberType type,
+                                 SequenceNumber new_seq) {
+    switch (type) {
+      case VersionSet::SequenceNumberType::kAllocatedSequence:
+        break;
+      case VersionSet::SequenceNumberType::kLastSequence:
+        if (last_seq_same_as_publish_seq_) {
+          release_cached_snapshot_requested_.store(true,
+                                                   std::memory_order_release);
+        }
+        break;
+      case VersionSet::SequenceNumberType::kPublishedSequence:
+        if (!last_seq_same_as_publish_seq_) {
+          release_cached_snapshot_requested_.store(true,
+                                                   std::memory_order_release);
+        }
+        break;
+      default:
+        assert(false);
+        break;
+    }
+  };
+  versions_.reset(new VersionSet(
+      dbname_, &immutable_db_options_, file_options_, table_cache_.get(),
+      write_buffer_manager_, &write_controller_, &block_cache_tracer_,
+      io_tracer_, db_session_id_, std::move(seq_num_callback)));
   column_family_memtables_.reset(
       new ColumnFamilyMemTablesImpl(versions_->GetColumnFamilySet()));
 
@@ -560,6 +582,7 @@ Status DBImpl::CloseHelper() {
   EraseThreadStatusDbInfo();
   flush_scheduler_.Clear();
   trim_history_scheduler_.Clear();
+  snapshots_.ResetCached();
 
   // For now, simply trigger a manual flush at close time
   // on all the column families.
@@ -1786,8 +1809,7 @@ Status DBImpl::GetImpl(const ReadOptions& read_options, const Slice& key,
       // Already calculated based on read_options.snapshot
       snapshot = get_impl_options.callback->max_visible_seq();
     } else {
-      snapshot =
-          reinterpret_cast<const SnapshotImpl*>(read_options.snapshot)->number_;
+      snapshot = read_options.snapshot->GetSequenceNumber();
     }
   } else {
     // Note that the snapshot is assigned AFTER referencing the super
@@ -2176,8 +2198,7 @@ bool DBImpl::MultiCFSnapshot(
       // In WriteUnprepared, we cannot set snapshot in the lookup key because we
       // may skip uncommitted data that should be visible to the transaction for
       // reading own writes.
-      *snapshot =
-          static_cast<const SnapshotImpl*>(read_options.snapshot)->number_;
+      *snapshot = read_options.snapshot->GetSequenceNumber();
       if (callback) {
         *snapshot = std::max(*snapshot, callback->max_visible_seq());
       }
@@ -2233,9 +2254,7 @@ bool DBImpl::MultiCFSnapshot(
           *snapshot = versions_->LastPublishedSequence();
         }
       } else {
-        *snapshot =
-            static_cast_with_check<const SnapshotImpl>(read_options.snapshot)
-                ->number_;
+        *snapshot = read_options.snapshot->GetSequenceNumber();
       }
       for (auto cf_iter = cf_list->begin(); cf_iter != cf_list->end();
            ++cf_iter) {
@@ -2790,7 +2809,7 @@ Status DBImpl::CreateColumnFamilyImpl(const ColumnFamilyOptions& cf_options,
                                          *cfd->GetLatestMutableCFOptions());
 
       if (!cfd->mem()->IsSnapshotSupported()) {
-        is_snapshot_supported_ = false;
+        is_snapshot_supported_.store(false, std::memory_order_release);
       }
 
       cfd->set_initialized();
@@ -2889,7 +2908,8 @@ Status DBImpl::DropColumnFamilyImpl(ColumnFamilyHandle* column_family) {
           break;
         }
       }
-      is_snapshot_supported_ = new_is_snapshot_supported;
+      is_snapshot_supported_.store(new_is_snapshot_supported,
+                                   std::memory_order_release);
     }
     bg_cv_.SignalAll();
   }
@@ -3158,30 +3178,50 @@ const Snapshot* DBImpl::GetSnapshotForWriteConflictBoundary() {
 
 SnapshotImpl* DBImpl::GetSnapshotImpl(bool is_write_conflict_boundary,
                                       bool lock) {
+  // returns null if the underlying memtable does not support snapshot.
+  if (!is_snapshot_supported_.load(std::memory_order_acquire)) {
+    return nullptr;
+  }
+
+  SnapshotImpl* snapshot = new SnapshotImpl(is_write_conflict_boundary);
+  if (lock) {
+    // Try to get a snapshot without taking a lock
+    if (snapshots_.RefCached(snapshot,
+                             last_seq_same_as_publish_seq_
+                                 ? versions_->LastSequence()
+                                 : versions_->LastPublishedSequence())) {
+      return snapshot;
+    }
+
+    // We failed to get a good snapshot (either because we didn't have a cached
+    // snapshot, or because the cached snapshot didn't match the sequence number
+    // or the write boundary requirement), but we might be holding a reference
+    // to a cached snapshot record, so let's release it (while keeping our
+    // instace of SnapshotImpl alive).
+    ReleaseSnapshotImpl(snapshot, lock, true);
+
+    mutex_.Lock();
+  }
+
   int64_t unix_time = 0;
   immutable_db_options_.clock->GetCurrentTime(&unix_time)
       .PermitUncheckedError();  // Ignore error
-  SnapshotImpl* s = new SnapshotImpl;
 
-  if (lock) {
-    mutex_.Lock();
-  }
-  // returns null if the underlying memtable does not support snapshot.
-  if (!is_snapshot_supported_) {
-    if (lock) {
-      mutex_.Unlock();
+  if (is_snapshot_supported_.load(std::memory_order_acquire)) {
+    const auto snapshot_seq = last_seq_same_as_publish_seq_
+                                  ? versions_->LastSequence()
+                                  : versions_->LastPublishedSequence();
+    if (snapshots_.New(snapshot, snapshot_seq, unix_time)) {
+      // Need to recalculate the snapshot mark threashold if we released the
+      // oldest snapshot
+      RecalculateSnapshotMarkThreshold();
     }
-    delete s;
-    return nullptr;
   }
-  auto snapshot_seq = last_seq_same_as_publish_seq_
-                          ? versions_->LastSequence()
-                          : versions_->LastPublishedSequence();
-  SnapshotImpl* snapshot =
-      snapshots_.New(s, snapshot_seq, unix_time, is_write_conflict_boundary);
+
   if (lock) {
     mutex_.Unlock();
   }
+
   return snapshot;
 }
 
@@ -3197,59 +3237,82 @@ bool CfdListContains(const CfdList& list, ColumnFamilyData* cfd) {
 }
 }  //  namespace
 
-void DBImpl::ReleaseSnapshot(const Snapshot* s) {
+void DBImpl::ReleaseSnapshotImpl(const Snapshot* s, bool lock,
+                                 bool keep_snapshot) {
   if (s == nullptr) {
     // DBImpl::GetSnapshot() can return nullptr when snapshot
     // not supported by specifying the condition:
     // inplace_update_support enabled.
     return;
   }
-  const SnapshotImpl* casted_s = reinterpret_cast<const SnapshotImpl*>(s);
-  {
-    InstrumentedMutexLock l(&mutex_);
-    snapshots_.Delete(casted_s);
-    uint64_t oldest_snapshot;
-    if (snapshots_.empty()) {
-      if (last_seq_same_as_publish_seq_) {
-        oldest_snapshot = versions_->LastSequence();
-      } else {
-        oldest_snapshot = versions_->LastPublishedSequence();
-      }
-    } else {
-      oldest_snapshot = snapshots_.oldest()->number_;
-    }
-    // Avoid to go through every column family by checking a global threshold
-    // first.
-    if (oldest_snapshot > bottommost_files_mark_threshold_) {
-      CfdList cf_scheduled;
-      for (auto* cfd : *versions_->GetColumnFamilySet()) {
-        cfd->current()->storage_info()->UpdateOldestSnapshot(oldest_snapshot);
-        if (!cfd->current()
-                 ->storage_info()
-                 ->BottommostFilesMarkedForCompaction()
-                 .empty()) {
-          SchedulePendingCompaction(cfd);
-          MaybeScheduleFlushOrCompaction();
-          cf_scheduled.push_back(cfd);
-        }
-      }
 
-      // Calculate a new threshold, skipping those CFs where compactions are
-      // scheduled. We do not do the same pass as the previous loop because
-      // mutex might be unlocked during the loop, making the result inaccurate.
-      SequenceNumber new_bottommost_files_mark_threshold = kMaxSequenceNumber;
-      for (auto* cfd : *versions_->GetColumnFamilySet()) {
-        if (CfdListContains(cf_scheduled, cfd)) {
-          continue;
-        }
-        new_bottommost_files_mark_threshold = std::min(
-            new_bottommost_files_mark_threshold,
-            cfd->current()->storage_info()->bottommost_files_mark_threshold());
-      }
-      bottommost_files_mark_threshold_ = new_bottommost_files_mark_threshold;
-    }
+  std::unique_ptr<const SnapshotImpl> release_guard;
+
+  const SnapshotImpl* casted_s = static_cast<const SnapshotImpl*>(s);
+  if (!keep_snapshot) {
+    release_guard.reset(casted_s);
   }
-  delete casted_s;
+
+  if (!snapshots_.Unref(casted_s)) {
+    return;
+  }
+
+  if (lock) {
+    mutex_.Lock();
+  }
+
+  if (snapshots_.Delete(casted_s)) {
+    RecalculateSnapshotMarkThreshold();
+  }
+
+  if (lock) {
+    mutex_.Unlock();
+  }
+}
+
+void DBImpl::RecalculateSnapshotMarkThreshold() {
+  mutex_.AssertHeld();
+
+  uint64_t oldest_snapshot;
+  if (snapshots_.empty()) {
+    if (last_seq_same_as_publish_seq_) {
+      oldest_snapshot = versions_->LastSequence();
+    } else {
+      oldest_snapshot = versions_->LastPublishedSequence();
+    }
+  } else {
+    oldest_snapshot = snapshots_.oldest()->number;
+  }
+  // Avoid to go through every column family by checking a global threshold
+  // first.
+  if (oldest_snapshot > bottommost_files_mark_threshold_) {
+    CfdList cf_scheduled;
+    for (auto* cfd : *versions_->GetColumnFamilySet()) {
+      cfd->current()->storage_info()->UpdateOldestSnapshot(oldest_snapshot);
+      if (!cfd->current()
+               ->storage_info()
+               ->BottommostFilesMarkedForCompaction()
+               .empty()) {
+        SchedulePendingCompaction(cfd);
+        MaybeScheduleFlushOrCompaction();
+        cf_scheduled.push_back(cfd);
+      }
+    }
+
+    // Calculate a new threshold, skipping those CFs where compactions are
+    // scheduled. We do not do the same pass as the previous loop because
+    // mutex might be unlocked during the loop, making the result inaccurate.
+    SequenceNumber new_bottommost_files_mark_threshold = kMaxSequenceNumber;
+    for (auto* cfd : *versions_->GetColumnFamilySet()) {
+      if (CfdListContains(cf_scheduled, cfd)) {
+        continue;
+      }
+      new_bottommost_files_mark_threshold = std::min(
+          new_bottommost_files_mark_threshold,
+          cfd->current()->storage_info()->bottommost_files_mark_threshold());
+    }
+    bottommost_files_mark_threshold_ = new_bottommost_files_mark_threshold;
+  }
 }
 
 #ifndef ROCKSDB_LITE
@@ -4107,6 +4170,7 @@ Status DBImpl::Close() {
   }
   {
     InstrumentedMutexLock l(&mutex_);
+    snapshots_.ResetCached();
     // If there is unreleased snapshot, fail the close call
     if (!snapshots_.empty()) {
       return Status::Aborted("Cannot close DB with unreleased snapshot.");

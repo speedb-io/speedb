@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cinttypes>
+#include <new>
 #include <string>
 #include <unordered_set>
 #include <vector>
@@ -403,7 +404,7 @@ void WritePreparedTxnDB::Init(const TransactionDBOptions& /* unused */) {
       new std::atomic<SequenceNumber>[SNAPSHOT_CACHE_SIZE] {});
   commit_cache_ = std::unique_ptr<std::atomic<CommitEntry64b>[]>(
       new std::atomic<CommitEntry64b>[COMMIT_CACHE_SIZE] {});
-  dummy_max_snapshot_.number_ = kMaxSequenceNumber;
+  new (&dummy_max_snapshot_) SnapshotImpl(kMaxSequenceNumber);
 }
 
 void WritePreparedTxnDB::CheckPreparedAgainstMax(SequenceNumber new_max,

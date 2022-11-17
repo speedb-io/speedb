@@ -3936,7 +3936,7 @@ class Benchmark {
       }
     }
 
-    if (FLAGS_statistics) {
+    if (dbstats) {
       fprintf(stdout, "STATISTICS:\n%s\n", dbstats->ToString().c_str());
     }
     if (FLAGS_simcache_size >= 0) {

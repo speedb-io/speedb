@@ -49,6 +49,10 @@ static_assert((speedb_filter::kPairedBloomBatchSizeInBlocks > 0) &&
 static const uint32_t kInBatchIdxNumBits =
     std::ceil(std::log2(speedb_filter::kPairedBloomBatchSizeInBlocks));
 
+static const int kInBatchIdxNumBitsHashComparison=
+      std::ceil(std::log2(speedb_filter::kPairedBloomBatchSizeInBlocks))-1;
+
+
 // kBlockSizeInBytes must be a power of 2 (= Cacheline size)
 constexpr uint32_t kBlockSizeInBytes = 64U;
 static_assert((kBlockSizeInBytes > 0) &&
@@ -192,14 +196,14 @@ inline int GetBitPosInBlockForHash(uint32_t hash, uint32_t set_idx) {
 
   if (set_idx == 0) {
     bitpos = hash >> 23;
-    if (LIKELY(bitpos > 6)) {
+    if (LIKELY(bitpos > kInBatchIdxNumBitsHashComparison)) {
       return bitpos;
     }
     hash <<= 9;
   } else {
     constexpr uint32_t mask = 0x007FC000;
     bitpos = (hash & mask) >> 14;
-    if (LIKELY(bitpos > 6)) {
+    if (LIKELY(bitpos > (kInBatchIdxNumBitsHashComparison))) {
       return bitpos;
     }
   }
@@ -214,7 +218,7 @@ inline void BuildBlock::SetBlockBloomBits(uint32_t hash, uint32_t set_idx,
                                           size_t hash_set_size) {
   for (auto i = 0U; i < hash_set_size; ++i) {
     int bitpos = GetBitPosInBlockForHash(hash, set_idx);
-    block_address_[bitpos >> 3] |= (char{1} << (bitpos & kInBatchIdxNumBits));
+    block_address_[bitpos >> 3] |= (char{1} << (bitpos & 7));
     hash *= 0x9e3779b9;
   }
 }
@@ -268,7 +272,7 @@ bool ReadBlock::AreAllBlockBloomBitsSet(uint32_t hash, uint32_t set_idx,
 
 #ifdef HAVE_AVX2
 const __m256i mask_vec = _mm256_set1_epi32(0x007FC000);
-const __m256i max_bitpos_vec = _mm256_set1_epi32(7);
+const __m256i max_bitpos_vec = _mm256_set1_epi32(kInBatchIdxNumBits);
 const __m256i fast_range_vec = _mm256_set1_epi32(KNumBitsInBlockBloom);
 const __m256i num_idx_bits_vec = _mm256_set1_epi32(kInBatchIdxNumBits);
 
@@ -365,7 +369,7 @@ bool ReadBlock::AreAllBlockBloomBitsSetNonAvx2(uint32_t hash, uint32_t set_idx,
   for (auto i = 0U; i < hash_set_size; ++i) {
     int bitpos = GetBitPosInBlockForHash(hash, set_idx);
     if ((block_address_[bitpos >> 3] &
-         (char{1} << (bitpos & kInBatchIdxNumBits))) == 0) {
+         (char{1} << (bitpos & 7))) == 0) {
       return false;
     }
     hash *= 0x9e3779b9;

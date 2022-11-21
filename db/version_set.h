@@ -991,8 +991,7 @@ class VersionSet {
     kPublishedSequence,
   };
 
-  using SequenceNumberChangedCallback =
-      std::function<void(SequenceNumberType, SequenceNumber)>;
+  using SequenceNumberChangedCallback = std::function<void(SequenceNumberType)>;
 
   VersionSet(const std::string& dbname, const ImmutableDBOptions* db_options,
              const FileOptions& file_options, Cache* table_cache,
@@ -1178,7 +1177,7 @@ class VersionSet {
     assert(!db_options_->two_write_queues || s <= last_allocated_sequence_);
     last_sequence_.store(s, std::memory_order_release);
     if (seq_num_callback_) {
-      seq_num_callback_(SequenceNumberType::kLastSequence, s);
+      seq_num_callback_(SequenceNumberType::kLastSequence);
     }
   }
 
@@ -1187,7 +1186,7 @@ class VersionSet {
     assert(s >= last_published_sequence_);
     last_published_sequence_.store(s, std::memory_order_seq_cst);
     if (seq_num_callback_) {
-      seq_num_callback_(SequenceNumberType::kPublishedSequence, s);
+      seq_num_callback_(SequenceNumberType::kPublishedSequence);
     }
   }
 
@@ -1196,7 +1195,7 @@ class VersionSet {
     assert(s >= last_allocated_sequence_);
     last_allocated_sequence_.store(s, std::memory_order_seq_cst);
     if (seq_num_callback_) {
-      seq_num_callback_(SequenceNumberType::kAllocatedSequence, s);
+      seq_num_callback_(SequenceNumberType::kAllocatedSequence);
     }
   }
 
@@ -1205,8 +1204,7 @@ class VersionSet {
     const uint64_t allocated_before =
         last_allocated_sequence_.fetch_add(s, std::memory_order_seq_cst);
     if (seq_num_callback_) {
-      seq_num_callback_(SequenceNumberType::kAllocatedSequence,
-                        allocated_before + s);
+      seq_num_callback_(SequenceNumberType::kAllocatedSequence);
     }
     return allocated_before;
   }

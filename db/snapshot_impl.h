@@ -38,7 +38,8 @@ struct SnapshotRecord {
   }
 
   size_t unref(uint32_t refs = 1) const {
-    return refcount_.fetch_sub(refs, std::memory_order_relaxed) - refs;
+    size_t ref = refcount_.fetch_sub(refs, std::memory_order_relaxed) - refs;
+    return ref;
   }
 
   // Will this snapshot be used by a Transaction to do write-conflict checking?
@@ -83,7 +84,8 @@ class SnapshotImpl : public Snapshot {
   SequenceNumber number_;
 
   SnapshotList* list_;                 // just for sanity checks
-  std::atomic<SnapshotRecord*> record_;
+  std::atomic<SnapshotRecord*>
+      record_;  // TODO: yuval - why does this need to be atomic?
 
   // Will this snapshot be used by a Transaction to do write-conflict checking?
   const bool is_write_conflict_boundary_;
@@ -257,7 +259,7 @@ class SnapshotList {
 
     // REQUIRES: DB mutex held
     inline SnapshotRecord* get() {
-      return from_intptr(snapshot_.load(std::memory_order_acquire));
+      return from_intptr(intptr_record_.load(std::memory_order_acquire));
     }
 
    private:
@@ -273,7 +275,7 @@ class SnapshotList {
           n);
     }
 
-    std::atomic<int64_t> snapshot_{0};
+    std::atomic<int64_t> intptr_record_{0};
   };
 
   SnapshotHolder last_snapshot_;

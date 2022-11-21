@@ -258,8 +258,7 @@ DBImpl::DBImpl(const DBOptions& options, const std::string& dbname,
   SetDbSessionId();
   assert(!db_session_id_.empty());
 
-  auto seq_num_callback = [this](VersionSet::SequenceNumberType type,
-                                 SequenceNumber new_seq) {
+  auto seq_num_callback = [this](VersionSet::SequenceNumberType type) {
     switch (type) {
       case VersionSet::SequenceNumberType::kAllocatedSequence:
         break;
@@ -3186,6 +3185,9 @@ SnapshotImpl* DBImpl::GetSnapshotImpl(bool is_write_conflict_boundary,
   SnapshotImpl* snapshot = new SnapshotImpl(is_write_conflict_boundary);
   if (lock) {
     // Try to get a snapshot without taking a lock
+    // is it possible checking snapshot number in last_snapshot_
+    // and then avoid the cached path? if it is, equal then we would need to
+    // take a ref so that its not dropped while we try to take it.
     if (snapshots_.RefCached(snapshot,
                              last_seq_same_as_publish_seq_
                                  ? versions_->LastSequence()

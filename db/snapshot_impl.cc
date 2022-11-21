@@ -105,7 +105,9 @@ bool SnapshotList::New(SnapshotImpl* s, SequenceNumber seq, int64_t unix_time) {
   assert(s->list_ == nullptr);
   assert(s->record_.load(std::memory_order_acquire) == nullptr);
 
-  SnapshotRecord* record = last_snapshot_.get();
+  SnapshotRecord* record =
+      last_snapshot_.get();  // TODO: yuval - why do we need this? just create a
+                             // new record and add it to the list.
 
   bool was_oldest_snapshot_released = false;
   if (record == nullptr || record->number != seq) {
@@ -124,7 +126,10 @@ bool SnapshotList::New(SnapshotImpl* s, SequenceNumber seq, int64_t unix_time) {
       // Delete from list if we were holding the last reference
       was_oldest_snapshot_released = Delete(&dummy);
     }
-  } else if (s->is_write_conflict_boundary_ &&
+  } else if (s->is_write_conflict_boundary_ &&  // this means the cached
+                                                // snapshot fits in seq but not
+                                                // with
+                                                // is_write_conflict_boundary
              !record->is_write_conflict_boundary) {
     record->is_write_conflict_boundary = true;
   }
@@ -137,12 +142,12 @@ bool SnapshotList::New(SnapshotImpl* s, SequenceNumber seq, int64_t unix_time) {
   return was_oldest_snapshot_released;
 }
 
-SnapshotRecord* SnapshotList::SnapshotHolder::reset(SnapshotRecord* s) {
-  if (s != nullptr) {
-    s->ref(kRefCtrInitValue);
+SnapshotRecord* SnapshotList::SnapshotHolder::reset(SnapshotRecord* record) {
+  if (record != nullptr) {
+    record->ref(kRefCtrInitValue);
   }
   const int64_t olds =
-      snapshot_.exchange(to_intptr(s), std::memory_order_release);
+      intptr_record_.exchange(to_intptr(record), std::memory_order_release);
   SnapshotRecord* old = from_intptr(olds);
   if (old != nullptr) {
     // Truncating here is OK, as we can never have that many active readers
@@ -159,17 +164,17 @@ SnapshotRecord* SnapshotList::SnapshotHolder::reset(SnapshotRecord* s) {
 }
 
 SnapshotRecord* SnapshotList::SnapshotHolder::ref() {
-  const int64_t cur_s = snapshot_.fetch_add(1, std::memory_order_acquire);
+  const int64_t cur_s = intptr_record_.fetch_add(1, std::memory_order_acquire);
   SnapshotRecord* snapshot = from_intptr(cur_s);
 
   if (snapshot != nullptr) {
     // Move references to the internal snapshot counter every kRefCtrBatchSize
     if ((cur_s & kRefCtrMask) > kRefCtrBatchSize) {
       snapshot->ref(kRefCtrBatchSize);
-      int64_t new_c = snapshot_.load(std::memory_order_acquire);
+      int64_t new_s = intptr_record_.load(std::memory_order_acquire);
       for (;;) {
-        const size_t active = new_c & kRefCtrMask;
-        const SnapshotRecord* nsnap = from_intptr(new_c);
+        const size_t active = new_s & kRefCtrMask;
+        const SnapshotRecord* nsnap = from_intptr(new_s);
 
         if (nsnap != snapshot || active <= kRefCtrBatchSize) {
           snapshot->unref(kRefCtrBatchSize);
@@ -178,8 +183,8 @@ SnapshotRecord* SnapshotList::SnapshotHolder::ref() {
 
         const int64_t updated = to_intptr(snapshot, active - kRefCtrBatchSize);
 
-        if (snapshot_.compare_exchange_weak(new_c, updated,
-                                            std::memory_order_release)) {
+        if (intptr_record_.compare_exchange_weak(new_s, updated,
+                                                 std::memory_order_release)) {
           break;
         }
       }

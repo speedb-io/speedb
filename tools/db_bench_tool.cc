@@ -8630,27 +8630,7 @@ class Benchmark {
 #endif  // ROCKSDB_LITE
 };
 
-void ValidateMetadataCacheOptions() {
-  if (FLAGS_top_level_index_pinning &&
-      (FLAGS_cache_index_and_filter_blocks == false)) {
-    ErrorExit(
-        "--cache_index_and_filter_blocks must be set for "
-        "--top_level_index_pinning to have any affect.");
-  }
-
-  if (FLAGS_unpartitioned_pinning &&
-      (FLAGS_cache_index_and_filter_blocks == false)) {
-    ErrorExit(
-        "--cache_index_and_filter_blocks must be set for "
-        "--unpartitioned_pinning to have any affect.");
-  }
-}
-
 namespace {
-// The benchmark needs to be created before running the first group, retained
-// between groups, and destroyed after running the last group
-std::unique_ptr<ROCKSDB_NAMESPACE::Benchmark> benchmark;
-
 // Records the values of applicable flags during the invocation of the first
 // group The user may not modify any of these in subsequent groups
 struct FirstGroupApplicableFlags {
@@ -8713,7 +8693,6 @@ void ValidateSubsequentGroupsDoNotOverrideApplicableFlags() {
     ErrorExit("It's illegal to change the seed in groups > 1");
   }
 }
-}  // namespace
 
 void ValidateAndProcessStatisticsFlags(
     [[maybe_unused]] bool first_group,
@@ -8734,9 +8713,6 @@ void ValidateAndProcessStatisticsFlags(
       ErrorExit("No Statistics registered matching string: %s status=%s",
                 FLAGS_statistics_string.c_str(), s.ToString().c_str());
     }
-  }
-  if (FLAGS_statistics) {
-    dbstats = ROCKSDB_NAMESPACE::CreateDBStatistics();
   }
   if (dbstats) {
     dbstats->set_stats_level(static_cast<StatsLevel>(FLAGS_stats_level));
@@ -8775,6 +8751,22 @@ void ValidateAndProcessEnvFlags(
     FLAGS_env = composite_env.get();
   }
 #endif  // ROCKSDB_LITE
+}
+
+void ValidateMetadataCacheOptions() {
+  if (FLAGS_top_level_index_pinning &&
+      (FLAGS_cache_index_and_filter_blocks == false)) {
+    ErrorExit(
+        "--cache_index_and_filter_blocks must be set for "
+        "--top_level_index_pinning to have any affect.");
+  }
+
+  if (FLAGS_unpartitioned_pinning &&
+      (FLAGS_cache_index_and_filter_blocks == false)) {
+    ErrorExit(
+        "--cache_index_and_filter_blocks must be set for "
+        "--unpartitioned_pinning to have any affect.");
+  }
 }
 
 // The actual running of a group of benchmarks that share configuration
@@ -8914,12 +8906,12 @@ int db_bench_tool_run_group(int group_num, int num_groups, int argc,
       fprintf(stdout, "Malloc stats:\n%s\n", stats_string.c_str());
     }
 #endif  // ROCKSDB_LITE
-
-    benchmark.reset();
   }
 
   return 0;
 }
+
+}  // namespace
 
 // Main entry point for db_bench tool
 //

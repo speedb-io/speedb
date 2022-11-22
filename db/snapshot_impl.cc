@@ -53,8 +53,15 @@ bool SnapshotList::Unref(const SnapshotImpl* s) {
   }
 
   assert(s->list_ == this);
-  assert(record != nullptr);
-
+  // if the record is pointed to by the last_snapshot_ then it will still have
+  // the extra refs (kRefCtrInitValue) which are inserted during reset(record).
+  // so we need to unref on the pointer.
+  if (record == last_snapshot_.get()) {
+    bool no_refs_left = last_snapshot_.unref();
+    if (no_refs_left) {
+      return true;
+    }
+  }
   if (record->unref() != 0) {
     const_cast<SnapshotImpl*>(s)->list_ = nullptr;
     const_cast<SnapshotImpl*>(s)->record_.store(nullptr);
@@ -126,10 +133,9 @@ bool SnapshotList::New(SnapshotImpl* s, SequenceNumber seq, int64_t unix_time) {
       // Delete from list if we were holding the last reference
       was_oldest_snapshot_released = Delete(&dummy);
     }
-  } else if (s->is_write_conflict_boundary_ &&  // this means the cached
-                                                // snapshot fits in seq but not
-                                                // with
-                                                // is_write_conflict_boundary
+    // this means the cached snapshot fits in seq but not with
+    // is_write_conflict_boundary
+  } else if (s->is_write_conflict_boundary_ &&
              !record->is_write_conflict_boundary) {
     record->is_write_conflict_boundary = true;
   }
@@ -194,4 +200,15 @@ SnapshotRecord* SnapshotList::SnapshotHolder::ref() {
   return snapshot;
 }
 
+// need to check if reference count on pointer might reach 0 but there could be
+// buffered refs in the record (multiplies of kRefCtrBatchSize). and when ref
+// count is truly 0 then we need to be careful not to start discarding it while
+// another thread takes a reference and tries to use it.
+bool SnapshotList::SnapshotHolder::unref() {
+  // could intptr_record_ change between checking that the record is the same as
+  // the last_snapshot and decremnting it here? last_snapshot_ and the
+  // intptr_record_ are only switched under mutex when inserting to the
+  // snapshotlist
+  const int64_t cur_s = intptr_record_.fetch_sub(1, std::memory_order_acquire);
+}
 }  // namespace ROCKSDB_NAMESPACE

@@ -198,7 +198,6 @@ class SnapshotList {
 
   uint64_t count() const { return count_; }
 
- private:
   // This is essentially an atomic shared pointer, which is currently only
   // implemented for the needs of snapshots, but can be extended to support
   // the standard library's shared_ptr<T> if we implement access to the ref
@@ -253,9 +252,13 @@ class SnapshotList {
    public:
     ~SnapshotHolder() { reset(); }
 
+    uint32_t get_kRefCtrBatchSize() { return kRefCtrBatchSize; }
+
     SnapshotRecord* reset(SnapshotRecord* s = nullptr);
 
     SnapshotRecord* ref();
+
+    bool unref();
 
     // REQUIRES: DB mutex held
     inline SnapshotRecord* get() {
@@ -278,6 +281,7 @@ class SnapshotList {
     std::atomic<int64_t> intptr_record_{0};
   };
 
+ private:
   SnapshotHolder last_snapshot_;
 
   // Dummy head of doubly-linked list of snapshots

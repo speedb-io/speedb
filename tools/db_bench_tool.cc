@@ -2768,7 +2768,8 @@ class Benchmark {
     fprintf(stdout, "------------------------------------------------\n");
   }
 
-  void PrintWarnings(bool first_group, const char* compression) {
+  void PrintWarnings([[maybe_unused]] bool first_group,
+                     const char* compression) {
 #if defined(__GNUC__) && !defined(__OPTIMIZE__)
     if (first_group) {
       fprintf(

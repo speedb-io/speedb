@@ -449,10 +449,12 @@ DEFINE_int32(user_timestamp_size, 0,
 DEFINE_int32(num_multi_db, 0,
              "Number of DBs used in the benchmark. 0 means single DB.");
 
-DEFINE_string(
-    dbs_to_use, "",
-    "Indices of the DBs to actually use in the benchmark of all available DBs "
-    " \"\" means use all available DBs. Indices may be specified in any order");
+DEFINE_string(dbs_to_use, "",
+              "A comma-separated list of indices of the DBs to actually use in "
+              "the benchmark "
+              "of all available DBs. \"\" means use all available DBs. Indices "
+              "may be specified "
+              "in any order. ");
 
 DEFINE_double(compression_ratio, 0.5, "Arrange to generate values that shrink"
               " to this fraction of their original size after compression");
@@ -2657,6 +2659,8 @@ class Benchmark {
     }
     return dbs_[0];
   }
+
+  DBWithColumnFamilies& FirstDb() { return dbs_[0]; }
 
   // Use this to access the DB when context requires a Multi-DB mode
   std::vector<DBWithColumnFamilies>& MultiDb() {
@@ -6709,7 +6713,7 @@ class Benchmark {
         thread->stats.ResetLastOpTime();
       }
 
-      thread->stats.FinishedOps(&SingleDb(), SingleDb().db, 1, kSeek);
+      thread->stats.FinishedOps(&FirstDb(), FirstDb().db, 1, kSeek);
     }
     for (auto iter : tailing_iters) {
       delete iter;
@@ -6876,7 +6880,7 @@ class Benchmark {
         ErrorExit("put or merge error: %s", s.ToString().c_str());
       }
       bytes += key.size() + val.size() + user_timestamp_size_;
-      thread->stats.FinishedOps(&SingleDb(), SingleDb().db, 1, kWrite);
+      thread->stats.FinishedOps(&FirstDb(), FirstDb().db, 1, kWrite);
 
       if (FLAGS_benchmark_write_rate_limit > 0) {
         write_rate_limiter->Request(
@@ -7280,8 +7284,6 @@ class Benchmark {
     int64_t puts_done = 0;
     int64_t deletes_done = 0;
 
-    auto& single_db = SingleDb();
-
     std::unique_ptr<const char[]> key_guard;
     Slice key = AllocateKey(&key_guard);
 
@@ -7308,7 +7310,7 @@ class Benchmark {
         }
         get_weight--;
         gets_done++;
-        thread->stats.FinishedOps(&single_db, single_db.db, 1, kRead);
+        thread->stats.FinishedOps(&FirstDb(), FirstDb().db, 1, kRead);
       } else if (put_weight > 0) {
         // then do all the corresponding number of puts
         // for all the gets we have done earlier
@@ -7318,7 +7320,7 @@ class Benchmark {
         }
         put_weight--;
         puts_done++;
-        thread->stats.FinishedOps(&single_db, single_db.db, 1, kWrite);
+        thread->stats.FinishedOps(&FirstDb(), FirstDb().db, 1, kWrite);
       } else if (delete_weight > 0) {
         Status s = DeleteMany(db, write_options_, key);
         if (!s.ok()) {
@@ -7326,7 +7328,7 @@ class Benchmark {
         }
         delete_weight--;
         deletes_done++;
-        thread->stats.FinishedOps(&single_db, single_db.db, 1, kDelete);
+        thread->stats.FinishedOps(&FirstDb(), FirstDb().db, 1, kDelete);
       }
     }
     char msg[128];
@@ -7537,7 +7539,7 @@ class Benchmark {
               RateLimiter::OpType::kRead);
         }
 
-        thread->stats.FinishedOps(&SingleDb(), SingleDb().db, 1, kSeek);
+        thread->stats.FinishedOps(&FirstDb(), FirstDb().db, 1, kSeek);
         // Write
       } else {
         DB* db = SelectDB(thread);
@@ -8049,8 +8051,6 @@ class Benchmark {
   // RandomTransactionVerify() will then validate the correctness of the results
   // by checking if the sum of all keys in each set is the same.
   void RandomTransaction(ThreadState* thread) {
-    auto& single_db = SingleDb();
-
     Duration duration(FLAGS_duration, readwrites_);
     uint16_t num_prefix_ranges = static_cast<uint16_t>(FLAGS_transaction_sets);
     uint64_t transactions_done = 0;
@@ -8072,6 +8072,7 @@ class Benchmark {
           "Cannot run RandomTransaction benchmark with  FLAGS_multi_db > 1.");
     }
 
+    auto& single_db = SingleDb();
     while (!duration.Done(1)) {
       bool success;
 
@@ -8347,7 +8348,7 @@ class Benchmark {
       // TODO - If there is a single db => no point selecting one above.
       // If there are multiple db-s, db_ / SingleDb() would be null / fail
       // => Seems like a bug or suitable only for the single db mode
-      thread->stats.FinishedOps(&SingleDb(), SingleDb().db, 1, kWrite);
+      thread->stats.FinishedOps(&FirstDb(), FirstDb().db, 1, kWrite);
       thread->stats.AddBytes(bytes);
 
       if (FLAGS_benchmark_write_rate_limit > 0) {

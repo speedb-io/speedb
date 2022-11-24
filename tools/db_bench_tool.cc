@@ -529,6 +529,8 @@ DEFINE_int64(db_write_buffer_size,
 DEFINE_bool(cost_write_buffer_to_cache, false,
             "The usage of memtable is costed to the block cache");
 
+DEFINE_bool(allow_wbm_stalls, false, "Enable WBM write stalls and delays");
+
 DEFINE_int64(arena_block_size, ROCKSDB_NAMESPACE::Options().arena_block_size,
              "The size, in bytes, of one block in arena memory allocation.");
 
@@ -4315,9 +4317,12 @@ class Benchmark {
         FLAGS_compression_use_zstd_dict_trainer;
 
     options.max_open_files = FLAGS_open_files;
+    if ((FLAGS_db_write_buffer_size == 0) && FLAGS_allow_wbm_stalls) {
+      ErrorExit("-allow_wbm_stalls is useless if db_write_buffer_size == 0");
+    }
     if (FLAGS_cost_write_buffer_to_cache || FLAGS_db_write_buffer_size != 0) {
-      options.write_buffer_manager.reset(
-          new WriteBufferManager(FLAGS_db_write_buffer_size, cache_));
+      options.write_buffer_manager.reset(new WriteBufferManager(
+          FLAGS_db_write_buffer_size, cache_, FLAGS_allow_wbm_stalls));
     }
     options.arena_block_size = FLAGS_arena_block_size;
     options.write_buffer_size = FLAGS_write_buffer_size;

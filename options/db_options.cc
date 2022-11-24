@@ -860,13 +860,12 @@ void ImmutableDBOptions::Dump(Logger* log) const {
   ROCKS_LOG_HEADER(
       log, "                   Options.db_write_buffer_size: %" ROCKSDB_PRIszt,
       db_write_buffer_size);
-  ROCKS_LOG_HEADER(log, "                   Options.write_buffer_manager: %p",
-                   write_buffer_manager.get());
-  if (write_buffer_manager.get()) {
-    ROCKS_LOG_HEADER(log, "                   write_buffer_manager_options:");
-    ROCKS_LOG_HEADER(log, "%s",
-                     write_buffer_manager->GetPrintableOptions().c_str());
-  }
+  ROCKS_LOG_HEADER(
+      log, "                   Options.write_buffer_manager: %p%s%s",
+      write_buffer_manager.get(), (write_buffer_manager.get() ? "\n" : ""),
+      (write_buffer_manager.get()
+           ? write_buffer_manager->GetPrintableOptions().c_str()
+           : ""));
   ROCKS_LOG_HEADER(log, "        Options.access_hint_on_compaction_start: %d",
                    static_cast<int>(access_hint_on_compaction_start));
   ROCKS_LOG_HEADER(

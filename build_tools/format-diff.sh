@@ -122,12 +122,12 @@ uncommitted_code=`git diff HEAD`
 
 # If there's no uncommitted changes, we assume user are doing post-commit
 # format check, in which case we'll try to check the modified lines vs. the
-# facebook/rocksdb.git main branch. Otherwise, we'll check format of the
+# speedb-io/speedb.git main branch. Otherwise, we'll check format of the
 # uncommitted code only.
 if [ -z "$uncommitted_code" ]
 then
-  # Attempt to get name of facebook/rocksdb.git remote.
-  [ "$FORMAT_REMOTE" ] || FORMAT_REMOTE="$(LC_ALL=POSIX LANG=POSIX git remote -v | grep 'facebook/rocksdb.git' | head -n 1 | cut -f 1)"
+  # Attempt to get name of speedb-io/speedb.git remote.
+  [ "$FORMAT_REMOTE" ] || FORMAT_REMOTE="$(LC_ALL=POSIX LANG=POSIX git remote -v | grep 'speedb-io/speedb.git' | head -n 1 | cut -f 1)"
   # Fall back on 'origin' if that fails
   [ "$FORMAT_REMOTE" ] || FORMAT_REMOTE=origin
   # Use main branch from that remote

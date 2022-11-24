@@ -516,7 +516,7 @@ function summarize_result {
 
   # In recent versions these can be found directly via db_bench --version, --build_info but
   # grepping from the log lets this work on older versions.
-  version="$( grep "RocksDB version:" "$DB_DIR"/LOG | head -1 | awk '{ printf "%s", $5 }' )"
+  version="$( grep "SpeeDB version:" "$DB_DIR"/LOG | head -1 | awk '{ printf "%s", $5 }' )"
   git_hash="$( grep "Git sha" "$DB_DIR"/LOG | head -1 | awk '{ printf "%s", substr($5, 1, 10) }' )"
 
   # Note that this function assumes that the benchmark executes long enough so
@@ -625,7 +625,7 @@ function summarize_result {
     echo -e "# usec_op - Microseconds per operation" >> "$report"
     echo -e "# p50, p99, p99.9, p99.99 - 50th, 99th, 99.9th, 99.99th percentile response time in usecs" >> "$report"
     echo -e "# pmax - max response time in usecs" >> "$report"
-    echo -e "# uptime - RocksDB uptime in seconds" >> "$report"
+    echo -e "# uptime - Speedb uptime in seconds" >> "$report"
     echo -e "# stall% - Percentage of time writes are stalled" >> "$report"
     echo -e "# Nstall - Number of stalls" >> "$report"
     echo -e "# u_cpu - #seconds/1000 of user CPU" >> "$report"
@@ -633,7 +633,7 @@ function summarize_result {
     echo -e "# rss - max RSS in GB for db_bench process" >> "$report"
     echo -e "# test - Name of test" >> "$report"
     echo -e "# date - Date/time of test" >> "$report"
-    echo -e "# version - RocksDB version" >> "$report"
+    echo -e "# version - Speedb version" >> "$report"
     echo -e "# job_id - User-provided job ID" >> "$report"
     echo -e "# githash - git hash at which db_bench was compiled" >> "$report"
     echo -e $tsv_header >> "$report"

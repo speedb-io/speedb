@@ -84,6 +84,7 @@
 #include "rocksdb/table.h"
 #include "rocksdb/version.h"
 #include "rocksdb/write_buffer_manager.h"
+#include "speedb/version.h"
 #include "table/block_based/block.h"
 #include "table/block_based/block_based_table_factory.h"
 #include "table/get_context.h"
@@ -4899,7 +4900,8 @@ void DBImpl::EraseThreadStatusDbInfo() const {}
 //
 // A global method that can dump out the build version
 void DumpRocksDBBuildVersion(Logger* log) {
-  ROCKS_LOG_HEADER(log, "SpeeDB version: %s\n",
+  ROCKS_LOG_HEADER(log, "SpeeDB version: %s (%s)\n",
+                   GetSpeedbVersionAsString().c_str(),
                    GetRocksVersionAsString().c_str());
   const auto& props = GetRocksBuildProperties();
   const auto& sha = props.find("speedb_build_git_sha");

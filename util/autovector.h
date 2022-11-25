@@ -303,7 +303,7 @@ class autovector {
   reference emplace_back(Args&&... args) {
     if (num_stack_items_ < kSize) {
       return *(new ((void*)(&values_[num_stack_items_++]))
-          value_type(std::forward<Args>(args)...));
+                   value_type(std::forward<Args>(args)...));
     } else {
       return vect_.emplace_back(std::forward<Args>(args)...);
     }
@@ -318,7 +318,6 @@ class autovector {
     }
   }
 #endif
-
 
   void pop_back() {
     assert(!empty());

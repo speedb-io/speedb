@@ -2088,6 +2088,7 @@ Status DBImpl::Open(const DBOptions& db_options, const std::string& dbname,
     delete impl;
     *dbptr = nullptr;
   }
+
   return s;
 }
 }  // namespace ROCKSDB_NAMESPACE

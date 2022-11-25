@@ -1,4 +1,29 @@
 # Speedb Change Log 
+
+## Blueberry 2.1.0 (10/26/2022)
+## New Features
+* Added new Paired bloom filter that reduces false positive rate with the same performance and memory. In some configurations, the memory consumption is even reduced by up to 30%.
+Note: Paired bloom filter is recommended to use when the number of bits per key is larger than 10. (#54)
+* Added Plugin Tests to builds (#143)
+
+## Enhancements
+* The default value for the number of compaction threads has changed to 8 (#194)
+* An infrastructure addition for a future feature: added API to retrieve the amount of immutable memory that can be freed. (#113)
+* cmake: allow running the tests in parallel like in the Makefile (#103)
+* build: fix the java test target dependencies (#129)
+* flush_job: do not roll back memtable flush on CF drop and DB shutdown (#127)
+* When background purges are used, set their priority to low instead of high, (#151)
+* Added db_bench option to change the parameter: avoid_unnecessary_blocking_io (#184)
+* Allow construction of Filter Policy from uri to the tools (#83)
+
+## Miscellaneous
+* Remove the GPL as an alternative license (#119)
+* Fix shell tab-completions in makefile (#148)
+* Added Speedb change-log to the HISTORY.md file (#189)
+* makefile: rework the dependency graph for faster test runs startup (#175)
+* Change the name of the output artifacts to Speedb (#66)
+
+
 ## Apricot 2.0.0 (08/04/2022)
 ## New Features
 * Added a new hash based memtable that supports concurrent reads and writes

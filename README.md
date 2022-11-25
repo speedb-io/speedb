@@ -91,14 +91,19 @@ We are using DBbench to test performance and progress between the versions. It i
 In there you can also find a readme with the commands we are using to get you started. 
 Here is a graph comparing Speedb's paired bloom filter with the default bloom filter. 
 
-
 <img width="769" alt="Screen Shot 2022-10-31 at 15 15 42" src="https://user-images.githubusercontent.com/107058910/199016617-4ecbe279-b281-4a8c-b630-87a509bc09da.png">
 
+For additional info see: [Paired Bloom Filter](https://docs.speedb.dev/documentation/speedb-features/paired-bloom-filter).
 
-For additional info see: <a href="https://app.gitbook.com/o/o2rbZPVFSai2q6o8Il3m/s/9jcjg12ODKbmmsnY7Cma/speedb-features/paired-bloom-filter">Paired Bloom Filter</a>
+## Documentation
+
+You can find a detailed description of all Speedb features [here](https://speedb.gitbook.io/documentation/).
+
+[Speedb's documentation repository](https://github.com/speedb-io/book) allows you to enhance, add content and fix issues. 
 
 ## 🛣️ Roadmap
-The <a href="https://github.com/orgs/speedb-io/projects/4/views/1"> product roadmap</a> provides a snapshot of the features we are currently developing, what we are planning for the future, and the items that have already been delivered.
+
+The [product roadmap](https://github.com/orgs/speedb-io/projects/4/views/1) provides a snapshot of the features we are currently developing, what we are planning for the future, and the items that have already been delivered.
 
 We have added a column with items that are awaiting community feedback. We invite you to participate in our polls inside, share your thoughts about topics that are important to you, and let us know if there is anything else you would like to see on the list.
 

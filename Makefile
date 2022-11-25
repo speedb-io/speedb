@@ -834,7 +834,17 @@ else
 	git_mod  := $(shell git diff-index HEAD --quiet 2>/dev/null; echo $$?)
 	git_date := $(shell git log -1 --date=iso --format="%ad" 2>/dev/null | awk '{print $1 " " $2}' 2>/dev/null)
 endif
-gen_build_version = sed -e s/@GIT_SHA@/$(git_sha)/ -e s:@GIT_TAG@:"$(git_tag)": -e s/@GIT_MOD@/"$(git_mod)"/ -e s/@BUILD_DATE@/"$(build_date)"/ -e s/@GIT_DATE@/"$(git_date)"/ -e s/@ROCKSDB_PLUGIN_BUILTINS@/'$(ROCKSDB_PLUGIN_BUILTINS)'/ -e s/@ROCKSDB_PLUGIN_EXTERNS@/"$(ROCKSDB_PLUGIN_EXTERNS)"/ util/build_version.cc.in
+
+SPDB_BUILD_TAG ?=
+ifneq (${SPDB_RELEASE_BUILD},1)
+	ifeq ($(strip ${SPDB_BUILD_TAG}),)
+		SPDB_BUILD_TAG := $(shell $(PYTHON) "$(CURDIR)/build_tools/spdb_get_build_tag.py")
+	endif
+	ifeq ($(strip ${SPDB_BUILD_TAG}),)
+		SPDB_BUILD_TAG := ?
+	endif
+endif
+gen_build_version = sed -e s/@GIT_SHA@/$(git_sha)/ -e s:@GIT_TAG@:"$(git_tag)": -e s/@GIT_MOD@/"$(git_mod)"/ -e s/@BUILD_DATE@/"$(build_date)"/ -e s/@GIT_DATE@/"$(git_date)"/ -e 's!@SPDB_BUILD_TAG@!$(SPDB_BUILD_TAG:!=\!)!' -e s/@ROCKSDB_PLUGIN_BUILTINS@/'$(ROCKSDB_PLUGIN_BUILTINS)'/ -e s/@ROCKSDB_PLUGIN_EXTERNS@/"$(ROCKSDB_PLUGIN_EXTERNS)"/ util/build_version.cc.in
 
 # Record the version of the source that we are compiling.
 # We keep a record of the git revision in this file.  It is then built

@@ -1122,6 +1122,24 @@ endif()
 string(REGEX REPLACE "[^0-9a-fA-F]+" "" GIT_SHA "${GIT_SHA}")
 string(REGEX REPLACE "[^0-9: /-]+" "" GIT_DATE "${GIT_DATE}")
 
+option(SPDB_RELEASE_BUILD "Create a release build of Speedb" OFF)
+set(SPDB_BUILD_TAG "" CACHE STRING "Set a specific build tag for this Speedb build")
+
+if(NOT SPDB_RELEASE_BUILD AND "${SPDB_BUILD_TAG}" STREQUAL "")
+  include(FindPython)
+  find_package(Python COMPONENTS Interpreter)
+  if(NOT Python_Interpreter_FOUND)
+    set(SPDB_BUILD_TAG "?")
+  else()
+    execute_process(
+      WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" OUTPUT_VARIABLE SPDB_BUILD_TAG
+      COMMAND "${Python_EXECUTABLE}" build_tools/spdb_get_build_tag.py OUTPUT_STRIP_TRAILING_WHITESPACE)
+    if ("${SPDB_BUILD_TAG}" STREQUAL "")
+      set(SPDB_BUILD_TAG "?")
+    endif()
+  endif()
+endif()
+
 set(BUILD_VERSION_CC ${CMAKE_BINARY_DIR}/build_version.cc)
 configure_file(util/build_version.cc.in ${BUILD_VERSION_CC} @ONLY)
 

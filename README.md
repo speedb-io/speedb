@@ -14,12 +14,15 @@
 </div>
 
 # Speedb
-Speedb is a library that provides persistent key-value stores. Keys and values are arbitrary byte arrays. The keys are ordered within the key value store according to a user-specified comparator function.
+Speedb is a library that provides a high performance, persistent key-value store. 
+This is a community led project that focuses on high performance, optimized for modern storage hardware, on-premise and in the cloud.
 It is maintained by Speedb and is forked from Rocksdb, developed by Facebook.
 
+**Jois us to build the next generation data engine!**
+
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset=".github/speedb-bee-dark.gif" width="80px" >
-  <img src=".github/speedb-bee.gif" width="80px">
+  <source media="(prefers-color-scheme: dark)" srcset=".github/new-bee-mascot-dark.gif" width="80px" >
+  <img src=".github/new-bee-mascot.gif" width="80px">
 </picture>
 
 
@@ -50,13 +53,13 @@ Please refer to the file [INSTALL.md](INSTALL.md) for a list of all the
 dependencies and how to install them across different platforms.
 
 
-## Building Speedb
+## 🔨 Building Speedb 
 
 Debug:
 
     mkdir build && cd build
     cmake .. -DCMAKE_BUILD_TYPE=Debug [cmake options]
-    make rocksdb
+    make speedb
 
 By default the build type is Debug.
 
@@ -64,7 +67,7 @@ Release:
 
     mkdir build && cd build
     cmake .. -DCMAKE_BUILD_TYPE=Release [cmake options]
-    make rocksdb
+    make speedb
 
 This will build the static library. If you want to build the dynamic library,
 use:
@@ -82,14 +85,30 @@ For development and functional testing, go with the debug version which includes
 more assertions and debug prints. Otherwise, for production or performance
 testing, we recommend building a release version which is more optimized.
 
+## 📈 Performance 
 
-## Questions 
+We are using DBbench to test performance and progress between the versions. It is available under tools and also in the artifact for direct download.
+In there you can also find a readme with the commands we are using to get you started. 
+Here is a graph comparing Speedb's paired bloom filter with the default bloom filter. 
 
-- For live discussion with the community you can use our official [Discord channel](https://discord.gg/52yzKZ5G9D). 
-- For technical questions and discussions you can use our official [Discourse forum](https://speedb.discourse.group/). 
+
+<img width="769" alt="Screen Shot 2022-10-31 at 15 15 42" src="https://user-images.githubusercontent.com/107058910/199016617-4ecbe279-b281-4a8c-b630-87a509bc09da.png">
 
 
-## Join us
+For additional info see: <a href="https://app.gitbook.com/o/o2rbZPVFSai2q6o8Il3m/s/9jcjg12ODKbmmsnY7Cma/speedb-features/paired-bloom-filter">Paired Bloom Filter</a>
+
+## 🛣️ Roadmap
+The <a href="https://github.com/orgs/speedb-io/projects/4/views/1"> product roadmap</a> provides a snapshot of the features we are currently developing, what we are planning for the future, and the items that have already been delivered.
+
+We have added a column with items that are awaiting community feedback. We invite you to participate in our polls inside, share your thoughts about topics that are important to you, and let us know if there is anything else you would like to see on the list.
+
+## ❔ Questions 
+
+- For live discussion with the community you can use our official [Discord channel](https://discord.gg/5fVUUtM2cG). 
+- For technical questions and discussions you can use our official [Discourse forum](https://forum.speedb.dev). 
+
+
+## 🌎 Join us 
 
 Speedb is committed to a welcoming and inclusive environment where everyone can
 contribute.

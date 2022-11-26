@@ -3176,7 +3176,6 @@ void InitializeOptionsFromFlags(
   options.preclude_last_level_data_seconds =
       FLAGS_preclude_last_level_data_seconds;
 
-
   if (FLAGS_use_full_merge_v1) {
     options.merge_operator = MergeOperators::CreateDeprecatedPutOperator();
   } else {

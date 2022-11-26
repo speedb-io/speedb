@@ -1721,7 +1721,6 @@ TEST_F(CompactionJobTest, ResultSerialization) {
   }
 }
 
-
 class CompactionJobTimestampTest : public CompactionJobTestBase {
  public:
   CompactionJobTimestampTest()

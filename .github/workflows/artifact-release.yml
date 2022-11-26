@@ -72,7 +72,7 @@ jobs:
             -DWITH_SNAPPY=1 -DWITH_LZ4=1 -DWITH_ZLIB=1 -DWITH_ZSTD=1 \
             -DWITH_BENCHMARK_TOOLS=1 -DROCKSDB_BUILD_SHARED=1
           make -j$(nproc) db_bench
-          cp tools/db_bench_README.txt .
+          cp docs/db_bench_README.txt .
           tar czf "$GITHUB_WORKSPACE/out/db_bench-speedb-${RELEASE_VERSION}.tar.gz" db_bench db_bench_README.txt
           cd .. && rm -rf build
 

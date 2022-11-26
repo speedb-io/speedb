@@ -3544,14 +3544,16 @@ TEST_F(OptionsParserTest, ParseVersion) {
   char buffer[kLength];
   RocksDBOptionsParser parser;
 
-  const std::vector<std::string> invalid_versions = {
-      "a.b.c", "3.2.2b", "3.-12", "3. 1",  // only digits and dots are allowed
-      "1.2.3.4",
-      "1.2.3",  // can only contains at most one dot.
-      "0",     // options_file_version must be at least one
-      "3..2",
-      ".", ".1.2",             // must have at least one digit before each dot
-      "1.2.", "1.", "2.34."};  // must have at least one digit after each dot
+  const std::vector<std::string> invalid_versions =
+      {"a.b.c",   "3.2.2b",
+       "3.-12",   "3. 1",  // only digits and dots are allowed
+       "1.2.3.4",
+       "1.2.3",  // can only contains at most one dot.
+       "0",      // options_file_version must be at least one
+       "3..2",    ".",
+       ".1.2",  // must have at least one digit before each dot
+       "1.2.",    "1.",
+       "2.34."};  // must have at least one digit after each dot
   for (auto iv : invalid_versions) {
     snprintf(buffer, kLength - 1, file_template.c_str(), iv.c_str());
 
@@ -3710,7 +3712,10 @@ TEST_F(OptionsParserTest, Readahead) {
 TEST_F(OptionsParserTest, DumpAndParse) {
   DBOptions base_db_opt;
   std::vector<ColumnFamilyOptions> base_cf_opts;
-  std::vector<std::string> cf_names = {"default", "cf1", "cf2", "cf3",
+  std::vector<std::string> cf_names = {"default",
+                                       "cf1",
+                                       "cf2",
+                                       "cf3",
                                        "c:f:4:4:4",
                                        "p\\i\\k\\a\\chu\\\\\\",
                                        "###rocksdb#1-testcf#2###"};

@@ -991,6 +991,7 @@ def gen_narrow_cmd_params(args):
     params["use_direct_reads"] = 0
     params["user_timestamp_size"] = 0
     params["ribbon_starting_level"] = 0
+    params["secondary_cache_uri"] = ""
 
     for k, v in vars(args).items():
         if v is not None:

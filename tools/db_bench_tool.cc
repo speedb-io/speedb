@@ -38,6 +38,8 @@
 #include <queue>
 #include <thread>
 #include <unordered_map>
+#include <unordered_set>
+#include <vector>
 
 #include "db/db_impl/db_impl.h"
 #include "db/malloc_stats.h"
@@ -444,6 +446,13 @@ DEFINE_int32(user_timestamp_size, 0,
 
 DEFINE_int32(num_multi_db, 0,
              "Number of DBs used in the benchmark. 0 means single DB.");
+
+DEFINE_string(dbs_to_use, "",
+              "A comma-separated list of indices of the DBs to actually use in "
+              "the benchmark "
+              "of all available DBs. \"\" means use all available DBs. Indices "
+              "may be specified "
+              "in any order. ");
 
 DEFINE_double(compression_ratio, 0.5,
               "Arrange to generate values that shrink to this fraction of "
@@ -1852,6 +1861,11 @@ DEFINE_bool(build_info, false,
 DEFINE_bool(track_and_verify_wals_in_manifest, false,
             "If true, enable WAL tracking in the MANIFEST");
 
+namespace {
+// Auxiliary collection of the indices of the DB-s to be used in the next group
+std::vector<uint64_t> db_idxs_to_use;
+}  // namespace
+
 namespace ROCKSDB_NAMESPACE {
 namespace {
 static Status CreateMemTableRepFactory(
@@ -2775,8 +2789,6 @@ class Benchmark {
   std::shared_ptr<Cache> cache_;
   std::shared_ptr<Cache> compressed_cache_;
   std::shared_ptr<const SliceTransform> prefix_extractor_;
-  DBWithColumnFamilies db_;
-  std::vector<DBWithColumnFamilies> multi_dbs_;
   int64_t num_;
   int key_size_;
   int user_timestamp_size_;
@@ -2809,6 +2821,71 @@ class Benchmark {
   std::condition_variable cond_;
   std::mutex mutex_;
   bool seek_started_;
+
+  // Use this to access the DB when context requires a Single-DB mode
+  DBWithColumnFamilies& SingleDb() {
+    if (IsSingleDb() == false) {
+      ErrorExit("Expecting a Single DB but thare are %" PRIu64 " DB-s",
+                NumDbs());
+    }
+    return dbs_[0];
+  }
+
+  DBWithColumnFamilies& FirstDb() { return dbs_[0]; }
+
+  // Use this to access the DB when context requires a Multi-DB mode
+  std::vector<DBWithColumnFamilies>& MultiDb() {
+    if (IsMultiDb() == false) {
+      ErrorExit("Expecting a Multiple DB-s (> 1) but thare are %" PRIu64
+                " DB-s",
+                NumDbs());
+    }
+    return dbs_;
+  }
+
+  void OpenAllDbs(Options options) {
+    assert(dbs_.empty());
+    assert(FLAGS_num_multi_db > 0);
+
+    // dbs_to_use_ is NOT initialized here since we open the db-s once for all
+    // groups but set dbs_to_use_ per group
+    dbs_.resize(FLAGS_num_multi_db);
+
+    if (IsSingleDb()) {
+      OpenDb(options, FLAGS_db, &dbs_[0]);
+    } else {
+      auto wal_dir = options.wal_dir;
+      for (int i = 0; i < FLAGS_num_multi_db; i++) {
+        if (!wal_dir.empty()) {
+          options.wal_dir = GetPathForMultiple(wal_dir, i);
+        }
+        OpenDb(options, GetPathForMultiple(FLAGS_db, i), &dbs_[i]);
+      }
+      options.wal_dir = wal_dir;
+    }
+  }
+
+  void DestroyAllDbs() {
+    // Record the number of db-s as dbs_ is cleared inside DeleteDBs()
+    auto num_dbs = dbs_.size();
+
+    DeleteDBs();
+
+    if (num_dbs == 1U) {
+      DestroyDB(FLAGS_db, open_options_);
+    } else if (num_dbs > 1U) {
+      Options options = open_options_;
+      for (auto i = 0U; i < num_dbs; ++i) {
+        if (!open_options_.wal_dir.empty()) {
+          options.wal_dir = GetPathForMultiple(open_options_.wal_dir, i);
+        }
+        DestroyDB(GetPathForMultiple(FLAGS_db, i), options);
+      }
+    }
+  }
+
+  std::vector<DBWithColumnFamilies> dbs_;
+  std::vector<DBWithColumnFamilies> dbs_to_use_;
 
   class ErrorHandlerListener : public EventListener {
    public:
@@ -3270,12 +3347,12 @@ class Benchmark {
   }
 
   void DeleteDBs() {
-    if (db_.db != nullptr) {
-      db_.DeleteDBs();
-    }
-    for (DBWithColumnFamilies& dbwcf : multi_dbs_) {
+    for (DBWithColumnFamilies& dbwcf : dbs_) {
       dbwcf.DeleteDBs();
     }
+
+    dbs_.clear();
+    dbs_to_use_.clear();
   }
 
   ~Benchmark() {
@@ -3397,16 +3474,18 @@ class Benchmark {
     if (!s.ok()) {
       ErrorExit("open error: %s", s.ToString().c_str());
     }
+
+    auto& single_db = SingleDb();
     ReadOptions ro;
     ro.total_order_seek = true;
     std::unique_ptr<Iterator> truth_iter(truth_db.db->NewIterator(ro));
-    std::unique_ptr<Iterator> db_iter(db_.db->NewIterator(ro));
+    std::unique_ptr<Iterator> db_iter(single_db.db->NewIterator(ro));
     // Verify that all the key/values in truth_db are retrivable in db with
     // ::Get
     fprintf(stderr, "Verifying db >= truth_db with ::Get...\n");
     for (truth_iter->SeekToFirst(); truth_iter->Valid(); truth_iter->Next()) {
       std::string value;
-      s = db_.db->Get(ro, truth_iter->key(), &value);
+      s = single_db.db->Get(ro, truth_iter->key(), &value);
       assert(s.ok());
       // TODO(myabandeh): provide debugging hints
       assert(Slice(value) == truth_iter->value());
@@ -3455,6 +3534,9 @@ class Benchmark {
       fprintf(stdout, "Using exiting options\n");
     }
     PrintHeader(first_group);
+
+    InitDbsToUse();
+
     std::stringstream benchmark_stream(FLAGS_benchmarks);
     std::string name;
     std::unique_ptr<ExpiredTimeFilter> filter;
@@ -3800,21 +3882,11 @@ class Benchmark {
               "--use_existing_db",
               name.c_str());
         } else {
-          if (db_.db != nullptr) {
-            db_.DeleteDBs();
-            DestroyDB(FLAGS_db, open_options_);
-          }
-          Options options = open_options_;
-          for (size_t i = 0; i < multi_dbs_.size(); i++) {
-            multi_dbs_[i].DeleteDBs();
-            if (!open_options_.wal_dir.empty()) {
-              options.wal_dir = GetPathForMultiple(open_options_.wal_dir, i);
-            }
-            DestroyDB(GetPathForMultiple(FLAGS_db, i), options);
-          }
-          multi_dbs_.clear();
+          DestroyAllDbs();
+          Open(&open_options_);  // use open_options for the last accessed
+          // There are new DB-s => Re-initialize dbs_to_use_
+          InitDbsToUse();
         }
-        Open(&open_options_);  // use open_options for the last accessed
       }
 
       if (method != nullptr) {
@@ -3841,7 +3913,8 @@ class Benchmark {
             ErrorExit("Encountered an error starting a trace, %s",
                       s.ToString().c_str());
           }
-          s = db_.db->StartTrace(trace_options_, std::move(trace_writer));
+          s = SingleDb().db->StartTrace(trace_options_,
+                                        std::move(trace_writer));
           if (!s.ok()) {
             ErrorExit("Encountered an error starting a trace, %s",
                       s.ToString().c_str());
@@ -3873,8 +3946,8 @@ class Benchmark {
             ErrorExit("Encountered an error when creating trace writer, %s",
                       s.ToString().c_str());
           }
-          s = db_.db->StartBlockCacheTrace(block_cache_trace_options_,
-                                           std::move(block_cache_trace_writer));
+          s = SingleDb().db->StartBlockCacheTrace(
+              block_cache_trace_options_, std::move(block_cache_trace_writer));
           if (!s.ok()) {
             ErrorExit(
                 "Encountered an error when starting block cache tracing, %s",
@@ -3922,14 +3995,14 @@ class Benchmark {
     }
 
     if (name != "replay" && FLAGS_trace_file != "") {
-      Status s = db_.db->EndTrace();
+      Status s = SingleDb().db->EndTrace();
       if (!s.ok()) {
         fprintf(stderr, "Encountered an error ending the trace, %s\n",
                 s.ToString().c_str());
       }
     }
     if (!FLAGS_block_cache_trace_file.empty()) {
-      Status s = db_.db->EndBlockCacheTrace();
+      Status s = SingleDb().db->EndBlockCacheTrace();
       if (!s.ok()) {
         fprintf(stderr,
                 "Encountered an error ending the block cache tracing, %s\n",
@@ -4230,8 +4303,6 @@ class Benchmark {
     Options& options = *opts;
     ConfigOptions config_options(options);
     config_options.ignore_unsupported_options = false;
-
-    assert(db_.db == nullptr);
 
     options.env = FLAGS_env;
     options.wal_dir = FLAGS_wal_dir;
@@ -4860,20 +4931,7 @@ class Benchmark {
       }
     }
 
-    if (FLAGS_num_multi_db <= 1) {
-      OpenDb(options, FLAGS_db, &db_);
-    } else {
-      multi_dbs_.clear();
-      multi_dbs_.resize(FLAGS_num_multi_db);
-      auto wal_dir = options.wal_dir;
-      for (int i = 0; i < FLAGS_num_multi_db; i++) {
-        if (!wal_dir.empty()) {
-          options.wal_dir = GetPathForMultiple(wal_dir, i);
-        }
-        OpenDb(options, GetPathForMultiple(FLAGS_db, i), &multi_dbs_[i]);
-      }
-      options.wal_dir = wal_dir;
-    }
+    OpenAllDbs(options);
 
     // KeepFilter is a noop filter, this can be used to test compaction filter
     if (options.compaction_filter == nullptr) {
@@ -4885,15 +4943,27 @@ class Benchmark {
 
     if (FLAGS_use_existing_keys) {
       // Only work on single database
-      assert(db_.db != nullptr);
+      assert(SingleDb().db != nullptr);
       ReadOptions read_opts;  // before read_options_ initialized
       read_opts.total_order_seek = true;
-      Iterator* iter = db_.db->NewIterator(read_opts);
+      Iterator* iter = SingleDb().db->NewIterator(read_opts);
       for (iter->SeekToFirst(); iter->Valid(); iter->Next()) {
         keys_.emplace_back(iter->key().ToString());
       }
       delete iter;
       FLAGS_num = keys_.size();
+    }
+  }
+
+  void InitDbsToUse() {
+    assert(static_cast<int>(dbs_.size()) == FLAGS_num_multi_db);
+    assert(db_idxs_to_use.empty() == false);
+    assert(db_idxs_to_use.size() <= dbs_.size());
+
+    dbs_to_use_.clear();
+    for (auto i = 0U; i < db_idxs_to_use.size(); ++i) {
+      assert(db_idxs_to_use[i] < dbs_.size());
+      dbs_to_use_.push_back(dbs_[db_idxs_to_use[i]]);
     }
   }
 
@@ -5129,11 +5199,7 @@ class Benchmark {
   }
 
   DBWithColumnFamilies* SelectDBWithCfh(uint64_t rand_int) {
-    if (db_.db != nullptr) {
-      return &db_;
-    } else {
-      return &multi_dbs_[rand_int % multi_dbs_.size()];
-    }
+    return &(dbs_to_use_[rand_int % dbs_to_use_.size()]);
   }
 
   double SineRate(double x) {
@@ -5144,10 +5210,7 @@ class Benchmark {
     const int test_duration = write_mode == RANDOM ? FLAGS_duration : 0;
     const int64_t num_ops = writes_ == 0 ? num_ : writes_;
 
-    size_t num_key_gens = 1;
-    if (db_.db == nullptr) {
-      num_key_gens = multi_dbs_.size();
-    }
+    size_t num_key_gens = dbs_to_use_.size();
     std::vector<std::unique_ptr<KeyGenerator>> key_gens(num_key_gens);
     int64_t max_ops = num_ops * num_key_gens;
     int64_t ops_per_stage = max_ops;
@@ -5273,12 +5336,8 @@ class Benchmark {
     while ((num_per_key_gen != 0) && !duration.Done(entries_per_batch_)) {
       if (duration.GetStage() != stage) {
         stage = duration.GetStage();
-        if (db_.db != nullptr) {
-          db_.CreateNewCf(open_options_, stage);
-        } else {
-          for (auto& db : multi_dbs_) {
-            db.CreateNewCf(open_options_, stage);
-          }
+        for (auto& db : dbs_to_use_) {
+          db.CreateNewCf(open_options_, stage);
         }
       }
 
@@ -5574,12 +5633,8 @@ class Benchmark {
                                 WriteMode write_mode) {
     ColumnFamilyMetaData meta;
     std::vector<DB*> db_list;
-    if (db_.db != nullptr) {
-      db_list.push_back(db_.db);
-    } else {
-      for (auto& db : multi_dbs_) {
-        db_list.push_back(db.db);
-      }
+    for (auto& db : dbs_to_use_) {
+      db_list.push_back(db.db);
     }
     std::vector<Options> options_list;
     for (auto db : db_list) {
@@ -5719,7 +5774,7 @@ class Benchmark {
         return Status::InvalidArgument(
             "num_levels should be 1 for FIFO compaction");
       }
-      if (FLAGS_num_multi_db != 0) {
+      if (IsMultiDb()) {
         return Status::InvalidArgument("Doesn't support multiDB");
       }
       auto db = db_list[0];
@@ -5873,12 +5928,8 @@ class Benchmark {
   }
 
   void ReadSequential(ThreadState* thread) {
-    if (db_.db != nullptr) {
-      ReadSequential(thread, db_.db);
-    } else {
-      for (const auto& db_with_cfh : multi_dbs_) {
-        ReadSequential(thread, db_with_cfh.db);
-      }
+    for (const auto& db_with_cfh : dbs_to_use_) {
+      ReadSequential(thread, db_with_cfh.db);
     }
   }
 
@@ -5976,12 +6027,8 @@ class Benchmark {
   }
 
   void ReadReverse(ThreadState* thread) {
-    if (db_.db != nullptr) {
-      ReadReverse(thread, db_.db);
-    } else {
-      for (const auto& db_with_cfh : multi_dbs_) {
-        ReadReverse(thread, db_with_cfh.db);
-      }
+    for (const auto& db_with_cfh : dbs_to_use_) {
+      ReadReverse(thread, db_with_cfh.db);
     }
   }
 
@@ -6826,12 +6873,8 @@ class Benchmark {
 
     std::vector<Iterator*> tailing_iters;
     if (FLAGS_use_tailing_iterator) {
-      if (db_.db != nullptr) {
-        tailing_iters.push_back(db_.db->NewIterator(options));
-      } else {
-        for (const auto& db_with_cfh : multi_dbs_) {
-          tailing_iters.push_back(db_with_cfh.db->NewIterator(options));
-        }
+      for (const auto& db_with_cfh : dbs_to_use_) {
+        tailing_iters.push_back(db_with_cfh.db->NewIterator(options));
       }
     }
     options.auto_prefix_mode = FLAGS_auto_prefix_mode;
@@ -6878,9 +6921,7 @@ class Benchmark {
 
       // Pick a Iterator to use
       uint64_t db_idx_to_use =
-          (db_.db == nullptr)
-              ? (static_cast<uint64_t>(key_rand) % multi_dbs_.size())
-              : 0;
+          static_cast<uint64_t>(key_rand) % dbs_to_use_.size();
       std::unique_ptr<Iterator> single_iter;
       Iterator* iter_to_use;
       if (FLAGS_use_tailing_iterator) {
@@ -6922,7 +6963,7 @@ class Benchmark {
         thread->stats.ResetLastOpTime();
       }
 
-      thread->stats.FinishedOps(&db_, db_.db, 1, kSeek);
+      thread->stats.FinishedOps(&FirstDb(), FirstDb().db, 1, kSeek);
     }
     for (auto iter : tailing_iters) {
       delete iter;
@@ -7103,7 +7144,7 @@ class Benchmark {
         ErrorExit("put or merge error: %s", s.ToString().c_str());
       }
       bytes += key.size() + val.size() + user_timestamp_size_;
-      thread->stats.FinishedOps(&db_, db_.db, 1, kWrite);
+      thread->stats.FinishedOps(&FirstDb(), FirstDb().db, 1, kWrite);
 
       if (FLAGS_benchmark_write_rate_limit > 0) {
         write_rate_limiter->Request(key.size() + val.size(), Env::IO_HIGH,
@@ -7143,7 +7184,7 @@ class Benchmark {
             ErrorExit("deleterange error: %s\n", s.ToString().c_str());
           }
         }
-        thread->stats.FinishedOps(&db_, db_.db, 1, kWrite);
+        thread->stats.FinishedOps(&FirstDb(), FirstDb().db, 1, kWrite);
         // TODO: DeleteRange is not included in calculcation of bytes/rate
         // limiter request
       }
@@ -7381,10 +7422,12 @@ class Benchmark {
   }
 
   void BGScan(ThreadState* thread) {
-    if (FLAGS_num_multi_db > 1) {
+    if (IsMultiDb()) {
       ErrorExit("Not supporting multiple DBs.");
     }
-    assert(db_.db != nullptr);
+
+    auto& single_db = SingleDb();
+
     ReadOptions read_options = read_options_;
     std::unique_ptr<char[]> ts_guard;
     Slice ts;
@@ -7393,7 +7436,7 @@ class Benchmark {
       ts = mock_app_clock_->GetTimestampForRead(thread->rand, ts_guard.get());
       read_options.timestamp = &ts;
     }
-    Iterator* iter = db_.db->NewIterator(read_options);
+    Iterator* iter = single_db.db->NewIterator(read_options);
 
     fprintf(stderr, "num reads to do %" PRIu64 "\n", reads_);
     Duration duration(FLAGS_duration, reads_);
@@ -7410,7 +7453,7 @@ class Benchmark {
         num_next++;
       }
 
-      thread->stats.FinishedOps(&db_, db_.db, 1, kSeek);
+      thread->stats.FinishedOps(&single_db, single_db.db, 1, kSeek);
     }
     delete iter;
   }
@@ -7568,7 +7611,7 @@ class Benchmark {
         }
         get_weight--;
         gets_done++;
-        thread->stats.FinishedOps(&db_, db_.db, 1, kRead);
+        thread->stats.FinishedOps(&FirstDb(), FirstDb().db, 1, kRead);
       } else if (put_weight > 0) {
         // then do all the corresponding number of puts
         // for all the gets we have done earlier
@@ -7578,7 +7621,7 @@ class Benchmark {
         }
         put_weight--;
         puts_done++;
-        thread->stats.FinishedOps(&db_, db_.db, 1, kWrite);
+        thread->stats.FinishedOps(&FirstDb(), FirstDb().db, 1, kWrite);
       } else if (delete_weight > 0) {
         Status s = DeleteMany(db, write_options_, key);
         if (!s.ok()) {
@@ -7586,7 +7629,7 @@ class Benchmark {
         }
         delete_weight--;
         deletes_done++;
-        thread->stats.FinishedOps(&db_, db_.db, 1, kDelete);
+        thread->stats.FinishedOps(&FirstDb(), FirstDb().db, 1, kDelete);
       }
     }
     char msg[128];
@@ -7697,10 +7740,10 @@ class Benchmark {
 
     std::unique_ptr<Iterator> single_iter;
     std::vector<std::unique_ptr<Iterator>> multi_iters;
-    if (db_.db != nullptr) {
-      single_iter.reset(db_.db->NewIterator(options));
+    if (IsSingleDb()) {
+      single_iter.reset(SingleDb().db->NewIterator(options));
     } else {
-      for (const auto& db_with_cfh : multi_dbs_) {
+      for (const auto& db_with_cfh : dbs_to_use_) {
         multi_iters.emplace_back(db_with_cfh.db->NewIterator(options));
       }
     }
@@ -7756,11 +7799,11 @@ class Benchmark {
         }
 
         if (!FLAGS_use_tailing_iterator) {
-          if (db_.db != nullptr) {
-            single_iter.reset(db_.db->NewIterator(options));
+          if (IsSingleDb()) {
+            single_iter.reset(SingleDb().db->NewIterator(options));
           } else {
             multi_iters.clear();
-            for (const auto& db_with_cfh : multi_dbs_) {
+            for (const auto& db_with_cfh : dbs_to_use_) {
               multi_iters.emplace_back(db_with_cfh.db->NewIterator(options));
             }
           }
@@ -7798,7 +7841,7 @@ class Benchmark {
               RateLimiter::OpType::kRead);
         }
 
-        thread->stats.FinishedOps(&db_, db_.db, 1, kSeek);
+        thread->stats.FinishedOps(&FirstDb(), FirstDb().db, 1, kSeek);
         // Write
       } else {
         DB* db = SelectDB(thread);
@@ -8323,23 +8366,24 @@ class Benchmark {
                                        read_options_, FLAGS_num,
                                        num_prefix_ranges);
 
-    if (FLAGS_num_multi_db > 1) {
+    if (IsMultiDb()) {
       ErrorExit(
           "Cannot run RandomTransaction benchmark with  FLAGS_multi_db > 1.");
     }
 
+    auto& single_db = SingleDb();
     while (!duration.Done(1)) {
       bool success;
 
       // RandomTransactionInserter will attempt to insert a key for each
       // # of FLAGS_transaction_sets
       if (FLAGS_optimistic_transaction_db) {
-        success = inserter.OptimisticTransactionDBInsert(db_.opt_txn_db);
+        success = inserter.OptimisticTransactionDBInsert(single_db.opt_txn_db);
       } else if (FLAGS_transaction_db) {
-        TransactionDB* txn_db = reinterpret_cast<TransactionDB*>(db_.db);
+        TransactionDB* txn_db = reinterpret_cast<TransactionDB*>(single_db.db);
         success = inserter.TransactionDBInsert(txn_db, txn_options);
       } else {
-        success = inserter.DBInsert(db_.db);
+        success = inserter.DBInsert(single_db.db);
       }
 
       if (!success) {
@@ -8347,7 +8391,7 @@ class Benchmark {
                   inserter.GetLastStatus().ToString().c_str());
       }
 
-      thread->stats.FinishedOps(nullptr, db_.db, 1, kOthers);
+      thread->stats.FinishedOps(nullptr, single_db.db, 1, kOthers);
       transactions_done++;
     }
 
@@ -8373,7 +8417,7 @@ class Benchmark {
     }
 
     Status s = RandomTransactionInserter::Verify(
-        db_.db, static_cast<uint16_t>(FLAGS_transaction_sets));
+        SingleDb().db, static_cast<uint16_t>(FLAGS_transaction_sets));
 
     if (s.ok()) {
       fprintf(stdout, "RandomTransactionVerify Success.\n");
@@ -8466,9 +8510,10 @@ class Benchmark {
     int64_t bytes = 0;
 
     Iterator* iter = nullptr;
+    auto& single_db = SingleDb();
+
     // Only work on single database
-    assert(db_.db != nullptr);
-    iter = db_.db->NewIterator(read_options_);
+    iter = single_db.db->NewIterator(read_options_);
 
     std::unique_ptr<const char[]> key_guard;
     Slice key = AllocateKey(&key_guard);
@@ -8484,7 +8529,7 @@ class Benchmark {
       }
       if (!FLAGS_use_tailing_iterator) {
         delete iter;
-        iter = db_.db->NewIterator(read_options_);
+        iter = single_db.db->NewIterator(read_options_);
       }
       // Pick a Iterator to use
 
@@ -8505,14 +8550,14 @@ class Benchmark {
         if (do_deletion) {
           bytes += iter->key().size();
           if (KeyExpired(timestamp_emulator_.get(), iter->key())) {
-            thread->stats.FinishedOps(&db_, db_.db, 1, kDelete);
-            db_.db->Delete(write_options_, iter->key());
+            thread->stats.FinishedOps(&single_db, single_db.db, 1, kDelete);
+            single_db.db->Delete(write_options_, iter->key());
           } else {
             break;
           }
         } else {
           bytes += iter->key().size() + iter->value().size();
-          thread->stats.FinishedOps(&db_, db_.db, 1, kRead);
+          thread->stats.FinishedOps(&single_db, single_db.db, 1, kRead);
           Slice value = iter->value();
           memcpy(value_buffer, value.data(),
                  std::min(value.size(), sizeof(value_buffer)));
@@ -8589,7 +8634,10 @@ class Benchmark {
         ErrorExit("put error: %s", s.ToString().c_str());
       }
       bytes = key.size() + val.size();
-      thread->stats.FinishedOps(&db_, db_.db, 1, kWrite);
+      // TODO - If there is a single db => no point selecting one above.
+      // If there are multiple db-s, db_ / SingleDb() would be null / fail
+      // => Seems like a bug or suitable only for the single db mode
+      thread->stats.FinishedOps(&FirstDb(), FirstDb().db, 1, kWrite);
       thread->stats.AddBytes(bytes);
 
       if (FLAGS_benchmark_write_rate_limit > 0) {
@@ -8628,10 +8676,7 @@ class Benchmark {
   void CompactAll() {
     CompactRangeOptions cro;
     cro.max_subcompactions = static_cast<uint32_t>(FLAGS_subcompactions);
-    if (db_.db != nullptr) {
-      db_.db->CompactRange(cro, nullptr, nullptr);
-    }
-    for (const auto& db_with_cfh : multi_dbs_) {
+    for (const auto& db_with_cfh : dbs_to_use_) {
       db_with_cfh.db->CompactRange(cro, nullptr, nullptr);
     }
   }
@@ -8681,14 +8726,9 @@ class Benchmark {
 
     // I am skeptical that this check race free. I hope that checking twice
     // reduces the chance.
-    if (db_.db != nullptr) {
-      WaitForCompactionHelper(db_);
-      WaitForCompactionHelper(db_);
-    } else {
-      for (auto& db_with_cfh : multi_dbs_) {
-        WaitForCompactionHelper(db_with_cfh);
-        WaitForCompactionHelper(db_with_cfh);
-      }
+    for (auto& db_with_cfh : dbs_to_use_) {
+      WaitForCompactionHelper(db_with_cfh);
+      WaitForCompactionHelper(db_with_cfh);
     }
   }
 
@@ -8764,10 +8804,7 @@ class Benchmark {
   }
 
   void CompactLevel(int from_level) {
-    if (db_.db != nullptr) {
-      while (!CompactLevelHelper(db_, from_level)) WaitForCompaction();
-    }
-    for (auto& db_with_cfh : multi_dbs_) {
+    for (auto& db_with_cfh : dbs_to_use_) {
       while (!CompactLevelHelper(db_with_cfh, from_level)) WaitForCompaction();
     }
   }
@@ -8776,50 +8813,25 @@ class Benchmark {
     FlushOptions flush_opt;
     flush_opt.wait = true;
 
-    if (db_.db != nullptr) {
-      Status s;
-      if (FLAGS_num_column_families > 1) {
-        s = db_.db->Flush(flush_opt, db_.cfh);
-      } else {
-        s = db_.db->Flush(flush_opt, db_.db->DefaultColumnFamily());
-      }
-
+    for (const auto& db_with_cfh : dbs_to_use_) {
+      Status s = db_with_cfh.db->Flush(flush_opt, db_with_cfh.cfh);
       if (!s.ok()) {
         ErrorExit("Flush failed: %s", s.ToString().c_str());
-      }
-    } else {
-      for (const auto& db_with_cfh : multi_dbs_) {
-        Status s;
-        if (FLAGS_num_column_families > 1) {
-          s = db_with_cfh.db->Flush(flush_opt, db_with_cfh.cfh);
-        } else {
-          s = db_with_cfh.db->Flush(flush_opt,
-                                    db_with_cfh.db->DefaultColumnFamily());
-        }
-
-        if (!s.ok()) {
-          ErrorExit("Flush failed: %s", s.ToString().c_str());
-        }
       }
     }
     fprintf(stdout, "flush memtable\n");
   }
 
   void ResetStats() {
-    if (db_.db != nullptr) {
-      db_.db->ResetStats();
-    }
-    for (const auto& db_with_cfh : multi_dbs_) {
+    for (const auto& db_with_cfh : dbs_to_use_) {
       db_with_cfh.db->ResetStats();
     }
   }
 
   void PrintStatsHistory() {
-    if (db_.db != nullptr) {
-      PrintStatsHistoryImpl(db_.db, false);
-    }
-    for (const auto& db_with_cfh : multi_dbs_) {
-      PrintStatsHistoryImpl(db_with_cfh.db, true);
+    auto print_header = IsMultiDb();
+    for (const auto& db_with_cfh : dbs_to_use_) {
+      PrintStatsHistoryImpl(db_with_cfh.db, print_header);
     }
   }
 
@@ -8849,11 +8861,9 @@ class Benchmark {
   }
 
   void PrintStats(const char* key) {
-    if (db_.db != nullptr) {
-      PrintStats(db_.db, key, false);
-    }
-    for (const auto& db_with_cfh : multi_dbs_) {
-      PrintStats(db_with_cfh.db, key, true);
+    auto print_header = IsMultiDb();
+    for (const auto& db_with_cfh : dbs_to_use_) {
+      PrintStats(db_with_cfh.db, key, print_header);
     }
   }
 
@@ -8869,11 +8879,9 @@ class Benchmark {
   }
 
   void PrintStats(const std::vector<std::string>& keys) {
-    if (db_.db != nullptr) {
-      PrintStats(db_.db, keys);
-    }
-    for (const auto& db_with_cfh : multi_dbs_) {
-      PrintStats(db_with_cfh.db, keys, true);
+    auto print_header = IsMultiDb();
+    for (const auto& db_with_cfh : dbs_to_use_) {
+      PrintStats(db_with_cfh.db, keys, print_header);
     }
   }
 
@@ -8894,8 +8902,8 @@ class Benchmark {
 
 
   void Replay(ThreadState* thread) {
-    if (db_.db != nullptr) {
-      Replay(thread, &db_);
+    if (IsSingleDb()) {
+      Replay(thread, &SingleDb());
     }
   }
 
@@ -8976,6 +8984,10 @@ class Benchmark {
     delete backup_engine;
   }
 
+ public:
+  size_t NumDbs() const { return dbs_.size(); }
+  bool IsSingleDb() const { return (NumDbs() == 1U); }
+  bool IsMultiDb() const { return (NumDbs() > 1U); }
 };
 
 void ValidateMetadataCacheOptions() {
@@ -9111,6 +9123,69 @@ void ValidateAndProcessEnvFlags(bool first_group,
   }
 }
 
+void ParseSanitizeAndValidateMultipleDBsFlags(bool first_group) {
+  if (FLAGS_num_multi_db < 0) {
+    ErrorExit("'-num_multi_db` must be >= 0");
+  }
+
+  if (FLAGS_num_multi_db == 0) {
+    FLAGS_num_multi_db = 1;
+  }
+
+  if (first_group == false) {
+    if (FLAGS_num_multi_db != static_cast<int>(benchmark->NumDbs())) {
+      ErrorExit("Can't change number of db-s (-num_multi_db) in groups > 1");
+    }
+  }
+
+  // Parse the string of db-s to use, convert to indices and validate them
+  std::stringstream db_idxs_stream(FLAGS_dbs_to_use);
+  std::string db_idx_str;
+  // The set will remove duplicates
+  std::unordered_set<int> dbs_idxs_to_use_set;
+  while (std::getline(db_idxs_stream, db_idx_str, ',')) {
+    try {
+      int db_idx = std::stoi(db_idx_str);
+      if ((db_idx < 0) || (db_idx >= FLAGS_num_multi_db)) {
+        ErrorExit("`-dbs_to_use` contains an invalid db index (%d)", db_idx);
+      }
+      dbs_idxs_to_use_set.insert(db_idx);
+    } catch (...) {
+      ErrorExit("Invalid `-dbs_to_use` string ('%s')",
+                FLAGS_dbs_to_use.c_str());
+    }
+  }
+  // By default, use all available db-s
+  if (dbs_idxs_to_use_set.empty()) {
+    for (auto i = 0; i < FLAGS_num_multi_db; ++i) {
+      dbs_idxs_to_use_set.insert(i);
+    }
+  }
+
+  // Prepare the indices. They will be used to initialize the dbs_ member
+  // during the benchmark
+  db_idxs_to_use.clear();
+  std::copy(std::begin(dbs_idxs_to_use_set), std::end(dbs_idxs_to_use_set),
+            std::back_inserter(db_idxs_to_use));
+  std::sort(std::begin(db_idxs_to_use), std::end(db_idxs_to_use));
+}
+
+void ValidateMetadataCacheOptions() {
+  if (FLAGS_top_level_index_pinning &&
+      (FLAGS_cache_index_and_filter_blocks == false)) {
+    ErrorExit(
+        "--cache_index_and_filter_blocks must be set for "
+        "--top_level_index_pinning to have any affect.");
+  }
+
+  if (FLAGS_unpartitioned_pinning &&
+      (FLAGS_cache_index_and_filter_blocks == false)) {
+    ErrorExit(
+        "--cache_index_and_filter_blocks must be set for "
+        "--unpartitioned_pinning to have any affect.");
+  }
+}
+
 // The actual running of a group of benchmarks that share configuration
 // Some entities need to be created once and used for running all of the groups.
 // So, they are created only when running the first group
@@ -9239,6 +9314,7 @@ int db_bench_tool_run_group(int group_num, int num_groups, int argc,
   }
 
   ValidateMetadataCacheOptions();
+  ParseSanitizeAndValidateMultipleDBsFlags(first_group);
 
   if (first_group) {
     RecordFirstGroupApplicableFlags();

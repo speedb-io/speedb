@@ -26,6 +26,8 @@
 #ifdef __FreeBSD__
 #include <sys/sysctl.h>
 #endif
+#include <stdarg.h>
+
 #include <atomic>
 #include <cinttypes>
 #include <condition_variable>
@@ -104,6 +106,54 @@ using GFLAGS_NAMESPACE::ParseCommandLineFlags;
 using GFLAGS_NAMESPACE::RegisterFlagValidator;
 using GFLAGS_NAMESPACE::SetUsageMessage;
 using GFLAGS_NAMESPACE::SetVersionString;
+
+namespace ROCKSDB_NAMESPACE {
+// Forward Declaration
+class Benchmark;
+}  // namespace ROCKSDB_NAMESPACE
+
+namespace {
+// The benchmark needs to be created before running the first group, retained
+// between groups, and destroyed after running the last group
+std::unique_ptr<ROCKSDB_NAMESPACE::Benchmark> benchmark;
+
+void ErrorExit(const char* format, ...) {
+  std::string extended_format = std::string("\nERROR: ") + format + "\n";
+  va_list arglist;
+  va_start(arglist, format);
+  vfprintf(stderr, extended_format.c_str(), arglist);
+  va_end(arglist);
+
+  benchmark.reset();
+  exit(1);
+}
+
+}  // namespace
+
+// The groups flags is NOT a standard GFLAGS flag. It is a special flag that is
+// used to indicate that the tool is run in a multiple-groups mode (see the help
+// description for the flag for more details). It is defined using GFLAGS
+// definition syntax so it is included in GFLAGS' automatic help generation.
+DEFINE_string(
+    groups, "",
+    "Run db_bench in benchmark groups mode (The default is single-group mode). "
+    "\n\n=====> IMPORTANT: '-groups' MUST BE THE SECOND ARGUMENT !!!!. \n\n"
+    "In this mode benchmarks are grouped, and each group has its own "
+    "configuration. "
+    "The first group is the MASTER group. This group sets the "
+    "initial configuration for all subsequent groups. Subsequent "
+    "groups may override the initial configuration."
+    "\n\nSyntax: ./db_bench -groups '<group1>' '<group2>' '<group3>' ...  \n\n"
+    "Each group consists of valid db_bench flags, and, most likely, a set of "
+    "benchmarks to run as part of that group. "
+    "\n\nNotes:\n"
+    "1.DB-s are opened when running the master group. They stay open in "
+    "subsequent groups, as long as not recreated as a result of a benchmark "
+    "requiring a fresh db.\n"
+    "2.DB options may only be configured during the running of the master "
+    "group. Attempting to override them later is SILENTLY ignored.\n"
+    "3.Some additional flags may only be set for the master group (e.g., "
+    "env-related flags).\n");
 
 DEFINE_string(
     benchmarks,
@@ -1329,7 +1379,8 @@ static enum ROCKSDB_NAMESPACE::CompressionType StringToCompressionType(
   else if (!strcasecmp(ctype, "zstd"))
     return ROCKSDB_NAMESPACE::kZSTD;
   else {
-    fprintf(stderr, "Cannot parse compression type '%s'\n", ctype);
+    ErrorExit("Cannot parse compression type '%s'", ctype);
+    // Unnecessary, but the compilre complains of missing return value otherwise
     exit(1);
   }
 }
@@ -1860,7 +1911,8 @@ static enum DistributionType StringToDistributionType(const char* ctype) {
   else if (!strcasecmp(ctype, "normal"))
     return kNormal;
 
-  fprintf(stdout, "Cannot parse distribution type '%s'\n", ctype);
+  ErrorExit("Cannot parse distribution type '%s'", ctype);
+  // Unnecessary, but the compilre complains of missing return value otherwise
   exit(1);
 }
 
@@ -2069,9 +2121,7 @@ struct DBWithColumnFamilies {
       Status s =
           db->CreateColumnFamily(options, ColumnFamilyName(i), &(cfh[i]));
       if (!s.ok()) {
-        fprintf(stderr, "create column family error: %s\n",
-                s.ToString().c_str());
-        abort();
+        ErrorExit("create column family error: %s", s.ToString().c_str());
       }
     }
     num_created.store(new_num_created, std::memory_order_release);
@@ -2096,9 +2146,7 @@ class ReporterAgent {
       s = report_file_->Flush();
     }
     if (!s.ok()) {
-      fprintf(stderr, "Can't open %s: %s\n", fname.c_str(),
-              s.ToString().c_str());
-      abort();
+      ErrorExit("Can't open %s: %s", fname.c_str(), s.ToString().c_str());
     }
 
     reporting_thread_ = port::Thread([&]() { SleepAndReport(); });
@@ -2730,6 +2778,11 @@ class Duration {
   uint64_t start_at_;
 };
 
+namespace {
+// Allows cleanup to adapt (see ~Benchmark() for more details)
+bool parsing_cmd_line_args = false;
+}  // namespace
+
 class Benchmark {
  private:
   std::shared_ptr<Cache> cache_;
@@ -2838,8 +2891,10 @@ class Benchmark {
                         compressed);
   }
 
-  void PrintHeader() {
-    PrintEnvironment();
+  void PrintHeader(bool first_group) {
+    if (first_group) {
+      PrintEnvironment();
+    }
     fprintf(stdout,
             "Keys:       %d bytes each (+ %d bytes user-defined timestamp)\n",
             FLAGS_key_size, FLAGS_user_timestamp_size);
@@ -2876,12 +2931,10 @@ class Benchmark {
     if (FLAGS_enable_numa) {
       fprintf(stderr, "Running in NUMA enabled mode.\n");
 #ifndef NUMA
-      fprintf(stderr, "NUMA is not defined in the system.\n");
-      exit(1);
+      ErrorExit("NUMA is not defined in the system.");
 #else
       if (numa_available() == -1) {
-        fprintf(stderr, "NUMA is not supported by the system.\n");
-        exit(1);
+        ErrorExit("NUMA is not supported by the system.");
       }
 #endif
     }
@@ -2894,19 +2947,25 @@ class Benchmark {
     fprintf(stdout, "Memtablerep: %s\n", FLAGS_memtablerep.c_str());
     fprintf(stdout, "Perf Level: %d\n", FLAGS_perf_level);
 
-    PrintWarnings(compression.c_str());
+    PrintWarnings(first_group, compression.c_str());
     fprintf(stdout, "------------------------------------------------\n");
   }
 
-  void PrintWarnings(const char* compression) {
+  void PrintWarnings([[maybe_unused]] bool first_group,
+                     const char* compression) {
 #if defined(__GNUC__) && !defined(__OPTIMIZE__)
-    fprintf(
-        stdout,
-        "WARNING: Optimization is disabled: benchmarks unnecessarily slow\n");
+    if (first_group) {
+      fprintf(
+          stdout,
+          "WARNING: Optimization is disabled: benchmarks unnecessarily slow\n");
+    }
 #endif
 #ifndef NDEBUG
-    fprintf(stdout,
-            "WARNING: Assertions are enabled; benchmarks unnecessarily slow\n");
+    if (first_group) {
+      fprintf(
+          stdout,
+          "WARNING: Assertions are enabled; benchmarks unnecessarily slow\n");
+    }
 #endif
     if (FLAGS_compression_type_e != ROCKSDB_NAMESPACE::kNoCompression) {
       // The test string should not be too small.
@@ -3154,11 +3213,9 @@ class Benchmark {
         Status s = SecondaryCache::CreateFromString(
             ConfigOptions(), FLAGS_secondary_cache_uri, &secondary_cache);
         if (secondary_cache == nullptr) {
-          fprintf(
-              stderr,
-              "No secondary cache registered matching string: %s status=%s\n",
+          fprintf(stderr,
+              "No secondary cache registered matching string: %s status=%s",
               FLAGS_secondary_cache_uri.c_str(), s.ToString().c_str());
-          exit(1);
         }
         opts.secondary_cache = secondary_cache;
       } else if (FLAGS_use_compressed_secondary_cache && !use_tiered_cache) {
@@ -3227,8 +3284,7 @@ class Benchmark {
     }
 
     if (FLAGS_prefix_size > FLAGS_key_size) {
-      fprintf(stderr, "prefix size is larger than key size");
-      exit(1);
+      ErrorExit("prefix size is larger than key size");
     }
 
     std::vector<std::string> files;
@@ -3277,6 +3333,12 @@ class Benchmark {
   }
 
   ~Benchmark() {
+    // Trying to cleanup in case the program died due to ParseCommandLineFlags()
+    // results in a SIGABORT.
+    if (parsing_cmd_line_args) {
+      return;
+    }
+
     DeleteDBs();
     if (cache_.get() != nullptr) {
       // Clear cache reference first
@@ -3387,8 +3449,7 @@ class Benchmark {
     DBWithColumnFamilies truth_db;
     auto s = DB::OpenForReadOnly(open_options_, truth_db_name, &truth_db.db);
     if (!s.ok()) {
-      fprintf(stderr, "open error: %s\n", s.ToString().c_str());
-      exit(1);
+      ErrorExit("open error: %s", s.ToString().c_str());
     }
     ReadOptions ro;
     ro.total_order_seek = true;
@@ -3416,17 +3477,38 @@ class Benchmark {
     fprintf(stderr, "...Verified\n");
   }
 
-  void ErrorExit() {
+  void ErrorExit(const char* format, ...) {
+    std::string extended_format = std::string("\nERROR: ") + format + "\n";
+    va_list arglist;
+    va_start(arglist, format);
+    vfprintf(stderr, extended_format.c_str(), arglist);
+    va_end(arglist);
+
     DeleteDBs();
     exit(1);
   }
 
-  void Run() {
+  void Run(int group_num, int num_groups) {
     if (!SanityCheck()) {
-      ErrorExit();
+      ErrorExit("Failed SanityCheck()");
     }
-    Open(&open_options_);
-    PrintHeader();
+
+    if (num_groups > 1) {
+      std::string group_title = std::string("Group ") +
+                                std::to_string(group_num) + "/" +
+                                std::to_string(num_groups);
+      fprintf(stdout, "%s\n", group_title.c_str());
+      fprintf(stdout, "%s\n", std::string(group_title.size(), '=').c_str());
+    }
+
+    auto first_group = (group_num == 1);
+
+    if (first_group) {
+      Open(&open_options_);
+    } else {
+      fprintf(stdout, "Using exiting options\n");
+    }
+    PrintHeader(first_group);
     std::stringstream benchmark_stream(FLAGS_benchmarks);
     std::string name;
     std::unique_ptr<ExpiredTimeFilter> filter;
@@ -3473,8 +3555,7 @@ class Benchmark {
       if (!name.empty() && *name.rbegin() == ']') {
         auto it = name.find('[');
         if (it == std::string::npos) {
-          fprintf(stderr, "unknown benchmark arguments '%s'\n", name.c_str());
-          ErrorExit();
+          ErrorExit("unknown benchmark arguments '%s'", name.c_str());
         }
         std::string args = name.substr(it + 1);
         args.resize(args.size() - 1);
@@ -3504,10 +3585,8 @@ class Benchmark {
       if (name == "fillseqdeterministic" ||
           name == "filluniquerandomdeterministic") {
         if (!FLAGS_disable_auto_compactions) {
-          fprintf(stderr,
-                  "Please disable_auto_compactions in FillDeterministic "
-                  "benchmark\n");
-          ErrorExit();
+          ErrorExit(
+              "Please disable_auto_compactions in FillDeterministic benchmark");
         }
         if (num_threads > 1) {
           fprintf(stderr,
@@ -3557,10 +3636,9 @@ class Benchmark {
         method = &Benchmark::ReadSequential;
       } else if (name == "readtorowcache") {
         if (!FLAGS_use_existing_keys || !FLAGS_row_cache_size) {
-          fprintf(stderr,
-                  "Please set use_existing_keys to true and specify a "
-                  "row cache size in readtorowcache benchmark\n");
-          ErrorExit();
+          ErrorExit(
+              "Please set use_existing_keys to true and specify a row cache "
+              "size in readtorowcache benchmark");
         }
         method = &Benchmark::ReadToRowCache;
       } else if (name == "readtocache") {
@@ -3649,23 +3727,19 @@ class Benchmark {
           FLAGS_delete_range_every_n_ranges = 1;
         }
         if (FLAGS_delete_mode < 0 || FLAGS_delete_mode > 3) {
-          fprintf(stderr, "delete_mode needs to be either 0,1,2,3 .");
-          ErrorExit();
+          ErrorExit("delete_mode needs to be either 0,1,2,3 .");
         }
         prefix_size_ = prefix_size_ ? prefix_size_ : 8;
         if (!((key_size_ - prefix_size_) >= 4)) {
-          fprintf(
-              stderr,
+          ErrorExit(
               "key_size needs to be at least 4 bytes larger than prefix_size.");
-          ErrorExit();
         }
         // seeks may take very long so reduce the time between checks.
         FLAGS_ops_between_duration_checks = 100;
       } else if (name == "readrandommergerandom") {
         if (FLAGS_merge_operator.empty()) {
-          fprintf(stdout, "%-12s : skipped (--merge_operator is unknown)\n",
-                  name.c_str());
-          ErrorExit();
+          ErrorExit("%-12s : skipped (--merge_operator is unknown)",
+                    name.c_str());
         }
         method = &Benchmark::ReadRandomMergeRandom;
       } else if (name == "updaterandom") {
@@ -3676,9 +3750,8 @@ class Benchmark {
         method = &Benchmark::AppendRandom;
       } else if (name == "mergerandom") {
         if (FLAGS_merge_operator.empty()) {
-          fprintf(stdout, "%-12s : skipped (--merge_operator is unknown)\n",
-                  name.c_str());
-          exit(1);
+          ErrorExit("%-12s : skipped (--merge_operator is unknown)",
+                    name.c_str());
         }
         method = &Benchmark::MergeRandom;
       } else if (name == "randomwithverify") {
@@ -3751,12 +3824,10 @@ class Benchmark {
         PrintStatsHistory();
       } else if (name == "replay") {
         if (num_threads > 1) {
-          fprintf(stderr, "Multi-threaded replay is not yet supported\n");
-          ErrorExit();
+          ErrorExit("Multi-threaded replay is not yet supported");
         }
         if (FLAGS_trace_file == "") {
-          fprintf(stderr, "Please set --trace_file to be replayed from\n");
-          ErrorExit();
+          ErrorExit("Please set --trace_file to be replayed from");
         }
         method = &Benchmark::Replay;
       } else if (name == "getmergeoperands") {
@@ -3773,15 +3844,15 @@ class Benchmark {
       } else if (name == "restore") {
         method = &Benchmark::Restore;
       } else if (!name.empty()) {  // No error message for empty name
-        fprintf(stderr, "unknown benchmark '%s'\n", name.c_str());
-        ErrorExit();
+        ErrorExit("unknown benchmark '%s'", name.c_str());
       }
 
       if (fresh_db) {
         if (FLAGS_use_existing_db) {
-          fprintf(stdout, "%-12s : skipped (--use_existing_db is true)\n",
-                  name.c_str());
-          method = nullptr;
+          ErrorExit(
+              "Benchmark %s requries a fresh DB and is mutual exclusive with "
+              "--use_existing_db",
+              name.c_str());
         } else {
           if (db_.db != nullptr) {
             db_.DeleteDBs();
@@ -3801,7 +3872,9 @@ class Benchmark {
       }
 
       if (method != nullptr) {
-        fprintf(stdout, "DB path: [%s]\n", FLAGS_db.c_str());
+        if (first_group) {
+          fprintf(stdout, "DB path: [%s]\n", FLAGS_db.c_str());
+        }
 
         if (name == "backup") {
           std::cout << "Backup path: [" << FLAGS_backup_dir << "]" << std::endl;
@@ -3819,15 +3892,13 @@ class Benchmark {
           Status s = NewFileTraceWriter(FLAGS_env, EnvOptions(),
                                         FLAGS_trace_file, &trace_writer);
           if (!s.ok()) {
-            fprintf(stderr, "Encountered an error starting a trace, %s\n",
-                    s.ToString().c_str());
-            ErrorExit();
+            ErrorExit("Encountered an error starting a trace, %s",
+                      s.ToString().c_str());
           }
           s = db_.db->StartTrace(trace_options_, std::move(trace_writer));
           if (!s.ok()) {
-            fprintf(stderr, "Encountered an error starting a trace, %s\n",
-                    s.ToString().c_str());
-            ErrorExit();
+            ErrorExit("Encountered an error starting a trace, %s",
+                      s.ToString().c_str());
           }
           fprintf(stdout, "Tracing the workload to: [%s]\n",
                   FLAGS_trace_file.c_str());
@@ -3836,16 +3907,13 @@ class Benchmark {
         if (!FLAGS_block_cache_trace_file.empty()) {
           // Sanity checks.
           if (FLAGS_block_cache_trace_sampling_frequency <= 0) {
-            fprintf(stderr,
-                    "Block cache trace sampling frequency must be higher than "
-                    "0.\n");
-            ErrorExit();
+            ErrorExit(
+                "Block cache trace sampling frequency must be higher than 0.");
           }
           if (FLAGS_block_cache_trace_max_trace_file_size_in_bytes <= 0) {
-            fprintf(stderr,
-                    "The maximum file size for block cache tracing must be "
-                    "higher than 0.\n");
-            ErrorExit();
+            ErrorExit(
+                "The maximum file size for block cache tracing must be higher "
+                "than 0.");
           }
           block_cache_trace_options_.max_trace_file_size =
               FLAGS_block_cache_trace_max_trace_file_size_in_bytes;
@@ -3856,19 +3924,15 @@ class Benchmark {
                                         FLAGS_block_cache_trace_file,
                                         &block_cache_trace_writer);
           if (!s.ok()) {
-            fprintf(stderr,
-                    "Encountered an error when creating trace writer, %s\n",
-                    s.ToString().c_str());
-            ErrorExit();
+            ErrorExit("Encountered an error when creating trace writer, %s",
+                      s.ToString().c_str());
           }
           s = db_.db->StartBlockCacheTrace(block_cache_trace_options_,
                                            std::move(block_cache_trace_writer));
           if (!s.ok()) {
-            fprintf(
-                stderr,
-                "Encountered an error when starting block cache tracing, %s\n",
+            ErrorExit(
+                "Encountered an error when starting block cache tracing, %s",
                 s.ToString().c_str());
-            ErrorExit();
           }
           fprintf(stdout, "Tracing block cache accesses to: [%s]\n",
                   FLAGS_block_cache_trace_file.c_str());
@@ -4212,9 +4276,8 @@ class Benchmark {
         *opts = Options(db_opts, cf_descs[0].options);
         return true;
       }
-      fprintf(stderr, "Unable to load options file %s --- %s\n",
-              FLAGS_options_file.c_str(), s.ToString().c_str());
-      exit(1);
+      ErrorExit("Unable to load options file %s --- %s",
+                FLAGS_options_file.c_str(), s.ToString().c_str());
     }
     return false;
   }
@@ -4287,8 +4350,7 @@ class Benchmark {
     if (FLAGS_use_uint64_comparator) {
       options.comparator = test::Uint64Comparator();
       if (FLAGS_key_size != 8) {
-        fprintf(stderr, "Using Uint64 comparator but key size is not 8.\n");
-        exit(1);
+        ErrorExit("Using Uint64 comparator but key size is not 8.");
       }
     }
     if (FLAGS_use_stderr_info_logger) {
@@ -4320,16 +4382,13 @@ class Benchmark {
     Status s =
         CreateMemTableRepFactory(config_options, &options.memtable_factory);
     if (!s.ok()) {
-      fprintf(stderr, "Could not create memtable factory: %s\n",
-              s.ToString().c_str());
-      exit(1);
+      ErrorExit("Could not create memtable factory: %s", s.ToString().c_str());
     } else if ((FLAGS_prefix_size == 0) &&
                (options.memtable_factory->IsInstanceOf("prefix_hash") ||
                 options.memtable_factory->IsInstanceOf("hash_linkedlist"))) {
-      fprintf(stderr,
-              "prefix_size should be non-zero if PrefixHash or "
-              "HashLinkedList memtablerep is used\n");
-      exit(1);
+      ErrorExit(
+          "prefix_size should be non-zero if PrefixHash or "
+          "HashLinkedList memtablerep is used\n");
     }
 
     if (FLAGS_use_plain_table) {
@@ -4352,13 +4411,11 @@ class Benchmark {
           NewPlainTableFactory(plain_table_options));
     } else if (FLAGS_use_cuckoo_table) {
       if (FLAGS_cuckoo_hash_ratio > 1 || FLAGS_cuckoo_hash_ratio < 0) {
-        fprintf(stderr, "Invalid cuckoo_hash_ratio\n");
-        exit(1);
+        ErrorExit("Invalid cuckoo_hash_ratio");
       }
 
       if (!FLAGS_mmap_read) {
-        fprintf(stderr, "cuckoo table format requires mmap read to operate\n");
-        exit(1);
+        ErrorExit("cuckoo table format requires mmap read to operate");
       }
 
       ROCKSDB_NAMESPACE::CuckooTableOptions table_options;
@@ -4372,9 +4429,7 @@ class Benchmark {
           static_cast<ChecksumType>(FLAGS_checksum_type);
       if (FLAGS_use_hash_search) {
         if (FLAGS_prefix_size == 0) {
-          fprintf(stderr,
-                  "prefix_size not assigned when enable use_hash_search \n");
-          exit(1);
+          ErrorExit("prefix_size not assigned when enable use_hash_search");
         }
         block_based_options.index_type = BlockBasedTableOptions::kHashSearch;
       } else {
@@ -4547,9 +4602,8 @@ class Benchmark {
         }
 
         if (!rc_status.ok()) {
-          fprintf(stderr, "Error initializing read cache, %s\n",
-                  rc_status.ToString().c_str());
-          exit(1);
+          ErrorExit("Error initializing read cache, %s",
+                    rc_status.ToString().c_str());
         }
       }
 
@@ -4606,10 +4660,10 @@ class Benchmark {
     if (FLAGS_max_bytes_for_level_multiplier_additional_v.size() > 0) {
       if (FLAGS_max_bytes_for_level_multiplier_additional_v.size() !=
           static_cast<unsigned int>(FLAGS_num_levels)) {
-        fprintf(stderr, "Insufficient number of fanouts specified %d\n",
-                static_cast<int>(
-                    FLAGS_max_bytes_for_level_multiplier_additional_v.size()));
-        exit(1);
+        ErrorExit(
+            "Insufficient number of fanouts specified %d",
+            static_cast<int>(
+                FLAGS_max_bytes_for_level_multiplier_additional_v.size()));
       }
       options.max_bytes_for_level_multiplier_additional =
           FLAGS_max_bytes_for_level_multiplier_additional_v;
@@ -4681,9 +4735,8 @@ class Benchmark {
       s = MergeOperator::CreateFromString(config_options, FLAGS_merge_operator,
                                           &options.merge_operator);
       if (!s.ok()) {
-        fprintf(stderr, "invalid merge operator[%s]: %s\n",
-                FLAGS_merge_operator.c_str(), s.ToString().c_str());
-        exit(1);
+        ErrorExit("invalid merge operator[%s]: %s",
+                  FLAGS_merge_operator.c_str(), s.ToString().c_str());
       }
     }
     options.max_successive_merges = FLAGS_max_successive_merges;
@@ -4720,8 +4773,7 @@ class Benchmark {
 
     if (FLAGS_user_timestamp_size > 0) {
       if (FLAGS_user_timestamp_size != 8) {
-        fprintf(stderr, "Only 64 bits timestamps are supported.\n");
-        exit(1);
+        ErrorExit("Only 64 bits timestamps are supported.");
       }
       options.comparator = test::BytewiseComparatorWithU64TsWrapper();
     }
@@ -4747,13 +4799,11 @@ class Benchmark {
     options.blob_file_starting_level = FLAGS_blob_file_starting_level;
 
     if (FLAGS_readonly && FLAGS_transaction_db) {
-      fprintf(stderr, "Cannot use readonly flag with transaction_db\n");
-      exit(1);
+      ErrorExit("Cannot use readonly flag with transaction_db");
     }
     if (FLAGS_use_secondary_db &&
         (FLAGS_transaction_db || FLAGS_optimistic_transaction_db)) {
-      fprintf(stderr, "Cannot use use_secondary_db flag with transaction_db\n");
-      exit(1);
+      ErrorExit("Cannot use use_secondary_db flag with transaction_db");
     }
     options.memtable_protection_bytes_per_key =
         FLAGS_memtable_protection_bytes_per_key;
@@ -4802,10 +4852,9 @@ class Benchmark {
             config_options, FLAGS_filter_uri + bits_str,
             &table_options->filter_policy);
         if (!s.ok()) {
-          fprintf(stderr, "failure creating filter policy[%s%s]: %s\n",
-                  FLAGS_filter_uri.c_str(), bits_str.c_str(),
-                  s.ToString().c_str());
-          exit(1);
+          ErrorExit("failure creating filter policy[%s%s]: %s",
+                    FLAGS_filter_uri.c_str(), bits_str.c_str(),
+                    s.ToString().c_str());
         }
       } else if (table_options->filter_policy == nullptr) {
         if (FLAGS_bloom_bits < 0) {
@@ -4943,16 +4992,13 @@ class Benchmark {
           sum += cfh_idx_to_prob.back();
         }
         if (sum != 100) {
-          fprintf(stderr, "column_family_distribution items must sum to 100\n");
-          exit(1);
+          ErrorExit("column_family_distribution items must sum to 100");
         }
         if (cfh_idx_to_prob.size() != num_hot) {
-          fprintf(stderr,
-                  "got %" ROCKSDB_PRIszt
-                  " column_family_distribution items; expected "
-                  "%" ROCKSDB_PRIszt "\n",
-                  cfh_idx_to_prob.size(), num_hot);
-          exit(1);
+          ErrorExit(
+              "got %" ROCKSDB_PRIszt
+              " column_family_distribution items; expected %" ROCKSDB_PRIszt,
+              cfh_idx_to_prob.size(), num_hot);
         }
       }
       if (FLAGS_readonly) {
@@ -5064,8 +5110,7 @@ class Benchmark {
                 << " milliseconds\n";
     }
     if (!s.ok()) {
-      fprintf(stderr, "open error: %s\n", s.ToString().c_str());
-      exit(1);
+      ErrorExit("open error: %s", s.ToString().c_str());
     }
   }
 
@@ -5206,9 +5251,7 @@ class Benchmark {
       // If overwrite set by user, and UNIQUE_RANDOM mode on,
       // the overwrite_window_size must be > 0.
       if (write_mode == UNIQUE_RANDOM && FLAGS_overwrite_window_size == 0) {
-        fprintf(stderr,
-                "Overwrite_window_size must be  strictly greater than 0.\n");
-        ErrorExit();
+        ErrorExit("Overwrite_window_size must be  strictly greater than 0.");
       }
     }
 
@@ -5247,19 +5290,15 @@ class Benchmark {
     if (kNumDispAndPersEntries > 0) {
       if ((write_mode != UNIQUE_RANDOM) || (writes_per_range_tombstone_ > 0) ||
           (p > 0.0)) {
-        fprintf(
-            stderr,
+        ErrorExit(
             "Disposable/persistent deletes are not compatible with overwrites "
-            "and DeleteRanges; and are only supported in filluniquerandom.\n");
-        ErrorExit();
+            "and DeleteRanges; and are only supported in filluniquerandom.");
       }
       if (FLAGS_disposable_entries_value_size < 0 ||
           FLAGS_persistent_entries_value_size < 0) {
-        fprintf(
-            stderr,
-            "disposable_entries_value_size and persistent_entries_value_size"
-            "have to be positive.\n");
-        ErrorExit();
+        ErrorExit(
+            "disposable_entries_value_size and persistent_entries_value_size "
+            "have to be positive.");
       }
     }
     Random rnd_disposable_entry(static_cast<uint32_t>(*seed_base));
@@ -5314,8 +5353,7 @@ class Benchmark {
           next_seq_db_at += num_ops;
           id++;
           if (id >= num_key_gens) {
-            fprintf(stderr, "Logic error. Filled all databases\n");
-            ErrorExit();
+            ErrorExit("Logic error. Filled all databases");
           }
         }
       }
@@ -5533,9 +5571,8 @@ class Benchmark {
         s = batch.UpdateTimestamps(
             user_ts, [this](uint32_t) { return user_timestamp_size_; });
         if (!s.ok()) {
-          fprintf(stderr, "assign timestamp to write batch: %s\n",
-                  s.ToString().c_str());
-          ErrorExit();
+          ErrorExit("assign timestamp to write batch: %s",
+                    s.ToString().c_str());
         }
       }
       if (!use_blob_db_) {
@@ -5570,8 +5607,7 @@ class Benchmark {
       }
 
       if (!s.ok()) {
-        fprintf(stderr, "put error: %s\n", s.ToString().c_str());
-        ErrorExit();
+        ErrorExit("put error: %s", s.ToString().c_str());
       }
     }
     if ((write_mode == UNIQUE_RANDOM) && (p > 0.0)) {
@@ -5662,9 +5698,8 @@ class Benchmark {
       }
       for (size_t i = 0; i < num_db; i++) {
         if (sorted_runs[i].size() < num_levels - 1) {
-          fprintf(stderr, "n is too small to fill %" ROCKSDB_PRIszt " levels\n",
-                  num_levels);
-          exit(1);
+          ErrorExit("n is too small to fill %" ROCKSDB_PRIszt " levels",
+                    num_levels);
         }
       }
       for (size_t i = 0; i < num_db; i++) {
@@ -5717,9 +5752,8 @@ class Benchmark {
       }
       for (size_t i = 0; i < num_db; i++) {
         if (sorted_runs[i].size() < num_levels) {
-          fprintf(stderr, "n is too small to fill %" ROCKSDB_PRIszt " levels\n",
-                  num_levels);
-          exit(1);
+          ErrorExit("n is too small to fill %" ROCKSDB_PRIszt " levels",
+                    num_levels);
         }
       }
       for (size_t i = 0; i < num_db; i++) {
@@ -5976,8 +6010,7 @@ class Benchmark {
         found++;
         bytes += key.size() + pinnable_val.size();
       } else if (!s.IsNotFound()) {
-        fprintf(stderr, "Get returned an error: %s\n", s.ToString().c_str());
-        abort();
+        ErrorExit("Get returned an error: %s", s.ToString().c_str());
       }
 
       if (thread->shared->read_rate_limiter.get() != nullptr &&
@@ -6072,9 +6105,7 @@ class Benchmark {
         if (status.ok()) {
           ++found;
         } else if (!status.IsNotFound()) {
-          fprintf(stderr, "Get returned an error: %s\n",
-                  status.ToString().c_str());
-          abort();
+          ErrorExit("Get returned an error: %s", status.ToString().c_str());
         }
         if (key_rand >= FLAGS_num) {
           ++nonexist;
@@ -6217,8 +6248,7 @@ class Benchmark {
           pinnable_vals[i].Reset();
         }
       } else if (!s.IsNotFound()) {
-        fprintf(stderr, "Get returned an error: %s\n", s.ToString().c_str());
-        abort();
+        ErrorExit("Get returned an error: %s", s.ToString().c_str());
       }
 
       if (thread->shared->read_rate_limiter.get() != nullptr &&
@@ -6300,9 +6330,8 @@ class Benchmark {
             bytes += keys[i].size() + values[i].size() + user_timestamp_size_;
             ++found;
           } else if (!statuses[i].IsNotFound()) {
-            fprintf(stderr, "MultiGet returned an error: %s\n",
-                    statuses[i].ToString().c_str());
-            abort();
+            ErrorExit("MultiGet returned an error: %s",
+                      statuses[i].ToString().c_str());
           }
         }
       } else {
@@ -6317,9 +6346,8 @@ class Benchmark {
                 keys[i].size() + pin_values[i].size() + user_timestamp_size_;
             ++found;
           } else if (!stat_list[i].IsNotFound()) {
-            fprintf(stderr, "MultiGet returned an error: %s\n",
-                    stat_list[i].ToString().c_str());
-            abort();
+            ErrorExit("MultiGet returned an error: %s",
+                      stat_list[i].ToString().c_str());
           }
           stat_list[i] = Status::OK();
           pin_values[i].Reset();
@@ -6730,8 +6758,7 @@ class Benchmark {
           get_found++;
           bytes += key.size() + pinnable_val.size();
         } else if (!s.IsNotFound()) {
-          fprintf(stderr, "Get returned an error: %s\n", s.ToString().c_str());
-          abort();
+          ErrorExit("Get returned an error: %s", s.ToString().c_str());
         }
 
         if (thread->shared->read_rate_limiter && (gets + seek) % 100 == 0) {
@@ -6759,8 +6786,7 @@ class Benchmark {
             write_options_, key,
             gen.Generate(static_cast<unsigned int>(val_size)));
         if (!s.ok()) {
-          fprintf(stderr, "put error: %s\n", s.ToString().c_str());
-          ErrorExit();
+          ErrorExit("put error: %s", s.ToString().c_str());
         }
 
         if (thread->shared->write_rate_limiter && puts % 100 == 0) {
@@ -7012,15 +7038,13 @@ class Benchmark {
         s = batch.UpdateTimestamps(
             ts, [this](uint32_t) { return user_timestamp_size_; });
         if (!s.ok()) {
-          fprintf(stderr, "assign timestamp: %s\n", s.ToString().c_str());
-          ErrorExit();
+          ErrorExit("assign timestamp: %s", s.ToString().c_str());
         }
       }
       s = db->Write(write_options_, &batch);
       thread->stats.FinishedOps(nullptr, db, entries_per_batch_, kDelete);
       if (!s.ok()) {
-        fprintf(stderr, "del error: %s\n", s.ToString().c_str());
-        exit(1);
+        ErrorExit("del error: %s", s.ToString().c_str());
       }
       i += entries_per_batch_;
     }
@@ -7135,8 +7159,7 @@ class Benchmark {
       written++;
 
       if (!s.ok()) {
-        fprintf(stderr, "put or merge error: %s\n", s.ToString().c_str());
-        exit(1);
+        ErrorExit("put or merge error: %s", s.ToString().c_str());
       }
       bytes += key.size() + val.size() + user_timestamp_size_;
       thread->stats.FinishedOps(&db_, db_.db, 1, kWrite);
@@ -7301,9 +7324,7 @@ class Benchmark {
             db_with_cfh->db->Delete(write_options_, iter->key());
           }
           if (!iter->status().ok()) {
-            fprintf(stderr, "iter error: %s\n",
-                    iter->status().ToString().c_str());
-            exit(1);
+            ErrorExit("iter error: %s", iter->status().ToString().c_str());
           }
           break;
         }
@@ -7421,9 +7442,8 @@ class Benchmark {
   }
 
   void BGScan(ThreadState* thread) {
-    if (FLAGS_num_multi_db > 0) {
-      fprintf(stderr, "Not supporting multiple DBs.\n");
-      abort();
+    if (FLAGS_num_multi_db > 1) {
+      ErrorExit("Not supporting multiple DBs.");
     }
     assert(db_.db != nullptr);
     ReadOptions read_options = read_options_;
@@ -7445,9 +7465,7 @@ class Benchmark {
         iter->SeekToFirst();
         num_seek_to_first++;
       } else if (!iter->status().ok()) {
-        fprintf(stderr, "Iterator error: %s\n",
-                iter->status().ToString().c_str());
-        abort();
+        ErrorExit("Iterator error: %s", iter->status().ToString().c_str());
       } else {
         iter->Next();
         num_next++;
@@ -7483,9 +7501,7 @@ class Benchmark {
       s = batch.UpdateTimestamps(
           ts, [this](uint32_t) { return user_timestamp_size_; });
       if (!s.ok()) {
-        fprintf(stderr, "assign timestamp to batch: %s\n",
-                s.ToString().c_str());
-        ErrorExit();
+        ErrorExit("assign timestamp to batch: %s", s.ToString().c_str());
       }
     }
 
@@ -7515,9 +7531,7 @@ class Benchmark {
       s = batch.UpdateTimestamps(
           ts, [this](uint32_t) { return user_timestamp_size_; });
       if (!s.ok()) {
-        fprintf(stderr, "assign timestamp to batch: %s\n",
-                s.ToString().c_str());
-        ErrorExit();
+        ErrorExit("assign timestamp to batch: %s", s.ToString().c_str());
       }
     }
 
@@ -7623,8 +7637,7 @@ class Benchmark {
         // for all the gets we have done earlier
         Status s = PutMany(db, write_options_, key, gen.Generate());
         if (!s.ok()) {
-          fprintf(stderr, "putmany error: %s\n", s.ToString().c_str());
-          exit(1);
+          ErrorExit("putmany error: %s", s.ToString().c_str());
         }
         put_weight--;
         puts_done++;
@@ -7632,8 +7645,7 @@ class Benchmark {
       } else if (delete_weight > 0) {
         Status s = DeleteMany(db, write_options_, key);
         if (!s.ok()) {
-          fprintf(stderr, "deletemany error: %s\n", s.ToString().c_str());
-          exit(1);
+          ErrorExit("deletemany error: %s", s.ToString().c_str());
         }
         delete_weight--;
         deletes_done++;
@@ -7713,8 +7725,7 @@ class Benchmark {
                       gen.Generate());
         }
         if (!s.ok()) {
-          fprintf(stderr, "put error: %s\n", s.ToString().c_str());
-          ErrorExit();
+          ErrorExit("put error: %s", s.ToString().c_str());
         }
         put_weight--;
         writes_done++;
@@ -7865,8 +7876,7 @@ class Benchmark {
         }
 
         if (!s.ok()) {
-          fprintf(stderr, "put error: %s\n", s.ToString().c_str());
-          ErrorExit();
+          ErrorExit("put error: %s", s.ToString().c_str());
         }
         writes_done++;
         thread->stats.FinishedOps(nullptr, db, 1, kWrite);
@@ -7917,9 +7927,7 @@ class Benchmark {
         ++found;
         bytes += key.size() + value.size() + user_timestamp_size_;
       } else if (!status.IsNotFound()) {
-        fprintf(stderr, "Get returned an error: %s\n",
-                status.ToString().c_str());
-        abort();
+        ErrorExit("Get returned an error: %s", status.ToString().c_str());
       }
 
       if (thread->shared->write_rate_limiter) {
@@ -7941,8 +7949,7 @@ class Benchmark {
         s = db->Put(write_options_, key, val);
       }
       if (!s.ok()) {
-        fprintf(stderr, "put error: %s\n", s.ToString().c_str());
-        exit(1);
+        ErrorExit("put error: %s", s.ToString().c_str());
       }
       bytes += key.size() + val.size() + user_timestamp_size_;
       thread->stats.FinishedOps(nullptr, db, 1, kUpdate);
@@ -7987,9 +7994,7 @@ class Benchmark {
       if (status.ok()) {
         ++found;
       } else if (!status.IsNotFound()) {
-        fprintf(stderr, "Get returned an error: %s\n",
-                status.ToString().c_str());
-        exit(1);
+        ErrorExit("Get returned an error: %s", status.ToString().c_str());
       }
 
       Slice value =
@@ -8011,8 +8016,7 @@ class Benchmark {
         s = db->Put(write_options_, key, Slice(new_value));
       }
       if (!s.ok()) {
-        fprintf(stderr, "put error: %s\n", s.ToString().c_str());
-        ErrorExit();
+        ErrorExit("put error: %s", s.ToString().c_str());
       }
       thread->stats.FinishedOps(nullptr, db, 1);
     }
@@ -8054,9 +8058,7 @@ class Benchmark {
         ++found;
         bytes += key.size() + value.size() + user_timestamp_size_;
       } else if (!status.IsNotFound()) {
-        fprintf(stderr, "Get returned an error: %s\n",
-                status.ToString().c_str());
-        abort();
+        ErrorExit("Get returned an error: %s", status.ToString().c_str());
       } else {
         // If not existing, then just assume an empty string of data
         value.clear();
@@ -8079,8 +8081,7 @@ class Benchmark {
         s = db->Put(write_options_, key, value);
       }
       if (!s.ok()) {
-        fprintf(stderr, "put error: %s\n", s.ToString().c_str());
-        ErrorExit();
+        ErrorExit("put error: %s", s.ToString().c_str());
       }
       bytes += key.size() + value.size() + user_timestamp_size_;
       thread->stats.FinishedOps(nullptr, db, 1, kUpdate);
@@ -8126,8 +8127,7 @@ class Benchmark {
       }
 
       if (!s.ok()) {
-        fprintf(stderr, "merge error: %s\n", s.ToString().c_str());
-        exit(1);
+        ErrorExit("merge error: %s", s.ToString().c_str());
       }
       bytes += key.size() + val.size();
       thread->stats.FinishedOps(nullptr, db_with_cfh->db, 1, kMerge);
@@ -8168,8 +8168,7 @@ class Benchmark {
       if (do_merge) {
         Status s = db->Merge(write_options_, key, gen.Generate());
         if (!s.ok()) {
-          fprintf(stderr, "merge error: %s\n", s.ToString().c_str());
-          exit(1);
+          ErrorExit("merge error: %s", s.ToString().c_str());
         }
         num_merges++;
         thread->stats.FinishedOps(nullptr, db, 1, kMerge);
@@ -8340,8 +8339,7 @@ class Benchmark {
     ro.readahead_size = FLAGS_readahead_size;
     Status s = db->VerifyChecksum(ro);
     if (!s.ok()) {
-      fprintf(stderr, "VerifyChecksum() failed: %s\n", s.ToString().c_str());
-      exit(1);
+      ErrorExit("VerifyChecksum() failed: %s", s.ToString().c_str());
     }
   }
 
@@ -8355,9 +8353,7 @@ class Benchmark {
     ro.readahead_size = FLAGS_readahead_size;
     Status s = db->VerifyFileChecksums(ro);
     if (!s.ok()) {
-      fprintf(stderr, "VerifyFileChecksums() failed: %s\n",
-              s.ToString().c_str());
-      exit(1);
+      ErrorExit("VerifyFileChecksums() failed: %s", s.ToString().c_str());
     }
   }
 
@@ -8379,8 +8375,7 @@ class Benchmark {
     uint64_t transactions_done = 0;
 
     if (num_prefix_ranges == 0 || num_prefix_ranges > 9999) {
-      fprintf(stderr, "invalid value for transaction_sets\n");
-      abort();
+      ErrorExit("invalid value for transaction_sets");
     }
 
     TransactionOptions txn_options;
@@ -8392,10 +8387,8 @@ class Benchmark {
                                        num_prefix_ranges);
 
     if (FLAGS_num_multi_db > 1) {
-      fprintf(stderr,
-              "Cannot run RandomTransaction benchmark with "
-              "FLAGS_multi_db > 1.");
-      abort();
+      ErrorExit(
+          "Cannot run RandomTransaction benchmark with  FLAGS_multi_db > 1.");
     }
 
     while (!duration.Done(1)) {
@@ -8413,9 +8406,8 @@ class Benchmark {
       }
 
       if (!success) {
-        fprintf(stderr, "Unexpected error: %s\n",
-                inserter.GetLastStatus().ToString().c_str());
-        abort();
+        ErrorExit("Unexpected error: %s",
+                  inserter.GetLastStatus().ToString().c_str());
       }
 
       thread->stats.FinishedOps(nullptr, db_.db, 1, kOthers);
@@ -8480,8 +8472,7 @@ class Benchmark {
         s = db->Put(write_options_, key, gen.Generate());
       }
       if (!s.ok()) {
-        fprintf(stderr, "Operation failed: %s\n", s.ToString().c_str());
-        exit(1);
+        ErrorExit("Operation failed: %s", s.ToString().c_str());
       }
     }
 
@@ -8518,8 +8509,7 @@ class Benchmark {
       }
 
       if (!s.ok()) {
-        fprintf(stderr, "Operation failed: %s\n", s.ToString().c_str());
-        exit(1);
+        ErrorExit("Operation failed: %s", s.ToString().c_str());
       }
 
       thread->stats.FinishedOps(nullptr, db, 1, kOthers);
@@ -8659,8 +8649,7 @@ class Benchmark {
       s = db->Put(write_options_, key, val);
 
       if (!s.ok()) {
-        fprintf(stderr, "put error: %s\n", s.ToString().c_str());
-        ErrorExit();
+        ErrorExit("put error: %s", s.ToString().c_str());
       }
       bytes = key.size() + val.size();
       thread->stats.FinishedOps(&db_, db_.db, 1, kWrite);
@@ -8729,9 +8718,8 @@ class Benchmark {
       for (const auto& k : keys) {
         uint64_t v;
         if (!db.db->GetIntProperty(k, &v)) {
-          fprintf(stderr, "waitforcompaction(%s): GetIntProperty(%s) failed\n",
-                  db.db->GetName().c_str(), k.c_str());
-          exit(1);
+          ErrorExit("waitforcompaction(%s): GetIntProperty(%s) failed",
+                    db.db->GetName().c_str(), k.c_str());
         } else if (v > 0) {
           fprintf(stdout,
                   "waitforcompaction(%s): active(%s). Sleep 10 seconds\n",
@@ -8860,8 +8848,7 @@ class Benchmark {
       }
 
       if (!s.ok()) {
-        fprintf(stderr, "Flush failed: %s\n", s.ToString().c_str());
-        exit(1);
+        ErrorExit("Flush failed: %s", s.ToString().c_str());
       }
     } else {
       for (const auto& db_with_cfh : multi_dbs_) {
@@ -8874,8 +8861,7 @@ class Benchmark {
         }
 
         if (!s.ok()) {
-          fprintf(stderr, "Flush failed: %s\n", s.ToString().c_str());
-          exit(1);
+          ErrorExit("Flush failed: %s", s.ToString().c_str());
         }
       }
     }
@@ -8982,22 +8968,17 @@ class Benchmark {
     s = NewFileTraceReader(FLAGS_env, EnvOptions(), FLAGS_trace_file,
                            &trace_reader);
     if (!s.ok()) {
-      fprintf(
-          stderr,
+      ErrorExit(
           "Encountered an error creating a TraceReader from the trace file. "
-          "Error: %s\n",
+          "Error: %s",
           s.ToString().c_str());
-      exit(1);
     }
     std::unique_ptr<Replayer> replayer;
     s = db_with_cfh->db->NewDefaultReplayer(db_with_cfh->cfh,
                                             std::move(trace_reader), &replayer);
     if (!s.ok()) {
-      fprintf(stderr,
-              "Encountered an error creating a default Replayer. "
-              "Error: %s\n",
-              s.ToString().c_str());
-      exit(1);
+      ErrorExit("Encountered an error creating a default Replayer. Error: %s",
+                s.ToString().c_str());
     }
     s = replayer->Prepare();
     if (!s.ok()) {
@@ -9063,56 +9044,157 @@ class Benchmark {
 void ValidateMetadataCacheOptions() {
   if (FLAGS_top_level_index_pinning &&
       (FLAGS_cache_index_and_filter_blocks == false)) {
-    fprintf(stderr,
-            "ERROR: --cache_index_and_filter_blocks must be set for "
-            "--top_level_index_pinning to have any affect.\n");
-    exit(1);
+    ErrorExit(
+        "--cache_index_and_filter_blocks must be set for "
+        "--top_level_index_pinning to have any affect.");
   }
 
   if (FLAGS_unpartitioned_pinning &&
       (FLAGS_cache_index_and_filter_blocks == false)) {
-    fprintf(stderr,
-            "ERROR: --cache_index_and_filter_blocks must be set for "
-            "--unpartitioned_pinning to have any affect.\n");
-    exit(1);
+    ErrorExit(
+        "--cache_index_and_filter_blocks must be set for "
+        "--unpartitioned_pinning to have any affect.");
   }
 }
 
-int db_bench_tool(int argc, char** argv) {
-  ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
-  ConfigOptions config_options;
-  static bool initialized = false;
-  if (!initialized) {
-    SetUsageMessage(std::string("\nUSAGE:\n") + std::string(argv[0]) +
-                    " [OPTIONS]...");
-    SetVersionString(GetRocksVersionAsString(true));
-    initialized = true;
+namespace {
+// Records the values of applicable flags during the invocation of the first
+// group The user may not modify any of these in subsequent groups
+struct FirstGroupApplicableFlags {
+  static inline const std::string kInvalidString = "INVALID STRING";
+
+  std::string db{kInvalidString};
+  bool statistics{false};
+  std::string statistics_string{kInvalidString};
+  std::string env_uri{kInvalidString};
+  std::string fs_uri{kInvalidString};
+  bool simulate_hdd{false};
+  std::string simulate_hybrid_fs_file{kInvalidString};
+  int32_t simulate_hybrid_hdd_multipliers{-1};
+  int64_t seed{-1};
+};
+
+FirstGroupApplicableFlags first_group_applicable_flags;
+
+void RecordFirstGroupApplicableFlags() {
+  first_group_applicable_flags.db = FLAGS_db;
+  first_group_applicable_flags.statistics = FLAGS_statistics;
+  first_group_applicable_flags.statistics_string = FLAGS_statistics_string;
+  first_group_applicable_flags.env_uri = FLAGS_env_uri;
+  first_group_applicable_flags.fs_uri = FLAGS_fs_uri;
+  first_group_applicable_flags.simulate_hdd = FLAGS_simulate_hdd;
+  first_group_applicable_flags.simulate_hybrid_fs_file =
+      FLAGS_simulate_hybrid_fs_file;
+  first_group_applicable_flags.simulate_hybrid_hdd_multipliers =
+      FLAGS_simulate_hybrid_hdd_multipliers;
+  first_group_applicable_flags.seed = FLAGS_seed;
+}
+
+void ValidateSubsequentGroupsDoNotOverrideApplicableFlags() {
+  if (FLAGS_db != first_group_applicable_flags.db) {
+    ErrorExit("It's illegal to change the DB's folder name in groups > 1");
   }
-  ParseCommandLineFlags(&argc, &argv, true);
-  FLAGS_compaction_style_e =
-      (ROCKSDB_NAMESPACE::CompactionStyle)FLAGS_compaction_style;
-  FLAGS_delete_mode_e = (DeleteMode)FLAGS_delete_mode;
-  if (FLAGS_statistics && !FLAGS_statistics_string.empty()) {
-    fprintf(stderr,
-            "Cannot provide both --statistics and --statistics_string.\n");
-    exit(1);
+
+  if ((FLAGS_statistics != first_group_applicable_flags.statistics) ||
+      (FLAGS_statistics_string !=
+       first_group_applicable_flags.statistics_string)) {
+    ErrorExit(
+        "It's illegal to change statistics flags (-statistics or "
+        "-statistics_string) in groups > 1");
   }
-  if (!FLAGS_statistics_string.empty()) {
+
+  if ((FLAGS_env_uri != first_group_applicable_flags.env_uri) ||
+      (FLAGS_fs_uri != first_group_applicable_flags.fs_uri) ||
+      (FLAGS_simulate_hdd != first_group_applicable_flags.simulate_hdd) ||
+      (FLAGS_simulate_hybrid_fs_file !=
+       first_group_applicable_flags.simulate_hybrid_fs_file) ||
+      (FLAGS_simulate_hybrid_hdd_multipliers !=
+       first_group_applicable_flags.simulate_hybrid_hdd_multipliers)) {
+    ErrorExit(
+        "It's illegal to change env flags (-env_uri, -fs_uri, "
+        "-simulate_hdd, -simulate_hybrid_fs_file, or "
+        "-simulate_hybrid_hdd_multipliers) in groups > 1");
+  }
+
+  if (FLAGS_seed != first_group_applicable_flags.seed) {
+    ErrorExit("It's illegal to change the seed in groups > 1");
+  }
+}
+
+void ValidateAndProcessStatisticsFlags(bool first_group,
+                                       const ConfigOptions& config_options) {
+  if (first_group == false) {
+    return;
+  }
+
+  if (FLAGS_statistics && (FLAGS_statistics_string.empty() == false)) {
+    ErrorExit("Cannot provide both --statistics and --statistics_string.");
+  } else if (FLAGS_statistics) {
+    dbstats = ROCKSDB_NAMESPACE::CreateDBStatistics();
+  } else if (FLAGS_statistics_string.empty() == false) {
     Status s = Statistics::CreateFromString(config_options,
                                             FLAGS_statistics_string, &dbstats);
     if (dbstats == nullptr) {
-      fprintf(stderr,
-              "No Statistics registered matching string: %s status=%s\n",
-              FLAGS_statistics_string.c_str(), s.ToString().c_str());
-      exit(1);
+      ErrorExit("No Statistics registered matching string: %s status=%s",
+                FLAGS_statistics_string.c_str(), s.ToString().c_str());
     }
-  }
-  if (FLAGS_statistics) {
-    dbstats = ROCKSDB_NAMESPACE::CreateDBStatistics();
   }
   if (dbstats) {
     dbstats->set_stats_level(static_cast<StatsLevel>(FLAGS_stats_level));
   }
+}
+
+void ValidateAndProcessEnvFlags(bool first_group,
+                                const ConfigOptions& config_options) {
+  if (first_group == false) {
+    return;
+  }
+
+  int env_opts = !FLAGS_env_uri.empty() + !FLAGS_fs_uri.empty();
+  if (env_opts > 1) {
+    ErrorExit("--env_uri and --fs_uri are mutually exclusive");
+  }
+
+  if (env_opts == 1) {
+    Status s = Env::CreateFromUri(config_options, FLAGS_env_uri, FLAGS_fs_uri,
+                                  &FLAGS_env, &env_guard);
+    if (!s.ok()) {
+      ErrorExit("Failed creating env: %s", s.ToString().c_str());
+    }
+  } else if (FLAGS_simulate_hdd || FLAGS_simulate_hybrid_fs_file != "") {
+    //**TODO: Make the simulate fs something that can be loaded
+    // from the ObjectRegistry...
+    static std::shared_ptr<ROCKSDB_NAMESPACE::Env> composite_env =
+        NewCompositeEnv(std::make_shared<SimulatedHybridFileSystem>(
+            FileSystem::Default(), FLAGS_simulate_hybrid_fs_file,
+            /*throughput_multiplier=*/
+            int{FLAGS_simulate_hybrid_hdd_multipliers},
+            /*is_full_fs_warm=*/FLAGS_simulate_hdd));
+    FLAGS_env = composite_env.get();
+  }
+}
+
+// The actual running of a group of benchmarks that share configuration
+// Some entities need to be created once and used for running all of the groups.
+// So, they are created only when running the first group
+int db_bench_tool_run_group(int group_num, int num_groups, int argc,
+                            char** argv) {
+  auto first_group = (group_num == 1);
+  auto last_group = (group_num == num_groups);
+
+  ConfigOptions config_options;
+
+  // Allow the ~Benchmark() to know the program died during command-line-parsing
+  // (see ~Benchmark() for more details)
+  parsing_cmd_line_args = true;
+  ParseCommandLineFlags(&argc, &argv, true);
+  parsing_cmd_line_args = false;
+
+  ValidateAndProcessStatisticsFlags(first_group, config_options);
+
+  FLAGS_compaction_style_e =
+      (ROCKSDB_NAMESPACE::CompactionStyle)FLAGS_compaction_style;
+  FLAGS_delete_mode_e = (DeleteMode)FLAGS_delete_mode;
   FLAGS_compaction_pri_e =
       (ROCKSDB_NAMESPACE::CompactionPri)FLAGS_compaction_pri;
 
@@ -9136,46 +9218,24 @@ int db_bench_tool(int argc, char** argv) {
   FLAGS_compressed_secondary_cache_compression_type_e = StringToCompressionType(
       FLAGS_compressed_secondary_cache_compression_type.c_str());
 
+  ValidateAndProcessEnvFlags(first_group, config_options);
+
   // Stacked BlobDB
   FLAGS_blob_db_compression_type_e =
       StringToCompressionType(FLAGS_blob_db_compression_type.c_str());
 
-  int env_opts = !FLAGS_env_uri.empty() + !FLAGS_fs_uri.empty();
-  if (env_opts > 1) {
-    fprintf(stderr, "Error: --env_uri and --fs_uri are mutually exclusive\n");
-    exit(1);
-  }
-
-  if (env_opts == 1) {
-    Status s = Env::CreateFromUri(config_options, FLAGS_env_uri, FLAGS_fs_uri,
-                                  &FLAGS_env, &env_guard);
-    if (!s.ok()) {
-      fprintf(stderr, "Failed creating env: %s\n", s.ToString().c_str());
-      exit(1);
-    }
-  } else if (FLAGS_simulate_hdd || FLAGS_simulate_hybrid_fs_file != "") {
-    //**TODO: Make the simulate fs something that can be loaded
-    // from the ObjectRegistry...
-    static std::shared_ptr<ROCKSDB_NAMESPACE::Env> composite_env =
-        NewCompositeEnv(std::make_shared<SimulatedHybridFileSystem>(
-            FileSystem::Default(), FLAGS_simulate_hybrid_fs_file,
-            /*throughput_multiplier=*/
-            int{FLAGS_simulate_hybrid_hdd_multipliers},
-            /*is_full_fs_warm=*/FLAGS_simulate_hdd));
-    FLAGS_env = composite_env.get();
-  }
-
   // Let -readonly imply -use_existing_db
   FLAGS_use_existing_db |= FLAGS_readonly;
 
-  if (FLAGS_build_info) {
+  if (first_group && FLAGS_build_info) {
     std::string build_info;
     std::cout << GetRocksBuildInfoAsString(build_info, true) << std::endl;
     // Similar to --version, nothing else will be done when this flag is set
     exit(0);
   }
 
-  if (!FLAGS_seed) {
+  // we're relaying on ValidateSubsequentGroupsDoNotOverrideApplicableFlags
+  if (first_group && !FLAGS_seed) {
     uint64_t now = FLAGS_env->GetSystemClock()->NowMicros();
     seed_base = static_cast<int64_t>(now);
     fprintf(stdout, "Set seed to %" PRIu64 " because --seed was 0\n",
@@ -9185,10 +9245,9 @@ int db_bench_tool(int argc, char** argv) {
   }
 
   if (FLAGS_use_existing_keys && !FLAGS_use_existing_db) {
-    fprintf(stderr,
-            "`-use_existing_db` must be true for `-use_existing_keys` to be "
-            "settable\n");
-    exit(1);
+    ErrorExit(
+        "`-use_existing_db` must be true for `-use_existing_keys` to be "
+        "settable");
   }
 
   if (!strcasecmp(FLAGS_compaction_fadvice.c_str(), "NONE"))
@@ -9200,9 +9259,8 @@ int db_bench_tool(int argc, char** argv) {
   else if (!strcasecmp(FLAGS_compaction_fadvice.c_str(), "WILLNEED"))
     FLAGS_compaction_fadvice_e = ROCKSDB_NAMESPACE::Options::WILLNEED;
   else {
-    fprintf(stdout, "Unknown compaction fadvice:%s\n",
-            FLAGS_compaction_fadvice.c_str());
-    exit(1);
+    ErrorExit("Unknown compaction fadvice:%s",
+              FLAGS_compaction_fadvice.c_str());
   }
 
   FLAGS_value_size_distribution_type_e =
@@ -9218,7 +9276,7 @@ int db_bench_tool(int argc, char** argv) {
                                   ROCKSDB_NAMESPACE::Env::Priority::LOW);
 
   // Choose a location for the test database if none given with --db=<path>
-  if (FLAGS_db.empty()) {
+  if (first_group && FLAGS_db.empty()) {
     std::string default_db_path;
     FLAGS_env->GetTestDirectory(&default_db_path);
     default_db_path += "/dbbench";
@@ -9240,22 +9298,154 @@ int db_bench_tool(int argc, char** argv) {
   }
 
   if (FLAGS_seek_missing_prefix && FLAGS_prefix_size <= 8) {
-    fprintf(stderr, "prefix_size > 8 required by --seek_missing_prefix\n");
-    exit(1);
+    ErrorExit("prefix_size > 8 required by --seek_missing_prefix");
   }
 
   ValidateMetadataCacheOptions();
 
-  ROCKSDB_NAMESPACE::Benchmark benchmark;
-  benchmark.Run();
+  if (first_group) {
+    RecordFirstGroupApplicableFlags();
+  } else {
+    ValidateSubsequentGroupsDoNotOverrideApplicableFlags();
+  }
 
-  if (FLAGS_print_malloc_stats) {
-    std::string stats_string;
-    ROCKSDB_NAMESPACE::DumpMallocStats(&stats_string);
-    fprintf(stdout, "Malloc stats:\n%s\n", stats_string.c_str());
+  if (first_group) {
+    benchmark.reset(new ROCKSDB_NAMESPACE::Benchmark);
+  } else {
+    fprintf(stdout, "\n");
+  }
+  if (last_group) {
+    if (FLAGS_print_malloc_stats) {
+      std::string stats_string;
+      ROCKSDB_NAMESPACE::DumpMallocStats(&stats_string);
+      fprintf(stdout, "Malloc stats:\n%s\n", stats_string.c_str());
+    }
   }
 
   return 0;
 }
+
+}  // namespace
+
+// Main entry point for db_bench tool
+//
+// There are 2 modes of operation:
+// 1. Single-group: The tool is run with a set of flags once, running all
+//    specified benchmarks and exiting. This is the DEFAULT mode.
+// 2. Multiple-groups: Benchmarks are grouped. Each group has its own
+//    configuration. The first group (the MASTER group) sets the initial
+//    configuration for all subsequent groups. Subsequent groups may override
+//    the initial configuration (some limitations apply, see below).
+//
+// The mode is controlled via the 'groups' "flag". When the user sets the 2nd
+// argument to be the string '-groups', the tool will run in mutliple-groups
+// mode. Otherwise (and by default), The tool will run in the single-group mode.
+//
+// The syntax for multiple-configs is as follows:
+// ----------------------------------------------
+// ./db_bench -groups '<group1>' '<group2>' '<group3>' ...
+//
+// Each group consists of valid db_bench flag, and, most likely, a set of
+// benchmarks to run as part of that group. Note however that there are certain
+// flags that are prohibited in non-master groups (e.g., the -db).
+//
+// For example:
+// ------------
+// ./db_bench -groups '-num 100 -benchmarks "fillseq,readrandom"' '-num 200
+//    -benchmarks readrandom' '-benchmarks readrandom -reads 10000'
+//
+// group1: The fillseq,readrandom benchmarks will run.
+//         FLAGS_num=100
+//         All other flags have their default values as usual.
+//
+// group2: The readrandom benchmark will run.
+//         FLAGS_num=200
+//
+// group3: The readrandom benchmark will run.
+//         FLAGS_num=100 (wasn't overridden in this group)
+//         FLAGS_reads=10000
+//
+// Notes:
+// 1. The DB-s are opened when the master group runs. When one group completes
+//     and the next starts, the db-s are retained (they are kept open).
+//    However, the DB options are set only when the DB-s are opened. Therefore,
+//     attempts to override options in subsequent groups are SILENTLY ignored.
+// 2. Some additional flags may only be set for the master group (e.g.,
+//     env-related flags)
+//
+// Return Value:
+// -------------
+// 0 If all of the groups completed successfully or an error reported by the
+// runner of the failed group (subsequent groups will NOT be run).
+//
+int db_bench_tool(int argc, char** argv) {
+  ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
+  static bool initialized = false;
+  if (!initialized) {
+    SetUsageMessage(std::string("\nUSAGE:\n") + std::string(argv[0]) +
+                    " [OPTIONS]...");
+    SetVersionString(GetRocksVersionAsString(true));
+    initialized = true;
+  }
+
+  // Check for multiple-groups mode
+  int result = 0;
+  if (argc > 1 && std::string(argv[1]) == "-groups") {
+    auto arg_idx = 2;
+    std::vector<char*> first_group_argv_vec;
+    // Process all groups, as long as all of them run successfully
+    while ((result == 0) && (arg_idx < argc)) {
+      auto group_num = arg_idx - 1;
+
+      std::vector<char*> argv_vec;
+      // Subsequent groups use the initial configuration by default
+      if (group_num > 1) {
+        argv_vec = first_group_argv_vec;
+      }
+      // Parse the group's command line arguments
+      const char delim[] = " ";
+      auto token = strtok(argv[arg_idx], delim);
+      while (token) {
+        argv_vec.push_back(token);
+        token = strtok(nullptr, delim);
+      }
+      // First argument is always the same for all groups => The "program name"
+      size_t argc1 = 1 + argv_vec.size();
+      char** argv1 = new char*[argc1];
+      argv1[0] = argv[0];
+
+      for (auto i = 0U; i < argv_vec.size(); ++i) {
+        char* next_arg = argv_vec[i];
+        auto next_arg_len = strlen(next_arg);
+        // Strip enclosing quotes (") characters
+        if ((next_arg[0] == '\"') && (next_arg[next_arg_len - 1] == '\"')) {
+          ++argv_vec[i];
+          next_arg[next_arg_len - 1] = '\0';
+        }
+        argv1[1 + i] = argv_vec[i];
+      }
+      // The first group sets the initial configuration for all subsequent
+      // groups
+      if (group_num == 1) {
+        first_group_argv_vec = argv_vec;
+      }
+
+      // Run the group (argc1 and argv1 are ready with this groups
+      // configuration)
+      auto num_groups = argc - 2;
+      result = db_bench_tool_run_group(group_num, num_groups, argc1, argv1);
+
+      ++arg_idx;
+    }
+  } else {
+    // Single ("classic") group mode
+    result = db_bench_tool_run_group(1 /* group_num */, 1 /* num_groups */,
+                                     argc, argv);
+  }
+
+  benchmark.reset();
+  return result;
+}
+
 }  // namespace ROCKSDB_NAMESPACE
 #endif

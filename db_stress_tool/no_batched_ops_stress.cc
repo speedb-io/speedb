@@ -1080,7 +1080,7 @@ class NonBatchedOpsStressTest : public StressTest {
     std::string key_str = Key(lb);
     iter->Seek(Slice(key_str));
     op_logs += "S " + Slice(key_str).ToString(true) + " ";
-    uint64_t curr;
+    uint64_t curr = 0;
     while (true) {
       if (!iter->Valid()) {
         if (!iter->status().ok()) {

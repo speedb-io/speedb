@@ -7261,7 +7261,7 @@ class Benchmark {
   // deterministically turns range_num to unsigned int
   uint64_t range_num_to_rand(uint64_t range_num) {
     std::string str = std::to_string(range_num);
-    unsigned int xxh64 = XXH64(str.data(), str.length(), 0);
+    auto xxh64 = XXH64(str.data(), str.length(), 0);
     // % num_ since the rand num will be used to make keys which are expected in
     // that range
     return xxh64 % num_;
@@ -9466,7 +9466,7 @@ int db_bench_tool(int argc, char** argv) {
         token = strtok(nullptr, delim);
       }
       // First argument is always the same for all groups => The "program name"
-      size_t argc1 = 1 + argv_vec.size();
+      auto argc1 = static_cast<int>(1 + argv_vec.size());
       char** argv1 = new char*[argc1];
       argv1[0] = argv[0];
 

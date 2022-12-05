@@ -14,7 +14,7 @@
 </div>
 
 # Speedb
-A first-of-its-kind, community-led project of a storage engine designed to support modern data sets. 
+A first-of-its-kind, community-led storage engine designed to support modern data sets. 
 It focuses on high performance, optimized for modern storage hardware and scale, on-premise and in the cloud. We strive to simplify the usability of complex data engines as well as stabilize and improve performance.
 
 We are building an open source community where RocksDB and Speedb users and developers can interact, improve, share knowledge, and learn best practices. 

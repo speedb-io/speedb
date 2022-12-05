@@ -14,9 +14,15 @@
 </div>
 
 # Speedb
-Speedb is a library that provides a high performance, persistent key-value store. 
-This is a community led project that focuses on high performance, optimized for modern storage hardware, on-premise and in the cloud.
-It is maintained by Speedb and is forked from Rocksdb, developed by Facebook.
+A first-of-its-kind, community-led storage engine designed to support modern data sets. 
+It focuses on high performance, optimized for modern storage hardware and scale, on-premise and in the cloud. We strive to simplify the usability of complex data engines as well as stabilize and improve performance.
+
+We are building an open source community where RocksDB and Speedb users and developers can interact, improve, share knowledge, and learn best practices. 
+You are welcome to join our community, contribute, and participate in the development of the next generation storage engine.
+We welcome any questions or comments you may have. 
+Please use issues to submit them, and pull requests to make contributions.
+
+This project is maintained by Speedb and is forked from Rocksdb, developed by Facebook.
 
 **Join us to build the next generation data engine!**
 
@@ -25,6 +31,26 @@ It is maintained by Speedb and is forked from Rocksdb, developed by Facebook.
   <img src=".github/new-bee-mascot.gif" width="80px">
 </picture>
 
+
+## Benchmarks
+Below is a graph comparing Speedb's paired bloom filter with the default bloom filter. 
+
+<img width="769" alt="Screen Shot 2022-10-31 at 15 15 42" src="https://user-images.githubusercontent.com/107058910/199016617-4ecbe279-b281-4a8c-b630-87a509bc09da.png">
+
+This test simulates a large number of non-existing keys, with the disk as the bottleneck. The test was running with 1 billion objects, value size of 256 bytes and 4 threads on a system with 8 CPU cores. 
+
+According to the graph, random reads produce significant improvements of up to 140% in this type of workload.
+
+
+Another test using the same bits per key, memory consumption was reduced by 23%, while performance remained unchanged.
+The results are presented in the graph below.
+The test was running with 1 billion objects, value size of 256 bytes and 4 threads on a system with 16 CPU cores.
+
+![Blueberry performance results  (4)](https://user-images.githubusercontent.com/107058910/205052811-888de6c3-2db5-46c0-9108-607206bf31f7.jpg)
+
+
+
+You can read more about our new paired bloom filter algorithm in the [documentation](https://docs.speedb.dev/documentation/speedb-features/paired-bloom-filter).
 
 ## Usage
 * If speedb is in your default library path:
@@ -89,11 +115,10 @@ testing, we recommend building a release version which is more optimized.
 
 We are using DBbench to test performance and progress between the versions. It is available under tools and also in the artifact for direct download.
 In there you can also find a readme with the commands we are using to get you started. 
-Here is a graph comparing Speedb's paired bloom filter with the default bloom filter. 
 
-<img width="769" alt="Screen Shot 2022-10-31 at 15 15 42" src="https://user-images.githubusercontent.com/107058910/199016617-4ecbe279-b281-4a8c-b630-87a509bc09da.png">
 
-For additional info see: [Paired Bloom Filter](https://docs.speedb.dev/documentation/speedb-features/paired-bloom-filter).
+
+
 
 ## Documentation
 

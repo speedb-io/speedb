@@ -43,13 +43,12 @@ According to the graph, random reads produce significant improvements of up to 1
 
 
 Another test using the same bits per key, memory consumption was reduced by 23%, while performance remained unchanged.
-The results are presented in the graphs below.
+The results are presented in the graph below.
 The test was running with 1 billion objects, value size of 256 bytes and 4 threads on a system with 16 CPU cores.
 
 ![Blueberry performance results  (4)](https://user-images.githubusercontent.com/107058910/205052811-888de6c3-2db5-46c0-9108-607206bf31f7.jpg)
 
 
-![Blueberry performance results  (2)](https://user-images.githubusercontent.com/107058910/205039108-589c8887-3d08-4de8-89aa-1f99b1b69af4.jpg)
 
 You can read more about our new paired bloom filter algorithm in the [documentation](https://docs.speedb.dev/documentation/speedb-features/paired-bloom-filter).
 

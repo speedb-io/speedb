@@ -3234,7 +3234,10 @@ void InitializeOptionsFromFlags(
   block_based_options.num_file_reads_for_auto_readahead =
       FLAGS_num_file_reads_for_auto_readahead;
   options.table_factory.reset(NewBlockBasedTableFactory(block_based_options));
-  options.db_write_buffer_size = FLAGS_db_write_buffer_size;
+  if (FLAGS_db_write_buffer_size > 0) {
+    options.write_buffer_manager.reset(new WriteBufferManager(
+        FLAGS_db_write_buffer_size, {} /* cache */, FLAGS_allow_wbm_stalls));
+  }
   options.write_buffer_size = FLAGS_write_buffer_size;
   options.max_write_buffer_number = FLAGS_max_write_buffer_number;
   options.min_write_buffer_number_to_merge =

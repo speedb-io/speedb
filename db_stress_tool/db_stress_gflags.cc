@@ -137,6 +137,7 @@ DEFINE_uint64(db_write_buffer_size,
 
 DEFINE_bool(use_write_buffer_manager, false,
             "Charge WriteBufferManager memory to the block cache");
+DEFINE_bool(allow_wbm_stalls, false, "Enable WBM write stalls and delays");
 
 DEFINE_int32(
     write_buffer_size,

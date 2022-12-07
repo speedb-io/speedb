@@ -367,6 +367,13 @@ int db_stress_tool(int argc, char** argv) {
                                      keys_per_level * (levels - 1));
   }
   std::unique_ptr<ROCKSDB_NAMESPACE::SharedState> shared;
+
+  if ((FLAGS_db_write_buffer_size == 0) && FLAGS_allow_wbm_stalls) {
+    fprintf(stderr,
+            "-allow_wbm_stalls is useless if db_write_buffer_size == 0\n");
+    exit(1);
+  }
+
   std::unique_ptr<ROCKSDB_NAMESPACE::StressTest> stress;
   if (FLAGS_test_cf_consistency) {
     stress.reset(CreateCfConsistencyStressTest());

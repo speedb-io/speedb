@@ -124,7 +124,7 @@ In there you can also find a readme with the commands we are using to get you st
 
 You can find a detailed description of all Speedb features [here](https://speedb.gitbook.io/documentation/).
 
-[Speedb's documentation repository](https://github.com/speedb-io/book) allows you to enhance, add content and fix issues. 
+[Speedb's documentation repository](https://github.com/speedb-io/documentation) allows you to enhance, add content and fix issues. 
 
 ## 🛣️ Roadmap
 

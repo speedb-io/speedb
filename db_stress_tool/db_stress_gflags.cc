@@ -124,6 +124,8 @@ DEFINE_uint64(db_write_buffer_size,
               ROCKSDB_NAMESPACE::Options().db_write_buffer_size,
               "Number of bytes to buffer in all memtables before compacting");
 
+DEFINE_bool(allow_wbm_stalls, false, "Enable WBM write stalls and delays");
+
 DEFINE_int32(
     write_buffer_size,
     static_cast<int32_t>(ROCKSDB_NAMESPACE::Options().write_buffer_size),

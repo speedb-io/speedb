@@ -124,7 +124,23 @@ DEFINE_uint64(db_write_buffer_size,
               ROCKSDB_NAMESPACE::Options().db_write_buffer_size,
               "Number of bytes to buffer in all memtables before compacting");
 
-DEFINE_bool(allow_wbm_stalls, false, "Enable WBM write stalls and delays");
+DEFINE_bool(allow_wbm_stalls,
+            ROCKSDB_NAMESPACE::WriteBufferManager::kDfltAllowStall,
+            "Enable WBM write stalls and delays");
+
+DEFINE_bool(initiate_wbm_flushes,
+            ROCKSDB_NAMESPACE::WriteBufferManager::kDfltInitiateFlushes,
+            "WBM will proactively initiate flushes (Speedb)."
+            "If false, WBM-related flushes will be initiated using the "
+            "ShouldFlush() service "
+            "of the WBM.");
+
+DEFINE_uint32(max_num_parallel_flushes,
+              ROCKSDB_NAMESPACE::WriteBufferManager::FlushInitiationOptions::
+                  kDfltMaxNumParallelFlushes,
+              "In case FLAGGS_initiate_wbm_flushes is true, this flag will "
+              "overwrite the default "
+              "max number of parallel flushes.");
 
 DEFINE_int32(
     write_buffer_size,

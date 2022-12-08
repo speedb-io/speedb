@@ -50,9 +50,14 @@ class WriteBufferManager final {
   static constexpr uint64_t kStartFlushPercentThreshold = 80U;
 
   struct FlushInitiationOptions {
+    static constexpr size_t kDfltMaxNumParallelFlushes = 4U;
+
     FlushInitiationOptions() {}
-    size_t max_num_parallel_flushes = 4U;
+    size_t max_num_parallel_flushes = kDfltMaxNumParallelFlushes;
   };
+
+  static constexpr bool kDfltAllowStall = false;
+  static constexpr bool kDfltInitiateFlushes = false;
 
  public:
   // Parameters:
@@ -75,7 +80,8 @@ class WriteBufferManager final {
   // write-path of a DB.
   explicit WriteBufferManager(
       size_t _buffer_size, std::shared_ptr<Cache> cache = {},
-      bool allow_stall = false, bool initiate_flushes = false,
+      bool allow_stall = kDfltAllowStall,
+      bool initiate_flushes = kDfltInitiateFlushes,
       const FlushInitiationOptions& flush_initiation_options =
           FlushInitiationOptions());
 

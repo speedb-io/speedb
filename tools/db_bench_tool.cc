@@ -77,6 +77,7 @@
 #include "rocksdb/utilities/transaction.h"
 #include "rocksdb/utilities/transaction_db.h"
 #include "rocksdb/write_batch.h"
+#include "rocksdb/write_buffer_manager.h"
 #include "speedb/version.h"
 #include "test_util/testutil.h"
 #include "test_util/transaction_test_util.h"
@@ -548,15 +549,20 @@ DEFINE_int64(db_write_buffer_size,
 DEFINE_bool(cost_write_buffer_to_cache, false,
             "The usage of memtable is costed to the block cache");
 
-DEFINE_bool(allow_wbm_stalls, false, "Enable WBM write stalls and delays");
+DEFINE_bool(allow_wbm_stalls,
+            ROCKSDB_NAMESPACE::WriteBufferManager::kDfltAllowStall,
+            "Enable WBM write stalls and delays");
 
-DEFINE_bool(initiate_wbm_flushes, false,
+DEFINE_bool(initiate_wbm_flushes,
+            ROCKSDB_NAMESPACE::WriteBufferManager::kDfltInitiateFlushes,
             "WBM will proactively initiate flushes (Speedb)."
             "If false, WBM-related flushes will be initiated using the "
             "ShouldFlush() service "
             "of the WBM.");
 
-DEFINE_uint32(max_num_parallel_flushes, 0,
+DEFINE_uint32(max_num_parallel_flushes,
+              ROCKSDB_NAMESPACE::WriteBufferManager::FlushInitiationOptions::
+                  kDfltMaxNumParallelFlushes,
               "In case FLAGGS_initiate_wbm_flushes is true, this flag will "
               "overwrite the default "
               "max number of parallel flushes.");
@@ -4906,10 +4912,16 @@ class Benchmark {
     options.allow_data_in_errors = FLAGS_allow_data_in_errors;
     options.track_and_verify_wals_in_manifest =
         FLAGS_track_and_verify_wals_in_manifest;
-    if ((FLAGS_db_write_buffer_size == 0) && FLAGS_allow_wbm_stalls) {
-      ErrorExit("-allow_wbm_stalls is useless if db_write_buffer_size == 0");
-    }
 
+    if (FLAGS_db_write_buffer_size == 0) {
+      if (FLAGS_allow_wbm_stalls) {
+        ErrorExit("-allow_wbm_stalls is useless if db_write_buffer_size == 0");
+      }
+      if (FLAGS_initiate_wbm_flushes) {
+        ErrorExit(
+            "-initiate_wbm_flushes is useless if db_write_buffer_size == 0");
+      }
+    }
     if (FLAGS_cost_write_buffer_to_cache || FLAGS_db_write_buffer_size != 0) {
       WriteBufferManager::FlushInitiationOptions flush_initiation_options;
       if (FLAGS_max_num_parallel_flushes > 0U) {

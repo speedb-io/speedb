@@ -140,27 +140,33 @@ void WriteBufferManager::FreeMemAborted(size_t mem) {
   }
 }
 
-void WriteBufferManager::FreeMem(size_t mem) {
+void WriteBufferManager::FreeMem(bool was_flushed, size_t mem) {
   const auto is_enabled = enabled();
   size_t new_memory_used = 0U;
 
   if (cache_res_mgr_ != nullptr) {
     new_memory_used = FreeMemWithCache(mem);
   } else if (is_enabled) {
-    auto old_memory_used =
-        memory_used_.fetch_sub(mem, std::memory_order_relaxed);
-    assert(old_memory_used >= mem);
-    new_memory_used = old_memory_used - mem;
+      auto old_memory_used = memory_used_.fetch_sub(mem, std::memory_order_relaxed);
+      assert(old_memory_used >= mem);
+      new_memory_used = old_memory_used - mem;
+      
   }
 
   if (is_enabled) {
     [[maybe_unused]] const auto curr_memory_inactive =
         memory_inactive_.fetch_sub(mem, std::memory_order_relaxed);
-    [[maybe_unused]] const auto curr_memory_being_freed =
-        memory_being_freed_.fetch_sub(mem, std::memory_order_relaxed);
-
     assert(curr_memory_inactive >= mem);
-    assert(curr_memory_being_freed >= mem);
+    if (was_flushed) {
+      [[maybe_unused]] const auto curr_memory_clean =
+          memory_clean_.fetch_sub(mem, std::memory_order_relaxed);
+      assert(curr_memory_clean >= mem);      
+    } else {      
+      [[maybe_unused]] const auto curr_memory_being_freed =
+          memory_being_freed_.fetch_sub(mem, std::memory_order_relaxed);
+
+      assert(curr_memory_being_freed >= mem);
+    }
   }
 
   // Check if stall is active and can be ended.
@@ -173,6 +179,20 @@ void WriteBufferManager::FreeMem(size_t mem) {
       ReevaluateNeedForMoreFlushesNoLockHeld(new_memory_used);
     }
   }
+}
+
+void WriteBufferManager::FlushDone(size_t mem) {
+  const auto is_enabled = enabled();
+
+  if (is_enabled) {
+    memory_clean_.fetch_add(mem, std::memory_order_relaxed);
+    [[maybe_unused]] const auto curr_memory_being_freed =
+        memory_being_freed_.fetch_sub(mem, std::memory_order_relaxed);
+
+    assert(curr_memory_being_freed >= mem);   
+  }
+  // Check if stall is active and can be ended.
+  MaybeEndWriteStall();
 }
 
 size_t WriteBufferManager::FreeMemWithCache(size_t mem) {

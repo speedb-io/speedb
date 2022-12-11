@@ -499,6 +499,9 @@ class MemTable {
     // In case flush is aborted, notify the memory tracker
     if (flush_completed_ && (completed == false)) {
       mem_tracker_.FreeMemAborted();
+    } else {
+      mem_tracker_.FlushDone();
+      
     }
     flush_completed_ = completed;
   }

@@ -59,6 +59,18 @@ void AllocTracker::FreeMemStarted() {
   }
 }
 
+void AllocTracker::FlushDone() {
+  assert(write_buffer_manager_ != nullptr);
+  assert(state_ == State::kFreeMemStarted);
+
+  if (ShouldUpdateWriteBufferManager()) {
+    write_buffer_manager_->FlushDone(
+        bytes_allocated_.load(std::memory_order_relaxed));
+  }
+  state_ = State::kFlushDone;
+  
+}
+  
 void AllocTracker::FreeMemAborted() {
   assert(write_buffer_manager_ != nullptr);
   // May be called without actually starting to free memory
@@ -86,9 +98,9 @@ void AllocTracker::FreeMem() {
     FreeMemStarted();
   }
 
-  if (state_ == State::kFreeMemStarted) {
+  if (state_ == State::kFreeMemStarted || state_ == State::kFlushDone) {
     if (ShouldUpdateWriteBufferManager()) {
-      write_buffer_manager_->FreeMem(
+      write_buffer_manager_->FreeMem(state_ == State::kFlushDone,
           bytes_allocated_.load(std::memory_order_relaxed));
     } else {
       assert(bytes_allocated_.load(std::memory_order_relaxed) == 0);

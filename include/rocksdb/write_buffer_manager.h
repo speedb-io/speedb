@@ -103,6 +103,9 @@ class WriteBufferManager final {
   size_t memory_usage() const {
     return memory_used_.load(std::memory_order_relaxed);
   }
+  size_t memory_clean() const {
+    return memory_clean_.load(std::memory_order_relaxed);
+  }
 
   // Returns the total memory used by active memtables.
   size_t mutable_memtable_memory_usage() const {
@@ -193,7 +196,7 @@ class WriteBufferManager final {
 
   // Returns true if stalling condition is met.
   bool IsStallThresholdExceeded() const {
-    return memory_usage() >= buffer_size_;
+    return memory_usage() - memory_clean() >= buffer_size_;
   }
 
   void ReserveMem(size_t mem);
@@ -213,7 +216,11 @@ class WriteBufferManager final {
   void FreeMemAborted(size_t mem);
 
   // Freeing 'mem' bytes completed successfully
-  void FreeMem(size_t mem);
+  void FreeMem(bool was_flushed, size_t mem);
+
+  // Flush done  on 'mem' bytes the memory is marked as clean 
+  void FlushDone(size_t mem);
+  
 
   // Add the DB instance to the queue and block the DB.
   // Should only be called by RocksDB internally.
@@ -261,6 +268,8 @@ class WriteBufferManager final {
   std::atomic<size_t> memory_inactive_ = 0U;
   // Memory that in the process of being freed
   std::atomic<size_t> memory_being_freed_ = 0U;
+  // clean memory refer to memory that was flushed but stay in cache 
+  std::atomic<size_t> memory_clean_ = 0U;
   std::shared_ptr<CacheReservationManager> cache_res_mgr_;
   // Protects cache_res_mgr_
   std::mutex cache_res_mgr_mu_;
@@ -310,9 +319,10 @@ class WriteBufferManager final {
   // flush ends, we wait until the total unflushed memory (curr_memory_used -
   // memory_being_freed_) exceeds a threshold.
   bool ShouldInitiateAnotherFlushMemOnly(size_t curr_memory_used) const {
-    return (curr_memory_used - memory_being_freed_ >=
+    return (curr_memory_used - memory_being_freed_ - memory_clean_ >=
                 additional_flush_step_size_ / 2 &&
-            curr_memory_used >= additional_flush_initiation_size_);
+            curr_memory_used - memory_clean_ >=
+                additional_flush_initiation_size_);
   }
 
   // This should be called only under the flushes_mu_ lock

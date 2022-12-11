@@ -44,6 +44,7 @@ class AllocTracker {
   void DoneAllocating();
   void FreeMemStarted();
   void FreeMemAborted();
+  void FlushDone();
   void FreeMem();
 
   bool HasMemoryFreeingStarted() const {
@@ -53,7 +54,7 @@ class AllocTracker {
   bool IsMemoryFreed() const { return (state_ == State::kFreed); }
 
  private:
-  enum class State { kAllocating, kDoneAllocating, kFreeMemStarted, kFreed };
+  enum class State { kAllocating, kDoneAllocating, kFreeMemStarted, kFlushDone, kFreed };
 
  private:
   bool ShouldUpdateWriteBufferManager() const {

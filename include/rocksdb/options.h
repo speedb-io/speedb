@@ -1394,6 +1394,13 @@ struct DBOptions {
   // of the contract leads to undefined behaviors with high possibility of data
   // inconsistency, e.g. deleted old data become visible again, etc.
   bool enforce_single_del_contracts = true;
+
+  // If non-zero, a task will be started to check for a new
+  // "refresh_options_file" If found, the refresh task will update the mutable
+  // options from the settings in this file
+  // Not supported in ROCKSDB_LITE mode!
+  unsigned int refresh_options_sec = 0;
+  std::string refresh_options_file;
 };
 
 // Options to control the behavior of a database (passed to DB::Open)

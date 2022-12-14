@@ -38,8 +38,11 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#include <condition_variable>
 #include <memory>
+#include <mutex>
 #include <stdexcept>
+#include <thread>
 #include <unordered_set>
 
 #include "rocksdb/customizable.h"
@@ -294,8 +297,36 @@ class MemTableRep {
 // new MemTableRep objects
 class MemTableRepFactory : public Customizable {
  public:
-  ~MemTableRepFactory() override {}
+  MemTableRepFactory() {}
 
+  ~MemTableRepFactory() override {
+    if (enable_switch_memtable_) {
+      {
+        std::unique_lock<std::mutex> lck(switch_memtable_thread_mutex_);
+        terminate_switch_memtable_.store(true);
+      }
+      switch_memtable_thread_cv_.notify_one();
+      switch_memtable_thread_.join();
+
+      const MemTableRep* memtable = switch_mem_.exchange(nullptr);
+      if (memtable != nullptr) {
+        delete memtable;
+      }
+    }
+  }
+
+  void Init() {
+    switch_memtable_thread_ =
+        std::thread(&MemTableRepFactory::PrepareSwitchMemTable, this);
+    // need to verify the thread was executed
+    {
+      std::unique_lock<std::mutex> lck(switch_memtable_thread_mutex_);
+      while (!switch_memtable_thread_init_.load()) {
+        switch_memtable_thread_cv_.wait(lck);
+      }
+    }
+    enable_switch_memtable_ = true;
+  }
   static const char* Type() { return "MemTableRepFactory"; }
   static Status CreateFromString(const ConfigOptions& config_options,
                                  const std::string& id,
@@ -311,7 +342,11 @@ class MemTableRepFactory : public Customizable {
       const MemTableRep::KeyComparator& key_cmp, Allocator* allocator,
       const SliceTransform* slice_transform, Logger* logger,
       uint32_t /* column_family_id */) {
-    return CreateMemTableRep(key_cmp, allocator, slice_transform, logger);
+    if (enable_switch_memtable_) {
+      return GetSwitchMemtable(key_cmp, allocator, slice_transform, logger);
+    } else {
+      return CreateMemTableRep(key_cmp, allocator, slice_transform, logger);
+    }
   }
 
   const char* Name() const override = 0;
@@ -325,6 +360,70 @@ class MemTableRepFactory : public Customizable {
   // false when if the <key,seq> already exists.
   // Default: false
   virtual bool CanHandleDuplicatedKey() const { return false; }
+  virtual MemTableRep* PreCreateMemTableRep() { return nullptr; }
+  virtual void PostCreateMemTableRep(
+      MemTableRep* /*switch_mem*/,
+      const MemTableRep::KeyComparator& /*key_cmp*/, Allocator* /*allocator*/,
+      const SliceTransform* /*slice_transform*/, Logger* /*logger*/) {}
+  void PrepareSwitchMemTable() {
+    {
+      std::unique_lock<std::mutex> lck(switch_memtable_thread_mutex_);
+      switch_memtable_thread_init_.store(true);
+    }
+    switch_memtable_thread_cv_.notify_one();
+    for (;;) {
+      {
+        std::unique_lock<std::mutex> lck(switch_memtable_thread_mutex_);
+        while (switch_mem_.load(std::memory_order_acquire) != nullptr) {
+          if (terminate_switch_memtable_.load()) {
+            return;
+          }
+
+          switch_memtable_thread_cv_.wait(lck);
+        }
+      }
+
+      // Construct new memtable only for the heavy object initilized proposed
+
+      switch_mem_.store(PreCreateMemTableRep(), std::memory_order_release);
+    }
+  }
+
+  MemTableRep* GetSwitchMemtable(const MemTableRep::KeyComparator& key_cmp,
+                                 Allocator* allocator,
+                                 const SliceTransform* slice_transform,
+                                 Logger* logger) {
+    MemTableRep* switch_mem = nullptr;
+    {
+      std::unique_lock<std::mutex> lck(switch_memtable_thread_mutex_);
+      switch_mem = switch_mem_.exchange(nullptr, std::memory_order_release);
+    }
+    switch_memtable_thread_cv_.notify_one();
+
+    if (switch_mem == nullptr) {
+      // No point in suspending, just construct the memtable here
+      switch_mem =
+          CreateMemTableRep(key_cmp, allocator, slice_transform, logger);
+    } else {
+      PostCreateMemTableRep(switch_mem, key_cmp, allocator, slice_transform,
+                            logger);
+    }
+    return switch_mem;
+  }
+
+ public:
+  // true if the current MemTableRep supports prepare memtable creation
+  // note that if it does the memtable contruction MUST NOT use any arena
+  // allocation!!! Default: false
+  bool enable_switch_memtable_ = false;
+
+ private:
+  std::thread switch_memtable_thread_;
+  std::mutex switch_memtable_thread_mutex_;
+  std::condition_variable switch_memtable_thread_cv_;
+  std::atomic<bool> terminate_switch_memtable_ = false;
+  std::atomic<bool> switch_memtable_thread_init_ = false;
+  std::atomic<MemTableRep*> switch_mem_ = nullptr;
 };
 
 // This uses a skip list to store keys. It is the default.

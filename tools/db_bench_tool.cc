@@ -9441,7 +9441,8 @@ int db_bench_tool(int argc, char** argv) {
 
   // Check for multiple-groups mode
   int result = 0;
-  if (argc > 1 && std::string(argv[1]) == "-groups") {
+  if (argc > 1 && ((std::string(argv[1]) == "-groups") ||
+                   (std::string(argv[1]) == "--groups"))) {
     auto arg_idx = 2;
     std::vector<char*> first_group_argv_vec;
     // Process all groups, as long as all of them run successfully

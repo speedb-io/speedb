@@ -23,7 +23,7 @@
 namespace ROCKSDB_NAMESPACE {
 
 namespace speedb_filter {
-inline constexpr size_t kPairedBloomBatchSizeInBlocks = 128U;
+inline constexpr size_t kPairedBloomBatchSizeInBlocks = 32U;
 // Max supported BPK. Filters using higher BPK-s will use the max
 inline constexpr int kMinMillibitsPerKey = 1000.0;
 

@@ -192,14 +192,14 @@ inline int GetBitPosInBlockForHash(uint32_t hash, uint32_t set_idx) {
 
   if (set_idx == 0) {
     bitpos = hash >> 23;
-    if (LIKELY(bitpos > 6)) {
+    if (LIKELY(bitpos > static_cast<int>(kInBatchIdxNumBits - 1))) {
       return bitpos;
     }
     hash <<= 9;
   } else {
     constexpr uint32_t mask = 0x007FC000;
     bitpos = (hash & mask) >> 14;
-    if (LIKELY(bitpos > 6)) {
+    if (LIKELY(bitpos > static_cast<int>(kInBatchIdxNumBits - 1))) {
       return bitpos;
     }
   }
@@ -214,7 +214,8 @@ inline void BuildBlock::SetBlockBloomBits(uint32_t hash, uint32_t set_idx,
                                           size_t hash_set_size) {
   for (auto i = 0U; i < hash_set_size; ++i) {
     int bitpos = GetBitPosInBlockForHash(hash, set_idx);
-    block_address_[bitpos >> 3] |= (char{1} << (bitpos & kInBatchIdxNumBits));
+    // Find the byte, and set the proper bit within that byte
+    block_address_[bitpos >> 3] |= (char{1} << (bitpos & 7));
     hash *= 0x9e3779b9;
   }
 }
@@ -268,7 +269,7 @@ bool ReadBlock::AreAllBlockBloomBitsSet(uint32_t hash, uint32_t set_idx,
 
 #ifdef __AVX2__
 const __m256i mask_vec = _mm256_set1_epi32(0x007FC000);
-const __m256i max_bitpos_vec = _mm256_set1_epi32(7);
+const __m256i max_bitpos_vec = _mm256_set1_epi32(kInBatchIdxNumBits);
 const __m256i fast_range_vec = _mm256_set1_epi32(KNumBitsInBlockBloom);
 const __m256i num_idx_bits_vec = _mm256_set1_epi32(kInBatchIdxNumBits);
 
@@ -364,8 +365,8 @@ bool ReadBlock::AreAllBlockBloomBitsSetNonAvx2(uint32_t hash, uint32_t set_idx,
                                                size_t hash_set_size) const {
   for (auto i = 0U; i < hash_set_size; ++i) {
     int bitpos = GetBitPosInBlockForHash(hash, set_idx);
-    if ((block_address_[bitpos >> 3] &
-         (char{1} << (bitpos & kInBatchIdxNumBits))) == 0) {
+    // Find the byte, and check the proper bit within that byte
+    if ((block_address_[bitpos >> 3] & (char{1} << (bitpos & 7))) == 0) {
       return false;
     }
     hash *= 0x9e3779b9;

@@ -1873,11 +1873,12 @@ TEST_F(LoadCustomizableTest, LoadMemTableRepFactoryTest) {
   std::shared_ptr<MemTableRepFactory> factory;
   Status s = TestExpectedBuiltins<MemTableRepFactory>(
       "SpecialSkipListFactory", expected, &factory, &failures);
-  // There is a "cuckoo" factory registered that we expect to fail.  Ignore the
+  // There is a "cuckoo" factory registerexd that we expect to fail.  Ignore the
   // error if this is the one
   if (s.ok() || failures.size() > 1 || failures[0] != "cuckoo") {
     ASSERT_OK(s);
   }
+  factory = nullptr;
   if (RegisterTests("Test")) {
     ExpectCreateShared<MemTableRepFactory>("SpecialSkipListFactory");
   }

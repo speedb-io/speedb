@@ -573,64 +573,25 @@ static std::unordered_map<std::string, OptionTypeInfo> hash_spd_factory_info = {
 HashSpdRepFactory::HashSpdRepFactory(size_t bucket_count)
     : bucket_count_(bucket_count) {
   RegisterOptions("", &bucket_count_, &hash_spd_factory_info);
-  switch_memtable_thread_ =
-      std::thread(&HashSpdRepFactory::PrepareSwitchMemTable, this);
+  Init();
 }
 
-// HashSpdRepFactory
-
-HashSpdRepFactory::~HashSpdRepFactory() {
-  {
-    std::unique_lock<std::mutex> lck(switch_memtable_thread_mutex_);
-    terminate_switch_memtable_ = true;
-  }
-  switch_memtable_thread_cv_.notify_one();
-  switch_memtable_thread_.join();
-
-  const MemTableRep* memtable = switch_mem_.exchange(nullptr);
-  if (memtable != nullptr) {
-    delete memtable;
-  }
-}
 MemTableRep* HashSpdRepFactory::CreateMemTableRep(
     const MemTableRep::KeyComparator& compare, Allocator* allocator,
     const SliceTransform* /*transform*/, Logger* /*logger*/) {
-  return GetSwitchMemtable(compare, allocator);
+  return new HashSpdRep(compare, allocator, bucket_count_);
 }
 
-void HashSpdRepFactory::PrepareSwitchMemTable() {
-  for (;;) {
-    {
-      std::unique_lock<std::mutex> lck(switch_memtable_thread_mutex_);
-      while (switch_mem_.load(std::memory_order_acquire) != nullptr) {
-        if (terminate_switch_memtable_) {
-          return;
-        }
-
-        switch_memtable_thread_cv_.wait(lck);
-      }
-    }
-    switch_mem_.store(new HashSpdRep(nullptr, bucket_count_),
-                      std::memory_order_release);
-  }
+MemTableRep* HashSpdRepFactory::PreCreateMemTableRep() {
+  MemTableRep* hash_spd = new HashSpdRep(nullptr, bucket_count_);
+  return hash_spd;
 }
 
-MemTableRep* HashSpdRepFactory::GetSwitchMemtable(
-    const MemTableRep::KeyComparator& compare, Allocator* allocator) {
-  MemTableRep* switch_mem = nullptr;
-  {
-    std::unique_lock<std::mutex> lck(switch_memtable_thread_mutex_);
-    switch_mem = switch_mem_.exchange(nullptr, std::memory_order_release);
-  }
-  switch_memtable_thread_cv_.notify_one();
-
-  if (switch_mem == nullptr) {
-    // No point in suspending, just construct the memtable here
-    switch_mem = new HashSpdRep(compare, allocator, bucket_count_);
-  } else {
-    static_cast<HashSpdRep*>(switch_mem)->PostCreate(compare, allocator);
-  }
-  return switch_mem;
+void HashSpdRepFactory::PostCreateMemTableRep(
+    MemTableRep* switch_mem, const MemTableRep::KeyComparator& compare,
+    Allocator* allocator, const SliceTransform* /*transform*/,
+    Logger* /*logger*/) {
+  static_cast<HashSpdRep*>(switch_mem)->PostCreate(compare, allocator);
 }
 
 }  // namespace ROCKSDB_NAMESPACE

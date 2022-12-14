@@ -26,7 +26,6 @@ namespace ROCKSDB_NAMESPACE {
 class HashSpdRepFactory : public MemTableRepFactory {
  public:
   explicit HashSpdRepFactory(size_t bucket_count = 1000000);
-  ~HashSpdRepFactory() override;
 
   using MemTableRepFactory::CreateMemTableRep;
   MemTableRep* CreateMemTableRep(const MemTableRep::KeyComparator& compare,
@@ -45,7 +44,7 @@ class HashSpdRepFactory : public MemTableRepFactory {
   static const char* kClassName() { return "speedb.HashSpdRepFactory"; }
   const char* Name() const override { return kClassName(); }
 
-  private:
+ private:
   size_t bucket_count_;
 };
 

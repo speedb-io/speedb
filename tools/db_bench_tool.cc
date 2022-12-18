@@ -1843,7 +1843,9 @@ DEFINE_int64(multiread_stride, 0,
 DEFINE_bool(multiread_batched, false, "Use the new MultiGet API");
 
 DEFINE_string(memtablerep, "speedb.HashSpdRepFactory", "");
-DEFINE_int64(hash_bucket_count, 1024 * 1024, "hash bucket count");
+DEFINE_int64(hash_bucket_count, 1000000, "hash bucket count");
+DEFINE_bool(use_seek_parralel_threshold, true,
+            "if use seek parralel threshold .");
 DEFINE_bool(use_plain_table, false,
             "if use plain table instead of block-based table format");
 DEFINE_bool(use_cuckoo_table, false, "if use cuckoo table format");
@@ -1941,8 +1943,10 @@ static Status CreateMemTableRepFactory(
     factory->reset(NewHashLinkListRepFactory(FLAGS_hash_bucket_count));
   } else {
     std::unique_ptr<MemTableRepFactory> unique;
-    s = MemTableRepFactory::CreateFromString(config_options, FLAGS_memtablerep,
-                                             &unique);
+    std::string memtable_opt;
+    memtable_opt = ":" + std::to_string(0);
+    s = MemTableRepFactory::CreateFromString(
+        config_options, FLAGS_memtablerep + memtable_opt, &unique);
     if (s.ok()) {
       factory->reset(unique.release());
     }

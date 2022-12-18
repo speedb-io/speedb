@@ -48,7 +48,7 @@ class InternalIteratorBase : public Cleanable {
   // not valid.  This method returns true iff the iterator is valid.
   // Always returns false if !status().ok().
   virtual bool Valid() const = 0;
-
+  bool IsEmpty() { return is_empty_; }
   // Position at the first key in the source.  The iterator is Valid()
   // after this call iff the source is not empty.
   virtual void SeekToFirst() = 0;
@@ -206,6 +206,7 @@ class InternalIteratorBase : public Cleanable {
   }
 
   bool is_mutable_;
+  bool is_empty_;
 };
 
 using InternalIterator = InternalIteratorBase<Slice>;

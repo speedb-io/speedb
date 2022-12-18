@@ -25,7 +25,7 @@
 #include "memory/arena.h"
 #include "memtable/stl_wrappers.h"
 #include "monitoring/histogram.h"
-#include "plugin/speedb/memtable/spdb_sort_list.h"
+#include "plugin/speedb/memtable/spdb_sorted_vector.h"
 #include "port/port.h"
 #include "rocksdb/memtablerep.h"
 #include "rocksdb/slice.h"
@@ -37,82 +37,63 @@
 
 namespace ROCKSDB_NAMESPACE {
 namespace {
-
+constexpr size_t kMergedVectorsMax = 8;
 struct SpdbKeyHandle {
   SpdbKeyHandle* GetNextBucketItem() {
-    return bucket_item_link_.load(std::memory_order_acquire);
+    return next_.load(std::memory_order_acquire);
   }
   void SetNextBucketItem(SpdbKeyHandle* handle) {
-    bucket_item_link_.store(handle, std::memory_order_release);
+    next_.store(handle, std::memory_order_release);
   }
-  SpdbKeyHandle* GetNextSortedItem() {
-    return spdb_item_link_.load(std::memory_order_acquire);
-  }
-  void SetNextSortedItem(SpdbKeyHandle* handle) {
-    spdb_item_link_.store(handle, std::memory_order_release);
-  }
-  void SetKey(char* key) { spdb_sorted_key_ = key; }
-  char* Key() { return spdb_sorted_key_; }
-  void Init() {
-    bucket_item_link_ = nullptr;
-    spdb_item_link_ = nullptr;
-    spdb_sorted_key_ = nullptr;
-  }
-
-  SpdbKeyHandle()
-      : bucket_item_link_(nullptr),
-        spdb_item_link_(nullptr),
-        spdb_sorted_key_(nullptr) {}
-
- public:
-  // this is for the bucket item list (should be very small)
-  std::atomic<SpdbKeyHandle*> bucket_item_link_;
-  // this is for the spdb item list its a next link
-  std::atomic<SpdbKeyHandle*> spdb_item_link_;
-  // Prohibit copying due to the below
-  SpdbKeyHandle(const SpdbKeyHandle&) = delete;
-  SpdbKeyHandle& operator=(const SpdbKeyHandle&) = delete;
-
- public:
-  char* spdb_sorted_key_;
+  std::atomic<SpdbKeyHandle*> next_ = nullptr;
+  char key_[1];
 };
 
 struct BucketHeader {
-  port::Mutex mutex_;  // this mutex probably wont cause delay
-  std::atomic<uint32_t> size_ = 0;
+  port::RWMutexWr rwlock_;  // this mutex probably wont cause delay
   std::atomic<SpdbKeyHandle*> items_ = nullptr;
+  std::atomic<uint32_t> elements_num_ = 0;
 
   BucketHeader() {}
 
   bool Contains(const char* check_key,
-                const MemTableRep::KeyComparator& comparator) {
+                const MemTableRep::KeyComparator& comparator, bool needs_lock) {
+    bool index_exist = false;
+    if (elements_num_.load() == 0) {
+      return false;
+    }
+    if (needs_lock) {
+      rwlock_.ReadLock();
+    }
     SpdbKeyHandle* anchor = items_.load(std::memory_order_acquire);
     for (auto k = anchor; k != nullptr; k = k->GetNextBucketItem()) {
-      const int cmp_res = comparator(k->spdb_sorted_key_, check_key);
+      const int cmp_res = comparator(k->key_, check_key);
       if (cmp_res == 0) {
-        return true;
+        index_exist = true;
+        break;
       }
       if (cmp_res > 0) {
         break;
       }
     }
-    return false;
+    if (needs_lock) {
+      rwlock_.ReadUnlock();
+    }
+    return index_exist;
   }
 
   bool Add(SpdbKeyHandle* handle,
            const MemTableRep::KeyComparator& comparator) {
-    MutexLock l(&mutex_);
+    WriteLock wl(&rwlock_);
     SpdbKeyHandle* iter = items_.load(std::memory_order_acquire);
     SpdbKeyHandle* prev = nullptr;
 
-    for (size_t i = 0; i < size_; i++) {
-      const int cmp_res =
-          comparator(iter->spdb_sorted_key_, handle->spdb_sorted_key_);
+    for (size_t i = 0; i < elements_num_; i++) {
+      const int cmp_res = comparator(iter->key_, handle->key_);
       if (cmp_res == 0) {
         // exist!
         return false;
       }
-
       if (cmp_res > 0) {
         // need to insert before
         break;
@@ -120,55 +101,41 @@ struct BucketHeader {
       prev = iter;
       iter = iter->GetNextBucketItem();
     }
-
     handle->SetNextBucketItem(iter);
     if (prev) {
       prev->SetNextBucketItem(handle);
     } else {
       items_ = handle;
     }
-
-    size_++;
-
+    elements_num_++;
     return true;
-  }
-
-  SpdbKeyHandle* InternalSeek(const char* seek_entry,
-                              const MemTableRep::KeyComparator& comparator) {
-    uint32_t bucket_size = size_.load(std::memory_order_acquire);
-    if (bucket_size == 0) {
-      return nullptr;
-    }
-    auto iter = items_.load(std::memory_order_acquire);
-    for (uint32_t i = 0; i < bucket_size;
-         iter = iter->GetNextBucketItem(), i++) {
-      const int cmp_res = comparator(iter->spdb_sorted_key_, seek_entry);
-      if (cmp_res == 0) {
-        return iter;
-      }
-    }
-    return nullptr;
   }
 
   void Get(const LookupKey& k, const MemTableRep::KeyComparator& comparator,
            void* callback_args,
-           bool (*callback_func)(void* arg, const char* entry)) const {
-    uint32_t bucket_size = size_.load(std::memory_order_acquire);
-    if (bucket_size == 0) {
+           bool (*callback_func)(void* arg, const char* entry),
+           bool needs_lock) {
+    if (elements_num_.load() == 0) {
       return;
     }
+
+    if (needs_lock) {
+      rwlock_.ReadLock();
+    }
     auto iter = items_.load(std::memory_order_acquire);
-    uint32_t i = 0;
-    for (; i < bucket_size; iter = iter->GetNextBucketItem(), i++) {
-      if (comparator(iter->spdb_sorted_key_, k.internal_key()) >= 0) {
+    for (; iter != nullptr; iter = iter->GetNextBucketItem()) {
+      if (comparator(iter->key_, k.internal_key()) >= 0) {
+        break;
+      }
+    }
+    for (; iter != nullptr; iter = iter->GetNextBucketItem()) {
+      if (!callback_func(callback_args, iter->key_)) {
         break;
       }
     }
 
-    for (; i < bucket_size; iter = iter->GetNextBucketItem(), i++) {
-      if (!callback_func(callback_args, iter->spdb_sorted_key_)) {
-        break;
-      }
+    if (needs_lock) {
+      rwlock_.ReadUnlock();
     }
   }
 };
@@ -178,28 +145,25 @@ struct SpdbHashTable {
 
   SpdbHashTable(size_t n_buckets) : buckets_(n_buckets) {}
 
-  bool Add(SpdbKeyHandle* val, const MemTableRep::KeyComparator& comparator) {
-    BucketHeader* bucket = GetBucket(val->Key(), comparator);
-    return bucket->Add(val, comparator);
+  bool Add(SpdbKeyHandle* handle,
+           const MemTableRep::KeyComparator& comparator) {
+    BucketHeader* bucket = GetBucket(handle->key_, comparator);
+    return bucket->Add(handle, comparator);
   }
 
   bool Contains(const char* check_key,
-                const MemTableRep::KeyComparator& comparator) const {
+                const MemTableRep::KeyComparator& comparator,
+                bool needs_lock) const {
     BucketHeader* bucket = GetBucket(check_key, comparator);
-    return bucket->Contains(check_key, comparator);
-  }
-
-  SpdbKeyHandle* InternalSeek(const char* seek_entry,
-                              const MemTableRep::KeyComparator& comparator) {
-    BucketHeader* bucket = GetBucket(seek_entry, comparator);
-    return bucket->InternalSeek(seek_entry, comparator);
+    return bucket->Contains(check_key, comparator, needs_lock);
   }
 
   void Get(const LookupKey& k, const MemTableRep::KeyComparator& comparator,
            void* callback_args,
-           bool (*callback_func)(void* arg, const char* entry)) const {
+           bool (*callback_func)(void* arg, const char* entry),
+           bool needs_lock) const {
     BucketHeader* bucket = GetBucket(k.internal_key(), comparator);
-    bucket->Get(k, comparator, callback_args, callback_func);
+    bucket->Get(k, comparator, callback_args, callback_func, needs_lock);
   }
 
  private:
@@ -232,56 +196,302 @@ struct SpdbHashTable {
   }
 };
 
-struct SpdbSort {
-  SpdbSort(const MemTableRep::KeyComparator& compare, Allocator* allocator)
-      : compare_(compare), spdb_sorted_list_(compare, allocator) {}
-  const MemTableRep::KeyComparator& compare_;
-  SpdbSortedList<const MemTableRep::KeyComparator&> spdb_sorted_list_;
-};
+// SpdbVector implemntation
+
+bool SpdbVector::Add(const char* key) {
+  ReadLock rl(&add_rwlock_);
+  if (sorted_) {
+    // it means this  entry arrived after an iterator was created and this
+    // vector is immutable return with false
+    return false;
+  }
+  const size_t location = n_elements_.fetch_add(1, std::memory_order_relaxed);
+  if (location < items_.size()) {
+    items_[location] = key;
+    return true;
+  }
+  return false;
+}
+
+bool SpdbVector::Sort(const MemTableRep::KeyComparator& comparator) {
+  if (sorted_.load(std::memory_order_acquire)) {
+    return true;
+  }
+
+  WriteLock wl(&add_rwlock_);
+  if (n_elements_ == 0) {
+    return false;
+  }
+  if (sorted_.load(std::memory_order_relaxed)) {
+    return true;
+  }
+
+  const size_t num_elements = std::min(n_elements_.load(), items_.size());
+  n_elements_.store(num_elements);
+  if (num_elements < items_.size()) {
+    items_.resize(num_elements);
+  }
+  std::sort(items_.begin(), items_.end(), stl_wrappers::Compare(comparator));
+  sorted_.store(true, std::memory_order_release);
+  return true;
+}
+
+SpdbVector::Iterator SpdbVector::SeekForward(
+    const MemTableRep::KeyComparator& comparator, const Slice* seek_key) {
+  if (seek_key == nullptr || comparator(items_.front(), *seek_key) >= 0) {
+    return items_.begin();
+  } else if (comparator(items_.back(), *seek_key) >= 0) {
+    return std::lower_bound(items_.begin(), items_.end(), *seek_key,
+                            stl_wrappers::Compare(comparator));
+  }
+  return items_.end();
+}
+
+SpdbVector::Iterator SpdbVector::SeekBackword(
+    const MemTableRep::KeyComparator& comparator, const Slice* seek_key) {
+  if (seek_key == nullptr || comparator(items_.back(), *seek_key) <= 0) {
+    return std::prev(items_.end());
+  } else if (comparator(items_.front(), *seek_key) <= 0) {
+    auto ret = std::lower_bound(items_.begin(), items_.end(), *seek_key,
+                                stl_wrappers::Compare(comparator));
+    if (comparator(*ret, *seek_key) > 0) {
+      --ret;
+    }
+    return ret;
+  }
+  return items_.end();
+}
+
+SpdbVector::Iterator SpdbVector::Seek(
+    const MemTableRep::KeyComparator& comparator, const Slice* seek_key,
+    bool up_iter_direction) {
+  SpdbVector::Iterator ret = items_.end();
+  if (!IsEmpty()) {
+    assert(sorted_);
+    if (up_iter_direction) {
+      ret = SeekForward(comparator, seek_key);
+    } else {
+      ret = SeekBackword(comparator, seek_key);
+    }
+  }
+  return ret;
+}
+
+// SpdbVectorContainer implemanmtation
+bool SpdbVectorContainer::InternalInsert(const char* key) {
+  return curr_vector_.load()->Add(key);
+}
+
+void SpdbVectorContainer::Insert(const char* key) {
+  num_elements_.fetch_add(1, std::memory_order_relaxed);
+  {
+    ReadLock rl(&spdb_vectors_add_rwlock_);
+
+    if (InternalInsert(key)) {
+      return;
+    }
+  }
+
+  // add wasnt completed. need to add new add vector
+  bool notify_sort_thread = false;
+  {
+    WriteLock wl(&spdb_vectors_add_rwlock_);
+
+    if (InternalInsert(key)) {
+      return;
+    }
+
+    {
+      MutexLock l(&spdb_vectors_mutex_);
+      SpdbVectorPtr spdb_vector(new SpdbVector(switch_spdb_vector_limit_));
+      spdb_vectors_.push_back(spdb_vector);
+      spdb_vector->SetVectorListIter(std::prev(spdb_vectors_.end()));
+      curr_vector_.store(spdb_vector.get());
+    }
+
+    notify_sort_thread = true;
+
+    if (!InternalInsert(key)) {
+      assert(false);
+      return;
+    }
+  }
+  if (notify_sort_thread) {
+    sort_thread_cv_.notify_one();
+  }
+}
+bool SpdbVectorContainer::IsEmpty() const { return num_elements_.load() == 0; }
+
+// copy the list of vectors to the iter_anchors
+bool SpdbVectorContainer::InitIterator(IterAnchors& iter_anchor) {
+  bool immutable = immutable_.load();
+  if (!immutable) {
+    spdb_vectors_merge_rwlock_.ReadLock();
+  }
+
+  auto last_iter = curr_vector_.load()->GetVectorListIter();
+  bool notify_sort_thread = false;
+  if (!immutable) {
+    if (!(*last_iter)->IsEmpty()) {
+      {
+        MutexLock l(&spdb_vectors_mutex_);
+        SpdbVectorPtr spdb_vector(new SpdbVector(switch_spdb_vector_limit_));
+        spdb_vectors_.push_back(spdb_vector);
+        spdb_vector->SetVectorListIter(std::prev(spdb_vectors_.end()));
+        curr_vector_.store(spdb_vector.get());
+      }
+      notify_sort_thread = true;
+    } else {
+      --last_iter;
+    }
+  }
+  ++last_iter;
+  InitIterator(iter_anchor, spdb_vectors_.begin(), last_iter);
+  if (!immutable) {
+    spdb_vectors_merge_rwlock_.ReadUnlock();
+    if (notify_sort_thread) {
+      sort_thread_cv_.notify_one();
+    }
+  }
+  return true;
+}
+
+void SpdbVectorContainer::InitIterator(
+    IterAnchors& iter_anchor, std::list<SpdbVectorPtr>::iterator start,
+    std::list<SpdbVectorPtr>::iterator last) {
+  for (auto iter = start; iter != last; ++iter) {
+    SortHeapItem* item = new SortHeapItem(*iter, (*iter)->End());
+    iter_anchor.push_back(item);
+  }
+}
+
+void SpdbVectorContainer::SeekIter(const IterAnchors& iter_anchor,
+                                   IterHeapInfo* iter_heap_info,
+                                   const Slice* seek_key,
+                                   bool up_iter_direction) {
+  iter_heap_info->Reset(up_iter_direction);
+  for (auto const& iter : iter_anchor) {
+    if (iter->spdb_vector_->Sort(comparator_)) {
+      iter->curr_iter_ =
+          iter->spdb_vector_->Seek(comparator_, seek_key, up_iter_direction);
+      if (iter->Valid()) {
+        iter_heap_info->Insert(iter);
+      }
+    }
+  }
+}
+
+void SpdbVectorContainer::Merge(std::list<SpdbVectorPtr>::iterator& begin,
+                                std::list<SpdbVectorPtr>::iterator& end) {
+  SpdbVectorIterator iterator(this, comparator_, begin, end);
+  const size_t num_elements = std::accumulate(
+      begin, end, 0,
+      [](size_t n, const SpdbVectorPtr& vec) { return n + vec->Size(); });
+  if (num_elements > 0) {
+    SpdbVector::Vec merged;
+    merged.reserve(num_elements);
+
+    for (iterator.SeekToFirst(); iterator.Valid(); iterator.Next()) {
+      merged.emplace_back(iterator.key());
+    }
+
+    const size_t actual_elements_count = merged.size();
+    SpdbVectorPtr new_vector(
+        new SpdbVector(std::move(merged), actual_elements_count));
+
+    // now replace
+    WriteLock wl(&spdb_vectors_merge_rwlock_);
+    spdb_vectors_.insert(begin, std::move(new_vector));
+    spdb_vectors_.erase(begin, end);
+  }
+}
+
+bool SpdbVectorContainer::TryMergeVectors(
+    std::list<SpdbVectorPtr>::iterator last) {
+  std::list<SpdbVectorPtr>::iterator start = spdb_vectors_.begin();
+  const size_t merge_threshold = switch_spdb_vector_limit_ * 75 / 100;
+
+  size_t count = 0;
+  for (auto s = start; s != last; ++s) {
+    if ((*s)->Size() > merge_threshold) {
+      if (count > 1) {
+        last = s;
+        break;
+      }
+
+      count = 0;
+      start = std::next(s);
+    } else {
+      ++count;
+      if (count == kMergedVectorsMax) {
+        last = std::next(s);
+        break;
+      }
+    }
+  }
+  if (count > 1) {
+    Merge(start, last);
+    return true;
+  }
+  return false;
+}
+
+void SpdbVectorContainer::SortThread() {
+  std::unique_lock<std::mutex> lck(sort_thread_mutex_);
+  std::list<SpdbVectorPtr>::iterator sort_iter_anchor = spdb_vectors_.begin();
+
+  for (;;) {
+    sort_thread_cv_.wait(lck);
+
+    if (immutable_) {
+      break;
+    }
+
+    std::list<SpdbVectorPtr>::iterator last;
+    last = std::prev(spdb_vectors_.end());
+
+    if (last == sort_iter_anchor) {
+      continue;
+    }
+
+    for (; sort_iter_anchor != last; ++sort_iter_anchor) {
+      (*sort_iter_anchor)->Sort(comparator_);
+    }
+
+    if (spdb_vectors_.size() > kMergedVectorsMax) {
+      if (TryMergeVectors(last)) {
+        sort_iter_anchor = spdb_vectors_.begin();
+      }
+    }
+  }
+}
 
 class HashSpdRep : public MemTableRep {
  public:
   HashSpdRep(const MemTableRep::KeyComparator& compare, Allocator* allocator,
-             size_t bucket_size);
-  void SpdbSortThread();
+             size_t bucket_size, bool use_seek_parralel_threshold = false);
 
-  HashSpdRep(Allocator* allocator, size_t bucket_size);
+  HashSpdRep(Allocator* allocator, size_t bucket_size,
+             bool use_seek_parralel_threshold = false);
   void PostCreate(const MemTableRep::KeyComparator& compare,
                   Allocator* allocator);
 
   KeyHandle Allocate(const size_t len, char** buf) override;
 
-  bool InsertInternal(KeyHandle handle, bool concurrently);
+  void Insert(KeyHandle handle) override { InsertKey(handle); }
 
-  void Insert(KeyHandle handle) override {
-    InsertInternal(handle, false);
-    return;
-  }
-
-  bool InsertKey(KeyHandle handle) override {
-    return InsertInternal(handle, false);
-  }
+  bool InsertKey(KeyHandle handle) override;
 
   bool InsertKeyWithHint(KeyHandle handle, void**) override {
-    return InsertInternal(handle, false);
+    return InsertKey(handle);
   }
 
   bool InsertKeyWithHintConcurrently(KeyHandle handle, void**) override {
-    return InsertInternal(handle, true);
+    return InsertKey(handle);
   }
 
   bool InsertKeyConcurrently(KeyHandle handle) override {
-    return InsertInternal(handle, true);
-  }
-
-  void InsertWithHintConcurrently(KeyHandle handle, void**) override {
-    InsertInternal(handle, true);
-    return;
-  }
-
-  void InsertConcurrently(KeyHandle handle) override {
-    InsertInternal(handle, true);
-    return;
+    return InsertKey(handle);
   }
 
   void MarkReadOnly() override;
@@ -290,300 +500,144 @@ class HashSpdRep : public MemTableRep {
 
   size_t ApproximateMemoryUsage() override;
 
-  SpdbKeyHandle* InternalSeek(const char* seek_entry);
-
   void Get(const LookupKey& k, void* callback_args,
            bool (*callback_func)(void* arg, const char* entry)) override;
 
   ~HashSpdRep() override;
 
-  // Iteration over the contents of a spdb sorted list
-  class SpdbIterator : public MemTableRep::Iterator {
-    SpdbSortedList<const MemTableRep::KeyComparator&>::Iterator iter_;
-    HashSpdRep* rep_;
-
-   public:
-    // Initialize an iterator over the specified list.
-    // The returned iterator is not valid.
-    explicit SpdbIterator(
-        const SpdbSortedList<const MemTableRep::KeyComparator&>* list,
-        HashSpdRep* rep)
-        : iter_(list), rep_(rep) {}
-
-    ~SpdbIterator() override {}
-
-    // Returns true iff the iterator is positioned at a valid node.
-    bool Valid() const override { return iter_.Valid(); }
-
-    // Returns the key at the current position.
-    // REQUIRES: Valid()
-    const char* key() const override { return iter_.key(); }
-
-    // Advances to the next position.
-    // REQUIRES: Valid()
-    void Next() override { iter_.Next(); }
-
-    // Advances to the previous position.
-    // REQUIRES: Valid()
-    void Prev() override { iter_.Prev(); }
-
-    // Advance to the first entry with a key >= target
-    void Seek(const Slice& user_key, const char* memtable_key) override {
-      const char* seek_key =
-          (memtable_key != nullptr) ? memtable_key : EncodeKey(&tmp_, user_key);
-      // first try to see if we get it fast
-      SpdbKeyHandle* seek_handle = rep_->InternalSeek(seek_key);
-      if (seek_handle) {
-        iter_.SetSeek(seek_handle->Key());
-      } else {
-        iter_.Seek(seek_key);
-      }
-    }
-
-    // Retreat to the last entry with a key <= target
-    void SeekForPrev(const Slice& user_key, const char* memtable_key) override {
-      const char* seek_key =
-          (memtable_key != nullptr) ? memtable_key : EncodeKey(&tmp_, user_key);
-      iter_.SeekForPrev(seek_key);
-    }
-
-    void RandomSeek() override { iter_.RandomSeek(); }
-
-    // Position at the first entry in list.
-    // Final state of iterator is Valid() iff list is not empty.
-    void SeekToFirst() override { iter_.SeekToFirst(); }
-
-    // Position at the last entry in list.
-    // Final state of iterator is Valid() iff list is not empty.
-    void SeekToLast() override { iter_.SeekToLast(); }
-
-   protected:
-    std::string tmp_;  // For passing to EncodeKey
-  };
-
-  class SpdbIteratorEmpty : public MemTableRep::Iterator {
-   public:
-    SpdbIteratorEmpty() {}
-
-    ~SpdbIteratorEmpty() override {}
-
-    // Returns true if the iterator is positioned at a valid node.
-    bool Valid() const override { return false; }
-
-    // Returns the key at the current position.
-    const char* key() const override { return nullptr; }
-
-    // Advances to the next position.
-    void Next() override { return; }
-
-    // Advances to the previous position.
-    void Prev() override { return; }
-
-    // Advance to the first entry with a key >= target
-    void Seek(const Slice& /* internal_key */,
-              const char* /* memtable_key */) override {
-      return;
-    }
-
-    // Retreat to the last entry with a key <= target
-    void SeekForPrev(const Slice& /* internal_key */,
-                     const char* /* memtable_key */) override {
-      return;
-    }
-
-    // Position at the first entry in list.
-    // Final state of iterator is Valid() if list is not empty.
-    void SeekToFirst() override { return; }
-
-    // Position at the last entry in list.
-    // Final state of iterator is Valid() if list is not empty.
-    void SeekToLast() override { return; }
-  };
-
   MemTableRep::Iterator* GetIterator(Arena* arena = nullptr) override;
-  bool IsImmutable() { return immutable_.load(); }
 
-  bool IsEmpty() { return elements_num_ == 0; }
+  const MemTableRep::KeyComparator& GetComparator() const {
+    return spdb_vectors_cont_->GetComparator();
+  }
 
  private:
   SpdbHashTable spdb_hash_table_;
-  std::shared_ptr<SpdbSort> spdb_sort_;
-  std::atomic<SpdbKeyHandle*> last_item_;
-  SpdbKeyHandle anchor_item_;
-  std::atomic<bool> immutable_ = false;
-  std::atomic<uint64_t> elements_num_ = 0;
-  std::atomic<uint64_t> sort_barrier_ = 0;
-
-  // sort thread info
-  std::atomic<bool> sort_thread_terminate_ = false;
-  std::atomic<bool> sort_thread_init_ = false;
-  std::thread sort_thread_;
-  std::mutex sort_thread_mutex_;
-  std::condition_variable sort_thread_cv_;
-  std::mutex notify_sorted_mutex_;
-  std::condition_variable notify_sorted_cv_;
+  bool use_seek_parralel_threshold_ = false;
+  std::shared_ptr<SpdbVectorContainer> spdb_vectors_cont_ = nullptr;
 };
 
 HashSpdRep::HashSpdRep(const MemTableRep::KeyComparator& compare,
-                       Allocator* allocator, size_t bucket_size)
-    : HashSpdRep(allocator, bucket_size) {
-  PostCreate(compare, allocator);
+                       Allocator* allocator, size_t bucket_size,
+                       bool use_seek_parralel_threshold)
+    : HashSpdRep(allocator, bucket_size, use_seek_parralel_threshold) {
+  spdb_vectors_cont_ = std::make_shared<SpdbVectorContainer>(compare);
 }
 
-HashSpdRep::~HashSpdRep() {
-  if (sort_thread_init_.load()) {
-    {
-      std::unique_lock<std::mutex> lck(sort_thread_mutex_);
-      sort_thread_terminate_.store(true);
-    }
-    sort_thread_cv_.notify_one();
-    // make sure the thread got the termination notify
-    sort_thread_.join();
-  }
-}
-
-void HashSpdRep::SpdbSortThread() {
-  bool should_exit = false;
-  SpdbKeyHandle* last_loop_item = last_item_.load();
-  {
-    std::unique_lock<std::mutex> lck(sort_thread_mutex_);
-    sort_thread_init_.store(true);
-  }
-  sort_thread_cv_.notify_one();
-
-  while (!should_exit) {
-    {
-      std::unique_lock<std::mutex> lck(sort_thread_mutex_);
-      while (!sort_thread_terminate_.load()) sort_thread_cv_.wait(lck);
-    }
-    if (sort_thread_terminate_.load()) {
-      should_exit = true;
-      break;
-    }
-
-    while (sort_barrier_ < elements_num_.load()) {
-      if (!last_loop_item->GetNextSortedItem()) {
-        continue;
-      }
-      last_loop_item = last_loop_item->GetNextSortedItem();
-      spdb_sort_->spdb_sorted_list_.Insert(last_loop_item->Key(), false);
-      {
-        std::unique_lock<std::mutex> notify_lck(notify_sorted_mutex_);
-        sort_barrier_.fetch_add(1);
-        notify_sorted_cv_.notify_all();
-      }
-      if (sort_thread_terminate_.load()) {
-        should_exit = true;
-        break;
-      }
-    }
-  }
-}
-
-HashSpdRep::HashSpdRep(Allocator* allocator, size_t bucket_size)
-    : MemTableRep(allocator), spdb_hash_table_(bucket_size), anchor_item_() {}
+HashSpdRep::HashSpdRep(Allocator* allocator, size_t bucket_size,
+                       bool use_seek_parralel_threshold)
+    : MemTableRep(allocator),
+      spdb_hash_table_(bucket_size),
+      use_seek_parralel_threshold_(use_seek_parralel_threshold) {}
 
 void HashSpdRep::PostCreate(const MemTableRep::KeyComparator& compare,
                             Allocator* allocator) {
   allocator_ = allocator;
-  spdb_sort_ = std::make_shared<SpdbSort>(compare, allocator);
+  spdb_vectors_cont_ = std::make_shared<SpdbVectorContainer>(compare);
+}
 
-  last_item_.store(&anchor_item_);
-  sort_thread_ = std::thread(&HashSpdRep::SpdbSortThread, this);
-  // need to verify the thread was executed
-  {
-    std::unique_lock<std::mutex> lck(sort_thread_mutex_);
-    while (!sort_thread_init_.load()) {
-      sort_thread_cv_.wait(lck);
-    }
+HashSpdRep::~HashSpdRep() {
+  if (spdb_vectors_cont_) {
+    MarkReadOnly();
   }
 }
 
 KeyHandle HashSpdRep::Allocate(const size_t len, char** buf) {
-  char* spdb_sorted_key;
-  SpdbKeyHandle* handle = reinterpret_cast<SpdbKeyHandle*>(
-      spdb_sort_->spdb_sorted_list_.AllocateSpdbItem(len, sizeof(SpdbKeyHandle),
-                                                     &spdb_sorted_key));
-  handle->Init();
-  handle->SetKey(spdb_sorted_key);
-  *buf = spdb_sorted_key;
-  return handle;
+  // constexpr size_t kInlineDataSize =
+  //     sizeof(SpdbKeyHandle) - offsetof(SpdbKeyHandle, key_);
+
+  size_t alloc_size = sizeof(SpdbKeyHandle) + len;
+  // alloc_size =
+  //     std::max(len, kInlineDataSize) - kInlineDataSize +
+  //     sizeof(SpdbKeyHandle);
+  SpdbKeyHandle* h =
+      reinterpret_cast<SpdbKeyHandle*>(allocator_->AllocateAligned(alloc_size));
+  *buf = h->key_;
+  return h;
 }
 
-bool HashSpdRep::InsertInternal(KeyHandle handle, bool concurrently) {
+bool HashSpdRep::InsertKey(KeyHandle handle) {
   SpdbKeyHandle* spdb_handle = static_cast<SpdbKeyHandle*>(handle);
-  if (!spdb_hash_table_.Add(spdb_handle, spdb_sort_->compare_)) {
+  if (!spdb_hash_table_.Add(spdb_handle, GetComparator())) {
     return false;
   }
-  spdb_sort_->spdb_sorted_list_.Insert(spdb_handle->Key(), concurrently);
-  elements_num_.fetch_add(1);
+  // insert to later sorter list
+  spdb_vectors_cont_->Insert(spdb_handle->key_);
   return true;
 }
 
 bool HashSpdRep::Contains(const char* key) const {
-  return spdb_hash_table_.Contains(key, spdb_sort_->compare_);
+  if (spdb_vectors_cont_->IsEmpty()) {
+    return false;
+  }
+  return spdb_hash_table_.Contains(key, GetComparator(),
+                                   !spdb_vectors_cont_->IsReadOnly());
 }
 
-void HashSpdRep::MarkReadOnly() { immutable_.store(true); }
+void HashSpdRep::MarkReadOnly() { spdb_vectors_cont_->MarkReadOnly(); }
 
 size_t HashSpdRep::ApproximateMemoryUsage() {
   // Memory is always allocated from the allocator.
   return 0;
 }
 
-SpdbKeyHandle* HashSpdRep::InternalSeek(const char* seek_entry) {
-  return spdb_hash_table_.InternalSeek(seek_entry, spdb_sort_->compare_);
-}
-
 void HashSpdRep::Get(const LookupKey& k, void* callback_args,
                      bool (*callback_func)(void* arg, const char* entry)) {
-  spdb_hash_table_.Get(k, spdb_sort_->compare_, callback_args, callback_func);
+  if (spdb_vectors_cont_->IsEmpty()) {
+    return;
+  }
+  spdb_hash_table_.Get(k, GetComparator(), callback_args, callback_func,
+                       !spdb_vectors_cont_->IsReadOnly());
 }
 
 MemTableRep::Iterator* HashSpdRep::GetIterator(Arena* arena) {
-  const bool empty_iter = IsEmpty();
-
+  const bool empty_iter =
+      spdb_vectors_cont_->IsEmpty() ||
+      (use_seek_parralel_threshold_ && !spdb_vectors_cont_->IsReadOnly());
   if (arena != nullptr) {
     void* mem;
     if (empty_iter) {
-      mem = arena->AllocateAligned(sizeof(SpdbIteratorEmpty));
-      return new (mem) SpdbIteratorEmpty();
+      mem = arena->AllocateAligned(sizeof(SpdbVectorIteratorEmpty));
+      return new (mem) SpdbVectorIteratorEmpty();
     } else {
-      mem = arena->AllocateAligned(sizeof(SpdbIterator));
-      return new (mem) SpdbIterator(&spdb_sort_->spdb_sorted_list_, this);
+      mem = arena->AllocateAligned(sizeof(SpdbVectorIterator));
+      return new (mem) SpdbVectorIterator(spdb_vectors_cont_, GetComparator());
     }
+  }
+  if (empty_iter) {
+    return new SpdbVectorIteratorEmpty();
   } else {
-    if (empty_iter) {
-      return new SpdbIteratorEmpty();
-    } else {
-      return new SpdbIterator(&spdb_sort_->spdb_sorted_list_, this);
-    }
+    return new SpdbVectorIterator(spdb_vectors_cont_, GetComparator());
   }
 }
 
 static std::unordered_map<std::string, OptionTypeInfo> hash_spd_factory_info = {
 #ifndef ROCKSDB_LITE
-    {"bucket_count",
+    {"hash_bucket_count",
      {0, OptionType::kSizeT, OptionVerificationType::kNormal,
+      OptionTypeFlags::kDontSerialize /*Since it is part of the ID*/}},
+    {"use_seek_parralel_threshold",
+     {0, OptionType::kBoolean, OptionVerificationType::kNormal,
       OptionTypeFlags::kDontSerialize /*Since it is part of the ID*/}},
 #endif
 };
 }  // namespace
 
-HashSpdRepFactory::HashSpdRepFactory(size_t bucket_count)
-    : bucket_count_(bucket_count) {
+// HashSpdRepFactory
+
+HashSpdRepFactory::HashSpdRepFactory(size_t hash_bucket_count)
+    : bucket_count_(hash_bucket_count), use_seek_parralel_threshold_(false) {
+  if (hash_bucket_count == 0) {
+    use_seek_parralel_threshold_ = true;
+    bucket_count_ = 1000000;
+  }
   RegisterOptions("", &bucket_count_, &hash_spd_factory_info);
   Init();
 }
 
-MemTableRep* HashSpdRepFactory::CreateMemTableRep(
-    const MemTableRep::KeyComparator& compare, Allocator* allocator,
-    const SliceTransform* /*transform*/, Logger* /*logger*/) {
-  return new HashSpdRep(compare, allocator, bucket_count_);
-}
-
 MemTableRep* HashSpdRepFactory::PreCreateMemTableRep() {
-  MemTableRep* hash_spd = new HashSpdRep(nullptr, bucket_count_);
+  MemTableRep* hash_spd =
+      new HashSpdRep(nullptr, bucket_count_, use_seek_parralel_threshold_);
   return hash_spd;
 }
 
@@ -592,6 +646,13 @@ void HashSpdRepFactory::PostCreateMemTableRep(
     Allocator* allocator, const SliceTransform* /*transform*/,
     Logger* /*logger*/) {
   static_cast<HashSpdRep*>(switch_mem)->PostCreate(compare, allocator);
+}
+
+MemTableRep* HashSpdRepFactory::CreateMemTableRep(
+    const MemTableRep::KeyComparator& compare, Allocator* allocator,
+    const SliceTransform* /*transform*/, Logger* /*logger*/) {
+  return new HashSpdRep(compare, allocator, bucket_count_,
+                        use_seek_parralel_threshold_);
 }
 
 }  // namespace ROCKSDB_NAMESPACE

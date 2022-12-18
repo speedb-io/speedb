@@ -772,7 +772,7 @@ TEST_F(CompactionServiceTest, FallbackLocalManual) {
   VerifyTestData();
 }
 
-TEST_F(CompactionServiceTest, RemoteEventListener) {
+TEST_F(CompactionServiceTest, DISABLED_RemoteEventListener) {
   class RemoteEventListenerTest : public EventListener {
    public:
     const char* Name() const override { return "RemoteEventListenerTest"; }

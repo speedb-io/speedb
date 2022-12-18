@@ -5012,6 +5012,8 @@ void DumpRocksDBBuildVersion(Logger* log) {
   if (date != props.end()) {
     ROCKS_LOG_HEADER(log, "Compile date %s", date->second.c_str());
   }
+  ROCKS_LOG_HEADER(log, "Build properties:%s",
+                   GetRocksDebugPropertiesAsString().c_str());
 }
 
 SequenceNumber DBImpl::GetEarliestMemTableSequenceNumber(SuperVersion* sv,

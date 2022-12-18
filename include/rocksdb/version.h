@@ -27,6 +27,10 @@ namespace ROCKSDB_NAMESPACE {
 // was created.
 const std::unordered_map<std::string, std::string>& GetRocksBuildProperties();
 
+// Returns a set of debug properties such as PORTABLE, DEBUG_LEVEL
+// and USE_RTTI indicating how was created.
+const std::unordered_map<std::string, std::string>& GetRocksDebugProperties();
+
 // Returns the current version of RocksDB as a string (e.g. "6.16.0").
 // If with_patch is true, the patch is included (6.16.x).
 // Otherwise, only major and minor version is included (6.16)
@@ -40,4 +44,15 @@ std::string GetRocksVersionAsString(bool with_patch = true);
 // GetRocksVersionString) is printed.
 std::string GetRocksBuildInfoAsString(const std::string& program,
                                       bool verbose = false);
+//// Gets the set of build properties (@see GetRocksBuildProperties) into a
+// string. Properties are returned one-per-line, with the first line being:
+// "<program> from RocksDB <version>.
+// If verbose is true, the full set of properties is
+// printed. If verbose is false, only the version information (@see
+// GetRocksVersionString) is printed.
+std::string GetRocksBuildFlagsAsString();
+//// Gets the set of build debug properties (@see GetRocksDebugProperties())
+// into a string.
+// Properties are returned on after another(if defined) in a single line.
+std::string GetRocksDebugPropertiesAsString();
 }  // namespace ROCKSDB_NAMESPACE

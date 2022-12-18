@@ -260,6 +260,7 @@ struct MutableCFOptions {
   size_t memtable_huge_page_size;
   size_t max_successive_merges;
   size_t inplace_update_num_locks;
+
   std::shared_ptr<const SliceTransform> prefix_extractor;
   // [experimental]
   // Used to activate or deactive the Mempurge feature (memtable garbage

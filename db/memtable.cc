@@ -383,6 +383,9 @@ class MemTableIterator : public InternalIterator {
       iter_ = mem.table_->GetDynamicPrefixIterator(arena);
     } else {
       iter_ = mem.table_->GetIterator(arena);
+      /*if (iter_->IsEmpty()) {
+        is_empty_ = true;
+      }*/
     }
     status_.PermitUncheckedError();
   }
@@ -411,6 +414,7 @@ class MemTableIterator : public InternalIterator {
 #endif
 
   bool Valid() const override { return valid_ && status_.ok(); }
+
   void Seek(const Slice& k) override {
     PERF_TIMER_GUARD(seek_on_memtable_time);
     PERF_COUNTER_ADD(seek_on_memtable_count, 1);

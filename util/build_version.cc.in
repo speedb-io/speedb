@@ -25,6 +25,15 @@ static const std::string speedb_build_date = "speedb_build_date:@BUILD_DATE@";
 #define SPDB_BUILD_TAG "@SPDB_BUILD_TAG@"
 static const std::string speedb_build_tag = "speedb_build_tag:" SPDB_BUILD_TAG;
 
+#define USE_RTTI "@USE_RTTI@"
+static const std::string use_rtti = "use_rtti:" USE_RTTI;
+
+#define DEBUG_LEVEL "@DEBUG_LEVEL@"
+static const std::string debug_level = "debug_level:" DEBUG_LEVEL;
+
+#define PORTABLE "@PORTABLE@"
+static const std::string portable = "portable:" PORTABLE;
+
 extern "C" {
 @ROCKSDB_PLUGIN_EXTERNS@
 } // extern "C"
@@ -45,22 +54,34 @@ static void AddProperty(std::unordered_map<std::string, std::string> *props, con
     }
   }
 }
-
-static std::unordered_map<std::string, std::string>* LoadPropertiesSet() {
-  auto * properties = new std::unordered_map<std::string, std::string>();
-  AddProperty(properties, speedb_build_git_sha);
-  AddProperty(properties, speedb_build_git_tag);
-  AddProperty(properties, speedb_build_date);
-  if (SPDB_BUILD_TAG[0] == '@') {
-    AddProperty(properties, "?");
+  
+static std::unordered_map<std::string, std::string>* LoadPropertiesSet(std::string p) {
+  if(p == "properties"){
+    auto * properties = new std::unordered_map<std::string, std::string>();
+    AddProperty(properties, speedb_build_git_sha);
+    AddProperty(properties, speedb_build_git_tag);
+    AddProperty(properties, speedb_build_date);
+    if (SPDB_BUILD_TAG[0] == '@') {
+      AddProperty(properties, "?");
+    } else {
+      AddProperty(properties, speedb_build_tag);
+    }
+    return properties;
   } else {
-    AddProperty(properties, speedb_build_tag);
+    auto * debug_properties = new std::unordered_map<std::string, std::string>();
+    AddProperty(debug_properties, use_rtti);
+    AddProperty(debug_properties, debug_level);
+    AddProperty(debug_properties, portable);
+    return debug_properties;
   }
-  return properties;
 }
 
 const std::unordered_map<std::string, std::string>& GetRocksBuildProperties() {
-  static std::unique_ptr<std::unordered_map<std::string, std::string>> props(LoadPropertiesSet());
+  static std::unique_ptr<std::unordered_map<std::string, std::string>> props(LoadPropertiesSet("properties"));
+  return *props;
+}
+const std::unordered_map<std::string, std::string>& GetRocksDebugProperties() {
+  static std::unique_ptr<std::unordered_map<std::string, std::string>> props(LoadPropertiesSet("debug_properties"));
   return *props;
 }
 
@@ -100,6 +121,19 @@ std::string GetRocksBuildInfoAsString(const std::string& program, bool verbose) 
       info.append(": ");
       info.append(it.second);
     }
+    info.append("\n Build properties:");
+    info.append(GetRocksDebugPropertiesAsString());
+  }
+  return info;
+}
+
+std::string GetRocksDebugPropertiesAsString() {
+  std::string info;
+  for (const auto& it : GetRocksDebugProperties()) {
+    info.append(" ");
+    info.append(it.first);
+    info.append("=");
+    info.append(it.second);
   }
   return info;
 }

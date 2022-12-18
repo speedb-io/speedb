@@ -35,22 +35,18 @@ class HashSpdRepFactory : public MemTableRepFactory {
                                  Logger* logger) override;
   bool IsInsertConcurrentlySupported() const override { return true; }
   bool CanHandleDuplicatedKey() const override { return true; }
+  MemTableRep* PreCreateMemTableRep() override;
+  void PostCreateMemTableRep(MemTableRep* switch_mem,
+                             const MemTableRep::KeyComparator& compare,
+                             Allocator* allocator,
+                             const SliceTransform* transform,
+                             Logger* logger) override;
 
   static const char* kClassName() { return "speedb.HashSpdRepFactory"; }
   const char* Name() const override { return kClassName(); }
 
- private:
-  void PrepareSwitchMemTable();
-  MemTableRep* GetSwitchMemtable(const MemTableRep::KeyComparator& compare,
-                                 Allocator* allocator);
-
- private:
+  private:
   size_t bucket_count_;
-  std::thread switch_memtable_thread_;
-  std::mutex switch_memtable_thread_mutex_;
-  std::condition_variable switch_memtable_thread_cv_;
-  bool terminate_switch_memtable_ = false;
-  std::atomic<MemTableRep*> switch_mem_ = nullptr;
 };
 
 }  // namespace ROCKSDB_NAMESPACE

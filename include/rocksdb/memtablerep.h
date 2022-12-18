@@ -230,6 +230,8 @@ class MemTableRep {
     // Returns true iff the iterator is positioned at a valid node.
     virtual bool Valid() const = 0;
 
+    virtual bool IsEmpty() { return false; }
+
     // Returns the key at the current position.
     // REQUIRES: Valid()
     virtual const char* key() const = 0;

@@ -22,8 +22,8 @@ class StopWatch {
         hist_type_(hist_type),
         elapsed_(elapsed),
         overwrite_(overwrite),
-        stats_enabled_(nullptr &&
-                       statistics->get_stats_level() >=
+        stats_enabled_(statistics &&
+                       kDisableAll >=
                            StatsLevel::kExceptTimers &&
                        statistics->HistEnabledForType(hist_type)),
         delay_enabled_(delay_enabled),

@@ -1010,6 +1010,12 @@ DEFINE_uint64(
 DEFINE_uint64(wp_commit_cache_bits, 23ull,
               "Number of bits to represent write-prepared transaction db's "
               "commit cache. Default: 23 (8M entries)");
+DEFINE_int32(
+    refresh_options_sec, 0,
+    "Frequency (in secs) to look for a new options file (off by default)");
+DEFINE_string(refresh_options_file, "",
+              "File in which to look for new options");
+
 #endif  // !ROCKSDB_LITE
 
 DEFINE_bool(adaptive_readahead, false,

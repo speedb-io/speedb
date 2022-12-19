@@ -3126,6 +3126,10 @@ void InitializeOptionsFromFlags(
       FLAGS_verify_sst_unique_id_in_manifest;
   options.memtable_protection_bytes_per_key =
       FLAGS_memtable_protection_bytes_per_key;
+#ifndef ROCKSDB_LITE
+  options.refresh_options_sec = FLAGS_refresh_options_sec;
+  options.refresh_options_file = FLAGS_refresh_options_file;
+#endif  // ROCKSDB_LITE
 
   // Integrated BlobDB
   options.enable_blob_files = FLAGS_enable_blob_files;

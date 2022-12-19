@@ -3126,6 +3126,7 @@ void InitializeOptionsFromFlags(
       FLAGS_verify_sst_unique_id_in_manifest;
   options.memtable_protection_bytes_per_key =
       FLAGS_memtable_protection_bytes_per_key;
+  options.use_dynamic_delay = FLAGS_use_dynamic_delay;
 
   // Integrated BlobDB
   options.enable_blob_files = FLAGS_enable_blob_files;

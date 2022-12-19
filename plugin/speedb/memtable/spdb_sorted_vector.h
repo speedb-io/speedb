@@ -25,7 +25,6 @@ class SpdbVector {
   SpdbVector(size_t switch_spdb_vector_limit)
       : items_(switch_spdb_vector_limit) {}
 
-
   void SetVectorListIter(
       std::list<std::shared_ptr<SpdbVector>>::iterator list_iter) {
     iter_ = list_iter;
@@ -172,10 +171,9 @@ using IterAnchors = std::list<SortHeapItem*>;
 
 class SpdbVectorContainer {
  public:
-  SpdbVectorContainer(const MemTableRep::KeyComparator& comparator,
-                      size_t switch_spdb_vector_limit)
+  SpdbVectorContainer(const MemTableRep::KeyComparator& comparator)
       : comparator_(comparator),
-        switch_spdb_vector_limit_(switch_spdb_vector_limit),
+        switch_spdb_vector_limit_(10000),
         immutable_(false),
         num_elements_(0) {
     SpdbVectorPtr spdb_vector(new SpdbVector(switch_spdb_vector_limit_));

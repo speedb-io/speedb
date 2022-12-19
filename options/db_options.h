@@ -104,6 +104,7 @@ struct ImmutableDBOptions {
   Statistics* stats;
   Logger* logger;
   std::shared_ptr<CompactionService> compaction_service;
+  bool use_dynamic_delay;
   bool enforce_single_del_contracts;
 
   bool IsWalDirSameAsDBPath() const;

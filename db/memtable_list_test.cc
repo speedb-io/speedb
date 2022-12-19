@@ -115,7 +115,8 @@ class MemTableListTest : public testing::Test {
     EnvOptions env_options;
     std::shared_ptr<Cache> table_cache(NewLRUCache(50000, 16));
     WriteBufferManager write_buffer_manager(db_options.db_write_buffer_size);
-    WriteController write_controller(10000000u);
+    WriteController write_controller(immutable_db_options.use_dynamic_delay,
+                                     10000000u);
 
     VersionSet versions(dbname, &immutable_db_options, env_options,
                         table_cache.get(), &write_buffer_manager,
@@ -166,7 +167,8 @@ class MemTableListTest : public testing::Test {
     EnvOptions env_options;
     std::shared_ptr<Cache> table_cache(NewLRUCache(50000, 16));
     WriteBufferManager write_buffer_manager(db_options.db_write_buffer_size);
-    WriteController write_controller(10000000u);
+    WriteController write_controller(immutable_db_options.use_dynamic_delay,
+                                     10000000u);
 
     VersionSet versions(dbname, &immutable_db_options, env_options,
                         table_cache.get(), &write_buffer_manager,

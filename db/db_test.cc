@@ -6551,6 +6551,7 @@ TEST_F(DBTest, DelayedWriteRate) {
   options.delayed_write_rate = 20000000;  // Start with 200MB/s
   options.memtable_factory.reset(
       test::NewSpecialSkipListFactory(kEntriesPerMemTable));
+  options.use_dynamic_delay = false;
 
   SetTimeElapseOnlySleepOnReopen(&options);
   CreateAndReopenWithCF({"pikachu"}, options);

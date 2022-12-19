@@ -364,7 +364,8 @@ TEST_F(OptionsSettableTest, DBOptionsAllFieldsSettable) {
                              "db_host_id=hostname;"
                              "lowest_used_cache_tier=kNonVolatileBlockTier;"
                              "allow_data_in_errors=false;"
-                             "enforce_single_del_contracts=false;",
+                             "enforce_single_del_contracts=false;"
+                             "use_dynamic_delay=true",
                              new_options));
 
   ASSERT_EQ(unset_bytes_base, NumUnsetBytes(new_options_ptr, sizeof(DBOptions),

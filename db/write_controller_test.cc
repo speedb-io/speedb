@@ -21,7 +21,8 @@ class TimeSetClock : public SystemClockWrapper {
   uint64_t NowNanos() override { return now_micros_ * std::milli::den; }
 };
 }  // anonymous namespace
-class WriteControllerTest : public testing::Test {
+// The param is whether dynamic_delay is used or not
+class WriteControllerTest : public testing::TestWithParam<bool> {
  public:
   WriteControllerTest() { clock_ = std::make_shared<TimeSetClock>(); }
   std::shared_ptr<TimeSetClock> clock_;
@@ -33,8 +34,8 @@ class WriteControllerTest : public testing::Test {
 #define MBPS MILLION
 #define SECS MILLION  // in microseconds
 
-TEST_F(WriteControllerTest, BasicAPI) {
-  WriteController controller(40 MBPS);  // also set max delayed rate
+TEST_P(WriteControllerTest, BasicAPI) {
+  WriteController controller(GetParam(), 40 MBPS);  // also set max delayed rate
   EXPECT_EQ(controller.delayed_write_rate(), 40 MBPS);
   EXPECT_FALSE(controller.IsStopped());
   EXPECT_FALSE(controller.NeedsDelay());
@@ -106,8 +107,8 @@ TEST_F(WriteControllerTest, BasicAPI) {
   EXPECT_FALSE(controller.NeedsDelay());
 }
 
-TEST_F(WriteControllerTest, StartFilled) {
-  WriteController controller(10 MBPS);
+TEST_P(WriteControllerTest, StartFilled) {
+  WriteController controller(GetParam(), 10 MBPS);
 
   // Attempt to write two things that combined would be allowed within
   // a single refill interval
@@ -132,8 +133,8 @@ TEST_F(WriteControllerTest, StartFilled) {
   EXPECT_LT(1.0 * delay, 1.001 SECS);
 }
 
-TEST_F(WriteControllerTest, DebtAccumulation) {
-  WriteController controller(10 MBPS);
+TEST_P(WriteControllerTest, DebtAccumulation) {
+  WriteController controller(GetParam(), 10 MBPS);
 
   std::array<std::unique_ptr<WriteControllerToken>, 10> tokens;
 
@@ -192,8 +193,8 @@ TEST_F(WriteControllerTest, DebtAccumulation) {
 }
 
 // This may or may not be a "good" feature, but it's an old feature
-TEST_F(WriteControllerTest, CreditAccumulation) {
-  WriteController controller(10 MBPS);
+TEST_P(WriteControllerTest, CreditAccumulation) {
+  WriteController controller(GetParam(), 10 MBPS);
 
   std::array<std::unique_ptr<WriteControllerToken>, 10> tokens;
 
@@ -238,6 +239,7 @@ TEST_F(WriteControllerTest, CreditAccumulation) {
   tokens[0] = controller.GetDelayToken(1 MBPS);
   ASSERT_EQ(10 SECS, controller.GetDelay(clock_.get(), 10 MB));
 }
+INSTANTIATE_TEST_CASE_P(DynamicWC, WriteControllerTest, testing::Bool());
 
 }  // namespace ROCKSDB_NAMESPACE
 

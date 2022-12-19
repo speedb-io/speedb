@@ -45,28 +45,25 @@ struct SpdbKeyHandle {
 };
 
 struct BucketHeader {
-  std::atomic<SpdbKeyHandle*> anchor_;
-  std::atomic<SpdbKeyHandle*> last_;
+  std::atomic<SpdbKeyHandle*> anchor_ = nullptr;
+  std::atomic<SpdbKeyHandle*> last_ = nullptr;
+  std::atomic<uint32_t> elements_num_ = 0;
 
   BucketHeader() : anchor_(nullptr), last_(nullptr) {}
 
   bool Contains(const MemTableRep::KeyComparator& comparator,
                 const char* check_key) const {
-    SpdbKeyHandle* item = anchor_.load();
-    if (item == nullptr) {
+    uint32_t curr_elements_num = elements_num_.load();
+    if (curr_elements_num == 0) {
       return false;
     }
-    SpdbKeyHandle* last_item = last_.load();
-    int cmp_res = comparator(last_item->key_, check_key);
-    if (cmp_res == 0) {
-      return true;
-    }
-    while (item != last_item) {
-      cmp_res = comparator(item->key_, check_key);
+    auto item = anchor_.load();
+    for (uint32_t count = 0; count < curr_elements_num && item != nullptr;
+         count++, item = item->next_) {
+      int cmp_res = comparator(item->key_, check_key);
       if (cmp_res == 0) {
         return true;
       }
-      item = item->next_;
     }
     return false;
   }
@@ -78,28 +75,23 @@ struct BucketHeader {
     } else {
       prev->next_ = val;
     }
+    elements_num_.fetch_add(1);
     return true;
   }
 
   void Get(const LookupKey& k, const MemTableRep::KeyComparator& comparator,
            void* callback_args,
            bool (*callback_func)(void* arg, const char* entry)) const {
-    SpdbKeyHandle* item = anchor_.load();
-    if (item == nullptr) {
+    uint32_t curr_elements_num = elements_num_.load();
+    if (curr_elements_num == 0) {
       return;
     }
-    SpdbKeyHandle* last_item = last_.load();
-
-    while (item != last_item) {
+    auto item = anchor_.load();
+    for (uint32_t count = 0; count < curr_elements_num && item != nullptr;
+         count++, item = item->next_) {
       if (comparator(item->key_, k.internal_key()) >= 0) {
-        if (!callback_func(callback_args, item->key_)) {
-          break;
-        }
+        callback_func(callback_args, item->key_);
       }
-    }
-
-    if (comparator(last_item->key_, k.internal_key()) >= 0) {
-      callback_func(callback_args, last_item->key_);
     }
   }
 };
@@ -434,10 +426,13 @@ HashSpdRep::~HashSpdRep() {
 }
 
 KeyHandle HashSpdRep::Allocate(const size_t len, char** buf) {
-  constexpr size_t kInlineDataSize =
-      sizeof(SpdbKeyHandle) - offsetof(SpdbKeyHandle, key_);
-  const size_t alloc_size =
-      std::max(len, kInlineDataSize) - kInlineDataSize + sizeof(SpdbKeyHandle);
+  // constexpr size_t kInlineDataSize =
+  //     sizeof(SpdbKeyHandle) - offsetof(SpdbKeyHandle, key_);
+
+  size_t alloc_size = sizeof(SpdbKeyHandle) + len;
+  // alloc_size =
+  //     std::max(len, kInlineDataSize) - kInlineDataSize +
+  //     sizeof(SpdbKeyHandle);
   SpdbKeyHandle* h =
       reinterpret_cast<SpdbKeyHandle*>(allocator_->AllocateAligned(alloc_size));
   *buf = h->key_;

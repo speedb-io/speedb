@@ -480,6 +480,24 @@ class ColumnFamilyData {
   WriteStallCondition RecalculateWriteStallConditions(
       const MutableCFOptions& mutable_cf_options);
 
+  // REQUIREMENT: db mutex must be held
+  double TEST_CalculateWriteDelayDivider(
+      uint64_t compaction_needed_bytes,
+      const MutableCFOptions& mutable_cf_options,
+      WriteStallCause& write_stall_cause);
+
+ private:
+  std::unique_ptr<WriteControllerToken> DynamicSetupDelay(
+      WriteController* write_controller, uint64_t compaction_needed_bytes,
+      const MutableCFOptions& mutable_cf_options,
+      WriteStallCause& write_stall_cause);
+
+  double CalculateWriteDelayDividerAndMaybeUpdateWriteStallCause(
+      uint64_t compaction_needed_bytes,
+      const MutableCFOptions& mutable_cf_options,
+      WriteStallCause& write_stall_cause);
+
+ public:
   void set_initialized() { initialized_.store(true); }
 
   bool initialized() const { return initialized_.load(); }

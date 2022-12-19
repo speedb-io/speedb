@@ -241,6 +241,7 @@ default_params = {
     "customopspercent": 0,
     "filter_uri": lambda: random.choice(["speedb.PairedBloomFilter", ""]),
     "memtablerep": lambda: random.choice(["skip_list", "speedb.HashSpdRepFactory"]),
+    "use_dynamic_delay": lambda: random.choice([0, 1, 1, 1]),
 }
 
 _TEST_DIR_ENV_VAR = "TEST_TMPDIR"

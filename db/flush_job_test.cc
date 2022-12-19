@@ -40,6 +40,7 @@ class FlushJobTestBase : public testing::Test {
         db_options_(options_),
         column_family_names_({kDefaultColumnFamilyName, "foo", "bar"}),
         table_cache_(NewLRUCache(50000, 16)),
+        write_controller_(db_options_.use_dynamic_delay),
         write_buffer_manager_(db_options_.db_write_buffer_size),
         shutting_down_(false),
         mock_table_factory_(new mock::MockTableFactory()) {}

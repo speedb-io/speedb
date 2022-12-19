@@ -1079,6 +1079,19 @@ struct DBOptions {
   // Dynamically changeable through SetDBOptions() API.
   uint64_t delayed_write_rate = 0;
 
+  // Use Speedb's dynamic delay -
+  // https://github.com/speedb-io/speedb/issues/276. Setting this to true,
+  // enables a different kind of calculation (instead of SetupDelay) for the
+  // delayed_write_rate whenever a call to RecalculateWriteStallConditions is
+  // made. the calculation itself is explained in the ticket and in the code of
+  // CalculateWriteDelayDividerAndMaybeUpdateWriteStallCause but in general its
+  // a linear decline of write speed with regards to by how much the system
+  // CURRENTLY exceeds the slowdown (soft_pending_compaction_bytes_limit and
+  // level0_slowdown_writes_trigger).
+  //
+  // Default: true
+  bool use_dynamic_delay = true;
+
   // By default, a single write thread queue is maintained. The thread gets
   // to the head of the queue becomes write batch group leader and responsible
   // for writing to WAL and memtable for the batch group.

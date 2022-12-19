@@ -876,6 +876,7 @@ TEST_F(DBOptionsTest, SanitizeDelayedWriteRate) {
   Options options;
   options.env = CurrentOptions().env;
   options.delayed_write_rate = 0;
+  options.use_dynamic_delay = false;
   Reopen(options);
   ASSERT_EQ(16 * 1024 * 1024, dbfull()->GetDBOptions().delayed_write_rate);
 

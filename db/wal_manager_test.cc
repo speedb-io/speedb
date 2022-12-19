@@ -33,6 +33,7 @@ class WalManagerTest : public testing::Test {
   WalManagerTest()
       : dbname_(test::PerThreadDBPath("wal_manager_test")),
         db_options_(),
+        write_controller_(db_options_.use_dynamic_delay),
         table_cache_(NewLRUCache(50000, 16)),
         write_buffer_manager_(db_options_.db_write_buffer_size),
         current_log_number_(0) {

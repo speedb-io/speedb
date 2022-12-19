@@ -1359,7 +1359,7 @@ void DumpManifestFile(Options options, std::string file, bool verbose, bool hex,
   // SanitizeOptions(), we need to initialize it manually.
   options.db_paths.emplace_back("dummy", 0);
   options.num_levels = 64;
-  WriteController wc(options.delayed_write_rate);
+  WriteController wc(options.use_dynamic_delay, options.delayed_write_rate);
   WriteBufferManager wb(options.db_write_buffer_size);
   ImmutableDBOptions immutable_db_options(options);
   VersionSet versions(dbname, &immutable_db_options, sopt, tc.get(), &wb, &wc,
@@ -1502,7 +1502,7 @@ Status GetLiveFilesChecksumInfoFromVersionSet(Options options,
   // SanitizeOptions(), we need to initialize it manually.
   options.db_paths.emplace_back(db_path, 0);
   options.num_levels = 64;
-  WriteController wc(options.delayed_write_rate);
+  WriteController wc(options.use_dynamic_delay, options.delayed_write_rate);
   WriteBufferManager wb(options.db_write_buffer_size);
   ImmutableDBOptions immutable_db_options(options);
   VersionSet versions(dbname, &immutable_db_options, sopt, tc.get(), &wb, &wc,
@@ -2324,7 +2324,7 @@ Status ReduceDBLevelsCommand::GetOldNumOfLevels(Options& opt, int* levels) {
   std::shared_ptr<Cache> tc(
       NewLRUCache(opt.max_open_files - 10, opt.table_cache_numshardbits));
   const InternalKeyComparator cmp(opt.comparator);
-  WriteController wc(opt.delayed_write_rate);
+  WriteController wc(opt.use_dynamic_delay, opt.delayed_write_rate);
   WriteBufferManager wb(opt.db_write_buffer_size);
   VersionSet versions(db_path_, &db_options, soptions, tc.get(), &wb, &wc,
                       /*block_cache_tracer=*/nullptr, /*io_tracer=*/nullptr,

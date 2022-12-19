@@ -566,6 +566,10 @@ static std::unordered_map<std::string, OptionTypeInfo>
          {offsetof(struct ImmutableDBOptions, enforce_single_del_contracts),
           OptionType::kBoolean, OptionVerificationType::kNormal,
           OptionTypeFlags::kNone}},
+        {"use_dynamic_delay",
+         {offsetof(struct ImmutableDBOptions, use_dynamic_delay),
+          OptionType::kBoolean, OptionVerificationType::kNormal,
+          OptionTypeFlags::kNone}},
 };
 
 const std::string OptionsHelper::kDBOptionsName = "DBOptions";
@@ -764,6 +768,7 @@ ImmutableDBOptions::ImmutableDBOptions(const DBOptions& options)
       checksum_handoff_file_types(options.checksum_handoff_file_types),
       lowest_used_cache_tier(options.lowest_used_cache_tier),
       compaction_service(options.compaction_service),
+      use_dynamic_delay(options.use_dynamic_delay),
       enforce_single_del_contracts(options.enforce_single_del_contracts) {
   fs = env->GetFileSystem();
   clock = env->GetSystemClock().get();
@@ -857,6 +862,8 @@ void ImmutableDBOptions::Dump(Logger* log) const {
                    is_fd_close_on_exec);
   ROCKS_LOG_HEADER(log, "                  Options.advise_random_on_open: %d",
                    advise_random_on_open);
+  ROCKS_LOG_HEADER(log, "                      Options.use_dynamic_delay: %d",
+                   use_dynamic_delay);
   ROCKS_LOG_HEADER(
       log, "                   Options.db_write_buffer_size: %" ROCKSDB_PRIszt,
       db_write_buffer_size);

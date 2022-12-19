@@ -1126,6 +1126,9 @@ DEFINE_uint64(stats_dump_period_sec,
               ROCKSDB_NAMESPACE::Options().stats_dump_period_sec,
               "Gap between printing stats to log in seconds");
 
+DEFINE_bool(use_dynamic_delay, ROCKSDB_NAMESPACE::Options().use_dynamic_delay,
+            "Use dynamic delay");
+
 DEFINE_bool(use_io_uring, false, "Enable the use of IO uring on Posix");
 
 DEFINE_bool(verification_only, false,

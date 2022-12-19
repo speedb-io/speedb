@@ -6196,7 +6196,7 @@ Status VersionSet::ReduceNumberOfLevels(const std::string& dbname,
   ColumnFamilyOptions cf_options(*options);
   std::shared_ptr<Cache> tc(NewLRUCache(options->max_open_files - 10,
                                         options->table_cache_numshardbits));
-  WriteController wc(options->delayed_write_rate);
+  WriteController wc(db_options.use_dynamic_delay, options->delayed_write_rate);
   WriteBufferManager wb(options->db_write_buffer_size);
   VersionSet versions(dbname, &db_options, file_options, tc.get(), &wb, &wc,
                       nullptr /*BlockCacheTracer*/, nullptr /*IOTracer*/,

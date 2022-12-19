@@ -18,7 +18,7 @@ namespace ROCKSDB_NAMESPACE {
 class OfflineManifestWriter {
  public:
   OfflineManifestWriter(const DBOptions& options, const std::string& db_path)
-      : wc_(options.delayed_write_rate),
+      : wc_(options.use_dynamic_delay, options.delayed_write_rate),
         wb_(options.db_write_buffer_size),
         immutable_db_options_(WithDbPath(options, db_path)),
         tc_(NewLRUCache(1 << 20 /* capacity */,

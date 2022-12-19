@@ -866,6 +866,39 @@ int GetL0ThresholdSpeedupCompaction(int level0_file_num_compaction_trigger,
 }
 }  // anonymous namespace
 
+namespace {
+const uint64_t Gb = 1ull << 30;
+const uint64_t Mb = 1ull << 20;
+const uint64_t kMinWriteRate = 16 * 1024u;  // Minimum write rate 16KB/s.
+const int kMemtablePenalty = 10;
+}  // namespace
+
+double ColumnFamilyData::TEST_CalculateWriteDelayDivider(
+    uint64_t compaction_needed_bytes,
+    const MutableCFOptions& mutable_cf_options,
+    WriteStallCause& write_stall_cause) {
+  return CalculateWriteDelayDividerAndMaybeUpdateWriteStallCause(
+      compaction_needed_bytes, mutable_cf_options, write_stall_cause);
+}
+
+std::unique_ptr<WriteControllerToken> ColumnFamilyData::DynamicSetupDelay(
+    WriteController* write_controller, uint64_t compaction_needed_bytes,
+    const MutableCFOptions& mutable_cf_options,
+    WriteStallCause& write_stall_cause) {
+  uint64_t max_write_rate = write_controller->max_delayed_write_rate();
+
+  const double rate_divider =
+      CalculateWriteDelayDividerAndMaybeUpdateWriteStallCause(
+          compaction_needed_bytes, mutable_cf_options, write_stall_cause);
+  assert(rate_divider >= 1);
+  auto write_rate = static_cast<uint64_t>(max_write_rate / rate_divider);
+  if (write_rate < kMinWriteRate) {
+    write_rate = kMinWriteRate;
+  }
+
+  return write_controller->GetDelayToken(write_rate);
+}
+
 std::pair<WriteStallCondition, WriteStallCause>
 ColumnFamilyData::GetWriteStallConditionAndCause(
     int num_unflushed_memtables, int num_l0_files,
@@ -904,6 +937,86 @@ ColumnFamilyData::GetWriteStallConditionAndCause(
   return {WriteStallCondition::kNormal, WriteStallCause::kNone};
 }
 
+// Delay divider is by how much we divide the users delayed_write_rate.
+// E.g. divider 10 will result in 10 Mb/s from users 100 Mb/s.
+// The rate is reduced linearly according to the range from slowdown to stop.
+double
+ColumnFamilyData::CalculateWriteDelayDividerAndMaybeUpdateWriteStallCause(
+    uint64_t compaction_needed_bytes,
+    const MutableCFOptions& mutable_cf_options,
+    WriteStallCause& write_stall_cause) {
+  assert(current_ != nullptr);
+
+  const auto* vstorage = current_->storage_info();
+
+  // Memtables
+  // this can only be entered when we're at the last memtable and theres more
+  // than 3. delay by 10X when writing to the last memtable.
+  double memtable_divider = 1;
+  auto num_unflushed_memtables = imm()->NumNotFlushed();
+  if (mutable_cf_options.max_write_buffer_number > 3 &&
+      num_unflushed_memtables >=
+          mutable_cf_options.max_write_buffer_number - 1 &&
+      num_unflushed_memtables - 1 >=
+          ioptions_.min_write_buffer_number_to_merge) {
+    memtable_divider = kMemtablePenalty;
+  }
+
+  // Pending Compaction Bytes
+  double pending_divider = 1;
+  auto soft_limit = mutable_cf_options.soft_pending_compaction_bytes_limit;
+  if (soft_limit > 0 && compaction_needed_bytes >= soft_limit) {
+    auto hard_limit = mutable_cf_options.hard_pending_compaction_bytes_limit;
+    // soft_limit != hard_limit here. we're in a kDelayed state here and not
+    // stop.
+    assert(hard_limit > soft_limit);
+    uint64_t soft_hard_range = hard_limit - soft_limit;
+    // change rate every 1G change or 100Mb if soft_hard_range is too small.
+    auto step_size = soft_hard_range > Gb ? Gb : 100 * Mb;
+    uint64_t num_steps = soft_hard_range / step_size;
+    auto extra_bytes = compaction_needed_bytes - soft_limit;
+    auto step_num = static_cast<uint64_t>(extra_bytes / step_size);
+    assert(step_num < num_steps);
+    if (num_steps > 0) {
+      pending_divider = 1 / (1 - (static_cast<double>(step_num) / num_steps));
+    }
+  }
+
+  double biggest_divider = 1;
+  if (memtable_divider > pending_divider) {
+    biggest_divider = memtable_divider;
+    write_stall_cause = WriteStallCause::kMemtableLimit;
+  } else if (pending_divider > 1) {
+    biggest_divider = pending_divider;
+    write_stall_cause = WriteStallCause::kPendingCompactionBytes;
+  }
+
+  // dont delay based on L0 when the user disables auto compactions
+  if (mutable_cf_options.disable_auto_compactions) {
+    return biggest_divider;
+  }
+
+  // L0 files
+  double l0_divider = 1;
+  const auto extra_l0_ssts = vstorage->NumLevelFiles(0) -
+                             mutable_cf_options.level0_slowdown_writes_trigger;
+  if (extra_l0_ssts > 0) {
+    const auto num_L0_steps = mutable_cf_options.level0_stop_writes_trigger -
+                              mutable_cf_options.level0_slowdown_writes_trigger;
+    assert(num_L0_steps > 0);
+    // since extra_l0_ssts == num_L0_steps then we're in a stop condition.
+    assert(extra_l0_ssts < num_L0_steps);
+    l0_divider = 1 / (1 - (extra_l0_ssts / num_L0_steps));
+  }
+
+  if (l0_divider > biggest_divider) {
+    biggest_divider = l0_divider;
+    write_stall_cause = WriteStallCause::kL0FileCountLimit;
+  }
+
+  return biggest_divider;
+}
+
 WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
     const MutableCFOptions& mutable_cf_options) {
   auto write_stall_condition = WriteStallCondition::kNormal;
@@ -922,6 +1035,18 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
 
     bool was_stopped = write_controller->IsStopped();
     bool needed_delay = write_controller->NeedsDelay();
+    bool dynamic_delay = write_controller->is_dynamic_delay();
+
+    // GetWriteStallConditionAndCause returns the first condition met, so its
+    // possible that a later condition will require a harder rate limiting.
+    // calculate all conditions with DynamicSetupDelay and reavaluate the
+    // write_stall_cause. this is only relevant in the kDelayed case.
+    if (dynamic_delay &&
+        write_stall_condition == WriteStallCondition::kDelayed) {
+      write_controller_token_ =
+          DynamicSetupDelay(write_controller, compaction_needed_bytes,
+                            mutable_cf_options, write_stall_cause);
+    }
 
     if (write_stall_condition == WriteStallCondition::kStopped &&
         write_stall_cause == WriteStallCause::kMemtableLimit) {
@@ -957,10 +1082,12 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
           name_.c_str(), compaction_needed_bytes);
     } else if (write_stall_condition == WriteStallCondition::kDelayed &&
                write_stall_cause == WriteStallCause::kMemtableLimit) {
-      write_controller_token_ =
-          SetupDelay(write_controller, compaction_needed_bytes,
-                     prev_compaction_needed_bytes_, was_stopped,
-                     mutable_cf_options.disable_auto_compactions);
+      if (!dynamic_delay) {
+        write_controller_token_ =
+            SetupDelay(write_controller, compaction_needed_bytes,
+                       prev_compaction_needed_bytes_, was_stopped,
+                       mutable_cf_options.disable_auto_compactions);
+      }
       internal_stats_->AddCFStats(InternalStats::MEMTABLE_LIMIT_DELAYS, 1);
       ROCKS_LOG_WARN(
           ioptions_.logger,
@@ -972,13 +1099,15 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
           write_controller->delayed_write_rate());
     } else if (write_stall_condition == WriteStallCondition::kDelayed &&
                write_stall_cause == WriteStallCause::kL0FileCountLimit) {
-      // L0 is the last two files from stopping.
-      bool near_stop = vstorage->l0_delay_trigger_count() >=
-                       mutable_cf_options.level0_stop_writes_trigger - 2;
-      write_controller_token_ =
-          SetupDelay(write_controller, compaction_needed_bytes,
-                     prev_compaction_needed_bytes_, was_stopped || near_stop,
-                     mutable_cf_options.disable_auto_compactions);
+      if (!dynamic_delay) {
+        // L0 is the last two files from stopping.
+        bool near_stop = vstorage->l0_delay_trigger_count() >=
+                         mutable_cf_options.level0_stop_writes_trigger - 2;
+        write_controller_token_ =
+            SetupDelay(write_controller, compaction_needed_bytes,
+                       prev_compaction_needed_bytes_, was_stopped || near_stop,
+                       mutable_cf_options.disable_auto_compactions);
+      }
       internal_stats_->AddCFStats(InternalStats::L0_FILE_COUNT_LIMIT_DELAYS, 1);
       if (compaction_picker_->IsLevel0CompactionInProgress()) {
         internal_stats_->AddCFStats(
@@ -995,19 +1124,21 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
       // If the distance to hard limit is less than 1/4 of the gap between soft
       // and
       // hard bytes limit, we think it is near stop and speed up the slowdown.
-      bool near_stop =
-          mutable_cf_options.hard_pending_compaction_bytes_limit > 0 &&
-          (compaction_needed_bytes -
-           mutable_cf_options.soft_pending_compaction_bytes_limit) >
-              3 *
-                  (mutable_cf_options.hard_pending_compaction_bytes_limit -
-                   mutable_cf_options.soft_pending_compaction_bytes_limit) /
-                  4;
+      if (!dynamic_delay) {
+        bool near_stop =
+            mutable_cf_options.hard_pending_compaction_bytes_limit > 0 &&
+            (compaction_needed_bytes -
+             mutable_cf_options.soft_pending_compaction_bytes_limit) >
+                3 *
+                    (mutable_cf_options.hard_pending_compaction_bytes_limit -
+                     mutable_cf_options.soft_pending_compaction_bytes_limit) /
+                    4;
 
-      write_controller_token_ =
-          SetupDelay(write_controller, compaction_needed_bytes,
-                     prev_compaction_needed_bytes_, was_stopped || near_stop,
-                     mutable_cf_options.disable_auto_compactions);
+        write_controller_token_ =
+            SetupDelay(write_controller, compaction_needed_bytes,
+                       prev_compaction_needed_bytes_, was_stopped || near_stop,
+                       mutable_cf_options.disable_auto_compactions);
+      }
       internal_stats_->AddCFStats(
           InternalStats::PENDING_COMPACTION_BYTES_LIMIT_DELAYS, 1);
       ROCKS_LOG_WARN(

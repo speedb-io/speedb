@@ -23,13 +23,15 @@ class WriteControllerToken;
 // to be called while holding DB mutex
 class WriteController {
  public:
-  explicit WriteController(uint64_t _delayed_write_rate = 1024u * 1024u * 32u,
+  explicit WriteController(bool dynamic_delay,
+                           uint64_t _delayed_write_rate = 1024u * 1024u * 32u,
                            int64_t low_pri_rate_bytes_per_sec = 1024 * 1024)
       : total_stopped_(0),
         total_delayed_(0),
         total_compaction_pressure_(0),
         credit_in_bytes_(0),
         next_refill_time_(0),
+        dynamic_delay_(dynamic_delay),
         low_pri_rate_limiter_(
             NewGenericRateLimiter(low_pri_rate_bytes_per_sec)) {
     set_max_delayed_write_rate(_delayed_write_rate);
@@ -85,6 +87,8 @@ class WriteController {
 
   RateLimiter* low_pri_rate_limiter() { return low_pri_rate_limiter_.get(); }
 
+  bool is_dynamic_delay() const { return dynamic_delay_; }
+
  private:
   uint64_t NowMicrosMonotonic(SystemClock* clock);
 
@@ -105,6 +109,8 @@ class WriteController {
   uint64_t max_delayed_write_rate_;
   // Current write rate (bytes / second)
   uint64_t delayed_write_rate_;
+  // Whether Speedb's dynamic delay is used
+  bool dynamic_delay_;
 
   std::unique_ptr<RateLimiter> low_pri_rate_limiter_;
 };

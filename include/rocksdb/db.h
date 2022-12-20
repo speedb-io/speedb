@@ -80,6 +80,9 @@ struct ColumnFamilyDescriptor {
       : name(_name), options(_options) {}
 };
 
+// COMPILATION BUG FOR MAX!!!
+XXXXXXXXXXXXXXXXXXXXXXXXXXxx
+
 class ColumnFamilyHandle {
  public:
   virtual ~ColumnFamilyHandle() {}

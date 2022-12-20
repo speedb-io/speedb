@@ -14,6 +14,7 @@
 #include "db/db_impl/db_impl.h"
 #include "db/db_test_util.h"
 #include "options/options_helper.h"
+#include "options/options_parser.h"
 #include "port/stack_trace.h"
 #include "rocksdb/cache.h"
 #include "rocksdb/convenience.h"
@@ -1147,6 +1148,41 @@ TEST_F(DBOptionsTest, ChangeCompression) {
   ASSERT_EQ(CompressionType::kSnappyCompression, compression_used);
   ASSERT_EQ(6, compression_opt_used.level);
   // Right now parallel_level is not yet allowed to be changed.
+
+  SyncPoint::GetInstance()->DisableProcessing();
+}
+
+TEST_F(DBOptionsTest, RefreshOptions) {
+  std::string test_path;
+  Options options = CurrentOptions();
+  auto fs = options.env->GetFileSystem();
+  options.create_if_missing = true;
+  options.refresh_options_sec = 1;
+  options.refresh_options_file = dbname_ + "/Options.New";
+  options.max_background_jobs = 1;
+  options.max_background_compactions = 2;
+  options.periodic_compaction_seconds = 100;
+  ASSERT_OK(TryReopen(options));
+  SyncPoint::GetInstance()->LoadDependency(
+      {{"DBImpl::RefreshOptions::Complete", "DBOptionsTest::WaitForUpdates"}});
+  SyncPoint::GetInstance()->EnableProcessing();
+  ConfigOptions config_options;
+  config_options.mutable_options_only = true;
+  options.max_background_jobs = 10;
+  options.max_background_compactions = 20;
+  options.periodic_compaction_seconds = 200;
+  ASSERT_OK(PersistRocksDBOptions(config_options, options, {"default"},
+                                  {options}, options.refresh_options_file,
+                                  fs.get()));
+
+  TEST_SYNC_POINT("DBOptionsTest::WaitForUpdates");
+  DBOptions new_db_opts = db_->GetDBOptions();
+  ASSERT_EQ(new_db_opts.max_background_jobs, 10);
+  ASSERT_EQ(new_db_opts.max_background_compactions, 20);
+  auto dcfh = db_->DefaultColumnFamily();
+  ColumnFamilyDescriptor dcd;
+  ASSERT_OK(dcfh->GetDescriptor(&dcd));
+  ASSERT_EQ(dcd.options.periodic_compaction_seconds, 200);
 
   SyncPoint::GetInstance()->DisableProcessing();
 }

@@ -1155,6 +1155,7 @@ void DBImpl::RefreshOptions() {
   }
   TEST_SYNC_POINT("DBImpl::RefreshOptions::Start");
   Status s = fs_->FileExists(new_options_file, IOOptions(), nullptr);
+  TEST_SYNC_POINT_CALLBACK("DBImpl::RefreshOptions::FileExists", &s);
   if (!s.ok()) {
     return;
   }
@@ -1167,12 +1168,14 @@ void DBImpl::RefreshOptions() {
   cfg_opts.mutable_options_only = true;
   RocksDBOptionsParser op;
   s = op.Parse(cfg_opts, new_options_file, fs_.get());
+  TEST_SYNC_POINT_CALLBACK("DBImpl::RefreshOptions::Parse", &s);
   if (!s.ok()) {
     ROCKS_LOG_WARN(immutable_db_options_.info_log,
                    "Failed to parse Options file (%s): %s\n",
                    new_options_file.c_str(), s.ToString().c_str());
   } else if (!op.db_opt_map()->empty()) {
     s = SetDBOptions(*(op.db_opt_map()));
+    TEST_SYNC_POINT_CALLBACK("DBImpl::RefreshOptions::SetDBOptions", &s);
     if (!s.ok()) {
       ROCKS_LOG_WARN(immutable_db_options_.info_log,
                      "Failed to refresh DBOptions, Aborting: %s\n",
@@ -1191,6 +1194,7 @@ void DBImpl::RefreshOptions() {
                          cf_name.c_str());
         } else if (!cfd->IsDropped()) {
           s = SetCFOptionsImpl(cfd, cf_opt_map);
+          TEST_SYNC_POINT_CALLBACK("DBImpl::RefreshOptions::SetCFOptions", &s);
           if (!s.ok()) {
             ROCKS_LOG_WARN(immutable_db_options_.info_log,
                            "Failed to refresh CFOptions for CF %s: %s\n",
@@ -1202,9 +1206,11 @@ void DBImpl::RefreshOptions() {
     }
   }
   s = fs_->DeleteFile(new_options_file, IOOptions(), nullptr);
+  TEST_SYNC_POINT_CALLBACK("DBImpl::RefreshOptions::DeleteFile", &s);
   ROCKS_LOG_INFO(immutable_db_options_.info_log,
                  "RefreshOptions Complete, deleting options file %s: %s\n",
                  new_options_file.c_str(), s.ToString().c_str());
+  TEST_SYNC_POINT("DBImpl::RefreshOptions::Complete");
 }
 #endif  // ROCKSDB_LITE
 

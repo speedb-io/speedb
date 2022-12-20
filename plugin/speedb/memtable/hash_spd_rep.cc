@@ -39,89 +39,57 @@ namespace ROCKSDB_NAMESPACE {
 namespace {
 constexpr size_t kMergedVectorsMax = 8;
 struct SpdbKeyHandle {
-  SpdbKeyHandle* GetNextBucketItem() {
-    return next_.load(std::memory_order_acquire);
-  }
-  void SetNextBucketItem(SpdbKeyHandle* handle) {
-    next_.store(handle, std::memory_order_release);
-  }
-  std::atomic<SpdbKeyHandle*> next_ = nullptr;
+  std::atomic<SpdbKeyHandle*> next_;
   char key_[1];
 };
 
 struct BucketHeader {
-  port::Mutex mutex_;  // this mutex probably wont cause delay
-  std::atomic<SpdbKeyHandle*> items_ = nullptr;
+  std::atomic<SpdbKeyHandle*> anchor_ = nullptr;
+  std::atomic<SpdbKeyHandle*> last_ = nullptr;
   std::atomic<uint32_t> elements_num_ = 0;
 
-  BucketHeader() {}
+  BucketHeader() : anchor_(nullptr), last_(nullptr) {}
 
-  bool Contains(const char* check_key,
-                const MemTableRep::KeyComparator& comparator) const {
+  bool Contains(const MemTableRep::KeyComparator& comparator,
+                const char* check_key) const {
     uint32_t curr_elements_num = elements_num_.load();
     if (curr_elements_num == 0) {
       return false;
     }
-    SpdbKeyHandle* anchor = items_.load(std::memory_order_acquire);
-    for (auto k = anchor; k != nullptr; k = k->GetNextBucketItem()) {
-      const int cmp_res = comparator(k->key_, check_key);
+    auto item = anchor_.load();
+    for (uint32_t count = 0; count < curr_elements_num && item != nullptr;
+         count++, item = item->next_) {
+      int cmp_res = comparator(item->key_, check_key);
       if (cmp_res == 0) {
         return true;
-      }
-      if (cmp_res > 0) {
-        break;
       }
     }
     return false;
   }
 
-  bool Add(SpdbKeyHandle* handle,
-           const MemTableRep::KeyComparator& comparator) {
-    MutexLock l(&mutex_);
-    SpdbKeyHandle* iter = items_.load(std::memory_order_acquire);
-    SpdbKeyHandle* prev = nullptr;
-
-    for (size_t i = 0; i < elements_num_; i++) {
-      const int cmp_res = comparator(iter->key_, handle->key_);
-      if (cmp_res == 0) {
-        // exist!
-        return false;
-      }
-      if (cmp_res > 0) {
-        // need to insert before
-        break;
-      }
-      prev = iter;
-      iter = iter->GetNextBucketItem();
-    }
-    handle->SetNextBucketItem(iter);
-    if (prev) {
-      prev->SetNextBucketItem(handle);
+  bool Add(SpdbKeyHandle* val) {
+    SpdbKeyHandle* prev = last_.exchange(val);
+    if (prev == nullptr) {
+      anchor_.store(val);
     } else {
-      items_ = handle;
+      prev->next_ = val;
     }
-    elements_num_++;
+    elements_num_.fetch_add(1);
     return true;
   }
 
   void Get(const LookupKey& k, const MemTableRep::KeyComparator& comparator,
            void* callback_args,
            bool (*callback_func)(void* arg, const char* entry)) const {
-    uint32_t curr_elements_num = elements_num_.load(std::memory_order_acquire);
+    uint32_t curr_elements_num = elements_num_.load();
     if (curr_elements_num == 0) {
       return;
     }
-
-    auto iter = items_.load(std::memory_order_acquire);
-    uint32_t i = 0;
-    for (; i < curr_elements_num; iter = iter->GetNextBucketItem(), i++) {
-      if (comparator(iter->key_, k.internal_key()) >= 0) {
-        break;
-      }
-    }
-    for (; i < curr_elements_num; iter = iter->GetNextBucketItem(), i++) {
-      if (!callback_func(callback_args, iter->key_)) {
-        break;
+    auto item = anchor_.load();
+    for (uint32_t count = 0; count < curr_elements_num && item != nullptr;
+         count++, item = item->next_) {
+      if (comparator(item->key_, k.internal_key()) >= 0) {
+        callback_func(callback_args, item->key_);
       }
     }
   }
@@ -132,16 +100,15 @@ struct SpdbHashTable {
 
   SpdbHashTable(size_t n_buckets) : buckets_(n_buckets) {}
 
-  bool Add(SpdbKeyHandle* handle,
-           const MemTableRep::KeyComparator& comparator) {
-    BucketHeader* bucket = GetBucket(handle->key_, comparator);
-    return bucket->Add(handle, comparator);
+  bool Add(SpdbKeyHandle* val, const MemTableRep::KeyComparator& comparator) {
+    BucketHeader* bucket = GetBucket(val->key_, comparator);
+    return bucket->Add(val);
   }
 
   bool Contains(const char* check_key,
                 const MemTableRep::KeyComparator& comparator) const {
     BucketHeader* bucket = GetBucket(check_key, comparator);
-    return bucket->Contains(check_key, comparator);
+    return bucket->Contains(comparator, check_key);
   }
 
   void Get(const LookupKey& k, const MemTableRep::KeyComparator& comparator,
@@ -180,7 +147,6 @@ struct SpdbHashTable {
     return bucket;
   }
 };
-
 // SpdbVector implemntation
 
 bool SpdbVector::Add(const char* key) {
@@ -573,8 +539,7 @@ void HashSpdRep::Get(const LookupKey& k, void* callback_args,
 }
 
 MemTableRep::Iterator* HashSpdRep::GetIterator(Arena* arena) {
-  const bool empty_iter =
-      spdb_vectors_cont_->IsEmpty() || !spdb_vectors_cont_->IsReadOnly();
+  const bool empty_iter = spdb_vectors_cont_->IsEmpty();
 
   if (arena != nullptr) {
     void* mem;

@@ -4501,8 +4501,8 @@ bool DBImpl::InitiateMemoryManagerFlushRequestNonAtomicFlush(
   ROCKS_LOG_INFO(immutable_db_options_.info_log,
                  "[%s] write buffer manager initiated flush "
                  "started current "
-                 "usage %lu out of %lu, min-size:%lu, seq:%lu, "
-                 "num-flushes:%lu, orig-cf:%s num-flushes:%lu",
+                 "usage %lu out of %lu, min-size:%lu, seq:%" PRIu64
+                 ", num-flushes:%" PRIu64 ", orig-cf:%s num-flushes:%" PRIu64,
                  cfd_to_flush->GetName().c_str(),
                  cfd_to_flush->write_buffer_mgr()->memory_usage(),
                  cfd_to_flush->write_buffer_mgr()->buffer_size(),

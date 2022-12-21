@@ -1,6 +1,7 @@
 name: Create release artifacts
 
 on:
+  workflow_dispatch:
   push:
     tags:
       - 'speedb/v*'

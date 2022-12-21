@@ -1858,7 +1858,7 @@ TEST_F(LoadCustomizableTest, LoadStatisticsTest) {
   }
 }
 
-TEST_F(LoadCustomizableTest, LoadMemTableRepFactoryTest) {
+TEST_F(LoadCustomizableTest, DISABLED_LoadMemTableRepFactoryTest) {
   std::unordered_set<std::string> expected = {
       SkipListFactory::kClassName(),
       SkipListFactory::kNickName(),

@@ -13,6 +13,7 @@
 #include "db/column_family.h"
 #include "db/db_impl/db_impl.h"
 #include "db/db_test_util.h"
+#include "env/mock_env.h"
 #include "options/options_helper.h"
 #include "options/options_parser.h"
 #include "port/stack_trace.h"
@@ -1177,6 +1178,11 @@ TEST_F(DBOptionsTest, RefreshOptions) {
                                   fs.get()));
 
   TEST_SYNC_POINT("DBOptionsTest::WaitForUpdates");
+  SyncPoint::GetInstance()->DisableProcessing();
+  SyncPoint::GetInstance()->LoadDependency(
+      {{"DBImpl::RefreshOptions::Complete", "DBOptionsTest::WaitForUpdates"}});
+  SyncPoint::GetInstance()->EnableProcessing();
+
   DBOptions new_db_opts = db_->GetDBOptions();
   ASSERT_EQ(new_db_opts.max_background_jobs, 10);
   ASSERT_EQ(new_db_opts.max_background_compactions, 20);
@@ -1184,6 +1190,145 @@ TEST_F(DBOptionsTest, RefreshOptions) {
   ColumnFamilyDescriptor dcd;
   ASSERT_OK(dcfh->GetDescriptor(&dcd));
   ASSERT_EQ(dcd.options.periodic_compaction_seconds, 200);
+
+  SyncPoint::GetInstance()->DisableProcessing();
+}
+
+TEST_F(DBOptionsTest, RefreshOptionsImmutable) {
+  std::string test_path;
+  Options options = CurrentOptions();
+  auto fs = options.env->GetFileSystem();
+  options.create_if_missing = true;
+  options.refresh_options_sec = 1;
+  options.refresh_options_file = dbname_ + "/Options.New";
+  ASSERT_OK(TryReopen(options));
+  SyncPoint::GetInstance()->LoadDependency(
+      {{"DBImpl::RefreshOptions::Complete", "DBOptionsTest::WaitForUpdates"}});
+  SyncPoint::GetInstance()->EnableProcessing();
+  ConfigOptions config_options;
+
+  // Test setting an immutable DBOption and see the value
+  // did not change
+  std::unique_ptr<Env> mock(MockEnv::Create(options.env));
+  options.env = mock.get();
+  ASSERT_OK(PersistRocksDBOptions(config_options, options, {"default"},
+                                  {options}, options.refresh_options_file,
+                                  fs.get()));
+  TEST_SYNC_POINT("DBOptionsTest::WaitForUpdates");
+
+  SyncPoint::GetInstance()->DisableProcessing();
+  SyncPoint::GetInstance()->LoadDependency(
+      {{"DBImpl::RefreshOptions::Complete", "DBOptionsTest::WaitForUpdates"}});
+  SyncPoint::GetInstance()->EnableProcessing();
+
+  // Test setting an immutable ColumnFamilyOption and see the value
+  // did not change
+  options = CurrentOptions();
+  options.comparator = ReverseBytewiseComparator();
+  options.refresh_options_sec = 1;
+  options.refresh_options_file = dbname_ + "/Options.New";
+  ASSERT_OK(PersistRocksDBOptions(config_options, options, {"default"},
+                                  {options}, options.refresh_options_file,
+                                  fs.get()));
+  TEST_SYNC_POINT("DBOptionsTest::WaitForUpdates");
+  auto dcfh = db_->DefaultColumnFamily();
+  ColumnFamilyDescriptor dcd;
+  ASSERT_OK(dcfh->GetDescriptor(&dcd));
+  ASSERT_EQ(dcd.options.comparator, BytewiseComparator());
+
+  SyncPoint::GetInstance()->DisableProcessing();
+}
+
+TEST_F(DBOptionsTest, RefreshOptionsBadFile) {
+  std::string test_path;
+  Options options = CurrentOptions();
+  auto fs = options.env->GetFileSystem();
+  options.create_if_missing = true;
+  options.refresh_options_sec = 1;
+  options.refresh_options_file = dbname_ + "/Options.New";
+  ASSERT_OK(TryReopen(options));
+
+  SyncPoint::GetInstance()->LoadDependency(
+      {{"DBImpl::RefreshOptions::Complete", "DBOptionsTest::WaitForUpdates"}});
+  SyncPoint::GetInstance()->SetCallBack("DBImpl::RefreshOptions::Parse",
+                                        [&](void* arg) {
+                                          auto s = static_cast<Status*>(arg);
+                                          ASSERT_NOK(*s);
+                                        });
+  SyncPoint::GetInstance()->EnableProcessing();
+  // Test with a file that is not an options file
+  ASSERT_OK(CreateFile(fs, options.refresh_options_file, "fred", false));
+  TEST_SYNC_POINT("DBOptionsTest::WaitForUpdates");
+  SyncPoint::GetInstance()->DisableProcessing();
+  SyncPoint::GetInstance()->LoadDependency(
+      {{"DBImpl::RefreshOptions::Complete", "DBOptionsTest::WaitForUpdates"}});
+  SyncPoint::GetInstance()->EnableProcessing();
+
+  // Test with a file that contains no DBOptions section
+  ASSERT_OK(CreateFile(fs, options.refresh_options_file,
+                       "[CFOptions \"default\"]\n", false));
+  TEST_SYNC_POINT("DBOptionsTest::WaitForUpdates");
+  SyncPoint::GetInstance()->DisableProcessing();
+  SyncPoint::GetInstance()->LoadDependency(
+      {{"DBImpl::RefreshOptions::Complete", "DBOptionsTest::WaitForUpdates"}});
+  SyncPoint::GetInstance()->EnableProcessing();
+
+  // Test with a file that contains no ColumnFamilyOptions section
+  ASSERT_OK(
+      CreateFile(fs, options.refresh_options_file, "[DBOptions]\n", false));
+  TEST_SYNC_POINT("DBOptionsTest::WaitForUpdates");
+  SyncPoint::GetInstance()->DisableProcessing();
+  SyncPoint::GetInstance()->LoadDependency(
+      {{"DBImpl::RefreshOptions::Complete", "DBOptionsTest::WaitForUpdates"}});
+  SyncPoint::GetInstance()->EnableProcessing();
+
+  // Test with a file that contains no default ColumnFamilyOptions section
+  ASSERT_OK(CreateFile(fs, options.refresh_options_file,
+                       "[DBOptions]\n"
+                       "[CFOptions \"unknown\"]\n",
+                       false));
+  TEST_SYNC_POINT("DBOptionsTest::WaitForUpdates");
+
+  SyncPoint::GetInstance()->DisableProcessing();
+}
+
+TEST_F(DBOptionsTest, RefreshOptionsUnknown) {
+  std::string test_path;
+  Options options = CurrentOptions();
+  auto fs = options.env->GetFileSystem();
+  options.create_if_missing = true;
+  options.refresh_options_sec = 1;
+  options.refresh_options_file = dbname_ + "/Options.New";
+  ASSERT_OK(TryReopen(options));
+  SyncPoint::GetInstance()->LoadDependency(
+      {{"DBImpl::RefreshOptions::Complete", "DBOptionsTest::WaitForUpdates"}});
+  SyncPoint::GetInstance()->SetCallBack("DBImpl::RefreshOptions::SetDBOptions",
+                                        [&](void* arg) {
+                                          auto s = static_cast<Status*>(arg);
+                                          ASSERT_NOK(*s);
+                                        });
+  SyncPoint::GetInstance()->SetCallBack("DBImpl::RefreshOptions::SetCFOptions",
+                                        [&](void* arg) {
+                                          auto s = static_cast<Status*>(arg);
+                                          ASSERT_NOK(*s);
+                                        });
+  SyncPoint::GetInstance()->EnableProcessing();
+  // Test with a file that contains a bad DBOptions value
+
+  ASSERT_OK(CreateFile(fs, options.refresh_options_file,
+                       "[DBOptions]\n"
+                       "unknown = value\n"
+                       "[CFOptions \"default\"]\n",
+                       false));
+  TEST_SYNC_POINT("DBOptionsTest::WaitForUpdates");
+
+  // Test with a file with a bad ColumnFamilyOptions
+  ASSERT_OK(CreateFile(fs, options.refresh_options_file,
+                       "[DBOptions]\n"
+                       "[CFOptions \"default\"]\n"
+                       "unknown = value\n",
+                       false));
+  TEST_SYNC_POINT("DBOptionsTest::WaitForUpdates");
 
   SyncPoint::GetInstance()->DisableProcessing();
 }

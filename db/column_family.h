@@ -462,7 +462,14 @@ class ColumnFamilyData {
   void ResetThreadLocalSuperVersions();
 
   // Protected by DB mutex
-  void set_queued_for_flush(bool value) { queued_for_flush_ = value; }
+  void set_queued_for_flush(bool value) {
+    queued_for_flush_ = value;
+
+    if (value) {
+      ++num_queued_for_flush_;
+    }
+  }
+
   void set_queued_for_compaction(bool value) { queued_for_compaction_ = value; }
   bool queued_for_flush() { return queued_for_flush_; }
   bool queued_for_compaction() { return queued_for_compaction_; }
@@ -485,6 +492,24 @@ class ColumnFamilyData {
   WriteStallCondition RecalculateWriteStallConditions(
       const MutableCFOptions& mutable_cf_options);
 
+  // REQUIREMENT: db mutex must be held
+  double TEST_CalculateWriteDelayDivider(
+      uint64_t compaction_needed_bytes,
+      const MutableCFOptions& mutable_cf_options,
+      WriteStallCause& write_stall_cause);
+
+ private:
+  std::unique_ptr<WriteControllerToken> DynamicSetupDelay(
+      WriteController* write_controller, uint64_t compaction_needed_bytes,
+      const MutableCFOptions& mutable_cf_options,
+      WriteStallCause& write_stall_cause);
+
+  double CalculateWriteDelayDividerAndMaybeUpdateWriteStallCause(
+      uint64_t compaction_needed_bytes,
+      const MutableCFOptions& mutable_cf_options,
+      WriteStallCause& write_stall_cause);
+
+ public:
   void set_initialized() { initialized_.store(true); }
 
   bool initialized() const { return initialized_.load(); }
@@ -531,6 +556,11 @@ class ColumnFamilyData {
   // Keep track of whether the mempurge feature was ever used.
   void SetMempurgeUsed() { mempurge_used_ = true; }
   bool GetMempurgeUsed() { return mempurge_used_; }
+  uint64_t GetNumQueuedForFlush() const { return num_queued_for_flush_; }
+
+  // TODO - Make it a CF option
+  static constexpr uint64_t kLaggingFlushesThreshold = 10U;
+  void SetNumTimedQueuedForFlush(uint64_t num) { num_queued_for_flush_ = num; }
 
  private:
   friend class ColumnFamilySet;
@@ -633,6 +663,9 @@ class ColumnFamilyData {
   // a Version associated with this CFD
   std::shared_ptr<CacheReservationManager> file_metadata_cache_res_mgr_;
   bool mempurge_used_;
+  // Used in the WBM's flush initiation heuristics.
+  // See DBImpl::InitiateMemoryManagerFlushRequest() for more details
+  uint64_t num_queued_for_flush_ = 0U;
 };
 
 // ColumnFamilySet has interesting thread-safety requirements

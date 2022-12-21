@@ -126,6 +126,19 @@ DEFINE_uint64(db_write_buffer_size,
 
 DEFINE_bool(allow_wbm_stalls, false, "Enable WBM write stalls and delays");
 
+DEFINE_bool(initiate_wbm_flushes, false,
+            "WBM will proactively initiate flushes (Speedb)."
+            "If false, WBM-related flushes will be initiated using the "
+            "ShouldFlush() service "
+            "of the WBM.");
+
+DEFINE_uint32(max_num_parallel_flushes,
+              ROCKSDB_NAMESPACE::WriteBufferManager::FlushInitiationOptions::
+                  kDfltMaxNumParallelFlushes,
+              "In case FLAGGS_initiate_wbm_flushes is true, this flag will "
+              "overwrite the default "
+              "max number of parallel flushes.");
+
 DEFINE_int32(
     write_buffer_size,
     static_cast<int32_t>(ROCKSDB_NAMESPACE::Options().write_buffer_size),
@@ -1068,5 +1081,8 @@ DEFINE_bool(
 DEFINE_uint64(stats_dump_period_sec,
               ROCKSDB_NAMESPACE::Options().stats_dump_period_sec,
               "Gap between printing stats to log in seconds");
+
+DEFINE_bool(use_dynamic_delay, ROCKSDB_NAMESPACE::Options().use_dynamic_delay,
+            "Use dynamic delay");
 
 #endif  // GFLAGS

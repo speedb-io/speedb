@@ -197,7 +197,8 @@ DBImpl::DBImpl(const DBOptions& options, const std::string& dbname,
       write_buffer_manager_(immutable_db_options_.write_buffer_manager.get()),
       write_thread_(immutable_db_options_),
       nonmem_write_thread_(immutable_db_options_),
-      write_controller_(mutable_db_options_.delayed_write_rate),
+      write_controller_(immutable_db_options_.use_dynamic_delay,
+                        mutable_db_options_.delayed_write_rate),
       last_batch_group_size_(0),
       unscheduled_flushes_(0),
       unscheduled_compactions_(0),
@@ -557,6 +558,13 @@ Status DBImpl::MaybeReleaseTimestampedSnapshotsAndCheck() {
 }
 
 Status DBImpl::CloseHelper() {
+  if (is_registered_for_flush_initiation_rqsts_) {
+    assert(write_buffer_manager_);
+    assert(write_buffer_manager_->IsInitiatingFlushes());
+    write_buffer_manager_->DeregisterFlushInitiator(this);
+    is_registered_for_flush_initiation_rqsts_ = false;
+  }
+
   // Guarantee that there is no background error recovery in progress before
   // continuing with the shutdown
   mutex_.Lock();
@@ -5018,6 +5026,8 @@ void DumpRocksDBBuildVersion(Logger* log) {
   if (date != props.end()) {
     ROCKS_LOG_HEADER(log, "Compile date %s", date->second.c_str());
   }
+  ROCKS_LOG_HEADER(log, "Build properties:%s",
+                   GetRocksDebugPropertiesAsString().c_str());
 }
 
 #ifndef ROCKSDB_LITE

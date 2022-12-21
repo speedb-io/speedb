@@ -77,6 +77,7 @@
 #include "rocksdb/utilities/transaction.h"
 #include "rocksdb/utilities/transaction_db.h"
 #include "rocksdb/write_batch.h"
+#include "rocksdb/write_buffer_manager.h"
 #include "speedb/version.h"
 #include "test_util/testutil.h"
 #include "test_util/transaction_test_util.h"
@@ -549,6 +550,19 @@ DEFINE_bool(cost_write_buffer_to_cache, false,
             "The usage of memtable is costed to the block cache");
 
 DEFINE_bool(allow_wbm_stalls, false, "Enable WBM write stalls and delays");
+
+DEFINE_bool(initiate_wbm_flushes, false,
+            "WBM will proactively initiate flushes (Speedb)."
+            "If false, WBM-related flushes will be initiated using the "
+            "ShouldFlush() service "
+            "of the WBM.");
+
+DEFINE_uint32(max_num_parallel_flushes,
+              ROCKSDB_NAMESPACE::WriteBufferManager::FlushInitiationOptions::
+                  kDfltMaxNumParallelFlushes,
+              "In case FLAGGS_initiate_wbm_flushes is true, this flag will "
+              "overwrite the default "
+              "max number of parallel flushes.");
 
 DEFINE_int64(arena_block_size, ROCKSDB_NAMESPACE::Options().arena_block_size,
              "The size, in bytes, of one block in arena memory allocation.");
@@ -1527,6 +1541,9 @@ DEFINE_uint64(hard_pending_compaction_bytes_limit, 128ull * 1024 * 1024 * 1024,
 DEFINE_uint64(delayed_write_rate, 8388608u,
               "Limited bytes allowed to DB when soft_rate_limit or "
               "level0_slowdown_writes_trigger triggers");
+
+DEFINE_bool(use_dynamic_delay, ROCKSDB_NAMESPACE::Options().use_dynamic_delay,
+            "use dynamic delay");
 
 DEFINE_bool(enable_pipelined_write, true,
             "Allow WAL and memtable writes to be pipelined");
@@ -3614,6 +3631,12 @@ class Benchmark {
     std::string name;
     std::unique_ptr<ExpiredTimeFilter> filter;
     while (std::getline(benchmark_stream, name, ',')) {
+      if (open_options_.write_buffer_manager) {
+        fprintf(stderr, "\nBEFORE Benchmark (%s): %lu OF %lu\n\n", name.c_str(),
+                open_options_.write_buffer_manager->memory_usage(),
+                open_options_.write_buffer_manager->buffer_size());
+      }
+
       // Sanitize parameters
       num_ = FLAGS_num;
       reads_ = (FLAGS_reads < 0 ? FLAGS_num : FLAGS_reads);
@@ -4066,6 +4089,12 @@ class Benchmark {
       if (post_process_method != nullptr) {
         (this->*post_process_method)();
       }
+
+      if (open_options_.write_buffer_manager) {
+        fprintf(stderr, "\nAFTER Benchmark (%s): %lu OF %lu\n", name.c_str(),
+                open_options_.write_buffer_manager->memory_usage(),
+                open_options_.write_buffer_manager->buffer_size());
+      }
     }
 
     if (secondary_update_thread_) {
@@ -4415,13 +4444,6 @@ class Benchmark {
         FLAGS_compression_use_zstd_dict_trainer;
 
     options.max_open_files = FLAGS_open_files;
-    if ((FLAGS_db_write_buffer_size == 0) && FLAGS_allow_wbm_stalls) {
-      ErrorExit("-allow_wbm_stalls is useless if db_write_buffer_size == 0");
-    }
-    if (FLAGS_cost_write_buffer_to_cache || FLAGS_db_write_buffer_size != 0) {
-      options.write_buffer_manager.reset(new WriteBufferManager(
-          FLAGS_db_write_buffer_size, cache_, FLAGS_allow_wbm_stalls));
-    }
     options.arena_block_size = FLAGS_arena_block_size;
     options.write_buffer_size = FLAGS_write_buffer_size;
     options.max_write_buffer_number = FLAGS_max_write_buffer_number;
@@ -4826,6 +4848,7 @@ class Benchmark {
     options.inplace_update_num_locks = FLAGS_inplace_update_num_locks;
     options.enable_write_thread_adaptive_yield =
         FLAGS_enable_write_thread_adaptive_yield;
+    options.use_dynamic_delay = FLAGS_use_dynamic_delay;
     options.enable_pipelined_write = FLAGS_enable_pipelined_write;
     options.unordered_write = FLAGS_unordered_write;
     options.write_thread_max_yield_usec = FLAGS_write_thread_max_yield_usec;
@@ -4898,6 +4921,27 @@ class Benchmark {
     options.allow_data_in_errors = FLAGS_allow_data_in_errors;
     options.track_and_verify_wals_in_manifest =
         FLAGS_track_and_verify_wals_in_manifest;
+
+    if (FLAGS_db_write_buffer_size == 0) {
+      if (FLAGS_allow_wbm_stalls) {
+        ErrorExit("-allow_wbm_stalls is useless if db_write_buffer_size == 0");
+      }
+      if (FLAGS_initiate_wbm_flushes) {
+        ErrorExit(
+            "-initiate_wbm_flushes is useless if db_write_buffer_size == 0");
+      }
+    }
+    if (FLAGS_cost_write_buffer_to_cache || FLAGS_db_write_buffer_size != 0) {
+      WriteBufferManager::FlushInitiationOptions flush_initiation_options;
+      if (FLAGS_max_num_parallel_flushes > 0U) {
+        flush_initiation_options.max_num_parallel_flushes =
+            FLAGS_max_num_parallel_flushes;
+      }
+
+      options.write_buffer_manager.reset(new WriteBufferManager(
+          FLAGS_db_write_buffer_size, cache_, FLAGS_allow_wbm_stalls,
+          FLAGS_initiate_wbm_flushes, flush_initiation_options));
+    }
 
     // Integrated BlobDB
     options.enable_blob_files = FLAGS_enable_blob_files;
@@ -9528,7 +9572,8 @@ int db_bench_tool(int argc, char** argv) {
 
   // Check for multiple-groups mode
   int result = 0;
-  if (argc > 1 && std::string(argv[1]) == "-groups") {
+  if (argc > 1 && ((std::string(argv[1]) == "-groups") ||
+                   (std::string(argv[1]) == "--groups"))) {
     auto arg_idx = 2;
     std::vector<char*> first_group_argv_vec;
     // Process all groups, as long as all of them run successfully

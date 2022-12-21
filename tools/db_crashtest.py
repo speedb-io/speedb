@@ -155,6 +155,7 @@ default_params = {
     #    [0, 0, 1024 * 1024]),
     "db_write_buffer_size" : lambda: random.choice(
         [0, 0, 0, 1024 * 1024, 8 * 1024 * 1024, 128 * 1024 * 1024, 1024 * 1024 * 1024]),
+    "initiate_wbm_flushes" : lambda: random.choice([0, 1]),
     "avoid_unnecessary_blocking_io" : random.randint(0, 1),
     "write_dbid_to_manifest" : random.randint(0, 1),
     "avoid_flush_during_recovery" : lambda: random.choice(
@@ -207,6 +208,7 @@ default_params = {
     "customopspercent": 0,
     "filter_uri": lambda: random.choice(["speedb.PairedBloomFilter", ""]),
     "memtablerep": lambda: random.choice(["skip_list", "speedb.HashSpdRepFactory"]),
+    "use_dynamic_delay": lambda: random.choice([0, 1, 1, 1]),
 }
 
 _TEST_DIR_ENV_VAR = 'TEST_TMPDIR'
@@ -722,6 +724,11 @@ def finalize_and_sanitize(src_params, counter):
     if dest_params.get("filter_uri") != "":
         dest_params["bloom_bits"] = random.choice([random.randint(1,19),
                                          random.lognormvariate(2.3, 1.3)])
+
+    # If initiate_wbm_flushes is enabled, db_write_buffer_size must be > 0, otherwise db_stress crashes 
+    if dest_params.get("initiate_wbm_flushes") == 1:
+      dest_params["db_write_buffer_size"]= random.choice([1024 * 1024, 8 * 1024 * 1024, 128 * 1024 * 1024, 1024 * 1024 * 1024])
+
     return dest_params
 
 

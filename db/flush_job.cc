@@ -76,6 +76,8 @@ const char* GetFlushReasonString (FlushReason flush_reason) {
       return "Error Recovery";
     case FlushReason::kWalFull:
       return "WAL Full";
+    case FlushReason::kWriteBufferManagerInitiated:
+      return "Write Buffer Manager Initiated";
     default:
       return "Invalid";
   }

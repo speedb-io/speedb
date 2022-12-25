@@ -998,7 +998,7 @@ ColumnFamilyData::CalculateWriteDelayDividerAndMaybeUpdateWriteStallCause(
 
   // L0 files
   double l0_divider = 1;
-  const auto extra_l0_ssts = vstorage->NumLevelFiles(0) -
+  const auto extra_l0_ssts = vstorage->l0_delay_trigger_count() -
                              mutable_cf_options.level0_slowdown_writes_trigger;
   if (extra_l0_ssts > 0) {
     const auto num_L0_steps = mutable_cf_options.level0_stop_writes_trigger -
@@ -1006,7 +1006,7 @@ ColumnFamilyData::CalculateWriteDelayDividerAndMaybeUpdateWriteStallCause(
     assert(num_L0_steps > 0);
     // since extra_l0_ssts == num_L0_steps then we're in a stop condition.
     assert(extra_l0_ssts < num_L0_steps);
-    l0_divider = 1 / (1 - (extra_l0_ssts / num_L0_steps));
+    l0_divider = 1 / (1 - (static_cast<double>(extra_l0_ssts) / num_L0_steps));
   }
 
   if (l0_divider > biggest_divider) {

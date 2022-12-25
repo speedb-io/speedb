@@ -265,6 +265,16 @@ std::string WriteBufferManager::GetPrintableOptions() const {
            "wbm.size", buffer_size());
   ret.append(buffer);
 
+  const Cache* cache = nullptr;
+  if (cache_res_mgr_ != nullptr) {
+    cache =
+        static_cast<CacheReservationManagerImpl<CacheEntryRole::kWriteBuffer>*>(
+            cache_res_mgr_.get())
+            ->TEST_GetCache();
+  }
+  snprintf(buffer, kBufferSize, "%*s: %p\n", field_width, "wbm.cache", cache);
+  ret.append(buffer);
+
   snprintf(buffer, kBufferSize, "%*s: %d\n", field_width, "wbm.allow_stalls",
            allow_stall_.load(std::memory_order_relaxed));
   ret.append(buffer);

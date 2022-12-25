@@ -202,6 +202,8 @@ class CacheReservationManagerImpl
   // test are from the same translation units
   static const Cache::CacheItemHelper *TEST_GetCacheItemHelperForRole();
 
+  const Cache *TEST_GetCache() const { return cache_.get(); }
+
  private:
   static constexpr std::size_t kSizeDummyEntry = 256 * 1024;
 

@@ -1,5 +1,46 @@
 # Speedb Change Log 
 
+## Coconut 2.2.0 (12/22/2022)
+## New Features
+* Proactive flushes for better resources utilization by @udi-speedb https://github.com/speedb-io/speedb/pull/185
+* Dynamic delayed write mechanism for consistent performance by @Yuval-Ariel in https://github.com/speedb-io/speedb/pull/281
+
+## Enhancements 
+* Paired block bloom: Removed the bits-per-key limitation for better results by @udi-speedb in https://github.com/speedb-io/speedb/pull/163
+* Allow running multiple benchmark, each with its own configuration by @udi-speedb in https://github.com/speedb-io/speedb/pull/250
+* db_bench: Support '--groups' in addition to '-groups' (#283) by @udi-speedb in https://github.com/speedb-io/speedb/pull/295
+* db_stress enhancement: Support control over WBM's allow_stall by @udi-speedb in https://github.com/speedb-io/speedb/pull/289
+* Shorten latency while switch generic memtable  by @ayulas in https://github.com/speedb-io/speedb/pull/297
+
+## Bug Fixes
+* db_bench: bug fix inserted in #200 (#263) by @Yuval-Ariel in https://github.com/speedb-io/speedb/pull/265
+* db_bench: ErrorExit from static func bug (#277) by @Yuval-Ariel in https://github.com/speedb-io/speedb/pull/278
+* Proactive Flushes: compilation warnings fix (#304) by @Yuval-Ariel in https://github.com/speedb-io/speedb/pull/307
+
+## Miscellaneous 
+* Added info to the log file for artifact testing by @RoyBenMoshe in https://github.com/speedb-io/speedb/pull/286
+* Disable LoadCustomizableTest.LoadMemTableRepFactoryTest (#303) by @ayulas in https://github.com/speedb-io/speedb/pull/305
+
+## 2.1.1 (11/15/2022)
+## Bug Fixes
+* Shorten latency while switch memtable (#14)
+* Fixed a crash that occurred when using the hash memtable. (#98)
+* memtable_list: avoid rolling back memtable flush on CF drop (#144) 
+* crashtest: fix 0 value of data_block_hash_table_util_ratio (#214) 
+* deletefile_test: fix breakage caused by the compaction threads change (#218)
+* cmake: clean up on successful runs and randomise test scheduling (#202) 
+* build: add a version build-tag for non-release builds (#156)
+* build: support ccache and sccache in the Makefile build (#170)
+* Update README.md 
+* docs: fix instructions for building Speedb in README.md and INSTALL.md 
+* readme typo fix by @azmisaquib (#223)
+* build_version: apply the build tag to the Speedb version string (#231) 
+* build: correctly handle merge commits when calculating a build tag (#207)
+* db_test2: fix BackgroundPurgeTest (#236) 
+* Update HISTORY.md (#239)
+* db_bench: Fix a bug when destructing a Benchmark with multiple db-s (#234)  
+* db_bench: add benchmark - seektodeletedranges  (#201)
+
 ## Blueberry 2.1.0 (10/26/2022)
 ## New Features
 * Added new Paired bloom filter that reduces false positive rate with the same performance and memory. In some configurations, the memory consumption is even reduced by up to 30%.

@@ -199,6 +199,15 @@ ifeq ($(COERCE_CONTEXT_SWITCH), 1)
 OPT += -DCOERCE_CONTEXT_SWITCH
 endif
 
+# Controls the mode and switches for sync and fsync
+# Valid modes are:
+# - FULL: Use F_FULLFSYNC for both sync and fsync
+# - BARRIER: Use F_BARRIERFSYNC for both sync and fsync
+# - AUTO: Detect what is available.  Favor barrier for sync, full for fsync
+#         (if available)
+# - OFF: Use fdatasync and fsync
+FSYNC_MODE ?= AUTO
+
 #-----------------------------------------------
 include src.mk
 
@@ -275,6 +284,7 @@ dummy := $(shell (export CXXFLAGS="$(EXTRA_CXXFLAGS)"; \
                   export LIB_MODE="$(LIB_MODE)"; \
 		  export ROCKSDB_CXX_STANDARD="$(ROCKSDB_CXX_STANDARD)"; \
 		  export USE_FOLLY="$(USE_FOLLY)"; \
+		  export FSYNC_MODE="$(FSYNC_MODE)"; \
                   "$(CURDIR)/build_tools/build_detect_platform" "$(CURDIR)/make_config.mk"))
 
 endif

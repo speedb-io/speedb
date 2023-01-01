@@ -698,7 +698,7 @@ DEFINE_bool(use_compressed_secondary_cache, false,
 DEFINE_int64(compressed_secondary_cache_size, 32 << 20,  // 32MB
              "Number of bytes to use as a cache of data");
 
-DEFINE_int32(compressed_secondary_cache_numshardbits, 6,
+DEFINE_int32(compressed_secondary_cache_numshardbits, -1,
              "Number of shards for the block cache"
              " is 2 ** compressed_secondary_cache_numshardbits."
              " Negative means use default settings."
@@ -759,7 +759,7 @@ DEFINE_bool(
     "Minimize memory footprint of filters");
 
 DEFINE_int64(
-    index_shortening_mode, 2,
+    index_shortening_mode, 1,
     "mode to shorten index: 0 for no shortening; 1 for only shortening "
     "separaters; 2 for shortening shortening and successor");
 
@@ -862,12 +862,16 @@ DEFINE_uint64(compaction_readahead_size,
               ROCKSDB_NAMESPACE::Options().compaction_readahead_size,
               "Compaction readahead size");
 
-DEFINE_int32(log_readahead_size, 0, "WAL and manifest readahead size");
+DEFINE_int32(log_readahead_size,
+             ROCKSDB_NAMESPACE::Options().log_readahead_size,
+             "WAL and manifest readahead size");
 
-DEFINE_int32(random_access_max_buffer_size, 1024 * 1024,
+DEFINE_int32(random_access_max_buffer_size,
+             ROCKSDB_NAMESPACE::Options().random_access_max_buffer_size,
              "Maximum windows randomaccess buffer size");
 
-DEFINE_int32(writable_file_max_buffer_size, 1024 * 1024,
+DEFINE_int32(writable_file_max_buffer_size,
+             ROCKSDB_NAMESPACE::Options().writable_file_max_buffer_size,
              "Maximum write buffer for Writable File");
 
 DEFINE_double(bloom_bits, -1,
@@ -876,10 +880,12 @@ DEFINE_double(bloom_bits, -1,
 
 DEFINE_bool(use_ribbon_filter, false, "Use Ribbon instead of Bloom filter");
 
-DEFINE_double(memtable_bloom_size_ratio, 0,
+DEFINE_double(memtable_bloom_size_ratio,
+              ROCKSDB_NAMESPACE::Options().memtable_prefix_bloom_size_ratio,
               "Ratio of memtable size used for bloom filter. 0 means no bloom "
               "filter.");
-DEFINE_bool(memtable_whole_key_filtering, false,
+DEFINE_bool(memtable_whole_key_filtering,
+            ROCKSDB_NAMESPACE::Options().memtable_whole_key_filtering,
             "Try to use whole key bloom filter in memtables.");
 DEFINE_bool(memtable_use_huge_page, false,
             "Try to use huge page in memtables.");
@@ -936,7 +942,7 @@ static bool ValidateCacheNumshardbits(const char* flagname, int32_t value) {
   return true;
 }
 
-DEFINE_bool(verify_checksum, true,
+DEFINE_bool(verify_checksum, ROCKSDB_NAMESPACE::ReadOptions().verify_checksums,
             "Verify checksum for every block read from storage");
 
 DEFINE_int32(checksum_type,
@@ -957,11 +963,12 @@ DEFINE_bool(finish_after_writes, false,
 
 DEFINE_bool(sync, false, "Sync all writes to disk");
 
-DEFINE_bool(use_fsync, false, "If true, issue fsync instead of fdatasync");
+DEFINE_bool(use_fsync, ROCKSDB_NAMESPACE::Options().use_fsync,
+            "If true, issue fsync instead of fdatasync");
 
 DEFINE_bool(disable_wal, false, "If true, do not write WAL for write.");
 
-DEFINE_bool(manual_wal_flush, false,
+DEFINE_bool(manual_wal_flush, ROCKSDB_NAMESPACE::Options().manual_wal_flush,
             "If true, buffer WAL until buffer is full or a manual FlushWAL().");
 
 DEFINE_string(wal_compression, "none",
@@ -974,7 +981,8 @@ DEFINE_string(wal_dir, "", "If not empty, use the given dir for WAL");
 DEFINE_string(truth_db, "/dev/shm/truth_db/dbbench",
               "Truth key/values used when using verify");
 
-DEFINE_int32(num_levels, 7, "The total number of levels");
+DEFINE_int32(num_levels, ROCKSDB_NAMESPACE::Options().num_levels,
+             "The total number of levels");
 
 DEFINE_int64(target_file_size_base,
              ROCKSDB_NAMESPACE::Options().target_file_size_base,
@@ -988,10 +996,12 @@ DEFINE_uint64(max_bytes_for_level_base,
               ROCKSDB_NAMESPACE::Options().max_bytes_for_level_base,
               "Max bytes for level-1");
 
-DEFINE_bool(level_compaction_dynamic_level_bytes, false,
+DEFINE_bool(level_compaction_dynamic_level_bytes,
+            ROCKSDB_NAMESPACE::Options().level_compaction_dynamic_level_bytes,
             "Whether level size base is dynamic");
 
-DEFINE_double(max_bytes_for_level_multiplier, 10,
+DEFINE_double(max_bytes_for_level_multiplier,
+              ROCKSDB_NAMESPACE::Options().max_bytes_for_level_multiplier,
               "A multiplier to compute max bytes for level-N (N >= 2)");
 
 static std::vector<int> FLAGS_max_bytes_for_level_multiplier_additional_v;
@@ -1297,7 +1307,8 @@ DEFINE_bool(io_uring_enabled, true,
             "If true, enable the use of IO uring if the platform supports it");
 extern "C" bool RocksDbIOUringEnable() { return FLAGS_io_uring_enabled; }
 
-DEFINE_bool(adaptive_readahead, false,
+DEFINE_bool(adaptive_readahead,
+            ROCKSDB_NAMESPACE::ReadOptions().adaptive_readahead,
             "carry forward internal auto readahead size from one file to next "
             "file at each level during iteration");
 
@@ -1314,11 +1325,12 @@ DEFINE_bool(rate_limit_auto_wal_flush, false,
             "limiter for automatic WAL flush (`Options::manual_wal_flush` == "
             "false) after the user write operation.");
 
-DEFINE_bool(async_io, false,
+DEFINE_bool(async_io, ROCKSDB_NAMESPACE::ReadOptions().async_io,
             "When set true, asynchronous reads are used for internal auto "
             "readahead prefetching.");
 
-DEFINE_bool(optimize_multiget_for_io, true,
+DEFINE_bool(optimize_multiget_for_io,
+            ROCKSDB_NAMESPACE::ReadOptions().optimize_multiget_for_io,
             "When set true, asynchronous reads are done for SST files in "
             "multiple levels for MultiGet.");
 
@@ -1534,31 +1546,37 @@ DEFINE_int32(thread_status_per_interval, 0,
 DEFINE_int32(perf_level, ROCKSDB_NAMESPACE::PerfLevel::kDisable,
              "Level of perf collection");
 
-DEFINE_uint64(soft_pending_compaction_bytes_limit, 64ull * 1024 * 1024 * 1024,
+DEFINE_uint64(soft_pending_compaction_bytes_limit,
+              ROCKSDB_NAMESPACE::Options().soft_pending_compaction_bytes_limit,
               "Slowdown writes if pending compaction bytes exceed this number");
 
-DEFINE_uint64(hard_pending_compaction_bytes_limit, 128ull * 1024 * 1024 * 1024,
+DEFINE_uint64(hard_pending_compaction_bytes_limit,
+              ROCKSDB_NAMESPACE::Options().hard_pending_compaction_bytes_limit,
               "Stop writes if pending compaction bytes exceed this number");
 
-DEFINE_uint64(delayed_write_rate, 8388608u,
+DEFINE_uint64(delayed_write_rate,
+              ROCKSDB_NAMESPACE::Options().delayed_write_rate,
               "Limited bytes allowed to DB when soft_rate_limit or "
               "level0_slowdown_writes_trigger triggers");
 
 DEFINE_bool(use_dynamic_delay, ROCKSDB_NAMESPACE::Options().use_dynamic_delay,
             "use dynamic delay");
 
-DEFINE_bool(enable_pipelined_write, true,
+DEFINE_bool(enable_pipelined_write,
+            ROCKSDB_NAMESPACE::Options().enable_pipelined_write,
             "Allow WAL and memtable writes to be pipelined");
 
 DEFINE_bool(
-    unordered_write, false,
+    unordered_write, ROCKSDB_NAMESPACE::Options().unordered_write,
     "Enable the unordered write feature, which provides higher throughput but "
     "relaxes the guarantees around atomic reads and immutable snapshots");
 
-DEFINE_bool(allow_concurrent_memtable_write, true,
+DEFINE_bool(allow_concurrent_memtable_write,
+            ROCKSDB_NAMESPACE::Options().allow_concurrent_memtable_write,
             "Allow multi-writers to update mem tables in parallel.");
 
-DEFINE_double(experimental_mempurge_threshold, 0.0,
+DEFINE_double(experimental_mempurge_threshold,
+              ROCKSDB_NAMESPACE::Options().experimental_mempurge_threshold,
               "Maximum useful payload ratio estimate that triggers a mempurge "
               "(memtable garbage collection).");
 
@@ -1570,14 +1588,17 @@ DEFINE_uint64(inplace_update_num_locks,
               ROCKSDB_NAMESPACE::Options().inplace_update_num_locks,
               "Number of RW locks to protect in-place memtable updates");
 
-DEFINE_bool(enable_write_thread_adaptive_yield, true,
+DEFINE_bool(enable_write_thread_adaptive_yield,
+            ROCKSDB_NAMESPACE::Options().enable_write_thread_adaptive_yield,
             "Use a yielding spin loop for brief writer thread waits.");
 
 DEFINE_uint64(
-    write_thread_max_yield_usec, 100,
+    write_thread_max_yield_usec,
+    ROCKSDB_NAMESPACE::Options().write_thread_max_yield_usec,
     "Maximum microseconds for enable_write_thread_adaptive_yield operation.");
 
-DEFINE_uint64(write_thread_slow_yield_usec, 3,
+DEFINE_uint64(write_thread_slow_yield_usec,
+              ROCKSDB_NAMESPACE::Options().write_thread_slow_yield_usec,
               "The threshold at which a slow yield is considered a signal that "
               "other processes or threads want the core.");
 
@@ -1686,7 +1707,9 @@ DEFINE_bool(readonly, false, "Run read only benchmarks.");
 DEFINE_bool(print_malloc_stats, false,
             "Print malloc stats to stdout after benchmarks finish.");
 
-DEFINE_bool(disable_auto_compactions, false, "Do not auto trigger compactions");
+DEFINE_bool(disable_auto_compactions,
+            ROCKSDB_NAMESPACE::Options().disable_auto_compactions,
+            "Do not auto trigger compactions");
 
 DEFINE_uint64(wal_ttl_seconds, 0, "Set the TTL for the WAL Files in seconds.");
 DEFINE_uint64(wal_size_limit_MB, 0,
@@ -1715,7 +1738,7 @@ DEFINE_string(compaction_fadvice, "NORMAL",
 static auto FLAGS_compaction_fadvice_e =
     ROCKSDB_NAMESPACE::Options().access_hint_on_compaction_start;
 
-DEFINE_bool(use_tailing_iterator, false,
+DEFINE_bool(use_tailing_iterator, ROCKSDB_NAMESPACE::ReadOptions().tailing,
             "Use tailing iterator to access a series of keys instead of get");
 
 DEFINE_bool(use_adaptive_mutex, ROCKSDB_NAMESPACE::Options().use_adaptive_mutex,
@@ -1776,9 +1799,10 @@ DEFINE_int64(keys_per_prefix, 0,
              "control average number of keys generated per prefix, 0 means no "
              "special handling of the prefix, i.e. use the prefix comes with "
              "the generated random number.");
-DEFINE_bool(total_order_seek, false,
+DEFINE_bool(total_order_seek, ROCKSDB_NAMESPACE::ReadOptions().total_order_seek,
             "Enable total order seek regardless of index format.");
-DEFINE_bool(prefix_same_as_start, false,
+DEFINE_bool(prefix_same_as_start,
+            ROCKSDB_NAMESPACE::ReadOptions().prefix_same_as_start,
             "Enforce iterator to return keys with prefix same as seek key.");
 DEFINE_bool(
     seek_missing_prefix, false,
@@ -1838,7 +1862,8 @@ DEFINE_int32(skip_list_lookahead, 0,
 DEFINE_bool(report_file_operations, false,
             "if report number of file operations");
 DEFINE_bool(report_open_timing, false, "if report open timing");
-DEFINE_int32(readahead_size, 0, "Iterator readahead size");
+DEFINE_int32(readahead_size, ROCKSDB_NAMESPACE::ReadOptions().readahead_size,
+             "Iterator readahead size");
 
 DEFINE_bool(read_with_latest_user_timestamp, true,
             "If true, always use the current latest timestamp for read. If "
@@ -1879,7 +1904,8 @@ DEFINE_uint32(write_batch_protection_bytes_per_key, 0,
               "only value 0 and 8 are supported.");
 
 DEFINE_uint32(
-    memtable_protection_bytes_per_key, 0,
+    memtable_protection_bytes_per_key,
+    ROCKSDB_NAMESPACE::Options().memtable_protection_bytes_per_key,
     "Enable memtable per key-value checksum protection. "
     "Each entry in memtable will be suffixed by a per key-value checksum. "
     "This options determines the size of such checksums. "
@@ -1892,7 +1918,8 @@ DEFINE_uint32(block_protection_bytes_per_key, 0,
 DEFINE_bool(build_info, false,
             "Print the build info via GetRocksBuildInfoAsString");
 
-DEFINE_bool(track_and_verify_wals_in_manifest, false,
+DEFINE_bool(track_and_verify_wals_in_manifest,
+            ROCKSDB_NAMESPACE::Options().track_and_verify_wals_in_manifest,
             "If true, enable WAL tracking in the MANIFEST");
 
 namespace {

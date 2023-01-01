@@ -1979,38 +1979,40 @@ TEST_F(DBRangeDelTest, TombstoneFromCurrentLevel) {
 TEST_F(DBRangeDelTest, TombstoneAcrossFileBoundary) {
   // Verify that a range tombstone across file boundary covers keys from older
   // levels. Test set up:
-  //    L1_0: 1, 3, [2, 6)   L1_1: 5, 7, [2, 6) ([2, 6) is from compaction with
-  //    L1_0) L2 has: 5
+  //    L1_0: 1, 2, 4 [3, 8)   L1_1: 5, 7, 8 [3, 8) ([3, 8) is from
+  //    compaction with L1_0) L2 has: 5
   // Seek(1) and then Next() should move the L1 level iterator to
   // L1_1. Check if 5 is returned after Next().
   Options options = CurrentOptions();
   options.compression = kNoCompression;
   options.disable_auto_compactions = true;
-  options.target_file_size_base = 2 * 1024;
-  options.max_compaction_bytes = 2 * 1024;
+  options.target_file_size_base = 2.5 * 1024 * 1024;
+  options.max_compaction_bytes = 2.5 * 1024 * 1024;
 
   DestroyAndReopen(options);
 
   Random rnd(301);
   // L2
-  ASSERT_OK(db_->Put(WriteOptions(), Key(5), rnd.RandomString(1 << 10)));
+  ASSERT_OK(db_->Put(WriteOptions(), Key(5), rnd.RandomString(1 << 20)));
   ASSERT_OK(db_->Flush(FlushOptions()));
   MoveFilesToLevel(2);
   ASSERT_EQ(1, NumTableFilesAtLevel(2));
 
   // L1_1
-  ASSERT_OK(db_->Put(WriteOptions(), Key(5), rnd.RandomString(1 << 10)));
-  ASSERT_OK(db_->Put(WriteOptions(), Key(7), rnd.RandomString(1 << 10)));
+  ASSERT_OK(db_->Put(WriteOptions(), Key(5), rnd.RandomString(1 << 20)));
+  ASSERT_OK(db_->Put(WriteOptions(), Key(7), rnd.RandomString(1 << 20)));
+  ASSERT_OK(db_->Put(WriteOptions(), Key(8), rnd.RandomString(1 << 20)));
   ASSERT_OK(db_->Flush(FlushOptions()));
   ASSERT_EQ(1, NumTableFilesAtLevel(0));
 
   // L1_0
-  ASSERT_OK(db_->Put(WriteOptions(), Key(1), rnd.RandomString(1 << 10)));
-  ASSERT_OK(db_->Put(WriteOptions(), Key(3), rnd.RandomString(1 << 10)));
+  ASSERT_OK(db_->Put(WriteOptions(), Key(1), rnd.RandomString(1 << 20)));
+  ASSERT_OK(db_->Put(WriteOptions(), Key(2), rnd.RandomString(1 << 20)));
+  ASSERT_OK(db_->Put(WriteOptions(), Key(4), rnd.RandomString(1 << 20)));
   // Prevent keys being compacted away
   const Snapshot* snapshot = db_->GetSnapshot();
-  ASSERT_OK(db_->DeleteRange(WriteOptions(), db_->DefaultColumnFamily(), Key(2),
-                             Key(6)));
+  ASSERT_OK(db_->DeleteRange(WriteOptions(), db_->DefaultColumnFamily(), Key(3),
+                             Key(8)));
   ASSERT_OK(db_->Flush(FlushOptions()));
   ASSERT_EQ(2, NumTableFilesAtLevel(0));
   MoveFilesToLevel(1);
@@ -2018,13 +2020,13 @@ TEST_F(DBRangeDelTest, TombstoneAcrossFileBoundary) {
 
   auto iter = db_->NewIterator(ReadOptions());
   get_perf_context()->Reset();
-  iter->Seek(Key(1));
+  iter->Seek(Key(2));
   ASSERT_TRUE(iter->Valid());
-  ASSERT_EQ(iter->key().ToString(), Key(1));
+  ASSERT_EQ(iter->key().ToString(), Key(2));
   iter->Next();
   ASSERT_TRUE(iter->Valid());
-  ASSERT_EQ(iter->key().ToString(), Key(7));
-  // 1 reseek into L2 when key 5 in L2 is covered by [2, 6) from L1
+  ASSERT_EQ(iter->key().ToString(), Key(8));
+  // 1 reseek into L2 when key 5 in L2 is covered by [3, 8) from L1
   ASSERT_EQ(get_perf_context()->internal_range_del_reseek_count, 1);
 
   delete iter;
@@ -2035,32 +2037,35 @@ TEST_F(DBRangeDelTest, NonOverlappingTombstonAtBoundary) {
   // Verify that a range tombstone across file boundary covers keys from older
   // levels.
   // Test set up:
-  //    L1_0: 1, 3, [4, 7)         L1_1: 6, 8, [4, 7)
+  //    L1_0: 1, 2, 3, [4, 7)         L1_1: 6, 8, 9 [4, 7)
   //    L2: 5
   // Note that [4, 7) is at end of L1_0 and not overlapping with any point key
   // in L1_0. [4, 7) from L1_0 should cover 5 is sentinel works
   Options options = CurrentOptions();
   options.compression = kNoCompression;
   options.disable_auto_compactions = true;
-  options.target_file_size_base = 2 * 1024;
+  options.target_file_size_base = 2.5 * 1024 * 1024;
+  options.max_compaction_bytes = 2.5 * 1024 * 1024;
   DestroyAndReopen(options);
 
   Random rnd(301);
   // L2
-  ASSERT_OK(db_->Put(WriteOptions(), Key(5), rnd.RandomString(4 << 10)));
+  ASSERT_OK(db_->Put(WriteOptions(), Key(5), rnd.RandomString(1 << 20)));
   ASSERT_OK(db_->Flush(FlushOptions()));
   MoveFilesToLevel(2);
   ASSERT_EQ(1, NumTableFilesAtLevel(2));
 
   // L1_1
-  ASSERT_OK(db_->Put(WriteOptions(), Key(6), rnd.RandomString(4 << 10)));
-  ASSERT_OK(db_->Put(WriteOptions(), Key(8), rnd.RandomString(4 << 10)));
+  ASSERT_OK(db_->Put(WriteOptions(), Key(6), rnd.RandomString(1 << 20)));
+  ASSERT_OK(db_->Put(WriteOptions(), Key(8), rnd.RandomString(1 << 20)));
+  ASSERT_OK(db_->Put(WriteOptions(), Key(9), rnd.RandomString(1 << 20)));
   ASSERT_OK(db_->Flush(FlushOptions()));
   ASSERT_EQ(1, NumTableFilesAtLevel(0));
 
   // L1_0
-  ASSERT_OK(db_->Put(WriteOptions(), Key(1), rnd.RandomString(4 << 10)));
-  ASSERT_OK(db_->Put(WriteOptions(), Key(3), rnd.RandomString(4 << 10)));
+  ASSERT_OK(db_->Put(WriteOptions(), Key(1), rnd.RandomString(1 << 20)));
+  ASSERT_OK(db_->Put(WriteOptions(), Key(2), rnd.RandomString(1 << 20)));
+  ASSERT_OK(db_->Put(WriteOptions(), Key(3), rnd.RandomString(1 << 20)));
   // Prevent keys being compacted away
   ASSERT_OK(db_->DeleteRange(WriteOptions(), db_->DefaultColumnFamily(), Key(4),
                              Key(7)));
@@ -2091,18 +2096,19 @@ TEST_F(DBRangeDelTest, NonOverlappingTombstonAtBoundary) {
 }
 
 TEST_F(DBRangeDelTest, OlderLevelHasNewerData) {
-  // L1_0: 1, 3, [2, 7)   L1_1: 5, 6 at a newer sequence number than [2, 7)
-  // Compact L1_1 to L2. Seek(3) should not skip 5 or 6.
+  // L1_0: 1, 2, 3, [2, 7)   L1_1: 5, 6, 7 at a newer sequence number than [2,
+  // 7) Compact L1_1 to L2. Seek(3) should not skip 5 or 6 or 7.
   Options options = CurrentOptions();
   options.compression = kNoCompression;
   options.disable_auto_compactions = true;
-  options.target_file_size_base = 3 * 1024;
+  options.target_file_size_base = 2.5 * 1024 * 1024;
   DestroyAndReopen(options);
 
   Random rnd(301);
   // L1_0
-  ASSERT_OK(db_->Put(WriteOptions(), Key(1), rnd.RandomString(4 << 10)));
-  ASSERT_OK(db_->Put(WriteOptions(), Key(3), rnd.RandomString(4 << 10)));
+  ASSERT_OK(db_->Put(WriteOptions(), Key(1), rnd.RandomString(1 << 20)));
+  ASSERT_OK(db_->Put(WriteOptions(), Key(2), rnd.RandomString(1 << 20)));
+  ASSERT_OK(db_->Put(WriteOptions(), Key(3), rnd.RandomString(1 << 20)));
   const Snapshot* snapshot = db_->GetSnapshot();
   ASSERT_OK(db_->DeleteRange(WriteOptions(), db_->DefaultColumnFamily(), Key(2),
                              Key(7)));
@@ -2111,8 +2117,9 @@ TEST_F(DBRangeDelTest, OlderLevelHasNewerData) {
   ASSERT_EQ(1, NumTableFilesAtLevel(1));
 
   // L1_1
-  ASSERT_OK(db_->Put(WriteOptions(), Key(5), rnd.RandomString(4 << 10)));
-  ASSERT_OK(db_->Put(WriteOptions(), Key(6), rnd.RandomString(4 << 10)));
+  ASSERT_OK(db_->Put(WriteOptions(), Key(5), rnd.RandomString(1 << 20)));
+  ASSERT_OK(db_->Put(WriteOptions(), Key(6), rnd.RandomString(1 << 20)));
+  ASSERT_OK(db_->Put(WriteOptions(), Key(7), rnd.RandomString(1 << 20)));
   ASSERT_OK(db_->Flush(FlushOptions()));
   ASSERT_EQ(1, NumTableFilesAtLevel(0));
   MoveFilesToLevel(1);

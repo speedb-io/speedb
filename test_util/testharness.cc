@@ -45,12 +45,19 @@ std::string PerThreadDBPath(std::string dir, std::string name) {
   return dir + "/" + name + "_" + GetPidStr() + "_" + std::to_string(tid);
 }
 
+std::string PerThreadDBPath(std::string dir, std::string name,
+                            int64_t time_now) {
+  return dir + "/" + name + "_" + GetPidStr() + "_" + std::to_string(time_now);
+}
+
 std::string PerThreadDBPath(std::string name) {
   return PerThreadDBPath(test::TmpDir(), name);
 }
 
 std::string PerThreadDBPath(Env* env, std::string name) {
-  return PerThreadDBPath(test::TmpDir(env), name);
+  int64_t time;
+  env->GetCurrentTime(&time);
+  return PerThreadDBPath(test::TmpDir(env), name, time);
 }
 
 int RandomSeed() {

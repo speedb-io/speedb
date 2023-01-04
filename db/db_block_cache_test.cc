@@ -35,6 +35,12 @@
 
 namespace ROCKSDB_NAMESPACE {
 
+namespace {
+const std::vector<CacheEntryRole> CacheCfStatsRoles{
+    CacheEntryRole::kDataBlock, CacheEntryRole::kFilterBlock,
+    CacheEntryRole::kIndexBlock};
+}
+
 class DBBlockCacheTest : public DBTestBase {
  private:
   size_t miss_count_ = 0;
@@ -168,7 +174,7 @@ class DBBlockCacheTest : public DBTestBase {
   }
 
 #ifndef ROCKSDB_LITE
-  const std::array<size_t, kNumCacheEntryRoles> GetCacheEntryRoleCountsBg() {
+  InternalStats::CacheEntryRoleStats GetCacheEntryRoleStatsBg() {
     // Verify in cache entry role stats
     ColumnFamilyHandleImpl* cfh =
         static_cast<ColumnFamilyHandleImpl*>(dbfull()->DefaultColumnFamily());
@@ -176,9 +182,88 @@ class DBBlockCacheTest : public DBTestBase {
     InternalStats::CacheEntryRoleStats stats;
     internal_stats_ptr->TEST_GetCacheEntryRoleStats(&stats,
                                                     /*foreground=*/false);
-    return stats.entry_counts;
+    return stats;
+  }
+
+  const std::array<size_t, kNumCacheEntryRoles> GetCacheEntryRoleCountsBg() {
+    return GetCacheEntryRoleStatsBg().entry_counts;
   }
 #endif  // ROCKSDB_LITE
+
+  void ValidateCacheCfMapProperty(
+      const std::vector<ColumnFamilyHandle*>& cf_handles,
+      const InternalStats::CacheEntryRoleStats& actual_stats) {
+    // Get the general block cache entry stats using the default cf as
+    // we are using only the total used bytes which is the total for all
+    // cf-s in this DB
+    std::map<std::string, std::string> entry_values;
+    ASSERT_TRUE(db_->GetMapProperty(dbfull()->DefaultColumnFamily(),
+                                    DB::Properties::kBlockCacheEntryStats,
+                                    &entry_values));
+    for (auto role : CacheCfStatsRoles) {
+      uint64_t total_role_charges_all_cfs_cf_stats = 0U;
+
+      for (const auto cf_handle : cf_handles) {
+        ColumnFamilyHandleImpl* cfh =
+            static_cast<ColumnFamilyHandleImpl*>(cf_handle);
+
+        std::map<std::string, std::string> cf_values;
+        ASSERT_TRUE(db_->GetMapProperty(cfh, DB::Properties::kBlockCacheCfStats,
+                                        &cf_values));
+
+        ASSERT_EQ(cfh->GetName(),
+                  cf_values[BlockCacheCfStatsMapKeys::CfName()]);
+        ASSERT_EQ(actual_stats.cache_id,
+                  cf_values[BlockCacheCfStatsMapKeys::CacheId()]);
+
+        total_role_charges_all_cfs_cf_stats +=
+            std::stoll(cf_values[BlockCacheCfStatsMapKeys::UsedBytes(role)]);
+      }
+
+      auto total_role_charges_global_stats =
+          std::stoll(entry_values[BlockCacheCfStatsMapKeys::UsedBytes(role)]);
+      ASSERT_EQ(total_role_charges_global_stats,
+                total_role_charges_all_cfs_cf_stats)
+          << "Role: " << GetCacheEntryRoleName(role);
+    }
+  }
+
+#define CALL_WRAPPER(func) \
+  func;                    \
+  ASSERT_FALSE(HasFailure());
+
+  void ValidateCacheStats(
+      const std::shared_ptr<Cache>& cache,
+      const std::array<size_t, kNumCacheEntryRoles>& expected_counts) {
+    auto actual_stats = GetCacheEntryRoleStatsBg();
+
+    auto actual_counts = actual_stats.entry_counts;
+    EXPECT_EQ(expected_counts, actual_counts);
+
+    std::vector<ColumnFamilyHandle*> cf_handles(handles_);
+    if (cf_handles.empty()) {
+      cf_handles.push_back(dbfull()->DefaultColumnFamily());
+    };
+
+    if (std::string(cache->Name()) == "LRUCache") {
+      // For LRU block cache, verify that the per-item owner id counts
+      // are maintained correctly.
+      // This feature is currently only supported in the LRU cache
+      for (auto role : CacheCfStatsRoles) {
+        auto role_idx = static_cast<uint>(role);
+        size_t total_role_charges_all_cfs = 0U;
+        for (const auto cfh : cf_handles) {
+          auto cfh_impl = static_cast<ColumnFamilyHandleImpl*>(cfh);
+          auto cache_owner_id = cfh_impl->cfd()->GetCacheOwnerId();
+          total_role_charges_all_cfs +=
+              actual_stats.charge_per_item_owner[cache_owner_id][role_idx];
+        }
+        ASSERT_EQ(actual_stats.total_charges[role_idx],
+                  total_role_charges_all_cfs);
+      }
+      ValidateCacheCfMapProperty(cf_handles, actual_stats);
+    }
+  }
 };
 
 TEST_F(DBBlockCacheTest, IteratorBlockCacheUsage) {
@@ -406,7 +491,8 @@ class ReadOnlyCacheWrapper : public CacheWrapper {
   using Cache::Insert;
   Status Insert(const Slice& /*key*/, void* /*value*/, size_t /*charge*/,
                 void (*)(const Slice& key, void* value) /*deleter*/,
-                Handle** /*handle*/, Priority /*priority*/) override {
+                Handle** /*handle*/, Priority /*priority*/,
+                Cache::ItemOwnerId /* item_owner_id */) override {
     return Status::NotSupported();
   }
 };
@@ -827,14 +913,16 @@ class MockCache : public LRUCache {
 
   Status Insert(const Slice& key, void* value,
                 const Cache::CacheItemHelper* helper_cb, size_t charge,
-                Handle** handle, Priority priority) override {
+                Handle** handle, Priority priority,
+                Cache::ItemOwnerId item_owner_id) override {
     DeleterFn delete_cb = helper_cb->del_cb;
     if (priority == Priority::LOW) {
       low_pri_insert_count++;
     } else {
       high_pri_insert_count++;
     }
-    return LRUCache::Insert(key, value, charge, delete_cb, handle, priority);
+    return LRUCache::Insert(key, value, charge, delete_cb, handle, priority,
+                            item_owner_id);
   }
 };
 
@@ -1275,17 +1363,22 @@ TEST_F(DBBlockCacheTest, CacheCompressionDict) {
   }
 }
 
-static void ClearCache(Cache* cache) {
+static void ClearCache(Cache* cache, Cache::ItemOwnerId owner_id_to_clear =
+                                         Cache::kUnknownItemId) {
   auto roles = CopyCacheDeleterRoleMap();
   std::deque<std::string> keys;
   Cache::ApplyToAllEntriesOptions opts;
   auto callback = [&](const Slice& key, void* /*value*/, size_t /*charge*/,
-                      Cache::DeleterFn deleter) {
+                      Cache::DeleterFn deleter,
+                      Cache::ItemOwnerId item_owner_id) {
     if (roles.find(deleter) == roles.end()) {
       // Keep the stats collector
       return;
     }
-    keys.push_back(key.ToString());
+    if ((owner_id_to_clear == Cache::kUnknownItemId) ||
+        (item_owner_id == owner_id_to_clear)) {
+      keys.push_back(key.ToString());
+    }
   };
   cache->ApplyToAllEntries(callback, opts);
   for (auto& k : keys) {
@@ -1353,8 +1446,7 @@ TEST_F(DBBlockCacheTest, CacheEntryRoleStats) {
       std::array<size_t, kNumCacheEntryRoles> expected{};
       // For CacheEntryStatsCollector
       expected[static_cast<size_t>(CacheEntryRole::kMisc)] = 1;
-      EXPECT_EQ(expected, GetCacheEntryRoleCountsBg());
-
+      CALL_WRAPPER(ValidateCacheStats(cache, expected));
       std::array<size_t, kNumCacheEntryRoles> prev_expected = expected;
 
       // First access only filters
@@ -1364,13 +1456,13 @@ TEST_F(DBBlockCacheTest, CacheEntryRoleStats) {
         expected[static_cast<size_t>(CacheEntryRole::kFilterMetaBlock)] += 2;
       }
       // Within some time window, we will get cached entry stats
-      EXPECT_EQ(prev_expected, GetCacheEntryRoleCountsBg());
+      CALL_WRAPPER(ValidateCacheStats(cache, prev_expected));
       // Not enough to force a miss
       env_->MockSleepForSeconds(45);
-      EXPECT_EQ(prev_expected, GetCacheEntryRoleCountsBg());
+      CALL_WRAPPER(ValidateCacheStats(cache, prev_expected));
       // Enough to force a miss
       env_->MockSleepForSeconds(601);
-      EXPECT_EQ(expected, GetCacheEntryRoleCountsBg());
+      CALL_WRAPPER(ValidateCacheStats(cache, expected));
 
       // Now access index and data block
       ASSERT_EQ("value", Get("foo"));
@@ -1392,7 +1484,7 @@ TEST_F(DBBlockCacheTest, CacheEntryRoleStats) {
             env_->MockSleepForSeconds(20);
           });
       SyncPoint::GetInstance()->EnableProcessing();
-      EXPECT_EQ(expected, GetCacheEntryRoleCountsBg());
+      CALL_WRAPPER(ValidateCacheStats(cache, expected));
       prev_expected = expected;
       SyncPoint::GetInstance()->DisableProcessing();
       SyncPoint::GetInstance()->ClearAllCallBacks();
@@ -1408,10 +1500,10 @@ TEST_F(DBBlockCacheTest, CacheEntryRoleStats) {
       // Because of the simulated long scan, this is not enough to force
       // a miss
       env_->MockSleepForSeconds(601);
-      EXPECT_EQ(prev_expected, GetCacheEntryRoleCountsBg());
+      CALL_WRAPPER(ValidateCacheStats(cache, prev_expected));
       // But this is enough
       env_->MockSleepForSeconds(10000);
-      EXPECT_EQ(expected, GetCacheEntryRoleCountsBg());
+      CALL_WRAPPER(ValidateCacheStats(cache, expected));
       prev_expected = expected;
 
       // Also check the GetProperty interface
@@ -1472,11 +1564,11 @@ TEST_F(DBBlockCacheTest, CacheEntryRoleStats) {
       // For Fill-it-up
       expected[static_cast<size_t>(CacheEntryRole::kMisc)]++;
       // Still able to hit on saved stats
-      EXPECT_EQ(prev_expected, GetCacheEntryRoleCountsBg());
+      CALL_WRAPPER(ValidateCacheStats(cache, prev_expected));
+
       // Enough to force a miss
       env_->MockSleepForSeconds(1000);
-      EXPECT_EQ(expected, GetCacheEntryRoleCountsBg());
-
+      CALL_WRAPPER(ValidateCacheStats(cache, expected));
       cache->Release(h);
 
       // Now we test that the DB mutex is not held during scans, for the ways
@@ -1525,7 +1617,210 @@ TEST_F(DBBlockCacheTest, CacheEntryRoleStats) {
   }
 }
 
+TEST_F(DBBlockCacheTest, CacheStatsPerCfMultipleCfs) {
+  const size_t capacity = size_t{1} << 25;
+  auto cache{NewLRUCache(capacity)};
+
+  Options options = CurrentOptions();
+  SetTimeElapseOnlySleepOnReopen(&options);
+  options.create_if_missing = true;
+  options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
+  options.max_open_files = 13;
+  options.table_cache_numshardbits = 0;
+  // If this wakes up, it could interfere with test
+  options.stats_dump_period_sec = 0;
+
+  BlockBasedTableOptions table_options;
+  table_options.block_cache = cache;
+  table_options.cache_index_and_filter_blocks = true;
+  table_options.filter_policy.reset(NewBloomFilterPolicy(50));
+  table_options.metadata_cache_options.top_level_index_pinning =
+      PinningTier::kNone;
+  table_options.metadata_cache_options.partition_pinning = PinningTier::kNone;
+  table_options.metadata_cache_options.unpartitioned_pinning =
+      PinningTier::kNone;
+  options.table_factory.reset(NewBlockBasedTableFactory(table_options));
+
+  CreateAndReopenWithCF({"CF1"}, options);
+
+  // Create a new table.
+  ASSERT_OK(Put("foo", "value"));
+  ASSERT_OK(Put("bar", "value"));
+  ASSERT_OK(Flush());
+  ASSERT_EQ(1, NumTableFilesAtLevel(0));
+
+  ASSERT_OK(Put(1, "zfoo", "value"));
+  ASSERT_OK(Put(1, "zbar", "value"));
+  ASSERT_OK(Flush(1));
+  ASSERT_EQ(1, NumTableFilesAtLevel(0, 1));
+
+  // Fresh cache
+  ClearCache(cache.get());
+
+  std::array<size_t, kNumCacheEntryRoles> expected{};
+  // For CacheEntryStatsCollector
+  expected[static_cast<size_t>(CacheEntryRole::kMisc)] = 1;
+  CALL_WRAPPER(ValidateCacheStats(cache, expected));
+
+  // First access only filters
+  ASSERT_EQ("NOT_FOUND", Get("different from any key added"));
+  ASSERT_EQ("NOT_FOUND", Get(1, "different from any key added"));
+  expected[static_cast<size_t>(CacheEntryRole::kFilterBlock)] += 2;
+  // Enough to force a miss
+  env_->MockSleepForSeconds(601);
+  CALL_WRAPPER(ValidateCacheStats(cache, expected));
+
+  // Now access index and data block
+  ASSERT_EQ("value", Get("foo"));
+  expected[static_cast<size_t>(CacheEntryRole::kIndexBlock)]++;
+  expected[static_cast<size_t>(CacheEntryRole::kDataBlock)]++;
+  // Enough to force a miss
+  env_->MockSleepForSeconds(601);
+  CALL_WRAPPER(ValidateCacheStats(cache, expected));
+
+  // The same for other CF
+  ASSERT_EQ("value", Get(1, "zfoo"));
+  expected[static_cast<size_t>(CacheEntryRole::kIndexBlock)]++;
+  expected[static_cast<size_t>(CacheEntryRole::kDataBlock)]++;
+  env_->MockSleepForSeconds(601);
+  CALL_WRAPPER(ValidateCacheStats(cache, expected));
+
+  auto cf1_owner_id = static_cast<ColumnFamilyHandleImpl*>(handles_[1])
+                          ->cfd()
+                          ->GetCacheOwnerId();
+
+  ASSERT_OK(dbfull()->DropColumnFamily(handles_[1]));
+  ASSERT_OK(dbfull()->DestroyColumnFamilyHandle(handles_[1]));
+  handles_.erase(handles_.begin() + 1);
+
+  --expected[static_cast<size_t>(CacheEntryRole::kFilterBlock)];
+  --expected[static_cast<size_t>(CacheEntryRole::kIndexBlock)];
+  --expected[static_cast<size_t>(CacheEntryRole::kDataBlock)];
+
+  // The cache may have items of CF1 in its LRU which will
+  // be counted => remove them explicitly
+  ClearCache(cache.get(), cf1_owner_id);
+
+  env_->MockSleepForSeconds(601);
+  CALL_WRAPPER(ValidateCacheStats(cache, expected));
+
+  ClearCache(cache.get());
+  std::fill(expected.begin(), expected.end(), 0);
+  // For CacheEntryStatsCollector
+  expected[static_cast<size_t>(CacheEntryRole::kMisc)] = 1;
+  env_->MockSleepForSeconds(601);
+  CALL_WRAPPER(ValidateCacheStats(cache, expected));
+
+  // Add some more CF-2
+  CreateColumnFamilies({"CF2", "CF3", "CF4"}, options);
+
+  for (auto cf_id = 1U; cf_id < 4U; ++cf_id) {
+    ASSERT_OK(Put(cf_id, std::string("CF") + std::to_string(cf_id) + "-foo",
+                  "value"));
+    ASSERT_OK(Flush(cf_id));
+    ASSERT_EQ(1, NumTableFilesAtLevel(0, 1));
+  }
+
+  // Fresh cache
+  ClearCache(cache.get());
+
+  ASSERT_EQ("NOT_FOUND", Get(1, "different from any key added"));
+  expected[static_cast<size_t>(CacheEntryRole::kFilterBlock)] += 1;
+
+  ASSERT_EQ("value", Get(2, "CF2-foo"));
+  expected[static_cast<size_t>(CacheEntryRole::kFilterBlock)]++;
+  expected[static_cast<size_t>(CacheEntryRole::kIndexBlock)]++;
+  expected[static_cast<size_t>(CacheEntryRole::kDataBlock)]++;
+
+  env_->MockSleepForSeconds(601);
+  CALL_WRAPPER(ValidateCacheStats(cache, expected));
+}
+
 #endif  // ROCKSDB_LITE
+
+TEST_F(DBBlockCacheTest, ItemIdAllocation) {
+  const size_t capacity = size_t{1} << 25;
+  auto cache{NewLRUCache(capacity)};
+
+  size_t max_num_ids = Cache::kMaxOwnerItemId - Cache::kMinOwnerItemId + 1;
+  auto expected_num_free_ids = max_num_ids;
+
+  // Allocate 10 id-s
+  auto expected_next_id = Cache::kMinOwnerItemId;
+  for (auto i = 0U; i < 10U; ++i) {
+    ASSERT_EQ(cache->GetNextItemOwnerId(), expected_next_id);
+    ++expected_next_id;
+    --expected_num_free_ids;
+  }
+  --expected_next_id;
+
+  // Release all 10 allocated id-s in reverse order
+  Cache::ItemOwnerId to_discard_id = expected_next_id;
+  for (auto i = 0U; i < 10U; ++i) {
+    auto temp = to_discard_id;
+    cache->DiscardItemOwnerId(&temp);
+    ASSERT_EQ(temp, Cache::kUnknownItemId);
+
+    ASSERT_GT(to_discard_id, 0U);
+    --to_discard_id;
+    ++expected_num_free_ids;
+  }
+
+  // Allocate 10 id-s and expect to get the id-s from the free list
+  // in the reverse order
+  ASSERT_EQ(expected_next_id, Cache::kMinOwnerItemId + 9U);
+  for (auto i = 0U; i < 10U; ++i) {
+    ASSERT_EQ(cache->GetNextItemOwnerId(), expected_next_id);
+    ASSERT_GT(expected_next_id, 0U);
+    --expected_next_id;
+    --expected_num_free_ids;
+  }
+
+  ASSERT_EQ(expected_num_free_ids, max_num_ids - 10U);
+
+  // Free list should now be empty
+  // Exhaust all of the id-s before wrap around
+  expected_next_id = Cache::kMinOwnerItemId + 10U;
+  while (expected_num_free_ids > 0U) {
+    ASSERT_EQ(cache->GetNextItemOwnerId(), expected_next_id);
+    ++expected_next_id;
+    --expected_num_free_ids;
+  }
+
+  // Expecting next allocations to fail
+  for (auto i = 0U; i < 5U; ++i) {
+    ASSERT_EQ(cache->GetNextItemOwnerId(), Cache::kUnknownItemId);
+  }
+
+  // Free some arbitrary id-s
+  Cache::ItemOwnerId owner_id = 5000U;
+  cache->DiscardItemOwnerId(&owner_id);
+  owner_id = 1000;
+  cache->DiscardItemOwnerId(&owner_id);
+  owner_id = 3000;
+  cache->DiscardItemOwnerId(&owner_id);
+
+  // Expect allocations to return id-s in the same order as freed
+  ASSERT_EQ(cache->GetNextItemOwnerId(), 5000);
+  ASSERT_EQ(cache->GetNextItemOwnerId(), 1000);
+  ASSERT_EQ(cache->GetNextItemOwnerId(), 3000);
+
+  // All id-s exhausted again
+  ASSERT_EQ(cache->GetNextItemOwnerId(), Cache::kUnknownItemId);
+
+  // Verify the max size of the free list
+  for (auto i = 0U; i < 2 * Cache::kMaxFreeItemOwnersIdListSize; ++i) {
+    owner_id = Cache::kMinOwnerItemId + i;
+    cache->DiscardItemOwnerId(&owner_id);
+  }
+
+  for (auto i = 0U; i < Cache::kMaxFreeItemOwnersIdListSize; ++i) {
+    ASSERT_EQ(cache->GetNextItemOwnerId(), Cache::kMinOwnerItemId + i);
+  }
+
+  // All id-s exhausted again
+  ASSERT_EQ(cache->GetNextItemOwnerId(), Cache::kUnknownItemId);
+}
 
 class DBBlockCacheKeyTest
     : public DBTestBase,

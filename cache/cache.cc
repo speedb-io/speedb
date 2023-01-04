@@ -126,4 +126,55 @@ Status Cache::CreateFromString(const ConfigOptions& config_options,
   }
   return status;
 }
+
+// ==================================================================================================================================
+Cache::ItemOwnerId Cache::ItemOwnerIdAllocator::Allocate() {
+  // In practice, onwer-ids are allocated and freed when cf-s
+  // are created and destroyed => relatively rare => paying
+  // the price to always lock the mutex and simplify the code
+  std::lock_guard<std::mutex> lock(free_ids_mutex_);
+
+  // First allocate from the free list if possible
+  if (free_ids_.empty() == false) {
+    auto allocated_id = free_ids_.front();
+    free_ids_.pop_front();
+    return allocated_id;
+  }
+
+  // Nothing on the free list - try to allocate from the
+  // next item counter if not yet exhausted
+  if (has_wrapped_around_) {
+    // counter exhausted, allocation not possible
+    return kUnknownItemId;
+  }
+
+  auto allocated_id = next_item_owner_id_++;
+
+  if (allocated_id == kMaxOwnerItemId) {
+    has_wrapped_around_ = true;
+  }
+
+  return allocated_id;
+}
+
+void Cache::ItemOwnerIdAllocator::Free(ItemOwnerId* id) {
+  if (*id != kUnknownItemId) {
+    std::lock_guard<std::mutex> lock(free_ids_mutex_);
+    // The freed id is lost but this is a luxury feature. We can't
+    // pay too much space to support it.
+    if (free_ids_.size() < kMaxFreeItemOwnersIdListSize) {
+      free_ids_.push_back(*id);
+    }
+    *id = kUnknownItemId;
+  }
+}
+
+Cache::ItemOwnerId Cache::GetNextItemOwnerId() {
+  return owner_id_allocator_.Allocate();
+}
+
+void Cache::DiscardItemOwnerId(ItemOwnerId* item_owner_id) {
+  owner_id_allocator_.Free(item_owner_id);
+}
+
 }  // namespace ROCKSDB_NAMESPACE

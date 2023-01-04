@@ -417,10 +417,11 @@ Status BlockBasedTable::InsertEntryToCache(
   Status s = Status::OK();
   if (cache_tier == CacheTier::kNonVolatileBlockTier) {
     s = block_cache->Insert(key, block_holder.get(), cache_helper, charge,
-                            cache_handle, priority);
+                            cache_handle, priority, rep_->cache_owner_id);
   } else {
     s = block_cache->Insert(key, block_holder.get(), charge,
-                            cache_helper->del_cb, cache_handle, priority);
+                            cache_helper->del_cb, cache_handle, priority,
+                            rep_->cache_owner_id);
   }
   return s;
 }
@@ -589,7 +590,8 @@ Status BlockBasedTable::Open(
     TailPrefetchStats* tail_prefetch_stats,
     BlockCacheTracer* const block_cache_tracer,
     size_t max_file_size_for_l0_meta_pin, const std::string& cur_db_session_id,
-    uint64_t cur_file_num, UniqueId64x2 expected_unique_id) {
+    uint64_t cur_file_num, UniqueId64x2 expected_unique_id,
+    Cache::ItemOwnerId cache_owner_id) {
   table_reader->reset();
 
   Status s;
@@ -649,9 +651,9 @@ Status BlockBasedTable::Open(
   }
 
   BlockCacheLookupContext lookup_context{TableReaderCaller::kPrefetch};
-  Rep* rep = new BlockBasedTable::Rep(ioptions, env_options, table_options,
-                                      internal_comparator, skip_filters,
-                                      file_size, level, immortal_table);
+  Rep* rep = new BlockBasedTable::Rep(
+      ioptions, env_options, table_options, internal_comparator, skip_filters,
+      file_size, level, immortal_table, cache_owner_id);
   rep->file = std::move(file);
   rep->footer = footer;
 

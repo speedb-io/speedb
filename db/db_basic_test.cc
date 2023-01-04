@@ -3476,12 +3476,14 @@ class DBBasicTestMultiGet : public DBTestBase {
     const char* Name() const override { return "MyBlockCache"; }
 
     using Cache::Insert;
-    Status Insert(const Slice& key, void* value, size_t charge,
-                  void (*deleter)(const Slice& key, void* value),
-                  Handle** handle = nullptr,
-                  Priority priority = Priority::LOW) override {
+    Status Insert(
+        const Slice& key, void* value, size_t charge,
+        void (*deleter)(const Slice& key, void* value),
+        Handle** handle = nullptr, Priority priority = Priority::LOW,
+        Cache::ItemOwnerId item_owner_id = Cache::kUnknownItemId) override {
       num_inserts_++;
-      return target_->Insert(key, value, charge, deleter, handle, priority);
+      return target_->Insert(key, value, charge, deleter, handle, priority,
+                             item_owner_id);
     }
 
     using Cache::Lookup;

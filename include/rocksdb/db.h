@@ -914,6 +914,10 @@ class DB {
     //      available in the map form.
     static const std::string kBlockCacheEntryStats;
 
+    //  "rocksdb.block-cache-cf-stats" - returns a multi-line string
+    //      with statistics on block cache usage for a specific column-family.
+    static const std::string kBlockCacheCfStats;
+
     //  "rocksdb.num-immutable-mem-table" - returns number of immutable
     //      memtables that have not yet been flushed.
     static const std::string kNumImmutableMemTable;

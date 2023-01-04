@@ -57,21 +57,25 @@ void ShardedCache::SetStrictCapacityLimit(bool strict_capacity_limit) {
 
 Status ShardedCache::Insert(const Slice& key, void* value, size_t charge,
                             DeleterFn deleter, Handle** handle,
-                            Priority priority) {
+                            Priority priority,
+                            Cache::ItemOwnerId item_owner_id) {
   uint32_t hash = HashSlice(key);
   return GetShard(Shard(hash))
-      ->Insert(key, hash, value, charge, deleter, handle, priority);
+      ->Insert(key, hash, value, charge, deleter, handle, priority,
+               item_owner_id);
 }
 
 Status ShardedCache::Insert(const Slice& key, void* value,
                             const CacheItemHelper* helper, size_t charge,
-                            Handle** handle, Priority priority) {
+                            Handle** handle, Priority priority,
+                            Cache::ItemOwnerId item_owner_id) {
   uint32_t hash = HashSlice(key);
   if (!helper) {
     return Status::InvalidArgument();
   }
   return GetShard(Shard(hash))
-      ->Insert(key, hash, value, helper, charge, handle, priority);
+      ->Insert(key, hash, value, helper, charge, handle, priority,
+               item_owner_id);
 }
 
 Cache::Handle* ShardedCache::Lookup(const Slice& key, Statistics* /*stats*/) {
@@ -160,7 +164,8 @@ size_t ShardedCache::GetPinnedUsage() const {
 
 void ShardedCache::ApplyToAllEntries(
     const std::function<void(const Slice& key, void* value, size_t charge,
-                             DeleterFn deleter)>& callback,
+                             DeleterFn deleter,
+                             Cache::ItemOwnerId item_owner_id)>& callback,
     const ApplyToAllEntriesOptions& opts) {
   uint32_t num_shards = GetNumShards();
   // Iterate over part of each shard, rotating between shards, to

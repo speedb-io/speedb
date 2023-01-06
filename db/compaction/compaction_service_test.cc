@@ -772,7 +772,7 @@ TEST_F(CompactionServiceTest, FallbackLocalManual) {
   VerifyTestData();
 }
 
-TEST_F(CompactionServiceTest, DISABLED_RemoteEventListener) {
+TEST_F(CompactionServiceTest, RemoteEventListener) {
   class RemoteEventListenerTest : public EventListener {
    public:
     const char* Name() const override { return "RemoteEventListenerTest"; }
@@ -817,7 +817,13 @@ TEST_F(CompactionServiceTest, DISABLED_RemoteEventListener) {
   remote_listeners.emplace_back(listener);
 
   Options options = CurrentOptions();
+  options.max_background_compactions = 1;
   ReopenWithCompactionService(&options);
+  // multiple compactions might notify on OnSubcompactionBegin simultaneously
+  // which will lead to duplicates in the set. job_id is always 1. was the
+  // intention that no two compaction service jobs run in parallel? or that the
+  // job_id should be unique?
+  env_->SetBackgroundThreads(1, Env::LOW);
 
   for (int i = 0; i < 20; i++) {
     for (int j = 0; j < 10; j++) {

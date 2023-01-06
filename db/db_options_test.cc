@@ -1380,6 +1380,17 @@ TEST_F(DBOptionsTest, RefreshOptionsBadFile) {
                        "[CFOptions \"unknown\"]\n",
                        false));
   ASSERT_NOK(WaitForOptionsUpdate(fs, options.refresh_options_file));
+
+  // Test what happens if the refresh_options_file is a directory, not a file
+  bool exists = false;
+  SyncPoint::GetInstance()->SetCallBack("DBImpl::RefreshOptions::FileExists",
+                                        [&](void* /*arg*/) { exists = true; });
+
+  ASSERT_OK(fs->CreateDir(options.refresh_options_file, IOOptions(), nullptr));
+  TEST_SYNC_POINT("DBOptionsTest::WaitForUpdates");
+  ASSERT_TRUE(exists);
+  ASSERT_OK(fs->FileExists(options.refresh_options_file, IOOptions(), nullptr));
+  ASSERT_OK(fs->DeleteDir(options.refresh_options_file, IOOptions(), nullptr));
 }
 
 TEST_F(DBOptionsTest, RefreshOptionsUnknown) {

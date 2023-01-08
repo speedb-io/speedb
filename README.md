@@ -22,7 +22,7 @@ You are welcome to join our community, contribute, and participate in the develo
 We welcome any questions or comments you may have. 
 Please use issues to submit them, and pull requests to make contributions.
 
-This project is maintained by Speedb and is forked from Rocksdb, developed by Facebook.
+This project is maintained by Speedb and is based on Rocksdb, developed by Facebook.
 
 **Join us to build the next generation data engine!**
 

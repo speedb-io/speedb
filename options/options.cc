@@ -19,6 +19,7 @@
 #include "rocksdb/cache.h"
 #include "rocksdb/compaction_filter.h"
 #include "rocksdb/comparator.h"
+#include "rocksdb/convenience.h"
 #include "rocksdb/env.h"
 #include "rocksdb/filter_policy.h"
 #include "rocksdb/memtablerep.h"
@@ -36,7 +37,16 @@
 namespace ROCKSDB_NAMESPACE {
 
 AdvancedColumnFamilyOptions::AdvancedColumnFamilyOptions() {
-  assert(memtable_factory.get() != nullptr);
+  ConfigOptions opts;
+  opts.invoke_prepare_options = true;
+  opts.ignore_unsupported_options = false;
+  
+  Status s = MemTableRepFactory::CreateFromString(opts,
+						  "speedb.HashSpdRepFactory",
+						  &memtable_factory);
+  if (!s.ok()) {
+    memtable_factory = std::make_shared<SkipListFactory>();
+  }
 }
 
 AdvancedColumnFamilyOptions::AdvancedColumnFamilyOptions(const Options& options)

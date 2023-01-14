@@ -12,6 +12,7 @@
 #include "db/dbformat.h"
 #include "port/port.h"
 #include "rocksdb/convenience.h"
+#include "rocksdb/memtablerep.h"
 #include "rocksdb/utilities/customizable_util.h"
 #include "rocksdb/utilities/object_registry.h"
 #include "rocksdb/utilities/options_type.h"

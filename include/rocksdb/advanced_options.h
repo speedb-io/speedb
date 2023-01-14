@@ -12,11 +12,11 @@
 
 #include "rocksdb/cache.h"
 #include "rocksdb/compression_type.h"
-#include "rocksdb/memtablerep.h"
 #include "rocksdb/universal_compaction.h"
 
 namespace ROCKSDB_NAMESPACE {
 
+class MemTableRepFactory;
 class Slice;
 class SliceTransform;
 class TablePropertiesCollectorFactory;
@@ -726,8 +726,7 @@ struct AdvancedColumnFamilyOptions {
   // This is a factory that provides MemTableRep objects.
   // Default: a factory that provides a skip-list-based implementation of
   // MemTableRep.
-  std::shared_ptr<MemTableRepFactory> memtable_factory =
-      std::shared_ptr<SkipListFactory>(new SkipListFactory);
+  std::shared_ptr<MemTableRepFactory> memtable_factory;
 
   // Block-based table related options are moved to BlockBasedTableOptions.
   // Related options that were originally here but now moved include:

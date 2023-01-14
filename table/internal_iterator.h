@@ -17,6 +17,7 @@
 
 namespace ROCKSDB_NAMESPACE {
 
+class Arena;
 class PinnedIteratorsManager;
 
 enum class IterBoundCheck : char {

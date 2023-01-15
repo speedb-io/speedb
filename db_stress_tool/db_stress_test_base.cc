@@ -3224,6 +3224,7 @@ void InitializeOptionsFromFlags(
   options.refresh_options_file = FLAGS_refresh_options_file;
 
   options.use_dynamic_delay = FLAGS_use_dynamic_delay;
+  options.use_clean_delete_during_flush = FLAGS_use_clean_delete_during_flush;
 
   // Integrated BlobDB
   options.enable_blob_files = FLAGS_enable_blob_files;

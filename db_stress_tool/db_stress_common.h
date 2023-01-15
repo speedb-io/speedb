@@ -263,6 +263,7 @@ DECLARE_int32(continuous_verification_interval);
 DECLARE_int32(get_property_one_in);
 DECLARE_string(file_checksum_impl);
 DECLARE_bool(use_dynamic_delay);
+DECLARE_bool(use_clean_delete_during_flush);
 
 // Options for StackableDB-based BlobDB
 DECLARE_bool(use_blob_db);

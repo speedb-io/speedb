@@ -1114,6 +1114,10 @@ DEFINE_uint64(stats_dump_period_sec,
 DEFINE_bool(use_dynamic_delay, ROCKSDB_NAMESPACE::Options().use_dynamic_delay,
             "Use dynamic delay");
 
+DEFINE_bool(use_clean_delete_during_flush,
+            ROCKSDB_NAMESPACE::Options().use_clean_delete_during_flush,
+            "Use clean delete during flush");
+
 DEFINE_bool(use_io_uring, false, "Enable the use of IO uring on Posix");
 extern "C" bool RocksDbIOUringEnable() { return FLAGS_use_io_uring; }
 

@@ -1181,6 +1181,10 @@ struct DBOptions {
   // Not supported in ROCKSDB_LITE mode!
   std::shared_ptr<Cache> row_cache = nullptr;
 
+  // If true during flush we skip any entry that has a followed single delete entry also in 
+  // the not flushed mutable and immutable memtables  (#411)
+  bool use_clean_single_delete_during_flush = false;
+
 #ifndef ROCKSDB_LITE
   // A filter object supplied to be invoked while processing write-ahead-logs
   // (WALs) during recovery. The filter provides a way to inspect log

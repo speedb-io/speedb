@@ -33,6 +33,46 @@ std::unique_ptr<WriteControllerToken> WriteController::GetDelayToken(
   return std::unique_ptr<WriteControllerToken>(new DelayWriteToken(this));
 }
 
+void WriteController::InsertOrAssignToCfIdAndRateMap(uint32_t cf_id,
+                                                     uint64_t write_rate) {
+  cf_id_to_write_rate_.insert_or_assign(cf_id,
+                                        RateAndWasMin{write_rate, false});
+}
+
+uint64_t WriteController::GetMinRate() {
+  assert(!cf_id_to_write_rate_.empty());
+  uint64_t min_rate = std::numeric_limits<uint64_t>::max();
+  uint32_t min_id = 0;
+  for (auto& key_val : cf_id_to_write_rate_) {
+    key_val.second.is_min = false;
+    if (key_val.second.write_rate < min_rate) {
+      min_rate = key_val.second.write_rate;
+      min_id = key_val.first;
+    }
+  }
+  cf_id_to_write_rate_[min_id].is_min = true;
+  assert(min_rate < std::numeric_limits<uint64_t>::max());
+  return min_rate;
+}
+
+bool WriteController::RemoveCfIdFromRateMap(uint32_t cf_id) {
+  assert(cf_id_to_write_rate_.count(cf_id));
+  bool was_min = cf_id_to_write_rate_[cf_id].is_min;
+  cf_id_to_write_rate_.erase(cf_id);
+  return was_min;
+}
+
+void WriteController::SetMinRate() { set_delayed_write_rate(GetMinRate()); }
+
+void WriteController::MaybeRemoveSelfAndRefreshDelayRate(uint32_t cf_id) {
+  if (cf_id_to_write_rate_.count(cf_id)) {
+    bool was_min = RemoveCfIdFromRateMap(cf_id);
+    if (was_min && !cf_id_to_write_rate_.empty()) {
+      SetMinRate();
+    }
+  }
+}
+
 std::unique_ptr<WriteControllerToken>
 WriteController::GetCompactionPressureToken() {
   ++total_compaction_pressure_;

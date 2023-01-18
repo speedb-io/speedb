@@ -620,6 +620,14 @@ class ColumnFamilyTestWithDynamic
     ASSERT_TRUE(dbfull()->TEST_write_controler().NeedsDelay() ==
                 expected_needs_delay);
   }
+
+  double PickMaxInDynamic(double original_divider, double previous_divider) {
+    double rate_divider_to_use = original_divider;
+    if (db_options_.use_dynamic_delay) {
+      rate_divider_to_use = std::max(original_divider, previous_divider);
+    }
+    return rate_divider_to_use;
+  }
 };
 
 INSTANTIATE_TEST_CASE_P(
@@ -3081,55 +3089,65 @@ TEST_P(ColumnFamilyTestWithDynamic, WriteStallTwoColumnFamilies) {
   bool Delayed = true;
   bool NotDelayed = false;
   double rate_divider;
+  double rate_divider1;
+  double rate_divider_to_use;
 
   rate_divider = CALL_WRAPPER(
       SetDelayAndCalculateRate(cfd, 50 Gb, 0 /* times_delayed*/,
                                mutable_cf_options, NotStopped, NotDelayed));
 
-  rate_divider = CALL_WRAPPER(
+  rate_divider1 = CALL_WRAPPER(
       SetDelayAndCalculateRate(cfd1, 201 Gb, 0 /* times_delayed*/,
                                mutable_cf_options1, NotStopped, NotDelayed));
 
-  rate_divider = CALL_WRAPPER(
+  rate_divider1 = CALL_WRAPPER(
       SetDelayAndCalculateRate(cfd1, 600 Gb, 0 /* times_delayed*/,
                                mutable_cf_options1, NotStopped, Delayed));
-  ASSERT_EQ(static_cast<uint64_t>(kBaseRate / rate_divider),
+  rate_divider_to_use = PickMaxInDynamic(rate_divider1, rate_divider);
+
+  ASSERT_EQ(static_cast<uint64_t>(kBaseRate / rate_divider_to_use),
             GetDbDelayedWriteRate());
 
   rate_divider = CALL_WRAPPER(
       SetDelayAndCalculateRate(cfd, 70 Gb, 0 /* times_delayed*/,
                                mutable_cf_options, NotStopped, Delayed));
-  ASSERT_EQ(static_cast<uint64_t>(kBaseRate / rate_divider),
+  rate_divider_to_use = PickMaxInDynamic(rate_divider, rate_divider1);
+  ASSERT_EQ(static_cast<uint64_t>(kBaseRate / rate_divider_to_use),
             GetDbDelayedWriteRate());
 
-  rate_divider = CALL_WRAPPER(
+  rate_divider1 = CALL_WRAPPER(
       SetDelayAndCalculateRate(cfd1, 800 Gb, 1 /* times_delayed*/,
                                mutable_cf_options1, NotStopped, Delayed));
-  ASSERT_EQ(static_cast<uint64_t>(kBaseRate / rate_divider),
+  rate_divider_to_use = PickMaxInDynamic(rate_divider1, rate_divider);
+  ASSERT_EQ(static_cast<uint64_t>(kBaseRate / rate_divider_to_use),
             GetDbDelayedWriteRate());
 
   rate_divider = CALL_WRAPPER(
       SetDelayAndCalculateRate(cfd, 300 Gb, 2 /* times_delayed*/,
                                mutable_cf_options, NotStopped, Delayed));
-  ASSERT_EQ(static_cast<uint64_t>(kBaseRate / rate_divider),
+  rate_divider_to_use = PickMaxInDynamic(rate_divider, rate_divider1);
+  ASSERT_EQ(static_cast<uint64_t>(kBaseRate / rate_divider_to_use),
             GetDbDelayedWriteRate());
 
-  rate_divider = CALL_WRAPPER(
+  rate_divider1 = CALL_WRAPPER(
       SetDelayAndCalculateRate(cfd1, 700 Gb, 1 /* times_delayed*/,
                                mutable_cf_options1, NotStopped, Delayed));
-  ASSERT_EQ(static_cast<uint64_t>(kBaseRate / rate_divider),
+  rate_divider_to_use = PickMaxInDynamic(rate_divider1, rate_divider);
+  ASSERT_EQ(static_cast<uint64_t>(kBaseRate / rate_divider_to_use),
             GetDbDelayedWriteRate());
 
   rate_divider = CALL_WRAPPER(
       SetDelayAndCalculateRate(cfd, 500 Gb, 2 /* times_delayed*/,
                                mutable_cf_options, NotStopped, Delayed));
-  ASSERT_EQ(static_cast<uint64_t>(kBaseRate / rate_divider),
+  rate_divider_to_use = PickMaxInDynamic(rate_divider, rate_divider1);
+  ASSERT_EQ(static_cast<uint64_t>(kBaseRate / rate_divider_to_use),
             GetDbDelayedWriteRate());
 
-  rate_divider = CALL_WRAPPER(
+  rate_divider1 = CALL_WRAPPER(
       SetDelayAndCalculateRate(cfd1, 600 Gb, 1 /* times_delayed*/,
                                mutable_cf_options1, NotStopped, Delayed));
-  ASSERT_EQ(static_cast<uint64_t>(kBaseRate / rate_divider),
+  rate_divider_to_use = PickMaxInDynamic(rate_divider1, rate_divider);
+  ASSERT_EQ(static_cast<uint64_t>(kBaseRate / rate_divider_to_use),
             GetDbDelayedWriteRate());
 }
 

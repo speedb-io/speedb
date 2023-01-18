@@ -50,6 +50,32 @@ class WriteController {
   // threads will be increased
   std::unique_ptr<WriteControllerToken> GetCompactionPressureToken();
 
+  struct RateAndWasMin {
+    uint64_t write_rate;
+    bool is_min;
+  };
+
+  void InsertOrAssignToCfIdAndRateMap(uint32_t cf_id, uint64_t write_rate);
+
+  // sets all enties to: is_min = false
+  // set is_min = true for the min rate entry;
+  // returns the min rate from cf_id_to_write_rate_ .
+  // Requires: cf_id_to_write_rate_ is not empty
+  uint64_t GetMinRate();
+
+  // try and remove the cf id from WriteController::cf_id_to_write_rate_.
+  // if successful and it was the min rate, set the current minimum value.
+  void MaybeRemoveSelfAndRefreshDelayRate(uint32_t cf_id);
+
+ private:
+  // returns true if the cf was the min delay rate
+  // Requires: cf_id is in the map
+  bool RemoveCfIdFromRateMap(uint32_t cf_id);
+
+  // when a previous is_min has been removed, we need to set a new min
+  void SetMinRate();
+
+ public:
   // these three metods are querying the state of the WriteController
   bool IsStopped() const;
   bool NeedsDelay() const { return total_delayed_.load() > 0; }
@@ -110,6 +136,8 @@ class WriteController {
   uint64_t delayed_write_rate_;
   // Whether Speedb's dynamic delay is used
   bool dynamic_delay_;
+
+  std::unordered_map<uint32_t, RateAndWasMin> cf_id_to_write_rate_;
 
   std::unique_ptr<RateLimiter> low_pri_rate_limiter_;
 };

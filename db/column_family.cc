@@ -749,6 +749,10 @@ void ColumnFamilyData::SetDropped() {
   // can't drop default CF
   assert(id_ != 0);
   dropped_ = true;
+  if (column_family_set_->write_controller_->is_dynamic_delay()) {
+    column_family_set_->write_controller_->MaybeRemoveSelfAndRefreshDelayRate(
+        GetID());
+  }
   write_controller_token_.reset();
 
   // remove from column_family_set
@@ -911,7 +915,10 @@ std::unique_ptr<WriteControllerToken> ColumnFamilyData::DynamicSetupDelay(
     write_rate = kMinWriteRate;
   }
 
-  return write_controller->GetDelayToken(write_rate);
+  write_controller->InsertOrAssignToCfIdAndRateMap(GetID(), write_rate);
+  uint64_t min_rate = write_controller->GetMinRate();
+
+  return write_controller->GetDelayToken(min_rate);
 }
 
 std::pair<WriteStallCondition, ColumnFamilyData::WriteStallCause>
@@ -1056,11 +1063,14 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
     // possible that a later condition will require a harder rate limiting.
     // calculate all conditions with DynamicSetupDelay and reavaluate the
     // write_stall_cause. this is only relevant in the kDelayed case.
-    if (dynamic_delay &&
-        write_stall_condition == WriteStallCondition::kDelayed) {
-      write_controller_token_ =
-          DynamicSetupDelay(write_controller, compaction_needed_bytes,
-                            mutable_cf_options, write_stall_cause);
+    if (dynamic_delay) {
+      if (write_stall_condition == WriteStallCondition::kDelayed) {
+        write_controller_token_ =
+            DynamicSetupDelay(write_controller, compaction_needed_bytes,
+                              mutable_cf_options, write_stall_cause);
+      } else {
+        write_controller->MaybeRemoveSelfAndRefreshDelayRate(GetID());
+      }
     }
 
     if (write_stall_condition == WriteStallCondition::kStopped &&
@@ -1196,7 +1206,7 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
       // If the DB recovers from delay conditions, we reward with reducing
       // double the slowdown ratio. This is to balance the long term slowdown
       // increase signal.
-      if (needed_delay) {
+      if (needed_delay && !dynamic_delay) {
         uint64_t write_rate = write_controller->delayed_write_rate();
         write_controller->set_delayed_write_rate(static_cast<uint64_t>(
             static_cast<double>(write_rate) * kDelayRecoverSlowdownRatio));

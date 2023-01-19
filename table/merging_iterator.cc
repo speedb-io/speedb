@@ -117,14 +117,16 @@ class MergingIterator : public InternalIterator {
  public:
   MergingIterator(const InternalKeyComparator* comparator,
                   InternalIterator** children, int n, bool is_arena_mode,
-                  bool prefix_seek_mode)
+                  bool prefix_seek_mode,
+                  const Slice* iterate_upper_bound = nullptr)
       : is_arena_mode_(is_arena_mode),
         prefix_seek_mode_(prefix_seek_mode),
         direction_(kForward),
         comparator_(comparator),
         current_(nullptr),
         minHeap_(comparator_),
-        pinned_iters_mgr_(nullptr) {
+        pinned_iters_mgr_(nullptr),
+        iterate_upper_bound_(iterate_upper_bound) {
     children_.resize(n);
     for (int i = 0; i < n; i++) {
       children_[i].level = i;
@@ -197,27 +199,48 @@ class MergingIterator : public InternalIterator {
   // Add range_tombstone_iters_[level] into min heap.
   // Updates active_ if the end key of a range tombstone is inserted.
   // @param start_key specifies which end point of the range tombstone to add.
-  void InsertRangeTombstoneToMinHeap(size_t level, bool start_key = true) {
+  void InsertRangeTombstoneToMinHeap(size_t level, bool start_key = true,
+                                     bool replace_top = false) {
     assert(!range_tombstone_iters_.empty() &&
            range_tombstone_iters_[level]->Valid());
     if (start_key) {
-      pinned_heap_item_[level].SetTombstoneKey(
-          range_tombstone_iters_[level]->start_key());
+      ParsedInternalKey pik = range_tombstone_iters_[level]->start_key();
+      // iterate_upper_bound does not have timestamp
+      if (iterate_upper_bound_ &&
+          comparator_->user_comparator()->CompareWithoutTimestamp(
+              pik.user_key, true /* a_has_ts */, *iterate_upper_bound_,
+              false /* b_has_ts */) >= 0) {
+        if (replace_top) {
+          // replace_top implies this range tombstone iterator is still in
+          // minHeap_ and at the top.
+          minHeap_.pop();
+        }
+        return;
+      }
+      pinned_heap_item_[level].SetTombstoneKey(std::move(pik));
       pinned_heap_item_[level].type = HeapItem::DELETE_RANGE_START;
       assert(active_.count(level) == 0);
     } else {
+      // allow end key to go over upper bound (if present) since start key is
+      // before upper bound and the range tombstone could still cover a
+      // range before upper bound.
       pinned_heap_item_[level].SetTombstoneKey(
           range_tombstone_iters_[level]->end_key());
       pinned_heap_item_[level].type = HeapItem::DELETE_RANGE_END;
       active_.insert(level);
     }
-    minHeap_.push(&pinned_heap_item_[level]);
+    if (replace_top) {
+      minHeap_.replace_top(&pinned_heap_item_[level]);
+    } else {
+      minHeap_.push(&pinned_heap_item_[level]);
+    }
   }
 
   // Add range_tombstone_iters_[level] into max heap.
   // Updates active_ if the start key of a range tombstone is inserted.
   // @param end_key specifies which end point of the range tombstone to add.
-  void InsertRangeTombstoneToMaxHeap(size_t level, bool end_key = true) {
+  void InsertRangeTombstoneToMaxHeap(size_t level, bool end_key = true,
+                                     bool replace_top = false) {
     assert(!range_tombstone_iters_.empty() &&
            range_tombstone_iters_[level]->Valid());
     if (end_key) {
@@ -231,7 +254,11 @@ class MergingIterator : public InternalIterator {
       pinned_heap_item_[level].type = HeapItem::DELETE_RANGE_START;
       active_.insert(level);
     }
-    maxHeap_->push(&pinned_heap_item_[level]);
+    if (replace_top) {
+      maxHeap_->replace_top(&pinned_heap_item_[level]);
+    } else {
+      maxHeap_->push(&pinned_heap_item_[level]);
+    }
   }
 
   // Remove HeapItems from top of minHeap_ that are of type DELETE_RANGE_START
@@ -241,10 +268,10 @@ class MergingIterator : public InternalIterator {
   void PopDeleteRangeStart() {
     while (!minHeap_.empty() &&
            minHeap_.top()->type == HeapItem::DELETE_RANGE_START) {
-      auto level = minHeap_.top()->level;
-      minHeap_.pop();
+      TEST_SYNC_POINT_CALLBACK("MergeIterator::PopDeleteRangeStart", nullptr);
       // insert end key of this range tombstone and updates active_
-      InsertRangeTombstoneToMinHeap(level, false /* start_key */);
+      InsertRangeTombstoneToMinHeap(
+          minHeap_.top()->level, false /* start_key */, true /* replace_top */);
     }
   }
 
@@ -255,10 +282,9 @@ class MergingIterator : public InternalIterator {
   void PopDeleteRangeEnd() {
     while (!maxHeap_->empty() &&
            maxHeap_->top()->type == HeapItem::DELETE_RANGE_END) {
-      auto level = maxHeap_->top()->level;
-      maxHeap_->pop();
       // insert start key of this range tombstone and updates active_
-      InsertRangeTombstoneToMaxHeap(level, false /* end_key */);
+      InsertRangeTombstoneToMaxHeap(maxHeap_->top()->level, false /* end_key */,
+                                    true /* replace_top */);
     }
   }
 
@@ -565,6 +591,10 @@ class MergingIterator : public InternalIterator {
   std::unique_ptr<MergerMaxIterHeap> maxHeap_;
   PinnedIteratorsManager* pinned_iters_mgr_;
 
+  // Used to bound range tombstones. For point keys, DBIter and SSTable iterator
+  // take care of boundary checking.
+  const Slice* iterate_upper_bound_;
+
   // In forward direction, process a child that is not in the min heap.
   // If valid, add to the min heap. Otherwise, check status.
   void AddToMinHeapOrCheckStatus(HeapItem*);
@@ -626,9 +656,19 @@ void MergingIterator::SeekImpl(const Slice& target, size_t starting_level,
     for (size_t level = 0; level < starting_level; ++level) {
       if (range_tombstone_iters_[level] &&
           range_tombstone_iters_[level]->Valid()) {
-        assert(static_cast<bool>(active_.count(level)) ==
-               (pinned_heap_item_[level].type == HeapItem::DELETE_RANGE_END));
-        minHeap_.push(&pinned_heap_item_[level]);
+        // use an iterator on active_ if performance becomes an issue here
+        if (active_.count(level) > 0) {
+          assert(pinned_heap_item_[level].type == HeapItem::DELETE_RANGE_END);
+          // if it was active, then start key must be within upper_bound,
+          // so we can add to minHeap_ directly.
+          minHeap_.push(&pinned_heap_item_[level]);
+        } else {
+          // this takes care of checking iterate_upper_bound, but with an extra
+          // key comparison if range_tombstone_iters_[level] was already out of
+          // bound. Consider using a new HeapItem type or some flag to remember
+          // boundary checking result.
+          InsertRangeTombstoneToMinHeap(level);
+        }
       } else {
         assert(!active_.count(level));
       }
@@ -761,13 +801,15 @@ bool MergingIterator::SkipNextDeleted() {
   // - range deletion end key
   auto current = minHeap_.top();
   if (current->type == HeapItem::DELETE_RANGE_END) {
-    minHeap_.pop();
     active_.erase(current->level);
     assert(range_tombstone_iters_[current->level] &&
            range_tombstone_iters_[current->level]->Valid());
     range_tombstone_iters_[current->level]->Next();
     if (range_tombstone_iters_[current->level]->Valid()) {
-      InsertRangeTombstoneToMinHeap(current->level);
+      InsertRangeTombstoneToMinHeap(current->level, true /* start_key */,
+                                    true /* replace_top */);
+    } else {
+      minHeap_.pop();
     }
     return true /* current key deleted */;
   }
@@ -977,13 +1019,15 @@ bool MergingIterator::SkipPrevDeleted() {
   // - range deletion start key
   auto current = maxHeap_->top();
   if (current->type == HeapItem::DELETE_RANGE_START) {
-    maxHeap_->pop();
     active_.erase(current->level);
     assert(range_tombstone_iters_[current->level] &&
            range_tombstone_iters_[current->level]->Valid());
     range_tombstone_iters_[current->level]->Prev();
     if (range_tombstone_iters_[current->level]->Valid()) {
-      InsertRangeTombstoneToMaxHeap(current->level);
+      InsertRangeTombstoneToMaxHeap(current->level, true /* end_key */,
+                                    true /* replace_top */);
+    } else {
+      maxHeap_->pop();
     }
     return true /* current key deleted */;
   }
@@ -1266,11 +1310,12 @@ InternalIterator* NewMergingIterator(const InternalKeyComparator* cmp,
 }
 
 MergeIteratorBuilder::MergeIteratorBuilder(
-    const InternalKeyComparator* comparator, Arena* a, bool prefix_seek_mode)
+    const InternalKeyComparator* comparator, Arena* a, bool prefix_seek_mode,
+    const Slice* iterate_upper_bound)
     : first_iter(nullptr), use_merging_iter(false), arena(a) {
   auto mem = arena->AllocateAligned(sizeof(MergingIterator));
-  merge_iter =
-      new (mem) MergingIterator(comparator, nullptr, 0, true, prefix_seek_mode);
+  merge_iter = new (mem) MergingIterator(comparator, nullptr, 0, true,
+                                         prefix_seek_mode, iterate_upper_bound);
 }
 
 MergeIteratorBuilder::~MergeIteratorBuilder() {

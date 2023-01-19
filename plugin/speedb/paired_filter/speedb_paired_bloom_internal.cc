@@ -431,11 +431,12 @@ SpdbPairedBloomBitsBuilder::SpdbPairedBloomBitsBuilder(
     std::atomic<int64_t>* aggregate_rounding_balance,
     const std::shared_ptr<CacheReservationManager>& cache_res_mgr,
     bool detect_filter_construct_corruption,
-    const FilterBitsReaderCreateFunc& reader_create_func)
+    const FilterBitsReaderCreateFunc& reader_create_func, bool is_bottomost)
     : XXPH3FilterBitsBuilder(aggregate_rounding_balance,
                              std::move(cache_res_mgr),
                              detect_filter_construct_corruption),
       millibits_per_key_(millibits_per_key),
+      is_bottomost_(is_bottomost),
       reader_create_func_(reader_create_func) {
   assert(millibits_per_key >= speedb_filter::kMinMillibitsPerKey);
 }
@@ -450,7 +451,11 @@ void SpdbPairedBloomBitsBuilder::InitVars(uint64_t len_no_metadata) {
   assert(num_blocks_ % 2 == 0);
   assert(num_blocks_ % speedb_filter::kPairedBloomBatchSizeInBlocks == 0);
 
-  num_batches_ = num_blocks_ / speedb_filter::kPairedBloomBatchSizeInBlocks;
+    if (is_bottomost_)
+  {num_batches_ = (num_blocks_ / speedb_filter::kPairedBloomBatchSizeInBlocks);
+  } else{
+  num_batches_ = std::ceil(num_blocks_ / speedb_filter::kPairedBloomBatchSizeInBlocks);
+  }
   // There must be at least 1 batch
   assert(num_batches_ > 0U);
 
@@ -571,8 +576,19 @@ size_t SpdbPairedBloomBitsBuilder::RoundDownUsableSpace(size_t available_size) {
   }
 
   // round down to multiple of a Batch
-  rv = std::max<size_t>((rv / kBatchSizeInBytes) * kBatchSizeInBytes,
-                        kBatchSizeInBytes);
+//  rv = std::max<size_t>((rv / kBatchSizeInBytes) * kBatchSizeInBytes,
+  //                      kBatchSizeInBytes);
+   // round down to multiple of a Batch for bottomost level, and round up for other levels
+  if (is_bottomost_)
+    {
+      rv = std::max<size_t>((rv / kBatchSizeInBytes) * kBatchSizeInBytes,kBatchSizeInBytes);
+    }else{
+
+          rv=std::ceil<size_t>((rv / kBatchSizeInBytes)) * kBatchSizeInBytes;
+
+          }
+
+
 
   return rv + speedb_filter::FilterMetadata::kMetadataLen;
 }

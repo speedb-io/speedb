@@ -2,20 +2,19 @@
 
 ## Coconut 2.2.0 (12/22/2022)
 ## New Features
-* Proactive flushes for better resources utilization by @udi-speedb https://github.com/speedb-io/speedb/pull/185
-* Dynamic delayed write mechanism for consistent performance by @Yuval-Ariel in https://github.com/speedb-io/speedb/pull/281
+* Proactive flushes for better memory utilization by @udi-speedb https://github.com/speedb-io/speedb/pull/185 https://docs.speedb.dev/documentation/speedb-features/proactive-flushing
+* Dynamic delayed write mechanism for performance stabilization by @Yuval-Ariel in https://github.com/speedb-io/speedb/pull/281 https://docs.speedb.dev/documentation/speedb-features/dynamic-delayed-writes
 
 ## Enhancements 
-* Paired block bloom: Removed the bits-per-key limitation for better results by @udi-speedb in https://github.com/speedb-io/speedb/pull/163
-* Allow running multiple benchmark, each with its own configuration by @udi-speedb in https://github.com/speedb-io/speedb/pull/250
+* Paired block bloom: Removed the bits-per-key limitation intorduced in v2.1.0 for better results by @udi-speedb in https://github.com/speedb-io/speedb/pull/163
+* db_bench: Allow running multiple benchmark, each with its own configuration by @udi-speedb in https://github.com/speedb-io/speedb/pull/250
 * db_bench: Support '--groups' in addition to '-groups' (#283) by @udi-speedb in https://github.com/speedb-io/speedb/pull/295
 * db_stress enhancement: Support control over WBM's allow_stall by @udi-speedb in https://github.com/speedb-io/speedb/pull/289
-* Shorten latency while switch generic memtable  by @ayulas in https://github.com/speedb-io/speedb/pull/297
+* Support a shorten latency of switch memtable for all memtables  by @ayulas in https://github.com/speedb-io/speedb/pull/297
 
 ## Bug Fixes
-* db_bench: bug fix inserted in #200 (#263) by @Yuval-Ariel in https://github.com/speedb-io/speedb/pull/265
-* db_bench: ErrorExit from static func bug (#277) by @Yuval-Ariel in https://github.com/speedb-io/speedb/pull/278
-* Proactive Flushes: compilation warnings fix (#304) by @Yuval-Ariel in https://github.com/speedb-io/speedb/pull/307
+* db_bench: fix compilation int conversion warning that was inserted in #200 by @Yuval-Ariel in https://github.com/speedb-io/speedb/pull/265
+* db_bench: db_bench: fix compilation warning about ErrorExit from static func by @Yuval-Ariel in https://github.com/speedb-io/speedb/pull/278
 
 ## Miscellaneous 
 * Added info to the log file for artifact testing by @RoyBenMoshe in https://github.com/speedb-io/speedb/pull/286
@@ -31,15 +30,16 @@
 * cmake: clean up on successful runs and randomise test scheduling (#202) 
 * build: add a version build-tag for non-release builds (#156)
 * build: support ccache and sccache in the Makefile build (#170)
-* Update README.md 
-* docs: fix instructions for building Speedb in README.md and INSTALL.md 
-* readme typo fix by @azmisaquib (#223)
+* docs: README.md typo fix by @azmisaquib (#223)
 * build_version: apply the build tag to the Speedb version string (#231) 
-* build: correctly handle merge commits when calculating a build tag (#207)
+* build: correctly handle merge commits when calculating a build tag (#225)
 * db_test2: fix BackgroundPurgeTest (#236) 
-* Update HISTORY.md (#239)
 * db_bench: Fix a bug when destructing a Benchmark with multiple db-s (#234)  
 * db_bench: add benchmark - seektodeletedranges  (#201)
+
+## Miscellaneous
+* Update HISTORY.md (#239)
+* docs: fix instructions for building Speedb in README.md and INSTALL.md (#229)
 
 ## Blueberry 2.1.0 (10/26/2022)
 ## New Features

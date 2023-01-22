@@ -456,7 +456,7 @@ void SpdbPairedBloomBitsBuilder::InitVars(uint64_t len_no_metadata) {
   if (is_bottomost_)
   {num_batches_ = (num_blocks_ / speedb_filter::kPairedBloomBatchSizeInBlocks);
   } else{
-  num_batches_ = std::ceil(num_blocks_ / speedb_filter::kPairedBloomBatchSizeInBlocks);
+  num_batches_ = std::ceil((num_blocks_+0.0) / speedb_filter::kPairedBloomBatchSizeInBlocks);
   }
   // There must be at least 1 batch
   assert(num_batches_ > 0U);
@@ -584,7 +584,7 @@ size_t SpdbPairedBloomBitsBuilder::RoundDownUsableSpace(size_t available_size) {
                         kBatchSizeInBytes);
     }else{
           
-          rv=std::ceil<size_t>((rv / kBatchSizeInBytes)) * kBatchSizeInBytes;
+          rv=std::ceil<size_t>(((rv+0.0) / kBatchSizeInBytes)) * kBatchSizeInBytes;
 
           }
                 

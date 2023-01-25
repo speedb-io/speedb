@@ -469,10 +469,9 @@ void SpdbVectorContainer::SortThread() {
 class HashSpdRep : public MemTableRep {
  public:
   HashSpdRep(const MemTableRep::KeyComparator& compare, Allocator* allocator,
-             size_t bucket_size, bool use_seek_parralel_threshold = false);
+             size_t bucket_size);
 
-  HashSpdRep(Allocator* allocator, size_t bucket_size,
-             bool use_seek_parralel_threshold = false);
+  HashSpdRep(Allocator* allocator, size_t bucket_size);
   void PostCreate(const MemTableRep::KeyComparator& compare,
                   Allocator* allocator);
 
@@ -513,22 +512,17 @@ class HashSpdRep : public MemTableRep {
 
  private:
   SpdbHashTable spdb_hash_table_;
-  bool use_seek_parralel_threshold_ = false;
   std::shared_ptr<SpdbVectorContainer> spdb_vectors_cont_ = nullptr;
 };
 
 HashSpdRep::HashSpdRep(const MemTableRep::KeyComparator& compare,
-                       Allocator* allocator, size_t bucket_size,
-                       bool use_seek_parralel_threshold)
-    : HashSpdRep(allocator, bucket_size, use_seek_parralel_threshold) {
+                       Allocator* allocator, size_t bucket_size)
+    : HashSpdRep(allocator, bucket_size) {
   spdb_vectors_cont_ = std::make_shared<SpdbVectorContainer>(compare);
 }
 
-HashSpdRep::HashSpdRep(Allocator* allocator, size_t bucket_size,
-                       bool use_seek_parralel_threshold)
-    : MemTableRep(allocator),
-      spdb_hash_table_(bucket_size),
-      use_seek_parralel_threshold_(use_seek_parralel_threshold) {}
+HashSpdRep::HashSpdRep(Allocator* allocator, size_t bucket_size)
+    : MemTableRep(allocator), spdb_hash_table_(bucket_size) {}
 
 void HashSpdRep::PostCreate(const MemTableRep::KeyComparator& compare,
                             Allocator* allocator) {
@@ -617,9 +611,6 @@ static std::unordered_map<std::string, OptionTypeInfo> hash_spd_factory_info = {
     {"hash_bucket_count",
      {0, OptionType::kSizeT, OptionVerificationType::kNormal,
       OptionTypeFlags::kDontSerialize /*Since it is part of the ID*/}},
-    {"use_seek_parralel_threshold",
-     {0, OptionType::kBoolean, OptionVerificationType::kNormal,
-      OptionTypeFlags::kDontSerialize /*Since it is part of the ID*/}},
 #endif
 };
 }  // namespace
@@ -627,19 +618,13 @@ static std::unordered_map<std::string, OptionTypeInfo> hash_spd_factory_info = {
 // HashSpdRepFactory
 
 HashSpdRepFactory::HashSpdRepFactory(size_t hash_bucket_count) {
-    use_seek_parralel_threshold_ = false;
-  if (hash_bucket_count == 0) {
-    use_seek_parralel_threshold_ = true;
-    hash_bucket_count = 1000000;
-  }
   bucket_count_ = hash_bucket_count;
   RegisterOptions("", &bucket_count_, &hash_spd_factory_info);
   Init();
 }
 
 MemTableRep* HashSpdRepFactory::PreCreateMemTableRep() {
-  MemTableRep* hash_spd =
-      new HashSpdRep(nullptr, bucket_count_, use_seek_parralel_threshold_);
+  MemTableRep* hash_spd = new HashSpdRep(nullptr, bucket_count_);
   return hash_spd;
 }
 
@@ -653,8 +638,7 @@ void HashSpdRepFactory::PostCreateMemTableRep(
 MemTableRep* HashSpdRepFactory::CreateMemTableRep(
     const MemTableRep::KeyComparator& compare, Allocator* allocator,
     const SliceTransform* /*transform*/, Logger* /*logger*/) {
-  return new HashSpdRep(compare, allocator, bucket_count_,
-                        use_seek_parralel_threshold_);
+  return new HashSpdRep(compare, allocator, bucket_count_);
 }
 
 }  // namespace ROCKSDB_NAMESPACE

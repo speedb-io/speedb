@@ -627,6 +627,7 @@ static std::unordered_map<std::string, OptionTypeInfo> hash_spd_factory_info = {
 // HashSpdRepFactory
 
 HashSpdRepFactory::HashSpdRepFactory(size_t hash_bucket_count) {
+    use_seek_parralel_threshold_ = false;
   if (hash_bucket_count == 0) {
     use_seek_parralel_threshold_ = true;
     hash_bucket_count = 1000000;

@@ -592,8 +592,9 @@ void HashSpdRep::Get(const LookupKey& k, void* callback_args,
 
 MemTableRep::Iterator* HashSpdRep::GetIterator(Arena* arena) {
   const bool empty_iter =
-      spdb_vectors_cont_->IsEmpty() ||
-      (use_seek_parralel_threshold_ && !spdb_vectors_cont_->IsReadOnly());
+      spdb_vectors_cont_->IsEmpty() /*||
+      (use_seek_parralel_threshold_ && !spdb_vectors_cont_->IsReadOnly())*/
+      ;
   if (arena != nullptr) {
     void* mem;
     if (empty_iter) {

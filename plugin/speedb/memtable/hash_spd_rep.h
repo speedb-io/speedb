@@ -46,7 +46,6 @@ class HashSpdRepFactory : public MemTableRepFactory {
 
  private:
   size_t bucket_count_;
-  bool use_seek_parralel_threshold_;
 };
 
 }  // namespace ROCKSDB_NAMESPACE

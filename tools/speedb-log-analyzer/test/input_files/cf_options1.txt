@@ -1,0 +1,23 @@
+2022/04/17-14:13:10.725921 7f4a9fdff700 Fast CRC32 supported: Not supported on x86
+2022/04/17-14:13:10.729516 7f4a9fdff700 [/db_impl/db_impl_open.cc:297] Creating manifest 1
+2022/04/17-14:13:10.733593 7f4a9fdff700 [/version_set.cc:4594] Recovering from manifest file: /data/rocksdb2/job_5a1bdc6ee6ac56392239a57560b7b7f2_op_KeyedProcessOperator_0a448493b4782967b150582570326227__1_5__uuid_ac3aad78-f1e3-4c63-aecc-5c83a00022bc/db/MANIFEST-000001
+2022/04/17-14:13:10.738586 7f4a9fdff700 [/column_family.cc:610] --------------- Options for column family [default]:
+2022/04/17-14:13:10.738590 7f4a9fdff700               Options.comparator: leveldb.BytewiseComparator
+2022/04/17-14:13:10.738592 7f4a9fdff700           Options.merge_operator: StringAppendTESTOperator
+2022/04/17-14:13:10.740750 7f4a9fdff700            table_factory options:   flush_block_policy_factory: FlushBlockBySizePolicyFactory (0x7f4af401f570)
+  cache_index_and_filter_blocks: 1
+  cache_index_and_filter_blocks_with_high_priority: 1
+  pin_l0_filter_and_index_blocks_in_cache: 1
+  pin_top_level_index_and_filter: 1
+  metadata_cache_options:
+    top_level_index_pinning: 0
+  block_cache_options:
+    capacity : 209715200
+  block_cache_compressed: (nil)
+  prepopulate_block_cache: 0
+2022/04/17-14:13:10.740763 7f4a9fdff700        Options.write_buffer_size: 67108864
+2022/04/17-14:13:10.740769 7f4a9fdff700  Options.max_write_buffer_number: 2
+2022/04/17-14:13:10.741031 7f4a9fdff700                               Options.ttl: 2592000
+2022/04/17-14:13:10.779593 7f4a9fdff700 [/version_set.cc:4634] Recovered from manifest file:/data/rocksdb2/job_5a1bdc6ee6ac56392239a57560b7b7f2_op_KeyedProcessOperator_0a448493b4782967b150582570326227__1_5__uuid_ac3aad78-f1e3-4c63-aecc-5c83a00022bc/db/MANIFEST-000001 succeeded,manifest_file_number is 1, next_file_number is 3, last_sequence is 0, log_number is 0,prev_log_number is 0,max_column_family is 0,min_log_number_to_keep is 0
+2022/04/17-14:13:10.779601 7f4a9fdff700 [/version_set.cc:4649] Column family [default] (ID 0), log number is 0
+2022/04/17-14:13:10.779710 7f4a9fdff700 [/version_set.cc:4140] Creating manifest 4

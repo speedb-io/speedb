@@ -1,0 +1,17 @@
+- Add the log-file-path to the ParsedLog
+- Handle write buffer manager options in db-wide options (currently reported
+as
+ errors)
+ - Handle bug of an options line that has the "Recover ..." text displayed in
+ it
+ - Handle add / drop column family
+ - Differentiate between unavailability of stats and 0 entries / no events
+ - Handle errors in parsing and test handling
+ - Verify that errors in parsing are raised correctly with the proper error
+ message
+ - Handle options that change dynamically. Also, they will probably be
+ displayed as the options at the beginning of the next log (in case they are
+ merged)
+
+- Handle metadata_cache_options, block_cache_options, etc.
+- Use Python's logging facility

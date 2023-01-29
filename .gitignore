@@ -98,3 +98,7 @@ fuzz/crash-*
 
 cmake-build-*
 third-party/folly/
+
+!tools/speedb-log-analyzer/test/input_files/LOG_sample.txt
+!tools/speedb-log-analyzer/test/input_files/LOG_sample_stats.txt
+

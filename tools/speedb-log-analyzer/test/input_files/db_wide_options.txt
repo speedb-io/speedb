@@ -1,0 +1,18 @@
+2022/04/17-14:13:10.723796 7f4a9fdff700 SpeeDB version: 6.22.1
+2022/04/17-14:13:10.724683 7f4a9fdff700 Git sha UNKNOWN:0a396684d6c08f6fe4a37572c0429d91176c51d1
+2022/04/17-14:13:10.724689 7f4a9fdff700 Compile date
+2022/04/17-14:13:10.724692 7f4a9fdff700 DB SUMMARY
+2022/04/17-14:13:10.724695 7f4a9fdff700 DB Session ID:  21GZXO5TD9VABJXGDIRA
+2022/04/17-14:13:10.725587 7f4a9fdff700 SST files in /data/rocksdb2/job_5a1bdc6ee6ac56392239a57560b7b7f2_op_KeyedProcessOperator_0a448493b4782967b150582570326227__1_5__uuid_ac3aad78-f1e3-4c63-aecc-5c83a00022bc/db dir, Total Num: 0, files:
+2022/04/17-14:13:10.725592 7f4a9fdff700 Write Ahead Log file in /data/rocksdb2/job_5a1bdc6ee6ac56392239a57560b7b7f2_op_KeyedProcessOperator_0a448493b4782967b150582570326227__1_5__uuid_ac3aad78-f1e3-4c63-aecc-5c83a00022bc/db:
+2022/04/17-14:13:10.725593 7f4a9fdff700                         Options.error_if_exists: 0
+2022/04/17-14:13:10.725594 7f4a9fdff700                       Options.create_if_missing: 1
+2022/04/17-14:13:10.725596 7f4a9fdff700                         Options.paranoid_checks: 1
+2022/04/17-14:13:10.725596 7f4a9fdff700             Options.flush_verify_memtable_count: 1
+2022/04/17-14:13:10.725596 7f4a9fdff700                               Options.track_and_verify_wals_in_manifest: 0
+2022/04/17-14:13:10.725604 7f4a9fdff700                                     Options.env: 0x7f4a9117d5c0
+2022/04/17-14:13:10.725604 7f4a9fdff700                                      Options.fs: Posix File System
+2022/04/17-14:13:10.725604 7f4a9fdff700                                Options.info_log: 0x7f4af4020bf0
+2022/04/17-14:13:10.725888 7f4a9fdff700 Compression algorithms supported:
+2022/04/17-14:13:10.725889 7f4a9fdff700 	kZSTDNotFinalCompression supported: 1
+2022/04/17-14:13:10.725892 7f4a9fdff700 	kZSTD supported: 1

@@ -1,24 +1,36 @@
 # Speedb Change Log 
 
+## 2.2.1 (30-Jan-2023)
+## Bug Fixes:
+* Delayed Writes: fixed L0 calc bug (#311)
+## Miscellaneous 
+* 357 upgrade base rocksdb version to 778 (#359)
+* Added WBM's cache info to the log (#312) 
+* db_bench: set db_bench defaults to speedbs (#61) (#322)
+* Artifacts check tool - readme file was updated (#293)
+* Unit tests: fixed CompactionServiceTest.RemoteEventListener (#314) (#354)
+* Update README.md by @bosmatt in https://github.com/speedb-io/speedb/pull/356
+* build: remove the dependency on GNU Parallel for running unit tests(#243)
+
 ## Coconut 2.2.0 (12/22/2022)
 ## New Features
-* Proactive flushes for better memory utilization by @udi-speedb https://github.com/speedb-io/speedb/pull/185 https://docs.speedb.dev/documentation/speedb-features/proactive-flushing
-* Dynamic delayed write mechanism for performance stabilization by @Yuval-Ariel in https://github.com/speedb-io/speedb/pull/281 https://docs.speedb.dev/documentation/speedb-features/dynamic-delayed-writes
+* Proactive flushes for better memory utilization (#185) 
+* Dynamic delayed write mechanism for performance stabilization (#281) 
 
 ## Enhancements 
-* Paired block bloom: Removed the bits-per-key limitation intorduced in v2.1.0 for better results by @udi-speedb in https://github.com/speedb-io/speedb/pull/163
-* db_bench: Allow running multiple benchmark, each with its own configuration by @udi-speedb in https://github.com/speedb-io/speedb/pull/250
-* db_bench: Support '--groups' in addition to '-groups' (#283) by @udi-speedb in https://github.com/speedb-io/speedb/pull/295
-* db_stress enhancement: Support control over WBM's allow_stall by @udi-speedb in https://github.com/speedb-io/speedb/pull/289
-* Support a shorten latency of switch memtable for all memtables  by @ayulas in https://github.com/speedb-io/speedb/pull/297
+* Paired block bloom: Removed the bits-per-key limitation intorduced in v2.1.0 for better results by @udi-speedb(#163)
+* db_bench: Allow running multiple benchmark, each with its own configuration (#250)
+* db_bench: Support '--groups' in addition to '-groups' (#283) (#295)
+* db_stress enhancement: Support control over WBM's allow_stall(#289)
+* Support a shorten latency of switch memtable for all memtables (#297)
 
 ## Bug Fixes
-* db_bench: fix compilation int conversion warning that was inserted in #200 by @Yuval-Ariel in https://github.com/speedb-io/speedb/pull/265
-* db_bench: db_bench: fix compilation warning about ErrorExit from static func by @Yuval-Ariel in https://github.com/speedb-io/speedb/pull/278
+* db_bench: fix compilation int conversion warning that was inserted in (#200)
+* db_bench: db_bench: fix compilation warning about ErrorExit from static func (#278)
 
 ## Miscellaneous 
-* Added info to the log file for artifact testing by @RoyBenMoshe in https://github.com/speedb-io/speedb/pull/286
-* Disable LoadCustomizableTest.LoadMemTableRepFactoryTest (#303) by @ayulas in https://github.com/speedb-io/speedb/pull/305
+* Added info to the log file for artifact testing (#286)
+* Disable LoadCustomizableTest.LoadMemTableRepFactoryTest (#305)
 
 ## 2.1.1 (11/15/2022)
 ## Bug Fixes

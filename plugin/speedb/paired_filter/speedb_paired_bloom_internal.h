@@ -25,7 +25,7 @@ namespace ROCKSDB_NAMESPACE {
 namespace speedb_filter {
 inline constexpr size_t kPairedBloomBatchSizeInBlocks = 32U;
 // Max supported BPK. Filters using higher BPK-s will use the max
-inline constexpr int kMinMillibitsPerKey = 1000.0;
+inline constexpr int kMinMillibitsPerKey = 1000;
 
 // Types of proprietary Speedb's filters
 enum class FilterType : uint8_t {
@@ -120,7 +120,7 @@ class SpdbPairedBloomBitsBuilder : public XXPH3FilterBitsBuilder {
 
   // Records the info about a block's pair in the batch
   struct PairingInfo {
-    uint8_t pair_in_batch_block_idx;
+    uint32_t pair_in_batch_block_idx;
     uint8_t hash_set_selector;
   };
 

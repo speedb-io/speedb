@@ -382,22 +382,19 @@ void SpdbVectorContainer::SeekIter(const IterAnchors& iter_anchor,
 }
 
 void SpdbVectorContainer::Merge(std::list<SpdbVectorPtr>::iterator& begin,
-                                std::list<SpdbVectorPtr>::iterator& end) {
+                                std::list<SpdbVectorPtr>::iterator& end,
+                                size_t total_merge_vector_elements) {
   SpdbVectorIterator iterator(this, comparator_, begin, end);
-  const size_t num_elements = std::accumulate(
-      begin, end, 0,
-      [](size_t n, const SpdbVectorPtr& vec) { return n + vec->Size(); });
-  if (num_elements > 0) {
+  if (total_merge_vector_elements > 0) {
     SpdbVector::Vec merged;
-    merged.reserve(num_elements);
+    merged.reserve(total_merge_vector_elements);
 
     for (iterator.SeekToFirst(); iterator.Valid(); iterator.Next()) {
       merged.emplace_back(iterator.key());
     }
 
-    const size_t actual_elements_count = merged.size();
     SpdbVectorPtr new_vector(
-        new SpdbVector(std::move(merged), actual_elements_count));
+        new SpdbVector(std::move(merged), total_merge_vector_elements));
 
     // now replace
     WriteLock wl(&spdb_vectors_merge_rwlock_);
@@ -411,26 +408,30 @@ bool SpdbVectorContainer::TryMergeVectors(
   std::list<SpdbVectorPtr>::iterator start = spdb_vectors_.begin();
   const size_t merge_threshold = switch_spdb_vector_limit_ * 75 / 100;
 
-  size_t count = 0;
+  size_t merge_vectors_count = 0;
+  size_t total_merge_vector_elements = 0;
+
   for (auto s = start; s != last; ++s) {
     if ((*s)->Size() > merge_threshold) {
-      if (count > 1) {
+      if (merge_vectors_count > 1) {
         last = s;
         break;
       }
 
-      count = 0;
+      merge_vectors_count = 0;
+      total_merge_vector_elements = 0;
       start = std::next(s);
     } else {
-      ++count;
-      if (count == kMergedVectorsMax) {
+      ++merge_vectors_count;
+      total_merge_vector_elements += (*s)->Size();
+      if (merge_vectors_count == kMergedVectorsMax) {
         last = std::next(s);
         break;
       }
     }
   }
-  if (count > 1) {
-    Merge(start, last);
+  if (merge_vectors_count > 1) {
+    Merge(start, last, total_merge_vector_elements);
     return true;
   }
   return false;

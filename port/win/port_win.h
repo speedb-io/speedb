@@ -164,6 +164,10 @@ class RWMutex {
  private:
   SRWLOCK srwLock_;
 };
+// in linux env the RW suffers from write starvation therefor we created a new
+// class inherited from the original RWMutex that allows balance priority in
+// windows env we dont have this issue.
+using RWMutexWr = RWMutex;
 
 class CondVar {
  public:

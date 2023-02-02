@@ -46,8 +46,8 @@ static_assert((speedb_filter::kPairedBloomBatchSizeInBlocks > 0) &&
                 (speedb_filter::kPairedBloomBatchSizeInBlocks - 1)) == 0));
 
 // Number of bits to point to any block in a batch (in-batch block index)
-static const uint32_t kInBatchIdxNumBits =
-    std::ceil(std::log2(speedb_filter::kPairedBloomBatchSizeInBlocks));
+static const uint32_t kInBatchIdxNumBits = static_cast<uint32_t>(
+    std::ceil(std::log2(speedb_filter::kPairedBloomBatchSizeInBlocks)));
 
 // kBlockSizeInBytes must be a power of 2 (= Cacheline size)
 constexpr uint32_t kBlockSizeInBytes = 64U;
@@ -55,11 +55,12 @@ static_assert((kBlockSizeInBytes > 0) &&
               ((kBlockSizeInBytes & (kBlockSizeInBytes - 1)) == 0));
 constexpr uint32_t kBlockSizeInBits = kBlockSizeInBytes * 8U;
 static const uint32_t kBlockSizeNumBits =
-    std::ceil(std::log2(kBlockSizeInBits));
+    static_cast<uint32_t>(std::ceil(std::log2(kBlockSizeInBits)));
 static const uint32_t kNumBlockSizeBitsShiftBits = 32 - kBlockSizeNumBits;
 
 // Number of bits to represent kBlockSizeInBytes
-static const uint32_t kNumBitsForBlockSize = std::log2(kBlockSizeInBytes);
+static const uint32_t kNumBitsForBlockSize =
+    static_cast<uint32_t>(std::log2(kBlockSizeInBytes));
 static const uint32_t KNumBitsInBlockBloom =
     kBlockSizeInBits - kInBatchIdxNumBits;
 
@@ -99,8 +100,8 @@ inline uint8_t GetInBatchBlockIdx(uint32_t global_block_idx) {
   return (global_block_idx % speedb_filter::kPairedBloomBatchSizeInBlocks);
 }
 
-inline uint32_t GetHashSetSelector(uint32_t first_in_batch_block_idx,
-                                   uint32_t second_in_batch_block_idx) {
+inline uint8_t GetHashSetSelector(uint32_t first_in_batch_block_idx,
+                                  uint32_t second_in_batch_block_idx) {
   assert((first_in_batch_block_idx <
           speedb_filter::kPairedBloomBatchSizeInBlocks) &&
          (second_in_batch_block_idx <
@@ -122,7 +123,8 @@ inline const char* GetBlockAddress(const char* data,
 }
 
 inline double CalcAdjustedBitsPerKey(size_t millibits_per_key) {
-  return ((millibits_per_key * KNumBitsInBlockBloom) / kBlockSizeInBits / 1000);
+  return static_cast<double>((millibits_per_key * KNumBitsInBlockBloom) /
+                             kBlockSizeInBits / 1000);
 }
 
 inline double CalcRawNumProbes(size_t millibits_per_key) {
@@ -157,8 +159,8 @@ class BuildBlock {
   BuildBlock(char* data, uint32_t global_block_idx, bool prefetch_block);
 
   uint8_t GetInBatchBlockIdxOfPair() const;
-  void SetInBatchBlockIdxOfPair(InBatchBlockIdx pair_batch_block_idx);
-  void SetBlockBloomBits(uint32_t hash, uint32_t set_idx, size_t hash_set_size);
+  void SetInBatchBlockIdxOfPair(uint8_t pair_batch_block_idx);
+  void SetBlockBloomBits(uint32_t hash, uint8_t set_idx, size_t hash_set_size);
 
  private:
   char* const block_address_ = nullptr;
@@ -185,7 +187,7 @@ inline void BuildBlock::SetInBatchBlockIdxOfPair(
       (pair_batch_block_idx | (*block_address_ & kFirstByteBitsMask));
 }
 
-inline int GetBitPosInBlockForHash(uint32_t hash, uint32_t set_idx) {
+inline int GetBitPosInBlockForHash(uint32_t hash, uint8_t set_idx) {
   assert(set_idx <= 1U);
 
   int bitpos = 0;
@@ -210,7 +212,7 @@ inline int GetBitPosInBlockForHash(uint32_t hash, uint32_t set_idx) {
           (kNumBlockSizeBitsShiftBits));
 }
 
-inline void BuildBlock::SetBlockBloomBits(uint32_t hash, uint32_t set_idx,
+inline void BuildBlock::SetBlockBloomBits(uint32_t hash, uint8_t set_idx,
                                           size_t hash_set_size) {
   for (auto i = 0U; i < hash_set_size; ++i) {
     int bitpos = GetBitPosInBlockForHash(hash, set_idx);
@@ -225,7 +227,7 @@ class ReadBlock {
   ReadBlock(const char* data, uint32_t global_block_idx, bool prefetch_block);
 
   uint8_t GetInBatchBlockIdxOfPair() const;
-  bool AreAllBlockBloomBitsSet(uint32_t hash, uint32_t set_idx,
+  bool AreAllBlockBloomBitsSet(uint32_t hash, uint8_t set_idx,
                                size_t hash_set_size) const;
 
  private:
@@ -233,7 +235,7 @@ class ReadBlock {
   bool AreAllBlockBloomBitsSetAvx2(uint32_t hash, uint32_t set_idx,
                                    size_t hash_set_size) const;
 #endif
-  bool AreAllBlockBloomBitsSetNonAvx2(uint32_t hash, uint32_t set_idx,
+  bool AreAllBlockBloomBitsSetNonAvx2(uint32_t hash, uint8_t set_idx,
                                       size_t hash_set_size) const;
 
  private:
@@ -252,7 +254,7 @@ inline uint8_t ReadBlock::GetInBatchBlockIdxOfPair() const {
   return static_cast<uint8_t>(*block_address_) & kInBatchIdxMask;
 }
 
-bool ReadBlock::AreAllBlockBloomBitsSet(uint32_t hash, uint32_t set_idx,
+bool ReadBlock::AreAllBlockBloomBitsSet(uint32_t hash, uint8_t set_idx,
                                         size_t hash_set_size) const {
 #ifdef __AVX2__
   // The AVX2 code currently supports only cache-line / block sizes of 64 bytes
@@ -361,7 +363,7 @@ bool ReadBlock::AreAllBlockBloomBitsSetAvx2(uint32_t hash, uint32_t set_idx,
 
 #endif  // __AVX2__
 
-bool ReadBlock::AreAllBlockBloomBitsSetNonAvx2(uint32_t hash, uint32_t set_idx,
+bool ReadBlock::AreAllBlockBloomBitsSetNonAvx2(uint32_t hash, uint8_t set_idx,
                                                size_t hash_set_size) const {
   for (auto i = 0U; i < hash_set_size; ++i) {
     int bitpos = GetBitPosInBlockForHash(hash, set_idx);
@@ -589,7 +591,7 @@ void SpdbPairedBloomBitsBuilder::InitBlockHistogram() {
                       sizeof(decltype(blocks_histogram_)::value_type));
 
   for (auto batch_idx = 0U; batch_idx < blocks_histogram_.size(); ++batch_idx) {
-    for (auto in_batch_block_idx = 0U;
+    for (uint8_t in_batch_block_idx = 0;
          in_batch_block_idx < blocks_histogram_[batch_idx].size();
          ++in_batch_block_idx) {
       blocks_histogram_[batch_idx][in_batch_block_idx]
@@ -657,7 +659,8 @@ void SpdbPairedBloomBitsBuilder::SetBlocksPairs(char* data) {
       BuildBlock block(data, global_block_idx, false /* prefetch */);
       const uint32_t pair_in_batch_block_idx =
           pairing_table_[batch_idx][in_batch_block_idx].pair_in_batch_block_idx;
-      block.SetInBatchBlockIdxOfPair(pair_in_batch_block_idx);
+      block.SetInBatchBlockIdxOfPair(
+          static_cast<uint8_t>(pair_in_batch_block_idx));
     }
   }
 }
@@ -818,7 +821,7 @@ bool SpdbPairedBloomBitsReader::HashMayMatch(const uint64_t hash) {
     return false;
   }
 
-  uint32_t secondary_block_hash_selector = 1 - primary_block_hash_selector;
+  uint8_t secondary_block_hash_selector = 1 - primary_block_hash_selector;
   uint32_t batch_idx = GetContainingBatchIdx(primary_global_block_idx);
   uint32_t secondary_global_block_idx =
       GetFirstGlobalBlockIdxOfBatch(batch_idx) + secondary_in_batch_block_idx;

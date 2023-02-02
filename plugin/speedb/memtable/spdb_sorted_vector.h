@@ -225,7 +225,8 @@ class SpdbVectorContainer {
   bool TryMergeVectors(std::list<SpdbVectorPtr>::iterator last);
 
   void Merge(std::list<SpdbVectorPtr>::iterator& start,
-             std::list<SpdbVectorPtr>::iterator& last);
+             std::list<SpdbVectorPtr>::iterator& last,
+             size_t total_merge_vector_elements);
 
  private:
   port::RWMutexWr spdb_vectors_add_rwlock_;

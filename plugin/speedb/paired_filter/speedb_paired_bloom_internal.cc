@@ -451,11 +451,11 @@ void SpdbPairedBloomBitsBuilder::InitVars(uint64_t len_no_metadata) {
   assert(num_blocks_ % 2 == 0);
   assert(num_blocks_ % speedb_filter::kPairedBloomBatchSizeInBlocks == 0);
 
-    if (is_bottomost_)
-  {num_batches_ = (num_blocks_ / speedb_filter::kPairedBloomBatchSizeInBlocks);
-  } else{
-  num_batches_ = std::ceil(static_cast<double>(num_blocks_) / speedb_filter::kPairedBloomBatchSizeInBlocks);
-  }
+    if (is_bottomost_) {
+          num_batches_ = (num_blocks_ / speedb_filter::kPairedBloomBatchSizeInBlocks);
+    } else{
+          num_batches_ = std::ceil(static_cast<double>(num_blocks_) / speedb_filter::kPairedBloomBatchSizeInBlocks);
+    }
   // There must be at least 1 batch
   assert(num_batches_ > 0U);
 
@@ -571,14 +571,11 @@ size_t SpdbPairedBloomBitsBuilder::RoundDownUsableSpace(size_t available_size) {
   size_t rv = available_size - speedb_filter::FilterMetadata::kMetadataLen;
 
   // round down to multiple of a Batch for bottomost level, and round up for other levels
-  if (is_bottomost_)
-    {
+  if (is_bottomost_) {
       rv = std::max<size_t>((rv / kBatchSizeInBytes) * kBatchSizeInBytes,kBatchSizeInBytes);
-    }else{
-
-          rv=std::ceil(static_cast<double>(rv) / kBatchSizeInBytes) * kBatchSizeInBytes;
-
-          }
+  }else{
+        rv=std::ceil(static_cast<double>(rv) / kBatchSizeInBytes) * kBatchSizeInBytes;
+  }
 
 
   if (rv >= kMaxSupportedSizeNoMetadata) {

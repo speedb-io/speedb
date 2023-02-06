@@ -14,6 +14,7 @@
 namespace ROCKSDB_NAMESPACE {
 
 class SystemClock;
+class WriteControllerAccess;
 class WriteControllerToken;
 
 // WriteController is controlling write stalls in our write code-path. Write
@@ -34,8 +35,10 @@ class WriteController {
         low_pri_rate_limiter_(
             NewGenericRateLimiter(low_pri_rate_bytes_per_sec)) {
     set_max_delayed_write_rate(_delayed_write_rate);
+    control_access_ = std::make_shared<WriteControllerAccess>();
   }
   ~WriteController() = default;
+  std::shared_ptr<WriteControllerAccess> GetAccess();
 
   // When an actor (column family) requests a stop token, all writes will be
   // stopped until the stop token is released (deleted)
@@ -112,7 +115,20 @@ class WriteController {
   bool dynamic_delay_;
 
   std::unique_ptr<RateLimiter> low_pri_rate_limiter_;
+  std::shared_ptr<WriteControllerAccess> control_access_;
+
 };
+
+class WriteControllerAccess {
+ public:
+  explicit WriteControllerAccess() {}
+  virtual ~WriteControllerAccess() {}
+  private:
+  // no copying allowed
+  WriteControllerAccess(const WriteControllerAccess&) = delete;
+  void operator=(const WriteControllerAccess&) = delete;
+};
+
 
 class WriteControllerToken {
  public:

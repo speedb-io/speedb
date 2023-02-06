@@ -13,6 +13,9 @@
 #include "rocksdb/system_clock.h"
 
 namespace ROCKSDB_NAMESPACE {
+std::shared_ptr<WriteControllerAccess> WriteController::GetAccess() {
+  return control_access_;
+}
 
 std::unique_ptr<WriteControllerToken> WriteController::GetStopToken() {
   ++total_stopped_;

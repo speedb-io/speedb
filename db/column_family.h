@@ -772,6 +772,7 @@ class ColumnFamilySet {
   Cache* table_cache_;
   WriteBufferManager* write_buffer_manager_;
   WriteController* write_controller_;
+  std::shared_ptr<WriteControllerAccess> write_controller_access_;
   BlockCacheTracer* const block_cache_tracer_;
   std::shared_ptr<IOTracer> io_tracer_;
   const std::string& db_id_;

@@ -162,7 +162,7 @@ class SpdbPairedBloomBitsBuilder : public XXPH3FilterBitsBuilder {
  private:
   // Target allocation per added key, in thousandths of a bit.
   int millibits_per_key_;
-  
+
   bool is_bottomost_;
   size_t num_blocks_ = 0U;
   size_t num_batches_ = 0U;

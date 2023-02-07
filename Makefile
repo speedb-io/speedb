@@ -122,6 +122,7 @@ dummy := $(shell (export ROCKSDB_ROOT="$(CURDIR)"; \
                   export LIB_MODE="$(LIB_MODE)"; \
 		  export ROCKSDB_CXX_STANDARD="$(ROCKSDB_CXX_STANDARD)"; \
 		  export USE_FOLLY="$(USE_FOLLY)"; \
+		  export FSYNC_MODE="$(FSYNC_MODE)"; \
                   "$(CURDIR)/build_tools/build_detect_platform" "$(CURDIR)/make_config.mk"))
 
 endif

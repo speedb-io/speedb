@@ -5,6 +5,8 @@
 
 package org.rocksdb;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import org.junit.ClassRule;
 import org.junit.Test;
 
@@ -34,6 +36,26 @@ public class FilterTest {
         blockConfig.setFilterPolicy(bloomFilter);
         options.setTableFormatConfig(blockConfig);
       }
+    }
+  }
+
+  @Test
+  public void createFromString() throws RocksDBException {
+    final BlockBasedTableConfig blockConfig = new BlockBasedTableConfig();
+    try (final Options options = new Options()) {
+      try (final Filter filter = Filter.createFromString("ribbonfilter:20")) {
+        assertThat(filter.getId()).startsWith("ribbonfilter");
+        assertThat(filter.isInstanceOf("ribbonfilter")).isTrue();
+        assertThat(filter.isInstanceOf("bloomfilter")).isFalse();
+        blockConfig.setFilterPolicy(filter);
+        options.setTableFormatConfig(blockConfig);
+      }
+    }
+  }
+
+  @Test(expected = RocksDBException.class)
+  public void createUnknownFromString() throws RocksDBException {
+    try (final Filter filter = Filter.createFromString("unknown")) {
     }
   }
 }

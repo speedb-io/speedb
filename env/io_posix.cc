@@ -104,6 +104,47 @@ int Madvise(void* addr, size_t len, int advice) {
 }
 
 namespace {
+IOStatus PosixSync(int fd, const std::string& file_name,
+                   const char* file_type) {
+#if defined(HAVE_BARRIERFSYNC)
+  if (::fcntl(fd, F_BARRIERFSYNC) < 0) {
+    std::string message = "while fcntl(F_BARRIERFSYNC) ";
+    return IOError(message + file_type, file_name, errno);
+  }
+#elif defined(HAVE_FULLFSYNC)
+  if (::fcntl(fd, F_FULLFSYNC) < 0) {
+    std::string message = "while fcntl(F_FULLFSYNC) ";
+    return IOError(message + file_type, file_name, errno);
+  }
+#else   // HAVE_FULLFSYNC
+  if (fdatasync(fd) < 0) {
+    std::string message = "While fdatasync ";
+    return IOError(message + file_type, file_name, errno);
+  }
+#endif  // HAVE_FULLFSYNC
+  return IOStatus::OK();
+}
+
+IOStatus PosixFSync(int fd, const std::string& file_name,
+                    const char* file_type) {
+#if defined(HAVE_FULLFSYNC)
+  if (::fcntl(fd, F_FULLFSYNC) < 0) {
+    std::string message = "while fcntl(F_FULLSYNC) ";
+    return IOError(message + file_type, file_name, errno);
+  }
+#elif defined(HAVE_BARRIERFSYNC)
+  if (::fcntl(fd, F_BARRIERFSYNC) < 0) {
+    std::string message = "while fcntl(F_BARRIERFSYNC) ";
+    return IOError(message + file_type, file_name, errno);
+  }
+#else   // HAVE_FULLFSYNC
+  if (fsync(fd) < 0) {
+    std::string message = "While fsync ";
+    return IOError(message + file_type, file_name, errno);
+  }
+#endif  // HAVE_FULLFSYNC
+  return IOStatus::OK();
+}
 
 // On MacOS (and probably *BSD), the posix write and pwrite calls do not support
 // buffers larger than 2^31-1 bytes. These two wrappers fix this issue by
@@ -1183,17 +1224,12 @@ IOStatus PosixMmapFile::Flush(const IOOptions& /*opts*/,
 
 IOStatus PosixMmapFile::Sync(const IOOptions& /*opts*/,
                              IODebugContext* /*dbg*/) {
-#ifdef HAVE_FULLFSYNC
-  if (::fcntl(fd_, F_FULLFSYNC) < 0) {
-    return IOError("while fcntl(F_FULLSYNC) mmapped file", filename_, errno);
+  IOStatus s = PosixSync(fd_, filename_, "mmapped file");
+  if (!s.ok()) {
+    return s;
+  } else {
+    return Msync();
   }
-#else   // HAVE_FULLFSYNC
-  if (fdatasync(fd_) < 0) {
-    return IOError("While fdatasync mmapped file", filename_, errno);
-  }
-#endif  // HAVE_FULLFSYNC
-
-  return Msync();
 }
 
 /**
@@ -1201,17 +1237,12 @@ IOStatus PosixMmapFile::Sync(const IOOptions& /*opts*/,
  */
 IOStatus PosixMmapFile::Fsync(const IOOptions& /*opts*/,
                               IODebugContext* /*dbg*/) {
-#ifdef HAVE_FULLFSYNC
-  if (::fcntl(fd_, F_FULLFSYNC) < 0) {
-    return IOError("While fcntl(F_FULLSYNC) on mmaped file", filename_, errno);
+  auto s = PosixFSync(fd_, filename_, "mmapped file");
+  if (!s.ok()) {
+    return s;
+  } else {
+    return Msync();
   }
-#else   // HAVE_FULLFSYNC
-  if (fsync(fd_) < 0) {
-    return IOError("While fsync mmaped file", filename_, errno);
-  }
-#endif  // HAVE_FULLFSYNC
-
-  return Msync();
 }
 
 /**
@@ -1401,30 +1432,12 @@ IOStatus PosixWritableFile::Flush(const IOOptions& /*opts*/,
 
 IOStatus PosixWritableFile::Sync(const IOOptions& /*opts*/,
                                  IODebugContext* /*dbg*/) {
-#ifdef HAVE_FULLFSYNC
-  if (::fcntl(fd_, F_FULLFSYNC) < 0) {
-    return IOError("while fcntl(F_FULLFSYNC)", filename_, errno);
-  }
-#else   // HAVE_FULLFSYNC
-  if (fdatasync(fd_) < 0) {
-    return IOError("While fdatasync", filename_, errno);
-  }
-#endif  // HAVE_FULLFSYNC
-  return IOStatus::OK();
+  return PosixSync(fd_, filename_, "");
 }
 
 IOStatus PosixWritableFile::Fsync(const IOOptions& /*opts*/,
                                   IODebugContext* /*dbg*/) {
-#ifdef HAVE_FULLFSYNC
-  if (::fcntl(fd_, F_FULLFSYNC) < 0) {
-    return IOError("while fcntl(F_FULLFSYNC)", filename_, errno);
-  }
-#else   // HAVE_FULLFSYNC
-  if (fsync(fd_) < 0) {
-    return IOError("While fsync", filename_, errno);
-  }
-#endif  // HAVE_FULLFSYNC
-  return IOStatus::OK();
+  return PosixFSync(fd_, filename_, "");
 }
 
 bool PosixWritableFile::IsSyncThreadSafe() const { return true; }
@@ -1596,30 +1609,12 @@ IOStatus PosixRandomRWFile::Flush(const IOOptions& /*opts*/,
 
 IOStatus PosixRandomRWFile::Sync(const IOOptions& /*opts*/,
                                  IODebugContext* /*dbg*/) {
-#ifdef HAVE_FULLFSYNC
-  if (::fcntl(fd_, F_FULLFSYNC) < 0) {
-    return IOError("while fcntl(F_FULLFSYNC) random rw file", filename_, errno);
-  }
-#else   // HAVE_FULLFSYNC
-  if (fdatasync(fd_) < 0) {
-    return IOError("While fdatasync random read/write file", filename_, errno);
-  }
-#endif  // HAVE_FULLFSYNC
-  return IOStatus::OK();
+  return PosixSync(fd_, filename_, "random read/write file");
 }
 
 IOStatus PosixRandomRWFile::Fsync(const IOOptions& /*opts*/,
                                   IODebugContext* /*dbg*/) {
-#ifdef HAVE_FULLFSYNC
-  if (::fcntl(fd_, F_FULLFSYNC) < 0) {
-    return IOError("While fcntl(F_FULLSYNC) random rw file", filename_, errno);
-  }
-#else   // HAVE_FULLFSYNC
-  if (fsync(fd_) < 0) {
-    return IOError("While fsync random read/write file", filename_, errno);
-  }
-#endif  // HAVE_FULLFSYNC
-  return IOStatus::OK();
+  return PosixFSync(fd_, filename_, "random read/write file");
 }
 
 IOStatus PosixRandomRWFile::Close(const IOOptions& /*opts*/,
@@ -1714,18 +1709,9 @@ IOStatus PosixDirectory::FsyncWithDirOptions(
   // skip fsync/fcntl when fd_ == -1 since this file descriptor has been closed
   // in either the de-construction or the close function, data must have been
   // fsync-ed before de-construction and close is called
-#ifdef HAVE_FULLFSYNC
-  // btrfs is a Linux file system, while currently F_FULLFSYNC is available on
-  // Mac OS.
-  assert(!is_btrfs_);
-  if (fd_ != -1 && ::fcntl(fd_, F_FULLFSYNC) < 0) {
-    return IOError("while fcntl(F_FULLFSYNC)", "a directory", errno);
+  if (fd_ != -1) {
+    s = PosixFSync(fd_, "", "a directory");
   }
-#else   // HAVE_FULLFSYNC
-  if (fd_ != -1 && fsync(fd_) == -1) {
-    s = IOError("While fsync", "a directory", errno);
-  }
-#endif  // HAVE_FULLFSYNC
 #endif  // OS_AIX
   return s;
 }

@@ -721,15 +721,39 @@ EOF
 fi
 
 # check for F_FULLFSYNC
-$CXX $PLATFORM_CXXFALGS -x c++ - -o test.o 2>/dev/null  <<EOF
+if [ "$FSYNC_MODE" != "OFF" ]; then
+  if [ "$FSYNC_MODE" != "FULL" ]; then
+$CXX $PLATFORM_CXXFLAGS -x c++ - -o test.o 2>/dev/null  <<EOF
+  #include <fcntl.h>
+  int main() {
+    fcntl(0, F_BARRIERFSYNC);
+    return 0;
+  }
+EOF
+    if [ "$?" = 0 ]; then
+      COMMON_FLAGS="$COMMON_FLAGS -DHAVE_BARRIERFSYNC"
+    elif [ "$FSYNC_MODE" == "BARRIER" ]; then
+      echo "Cannot compile with FSYNC_MODE " $FSYNC_MODE >&2
+      exit 1
+    fi
+  fi
+
+
+  if [ "$FSYNC_MODE" != "BARRIER" ]; then
+$CXX $PLATFORM_CXXFLAGS -x c++ - -o test.o 2>/dev/null  <<EOF
   #include <fcntl.h>
   int main() {
     fcntl(0, F_FULLFSYNC);
     return 0;
   }
 EOF
-if [ "$?" = 0 ]; then
-  COMMON_FLAGS="$COMMON_FLAGS -DHAVE_FULLFSYNC"
+    if [ "$?" = 0 ]; then
+      COMMON_FLAGS="$COMMON_FLAGS -DHAVE_FULLFSYNC"
+    elif [ "$FSYNC_MODE" == "FULL" ]; then
+      echo "Cannot compile with FSYNC_MODE " $FSYNC_MODE >&2
+      exit 1
+    fi
+  fi
 fi
 
 rm -f test.o test_dl.o

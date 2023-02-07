@@ -1161,7 +1161,7 @@ TEST_F(DBOptionsTest, ChangeCompression) {
 
 namespace {
 IOStatus WaitForOptionsUpdate(const std::shared_ptr<FileSystem>& fs,
-                            const std::string& options_file) {
+                              const std::string& options_file) {
   TEST_SYNC_POINT("DBOptionsTest::WaitForUpdates");
   auto s = fs->FileExists(options_file, IOOptions(), nullptr);
   SyncPoint::GetInstance()->LoadDependency(

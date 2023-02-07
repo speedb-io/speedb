@@ -35,6 +35,8 @@ public class FilterTest {
       try(final Filter bloomFilter = new BloomFilter(10, false)) {
         blockConfig.setFilterPolicy(bloomFilter);
         options.setTableFormatConfig(blockConfig);
+        assertThat(bloomFilter.isInstanceOf("bloomfilter")).isTrue();
+        assertThat(bloomFilter.isInstanceOf("ribbonfilter")).isFalse();
       }
     }
   }

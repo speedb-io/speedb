@@ -361,6 +361,8 @@ TEST_F(OptionsSettableTest, DBOptionsAllFieldsSettable) {
                              "lowest_used_cache_tier=kNonVolatileBlockTier;"
                              "allow_data_in_errors=false;"
                              "enforce_single_del_contracts=false;"
+                             "refresh_options_sec=0;"
+                             "refresh_options_file=Options.new;"
                              "use_dynamic_delay=true",
                              new_options));
 

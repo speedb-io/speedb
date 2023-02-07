@@ -1161,9 +1161,14 @@ TEST_F(DBOptionsTest, ChangeCompression) {
 
 namespace {
 IOStatus WaitForOptionsUpdate(const std::shared_ptr<FileSystem>& fs,
-                              const std::string& options_file) {
-  TEST_SYNC_POINT("DBOptionsTest::WaitForUpdates");
-  auto s = fs->FileExists(options_file, IOOptions(), nullptr);
+                              const std::string& tmp_options_file,
+                              const std::string& new_options_file) {
+  auto s =
+      fs->RenameFile(tmp_options_file, new_options_file, IOOptions(), nullptr);
+  if (s.ok()) {
+    TEST_SYNC_POINT("DBOptionsTest::WaitForUpdates");
+    s = fs->FileExists(new_options_file, IOOptions(), nullptr);
+  }
   SyncPoint::GetInstance()->LoadDependency(
       {{"DBImpl::RefreshOptions::Complete", "DBOptionsTest::WaitForUpdates"}});
   return s;
@@ -1176,6 +1181,7 @@ TEST_F(DBOptionsTest, RefreshOptions) {
   options.create_if_missing = true;
   options.refresh_options_sec = 1;
   options.refresh_options_file = dbname_ + "/Options.new";
+  std::string tmp_options_file = dbname_ + "/Options.tmp";
   options.max_background_jobs = 1;
   options.max_background_compactions = 2;
   options.periodic_compaction_seconds = 100;
@@ -1189,9 +1195,9 @@ TEST_F(DBOptionsTest, RefreshOptions) {
   options.max_background_compactions = 20;
   options.periodic_compaction_seconds = 200;
   ASSERT_OK(PersistRocksDBOptions(config_options, options, {"default"},
-                                  {options}, options.refresh_options_file,
-                                  fs.get()));
-  ASSERT_NOK(WaitForOptionsUpdate(fs, options.refresh_options_file));
+                                  {options}, tmp_options_file, fs.get()));
+  ASSERT_NOK(
+      WaitForOptionsUpdate(fs, tmp_options_file, options.refresh_options_file));
 
   DBOptions new_db_opts = db_->GetDBOptions();
   ASSERT_EQ(new_db_opts.max_background_jobs, 10);
@@ -1209,6 +1215,7 @@ TEST_F(DBOptionsTest, RefreshSimpleOptions) {
   options.max_background_compactions = 11;
   options.refresh_options_sec = 1;
   options.refresh_options_file = dbname_ + "/Options.new";
+  std::string tmp_options_file = dbname_ + "/Options.tmp";
   options.enable_blob_files = false;
   ASSERT_OK(TryReopen(options));
 
@@ -1217,34 +1224,37 @@ TEST_F(DBOptionsTest, RefreshSimpleOptions) {
   SyncPoint::GetInstance()->EnableProcessing();
 
   // Test with a file that contains only DBOptions
-  ASSERT_OK(CreateFile(fs, options.refresh_options_file,
+  ASSERT_OK(CreateFile(fs, tmp_options_file,
                        "[DBOptions]\n"
                        "max_background_compactions = 22\n"
                        "[CFOptions \"default\"]\n",
                        false));
-  ASSERT_NOK(WaitForOptionsUpdate(fs, options.refresh_options_file));
+  ASSERT_NOK(
+      WaitForOptionsUpdate(fs, tmp_options_file, options.refresh_options_file));
   DBOptions new_db_opts = db_->GetDBOptions();
   ASSERT_EQ(new_db_opts.max_background_compactions, 22);
 
   // Test with a file that contains only ColumnFamilyOptions
-  ASSERT_OK(CreateFile(fs, options.refresh_options_file,
+  ASSERT_OK(CreateFile(fs, tmp_options_file,
                        "[DBOptions]\n"
                        "[CFOptions \"default\"]\n"
                        "enable_blob_files = true\n",
                        false));
-  ASSERT_NOK(WaitForOptionsUpdate(fs, options.refresh_options_file));
+  ASSERT_NOK(
+      WaitForOptionsUpdate(fs, tmp_options_file, options.refresh_options_file));
   auto dcfh = db_->DefaultColumnFamily();
   ColumnFamilyDescriptor dcd;
   ASSERT_OK(dcfh->GetDescriptor(&dcd));
   ASSERT_EQ(dcd.options.enable_blob_files, true);
 
   // Test with a file that contains a table factory options
-  ASSERT_OK(CreateFile(fs, options.refresh_options_file,
+  ASSERT_OK(CreateFile(fs, tmp_options_file,
                        "[DBOptions]\n"
                        "[CFOptions \"default\"]\n"
                        "table_factory.block_size = 32768\n",
                        false));
-  ASSERT_NOK(WaitForOptionsUpdate(fs, options.refresh_options_file));
+  ASSERT_NOK(
+      WaitForOptionsUpdate(fs, tmp_options_file, options.refresh_options_file));
 
   ASSERT_OK(dcfh->GetDescriptor(&dcd));
   auto bbto = dcd.options.table_factory->GetOptions<BlockBasedTableOptions>();
@@ -1261,6 +1271,7 @@ TEST_F(DBOptionsTest, DifferentOptionsFile) {
   options.max_background_jobs = 1;
   options.max_background_compactions = 2;
   options.periodic_compaction_seconds = 100;
+  std::string tmp_options_file = dbname_ + "/Options.new.tmp";
   ASSERT_OK(TryReopen(options));
   SyncPoint::GetInstance()->LoadDependency(
       {{"DBImpl::RefreshOptions::Complete", "DBOptionsTest::WaitForUpdates"}});
@@ -1269,38 +1280,38 @@ TEST_F(DBOptionsTest, DifferentOptionsFile) {
   config_options.mutable_options_only = true;
   options.refresh_options_file = "Options.tmp.1";
   ASSERT_OK(PersistRocksDBOptions(config_options, options, {"default"},
-                                  {options}, dbname_ + "/Options.new",
-                                  fs.get()));
-  ASSERT_NOK(WaitForOptionsUpdate(fs, dbname_ + "/Options.new"));
+                                  {options}, tmp_options_file, fs.get()));
+  ASSERT_NOK(
+      WaitForOptionsUpdate(fs, tmp_options_file, dbname_ + "/Options.new"));
 
   DBOptions new_db_opts = db_->GetDBOptions();
   ASSERT_EQ(new_db_opts.refresh_options_file, "Options.tmp.1");
 
   options.refresh_options_file = "Options.tmp.2";
   ASSERT_OK(PersistRocksDBOptions(config_options, options, {"default"},
-                                  {options}, dbname_ + "/Options.tmp.1",
-                                  fs.get()));
-  ASSERT_NOK(WaitForOptionsUpdate(fs, dbname_ + "/Options.tmp.1"));
+                                  {options}, tmp_options_file, fs.get()));
+  ASSERT_NOK(
+      WaitForOptionsUpdate(fs, tmp_options_file, dbname_ + "/Options.tmp.1"));
   new_db_opts = db_->GetDBOptions();
   ASSERT_EQ(new_db_opts.refresh_options_file, "Options.tmp.2");
 
   ASSERT_OK(fs->CreateDir(dbname_ + "/Options.tmp", IOOptions(), nullptr));
   options.refresh_options_file = dbname_ + "/Options.tmp/Options.new";
   ASSERT_OK(PersistRocksDBOptions(config_options, options, {"default"},
-                                  {options}, dbname_ + "/Options.tmp.2",
-                                  fs.get()));
+                                  {options}, tmp_options_file, fs.get()));
 
-  ASSERT_NOK(WaitForOptionsUpdate(fs, dbname_ + "/Options.tmp.2"));
+  ASSERT_NOK(
+      WaitForOptionsUpdate(fs, tmp_options_file, dbname_ + "/Options.tmp.2"));
 
   new_db_opts = db_->GetDBOptions();
   ASSERT_EQ(new_db_opts.refresh_options_file,
             dbname_ + "/Options.tmp/Options.new");
 
   options.max_background_compactions = 4;
-  ASSERT_OK(
-      PersistRocksDBOptions(config_options, options, {"default"}, {options},
-                            dbname_ + "/Options.tmp/Options.new", fs.get()));
-  ASSERT_NOK(WaitForOptionsUpdate(fs, dbname_ + "/Options.tmp/Options.new"));
+  ASSERT_OK(PersistRocksDBOptions(config_options, options, {"default"},
+                                  {options}, tmp_options_file, fs.get()));
+  ASSERT_NOK(WaitForOptionsUpdate(fs, tmp_options_file,
+                                  dbname_ + "/Options.tmp/Options.new"));
   new_db_opts = db_->GetDBOptions();
   ASSERT_EQ(new_db_opts.max_background_compactions, 4);
   ASSERT_OK(fs->DeleteDir(dbname_ + "/Options.tmp", IOOptions(), nullptr));
@@ -1312,6 +1323,7 @@ TEST_F(DBOptionsTest, RefreshOptionsImmutable) {
   options.create_if_missing = true;
   options.refresh_options_sec = 1;
   options.refresh_options_file = dbname_ + "/Options.new";
+  std::string tmp_options_file = dbname_ + "/Options.tmp";
   ASSERT_OK(TryReopen(options));
   SyncPoint::GetInstance()->LoadDependency(
       {{"DBImpl::RefreshOptions::Complete", "DBOptionsTest::WaitForUpdates"}});
@@ -1323,9 +1335,9 @@ TEST_F(DBOptionsTest, RefreshOptionsImmutable) {
   std::unique_ptr<Env> mock(MockEnv::Create(options.env));
   options.env = mock.get();
   ASSERT_OK(PersistRocksDBOptions(config_options, options, {"default"},
-                                  {options}, options.refresh_options_file,
-                                  fs.get()));
-  ASSERT_NOK(WaitForOptionsUpdate(fs, options.refresh_options_file));
+                                  {options}, tmp_options_file, fs.get()));
+  ASSERT_NOK(
+      WaitForOptionsUpdate(fs, tmp_options_file, options.refresh_options_file));
 
   // Test setting an immutable ColumnFamilyOption and see the value
   // did not change
@@ -1334,9 +1346,9 @@ TEST_F(DBOptionsTest, RefreshOptionsImmutable) {
   options.refresh_options_sec = 1;
   options.refresh_options_file = dbname_ + "/Options.new";
   ASSERT_OK(PersistRocksDBOptions(config_options, options, {"default"},
-                                  {options}, options.refresh_options_file,
-                                  fs.get()));
-  ASSERT_NOK(WaitForOptionsUpdate(fs, options.refresh_options_file));
+                                  {options}, tmp_options_file, fs.get()));
+  ASSERT_NOK(
+      WaitForOptionsUpdate(fs, tmp_options_file, options.refresh_options_file));
 
   auto dcfh = db_->DefaultColumnFamily();
   ColumnFamilyDescriptor dcd;
@@ -1350,6 +1362,7 @@ TEST_F(DBOptionsTest, RefreshOptionsBadFile) {
   options.create_if_missing = true;
   options.refresh_options_sec = 1;
   options.refresh_options_file = dbname_ + "/Options.new";
+  std::string tmp_options_file = dbname_ + "/Options.tmp";
   ASSERT_OK(TryReopen(options));
 
   SyncPoint::GetInstance()->LoadDependency(
@@ -1361,25 +1374,28 @@ TEST_F(DBOptionsTest, RefreshOptionsBadFile) {
                                         });
   SyncPoint::GetInstance()->EnableProcessing();
   // Test with a file that is not an options file
-  ASSERT_OK(CreateFile(fs, options.refresh_options_file, "fred", false));
-  ASSERT_NOK(WaitForOptionsUpdate(fs, options.refresh_options_file));
+  ASSERT_OK(CreateFile(fs, tmp_options_file, "fred", false));
+  ASSERT_NOK(
+      WaitForOptionsUpdate(fs, tmp_options_file, options.refresh_options_file));
 
   // Test with a file that contains no DBOptions section
-  ASSERT_OK(CreateFile(fs, options.refresh_options_file,
-                       "[CFOptions \"default\"]\n", false));
-  ASSERT_NOK(WaitForOptionsUpdate(fs, options.refresh_options_file));
+  ASSERT_OK(
+      CreateFile(fs, tmp_options_file, "[CFOptions \"default\"]\n", false));
+  ASSERT_NOK(
+      WaitForOptionsUpdate(fs, tmp_options_file, options.refresh_options_file));
 
   // Test with a file that contains no ColumnFamilyOptions section
-  ASSERT_OK(
-      CreateFile(fs, options.refresh_options_file, "[DBOptions]\n", false));
-  ASSERT_NOK(WaitForOptionsUpdate(fs, options.refresh_options_file));
+  ASSERT_OK(CreateFile(fs, tmp_options_file, "[DBOptions]\n", false));
+  ASSERT_NOK(
+      WaitForOptionsUpdate(fs, tmp_options_file, options.refresh_options_file));
 
   // Test with a file that contains no default ColumnFamilyOptions section
-  ASSERT_OK(CreateFile(fs, options.refresh_options_file,
+  ASSERT_OK(CreateFile(fs, tmp_options_file,
                        "[DBOptions]\n"
                        "[CFOptions \"unknown\"]\n",
                        false));
-  ASSERT_NOK(WaitForOptionsUpdate(fs, options.refresh_options_file));
+  ASSERT_NOK(
+      WaitForOptionsUpdate(fs, tmp_options_file, options.refresh_options_file));
 
   // Test what happens if the refresh_options_file is a directory, not a file
   bool exists = false;
@@ -1399,6 +1415,7 @@ TEST_F(DBOptionsTest, RefreshOptionsUnknown) {
   options.create_if_missing = true;
   options.refresh_options_sec = 1;
   options.refresh_options_file = dbname_ + "/Options.new";
+  std::string tmp_options_file = dbname_ + "/Options.tmp";
   ASSERT_OK(TryReopen(options));
   SyncPoint::GetInstance()->LoadDependency(
       {{"DBImpl::RefreshOptions::Complete", "DBOptionsTest::WaitForUpdates"}});
@@ -1414,20 +1431,22 @@ TEST_F(DBOptionsTest, RefreshOptionsUnknown) {
                                         });
   SyncPoint::GetInstance()->EnableProcessing();
   // Test with a file that contains a bad DBOptions value
-  ASSERT_OK(CreateFile(fs, options.refresh_options_file,
+  ASSERT_OK(CreateFile(fs, tmp_options_file,
                        "[DBOptions]\n"
                        "unknown = value\n"
                        "[CFOptions \"default\"]\n",
                        false));
-  ASSERT_NOK(WaitForOptionsUpdate(fs, options.refresh_options_file));
+  ASSERT_NOK(
+      WaitForOptionsUpdate(fs, tmp_options_file, options.refresh_options_file));
 
   // Test with a file with a bad ColumnFamilyOptions
-  ASSERT_OK(CreateFile(fs, options.refresh_options_file,
+  ASSERT_OK(CreateFile(fs, tmp_options_file,
                        "[DBOptions]\n"
                        "[CFOptions \"default\"]\n"
                        "unknown = value\n",
                        false));
-  ASSERT_NOK(WaitForOptionsUpdate(fs, options.refresh_options_file));
+  ASSERT_NOK(
+      WaitForOptionsUpdate(fs, tmp_options_file, options.refresh_options_file));
 }
 
 #endif  // ROCKSDB_LITE

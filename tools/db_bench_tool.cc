@@ -862,16 +862,19 @@ DEFINE_uint64(compaction_readahead_size,
               ROCKSDB_NAMESPACE::Options().compaction_readahead_size,
               "Compaction readahead size");
 
-DEFINE_int32(log_readahead_size,
-             ROCKSDB_NAMESPACE::Options().log_readahead_size,
-             "WAL and manifest readahead size");
+DEFINE_int32(
+    log_readahead_size,
+    static_cast<int32_t>(ROCKSDB_NAMESPACE::Options().log_readahead_size),
+    "WAL and manifest readahead size");
 
 DEFINE_int32(random_access_max_buffer_size,
-             ROCKSDB_NAMESPACE::Options().random_access_max_buffer_size,
+             static_cast<int32_t>(
+                 ROCKSDB_NAMESPACE::Options().random_access_max_buffer_size),
              "Maximum windows randomaccess buffer size");
 
 DEFINE_int32(writable_file_max_buffer_size,
-             ROCKSDB_NAMESPACE::Options().writable_file_max_buffer_size,
+             static_cast<int32_t>(
+                 ROCKSDB_NAMESPACE::Options().writable_file_max_buffer_size),
              "Maximum write buffer for Writable File");
 
 DEFINE_double(bloom_bits, -1,
@@ -1864,8 +1867,10 @@ DEFINE_int32(skip_list_lookahead, 0,
 DEFINE_bool(report_file_operations, false,
             "if report number of file operations");
 DEFINE_bool(report_open_timing, false, "if report open timing");
-DEFINE_int32(readahead_size, ROCKSDB_NAMESPACE::ReadOptions().readahead_size,
-             "Iterator readahead size");
+DEFINE_int32(
+    readahead_size,
+    static_cast<int32_t>(ROCKSDB_NAMESPACE::ReadOptions().readahead_size),
+    "Iterator readahead size");
 
 DEFINE_bool(read_with_latest_user_timestamp, true,
             "If true, always use the current latest timestamp for read. If "

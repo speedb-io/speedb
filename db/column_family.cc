@@ -1128,7 +1128,7 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
 
     // GetWriteStallConditionAndCause returns the first condition met, so its
     // possible that a later condition will require a harder rate limiting.
-    // calculate all conditions with DynamicSetupDelay and reavaluate the
+    // calculate all conditions with DynamicSetupDelay and reevaluate the
     // write_stall_cause. this is only relevant in the kDelayed case.
     if (dynamic_delay) {
       if (write_stall_condition == WriteStallCondition::kDelayed) {

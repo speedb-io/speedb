@@ -52,16 +52,6 @@ class WriteController {
   // threads will be increased
   std::unique_ptr<WriteControllerToken> GetCompactionPressureToken();
 
-  // sets all enties to: is_min = false
-  // set is_min = true for the min rate entry;
-  // returns the min rate from cf_id_to_write_rate_ .
-  // Requires: cf_id_to_write_rate_ is not empty
-  uint64_t GetMinRate();
-
-  // when a previous min rate cf has been removed, we need to set a new min
-  void SetMinRate();
-
- public:
   // these three metods are querying the state of the WriteController
   bool IsStopped() const;
   bool NeedsDelay() const { return total_delayed_.load() > 0; }
@@ -107,6 +97,12 @@ class WriteController {
   void AddToDbRateMap(CfIdToRateMap* cf_map);
 
   void RemoveFromDbRateMap(CfIdToRateMap* cf_map);
+
+  // returns the min rate from db_id_to_write_rate_map
+  uint64_t GetMinRate();
+
+  // when a previous min rate cf has been removed, we need to set a new min
+  void SetMinRate();
 
  private:
   uint64_t NowMicrosMonotonic(SystemClock* clock);

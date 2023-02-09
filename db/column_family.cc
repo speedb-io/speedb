@@ -749,6 +749,9 @@ void ColumnFamilyData::SetDropped() {
   // can't drop default CF
   assert(id_ != 0);
   dropped_ = true;
+  if (column_family_set_->write_controller_->is_dynamic_delay()) {
+    MaybeRemoveSelfAndRefreshDelayRate();
+  }
   write_controller_token_.reset();
 
   // remove from column_family_set
@@ -896,6 +899,46 @@ double ColumnFamilyData::TEST_CalculateWriteDelayDivider(
       compaction_needed_bytes, mutable_cf_options, write_stall_cause);
 }
 
+bool ColumnFamilyData::IsInRateMap() {
+  return column_family_set_->cf_id_to_write_rate_.count(id_);
+}
+
+void ColumnFamilyData::RemoveCfFromRateMap() {
+  column_family_set_->cf_id_to_write_rate_.erase(id_);
+}
+
+void ColumnFamilyData::InsertOrAssignToCfIdAndRateMap(uint64_t write_rate) {
+  column_family_set_->cf_id_to_write_rate_.insert_or_assign(id_, write_rate);
+}
+
+// REQUIRES: cf IsInRateMap == true.
+bool ColumnFamilyData::IsMinRate() {
+  assert(IsInRateMap());
+  uint64_t min_rate =
+      column_family_set_->write_controller_->delayed_write_rate();
+  auto cf_rate = column_family_set_->cf_id_to_write_rate_[id_];
+  // the cf is already in the map so it shouldnt be possible for it to have a
+  // lower rate than the delayed_write_rate_ unless set_max_delayed_write_rate
+  // has been used which also sets delayed_write_rate_
+  // its fine for several cfs to have the same min_rate.
+  return cf_rate <= min_rate;
+}
+
+// this needs to be synced with WriteController::GetMinRate() since one cf might
+// go through GetMinRate() and find a min value which is dropped at the same
+// time by cf in a different db. so hold write_controller mutex during removal.
+void ColumnFamilyData::MaybeRemoveSelfAndRefreshDelayRate() {
+  if (IsInRateMap()) {
+    std::lock_guard<std::mutex> lock(
+        column_family_set_->write_controller_->GetMapMutex());
+    bool was_min = IsMinRate();
+    RemoveCfFromRateMap();
+    if (was_min) {
+      column_family_set_->write_controller_->SetMinRate();
+    }
+  }
+}
+
 std::unique_ptr<WriteControllerToken> ColumnFamilyData::DynamicSetupDelay(
     WriteController* write_controller, uint64_t compaction_needed_bytes,
     const MutableCFOptions& mutable_cf_options,
@@ -911,6 +954,37 @@ std::unique_ptr<WriteControllerToken> ColumnFamilyData::DynamicSetupDelay(
     write_rate = kMinWriteRate;
   }
 
+  bool was_min = false;
+  if (IsInRateMap()) {
+    was_min = IsMinRate();
+  }
+  InsertOrAssignToCfIdAndRateMap(write_rate);
+
+  // GetDelayToken returns a DelayWriteToken and also sets the
+  // delayed_write_rate_ which is used by all cfs and dbs using this write
+  // controller. because it also sets the delayed_write_rate_, we need to set
+  // only the smallest active delay request. the usual case is to set the
+  // write_rate of this cf only if its lower than the current min if (write_rate
+  // < delayed_write_rate_) but theres also the case where this cf was the min
+  // rate and now its write_rate is higher than the delayed_write_rate_ so we
+  // need to find a new min from all cfs (GetMinRate())
+  if (write_rate > write_controller->delayed_write_rate()) {
+    if (was_min) {
+      std::lock_guard<std::mutex> lock(
+          column_family_set_->write_controller_->GetMapMutex());
+      write_rate = write_controller->GetMinRate();
+    } else {
+      write_rate = write_controller->delayed_write_rate();
+    }
+  }
+  // theres a race when there are two cfs from two different dbs. cf1 need 100Mb
+  // delay, cf2 needs 50. delayed_write_rate_ is 150. cf2 calls
+  // InsertOrAssignToCfIdAndRateMap first and right after cf1 enters (before
+  // cf2) manages to set delayed_write_rate_. so cf1 would also set its write
+  // rate (since - write_rate < write_controller->delayed_write_rate()), even
+  // though its higher than cf2. if this situation is problematic, it can be
+  // solved by using locks or checking against GetMinRate() instead of
+  // delayed_write_rate.
   return write_controller->GetDelayToken(write_rate);
 }
 
@@ -1037,7 +1111,7 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
   auto write_stall_condition = WriteStallCondition::kNormal;
   if (current_ != nullptr) {
     auto* vstorage = current_->storage_info();
-    auto write_controller = column_family_set_->write_controller_;
+    auto write_controller = column_family_set_->write_controller().get();
     uint64_t compaction_needed_bytes =
         vstorage->estimated_compaction_needed_bytes();
 
@@ -1056,11 +1130,14 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
     // possible that a later condition will require a harder rate limiting.
     // calculate all conditions with DynamicSetupDelay and reavaluate the
     // write_stall_cause. this is only relevant in the kDelayed case.
-    if (dynamic_delay &&
-        write_stall_condition == WriteStallCondition::kDelayed) {
-      write_controller_token_ =
-          DynamicSetupDelay(write_controller, compaction_needed_bytes,
-                            mutable_cf_options, write_stall_cause);
+    if (dynamic_delay) {
+      if (write_stall_condition == WriteStallCondition::kDelayed) {
+        write_controller_token_ =
+            DynamicSetupDelay(write_controller, compaction_needed_bytes,
+                              mutable_cf_options, write_stall_cause);
+      } else {
+        MaybeRemoveSelfAndRefreshDelayRate();
+      }
     }
 
     if (write_stall_condition == WriteStallCondition::kStopped &&
@@ -1196,7 +1273,7 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
       // If the DB recovers from delay conditions, we reward with reducing
       // double the slowdown ratio. This is to balance the long term slowdown
       // increase signal.
-      if (needed_delay) {
+      if (needed_delay && !dynamic_delay) {
         uint64_t write_rate = write_controller->delayed_write_rate();
         write_controller->set_delayed_write_rate(static_cast<uint64_t>(
             static_cast<double>(write_rate) * kDelayRecoverSlowdownRatio));
@@ -1652,16 +1729,14 @@ FSDirectory* ColumnFamilyData::GetDataDir(size_t path_id) const {
   return data_dirs_[path_id].get();
 }
 
-ColumnFamilySet::ColumnFamilySet(const std::string& dbname,
-                                 const ImmutableDBOptions* db_options,
-                                 const FileOptions& file_options,
-                                 Cache* table_cache,
-                                 WriteBufferManager* _write_buffer_manager,
-                                 WriteController* _write_controller,
-                                 BlockCacheTracer* const block_cache_tracer,
-                                 const std::shared_ptr<IOTracer>& io_tracer,
-                                 const std::string& db_id,
-                                 const std::string& db_session_id)
+ColumnFamilySet::ColumnFamilySet(
+    const std::string& dbname, const ImmutableDBOptions* db_options,
+    const FileOptions& file_options, Cache* table_cache,
+    WriteBufferManager* _write_buffer_manager,
+    std::shared_ptr<WriteController> _write_controller,
+    BlockCacheTracer* const block_cache_tracer,
+    const std::shared_ptr<IOTracer>& io_tracer, const std::string& db_id,
+    const std::string& db_session_id)
     : max_column_family_(0),
       file_options_(file_options),
       dummy_cfd_(new ColumnFamilyData(
@@ -1681,6 +1756,10 @@ ColumnFamilySet::ColumnFamilySet(const std::string& dbname,
   // initialize linked list
   dummy_cfd_->prev_ = dummy_cfd_;
   dummy_cfd_->next_ = dummy_cfd_;
+  if (write_controller_) {
+    std::lock_guard<std::mutex> lock(write_controller_->GetMapMutex());
+    write_controller_->AddToDbRateMap(&cf_id_to_write_rate_);
+  }
 }
 
 ColumnFamilySet::~ColumnFamilySet() {
@@ -1694,6 +1773,10 @@ ColumnFamilySet::~ColumnFamilySet() {
   bool dummy_last_ref __attribute__((__unused__));
   dummy_last_ref = dummy_cfd_->UnrefAndTryDelete();
   assert(dummy_last_ref);
+  if (write_controller_) {
+    std::lock_guard<std::mutex> lock(write_controller_->GetMapMutex());
+    write_controller_->RemoveFromDbRateMap(&cf_id_to_write_rate_);
+  }
 }
 
 ColumnFamilyData* ColumnFamilySet::GetDefault() const {

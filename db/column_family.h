@@ -509,6 +509,18 @@ class ColumnFamilyData {
       const MutableCFOptions& mutable_cf_options,
       WriteStallCause& write_stall_cause);
 
+  void InsertOrAssignToCfIdAndRateMap(uint64_t write_rate);
+
+  bool IsMinRate();
+
+  void RemoveCfFromRateMap();
+
+  bool IsInRateMap();
+
+  // try and remove the cf id from WriteController::cf_id_to_write_rate_.
+  // if successful and it was the min rate, set the current minimum value.
+  void MaybeRemoveSelfAndRefreshDelayRate();
+
  public:
   void set_initialized() { initialized_.store(true); }
 
@@ -778,6 +790,8 @@ class ColumnFamilySet {
   std::shared_ptr<IOTracer> io_tracer_;
   const std::string& db_id_;
   std::string db_session_id_;
+
+  std::unordered_map<uint32_t, uint64_t> cf_id_to_write_rate_;
 };
 
 // A wrapper for ColumnFamilySet that supports releasing DB mutex during each

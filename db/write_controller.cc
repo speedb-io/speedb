@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cassert>
+#include <mutex>
 #include <ratio>
 
 #include "rocksdb/system_clock.h"
@@ -21,10 +22,13 @@ std::unique_ptr<WriteControllerToken> WriteController::GetStopToken() {
 
 std::unique_ptr<WriteControllerToken> WriteController::GetDelayToken(
     uint64_t write_rate) {
-  if (0 == total_delayed_++) {
-    // Starting delay, so reset counters.
-    next_refill_time_ = 0;
-    credit_in_bytes_ = 0;
+  {
+    std::lock_guard<std::mutex> lock(mu_);
+    if (0 == total_delayed_++) {
+      // Starting delay, so reset counters.
+      next_refill_time_ = 0;
+      credit_in_bytes_ = 0;
+    }
   }
   // NOTE: for simplicity, any current credit_in_bytes_ or "debt" in
   // next_refill_time_ will be based on an old rate. This rate will apply
@@ -32,6 +36,29 @@ std::unique_ptr<WriteControllerToken> WriteController::GetDelayToken(
   set_delayed_write_rate(write_rate);
   return std::unique_ptr<WriteControllerToken>(new DelayWriteToken(this));
 }
+
+void WriteController::AddToDbRateMap(CfIdToRateMap* cf_map) {
+  db_id_to_write_rate_map.insert(cf_map);
+}
+
+void WriteController::RemoveFromDbRateMap(CfIdToRateMap* cf_map) {
+  db_id_to_write_rate_map.erase(cf_map);
+}
+
+// REQUIRES: write_controller map mutex held.
+uint64_t WriteController::GetMinRate() {
+  uint64_t min_rate = max_delayed_write_rate();
+  for (auto cf_id_to_write_rate_ : db_id_to_write_rate_map) {
+    for (const auto& key_val : *cf_id_to_write_rate_) {
+      if (key_val.second < min_rate) {
+        min_rate = key_val.second;
+      }
+    }
+  }
+  return min_rate;
+}
+
+void WriteController::SetMinRate() { set_delayed_write_rate(GetMinRate()); }
 
 std::unique_ptr<WriteControllerToken>
 WriteController::GetCompactionPressureToken() {
@@ -56,9 +83,10 @@ uint64_t WriteController::GetDelay(SystemClock* clock, uint64_t num_bytes) {
     return 0;
   }
 
-  if (credit_in_bytes_ >= num_bytes) {
-    credit_in_bytes_ -= num_bytes;
-    return 0;
+  auto credits = credit_in_bytes_.load();
+  while (credits >= num_bytes) {
+    if (credit_in_bytes_.compare_exchange_weak(credits, credits - num_bytes))
+      return 0;
   }
   // The frequency to get time inside DB mutex is less than one per refill
   // interval.
@@ -67,6 +95,8 @@ uint64_t WriteController::GetDelay(SystemClock* clock, uint64_t num_bytes) {
   const uint64_t kMicrosPerSecond = 1000000;
   // Refill every 1 ms
   const uint64_t kMicrosPerRefill = 1000;
+
+  std::lock_guard<std::mutex> lock(mu_);
 
   if (next_refill_time_ == 0) {
     // Start with an initial allotment of bytes for one interval

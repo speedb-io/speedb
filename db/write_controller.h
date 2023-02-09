@@ -9,6 +9,8 @@
 
 #include <atomic>
 #include <memory>
+#include <mutex>
+
 #include "rocksdb/rate_limiter.h"
 
 namespace ROCKSDB_NAMESPACE {
@@ -50,6 +52,16 @@ class WriteController {
   // threads will be increased
   std::unique_ptr<WriteControllerToken> GetCompactionPressureToken();
 
+  // sets all enties to: is_min = false
+  // set is_min = true for the min rate entry;
+  // returns the min rate from cf_id_to_write_rate_ .
+  // Requires: cf_id_to_write_rate_ is not empty
+  uint64_t GetMinRate();
+
+  // when a previous min rate cf has been removed, we need to set a new min
+  void SetMinRate();
+
+ public:
   // these three metods are querying the state of the WriteController
   bool IsStopped() const;
   bool NeedsDelay() const { return total_delayed_.load() > 0; }
@@ -88,6 +100,14 @@ class WriteController {
 
   bool is_dynamic_delay() const { return dynamic_delay_; }
 
+  std::mutex& GetMapMutex() { return mu_for_map_; }
+
+  using CfIdToRateMap = std::unordered_map<uint32_t, uint64_t>;
+
+  void AddToDbRateMap(CfIdToRateMap* cf_map);
+
+  void RemoveFromDbRateMap(CfIdToRateMap* cf_map);
+
  private:
   uint64_t NowMicrosMonotonic(SystemClock* clock);
 
@@ -100,16 +120,22 @@ class WriteController {
   std::atomic<int> total_delayed_;
   std::atomic<int> total_compaction_pressure_;
 
+  // mutex to protect below 4 members
+  std::mutex mu_;
   // Number of bytes allowed to write without delay
-  uint64_t credit_in_bytes_;
+  std::atomic<uint64_t> credit_in_bytes_;
   // Next time that we can add more credit of bytes
-  uint64_t next_refill_time_;
+  std::atomic<uint64_t> next_refill_time_;
   // Write rate set when initialization or by `DBImpl::SetDBOptions`
-  uint64_t max_delayed_write_rate_;
+  std::atomic<uint64_t> max_delayed_write_rate_;
   // Current write rate (bytes / second)
-  uint64_t delayed_write_rate_;
+  std::atomic<uint64_t> delayed_write_rate_;
+
   // Whether Speedb's dynamic delay is used
   bool dynamic_delay_;
+
+  std::mutex mu_for_map_;
+  std::unordered_set<CfIdToRateMap*> db_id_to_write_rate_map;
 
   std::unique_ptr<RateLimiter> low_pri_rate_limiter_;
 };

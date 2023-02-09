@@ -720,6 +720,7 @@ ImmutableDBOptions::ImmutableDBOptions(const DBOptions& options)
       advise_random_on_open(options.advise_random_on_open),
       db_write_buffer_size(options.db_write_buffer_size),
       write_buffer_manager(options.write_buffer_manager),
+      write_controller(options.write_controller),
       access_hint_on_compaction_start(options.access_hint_on_compaction_start),
       random_access_max_buffer_size(options.random_access_max_buffer_size),
       use_adaptive_mutex(options.use_adaptive_mutex),
@@ -854,6 +855,8 @@ void ImmutableDBOptions::Dump(Logger* log) const {
   ROCKS_LOG_HEADER(
       log, "                   Options.db_write_buffer_size: %" ROCKSDB_PRIszt,
       db_write_buffer_size);
+  ROCKS_LOG_HEADER(log, "                   Options.write_controller: %p",
+                   write_controller.get());
   ROCKS_LOG_HEADER(
       log, "                   Options.write_buffer_manager: %p%s%s",
       write_buffer_manager.get(), (write_buffer_manager.get() ? "\n" : ""),

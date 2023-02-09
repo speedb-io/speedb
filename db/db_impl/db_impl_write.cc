@@ -1163,8 +1163,8 @@ Status DBImpl::PreprocessWrite(const WriteOptions& write_options,
   PERF_TIMER_STOP(write_scheduling_flushes_compactions_time);
   PERF_TIMER_GUARD(write_pre_and_post_process_time);
 
-  if (UNLIKELY(status.ok() && (write_controller_.IsStopped() ||
-                               write_controller_.NeedsDelay()))) {
+  if (UNLIKELY(status.ok() && (write_controller_->IsStopped() ||
+                               write_controller_->NeedsDelay()))) {
     PERF_TIMER_STOP(write_pre_and_post_process_time);
     PERF_TIMER_GUARD(write_delay_time);
     // We don't know size of curent batch so that we always use the size
@@ -1748,7 +1748,7 @@ Status DBImpl::DelayWrite(uint64_t num_bytes,
     StopWatch sw(immutable_db_options_.clock, stats_, WRITE_STALL,
                  &time_delayed);
     uint64_t delay =
-        write_controller_.GetDelay(immutable_db_options_.clock, num_bytes);
+        write_controller_->GetDelay(immutable_db_options_.clock, num_bytes);
     if (delay > 0) {
       if (write_options.no_slowdown) {
         return Status::Incomplete("Write stall");
@@ -1766,7 +1766,7 @@ Status DBImpl::DelayWrite(uint64_t num_bytes,
       // case of sleep imprecision, rounding, etc.)
       const uint64_t kDelayInterval = 1001;
       uint64_t stall_end = sw.start_time() + delay;
-      while (write_controller_.NeedsDelay()) {
+      while (write_controller_->NeedsDelay()) {
         if (immutable_db_options_.clock->NowMicros() >= stall_end) {
           // We already delayed this write `delay` microseconds
           break;
@@ -1784,7 +1784,7 @@ Status DBImpl::DelayWrite(uint64_t num_bytes,
     // might wait here indefinitely as the background compaction may never
     // finish successfully, resulting in the stall condition lasting
     // indefinitely
-    while (error_handler_.GetBGError().ok() && write_controller_.IsStopped()) {
+    while (error_handler_.GetBGError().ok() && write_controller_->IsStopped()) {
       if (write_options.no_slowdown) {
         return Status::Incomplete("Write stall");
       }
@@ -1809,7 +1809,7 @@ Status DBImpl::DelayWrite(uint64_t num_bytes,
   // writes, we can ignore any background errors and allow the write to
   // proceed
   Status s;
-  if (write_controller_.IsStopped()) {
+  if (write_controller_->IsStopped()) {
     // If writes are still stopped, it means we bailed due to a background
     // error
     s = Status::Incomplete(error_handler_.GetBGError().ToString());
@@ -1858,7 +1858,7 @@ Status DBImpl::ThrottleLowPriWritesIfNeeded(const WriteOptions& write_options,
   // it in this case.
   // If we need to speed compaction, it means the compaction is left behind
   // and we start to limit low pri writes to a limit.
-  if (write_controller_.NeedSpeedupCompaction()) {
+  if (write_controller_->NeedSpeedupCompaction()) {
     if (allow_2pc() && (my_batch->HasCommit() || my_batch->HasRollback())) {
       // For 2PC, we only rate limit prepare, not commit.
       return Status::OK();
@@ -1872,7 +1872,7 @@ Status DBImpl::ThrottleLowPriWritesIfNeeded(const WriteOptions& write_options,
       // a chance to run. Now we guarantee we are still slowly making
       // progress.
       PERF_TIMER_GUARD(write_delay_time);
-      write_controller_.low_pri_rate_limiter()->Request(
+      write_controller_->low_pri_rate_limiter()->Request(
           my_batch->GetDataSize(), Env::IO_HIGH, nullptr /* stats */,
           RateLimiter::OpType::kWrite);
     }

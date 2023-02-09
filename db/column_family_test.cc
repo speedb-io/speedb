@@ -234,7 +234,7 @@ class ColumnFamilyTestBase : public testing::Test {
     EXPECT_TRUE(dbfull()->GetIntProperty("rocksdb.is-write-stopped", &v));
     return (v == 1);
 #else
-    return dbfull()->TEST_write_controler().IsStopped();
+    return dbfull()->TEST_write_controler()->IsStopped();
 #endif  // !ROCKSDB_LITE
   }
 
@@ -245,10 +245,10 @@ class ColumnFamilyTestBase : public testing::Test {
         dbfull()->GetIntProperty("rocksdb.actual-delayed-write-rate", &v));
     return v;
 #else
-    if (!dbfull()->TEST_write_controler().NeedsDelay()) {
+    if (!dbfull()->TEST_write_controler()->NeedsDelay()) {
       return 0;
     }
-    return dbfull()->TEST_write_controler().delayed_write_rate();
+    return dbfull()->TEST_write_controler()->delayed_write_rate();
 #endif  // !ROCKSDB_LITE
   }
 
@@ -617,7 +617,7 @@ class ColumnFamilyTestWithDynamic
   void CheckAssertions(bool expected_is_db_write_stopped,
                        bool expected_needs_delay) {
     ASSERT_TRUE(IsDbWriteStopped() == expected_is_db_write_stopped);
-    ASSERT_TRUE(dbfull()->TEST_write_controler().NeedsDelay() ==
+    ASSERT_TRUE(dbfull()->TEST_write_controler()->NeedsDelay() ==
                 expected_needs_delay);
   }
 };
@@ -1770,7 +1770,7 @@ TEST_P(ColumnFamilyTest, AutomaticAndManualCompactions) {
   Reopen({default_cf, one, two});
   // make sure all background compaction jobs can be scheduled
   auto stop_token =
-      dbfull()->TEST_write_controler().GetCompactionPressureToken();
+      dbfull()->TEST_write_controler()->GetCompactionPressureToken();
 
   std::atomic_bool cf_1_1{true};
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->LoadDependency(
@@ -1865,7 +1865,7 @@ TEST_P(ColumnFamilyTest, ManualAndAutomaticCompactions) {
   Reopen({default_cf, one, two});
   // make sure all background compaction jobs can be scheduled
   auto stop_token =
-      dbfull()->TEST_write_controler().GetCompactionPressureToken();
+      dbfull()->TEST_write_controler()->GetCompactionPressureToken();
 
   // SETUP column family "one" -- universal style
   for (int i = 0; i < one.level0_file_num_compaction_trigger - 2; ++i) {
@@ -1957,7 +1957,7 @@ TEST_P(ColumnFamilyTest, SameCFManualManualCompactions) {
   Reopen({default_cf, one});
   // make sure all background compaction jobs can be scheduled
   auto stop_token =
-      dbfull()->TEST_write_controler().GetCompactionPressureToken();
+      dbfull()->TEST_write_controler()->GetCompactionPressureToken();
 
   // SETUP column family "one" -- universal style
   for (int i = 0; i < one.level0_file_num_compaction_trigger - 2; ++i) {
@@ -2057,7 +2057,7 @@ TEST_P(ColumnFamilyTest, SameCFManualAutomaticCompactions) {
   Reopen({default_cf, one});
   // make sure all background compaction jobs can be scheduled
   auto stop_token =
-      dbfull()->TEST_write_controler().GetCompactionPressureToken();
+      dbfull()->TEST_write_controler()->GetCompactionPressureToken();
 
   // SETUP column family "one" -- universal style
   for (int i = 0; i < one.level0_file_num_compaction_trigger - 2; ++i) {
@@ -2148,7 +2148,7 @@ TEST_P(ColumnFamilyTest, SameCFManualAutomaticCompactionsLevel) {
   Reopen({default_cf, one});
   // make sure all background compaction jobs can be scheduled
   auto stop_token =
-      dbfull()->TEST_write_controler().GetCompactionPressureToken();
+      dbfull()->TEST_write_controler()->GetCompactionPressureToken();
 
   // SETUP column family "one" -- level style
   for (int i = 0; i < one.level0_file_num_compaction_trigger - 2; ++i) {
@@ -2245,7 +2245,7 @@ TEST_P(ColumnFamilyTest, SameCFAutomaticManualCompactions) {
   Reopen({default_cf, one});
   // make sure all background compaction jobs can be scheduled
   auto stop_token =
-      dbfull()->TEST_write_controler().GetCompactionPressureToken();
+      dbfull()->TEST_write_controler()->GetCompactionPressureToken();
 
   std::atomic_bool cf_1_1{true};
   std::atomic_bool cf_1_2{true};
@@ -2959,24 +2959,24 @@ TEST_P(ColumnFamilyTestWithDynamic, WriteStallSingleColumnFamily) {
                                mutable_cf_options, NotStopped, NotDelayed));
 
   mutable_cf_options.disable_auto_compactions = true;
-  dbfull()->TEST_write_controler().set_delayed_write_rate(kBaseRate);
+  dbfull()->TEST_write_controler()->set_delayed_write_rate(kBaseRate);
   RecalculateWriteStallConditions(cfd, mutable_cf_options);
   ASSERT_TRUE(!IsDbWriteStopped());
-  ASSERT_TRUE(!dbfull()->TEST_write_controler().NeedsDelay());
+  ASSERT_TRUE(!dbfull()->TEST_write_controler()->NeedsDelay());
 
   rate_divider = CALL_WRAPPER(SetDelayAndCalculateRate(
       cfd, 0 Gb, 0 /* times_delayed*/, mutable_cf_options, NotStopped,
       NotDelayed, 50 /* l0_files*/));
   ASSERT_EQ(0, GetDbDelayedWriteRate());
   ASSERT_EQ(static_cast<uint64_t>(kBaseRate / rate_divider),
-            dbfull()->TEST_write_controler().delayed_write_rate());
+            dbfull()->TEST_write_controler()->delayed_write_rate());
 
   rate_divider = CALL_WRAPPER(SetDelayAndCalculateRate(
       cfd, 300 Gb, 0 /* times_delayed*/, mutable_cf_options, NotStopped,
       NotDelayed, 60 /* l0_files*/));
   ASSERT_EQ(0, GetDbDelayedWriteRate());
   ASSERT_EQ(static_cast<uint64_t>(kBaseRate / rate_divider),
-            dbfull()->TEST_write_controler().delayed_write_rate());
+            dbfull()->TEST_write_controler()->delayed_write_rate());
 
   mutable_cf_options.disable_auto_compactions = false;
   rate_divider = CALL_WRAPPER(SetDelayAndCalculateRate(

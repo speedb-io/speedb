@@ -889,7 +889,9 @@ class DBImpl : public DB {
     return num_running_compactions_;
   }
 
-  const WriteController& write_controller() { return write_controller_; }
+  const std::shared_ptr<WriteController>& write_controller() const {
+    return write_controller_;
+  }
 
   // hollow transactions shell used for recovery.
   // these will then be passed to TransactionDB so that
@@ -1148,7 +1150,9 @@ class DBImpl : public DB {
 
   Cache* TEST_table_cache() { return table_cache_.get(); }
 
-  WriteController& TEST_write_controler() { return write_controller_; }
+  const std::shared_ptr<WriteController>& TEST_write_controler() {
+    return write_controller_;
+  }
 
   uint64_t TEST_FindMinLogContainingOutstandingPrep();
   uint64_t TEST_FindMinPrepLogReferencedByMemTable();
@@ -2451,7 +2455,7 @@ class DBImpl : public DB {
   // in 2PC to batch the prepares separately from the serial commit.
   WriteThread nonmem_write_thread_;
 
-  WriteController write_controller_;
+  std::shared_ptr<WriteController> write_controller_;
 
   // Size of the last batch group. In slowdown mode, next write needs to
   // sleep if it uses up the quota.

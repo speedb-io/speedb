@@ -104,7 +104,7 @@ TEST_F(GlobalWriteControllerTest, TestGetMinRate) {
   ASSERT_TRUE(options.write_controller->delayed_write_rate() == 8 * MB);
   ASSERT_TRUE(options.write_controller->GetMinRate() == 8 * MB);
 
-  // sets db0 to 8Mbs
+  // removes delay requirement from both dbs
   SetL0delayAndRecalcConditions(0 /*db_idx*/, 9 /*l0_files*/);
   SetL0delayAndRecalcConditions(1 /*db_idx*/, 9 /*l0_files*/);
   uint64_t max_rate = options.write_controller->max_delayed_write_rate();

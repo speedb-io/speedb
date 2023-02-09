@@ -1827,7 +1827,7 @@ class FSDirectoryWrapper : public FSDirectory {
     return target_->GetUniqueId(id, max_size);
   }
 
- private:
+ protected:
   std::unique_ptr<FSDirectory> guard_;
   FSDirectory* target_;
 };

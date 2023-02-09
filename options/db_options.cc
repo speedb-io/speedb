@@ -852,11 +852,11 @@ void ImmutableDBOptions::Dump(Logger* log) const {
                    advise_random_on_open);
   ROCKS_LOG_HEADER(log, "                      Options.use_dynamic_delay: %d",
                    use_dynamic_delay);
+  ROCKS_LOG_HEADER(log, "                   Options.write_controller: %p",
+                   write_controller.get());
   ROCKS_LOG_HEADER(
       log, "                   Options.db_write_buffer_size: %" ROCKSDB_PRIszt,
       db_write_buffer_size);
-  ROCKS_LOG_HEADER(log, "                   Options.write_controller: %p",
-                   write_controller.get());
   ROCKS_LOG_HEADER(
       log, "                   Options.write_buffer_manager: %p%s%s",
       write_buffer_manager.get(), (write_buffer_manager.get() ? "\n" : ""),

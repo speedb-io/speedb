@@ -36,6 +36,7 @@
 #include "port/port.h"
 #include "rocksdb/convenience.h"
 #include "rocksdb/table.h"
+#include "rocksdb/utilities/options_type.h"
 #include "table/merging_iterator.h"
 #include "util/autovector.h"
 #include "util/cast_util.h"
@@ -205,7 +206,7 @@ Status CheckCFPathsSupported(const DBOptions& db_options,
 namespace {
 const uint64_t kDefaultTtl = 0xfffffffffffffffe;
 const uint64_t kDefaultPeriodicCompSecs = 0xfffffffffffffffe;
-}  // namespace
+}  // anonymous namespace
 
 ColumnFamilyOptions SanitizeOptions(const ImmutableDBOptions& db_options,
                                     const ColumnFamilyOptions& src) {
@@ -213,8 +214,8 @@ ColumnFamilyOptions SanitizeOptions(const ImmutableDBOptions& db_options,
   size_t clamp_max = std::conditional<
       sizeof(size_t) == 4, std::integral_constant<size_t, 0xffffffff>,
       std::integral_constant<uint64_t, 64ull << 30>>::type::value;
-  ClipToRange(&result.write_buffer_size, (static_cast<size_t>(64)) << 10,
-              clamp_max);
+  OptionTypeInfo::ClipToRange(&result.write_buffer_size,
+                              (static_cast<size_t>(64)) << 10, clamp_max);
   // if user sets arena_block_size, we trust user to use this value. Otherwise,
   // calculate a proper value from writer_buffer_size;
   if (result.arena_block_size <= 0) {

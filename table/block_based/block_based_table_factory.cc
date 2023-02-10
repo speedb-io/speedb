@@ -280,35 +280,166 @@ static std::unordered_map<std::string, OptionTypeInfo>
           OptionType::kChecksumType, OptionVerificationType::kNormal,
           OptionTypeFlags::kNone}},
         {"no_block_cache",
-         {offsetof(struct BlockBasedTableOptions, no_block_cache),
-          OptionType::kBoolean, OptionVerificationType::kNormal,
-          OptionTypeFlags::kNone}},
+         OptionTypeInfo(offsetof(struct BlockBasedTableOptions, no_block_cache),
+                        OptionType::kBoolean, OptionVerificationType::kNormal,
+                        OptionTypeFlags::kUseBaseAddress)
+             .SetPrepareFunc([](const ConfigOptions& /*opts*/,
+                                const std::string& /*name*/, void* addr) {
+               auto bbto = static_cast<BlockBasedTableOptions*>(addr);
+               if (bbto->no_block_cache) {
+                 bbto->block_cache.reset();
+               } else if (bbto->block_cache == nullptr) {
+                 LRUCacheOptions co;
+                 co.capacity = 8 << 20;
+                 // It makes little sense to pay overhead for mid-point
+                 // insertion while the block size is only 8MB.
+                 co.high_pri_pool_ratio = 0.0;
+                 co.low_pri_pool_ratio = 0.0;
+                 bbto->block_cache = NewLRUCache(co);
+               }
+               return Status::OK();
+             })},
         {"block_size",
          {offsetof(struct BlockBasedTableOptions, block_size),
           OptionType::kSizeT, OptionVerificationType::kNormal,
           OptionTypeFlags::kMutable}},
         {"block_size_deviation",
-         {offsetof(struct BlockBasedTableOptions, block_size_deviation),
-          OptionType::kInt, OptionVerificationType::kNormal,
-          OptionTypeFlags::kNone}},
+         OptionTypeInfo(
+             offsetof(struct BlockBasedTableOptions, block_size_deviation),
+             OptionType::kInt, OptionVerificationType::kNormal,
+             OptionTypeFlags::kNone)
+             .SetParseFunc([](const ConfigOptions& /*opts*/,
+                              const std::string& /*name*/,
+                              const std::string& value, void* addr) {
+               auto deviation = static_cast<int*>(addr);
+               *deviation = ParseInt(value);
+               if (*deviation < 0 || *deviation > 100) {
+                 *deviation = 0;
+               }
+               return Status::OK();
+             })
+             .SetPrepareFunc([](const ConfigOptions& /*opts*/,
+                                const std::string& /*name*/, void* addr) {
+               auto deviation = static_cast<int*>(addr);
+               if (*deviation < 0 || *deviation > 100) {
+                 *deviation = 0;
+               }
+               return Status::OK();
+             })},
         {"block_restart_interval",
-         {offsetof(struct BlockBasedTableOptions, block_restart_interval),
-          OptionType::kInt, OptionVerificationType::kNormal,
-          OptionTypeFlags::kMutable}},
+         OptionTypeInfo(
+             offsetof(struct BlockBasedTableOptions, block_restart_interval),
+             OptionType::kInt, OptionVerificationType::kNormal,
+             OptionTypeFlags::kMutable)
+             .SetParseFunc([](const ConfigOptions& /*opts*/,
+                              const std::string& /*name*/,
+                              const std::string& value, void* addr) {
+               auto interval = static_cast<int*>(addr);
+               *interval = ParseInt(value);
+               *interval = std::max(1, *interval);
+               return Status::OK();
+             })
+             .SetPrepareFunc([](const ConfigOptions& /*opts*/,
+                                const std::string& /*name*/, void* addr) {
+               auto interval = static_cast<int*>(addr);
+               *interval = std::max(1, *interval);
+               return Status::OK();
+             })},
         {"index_block_restart_interval",
-         {offsetof(struct BlockBasedTableOptions, index_block_restart_interval),
-          OptionType::kInt, OptionVerificationType::kNormal,
-          OptionTypeFlags::kNone}},
+         OptionTypeInfo(offsetof(struct BlockBasedTableOptions,
+                                 index_block_restart_interval),
+                        OptionType::kInt, OptionVerificationType::kNormal,
+                        OptionTypeFlags::kUseBaseAddress)
+             .SetParseFunc([](const ConfigOptions& /*opts*/,
+                              const std::string& /*name*/,
+                              const std::string& value, void* addr) {
+               auto bbto = static_cast<BlockBasedTableOptions*>(addr);
+               bbto->index_block_restart_interval = ParseInt(value);
+               if (bbto->index_block_restart_interval < 1) {
+                 bbto->index_block_restart_interval = 1;
+               }
+               return Status::OK();
+             })
+             .SetPrepareFunc([](const ConfigOptions& /*opts*/,
+                                const std::string& /*name*/, void* addr) {
+               auto bbto = static_cast<BlockBasedTableOptions*>(addr);
+               if (bbto->index_block_restart_interval < 1) {
+                 bbto->index_block_restart_interval = 1;
+               } else if (bbto->index_type ==
+                              BlockBasedTableOptions::kHashSearch &&
+                          bbto->index_block_restart_interval != 1) {
+                 // Currently kHashSearch is incompatible with
+                 // index_block_restart_interval > 1
+                 bbto->index_block_restart_interval = 1;
+               }
+               return Status::OK();
+             })},
+        {"index_type",
+         OptionTypeInfo(offsetof(struct BlockBasedTableOptions, index_type),
+                        OptionType::kEnum, OptionVerificationType::kNormal,
+                        OptionTypeFlags::kUseBaseAddress)
+             .SetParseFunc([](const ConfigOptions&, const std::string& name,
+                              const std::string& value, void* addr) {
+               auto bbto = static_cast<BlockBasedTableOptions*>(addr);
+               return OptionTypeInfo::StringToEnum(
+                   name, &block_base_table_index_type_string_map, value,
+                   &bbto->index_type);
+             })
+             .SetSerializeFunc([](const ConfigOptions&, const std::string& name,
+                                  const void* addr, std::string* value) {
+               auto bbto = static_cast<const BlockBasedTableOptions*>(addr);
+               return OptionTypeInfo::EnumToString(
+                   name, &block_base_table_index_type_string_map,
+                   bbto->index_type, value);
+             })
+             .SetEqualsFunc([](const ConfigOptions&, const std::string&,
+                               const void* addr1, const void* addr2,
+                               std::string*) {
+               auto bbto1 = static_cast<const BlockBasedTableOptions*>(addr1);
+               auto bbto2 = static_cast<const BlockBasedTableOptions*>(addr2);
+               return bbto1->index_type == bbto2->index_type;
+             })
+             .SetPrepareFunc([](const ConfigOptions& /*opts*/,
+                                const std::string& /*name*/, void* addr) {
+               auto bbto = static_cast<BlockBasedTableOptions*>(addr);
+               if (bbto->index_type == BlockBasedTableOptions::kHashSearch &&
+                   bbto->index_block_restart_interval != 1) {
+                 // Currently kHashSearch is incompatible with
+                 // index_block_restart_interval > 1
+                 bbto->index_block_restart_interval = 1;
+               }
+               if (bbto->partition_filters &&
+                   bbto->index_type !=
+                       BlockBasedTableOptions::kTwoLevelIndexSearch) {
+                 // We do not support partitioned filters without partitioning
+                 // indexes
+                 bbto->partition_filters = false;
+               }
+               return Status::OK();
+             })},
+        {"partition_filters",
+         OptionTypeInfo(
+             offsetof(struct BlockBasedTableOptions, partition_filters),
+             OptionType::kBoolean, OptionVerificationType::kNormal,
+             OptionTypeFlags::kUseBaseAddress)
+             .SetPrepareFunc([](const ConfigOptions& /*opts*/,
+                                const std::string& /*name*/, void* addr) {
+               auto bbto = static_cast<BlockBasedTableOptions*>(addr);
+               if (bbto->partition_filters &&
+                   bbto->index_type !=
+                       BlockBasedTableOptions::kTwoLevelIndexSearch) {
+                 // We do not support partitioned filters without partitioning
+                 // indexes
+                 bbto->partition_filters = false;
+               }
+               return Status::OK();
+             })},
         {"index_per_partition",
          {0, OptionType::kUInt64T, OptionVerificationType::kDeprecated,
           OptionTypeFlags::kNone}},
         {"metadata_block_size",
          {offsetof(struct BlockBasedTableOptions, metadata_block_size),
           OptionType::kUInt64T, OptionVerificationType::kNormal,
-          OptionTypeFlags::kNone}},
-        {"partition_filters",
-         {offsetof(struct BlockBasedTableOptions, partition_filters),
-          OptionType::kBoolean, OptionVerificationType::kNormal,
           OptionTypeFlags::kNone}},
         {"optimize_filters_for_memory",
          {offsetof(struct BlockBasedTableOptions, optimize_filters_for_memory),
@@ -430,23 +561,11 @@ static std::unordered_map<std::string, OptionTypeInfo>
 BlockBasedTableFactory::BlockBasedTableFactory(
     const BlockBasedTableOptions& _table_options)
     : table_options_(_table_options) {
-  InitializeOptions();
   RegisterOptions(&table_options_, &block_based_table_type_info);
 
-  const auto table_reader_charged =
-      table_options_.cache_usage_options.options_overrides
-          .at(CacheEntryRole::kBlockBasedTableReader)
-          .charged;
-  if (table_options_.block_cache &&
-      table_reader_charged == CacheEntryRoleOptions::Decision::kEnabled) {
-    table_reader_cache_res_mgr_.reset(new ConcurrentCacheReservationManager(
-        std::make_shared<CacheReservationManagerImpl<
-            CacheEntryRole::kBlockBasedTableReader>>(
-            table_options_.block_cache)));
-  }
-}
-
-void BlockBasedTableFactory::InitializeOptions() {
+  // Initialize/Prepare the BlockBasedTableOptions
+  // Note that comparable code is also implemented in the OptionTypeMap;
+  // the code is needed here as well in order to support LITE mode
   if (table_options_.flush_block_policy_factory == nullptr) {
     table_options_.flush_block_policy_factory.reset(
         new FlushBlockBySizePolicyFactory());
@@ -474,7 +593,8 @@ void BlockBasedTableFactory::InitializeOptions() {
   }
   if (table_options_.index_type == BlockBasedTableOptions::kHashSearch &&
       table_options_.index_block_restart_interval != 1) {
-    // Currently kHashSearch is incompatible with index_block_restart_interval > 1
+    // Currently kHashSearch is incompatible with
+    // index_block_restart_interval > 1
     table_options_.index_block_restart_interval = 1;
   }
   if (table_options_.partition_filters &&
@@ -483,6 +603,7 @@ void BlockBasedTableFactory::InitializeOptions() {
     // We do not support partitioned filters without partitioning indexes
     table_options_.partition_filters = false;
   }
+
   auto& options_overrides =
       table_options_.cache_usage_options.options_overrides;
   const auto options = table_options_.cache_usage_options.options;
@@ -496,11 +617,26 @@ void BlockBasedTableFactory::InitializeOptions() {
       options_overrides_iter->second.charged = options.charged;
     }
   }
+  //**TODO: Move this code into PrepareOptions
+  const auto table_reader_charged =
+      table_options_.cache_usage_options.options_overrides
+          .at(CacheEntryRole::kBlockBasedTableReader)
+          .charged;
+  if (table_options_.block_cache &&
+      table_reader_charged == CacheEntryRoleOptions::Decision::kEnabled) {
+    table_reader_cache_res_mgr_.reset(new ConcurrentCacheReservationManager(
+        std::make_shared<CacheReservationManagerImpl<
+            CacheEntryRole::kBlockBasedTableReader>>(
+            table_options_.block_cache)));
+  }
 }
 
 Status BlockBasedTableFactory::PrepareOptions(const ConfigOptions& opts) {
-  InitializeOptions();
-  return TableFactory::PrepareOptions(opts);
+  Status s = TableFactory::PrepareOptions(opts);
+  if (s.ok()) {
+    //**TODO: Setup cache_res_mgr (move from InitializeOptions)
+  }
+  return s;
 }
 
 namespace {
@@ -524,32 +660,32 @@ Status CheckCacheOptionCompatibility(const BlockBasedTableOptions& bbto) {
 
   // More complex test of shared key space, in case the instances are wrappers
   // for some shared underlying cache.
-  std::string sentinel_key(size_t{1}, '\0');
+  CacheKey sentinel_key = CacheKey::CreateUniqueForProcessLifetime();
   static char kRegularBlockCacheMarker = 'b';
   static char kCompressedBlockCacheMarker = 'c';
   static char kPersistentCacheMarker = 'p';
   if (bbto.block_cache) {
     bbto.block_cache
-        ->Insert(Slice(sentinel_key), &kRegularBlockCacheMarker, 1,
+        ->Insert(sentinel_key.AsSlice(), &kRegularBlockCacheMarker, 1,
                  GetNoopDeleterForRole<CacheEntryRole::kMisc>())
         .PermitUncheckedError();
   }
   if (bbto.block_cache_compressed) {
     bbto.block_cache_compressed
-        ->Insert(Slice(sentinel_key), &kCompressedBlockCacheMarker, 1,
+        ->Insert(sentinel_key.AsSlice(), &kCompressedBlockCacheMarker, 1,
                  GetNoopDeleterForRole<CacheEntryRole::kMisc>())
         .PermitUncheckedError();
   }
   if (bbto.persistent_cache) {
     // Note: persistent cache copies the data, not keeping the pointer
     bbto.persistent_cache
-        ->Insert(Slice(sentinel_key), &kPersistentCacheMarker, 1)
+        ->Insert(sentinel_key.AsSlice(), &kPersistentCacheMarker, 1)
         .PermitUncheckedError();
   }
   // If we get something different from what we inserted, that indicates
   // dangerously overlapping key spaces.
   if (bbto.block_cache) {
-    auto handle = bbto.block_cache->Lookup(Slice(sentinel_key));
+    auto handle = bbto.block_cache->Lookup(sentinel_key.AsSlice());
     if (handle) {
       auto v = static_cast<char*>(bbto.block_cache->Value(handle));
       char c = *v;
@@ -568,7 +704,7 @@ Status CheckCacheOptionCompatibility(const BlockBasedTableOptions& bbto) {
     }
   }
   if (bbto.block_cache_compressed) {
-    auto handle = bbto.block_cache_compressed->Lookup(Slice(sentinel_key));
+    auto handle = bbto.block_cache_compressed->Lookup(sentinel_key.AsSlice());
     if (handle) {
       auto v = static_cast<char*>(bbto.block_cache_compressed->Value(handle));
       char c = *v;
@@ -591,7 +727,7 @@ Status CheckCacheOptionCompatibility(const BlockBasedTableOptions& bbto) {
   if (bbto.persistent_cache) {
     std::unique_ptr<char[]> data;
     size_t size = 0;
-    bbto.persistent_cache->Lookup(Slice(sentinel_key), &data, &size)
+    bbto.persistent_cache->Lookup(sentinel_key.AsSlice(), &data, &size)
         .PermitUncheckedError();
     if (data && size > 0) {
       if (data[0] == kRegularBlockCacheMarker) {
@@ -791,19 +927,6 @@ std::string BlockBasedTableFactory::GetPrintableOptions() const {
   ret.append(buffer);
   snprintf(buffer, kBufferSize, "  pin_top_level_index_and_filter: %d\n",
            table_options_.pin_top_level_index_and_filter);
-  ret.append(buffer);
-  ret.append("  metadata_cache_options:\n");
-  snprintf(buffer, kBufferSize, "    top_level_index_pinning: %d\n",
-           static_cast<int>(
-               table_options_.metadata_cache_options.top_level_index_pinning));
-  ret.append(buffer);
-  snprintf(buffer, kBufferSize, "    partition_pinning: %d\n",
-           static_cast<int>(
-               table_options_.metadata_cache_options.partition_pinning));
-  ret.append(buffer);
-  snprintf(buffer, kBufferSize, "    unpartitioned_pinning: %d\n",
-           static_cast<int>(
-               table_options_.metadata_cache_options.unpartitioned_pinning));
   ret.append(buffer);
   snprintf(buffer, kBufferSize, "  index_type: %d\n",
            table_options_.index_type);

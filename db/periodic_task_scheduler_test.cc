@@ -41,6 +41,7 @@ TEST_F(PeriodicTaskSchedulerTest, Basic) {
   Options options;
   options.stats_dump_period_sec = kPeriodSec;
   options.stats_persist_period_sec = kPeriodSec;
+  options.refresh_options_sec = 0;
   options.create_if_missing = true;
   options.env = mock_env_.get();
 
@@ -129,6 +130,7 @@ TEST_F(PeriodicTaskSchedulerTest, MultiInstances) {
   Options options;
   options.stats_dump_period_sec = kPeriodSec;
   options.stats_persist_period_sec = kPeriodSec;
+  options.refresh_options_sec = 0;
   options.create_if_missing = true;
   options.env = mock_env_.get();
 

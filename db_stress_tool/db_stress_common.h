@@ -328,6 +328,8 @@ DECLARE_bool(two_write_queues);
 DECLARE_bool(use_only_the_last_commit_time_batch_for_recovery);
 DECLARE_uint64(wp_snapshot_cache_bits);
 DECLARE_uint64(wp_commit_cache_bits);
+DECLARE_int32(refresh_options_sec);
+DECLARE_string(refresh_options_file);
 
 DECLARE_bool(adaptive_readahead);
 DECLARE_bool(async_io);

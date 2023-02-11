@@ -1492,6 +1492,12 @@ DEFINE_int32(table_cache_numshardbits, 4, "");
 
 DEFINE_string(filter_uri, "", "URI for registry FilterPolicy");
 
+DEFINE_int32(
+    refresh_options_sec, 0,
+    "Frequency (in secs) to look for a new options file (off by default)");
+DEFINE_string(refresh_options_file, "",
+              "File in which to look for new options");
+
 DEFINE_string(env_uri, "",
               "URI for registry Env lookup. Mutually exclusive with --fs_uri");
 DEFINE_string(fs_uri, "",
@@ -4501,6 +4507,8 @@ class Benchmark {
         FLAGS_use_direct_io_for_flush_and_compaction;
     options.manual_wal_flush = FLAGS_manual_wal_flush;
     options.wal_compression = FLAGS_wal_compression_e;
+    options.refresh_options_sec = FLAGS_refresh_options_sec;
+    options.refresh_options_file = FLAGS_refresh_options_file;
     options.ttl = FLAGS_fifo_compaction_ttl;
     options.compaction_options_fifo = CompactionOptionsFIFO(
         FLAGS_fifo_compaction_max_table_files_size_mb * 1024 * 1024,

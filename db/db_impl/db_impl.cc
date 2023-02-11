@@ -83,6 +83,7 @@
 #include "rocksdb/table.h"
 #include "rocksdb/version.h"
 #include "rocksdb/write_buffer_manager.h"
+#include "rocksdb/convenience.h"
 #include "speedb/version.h"
 #include "table/block_based/block.h"
 #include "table/block_based/block_based_table_factory.h"
@@ -277,6 +278,8 @@ DBImpl::DBImpl(const DBOptions& options, const std::string& dbname,
       PeriodicTaskType::kRecordSeqnoTime, [this]() {
         this->RecordSeqnoToTimeMapping(/*populate_historical_seconds=*/0);
       });
+  periodic_task_functions_.emplace(PeriodicTaskType::kRefreshOptions,
+                                   [this]() { this->RefreshOptions(); });
 
   versions_.reset(new VersionSet(dbname_, &immutable_db_options_, file_options_,
                                  table_cache_.get(), write_buffer_manager_,
@@ -797,6 +800,15 @@ Status DBImpl::StartPeriodicTaskScheduler() {
       return s;
     }
   }
+  if (mutable_db_options_.refresh_options_sec > 0) {
+    Status s = periodic_task_scheduler_.Register(
+        PeriodicTaskType::kRefreshOptions,
+        periodic_task_functions_.at(PeriodicTaskType::kRefreshOptions),
+        mutable_db_options_.refresh_options_sec);
+    if (!s.ok()) {
+      return s;
+    }
+  }
 
   Status s = periodic_task_scheduler_.Register(
       PeriodicTaskType::kFlushInfoLog,
@@ -1174,6 +1186,82 @@ void DBImpl::FlushInfoLog() {
   LogFlush(immutable_db_options_.info_log);
 }
 
+#ifndef ROCKSDB_LITE
+// Periodically checks to see if the new options should be loaded into the
+// process. log.
+void DBImpl::RefreshOptions() {
+  if (shutdown_initiated_) {
+    return;
+  }
+  std::string new_options_file = mutable_db_options_.refresh_options_file;
+  if (new_options_file.empty()) {
+    new_options_file = "Options.new";
+  }
+  if (new_options_file[0] != kFilePathSeparator) {
+    new_options_file = NormalizePath(immutable_db_options_.db_paths[0].path +
+                                     kFilePathSeparator + new_options_file);
+  }
+  TEST_SYNC_POINT("DBImpl::RefreshOptions::Start");
+  Status s = fs_->FileExists(new_options_file, IOOptions(), nullptr);
+  TEST_SYNC_POINT_CALLBACK("DBImpl::RefreshOptions::FileExists", &s);
+  if (!s.ok()) {
+    return;
+  }
+  ROCKS_LOG_INFO(immutable_db_options_.info_log,
+                 "Refreshing Options from file: %s\n",
+                 new_options_file.c_str());
+
+  ConfigOptions cfg_opts;
+  cfg_opts.ignore_unknown_options = true;
+  cfg_opts.mutable_options_only = true;
+  RocksDBOptionsParser op;
+  s = op.Parse(cfg_opts, new_options_file, fs_.get());
+  TEST_SYNC_POINT_CALLBACK("DBImpl::RefreshOptions::Parse", &s);
+  if (!s.ok()) {
+    ROCKS_LOG_WARN(immutable_db_options_.info_log,
+                   "Failed to parse Options file (%s): %s\n",
+                   new_options_file.c_str(), s.ToString().c_str());
+  } else if (!op.db_opt_map()->empty()) {
+    s = SetDBOptions(*(op.db_opt_map()));
+    TEST_SYNC_POINT_CALLBACK("DBImpl::RefreshOptions::SetDBOptions", &s);
+    if (!s.ok()) {
+      ROCKS_LOG_WARN(immutable_db_options_.info_log,
+                     "Failed to refresh DBOptions, Aborting: %s\n",
+                     s.ToString().c_str());
+    }
+  }
+  if (s.ok()) {
+    int idx = 0;
+    for (const auto& cf_opt_map : *(op.cf_opt_maps())) {
+      if (!cf_opt_map.empty()) {
+        const auto& cf_name = (*op.cf_names())[idx];
+        auto cfd = versions_->GetColumnFamilySet()->GetColumnFamily(cf_name);
+        if (cfd == nullptr) {
+          ROCKS_LOG_WARN(immutable_db_options_.info_log,
+                         "RefreshOptions failed locating CF: %s\n",
+                         cf_name.c_str());
+        } else if (!cfd->IsDropped()) {
+          s = SetCFOptionsImpl(cfd, cf_opt_map);
+          TEST_SYNC_POINT_CALLBACK("DBImpl::RefreshOptions::SetCFOptions", &s);
+          if (!s.ok()) {
+            ROCKS_LOG_WARN(immutable_db_options_.info_log,
+                           "Failed to refresh CFOptions for CF %s: %s\n",
+                           cf_name.c_str(), s.ToString().c_str());
+          }
+        }
+      }
+      idx++;
+    }
+  }
+  s = fs_->DeleteFile(new_options_file, IOOptions(), nullptr);
+  TEST_SYNC_POINT_CALLBACK("DBImpl::RefreshOptions::DeleteFile", &s);
+  ROCKS_LOG_INFO(immutable_db_options_.info_log,
+                 "RefreshOptions Complete, deleting options file %s: %s\n",
+                 new_options_file.c_str(), s.ToString().c_str());
+  TEST_SYNC_POINT("DBImpl::RefreshOptions::Complete");
+}
+#endif  // ROCKSDB_LITE
+
 Status DBImpl::TablesRangeTombstoneSummary(ColumnFamilyHandle* column_family,
                                            int max_entries_to_print,
                                            std::string* out_str) {
@@ -1213,7 +1301,6 @@ Status DBImpl::SetOptions(
     ColumnFamilyHandle* column_family,
     const std::unordered_map<std::string, std::string>& options_map) {
   // TODO: plumb Env::IOActivity
-  const ReadOptions read_options;
   auto* cfd =
       static_cast_with_check<ColumnFamilyHandleImpl>(column_family)->cfd();
   if (options_map.empty()) {
@@ -1222,7 +1309,14 @@ Status DBImpl::SetOptions(
                    cfd->GetName().c_str());
     return Status::InvalidArgument("empty input");
   }
+  return SetCFOptionsImpl(cfd, options_map);
+}
 
+#ifndef ROCKSDB_LITE
+Status DBImpl::SetCFOptionsImpl(
+    ColumnFamilyData* cfd,
+    const std::unordered_map<std::string, std::string>& options_map) {
+  const ReadOptions read_options;
   InstrumentedMutexLock ol(&options_mutex_);
   MutableCFOptions new_options;
   Status s;
@@ -1272,6 +1366,7 @@ Status DBImpl::SetOptions(
   LogFlush(immutable_db_options_.info_log);
   return s;
 }
+#endif  // ROCKSDB_LITE
 
 Status DBImpl::SetDBOptions(
     const std::unordered_map<std::string, std::string>& options_map) {
@@ -1377,6 +1472,18 @@ Status DBImpl::SetDBOptions(
               new_options.stats_persist_period_sec);
         }
       }
+      if (s.ok()) {
+        if (new_options.refresh_options_sec == 0) {
+          s = periodic_task_scheduler_.Unregister(
+              PeriodicTaskType::kRefreshOptions);
+        } else {
+          s = periodic_task_scheduler_.Register(
+              PeriodicTaskType::kRefreshOptions,
+              periodic_task_functions_.at(PeriodicTaskType::kRefreshOptions),
+              new_options.refresh_options_sec);
+        }
+      }
+
       mutex_.Lock();
       if (!s.ok()) {
         return s;

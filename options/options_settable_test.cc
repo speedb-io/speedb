@@ -253,6 +253,7 @@ TEST_F(OptionsSettableTest, DBOptionsAllFieldsSettable) {
       {offsetof(struct DBOptions, compaction_service),
        sizeof(std::shared_ptr<CompactionService>)},
       {offsetof(struct DBOptions, daily_offpeak_time_utc), sizeof(std::string)},
+      {offsetof(struct DBOptions, refresh_options_file), sizeof(std::string)},
   };
 
   char* options_ptr = new char[sizeof(DBOptions)];
@@ -368,6 +369,8 @@ TEST_F(OptionsSettableTest, DBOptionsAllFieldsSettable) {
                              "allow_data_in_errors=false;"
                              "enforce_single_del_contracts=false;"
                              "daily_offpeak_time_utc=08:30-19:00;"
+                             "refresh_options_sec=0;"
+                             "refresh_options_file=Options.new;"
                              "use_dynamic_delay=true",
                              new_options));
 

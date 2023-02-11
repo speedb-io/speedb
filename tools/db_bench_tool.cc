@@ -2983,7 +2983,6 @@ class Benchmark {
   }
 
   void OpenAllDbs(Options options) {
-    assert(dbs_.empty());
     assert(FLAGS_num_multi_db > 0);
 
     // dbs_to_use_ is NOT initialized here since we open the db-s once for all
@@ -2995,6 +2994,19 @@ class Benchmark {
     } else {
       auto wal_dir = options.wal_dir;
       for (int i = 0; i < FLAGS_num_multi_db; i++) {
+#ifndef ROCKSDB_LITE
+        if (FLAGS_optimistic_transaction_db) {
+          if (dbs_[i].opt_txn_db) {
+            continue;
+          }
+        } else if (dbs_[i].db) {
+          continue;
+        }
+#else   // ROCKSDB_LITE
+        if (dbs_[i].db) {
+          continue;
+        }
+#endif  // ROCKSDB_LITE
         if (!wal_dir.empty()) {
           options.wal_dir = GetPathForMultiple(wal_dir, i);
         }
@@ -3004,17 +3016,17 @@ class Benchmark {
     }
   }
 
-  void DestroyAllDbs() {
-    // Record the number of db-s as dbs_ is cleared inside DeleteDBs()
-    auto num_dbs = dbs_.size();
+  void DestroyUsedDbs() {
+    for (auto i : db_idxs_to_use) {
+      dbs_[i].DeleteDBs();
+    }
+    dbs_to_use_.clear();
 
-    DeleteDBs();
-
-    if (num_dbs == 1U) {
+    if (IsSingleDb()) {
       DestroyDB(FLAGS_db, open_options_);
-    } else if (num_dbs > 1U) {
+    } else if (IsMultiDb()) {
       Options options = open_options_;
-      for (auto i = 0U; i < num_dbs; ++i) {
+      for (auto i : db_idxs_to_use) {
         if (!open_options_.wal_dir.empty()) {
           options.wal_dir = GetPathForMultiple(open_options_.wal_dir, i);
         }
@@ -4048,7 +4060,7 @@ class Benchmark {
               "--use_existing_db",
               name.c_str());
         } else {
-          DestroyAllDbs();
+          DestroyUsedDbs();
           Open(&open_options_);  // use open_options for the last accessed
           // There are new DB-s => Re-initialize dbs_to_use_
           InitDbsToUse();

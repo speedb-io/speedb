@@ -179,6 +179,8 @@ DBOptions BuildDBOptions(const ImmutableDBOptions& immutable_db_options,
   options.lowest_used_cache_tier = immutable_db_options.lowest_used_cache_tier;
   options.enforce_single_del_contracts =
       immutable_db_options.enforce_single_del_contracts;
+  options.refresh_options_sec = mutable_db_options.refresh_options_sec;
+  options.refresh_options_file = mutable_db_options.refresh_options_file;
   return options;
 }
 

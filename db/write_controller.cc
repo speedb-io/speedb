@@ -67,6 +67,19 @@ WriteController::GetCompactionPressureToken() {
       new CompactionPressureToken(this));
 }
 
+// Delay Write Rate
+void WriteController::Register(DelayWriteRate* delay_rate) {
+  delay_write_cont_.Register(delay_rate);
+}
+void WriteController::Unregister(DelayWriteRate* delay_rate) {
+  delay_write_cont_.Unregister(delay_rate);
+}
+void WriteController::Update(DelayWriteRate* delay_rate) {
+  delay_write_cont_.Update(delay_rate);
+}
+
+
+
 bool WriteController::IsStopped() const {
   return total_stopped_.load(std::memory_order_relaxed) > 0;
 }

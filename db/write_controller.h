@@ -10,6 +10,7 @@
 #include <atomic>
 #include <memory>
 #include <mutex>
+#include <set>
 
 #include "rocksdb/rate_limiter.h"
 
@@ -17,6 +18,64 @@ namespace ROCKSDB_NAMESPACE {
 
 class SystemClock;
 class WriteControllerToken;
+
+class DelayWriteRate {
+ public:
+  DelayWriteRate() {}
+  virtual ~DelayWriteRate() {}
+  uint64_t GetDelayRate() const { return delay_rate_.load(); }
+  // update to 0 means we unregister form cf set delay cont
+  virtual uint64_t UpdateDelayRate(uint64_t delay_rate) { delay_rate_.store(delay_rate); return delay_rate; }
+
+ public:
+  // 0 means it wasnt register to cf set delay cont
+  std::atomic<uint64_t> delay_rate_ = 0; 
+};
+
+struct DelayWriteRateContainer {
+  std::atomic<uint64_t> delay_rate_; // the global . in the write controller its not used.
+  struct rate_compare {
+    bool operator() (const DelayWriteRate* a, const DelayWriteRate* b) const {
+      return a->GetDelayRate() < b->GetDelayRate();
+    }
+  };
+
+  // this is sorted. and the first element is the min by definition
+  std::set<DelayWriteRate*, rate_compare> delay_write_set_; 
+  std::mutex delay_write_set_mutex_;
+
+  uint64_t Register(DelayWriteRate* delay_rate) { 
+    std::lock_guard<std::mutex> lock(delay_write_set_mutex_);
+    delay_write_set_.insert(delay_rate);
+    uint64_t new_delay_rate = (*delay_write_set_.begin())->GetDelayRate();
+    delay_rate_.store(new_delay_rate);
+    return new_delay_rate;
+  }
+
+  uint64_t Unregister(DelayWriteRate* delay_rate) { 
+    std::lock_guard<std::mutex> lock(delay_write_set_mutex_);
+    // note  - delay_rate object may not be found. this is valid!
+    delay_write_set_.erase(delay_rate);
+    uint64_t new_delay_rate = 0;
+    if (delay_write_set_.size() != 0) {
+      new_delay_rate = (*delay_write_set_.begin())->GetDelayRate();
+    }
+    delay_rate_.store(new_delay_rate);
+    return new_delay_rate;
+  }
+
+  uint64_t Update(DelayWriteRate* delay_write_rate) { 
+    std::lock_guard<std::mutex> lock(delay_write_set_mutex_);
+    delay_write_set_.erase(delay_write_rate);
+    delay_write_set_.insert(delay_write_rate);
+    uint64_t delay_rate = (*delay_write_set_.begin())->GetDelayRate();
+    delay_rate_.store(delay_rate);
+    return delay_rate;
+  }
+  /* give the min */
+  uint64_t GetDelayRate() { return delay_rate_.load(); }
+
+ }; 
 
 // WriteController is controlling write stalls in our write code-path. Write
 // stalls happen when compaction can't keep up with write rate.
@@ -104,6 +163,12 @@ class WriteController {
   // when a previous min rate cf has been removed, we need to set a new min
   void SetMinRate();
 
+  // Delay Write Rate
+  void Register(DelayWriteRate* delay_rate);
+  void Unregister(DelayWriteRate* delay_rate);
+  void Update(DelayWriteRate* delay_rate);
+  uint64_t GetDelayRate() { return delay_write_cont_.GetDelayRate(); }
+
  private:
   uint64_t NowMicrosMonotonic(SystemClock* clock);
 
@@ -131,10 +196,15 @@ class WriteController {
   bool dynamic_delay_;
 
   std::mutex mu_for_map_;
+
   std::unordered_set<CfIdToRateMap*> db_id_to_write_rate_map;
 
   std::unique_ptr<RateLimiter> low_pri_rate_limiter_;
+  DelayWriteRateContainer delay_write_cont_;
 };
+
+
+
 
 class WriteControllerToken {
  public:

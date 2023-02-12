@@ -265,9 +265,11 @@ class ColumnFamilySet;
 
 // This class keeps all the data that a column family needs.
 // Most methods require DB mutex held, unless otherwise noted
-class ColumnFamilyData {
+class ColumnFamilyData: public DelayWriteRate {
  public:
   ~ColumnFamilyData();
+  //DelayWriteRate
+  uint64_t UpdateDelayRate(uint64_t delay_rate) override;
 
   // thread-safe
   uint32_t GetID() const { return id_; }
@@ -509,18 +511,6 @@ class ColumnFamilyData {
       const MutableCFOptions& mutable_cf_options,
       WriteStallCause& write_stall_cause);
 
-  void InsertOrAssignToCfIdAndRateMap(uint64_t write_rate);
-
-  bool IsMinRate();
-
-  void RemoveCfFromRateMap();
-
-  bool IsInRateMap();
-
-  // try and remove the cf id from WriteController::cf_id_to_write_rate_.
-  // if successful and it was the min rate, set the current minimum value.
-  void MaybeRemoveSelfAndRefreshDelayRate();
-
  public:
   void set_initialized() { initialized_.store(true); }
 
@@ -696,7 +686,7 @@ class ColumnFamilyData {
 // * GetColumnFamily() -- either inside of DB mutex or from a write thread
 // * GetNextColumnFamilyID(), GetMaxColumnFamily(), UpdateMaxColumnFamily(),
 // NumberOfColumnFamilies -- inside of DB mutex
-class ColumnFamilySet {
+class ColumnFamilySet: public DelayWriteRate {
  public:
   // ColumnFamilySet supports iteration
   class iterator {
@@ -755,6 +745,11 @@ class ColumnFamilySet {
     return write_controller_;
   }
 
+  // Delay Write Rate
+  uint64_t Register(DelayWriteRate* delay_rate);
+  void Unregister(DelayWriteRate* delay_rate);
+  uint64_t Update(DelayWriteRate* delay_rate);
+
  private:
   friend class ColumnFamilyData;
   // helper function that gets called from cfd destructor
@@ -790,6 +785,8 @@ class ColumnFamilySet {
   std::shared_ptr<IOTracer> io_tracer_;
   const std::string& db_id_;
   std::string db_session_id_;
+  DelayWriteRateContainer delay_write_cont_;
+
 
   std::unordered_map<uint32_t, uint64_t> cf_id_to_write_rate_;
 };

@@ -520,7 +520,7 @@ void FilterBench::Go() {
     std::cout << "Outside queries (mostly)..." << std::endl;
     // Do about 95% outside queries rather than 100% so that branch predictor
     // can't give itself an artifically crazy advantage.
-    inside_threshold = UINT32_MAX / 20;
+    inside_threshold = UINT32_MAX / 50;
     for (TestMode tm : testModes) {
       random_.Seed(FLAGS_seed + 2);
       double f = RandomQueryTest(inside_threshold, /*dry_run*/ false, tm);

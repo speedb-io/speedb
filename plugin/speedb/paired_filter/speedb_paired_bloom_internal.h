@@ -89,7 +89,7 @@ class SpdbPairedBloomBitsBuilder : public XXPH3FilterBitsBuilder {
       std::atomic<int64_t>* aggregate_rounding_balance,
       const std::shared_ptr<CacheReservationManager>& cache_res_mgr,
       bool detect_filter_construct_corruption,
-      const FilterBitsReaderCreateFunc& reader_create_func);
+      const FilterBitsReaderCreateFunc& reader_create_func, bool is_bottomost);
 
   ~SpdbPairedBloomBitsBuilder() override {}
 
@@ -163,6 +163,7 @@ class SpdbPairedBloomBitsBuilder : public XXPH3FilterBitsBuilder {
   // Target allocation per added key, in thousandths of a bit.
   int millibits_per_key_;
 
+  bool is_bottomost_;
   size_t num_blocks_ = 0U;
   size_t num_batches_ = 0U;
   size_t num_probes_ = 0U;

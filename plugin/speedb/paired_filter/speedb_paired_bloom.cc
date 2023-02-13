@@ -75,7 +75,8 @@ FilterBitsBuilder* SpdbPairedBloomFilterPolicy::GetBuilderWithContext(
       millibits_per_key_, offm ? &aggregate_rounding_balance_ : nullptr,
       cache_res_mgr, context.table_options.detect_filter_construct_corruption,
       std::bind(&SpdbPairedBloomFilterPolicy::GetFilterBitsReader, this,
-                std::placeholders::_1));
+                std::placeholders::_1),
+      context.is_bottommost);
 }
 
 FilterBitsReader* SpdbPairedBloomFilterPolicy::GetFilterBitsReader(

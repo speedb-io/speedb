@@ -91,6 +91,7 @@ DECLARE_bool(test_cf_consistency);
 DECLARE_bool(test_multi_ops_txns);
 DECLARE_int32(threads);
 DECLARE_int32(ttl);
+DECLARE_bool(skip_expired_data);
 DECLARE_int32(value_size_mult);
 DECLARE_int32(compaction_readahead_size);
 DECLARE_bool(enable_pipelined_write);

@@ -1731,6 +1731,10 @@ struct ReadOptions {
   // Default: true
   bool optimize_multiget_for_io;
 
+  // If true, DB with TTL will not Get keys that reached their timeout
+  // Default: false
+  bool skip_expired_data = false;
+
   ReadOptions();
   ReadOptions(bool cksum, bool cache);
 };

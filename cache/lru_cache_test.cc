@@ -54,14 +54,16 @@ class LRUCacheTest : public testing::Test {
   }
 
   void Insert(const std::string& key,
-              Cache::Priority priority = Cache::Priority::LOW) {
+              Cache::Priority priority = Cache::Priority::LOW,
+              Cache::ItemOwnerId item_owner_id = Cache::kUnknownItemId) {
     EXPECT_OK(cache_->Insert(key, 0 /*hash*/, nullptr /*value*/, 1 /*charge*/,
-                             nullptr /*deleter*/, nullptr /*handle*/,
-                             priority));
+                             nullptr /*deleter*/, nullptr /*handle*/, priority,
+                             item_owner_id));
   }
 
-  void Insert(char key, Cache::Priority priority = Cache::Priority::LOW) {
-    Insert(std::string(1, key), priority);
+  void Insert(char key, Cache::Priority priority = Cache::Priority::LOW,
+              Cache::ItemOwnerId item_owner_id = Cache::kUnknownItemId) {
+    Insert(std::string(1, key), priority, item_owner_id);
   }
 
   bool Lookup(const std::string& key) {
@@ -395,7 +397,7 @@ class FastLRUCacheTest : public testing::Test {
   Status Insert(const std::string& key) {
     return cache_->Insert(key, 0 /*hash*/, nullptr /*value*/, 1 /*charge*/,
                           nullptr /*deleter*/, nullptr /*handle*/,
-                          Cache::Priority::LOW);
+                          Cache::Priority::LOW, Cache::kUnknownItemId);
   }
 
   Status Insert(char key, size_t len) { return Insert(std::string(len, key)); }
@@ -530,13 +532,16 @@ class ClockCacheTest : public testing::Test {
   }
 
   Status Insert(const std::string& key,
-                Cache::Priority priority = Cache::Priority::LOW) {
+                Cache::Priority priority = Cache::Priority::LOW,
+                Cache::ItemOwnerId item_owner_id = Cache::kUnknownItemId) {
     return shard_->Insert(key, 0 /*hash*/, nullptr /*value*/, 1 /*charge*/,
-                          nullptr /*deleter*/, nullptr /*handle*/, priority);
+                          nullptr /*deleter*/, nullptr /*handle*/, priority,
+                          item_owner_id);
   }
 
-  Status Insert(char key, Cache::Priority priority = Cache::Priority::LOW) {
-    return Insert(std::string(kCacheKeySize, key), priority);
+  Status Insert(char key, Cache::Priority priority = Cache::Priority::LOW,
+                Cache::ItemOwnerId item_owner_id = Cache::kUnknownItemId) {
+    return Insert(std::string(kCacheKeySize, key), priority, item_owner_id);
   }
 
   Status InsertWithLen(char key, size_t len) {
@@ -626,9 +631,9 @@ TEST_F(ClockCacheTest, Limits) {
 
     // Single entry charge beyond capacity
     {
-      Status s = shard_->Insert(key, 0 /*hash*/, nullptr /*value*/,
-                                5 /*charge*/, nullptr /*deleter*/,
-                                nullptr /*handle*/, Cache::Priority::LOW);
+      Status s = shard_->Insert(
+          key, 0 /*hash*/, nullptr /*value*/, 5 /*charge*/, nullptr /*deleter*/,
+          nullptr /*handle*/, Cache::Priority::LOW, Cache::kUnknownItemId);
       if (strict_capacity_limit) {
         EXPECT_TRUE(s.IsMemoryLimit());
       } else {
@@ -640,7 +645,8 @@ TEST_F(ClockCacheTest, Limits) {
     {
       Cache::Handle* h;
       ASSERT_OK(shard_->Insert(key, 0 /*hash*/, nullptr /*value*/, 3 /*charge*/,
-                               nullptr /*deleter*/, &h, Cache::Priority::LOW));
+                               nullptr /*deleter*/, &h, Cache::Priority::LOW,
+                               Cache::kUnknownItemId));
       // Try to insert more
       Status s = Insert('a');
       if (strict_capacity_limit) {
@@ -662,7 +668,8 @@ TEST_F(ClockCacheTest, Limits) {
       for (size_t i = 0; i < n && s.ok(); ++i) {
         EncodeFixed64(&key[0], i);
         s = shard_->Insert(key, 0 /*hash*/, nullptr /*value*/, 0 /*charge*/,
-                           nullptr /*deleter*/, &ha[i], Cache::Priority::LOW);
+                           nullptr /*deleter*/, &ha[i], Cache::Priority::LOW,
+                           Cache::kUnknownItemId);
         if (i == 0) {
           EXPECT_OK(s);
         }
@@ -812,7 +819,7 @@ TEST_F(ClockCacheTest, ClockCounterOverflowTest) {
   std::string my_key(kCacheKeySize, 'x');
   uint32_t my_hash = 42;
   ASSERT_OK(shard_->Insert(my_key, my_hash, &deleted, 1, IncrementIntDeleter,
-                           &h, Cache::Priority::HIGH));
+                           &h, Cache::Priority::HIGH, Cache::kUnknownItemId));
 
   // Some large number outstanding
   shard_->TEST_RefN(h, 123456789);
@@ -850,13 +857,13 @@ TEST_F(ClockCacheTest, CollidingInsertEraseTest) {
   uint32_t my_hash = 42;
   Cache::Handle* h1;
   ASSERT_OK(shard_->Insert(key1, my_hash, &deleted, 1, IncrementIntDeleter, &h1,
-                           Cache::Priority::HIGH));
+                           Cache::Priority::HIGH, Cache::kUnknownItemId));
   Cache::Handle* h2;
   ASSERT_OK(shard_->Insert(key2, my_hash, &deleted, 1, IncrementIntDeleter, &h2,
-                           Cache::Priority::HIGH));
+                           Cache::Priority::HIGH, Cache::kUnknownItemId));
   Cache::Handle* h3;
   ASSERT_OK(shard_->Insert(key3, my_hash, &deleted, 1, IncrementIntDeleter, &h3,
-                           Cache::Priority::HIGH));
+                           Cache::Priority::HIGH, Cache::kUnknownItemId));
 
   // Can repeatedly lookup+release despite the hash collision
   Cache::Handle* tmp_h;
@@ -899,7 +906,8 @@ TEST_F(ClockCacheTest, CollidingInsertEraseTest) {
 
   // Also Insert with invisible entry there
   ASSERT_OK(shard_->Insert(key1, my_hash, &deleted, 1, IncrementIntDeleter,
-                           nullptr, Cache::Priority::HIGH));
+                           nullptr, Cache::Priority::HIGH,
+                           Cache::kUnknownItemId));
   tmp_h = shard_->Lookup(key1, my_hash);
   // Found but distinct handle
   ASSERT_NE(nullptr, tmp_h);
@@ -2050,15 +2058,20 @@ class LRUCacheWithStat : public LRUCache {
   ~LRUCacheWithStat() {}
 
   Status Insert(const Slice& key, void* value, size_t charge, DeleterFn deleter,
-                Handle** handle, Priority priority) override {
+                Handle** handle, Priority priority,
+                Cache::ItemOwnerId item_owner_id) override {
     insert_count_++;
-    return LRUCache::Insert(key, value, charge, deleter, handle, priority);
+    return LRUCache::Insert(key, value, charge, deleter, handle, priority,
+                            item_owner_id);
   }
-  Status Insert(const Slice& key, void* value, const CacheItemHelper* helper,
-                size_t charge, Handle** handle = nullptr,
-                Priority priority = Priority::LOW) override {
+  Status Insert(
+      const Slice& key, void* value, const CacheItemHelper* helper,
+      size_t charge, Handle** handle = nullptr,
+      Priority priority = Priority::LOW,
+      Cache::ItemOwnerId item_owner_id = Cache::kUnknownItemId) override {
     insert_count_++;
-    return LRUCache::Insert(key, value, helper, charge, handle, priority);
+    return LRUCache::Insert(key, value, helper, charge, handle, priority,
+                            item_owner_id);
   }
   Handle* Lookup(const Slice& key, Statistics* stats) override {
     lookup_count_++;

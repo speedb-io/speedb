@@ -508,7 +508,8 @@ class ALIGN_AS(CACHE_LINE_SIZE) ClockCacheShard final : public CacheShard {
 
   Status Insert(const Slice& key, uint32_t hash, void* value, size_t charge,
                 Cache::DeleterFn deleter, Cache::Handle** handle,
-                Cache::Priority priority) override;
+                Cache::Priority priority,
+                Cache::ItemOwnerId item_owner_id) override;
 
   Cache::Handle* Lookup(const Slice& key, uint32_t hash) override;
 
@@ -531,7 +532,8 @@ class ALIGN_AS(CACHE_LINE_SIZE) ClockCacheShard final : public CacheShard {
 
   void ApplyToSomeEntries(
       const std::function<void(const Slice& key, void* value, size_t charge,
-                               DeleterFn deleter)>& callback,
+                               DeleterFn deleter,
+                               Cache::ItemOwnerId item_owner_id)>& callback,
       uint32_t average_entries_per_lock, uint32_t* state) override;
 
   void EraseUnRefEntries() override;
@@ -541,8 +543,10 @@ class ALIGN_AS(CACHE_LINE_SIZE) ClockCacheShard final : public CacheShard {
   // SecondaryCache not yet supported
   Status Insert(const Slice& key, uint32_t hash, void* value,
                 const Cache::CacheItemHelper* helper, size_t charge,
-                Cache::Handle** handle, Cache::Priority priority) override {
-    return Insert(key, hash, value, charge, helper->del_cb, handle, priority);
+                Cache::Handle** handle, Cache::Priority priority,
+                Cache::ItemOwnerId item_owner_id) override {
+    return Insert(key, hash, value, charge, helper->del_cb, handle, priority,
+                  item_owner_id);
   }
 
   Cache::Handle* Lookup(const Slice& key, uint32_t hash,

@@ -21,6 +21,7 @@
 #include "db/write_batch_internal.h"
 #include "db/write_controller.h"
 #include "options/cf_options.h"
+#include "rocksdb/cache.h"
 #include "rocksdb/compaction_job_stats.h"
 #include "rocksdb/db.h"
 #include "rocksdb/env.h"
@@ -562,6 +563,8 @@ class ColumnFamilyData {
   static constexpr uint64_t kLaggingFlushesThreshold = 10U;
   void SetNumTimedQueuedForFlush(uint64_t num) { num_queued_for_flush_ = num; }
 
+  Cache::ItemOwnerId GetCacheOwnerId() const { return cache_owner_id_; }
+
  private:
   friend class ColumnFamilySet;
   ColumnFamilyData(uint32_t id, const std::string& name,
@@ -666,6 +669,8 @@ class ColumnFamilyData {
   // Used in the WBM's flush initiation heuristics.
   // See DBImpl::InitiateMemoryManagerFlushRequest() for more details
   uint64_t num_queued_for_flush_ = 0U;
+
+  Cache::ItemOwnerId cache_owner_id_ = Cache::kUnknownItemId;
 };
 
 // ColumnFamilySet has interesting thread-safety requirements

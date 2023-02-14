@@ -27,10 +27,12 @@ class CacheShard {
   using DeleterFn = Cache::DeleterFn;
   virtual Status Insert(const Slice& key, uint32_t hash, void* value,
                         size_t charge, DeleterFn deleter,
-                        Cache::Handle** handle, Cache::Priority priority) = 0;
+                        Cache::Handle** handle, Cache::Priority priority,
+                        Cache::ItemOwnerId item_owner_id) = 0;
   virtual Status Insert(const Slice& key, uint32_t hash, void* value,
                         const Cache::CacheItemHelper* helper, size_t charge,
-                        Cache::Handle** handle, Cache::Priority priority) = 0;
+                        Cache::Handle** handle, Cache::Priority priority,
+                        Cache::ItemOwnerId item_owner_id) = 0;
   virtual Cache::Handle* Lookup(const Slice& key, uint32_t hash) = 0;
   virtual Cache::Handle* Lookup(const Slice& key, uint32_t hash,
                                 const Cache::CacheItemHelper* helper,
@@ -56,7 +58,8 @@ class CacheShard {
   // completion.
   virtual void ApplyToSomeEntries(
       const std::function<void(const Slice& key, void* value, size_t charge,
-                               DeleterFn deleter)>& callback,
+                               DeleterFn deleter,
+                               Cache::ItemOwnerId item_owner_id)>& callback,
       uint32_t average_entries_per_lock, uint32_t* state) = 0;
   virtual void EraseUnRefEntries() = 0;
   virtual std::string GetPrintableOptions() const { return ""; }
@@ -82,12 +85,13 @@ class ShardedCache : public Cache {
   virtual void SetStrictCapacityLimit(bool strict_capacity_limit) override;
 
   virtual Status Insert(const Slice& key, void* value, size_t charge,
-                        DeleterFn deleter, Handle** handle,
-                        Priority priority) override;
-  virtual Status Insert(const Slice& key, void* value,
-                        const CacheItemHelper* helper, size_t charge,
-                        Handle** handle = nullptr,
-                        Priority priority = Priority::LOW) override;
+                        DeleterFn deleter, Handle** handle, Priority priority,
+                        Cache::ItemOwnerId item_owner_id) override;
+  virtual Status Insert(
+      const Slice& key, void* value, const CacheItemHelper* helper,
+      size_t charge, Handle** handle = nullptr,
+      Priority priority = Priority::LOW,
+      Cache::ItemOwnerId item_owner_id = kUnknownItemId) override;
   virtual Handle* Lookup(const Slice& key, Statistics* stats) override;
   virtual Handle* Lookup(const Slice& key, const CacheItemHelper* helper,
                          const CreateCallback& create_cb, Priority priority,
@@ -109,7 +113,8 @@ class ShardedCache : public Cache {
   virtual size_t GetTableAddressCount() const override;
   virtual void ApplyToAllEntries(
       const std::function<void(const Slice& key, void* value, size_t charge,
-                               DeleterFn deleter)>& callback,
+                               DeleterFn deleter,
+                               Cache::ItemOwnerId item_owner_id)>& callback,
       const ApplyToAllEntriesOptions& opts) override;
   virtual void EraseUnRefEntries() override;
   virtual std::string GetPrintableOptions() const override;

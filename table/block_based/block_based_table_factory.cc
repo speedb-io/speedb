@@ -256,9 +256,6 @@ static std::unordered_map<std::string, OptionTypeInfo>
                    pin_l0_filter_and_index_blocks_in_cache),
           OptionType::kBoolean, OptionVerificationType::kNormal,
           OptionTypeFlags::kNone}},
-        {"index_type", OptionTypeInfo::Enum<BlockBasedTableOptions::IndexType>(
-                           offsetof(struct BlockBasedTableOptions, index_type),
-                           &block_base_table_index_type_string_map)},
         {"hash_index_allow_collision",
          {0, OptionType::kBoolean, OptionVerificationType::kDeprecated,
           OptionTypeFlags::kNone}},

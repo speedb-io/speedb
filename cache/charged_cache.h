@@ -24,10 +24,13 @@ class ChargedCache : public Cache {
   ~ChargedCache() override = default;
 
   Status Insert(const Slice& key, void* value, size_t charge, DeleterFn deleter,
-                Handle** handle, Priority priority) override;
-  Status Insert(const Slice& key, void* value, const CacheItemHelper* helper,
-                size_t charge, Handle** handle = nullptr,
-                Priority priority = Priority::LOW) override;
+                Handle** handle, Priority priority,
+                Cache::ItemOwnerId item_owner_id) override;
+  Status Insert(
+      const Slice& key, void* value, const CacheItemHelper* helper,
+      size_t charge, Handle** handle = nullptr,
+      Priority priority = Priority::LOW,
+      Cache::ItemOwnerId item_owner_id = Cache::kUnknownItemId) override;
 
   Cache::Handle* Lookup(const Slice& key, Statistics* stats) override;
   Cache::Handle* Lookup(const Slice& key, const CacheItemHelper* helper,
@@ -90,7 +93,8 @@ class ChargedCache : public Cache {
 
   void ApplyToAllEntries(
       const std::function<void(const Slice& key, void* value, size_t charge,
-                               Cache::DeleterFn deleter)>& callback,
+                               Cache::DeleterFn deleter,
+                               Cache::ItemOwnerId item_owner_id)>& callback,
       const Cache::ApplyToAllEntriesOptions& opts) override {
     cache_->ApplyToAllEntries(callback, opts);
   }

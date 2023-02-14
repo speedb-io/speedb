@@ -1706,8 +1706,9 @@ template <CacheEntryRole R>
 Status TargetCacheChargeTrackingCache<R>::Insert(
     const Slice& key, void* value, size_t charge,
     void (*deleter)(const Slice& key, void* value), Handle** handle,
-    Priority priority) {
-  Status s = target_->Insert(key, value, charge, deleter, handle, priority);
+    Priority priority, Cache::ItemOwnerId item_owner_id) {
+  Status s = target_->Insert(key, value, charge, deleter, handle, priority,
+                             item_owner_id);
   if (deleter == kNoopDeleter) {
     if (last_peak_tracked_) {
       cache_charge_peak_ = 0;

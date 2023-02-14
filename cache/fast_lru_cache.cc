@@ -210,7 +210,8 @@ void LRUCacheShard::EraseUnRefEntries() {
 
 void LRUCacheShard::ApplyToSomeEntries(
     const std::function<void(const Slice& key, void* value, size_t charge,
-                             DeleterFn deleter)>& callback,
+                             DeleterFn deleter,
+                             Cache::ItemOwnerId item_owner_id)>& callback,
     uint32_t average_entries_per_lock, uint32_t* state) {
   // The state is essentially going to be the starting hash, which works
   // nicely even if we resize between calls because we use upper-most
@@ -238,7 +239,7 @@ void LRUCacheShard::ApplyToSomeEntries(
       [callback,
        metadata_charge_policy = metadata_charge_policy_](LRUHandle* h) {
         callback(h->key(), h->value, h->GetCharge(metadata_charge_policy),
-                 h->deleter);
+                 h->deleter, Cache::kUnknownItemId);
       },
       index_begin, index_end);
 }
@@ -323,7 +324,8 @@ void LRUCacheShard::SetStrictCapacityLimit(bool strict_capacity_limit) {
 Status LRUCacheShard::Insert(const Slice& key, uint32_t hash, void* value,
                              size_t charge, Cache::DeleterFn deleter,
                              Cache::Handle** handle,
-                             Cache::Priority /*priority*/) {
+                             Cache::Priority /*priority*/,
+                             Cache::ItemOwnerId /* item_owner_id */) {
   if (key.size() != kCacheKeySize) {
     return Status::NotSupported("FastLRUCache only supports key size " +
                                 std::to_string(kCacheKeySize) + "B");

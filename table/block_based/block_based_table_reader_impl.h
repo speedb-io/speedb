@@ -96,7 +96,7 @@ TBlockIter* BlockBasedTable::NewDataBlockIterator(
         s = block_cache->Insert(key.AsSlice(), nullptr,
                                 block.GetValue()->ApproximateMemoryUsage(),
                                 nullptr, &cache_handle, Cache::kDefaultPriority,
-                                rep_->table_properties->column_family_id);
+                                static_cast<Cache::ItemOwnerId>(rep_->table_properties->column_family_id));
 
         if (s.ok()) {
           assert(cache_handle != nullptr);
@@ -155,7 +155,7 @@ TBlockIter* BlockBasedTable::NewDataBlockIterator(const ReadOptions& ro,
         s = block_cache->Insert(key.AsSlice(), nullptr,
                                 block.GetValue()->ApproximateMemoryUsage(),
                                 nullptr, &cache_handle, Cache::kDefaultPriority,
-                                rep_->table_properties->column_family_id);
+                                static_cast<Cache::ItemOwnerId>(rep_->table_properties->column_family_id));
 
         if (s.ok()) {
           assert(cache_handle != nullptr);

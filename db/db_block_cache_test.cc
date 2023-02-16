@@ -250,7 +250,7 @@ class DBBlockCacheTest : public DBTestBase {
       // are maintained correctly.
       // This feature is currently only supported in the LRU cache
       for (auto role : CacheCfStatsRoles) {
-        auto role_idx = static_cast<uint>(role);
+        auto role_idx = static_cast<uint32_t>(role);
         size_t total_role_charges_all_cfs = 0U;
         for (const auto cfh : cf_handles) {
           auto cfh_impl = static_cast<ColumnFamilyHandleImpl*>(cfh);

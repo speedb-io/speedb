@@ -1632,6 +1632,9 @@ write_batch_test: $(OBJ_DIR)/db/write_batch_test.o $(TEST_LIBRARY) $(LIBRARY)
 write_controller_test: $(OBJ_DIR)/db/write_controller_test.o $(TEST_LIBRARY) $(LIBRARY)
 	$(AM_LINK)
 
+global_write_controller_test: $(OBJ_DIR)/db/global_write_controller_test.o $(TEST_LIBRARY) $(LIBRARY)
+	$(AM_LINK)
+
 merge_helper_test: $(OBJ_DIR)/db/merge_helper_test.o $(TEST_LIBRARY) $(LIBRARY)
 	$(AM_LINK)
 

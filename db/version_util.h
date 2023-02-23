@@ -18,12 +18,13 @@ namespace ROCKSDB_NAMESPACE {
 class OfflineManifestWriter {
  public:
   OfflineManifestWriter(const DBOptions& options, const std::string& db_path)
-      : wc_(options.use_dynamic_delay, options.delayed_write_rate),
+      : wc_(std::make_shared<WriteController>(options.use_dynamic_delay,
+                                              options.delayed_write_rate)),
         wb_(options.db_write_buffer_size),
         immutable_db_options_(WithDbPath(options, db_path)),
         tc_(NewLRUCache(1 << 20 /* capacity */,
                         options.table_cache_numshardbits)),
-        versions_(db_path, &immutable_db_options_, sopt_, tc_.get(), &wb_, &wc_,
+        versions_(db_path, &immutable_db_options_, sopt_, tc_.get(), &wb_, wc_,
                   /*block_cache_tracer=*/nullptr, /*io_tracer=*/nullptr,
                   /*db_id*/ "", /*db_session_id*/ "") {}
 
@@ -50,7 +51,7 @@ class OfflineManifestWriter {
   const ImmutableDBOptions& IOptions() { return immutable_db_options_; }
 
  private:
-  WriteController wc_;
+  std::shared_ptr<WriteController> wc_;
   WriteBufferManager wb_;
   ImmutableDBOptions immutable_db_options_;
   std::shared_ptr<Cache> tc_;

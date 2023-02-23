@@ -228,7 +228,7 @@ TEST_F(DBTest, SkipDelay) {
       // when we do Put
       // TODO(myabandeh): this is time dependent and could potentially make
       // the test flaky
-      auto token = dbfull()->TEST_write_controler().GetDelayToken(1);
+      auto token = dbfull()->TEST_write_controler()->GetDelayToken(1);
       std::atomic<int> sleep_count(0);
       ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
           "DBImpl::DelayWrite:Sleep",
@@ -255,7 +255,7 @@ TEST_F(DBTest, SkipDelay) {
       ASSERT_GE(wait_count.load(), 0);
       token.reset();
 
-      token = dbfull()->TEST_write_controler().GetDelayToken(1000000);
+      token = dbfull()->TEST_write_controler()->GetDelayToken(1000000);
       wo.no_slowdown = false;
       ASSERT_OK(dbfull()->Put(wo, "foo3", large_value));
       ASSERT_GE(sleep_count.load(), 1);
@@ -290,7 +290,7 @@ TEST_F(DBTest, MixedSlowdownOptions) {
   // when we do Put
   // TODO(myabandeh): this is time dependent and could potentially make
   // the test flaky
-  auto token = dbfull()->TEST_write_controler().GetDelayToken(1);
+  auto token = dbfull()->TEST_write_controler()->GetDelayToken(1);
   std::atomic<int> sleep_count(0);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::DelayWrite:BeginWriteStallDone", [&](void* /*arg*/) {
@@ -344,7 +344,7 @@ TEST_F(DBTest, MixedSlowdownOptionsInQueue) {
   // when we do Put
   // TODO(myabandeh): this is time dependent and could potentially make
   // the test flaky
-  auto token = dbfull()->TEST_write_controler().GetDelayToken(1);
+  auto token = dbfull()->TEST_write_controler()->GetDelayToken(1);
   std::atomic<int> sleep_count(0);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::DelayWrite:Sleep", [&](void* /*arg*/) {
@@ -412,7 +412,7 @@ TEST_F(DBTest, MixedSlowdownOptionsStop) {
   // when we do Put
   // TODO(myabandeh): this is time dependent and could potentially make
   // the test flaky
-  auto token = dbfull()->TEST_write_controler().GetStopToken();
+  auto token = dbfull()->TEST_write_controler()->GetStopToken();
   std::atomic<int> wait_count(0);
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::DelayWrite:Wait", [&](void* /*arg*/) {
@@ -5431,7 +5431,7 @@ TEST_F(DBTest, DynamicCompactionOptions) {
     ASSERT_OK(Put(Key(count), rnd.RandomString(1024), wo));
     ASSERT_OK(dbfull()->TEST_FlushMemTable(true, true));
     count++;
-    if (dbfull()->TEST_write_controler().IsStopped()) {
+    if (dbfull()->TEST_write_controler()->IsStopped()) {
       for (auto& sleeping_task : sleeping_task_low) {
         sleeping_task.WakeUp();
       }
@@ -5465,7 +5465,7 @@ TEST_F(DBTest, DynamicCompactionOptions) {
     ASSERT_OK(Put(Key(count), rnd.RandomString(1024), wo));
     ASSERT_OK(dbfull()->TEST_FlushMemTable(true, true));
     count++;
-    if (dbfull()->TEST_write_controler().IsStopped()) {
+    if (dbfull()->TEST_write_controler()->IsStopped()) {
       for (auto& sleeping_task : sleeping_task_low) {
         sleeping_task.WakeUp();
       }
@@ -6777,7 +6777,7 @@ TEST_F(DBTest, SoftLimit) {
     ASSERT_OK(dbfull()->TEST_FlushMemTable(true, true));
     WaitForFlush();
   }
-  ASSERT_TRUE(dbfull()->TEST_write_controler().NeedsDelay());
+  ASSERT_TRUE(dbfull()->TEST_write_controler()->NeedsDelay());
   ASSERT_TRUE(listener->CheckCondition(WriteStallCondition::kDelayed));
 
   for (auto& sleeping_task : sleeping_task_low) {
@@ -6794,7 +6794,7 @@ TEST_F(DBTest, SoftLimit) {
   //
   // The L1 file size is around 30KB.
   ASSERT_EQ(NumTableFilesAtLevel(1), 1);
-  ASSERT_TRUE(!dbfull()->TEST_write_controler().NeedsDelay());
+  ASSERT_TRUE(!dbfull()->TEST_write_controler()->NeedsDelay());
   ASSERT_TRUE(listener->CheckCondition(WriteStallCondition::kNormal));
 
   // Only allow one compactin going through.
@@ -6831,7 +6831,7 @@ TEST_F(DBTest, SoftLimit) {
   // Given level multiplier 10, estimated pending compaction is around 100KB
   // doesn't trigger soft_pending_compaction_bytes_limit
   ASSERT_EQ(NumTableFilesAtLevel(1), 1);
-  ASSERT_TRUE(!dbfull()->TEST_write_controler().NeedsDelay());
+  ASSERT_TRUE(!dbfull()->TEST_write_controler()->NeedsDelay());
   ASSERT_TRUE(listener->CheckCondition(WriteStallCondition::kNormal));
 
   // Create 3 L0 files, making score of L0 to be 3, higher than L0.
@@ -6854,13 +6854,13 @@ TEST_F(DBTest, SoftLimit) {
   // compaction is around 200KB
   // triggerring soft_pending_compaction_bytes_limit
   ASSERT_EQ(NumTableFilesAtLevel(1), 1);
-  ASSERT_TRUE(dbfull()->TEST_write_controler().NeedsDelay());
+  ASSERT_TRUE(dbfull()->TEST_write_controler()->NeedsDelay());
   ASSERT_TRUE(listener->CheckCondition(WriteStallCondition::kDelayed));
 
   sleeping_task_low[0].WakeUp();
   sleeping_task_low[0].WaitUntilSleeping();
 
-  ASSERT_TRUE(!dbfull()->TEST_write_controler().NeedsDelay());
+  ASSERT_TRUE(!dbfull()->TEST_write_controler()->NeedsDelay());
   ASSERT_TRUE(listener->CheckCondition(WriteStallCondition::kNormal));
 
   // shrink level base so L2 will hit soft limit easier.
@@ -6870,7 +6870,7 @@ TEST_F(DBTest, SoftLimit) {
 
   ASSERT_OK(Put("", ""));
   ASSERT_OK(Flush());
-  ASSERT_TRUE(dbfull()->TEST_write_controler().NeedsDelay());
+  ASSERT_TRUE(dbfull()->TEST_write_controler()->NeedsDelay());
   ASSERT_TRUE(listener->CheckCondition(WriteStallCondition::kDelayed));
 
   sleeping_task_low[0].WaitUntilSleeping();
@@ -6906,11 +6906,11 @@ TEST_F(DBTest, LastWriteBufferDelay) {
     for (int j = 0; j < kNumKeysPerMemtable; j++) {
       ASSERT_OK(Put(Key(j), ""));
     }
-    ASSERT_TRUE(!dbfull()->TEST_write_controler().NeedsDelay());
+    ASSERT_TRUE(!dbfull()->TEST_write_controler()->NeedsDelay());
   }
   // Inserting a new entry would create a new mem table, triggering slow down.
   ASSERT_OK(Put(Key(0), ""));
-  ASSERT_TRUE(dbfull()->TEST_write_controler().NeedsDelay());
+  ASSERT_TRUE(dbfull()->TEST_write_controler()->NeedsDelay());
 
   sleeping_task.WakeUp();
   sleeping_task.WaitUntilDone();

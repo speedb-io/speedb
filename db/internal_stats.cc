@@ -1448,18 +1448,18 @@ bool InternalStats::HandleMinObsoleteSstNumberToKeep(uint64_t* value,
 
 bool InternalStats::HandleActualDelayedWriteRate(uint64_t* value, DBImpl* db,
                                                  Version* /*version*/) {
-  const WriteController& wc = db->write_controller();
-  if (!wc.NeedsDelay()) {
+  const WriteController* wc = db->write_controller_ptr();
+  if (!wc->NeedsDelay()) {
     *value = 0;
   } else {
-    *value = wc.delayed_write_rate();
+    *value = wc->delayed_write_rate();
   }
   return true;
 }
 
 bool InternalStats::HandleIsWriteStopped(uint64_t* value, DBImpl* db,
                                          Version* /*version*/) {
-  *value = db->write_controller().IsStopped() ? 1 : 0;
+  *value = db->write_controller()->IsStopped() ? 1 : 0;
   return true;
 }
 

@@ -1953,7 +1953,7 @@ TEST_F(DBTest2, CompactionStall) {
   DestroyAndReopen(options);
   // make sure all background compaction jobs can be scheduled
   auto stop_token =
-      dbfull()->TEST_write_controler().GetCompactionPressureToken();
+      dbfull()->TEST_write_controler()->GetCompactionPressureToken();
 
   Random rnd(301);
 

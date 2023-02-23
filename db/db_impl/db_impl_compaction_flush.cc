@@ -2541,7 +2541,7 @@ DBImpl::BGJobLimits DBImpl::GetBGJobLimits() const {
   return GetBGJobLimits(mutable_db_options_.max_background_flushes,
                         mutable_db_options_.max_background_compactions,
                         mutable_db_options_.max_background_jobs,
-                        write_controller_.NeedSpeedupCompaction());
+                        write_controller_->NeedSpeedupCompaction());
 }
 
 DBImpl::BGJobLimits DBImpl::GetBGJobLimits(int max_background_flushes,

@@ -5047,7 +5047,7 @@ VersionSet::VersionSet(const std::string& dbname,
                        const ImmutableDBOptions* _db_options,
                        const FileOptions& storage_options, Cache* table_cache,
                        WriteBufferManager* write_buffer_manager,
-                       WriteController* write_controller,
+                       std::shared_ptr<WriteController> write_controller,
                        BlockCacheTracer* const block_cache_tracer,
                        const std::shared_ptr<IOTracer>& io_tracer,
                        const std::string& db_id,
@@ -5096,7 +5096,7 @@ VersionSet::~VersionSet() {
 void VersionSet::Reset() {
   if (column_family_set_) {
     WriteBufferManager* wbm = column_family_set_->write_buffer_manager();
-    WriteController* wc = column_family_set_->write_controller();
+    auto wc = column_family_set_->write_controller();
     // db_id becomes the source of truth after DBImpl::Recover():
     // https://github.com/facebook/rocksdb/blob/v7.3.1/db/db_impl/db_impl_open.cc#L527
     // Note: we may not be able to recover db_id from MANIFEST if
@@ -6196,9 +6196,10 @@ Status VersionSet::ReduceNumberOfLevels(const std::string& dbname,
   ColumnFamilyOptions cf_options(*options);
   std::shared_ptr<Cache> tc(NewLRUCache(options->max_open_files - 10,
                                         options->table_cache_numshardbits));
-  WriteController wc(db_options.use_dynamic_delay, options->delayed_write_rate);
+  auto wc = std::make_shared<WriteController>(db_options.use_dynamic_delay,
+                                              options->delayed_write_rate);
   WriteBufferManager wb(options->db_write_buffer_size);
-  VersionSet versions(dbname, &db_options, file_options, tc.get(), &wb, &wc,
+  VersionSet versions(dbname, &db_options, file_options, tc.get(), &wb, wc,
                       nullptr /*BlockCacheTracer*/, nullptr /*IOTracer*/,
                       /*db_id*/ "",
                       /*db_session_id*/ "");
@@ -7237,7 +7238,8 @@ Status VersionSet::VerifyFileMetadata(const ReadOptions& read_options,
 ReactiveVersionSet::ReactiveVersionSet(
     const std::string& dbname, const ImmutableDBOptions* _db_options,
     const FileOptions& _file_options, Cache* table_cache,
-    WriteBufferManager* write_buffer_manager, WriteController* write_controller,
+    WriteBufferManager* write_buffer_manager,
+    std::shared_ptr<WriteController> write_controller,
     const std::shared_ptr<IOTracer>& io_tracer)
     : VersionSet(dbname, _db_options, _file_options, table_cache,
                  write_buffer_manager, write_controller,

@@ -1053,6 +1053,14 @@ class DBTestBase : public testing::Test {
 
   ~DBTestBase();
 
+  void RecalculateWriteStallConditions(
+      DBImpl* db, ColumnFamilyData* cfd,
+      const MutableCFOptions& mutable_cf_options);
+
+  bool IsDbWriteStopped(DBImpl* dbimpl);
+
+  bool IsDbWriteDelayed(DBImpl* dbimpl);
+
   static std::string Key(int i) {
     char buf[100];
     snprintf(buf, sizeof(buf), "key%06d", i);

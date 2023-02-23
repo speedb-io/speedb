@@ -199,8 +199,7 @@ DBImpl::DBImpl(const DBOptions& options, const std::string& dbname,
       write_buffer_manager_(immutable_db_options_.write_buffer_manager.get()),
       write_thread_(immutable_db_options_),
       nonmem_write_thread_(immutable_db_options_),
-      write_controller_(immutable_db_options_.use_dynamic_delay,
-                        mutable_db_options_.delayed_write_rate),
+      write_controller_(immutable_db_options_.write_controller),
       last_batch_group_size_(0),
       unscheduled_flushes_(0),
       unscheduled_compactions_(0),
@@ -283,7 +282,7 @@ DBImpl::DBImpl(const DBOptions& options, const std::string& dbname,
 
   versions_.reset(new VersionSet(dbname_, &immutable_db_options_, file_options_,
                                  table_cache_.get(), write_buffer_manager_,
-                                 &write_controller_, &block_cache_tracer_,
+                                 write_controller_, &block_cache_tracer_,
                                  io_tracer_, db_id_, db_session_id_));
   column_family_memtables_.reset(
       new ColumnFamilyMemTablesImpl(versions_->GetColumnFamilySet()));
@@ -1489,7 +1488,7 @@ Status DBImpl::SetDBOptions(
         return s;
       }
 
-      write_controller_.set_max_delayed_write_rate(
+      write_controller_->set_max_delayed_write_rate(
           new_options.delayed_write_rate);
       table_cache_.get()->SetCapacity(new_options.max_open_files == -1
                                           ? TableCache::kInfiniteCapacity
@@ -1737,7 +1736,7 @@ Status DBImpl::LockWAL() {
       // now lock_wal_count > 0
       if (lock_wal_count_ == 0) {
         assert(!lock_wal_write_token_);
-        lock_wal_write_token_ = write_controller_.GetStopToken();
+        lock_wal_write_token_ = write_controller_->GetStopToken();
       }
       ++lock_wal_count_;
 

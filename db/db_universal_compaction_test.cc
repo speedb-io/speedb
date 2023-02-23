@@ -1684,7 +1684,7 @@ TEST_P(DBTestUniversalCompaction, ConcurrentBottomPriLowPriCompactions) {
   // Need to get a token to enable compaction parallelism up to
   // `max_background_compactions` jobs.
   auto pressure_token =
-      dbfull()->TEST_write_controler().GetCompactionPressureToken();
+      dbfull()->TEST_write_controler()->GetCompactionPressureToken();
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->LoadDependency(
       {// wait for the full compaction to be picked before adding files intended
        // for the second one.
@@ -1778,7 +1778,7 @@ TEST_P(DBTestUniversalCompaction, FinalSortedRunCompactFilesConflict) {
 
   // make sure compaction jobs can be parallelized
   auto stop_token =
-      dbfull()->TEST_write_controler().GetCompactionPressureToken();
+      dbfull()->TEST_write_controler()->GetCompactionPressureToken();
 
   ASSERT_OK(Put("key", "val"));
   ASSERT_OK(Flush());

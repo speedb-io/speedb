@@ -33,7 +33,8 @@ class WalManagerTest : public testing::Test {
   WalManagerTest()
       : dbname_(test::PerThreadDBPath("wal_manager_test")),
         db_options_(),
-        write_controller_(db_options_.use_dynamic_delay),
+        write_controller_(
+            std::make_shared<WriteController>(db_options_.use_dynamic_delay)),
         table_cache_(NewLRUCache(50000, 16)),
         write_buffer_manager_(db_options_.db_write_buffer_size),
         current_log_number_(0) {
@@ -53,7 +54,7 @@ class WalManagerTest : public testing::Test {
 
     versions_.reset(
         new VersionSet(dbname_, &db_options_, env_options_, table_cache_.get(),
-                       &write_buffer_manager_, &write_controller_,
+                       &write_buffer_manager_, write_controller_,
                        /*block_cache_tracer=*/nullptr, /*io_tracer=*/nullptr,
                        /*db_id*/ "", /*db_session_id*/ ""));
 
@@ -113,7 +114,7 @@ class WalManagerTest : public testing::Test {
   std::unique_ptr<MockEnv> env_;
   std::string dbname_;
   ImmutableDBOptions db_options_;
-  WriteController write_controller_;
+  std::shared_ptr<WriteController> write_controller_;
   EnvOptions env_options_;
   std::shared_ptr<Cache> table_cache_;
   WriteBufferManager write_buffer_manager_;

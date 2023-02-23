@@ -2249,7 +2249,7 @@ Status DBImpl::FlushMemTable(ColumnFamilyData* cfd,
                              bool entered_write_thread) {
   // This method should not be called if atomic_flush is true.
   assert(!immutable_db_options_.atomic_flush);
-  if (!flush_options.wait && write_controller_.IsStopped()) {
+  if (!flush_options.wait && write_controller_->IsStopped()) {
     std::ostringstream oss;
     oss << "Writes have been stopped, thus unable to perform manual flush. "
            "Please try again later after writes are resumed";
@@ -2387,7 +2387,7 @@ Status DBImpl::AtomicFlushMemTables(
     const autovector<ColumnFamilyData*>& provided_candidate_cfds,
     bool entered_write_thread) {
   assert(immutable_db_options_.atomic_flush);
-  if (!flush_options.wait && write_controller_.IsStopped()) {
+  if (!flush_options.wait && write_controller_->IsStopped()) {
     std::ostringstream oss;
     oss << "Writes have been stopped, thus unable to perform manual flush. "
            "Please try again later after writes are resumed";
@@ -2879,7 +2879,7 @@ DBImpl::BGJobLimits DBImpl::GetBGJobLimits() const {
   return GetBGJobLimits(mutable_db_options_.max_background_flushes,
                         mutable_db_options_.max_background_compactions,
                         mutable_db_options_.max_background_jobs,
-                        write_controller_.NeedSpeedupCompaction());
+                        write_controller_->NeedSpeedupCompaction());
 }
 
 DBImpl::BGJobLimits DBImpl::GetBGJobLimits(int max_background_flushes,

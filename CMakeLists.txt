@@ -1433,6 +1433,7 @@ if(WITH_TESTS)
         db/write_batch_test.cc
         db/write_callback_test.cc
         db/write_controller_test.cc
+        db/global_write_controller_test.cc
         env/env_test.cc
         env/io_posix_test.cc
         env/mock_env_test.cc

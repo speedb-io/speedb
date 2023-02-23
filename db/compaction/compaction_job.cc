@@ -2130,7 +2130,7 @@ Env::IOPriority CompactionJob::GetRateLimiterPriority() {
   if (versions_ && versions_->GetColumnFamilySet() &&
       versions_->GetColumnFamilySet()->write_controller()) {
     WriteController* write_controller =
-        versions_->GetColumnFamilySet()->write_controller();
+        versions_->GetColumnFamilySet()->write_controller_ptr();
     if (write_controller->NeedsDelay() || write_controller->IsStopped()) {
       return Env::IO_USER;
     }

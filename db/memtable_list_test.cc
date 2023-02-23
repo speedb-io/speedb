@@ -115,12 +115,12 @@ class MemTableListTest : public testing::Test {
     EnvOptions env_options;
     std::shared_ptr<Cache> table_cache(NewLRUCache(50000, 16));
     WriteBufferManager write_buffer_manager(db_options.db_write_buffer_size);
-    WriteController write_controller(immutable_db_options.use_dynamic_delay,
-                                     10000000u);
+    auto write_controller = std::make_shared<WriteController>(
+        immutable_db_options.use_dynamic_delay, 10000000u);
 
     VersionSet versions(dbname, &immutable_db_options, env_options,
                         table_cache.get(), &write_buffer_manager,
-                        &write_controller, /*block_cache_tracer=*/nullptr,
+                        write_controller, /*block_cache_tracer=*/nullptr,
                         /*io_tracer=*/nullptr, /*db_id*/ "",
                         /*db_session_id*/ "");
     std::vector<ColumnFamilyDescriptor> cf_descs;
@@ -167,12 +167,12 @@ class MemTableListTest : public testing::Test {
     EnvOptions env_options;
     std::shared_ptr<Cache> table_cache(NewLRUCache(50000, 16));
     WriteBufferManager write_buffer_manager(db_options.db_write_buffer_size);
-    WriteController write_controller(immutable_db_options.use_dynamic_delay,
-                                     10000000u);
+    auto write_controller = std::make_shared<WriteController>(
+        immutable_db_options.use_dynamic_delay, 10000000u);
 
     VersionSet versions(dbname, &immutable_db_options, env_options,
                         table_cache.get(), &write_buffer_manager,
-                        &write_controller, /*block_cache_tracer=*/nullptr,
+                        write_controller, /*block_cache_tracer=*/nullptr,
                         /*io_tracer=*/nullptr, /*db_id*/ "",
                         /*db_session_id*/ "");
     std::vector<ColumnFamilyDescriptor> cf_descs;

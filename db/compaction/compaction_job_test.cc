@@ -210,11 +210,12 @@ class CompactionJobTestBase : public testing::Test {
         mutable_cf_options_(cf_options_),
         mutable_db_options_(),
         table_cache_(NewLRUCache(50000, 16)),
-        write_controller_(db_options_.use_dynamic_delay),
+        write_controller_(
+            std::make_shared<WriteController>(db_options_.use_dynamic_delay)),
         write_buffer_manager_(db_options_.db_write_buffer_size),
         versions_(new VersionSet(
             dbname_, &db_options_, env_options_, table_cache_.get(),
-            &write_buffer_manager_, &write_controller_,
+            &write_buffer_manager_, write_controller_,
             /*block_cache_tracer=*/nullptr,
             /*io_tracer=*/nullptr, /*db_id*/ "", /*db_session_id*/ "")),
         shutting_down_(false),
@@ -543,7 +544,7 @@ class CompactionJobTestBase : public testing::Test {
 
     versions_.reset(
         new VersionSet(dbname_, &db_options_, env_options_, table_cache_.get(),
-                       &write_buffer_manager_, &write_controller_,
+                       &write_buffer_manager_, write_controller_,
                        /*block_cache_tracer=*/nullptr, /*io_tracer=*/nullptr,
                        /*db_id*/ "", /*db_session_id*/ ""));
     compaction_job_stats_.Reset();
@@ -706,7 +707,7 @@ class CompactionJobTestBase : public testing::Test {
     ASSERT_EQ(compaction_job.GetRateLimiterPriority(), Env::IO_LOW);
 
     WriteController* write_controller =
-        compaction_job.versions_->GetColumnFamilySet()->write_controller();
+        compaction_job.versions_->GetColumnFamilySet()->write_controller_ptr();
 
     {
       // When the state from WriteController is Delayed.
@@ -735,7 +736,7 @@ class CompactionJobTestBase : public testing::Test {
   MutableDBOptions mutable_db_options_;
   const ReadOptions read_options_;
   std::shared_ptr<Cache> table_cache_;
-  WriteController write_controller_;
+  std::shared_ptr<WriteController> write_controller_;
   WriteBufferManager write_buffer_manager_;
   std::unique_ptr<VersionSet> versions_;
   InstrumentedMutex mutex_;
@@ -2403,7 +2404,7 @@ TEST_F(CompactionJobIOPriorityTest, WriteControllerStateDelayed) {
   ASSERT_EQ(2U, files.size());
   {
     std::unique_ptr<WriteControllerToken> delay_token =
-        write_controller_.GetDelayToken(1000000);
+        write_controller_->GetDelayToken(1000000);
     RunCompaction({files}, {input_level}, {expected_results}, {},
                   kMaxSequenceNumber, 1, false, {kInvalidBlobFileNumber}, false,
                   Env::IO_USER, Env::IO_USER);
@@ -2420,7 +2421,7 @@ TEST_F(CompactionJobIOPriorityTest, WriteControllerStateStalled) {
   ASSERT_EQ(2U, files.size());
   {
     std::unique_ptr<WriteControllerToken> stop_token =
-        write_controller_.GetStopToken();
+        write_controller_->GetStopToken();
     RunCompaction({files}, {input_level}, {expected_results}, {},
                   kMaxSequenceNumber, 1, false, {kInvalidBlobFileNumber}, false,
                   Env::IO_USER, Env::IO_USER);

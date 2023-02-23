@@ -8,8 +8,11 @@
 #include <stdint.h>
 
 #include <atomic>
+#include <condition_variable>
 #include <memory>
+#include <mutex>
 
+#include "db/error_handler.h"
 #include "rocksdb/rate_limiter.h"
 
 namespace ROCKSDB_NAMESPACE {
@@ -24,7 +27,7 @@ class WriteControllerToken;
 class WriteController {
  public:
   explicit WriteController(bool dynamic_delay,
-                           uint64_t _delayed_write_rate = 1024u * 1024u * 32u,
+                           uint64_t _delayed_write_rate = 1024u * 1024u * 16u,
                            int64_t low_pri_rate_bytes_per_sec = 1024 * 1024)
       : total_stopped_(0),
         total_delayed_(0),
@@ -89,7 +92,31 @@ class WriteController {
 
   bool is_dynamic_delay() const { return dynamic_delay_; }
 
+  std::mutex& GetMapMutex() { return mu_for_map_; }
+
+  using CfIdToRateMap = std::unordered_map<uint32_t, uint64_t>;
+
+  void AddToDbRateMap(CfIdToRateMap* cf_map);
+
+  void RemoveFromDbRateMap(CfIdToRateMap* cf_map);
+
+  void DeleteSelfFromMapAndMaybeUpdateDelayRate(uint32_t id,
+                                                CfIdToRateMap* cf_map);
+
+  uint64_t InsertToMapAndGetMinRate(uint32_t id, CfIdToRateMap* cf_map,
+                                    uint64_t cf_write_rate);
+
+  uint64_t TEST_GetMapMinRate();
+
+  void WaitOnCV(const ErrorHandler& error_handler);
+  void NotifyCV();
+
  private:
+  bool IsMinRate(uint32_t id, CfIdToRateMap* cf_map);
+
+  // returns the min rate from db_id_to_write_rate_map_
+  uint64_t GetMapMinRate();
+
   uint64_t NowMicrosMonotonic(SystemClock* clock);
 
   friend class WriteControllerToken;
@@ -101,16 +128,26 @@ class WriteController {
   std::atomic<int> total_delayed_;
   std::atomic<int> total_compaction_pressure_;
 
+  // mutex to protect below 4 members
+  std::mutex mu_;
   // Number of bytes allowed to write without delay
-  uint64_t credit_in_bytes_;
+  std::atomic<uint64_t> credit_in_bytes_;
   // Next time that we can add more credit of bytes
-  uint64_t next_refill_time_;
+  std::atomic<uint64_t> next_refill_time_;
   // Write rate set when initialization or by `DBImpl::SetDBOptions`
-  uint64_t max_delayed_write_rate_;
+  std::atomic<uint64_t> max_delayed_write_rate_;
   // Current write rate (bytes / second)
-  uint64_t delayed_write_rate_;
+  std::atomic<uint64_t> delayed_write_rate_;
+
   // Whether Speedb's dynamic delay is used
   bool dynamic_delay_;
+
+  std::mutex mu_for_map_;
+  std::unordered_set<CfIdToRateMap*> db_id_to_write_rate_map_;
+
+  std::condition_variable stop_cv_;
+  // The mutex used by stop_cv_
+  std::mutex stop_mutex_;
 
   std::unique_ptr<RateLimiter> low_pri_rate_limiter_;
 };

@@ -1535,11 +1535,10 @@ class RecoveryTestHelper {
 
     std::unique_ptr<VersionSet> versions;
     std::unique_ptr<WalManager> wal_manager;
-    WriteController write_controller(db_options.use_dynamic_delay);
 
     versions.reset(new VersionSet(
         test->dbname_, &db_options, file_options, table_cache.get(),
-        &write_buffer_manager, &write_controller,
+        &write_buffer_manager, db_options.write_controller,
         /*block_cache_tracer=*/nullptr,
         /*io_tracer=*/nullptr, /*db_id*/ "", /*db_session_id*/ ""));
 

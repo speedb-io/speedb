@@ -96,6 +96,16 @@ DBOptions SanitizeOptions(const std::string& dbname, const DBOptions& src,
     }
   }
 
+  if (!result.write_controller) {
+    result.write_controller.reset(new WriteController(
+        result.use_dynamic_delay, result.delayed_write_rate));
+  } else if (result.use_dynamic_delay == false) {
+    result.use_dynamic_delay = true;
+    ROCKS_LOG_WARN(
+        result.info_log,
+        "Global Write Controller is only possible with use_dynamic_delay");
+  }
+
   if (result.WAL_ttl_seconds > 0 || result.WAL_size_limit_MB > 0) {
     result.recycle_log_file_num = false;
   }

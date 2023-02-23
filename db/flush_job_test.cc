@@ -40,7 +40,8 @@ class FlushJobTestBase : public testing::Test {
         db_options_(options_),
         column_family_names_({kDefaultColumnFamilyName, "foo", "bar"}),
         table_cache_(NewLRUCache(50000, 16)),
-        write_controller_(db_options_.use_dynamic_delay),
+        write_controller_(
+            std::make_shared<WriteController>(db_options_.use_dynamic_delay)),
         write_buffer_manager_(db_options_.db_write_buffer_size),
         shutting_down_(false),
         mock_table_factory_(new mock::MockTableFactory()) {}
@@ -130,7 +131,7 @@ class FlushJobTestBase : public testing::Test {
 
     versions_.reset(
         new VersionSet(dbname_, &db_options_, env_options_, table_cache_.get(),
-                       &write_buffer_manager_, &write_controller_,
+                       &write_buffer_manager_, write_controller_,
                        /*block_cache_tracer=*/nullptr, /*io_tracer=*/nullptr,
                        /*db_id*/ "", /*db_session_id*/ ""));
     EXPECT_OK(versions_->Recover(column_families, false));
@@ -145,7 +146,7 @@ class FlushJobTestBase : public testing::Test {
   ImmutableDBOptions db_options_;
   const std::vector<std::string> column_family_names_;
   std::shared_ptr<Cache> table_cache_;
-  WriteController write_controller_;
+  std::shared_ptr<WriteController> write_controller_;
   WriteBufferManager write_buffer_manager_;
   ColumnFamilyOptions cf_options_;
   std::unique_ptr<VersionSet> versions_;
@@ -591,7 +592,7 @@ TEST_F(FlushJobTest, GetRateLimiterPriorityForWrite) {
   ASSERT_EQ(flush_job.GetRateLimiterPriorityForWrite(), Env::IO_HIGH);
 
   WriteController* write_controller =
-      flush_job.versions_->GetColumnFamilySet()->write_controller();
+      flush_job.versions_->GetColumnFamilySet()->write_controller_ptr();
 
   {
     // When the state from WriteController is Delayed.

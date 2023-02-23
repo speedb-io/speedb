@@ -504,6 +504,9 @@ class ColumnFamilyData {
       const MutableCFOptions& mutable_cf_options,
       WriteStallCause& write_stall_cause);
 
+  // returns the min rate to set
+  uint64_t UpdateCFRate(uint32_t id, uint64_t write_rate);
+
  public:
   void set_initialized() { initialized_.store(true); }
 
@@ -726,7 +729,7 @@ class ColumnFamilySet {
                   const ImmutableDBOptions* db_options,
                   const FileOptions& file_options, Cache* table_cache,
                   WriteBufferManager* _write_buffer_manager,
-                  WriteController* _write_controller,
+                  std::shared_ptr<WriteController> _write_controller,
                   BlockCacheTracer* const block_cache_tracer,
                   const std::shared_ptr<IOTracer>& io_tracer,
                   const std::string& db_id, const std::string& db_session_id);
@@ -766,7 +769,19 @@ class ColumnFamilySet {
 
   WriteBufferManager* write_buffer_manager() { return write_buffer_manager_; }
 
-  WriteController* write_controller() { return write_controller_; }
+  const std::shared_ptr<WriteController>& write_controller() const {
+    return write_controller_;
+  }
+
+  uint64_t UpdateCFRate(uint32_t id, uint64_t write_rate);
+
+  bool IsInRateMap(uint32_t id) { return cf_id_to_write_rate_.count(id); }
+
+  // try and remove the cf id from WriteController::cf_id_to_write_rate_.
+  // if successful and it was the min rate, set the current minimum value.
+  void DeleteSelfFromMapAndMaybeUpdateDelayRate(uint32_t id);
+
+  WriteController* write_controller_ptr() { return write_controller_.get(); }
 
  private:
   friend class ColumnFamilyData;
@@ -807,11 +822,13 @@ class ColumnFamilySet {
   const ImmutableDBOptions* const db_options_;
   Cache* table_cache_;
   WriteBufferManager* write_buffer_manager_;
-  WriteController* write_controller_;
+  std::shared_ptr<WriteController> write_controller_;
   BlockCacheTracer* const block_cache_tracer_;
   std::shared_ptr<IOTracer> io_tracer_;
   const std::string& db_id_;
   std::string db_session_id_;
+
+  std::unordered_map<uint32_t, uint64_t> cf_id_to_write_rate_;
 };
 
 // A wrapper for ColumnFamilySet that supports releasing DB mutex during each

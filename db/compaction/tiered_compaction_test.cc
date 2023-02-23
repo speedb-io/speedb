@@ -1670,7 +1670,7 @@ TEST_P(PrecludeLastLevelTestWithParms, LastLevelOnlyCompactionNoPreclude) {
   TEST_SYNC_POINT(
       "PrecludeLastLevelTest::LastLevelOnlyCompactionConflit:StartWrite");
   auto stop_token =
-      dbfull()->TEST_write_controler().GetCompactionPressureToken();
+      dbfull()->TEST_write_controler()->GetCompactionPressureToken();
 
   for (; sst_num < kNumTrigger * 2; sst_num++) {
     for (int i = 0; i < kNumKeys; i++) {
@@ -1796,7 +1796,7 @@ TEST_P(PrecludeLastLevelTestWithParms, PeriodicCompactionToPenultimateLevel) {
   });
 
   auto stop_token =
-      dbfull()->TEST_write_controler().GetCompactionPressureToken();
+      dbfull()->TEST_write_controler()->GetCompactionPressureToken();
 
   for (int i = 0; i < kNumTrigger - 1; i++) {
     for (int j = 0; j < kNumKeys; j++) {

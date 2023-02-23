@@ -56,6 +56,7 @@ class Statistics;
 class InternalKeyComparator;
 class WalFilter;
 class FileSystem;
+class WriteController;
 
 struct Options;
 struct DbPath;
@@ -920,6 +921,15 @@ struct DBOptions {
   //
   // Default: null
   std::shared_ptr<WriteBufferManager> write_buffer_manager = nullptr;
+
+  // This object tracks and enforces the delay requirements of all cfs in all
+  // the dbs where its passed
+  //
+  // Only supported together with use_dynamic_delay. passing a WriteController
+  // here forces use_dynamic_delay.
+  //
+  // Default: null
+  std::shared_ptr<WriteController> write_controller = nullptr;
 
   // Specify the file access pattern once a compaction is started.
   // It will be applied to all input files of a compaction.

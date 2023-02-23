@@ -43,6 +43,12 @@ if [ "$?" != "1" ]; then
   BAD=1
 fi
 
+git grep -Li -E "license|copyright" -- ':*speed*.cc' ':*spdb*.h' ':*speed*.h' ':*spdb*.cc'
+if [ "$?" != "1" ]; then
+  echo '^^^^ Source files do not contain license'
+  BAD=1
+fi
+
 if [ "$BAD" ]; then
   exit 1
 fi

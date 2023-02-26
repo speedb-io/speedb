@@ -207,9 +207,7 @@ enum TestMode {
 };
 
 static const std::vector<TestMode> allTestModes = {
-    kSingleFilter,   kBatchPrepared,      kBatchUnprepared,
-    kFiftyOneFilter, kEightyTwentyFilter, kRandomFilter,
-};
+    kSingleFilter};
 
 static const std::vector<TestMode> quickTestModes = {
     kSingleFilter,
@@ -487,40 +485,42 @@ void FilterBench::Go() {
       ALWAYS_ASSERT(prelim_rate < tolerable_rate);
     }
   }
-
+/*
   std::cout << "----------------------------" << std::endl;
   std::cout << "Mixed inside/outside queries..." << std::endl;
   // 50% each inside and outside
   uint32_t inside_threshold = UINT32_MAX / 2;
   for (TestMode tm : testModes) {
-    random_.Seed(FLAGS_seed + 1);
-    double f = RandomQueryTest(inside_threshold, /*dry_run*/ false, tm);
-    random_.Seed(FLAGS_seed + 1);
-    double d = RandomQueryTest(inside_threshold, /*dry_run*/ true, tm);
-    std::cout << "  " << TestModeToString(tm) << " net ns/op: " << (f - d)
-              << std::endl;
-  }
+    random_.Seed(FLAGS_seed + 1); */
+    //double f = RandomQueryTest(inside_threshold, dry_run false, tm);
+    //random_.Seed(FLAGS_seed + 1);
+    //double d = RandomQueryTest(inside_threshold, dry_run true, tm);
+    //std::cout << "  " << TestModeToString(tm) << " net ns/op: " << (f - d)
+      //        << std::endl;
+  //}
 
   if (!FLAGS_quick) {
-    std::cout << "----------------------------" << std::endl;
+    
+    /*std::cout << "----------------------------" << std::endl;
     std::cout << "Inside queries (mostly)..." << std::endl;
     // Do about 95% inside queries rather than 100% so that branch predictor
     // can't give itself an artifically crazy advantage.
     inside_threshold = UINT32_MAX / 20 * 19;
     for (TestMode tm : testModes) {
-      random_.Seed(FLAGS_seed + 1);
-      double f = RandomQueryTest(inside_threshold, /*dry_run*/ false, tm);
-      random_.Seed(FLAGS_seed + 1);
-      double d = RandomQueryTest(inside_threshold, /*dry_run*/ true, tm);
-      std::cout << "  " << TestModeToString(tm) << " net ns/op: " << (f - d)
-                << std::endl;
-    }
+      random_.Seed(FLAGS_seed + 1);*/
+  //    double f = RandomQueryTest(inside_threshold, dry_run false, tm);
+     // random_.Seed(FLAGS_seed + 1);
+    //  double d = RandomQueryTest(inside_threshold, dry_run true, tm);
+     // std::cout << "  " << TestModeToString(tm) << " net ns/op: " << (f - d)
+       //         << std::endl;
+                
+    //}
 
     std::cout << "----------------------------" << std::endl;
     std::cout << "Outside queries (mostly)..." << std::endl;
     // Do about 95% outside queries rather than 100% so that branch predictor
     // can't give itself an artifically crazy advantage.
-    inside_threshold = UINT32_MAX / 20;
+    uint32_t inside_threshold = UINT32_MAX / 20;
     for (TestMode tm : testModes) {
       random_.Seed(FLAGS_seed + 2);
       double f = RandomQueryTest(inside_threshold, /*dry_run*/ false, tm);
@@ -831,7 +831,7 @@ int main(int argc, char **argv) {
   } else if (bloom_idx == 1) {
     fprintf(stderr,
             "Block-based filter not currently supported by filter_bench");
-    exit(-1);
+    //exit(-1);
   }
   ROCKSDB_NAMESPACE::FilterBench b(policy, bloom_idx);
   for (uint32_t i = 0; i < FLAGS_runs; ++i) {

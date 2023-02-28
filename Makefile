@@ -2382,15 +2382,15 @@ build_size:
 	# === normal build, static ===
 	$(MAKE) clean
 	$(MAKE) static_lib
-	$(REPORT_BUILD_STATISTIC) rocksdb.build_size.static_lib $$(stat --printf="%s" librocksdb.a)
-	strip librocksdb.a
-	$(REPORT_BUILD_STATISTIC) rocksdb.build_size.static_lib_stripped $$(stat --printf="%s" librocksdb.a)
+	$(REPORT_BUILD_STATISTIC) $(PROJECT_NAME).build_size.static_lib $$(stat --printf="%s" $(LIBNAME).a)
+	strip -x $(LIBNAME).a
+	$(REPORT_BUILD_STATISTIC) $(PROJECT_NAME).build_size.static_lib_stripped $$(stat --printf="%s" $(LIBNAME).a)
 	# === normal build, shared ===
 	$(MAKE) clean
 	$(MAKE) shared_lib
-	$(REPORT_BUILD_STATISTIC) rocksdb.build_size.shared_lib $$(stat --printf="%s" `readlink -f librocksdb.so`)
-	strip `readlink -f librocksdb.so`
-	$(REPORT_BUILD_STATISTIC) rocksdb.build_size.shared_lib_stripped $$(stat --printf="%s" `readlink -f librocksdb.so`)
+	$(REPORT_BUILD_STATISTIC) $(PROJECT_NAME).build_size.shared_lib $$(stat --printf="%s" `readlink $(LIBNAME).$(PLATFORM_SHARED_EXT)`)
+	strip -x `readlink $(LIBNAME).$(PLATFORM_SHARED_EXT)`
+	$(REPORT_BUILD_STATISTIC) $(PROJECT_NAME).build_size.shared_lib_stripped $$(stat --printf="%s" `readlink $(LIBNAME).$(PLATFORM_SHARED_EXT)`)
 
 # ---------------------------------------------------------------------------
 #  	Platform-specific compilation

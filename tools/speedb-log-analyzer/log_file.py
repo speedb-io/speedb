@@ -108,7 +108,8 @@ class LogFileMetadata:
 
 
 class ParsedLog:
-    def __init__(self, log_lines):
+    def __init__(self, log_file_path, log_lines):
+        self.log_file_path = log_file_path
         self.metadata = None
         self.db_options = DatabaseOptions()
         self.cf_names = []
@@ -235,6 +236,9 @@ class ParsedLog:
                     assert entry_idx > prev_entry_idx
                 else:
                     entry_idx += 1
+
+    def get_log_file_path(self):
+        return self.log_file_path
 
     def get_metadata(self):
         return self.metadata

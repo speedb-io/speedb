@@ -139,8 +139,10 @@ class EventsMngr:
                                          preamble_info.type,
                                          preamble_info.job_id)
 
-        # Assuming no more than one preamble for the same job
-        assert job_id not in self.preambles
+        # If a preamble was already encountered, it must be for the same
+        # parameters
+        if job_id in self.preambles:
+            assert self.preambles[job_id] == (event_type, cf_name)
         self.preambles[job_id] = (event_type, cf_name)
 
         return True

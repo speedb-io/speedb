@@ -20,7 +20,7 @@ def parse_log(log_file_path):
     with open(log_file_path) as log_file:
         log_lines = log_file.readlines()
         log_lines = [line.strip() for line in log_lines]
-        return ParsedLog(log_lines)
+        return ParsedLog(log_file_path, log_lines)
 
 
 def setup_cmd_line_parser():
@@ -97,13 +97,13 @@ if __name__ == '__main__':
                     log_file_path,
                     parsed_log,
                     cmdline_args.console))
-            print(f"{f.getvalue()}\n")
+            print(f"{f.getvalue()}")
 
         if cmdline_args.json_file_name:
-            json_content = json_output.get_json(log_file_path, parsed_log)
+            json_content = json_output.get_json(parsed_log)
             json_output.write_json(cmdline_args.json_file_name,
                                    json_content)
-            print(f"JSON Output is in {cmdline_args.json_file_name}")
+            print(f"JSON Output is in {cmdline_args.json_file_name}\n")
 
         print_warnings_if_applicable()
 

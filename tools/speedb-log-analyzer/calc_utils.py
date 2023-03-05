@@ -66,6 +66,8 @@ def calc_flush_started_stats(cf_name, events_mngr):
         total_num_entries += event_details["num_entries"]
         total_num_deletes += event_details["num_deletes"]
 
+    # TODO - Consider setting as -1 / illegal value to indicate no value
+    percent_deletes = 0
     if total_num_entries > 0:
         percent_deletes = \
             f'{total_num_deletes / total_num_entries * 100:.1f}%'

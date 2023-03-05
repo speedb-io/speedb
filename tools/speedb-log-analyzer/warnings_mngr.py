@@ -10,6 +10,9 @@ class WarningElementInfo:
     cf_name: str
     warning_msg: str
 
+    def __str__(self):
+        return f"{self.warning_time} [{self.cf_name}] {self.warning_msg}"
+
 
 class WarningsMngr:
     def __init__(self, cf_names):

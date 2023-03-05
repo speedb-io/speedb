@@ -10,7 +10,7 @@ def read_file(file_path):
 
 def create_parsed_log():
     log_lines = read_file(SampleInfo.FILE_PATH)
-    return ParsedLog(log_lines)
+    return ParsedLog(SampleInfo.FILE_PATH, log_lines)
 
 
 def lines_to_entries(lines):

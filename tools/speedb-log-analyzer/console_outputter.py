@@ -1,7 +1,7 @@
 import io
 import defs_and_utils
-import calc_utils
 from log_file import ParsedLog
+import display_utils
 
 
 def get_title(log_file_path, parsed_log):
@@ -48,67 +48,39 @@ def print_db_wide_user_opers_stats(db_wide_info, f, width):
 
 def print_cf_console_printout(f, parsed_log):
     cf_names = parsed_log.get_cf_names()
-    events_mngr = parsed_log.get_events_mngr()
     cf_width = max([len(cf_name) for cf_name in cf_names])
 
+    cfs_info_for_display = \
+        display_utils.prepare_general_cf_info_for_display(parsed_log)
+
     for i, cf_name in enumerate(cf_names):
-        table_creation_stats = \
-            calc_utils.calc_cf_table_creation_stats(cf_name, events_mngr)
-        cf_options = calc_utils.get_applicable_cf_options(parsed_log)
+        cf_info_for_display = cfs_info_for_display[cf_name]
 
         cf_title = f'#{i+1}' + ' ' + cf_name.ljust(cf_width)
-        cf_size_bytes = calc_utils.get_cf_size_bytes(parsed_log, cf_name)
-        key_size = \
-            defs_and_utils.get_size_for_display(
-                table_creation_stats['avg_key_size'])
-        value_size = \
-            defs_and_utils.get_size_for_display(
-                table_creation_stats['avg_value_size'])
-
         cf_line = f"{cf_title}: "
-        cf_line += f"{defs_and_utils.get_size_for_display(cf_size_bytes)}  "
-        cf_line += f"Key:{key_size}  Value:{value_size}  "
-        if cf_options['compaction_style']['common'] == 'Per Column Family':
+        cf_line += cf_info_for_display["CF Size"] + " "
+        cf_line += "Key:" + cf_info_for_display["Avg Key Size"] + " "
+        cf_line += "Value:" + cf_info_for_display["Avg Value Size"] + " "
+        if "Compaction Style" in cf_info_for_display:
             cf_line += \
-                f"Compaction:{cf_options['compaction_style'][cf_name]}  "
-        if cf_options['compression']['common'] == 'Per Column Family':
-            cf_line += f"Compression:{cf_options['compression'][cf_name]}  "
-        if cf_options['filter_policy']['common'] == 'Per Column Family':
+                "Compaction:" + cf_info_for_display["Compaction Style"] + " "
+        if "Compression" in cf_info_for_display:
             cf_line += \
-                f"Filter-Policy:{cf_options['filter_policy'][cf_name]}  "
+                "Compression:" + cf_info_for_display["Compression"] + " "
+        if "Filter-Policy" in cf_info_for_display:
+            cf_line += \
+                "Filter-Policy:" + cf_info_for_display["Filter-Policy"] + " "
 
         print(cf_line, file=f)
 
 
-def print_db_wide_info(f, parsed_log: ParsedLog):
-    db_wide_info = calc_utils.get_db_wide_info(parsed_log)
-    cfs_options = calc_utils.get_applicable_cf_options(parsed_log)
+def print_general_info(f, parsed_log: ParsedLog):
+    display_general_info_dict = \
+        display_utils.prepare_db_wide_info_for_display(parsed_log)
 
     width = 25
-    print(f"{'Version'.ljust(width)}: "
-          f"{db_wide_info['version']} [{db_wide_info['git_hash']}]", file=f)
-    db_size_bytes = db_wide_info['db_size_bytes']
-    print(f"{'DB Size'.ljust(width)}: "
-          f"{defs_and_utils.get_size_for_display(db_size_bytes)}", file=f)
-    print(f"{'Num Keys'.ljust(width)}: {db_wide_info['num_written']}", file=f)
-    print(f"{'Average Key Size'.ljust(width)}: "
-          f"{db_wide_info['avg_key_size_bytes']}",
-          file=f)
-    print(f"{'Average Value Size'.ljust(width)}:"
-          f" {db_wide_info['avg_value_size_bytes']}", file=f)
-    print(f"{'Num Warnings'.ljust(width)}: "
-          f"{db_wide_info['num_warns']}", file=f)
-    print(f"{'Num Errors'.ljust(width)}: {db_wide_info['num_errors']}", file=f)
-    print(f"{'Num Stalls'.ljust(width)}: {db_wide_info['num_stalls']}", file=f)
-    print(f"{'Compaction Style'.ljust(width)}: "
-          f"{cfs_options['compaction_style']['common']}", file=f)
-    print(f"{'Compression'.ljust(width)}: "
-          f"{cfs_options['compression']['common']}", file=f)
-    print(f"{'Filter-Policy'.ljust(width)}: "
-          f"{cfs_options['filter_policy']['common']}", file=f)
-
-    print_db_wide_user_opers_stats(db_wide_info, f, width)
-    print(f"{'Num CF-s'.ljust(width)}: {db_wide_info['num_cfs']}", file=f)
+    for field_name, value in display_general_info_dict.items():
+        print(f"{field_name.ljust(width)}: {value}", file=f)
     print_cf_console_printout(f, parsed_log)
 
 
@@ -117,6 +89,6 @@ def get_console_output(log_file_path, parsed_log, output_type):
 
     if output_type == defs_and_utils.ConsoleOutputType.SHORT:
         print_title(f, log_file_path, parsed_log)
-        print_db_wide_info(f, parsed_log)
+        print_general_info(f, parsed_log)
 
     return f.getvalue()

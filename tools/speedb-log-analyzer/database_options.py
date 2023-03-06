@@ -370,7 +370,7 @@ class DatabaseOptions:
                 if "Table-Options" not in cf_diff:
                     cf_diff["Table-Options"] = {}
                 cf_diff["Table-Options"][option_name] =\
-                    {"Base":values_diff[0],
+                    {"Base": values_diff[0],
                      "Log": values_diff[1]}
 
         return cf_diff

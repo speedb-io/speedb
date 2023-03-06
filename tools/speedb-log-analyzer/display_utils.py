@@ -153,6 +153,7 @@ def get_options_baseline_diff_for_display(parsed_log):
 
     options_diff, baseline_version = \
         options_files_utils.find_options_diff(
+            defs_and_utils.OPTIONS_FILE_FOLDER,
             metadata.get_product_name(),
             metadata.get_version(),
             parsed_log.get_database_options())

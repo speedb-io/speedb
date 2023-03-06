@@ -4,6 +4,7 @@ from options_file_parser import OptionsFileParser
 
 
 v = defs_and_utils.Version
+options_files_path = "../" + defs_and_utils.OPTIONS_FILE_FOLDER
 
 
 def test_version():
@@ -70,27 +71,48 @@ def test_find_closest_version():
 def test_find_closest_baseline_options_file():
     find = options_files_utils.find_closest_baseline_options_file
 
-    assert find(defs_and_utils.ProductName.SPEEDB,
-                v("2.2.1")).name == "OPTIONS-speedb-2.2.1"
-    assert find(defs_and_utils.ProductName.SPEEDB,
-                v("2.2.2")).name == "OPTIONS-speedb-2.2.1"
-    assert find(defs_and_utils.ProductName.ROCKSDB,
-                v("7.8.3")).name == "OPTIONS-rocksdb-7.7.8"
-    assert find(defs_and_utils.ProductName.SPEEDB,
-                v("32.0.1 ")).name == "OPTIONS-speedb-9.9.0"
+    closest_file_path, closest_version = \
+        find(options_files_path,
+             defs_and_utils.ProductName.SPEEDB,
+             v("2.2.1"))
+    assert closest_file_path.name == "OPTIONS-speedb-2.2.1"
+    assert closest_version == defs_and_utils.Version("2.2.1")
+
+    closest_file_path, closest_version = \
+        find(options_files_path,
+             defs_and_utils.ProductName.SPEEDB,
+             v("2.2.2"))
+    assert closest_file_path.name == "OPTIONS-speedb-2.2.1"
+    assert closest_version == defs_and_utils.Version("2.2.1")
+
+    closest_file_path, closest_version = \
+        find(options_files_path,
+             defs_and_utils.ProductName.ROCKSDB,
+             v("7.8.3"))
+    assert closest_file_path.name == "OPTIONS-rocksdb-7.7.8"
+    assert closest_version == defs_and_utils.Version("7.7.8")
+
+    closest_file_path, closest_version = \
+        find(options_files_path,
+             defs_and_utils.ProductName.SPEEDB,
+             v("32.0.1 "))
+    assert closest_file_path.name == "OPTIONS-speedb-9.9.0"
+    assert closest_version == defs_and_utils.Version("9.9.0")
 
 
 def test_find_options_diff():
     database_options_2_1_0 =\
         OptionsFileParser.load_options_file(
-            defs_and_utils.OPTIONS_FILE_FOLDER + "/OPTIONS-speedb-2.1.0")
+            options_files_path + "/OPTIONS-speedb-2.1.0")
 
-    options_diff_2_1_0_vs_itself =\
+    options_diff_2_1_0_vs_itself, closest_version =\
         options_files_utils.find_options_diff(
+            options_files_path,
             defs_and_utils.ProductName.SPEEDB,
             v("2.1.0"),
             database_options_2_1_0)
     assert options_diff_2_1_0_vs_itself == {}
+    assert closest_version == defs_and_utils.Version("2.1.0")
 
     expected_diff = {}
     updated_database_options_2_1_0 = database_options_2_1_0
@@ -143,9 +165,11 @@ def test_find_options_diff():
     expected_diff['TableOptions.BlockBasedTable.NEW_CF_TABLE_OPTION1'] = \
         {'default': (None, "NEW_CF_TABLE_VALUE1")}
 
-    options_diff_2_1_0_vs_itself =\
+    options_diff_2_1_0_vs_itself, closest_version =\
         options_files_utils.find_options_diff(
+            options_files_path,
             defs_and_utils.ProductName.SPEEDB,
             v("2.1.0"),
             updated_database_options_2_1_0)
     assert options_diff_2_1_0_vs_itself == expected_diff
+    assert closest_version == defs_and_utils.Version("2.1.0")

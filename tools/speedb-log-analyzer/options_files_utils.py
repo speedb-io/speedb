@@ -7,7 +7,7 @@ from options_file_parser import OptionsFileParser
 from database_options import DatabaseOptions
 
 
-def find_all_baseline_options_files(product_name):
+def find_all_baseline_options_files(options_folder, product_name):
     if product_name == defs_and_utils.ProductName.ROCKSDB:
         options_regex = regexes.ROCKSDB_OPTIONS_FILE_REGEX
     elif product_name == defs_and_utils.ProductName.SPEEDB:
@@ -15,7 +15,7 @@ def find_all_baseline_options_files(product_name):
     else:
         assert False
 
-    options_folder = pathlib.Path(defs_and_utils.OPTIONS_FILE_FOLDER)
+    options_folder = pathlib.Path(options_folder)
 
     files = []
     for file_name in options_folder.iterdir():
@@ -45,8 +45,9 @@ def find_closest_version_idx(baseline_versions, version):
         return None
 
 
-def find_closest_baseline_options_file(product_name, version):
-    baseline_files = find_all_baseline_options_files(product_name)
+def find_closest_baseline_options_file(options_folder, product_name, version):
+    baseline_files = find_all_baseline_options_files(options_folder,
+                                                     product_name)
     baseline_versions = [file.version for file in baseline_files]
     closest_version_idx = find_closest_version_idx(baseline_versions, version)
     if closest_version_idx is not None:
@@ -56,9 +57,11 @@ def find_closest_baseline_options_file(product_name, version):
         return None
 
 
-def find_options_diff(product_name, version, database_options):
+def find_options_diff(options_folder, product_name, version, database_options):
     closest_options_file, closest_version =\
-        find_closest_baseline_options_file(product_name, version)
+        find_closest_baseline_options_file(options_folder,
+                                           product_name,
+                                           version)
     baseline_database_options = OptionsFileParser.load_options_file(
         closest_options_file)
 
@@ -67,4 +70,3 @@ def find_options_diff(product_name, version, database_options):
             baseline_database_options.get_all_options(),
             database_options.get_all_options()), \
         closest_version
-

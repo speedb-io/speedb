@@ -171,3 +171,19 @@ def get_options_baseline_diff_for_display(parsed_log):
             display_diff["CF-s"][cf_name] = cf_options_diff
 
     return display_diff
+
+
+def prepare_flushes_histogram_for_display(parsed_log):
+    flushes_for_display = {}
+
+    cf_names = parsed_log.get_cf_names()
+    events_mngr = parsed_log.get_events_mngr()
+    for cf_name in cf_names:
+        cf_flushes_histogram = calc_utils.calc_flushes_histogram(cf_name,
+                                                                 events_mngr)
+        if cf_flushes_histogram:
+            flushes_for_display[cf_name] = cf_flushes_histogram
+        else:
+            flushes_for_display[cf_name] = "NO Flushes"
+
+    return flushes_for_display

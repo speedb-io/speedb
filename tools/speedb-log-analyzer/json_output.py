@@ -21,6 +21,8 @@ def get_json(parsed_log):
 
     j["Warnings"] = display_utils.prepare_warnings_for_display(parsed_log)
     j["Events"] = calc_utils.calc_all_events_histogram(cf_names, events_mngr)
+    j["Flushes"] = \
+        display_utils.prepare_flushes_histogram_for_display(parsed_log)
 
     return j
 

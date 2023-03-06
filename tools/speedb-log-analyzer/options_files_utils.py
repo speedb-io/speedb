@@ -30,6 +30,9 @@ def find_all_baseline_options_files(product_name):
 
 
 def find_closest_version_idx(baseline_versions, version):
+    if isinstance(version, str):
+        version = defs_and_utils.Version(version)
+
     if baseline_versions[0] == version:
         return 0
 
@@ -47,17 +50,21 @@ def find_closest_baseline_options_file(product_name, version):
     baseline_versions = [file.version for file in baseline_files]
     closest_version_idx = find_closest_version_idx(baseline_versions, version)
     if closest_version_idx is not None:
-        return baseline_files[closest_version_idx].file_name
+        return baseline_files[closest_version_idx].file_name,\
+               baseline_files[closest_version_idx].version
     else:
         return None
 
 
 def find_options_diff(product_name, version, database_options):
-    closest_options_file =\
+    closest_options_file, closest_version =\
         find_closest_baseline_options_file(product_name, version)
     baseline_database_options = OptionsFileParser.load_options_file(
         closest_options_file)
 
-    return DatabaseOptions.get_options_diff(
-        baseline_database_options.get_all_options(),
-        database_options.get_all_options())
+    return \
+        DatabaseOptions.get_options_diff(
+            baseline_database_options.get_all_options(),
+            database_options.get_all_options()), \
+        closest_version
+

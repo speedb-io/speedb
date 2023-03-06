@@ -10,7 +10,7 @@ import regexes
 
 NO_COL_FAMILY = 'DB_WIDE'
 
-OPTIONS_FILE_FOLDER = "../options_files"
+OPTIONS_FILE_FOLDER = "options_files"
 
 
 g_parsing_warnings = []

@@ -14,47 +14,6 @@ class DatabaseOptions:
         return '.' not in option_name
 
     @staticmethod
-    def get_options_diff(opt_old, opt_new):
-        # type: Dict(option, Dict[col_fam, value]] X 2 -> # noqa
-        # Dict[option, Dict[col_fam, Tuple(old_value, new_value)]]
-        # note: diff should contain a tuple of values only if they are
-        # different from each other
-        options_union = set(opt_old.keys()).union(set(opt_new.keys()))
-        diff = {}
-        for opt in options_union:
-            diff[opt] = {}
-            # if option in options_union, then it must be in one of the configs
-            if opt not in opt_old:
-                for col_fam in opt_new[opt]:
-                    diff[opt][col_fam] = (None, opt_new[opt][col_fam])
-            elif opt not in opt_new:
-                for col_fam in opt_old[opt]:
-                    diff[opt][col_fam] = (opt_old[opt][col_fam], None)
-            else:
-                for col_fam in opt_old[opt]:
-                    if col_fam in opt_new[opt]:
-                        if opt_old[opt][col_fam] != opt_new[opt][col_fam]:
-                            diff[opt][col_fam] = (
-                                opt_old[opt][col_fam],
-                                opt_new[opt][col_fam]
-                            )
-                    else:
-                        diff[opt][col_fam] = (opt_old[opt][col_fam], None)
-
-                for col_fam in opt_new[opt]:
-                    if col_fam in opt_old[opt]:
-                        if opt_old[opt][col_fam] != opt_new[opt][col_fam]:
-                            diff[opt][col_fam] = (
-                                opt_old[opt][col_fam],
-                                opt_new[opt][col_fam]
-                            )
-                    else:
-                        diff[opt][col_fam] = (None, opt_new[opt][col_fam])
-            if not diff[opt]:
-                diff.pop(opt)
-        return diff
-
-    @staticmethod
     def get_cfs_options_diff(opt_old, old_cf_name, opt_new, new_cf_name):
         # type: Dict(option, Tuple(old value, new value) -> # noqa
         # note: diff should contain a tuple of values only if they are
@@ -331,3 +290,87 @@ class DatabaseOptions:
                             self.options_dict[sec_type][col_fam][opt_name]
                         )
         return reqd_options_dict
+
+    @staticmethod
+    def get_options_diff(opt_old, opt_new):
+        # type: Dict(option, Dict[col_fam, value]] X 2 -> # noqa
+        # Dict[option, Dict[col_fam, Tuple(old_value, new_value)]]
+        # note: diff should contain a tuple of values only if they are
+        # different from each other
+        options_union = set(opt_old.keys()).union(set(opt_new.keys()))
+        diff = {}
+        for opt in options_union:
+            diff[opt] = {}
+            # if option in options_union, then it must be in one of the configs
+            if opt not in opt_old:
+                for col_fam in opt_new[opt]:
+                    diff[opt][col_fam] = (None, opt_new[opt][col_fam])
+            elif opt not in opt_new:
+                for col_fam in opt_old[opt]:
+                    diff[opt][col_fam] = (opt_old[opt][col_fam], None)
+            else:
+                for col_fam in opt_old[opt]:
+                    if col_fam in opt_new[opt]:
+                        if opt_old[opt][col_fam] != opt_new[opt][col_fam]:
+                            diff[opt][col_fam] = (
+                                opt_old[opt][col_fam],
+                                opt_new[opt][col_fam]
+                            )
+                    else:
+                        diff[opt][col_fam] = (opt_old[opt][col_fam], None)
+
+                for col_fam in opt_new[opt]:
+                    if col_fam in opt_old[opt]:
+                        if opt_old[opt][col_fam] != opt_new[opt][col_fam]:
+                            diff[opt][col_fam] = (
+                                opt_old[opt][col_fam],
+                                opt_new[opt][col_fam]
+                            )
+                    else:
+                        diff[opt][col_fam] = (None, opt_new[opt][col_fam])
+            if not diff[opt]:
+                diff.pop(opt)
+        return diff
+
+    @staticmethod
+    def get_db_wide_options_diff(options_diff):
+        db_wide_diff = {}
+        for diff_key in options_diff.keys():
+            if str(diff_key).startswith(DatabaseOptions.DB_WIDE_KEY):
+                assert defs_and_utils.NO_COL_FAMILY in options_diff[diff_key]
+                values_diff = options_diff[diff_key][
+                               defs_and_utils.NO_COL_FAMILY]
+                assert len(values_diff) == 2
+
+                option_name = str(diff_key)[len(
+                    DatabaseOptions.DB_WIDE_KEY)+1:]
+                db_wide_diff[option_name] = {"Base": values_diff[0],
+                                             "Log": values_diff[1]}
+
+        return db_wide_diff
+
+    @staticmethod
+    def get_cf_options_diff(options_diff, cf_name):
+        cf_diff = {}
+        for diff_key in options_diff.keys():
+            if cf_name not in options_diff[diff_key]:
+                continue
+
+            values_diff = options_diff[diff_key][cf_name]
+            assert len(values_diff) == 2
+
+            if str(diff_key).startswith(DatabaseOptions.CF_KEY):
+                option_name = str(diff_key)[len(
+                    DatabaseOptions.CF_KEY)+1:]
+                cf_diff[option_name] = {"Base": values_diff[0],
+                                        "Log": values_diff[1]}
+            elif str(diff_key).startswith(DatabaseOptions.TABLE_OPTIONS_KEY):
+                option_name = str(diff_key)[len(
+                    DatabaseOptions.TABLE_OPTIONS_KEY)+1:]
+                if "Table-Options" not in cf_diff:
+                    cf_diff["Table-Options"] = {}
+                cf_diff["Table-Options"][option_name] =\
+                    {"Base":values_diff[0],
+                     "Log": values_diff[1]}
+
+        return cf_diff

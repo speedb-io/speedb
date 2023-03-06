@@ -1,5 +1,7 @@
 import defs_and_utils
 import calc_utils
+import options_files_utils
+from database_options import DatabaseOptions
 
 
 def prepare_db_wide_user_opers_stats_for_display(db_wide_info):
@@ -109,3 +111,62 @@ def prepare_general_cf_info_for_display(parsed_log):
                 cf_display_info["Filter-Policy"] = "UNKNOWN"
 
     return display_info
+
+
+def prepare_warnings_for_display(parsed_log):
+    warnings = parsed_log.get_warnings_mngr().get_all_warnings()
+    display_warnings = {}
+    for key in warnings.keys():
+        if len(warnings[key]) == 0:
+            continue
+
+        display_warnings[key.value] = {}
+        for warning_id in warnings[key]:
+            warning_id_warnings = warnings[key][warning_id]
+            num_warnings_of_id = len(warning_id_warnings)
+            warning_id_key = f"{warning_id} ({num_warnings_of_id})"
+            display_warnings[key.value][warning_id_key] = {}
+            for warn_info in warning_id_warnings:
+                temp = display_warnings[key.value][warning_id_key]
+                temp[warn_info.warning_time] = \
+                    f"[{warn_info.cf_name}] {warn_info.warning_msg}"
+    return display_warnings
+
+
+def get_all_options_for_display(parsed_log):
+    options_per_cf = {}
+    cf_names = parsed_log.get_cf_names()
+    db_options = parsed_log.get_database_options()
+
+    options_per_cf["DB-Wide"] = db_options.get_db_wide_options_for_display()
+    for cf_name in cf_names:
+        cf_options, cf_table_options = \
+            db_options.get_cf_options_for_display(cf_name)
+        options_per_cf[cf_name] = cf_options
+        options_per_cf[cf_name]["Table-Options"] = cf_table_options
+
+    return options_per_cf
+
+
+def get_options_baseline_diff_for_display(parsed_log):
+    metadata = parsed_log.get_metadata()
+
+    options_diff, baseline_version = \
+        options_files_utils.find_options_diff(
+            metadata.get_product_name(),
+            metadata.get_version(),
+            parsed_log.get_database_options())
+
+    display_diff = {
+        "Baseline": str(baseline_version),
+        "DB-Wide": DatabaseOptions.get_db_wide_options_diff(options_diff)}
+
+    for cf_name in parsed_log.get_cf_names():
+        cf_options_diff = \
+            DatabaseOptions.get_cf_options_diff(options_diff, cf_name)
+        if cf_options_diff:
+            if "CF-s" not in display_diff:
+                display_diff["CF-s"] = {}
+            display_diff["CF-s"][cf_name] = cf_options_diff
+
+    return display_diff

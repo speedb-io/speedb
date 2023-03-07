@@ -92,7 +92,7 @@ endif
 # Figure out optimize level.
 ifneq ($(DEBUG_LEVEL), 2)
 ifeq ($(LITE), 0)
-	OPTIMIZE_LEVEL ?= -O2
+	OPTIMIZE_LEVEL ?= -O2 -mno-avx512f
 else
 	OPTIMIZE_LEVEL ?= -Os
 endif

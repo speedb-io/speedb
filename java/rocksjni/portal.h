@@ -8736,6 +8736,9 @@ class CustomizableJni : public JavaClass {
   template <typename R, typename T>
   static jlong createSharedFromString(JNIEnv* env, jstring s) {
     ROCKSDB_NAMESPACE::ConfigOptions cfg_opts;
+    // Since this method is new in Java and does not need to follow any
+    // historical behavior, set the options to not ignore any errors and
+    // to invoke prepare options.
     cfg_opts.ignore_unsupported_options = false;
     cfg_opts.ignore_unknown_options = false;
     cfg_opts.invoke_prepare_options = true;

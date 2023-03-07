@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+
 class SampleInfo:
     FILE_PATH = "input_files/LOG_sample.txt"
     START_TIME = "2022/04/17-14:13:10.723796"
@@ -114,7 +115,7 @@ class SampleInfo:
     ]
 
     DB_STATS_ENTRY_TIME = "2022/04/17-14:14:28.645150"
-    CUMULATIVE_DURATION= \
+    CUMULATIVE_DURATION = \
         timedelta(hours=12, minutes=10, seconds=56, milliseconds=123)
     INTERVAL_DURATION = \
         timedelta(hours=45, minutes=34, seconds=12, milliseconds=789)

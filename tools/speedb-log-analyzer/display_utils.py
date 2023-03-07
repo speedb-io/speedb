@@ -132,7 +132,7 @@ def prepare_warnings_for_display(parsed_log):
                 temp = display_warnings[key.value][warning_id_key]
                 temp[warn_info.warning_time] = \
                     f"[{warn_info.cf_name}] {warn_info.warning_msg}"
-    return display_warnings
+    return display_warnings if display_warnings else "No Warnings"
 
 
 def get_all_options_for_display(parsed_log):
@@ -185,8 +185,6 @@ def prepare_flushes_histogram_for_display(parsed_log):
                                                                  events_mngr)
         if cf_flushes_histogram:
             flushes_for_display[cf_name] = cf_flushes_histogram
-        else:
-            flushes_for_display[cf_name] = "NO Flushes"
 
     return flushes_for_display
 
@@ -204,9 +202,18 @@ def prepare_db_wide_stalls_entries_for_display(parsed_log):
              "Cumulative-Duration": str(entry_stats["cumulative_duration"]),
              "Cumulative-Percent": entry_stats["cumulative_percent"]}
 
+    return stalls_display_entries if stalls_display_entries \
+        else "No (Non-Zero) Entries"
+
 
 def prepare_cf_stalls_entries_for_display(parsed_log):
     mngr = parsed_log.get_stats_mngr().get_cf_no_file_stats_mngr()
-    return mngr.get_stall_counts()
+    stall_counts = mngr.get_stall_counts()
 
+    display_stall_counts = {}
+    for cf_name in stall_counts.keys():
+        if stall_counts[cf_name]:
+            display_stall_counts[cf_name] = stall_counts[cf_name]
 
+    return display_stall_counts if display_stall_counts \
+        else "No (Non-Zero) Entries"

@@ -194,13 +194,14 @@ def calc_compactions_histogram(cf_name, events_mngr):
 def calc_all_events_histogram(cf_names, events_mngr):
     # Returns a dictionary of:
     # {<cf_name>: {<event_type>: [events]}}   # noqa
-    histogram = {cf_name: {} for cf_name in cf_names}
+    histogram = {}
 
     for cf_name in cf_names:
         for event_type in EventType:
-            histogram[cf_name] = \
-                {event_type: events_mngr.get_cf_events_by_type(cf_name,
-                                                               event_type)}
+            cf_events_of_type = events_mngr.get_cf_events_by_type(cf_name,
+                                                                  event_type)
+            if cf_events_of_type:
+                histogram[cf_name] = cf_events_of_type
     return histogram
 
 

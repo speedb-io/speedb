@@ -52,7 +52,8 @@ class DbWideStatsMngr:
             elif self.try_parse_as_cumulative_stall_line(time, line):
                 continue
 
-        if not self.stalls[time]:
+        assert self.stalls[time]
+        if DbWideStatsMngr.is_all_zeroes_entry(self.stalls[time]):
             del self.stalls[time]
 
     @staticmethod
@@ -90,6 +91,13 @@ class DbWideStatsMngr:
         self.stalls[time].update({"cumulative_duration": stall_duration,
                                   "cumulative_percent": float(stall_percent)})
 
+    @staticmethod
+    def is_all_zeroes_entry(entry):
+        return entry["interval_duration"].total_seconds() == 0.0 and \
+               entry["interval_percent"] == 0.0 and \
+               entry["cumulative_duration"].total_seconds() == 0.0 and \
+               entry["cumulative_percent"] == 0.0
+
     def get_stalls_entries(self):
         return self.stalls
 
@@ -124,7 +132,7 @@ class CompactionStatsMngr:
     def parse_level_lines(self, time, cf_name, db_stats_lines):
         header_line_parts = db_stats_lines[1].split()
         # TODO - The code should adapt to the actual number of columns
-        ##### assert len(header_line_parts) == 21
+        ##### assert len(header_line_parts) == 21   # noqa
         assert header_line_parts[0] == 'Level' and header_line_parts[1] == \
                "Files" and header_line_parts[2] == "Size"
 
@@ -136,7 +144,7 @@ class CompactionStatsMngr:
                 sum_line_parts = line.split()
                 # One more since Size has both a value and a unit
                 # TODO - The code should adapt to the actual number of columns
-                ########## assert len(sum_line_parts) == 22
+                ########## assert len(sum_line_parts) == 22 # noqa
                 self.level_entries[cf_name].append(
                     {"time": time,
                      "files": sum_line_parts[1],
@@ -235,25 +243,33 @@ class CfNoFileStatsMngr:
         if cf_name not in self.stall_counts:
             self.stall_counts[cf_name] = {}
         # TODO - Redis have compaction stats for the same cf twice - WHY?
-        #######assert time not in self.stall_counts[cf_name]
+        #######assert time not in self.stall_counts[cf_name] # noqa
         self.stall_counts[cf_name][time] = {}
 
         stall_count_and_reason_matches =\
             re.compile(regexes.CF_STALLS_COUNT_AND_REASON_REGEX)
+        sum_fields_count = 0
         for match in stall_count_and_reason_matches.finditer(line):
-            self.stall_counts[cf_name][time][match[2]] = int(match[1])
+            count = int(match[1])
+            self.stall_counts[cf_name][time][match[2]] = count
+            sum_fields_count += count
         assert self.stall_counts[cf_name][time]
 
         total_count_match = re.findall(
             regexes.CF_STALLS_INTERVAL_COUNT_REGEX, line)
 
         # TODO - Last line of Redis's log was cropped in the middle
-        ###### assert total_count_match and len(total_count_match) == 1
+        ###### assert total_count_match and len(total_count_match) == 1 # noqa
         if not total_count_match or len(total_count_match) != 1:
+            del self.stall_counts[cf_name][time]
             return None
 
-        self.stall_counts[cf_name][time]["interval_total_count"] = \
-            int(total_count_match[0])
+        total_count = int(total_count_match[0])
+        self.stall_counts[cf_name][time]["interval_total_count"] = total_count
+        sum_fields_count += total_count
+
+        if sum_fields_count == 0:
+            del self.stall_counts[cf_name][time]
 
     def add_lines(self, time, cf_name, stats_lines):
         for line in stats_lines:

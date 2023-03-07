@@ -1,8 +1,10 @@
+from datetime import timedelta
 import defs_and_utils
 from log_entry import LogEntry
 from stats_mngr import DbWideStatsMngr, CompactionStatsMngr, BlobStatsMngr, \
     CfFileHistogramStatsMngr, BlockCacheStatsMngr, \
-    StatsMngr, parse_uptime_line, StatsCountersAndHistogramsMngr
+    StatsMngr, parse_uptime_line, StatsCountersAndHistogramsMngr, \
+    CfNoFileStatsMngr
 from test.test_utils import lines_to_entries
 
 
@@ -288,3 +290,64 @@ def test_compaction_stats_mngr():
     assert mngr.get_cf_size_bytes("default") == \
            defs_and_utils.get_value_by_unit("82.43", "GB")
     assert mngr.get_cf_size_bytes("CF1") == 0
+
+
+def test_db_wide_stats_mngr():
+    time = "2022/11/24-15:58:09.511260"
+    db_wide_stats_lines = \
+    '''Uptime(secs): 4.8 total, 4.8 interval
+    Cumulative writes: 0 writes, 0 keys, 0 commit groups, 0.0 writes per commit group, ingest: 0.00 GB, 0.00 MB/s
+    Cumulative WAL: 0 writes, 0 syncs, 0.00 writes per sync, written: 0.00 GB, 0.00 MB/s
+    Cumulative stall: 12:10:56.123 H:M:S, 98.7 percent
+    Interval writes: 0 writes, 0 keys, 0 commit groups, 0.0 writes per commit group, ingest: 0.00 MB, 0.00 MB/s
+    Interval WAL: 0 writes, 0 syncs, 0.00 writes per sync, written: 0.00 GB, 0.00 MB/s
+    Interval stall: 45:34:12.789 H:M:S, 12.3 percent
+    '''.splitlines() # noqa
+
+    mngr = DbWideStatsMngr()
+    assert mngr.get_stalls_entries() == {}
+
+    mngr.add_lines(time, db_wide_stats_lines)
+    expected_cumulative_duration = \
+        timedelta(hours=12, minutes=10, seconds=56, milliseconds=123)
+    expected_interval_duration = \
+        timedelta(hours=45, minutes=34, seconds=12, milliseconds=789)
+    expected_stalls_entries = \
+        {time: {"cumulative_duration": expected_cumulative_duration,
+                "cumulative_percent": 98.7,
+                "interval_duration": expected_interval_duration,
+                "interval_percent": 12.3}}
+    actual_stalls_entries = mngr.get_stalls_entries()
+    assert actual_stalls_entries == expected_stalls_entries
+
+
+def test_cf_no_file_stats_mngr():
+    time = "2022/11/24-15:58:09.511260"
+    cf_name = "cf1"
+    lines = '''
+    Uptime(secs): 22939219.8 total, 0.0 interval
+    Flush(GB): cumulative 158.813, interval 0.000
+    AddFile(GB): cumulative 0.000, interval 0.000
+    AddFile(Total Files): cumulative 0, interval 0
+    AddFile(L0 Files): cumulative 0, interval 0
+    AddFile(Keys): cumulative 0, interval 0
+    Cumulative compaction: 364.52 GB write, 0.02 MB/s write, 363.16 GB read, 0.02 MB/s read, 1942.7 seconds
+    Interval compaction: 0.00 GB write, 0.00 MB/s write, 0.00 GB read, 0.00 MB/s read, 0.0 seconds
+    Stalls(count): 0 level0_slowdown, 1 level0_slowdown_with_compaction, 2 level0_numfiles, 3 level0_numfiles_with_compaction, 4 stop for pending_compaction_bytes, 5 slowdown for pending_compaction_bytes, 6 memtable_compaction, 7 memtable_slowdown, interval 100 total count
+    '''.splitlines() # noqa
+
+    expected_stall_counts = \
+        {cf_name: {time: {'level0_slowdown': 0,
+                          'level0_slowdown_with_compaction': 1,
+                          'level0_numfiles': 2,
+                          'level0_numfiles_with_compaction': 3,
+                          'stop for pending_compaction_bytes': 4,
+                          'slowdown for pending_compaction_bytes': 5,
+                          'memtable_compaction': 6,
+                          'memtable_slowdown': 7,
+                          'interval_total_count': 100}}}
+    mngr = CfNoFileStatsMngr()
+    mngr.add_lines(time, cf_name, lines)
+    stall_counts = mngr.get_stall_counts()
+
+    assert stall_counts == expected_stall_counts

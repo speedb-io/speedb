@@ -91,3 +91,13 @@ SUPPORT_INFO_START_LINE_REGEX = r'\s*Compression algorithms supported:\s*$'
 VERSION_REGEX = r'(\d+)\.(\d+)\.?(\d+)?'
 ROCKSDB_OPTIONS_FILE_REGEX = r"OPTIONS-rocksdb-(\d+\.\d+\.?\d*)"
 SPEEDB_OPTIONS_FILE_REGEX = r"OPTIONS-speedb-(\d+\.\d+\.?\d*)"
+
+DB_WIDE_INTERVAL_STALL_REGEX = \
+    fr"Interval stall: (\d+):(\d+):(\d+)\.(\d+) H:M:S, {FLOAT} percent"
+
+DB_WIDE_CUMULATIVE_STALL_REGEX = \
+    fr"Cumulative stall: (\d+):(\d+):(\d+)\.(\d+) H:M:S, {FLOAT} percent"
+
+CF_STALLS_LINE_START = "Stalls(count):"
+CF_STALLS_COUNT_AND_REASON_REGEX = r"\b(\d+) (.*?),"
+CF_STALLS_INTERVAL_COUNT_REGEX = r".*interval (\d+) total count$"

@@ -71,6 +71,10 @@ class LogFileMetadata:
         session_id_str = str(log_entry.msg_lines).strip()
         session_id_parts = re.findall(r"DB Session ID:  ([0-9A-Z]*)",
                                       session_id_str)
+        # TODO - Check why Redis do not have a session id
+        if not session_id_parts:
+            return ""
+
         assert len(session_id_parts) == 1
         return session_id_parts[0]
 

@@ -15,3 +15,6 @@ as
 
 - Handle metadata_cache_options, block_cache_options, etc.
 - Use Python's logging facility
+- Handle old log files in which the column families are not displayed when
+their options are. Also, the 1st is always the default, but need to find where
+the others start and their names

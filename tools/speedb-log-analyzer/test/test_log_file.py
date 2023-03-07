@@ -61,3 +61,12 @@ def test_parse_warns():
 
     warns_mngr = parsed_log.get_warnings_mngr()
     assert warns_mngr.get_total_num_warns() == 1
+
+
+def test_parse_db_wide_stats():
+    parsed_log = test_utils.create_parsed_log()
+
+    mngr = parsed_log.get_stats_mngr()
+    db_wide_stats_mngr = mngr.get_db_wide_stats_mngr()
+    assert db_wide_stats_mngr.get_stalls_entries() == \
+           SampleInfo.DB_WIDE_STALLS_ENTRIES

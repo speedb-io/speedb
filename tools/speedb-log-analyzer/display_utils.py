@@ -97,9 +97,11 @@ def prepare_general_cf_info_for_display(parsed_log):
                 cf_display_info["Compaction Style"] = "UNKNOWN"
 
         if cf_options['compression']['common'] == 'Per Column Family':
-            if cf_options['Compression'][cf_name] is not None:
+            if cf_options['compression'][cf_name] is not None:
                 cf_display_info["Compression"] = \
                     cf_options['compression'][cf_name]
+            elif calc_utils.is_cf_compression_by_level(parsed_log, cf_name):
+                cf_display_info["Compression"] = "Per-Level"
             else:
                 cf_display_info["Compression"] = "UNKNOWN"
 
@@ -187,3 +189,24 @@ def prepare_flushes_histogram_for_display(parsed_log):
             flushes_for_display[cf_name] = "NO Flushes"
 
     return flushes_for_display
+
+
+def prepare_db_wide_stalls_entries_for_display(parsed_log):
+    stalls_display_entries = {}
+
+    mngr = parsed_log.get_stats_mngr().get_db_wide_stats_mngr()
+    stalls_entries = mngr.get_stalls_entries()
+
+    for entry_time, entry_stats in stalls_entries.items():
+        stalls_display_entries[entry_time] = \
+            {"Interval-Duration": str(entry_stats["interval_duration"]),
+             "Interval-Percent": entry_stats["interval_percent"],
+             "Cumulative-Duration": str(entry_stats["cumulative_duration"]),
+             "Cumulative-Percent": entry_stats["cumulative_percent"]}
+
+
+def prepare_cf_stalls_entries_for_display(parsed_log):
+    mngr = parsed_log.get_stats_mngr().get_cf_no_file_stats_mngr()
+    return mngr.get_stall_counts()
+
+

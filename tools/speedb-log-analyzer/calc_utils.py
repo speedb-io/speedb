@@ -134,15 +134,23 @@ def get_db_wide_info(parsed_log: ParsedLog):
         total_percent_deletes = \
             f'{total_num_deletes / total_num_flushed_entries * 100:.1f}%'
 
+    # TODO - Add unit test when total_num_table_created_entries == 0
+    # TODO - Consider whether this means data is not available
+    avg_key_size_bytes = 0
+    avg_value_size_bytes = 0
+    if total_num_table_created_entries > 0:
+        avg_key_size_bytes =\
+            int(total_keys_sizes / total_num_table_created_entries)
+        avg_value_size_bytes = \
+            int(total_values_size / total_num_table_created_entries),
+
     info = {
         "version": metadata.get_version(),
         "git_hash": metadata.get_git_hash(),
         "db_size_bytes": get_db_size_bytes(parsed_log),
         "num_cfs": len(parsed_log.get_cf_names()),
-        "avg_key_size_bytes":
-            int(total_keys_sizes / total_num_table_created_entries),
-        "avg_value_size_bytes":
-            int(total_values_size / total_num_table_created_entries),
+        "avg_key_size_bytes": avg_key_size_bytes,
+        "avg_value_size_bytes": avg_value_size_bytes,
         "num_warns": warns_mngr.get_total_num_warns(),
         "num_errors": warns_mngr.get_total_num_errors(),
         "num_stalls": warns_mngr.get_num_stalls_and_stops(),
@@ -196,6 +204,11 @@ def calc_all_events_histogram(cf_names, events_mngr):
     return histogram
 
 
+def is_cf_compression_by_level(parsed_log, cf_name):
+    db_options = parsed_log.get_database_options()
+    return db_options.get_cf_option(cf_name, "compression[0]") is not None
+
+
 def get_applicable_cf_options(parsed_log: ParsedLog):
     cf_names = parsed_log.get_cf_names()
     db_options = parsed_log.get_database_options()
@@ -209,7 +222,7 @@ def get_applicable_cf_options(parsed_log: ParsedLog):
         cfs_options["compression"][cf_name] = \
             db_options.get_cf_option(cf_name, "compression")
         cfs_options["filter_policy"][cf_name] = \
-            db_options.get_cf_option(cf_name, "filter_policy")
+            db_options.get_cf_table_option(cf_name, "filter_policy")
 
     compaction_styles = list(set(cfs_options["compaction_style"].values()))
     if len(compaction_styles) == 1 and compaction_styles[0] is not None:

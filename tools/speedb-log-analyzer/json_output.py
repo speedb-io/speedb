@@ -24,6 +24,13 @@ def get_json(parsed_log):
     j["Flushes"] = \
         display_utils.prepare_flushes_histogram_for_display(parsed_log)
 
+    j["Stalls"] = \
+        {"DB-Wide":
+            display_utils.prepare_db_wide_stalls_entries_for_display(
+                 parsed_log),
+        "CF-s": display_utils.prepare_cf_stalls_entries_for_display(
+            parsed_log)}
+
     return j
 
 

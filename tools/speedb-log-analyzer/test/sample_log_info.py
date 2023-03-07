@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 class SampleInfo:
     FILE_PATH = "input_files/LOG_sample.txt"
     START_TIME = "2022/04/17-14:13:10.723796"
@@ -110,3 +112,14 @@ class SampleInfo:
         SAMPLE_CF2_TABLE_OPTIONS_DICT,
         EMPTY_CF_TABLE_OPTIONS_DICT
     ]
+
+    DB_STATS_ENTRY_TIME = "2022/04/17-14:14:28.645150"
+    CUMULATIVE_DURATION= \
+        timedelta(hours=12, minutes=10, seconds=56, milliseconds=123)
+    INTERVAL_DURATION = \
+        timedelta(hours=45, minutes=34, seconds=12, milliseconds=789)
+    DB_WIDE_STALLS_ENTRIES = \
+        {DB_STATS_ENTRY_TIME: {"cumulative_duration": CUMULATIVE_DURATION,
+                               "cumulative_percent": 98.7,
+                               "interval_duration": INTERVAL_DURATION,
+                               "interval_percent": 12.3}}

@@ -2,6 +2,7 @@ from enum import Enum, auto
 import re
 import defs_and_utils
 import regexes
+from datetime import timedelta
 
 
 def is_empty_line(line):
@@ -37,8 +38,60 @@ class DbWideStatsMngr:
     def is_start_line(line):
         return re.findall(regexes.DB_STATS_REGEX, line) != []
 
+    def __init__(self):
+        self.stalls = {}
+
     def add_lines(self, time, db_stats_lines):
-        pass
+        assert len(db_stats_lines) > 0
+
+        self.stalls[time] = {}
+
+        for line in db_stats_lines[1:]:
+            if self.try_parse_as_interval_stall_line(time, line):
+                continue
+            elif self.try_parse_as_cumulative_stall_line(time, line):
+                continue
+
+        if not self.stalls[time]:
+            del self.stalls[time]
+
+    @staticmethod
+    def try_parse_as_stalls_line(regex, line):
+        line_parts = re.findall(regex, line)
+        if not line_parts:
+            return None
+
+        assert len(line_parts) == 1 and len(line_parts[0]) == 5
+
+        hours, minutes, seconds, ms, stall_percent = line_parts[0]
+        stall_duration = timedelta(hours=int(hours),
+                                   minutes=int(minutes),
+                                   seconds=int(seconds),
+                                   milliseconds=int(ms))
+        return stall_duration, stall_percent
+
+    def try_parse_as_interval_stall_line(self, time, line):
+        stall_info = DbWideStatsMngr.try_parse_as_stalls_line(
+            regexes.DB_WIDE_INTERVAL_STALL_REGEX, line)
+        if stall_info is None:
+            return None
+
+        stall_duration, stall_percent = stall_info
+        self.stalls[time].update({"interval_duration": stall_duration,
+                                  "interval_percent": float(stall_percent)})
+
+    def try_parse_as_cumulative_stall_line(self, time, line):
+        stall_info = DbWideStatsMngr.try_parse_as_stalls_line(
+            regexes.DB_WIDE_CUMULATIVE_STALL_REGEX, line)
+        if stall_info is None:
+            return None
+
+        stall_duration, stall_percent = stall_info
+        self.stalls[time].update({"cumulative_duration": stall_duration,
+                                  "cumulative_percent": float(stall_percent)})
+
+    def get_stalls_entries(self):
+        return self.stalls
 
 
 class CompactionStatsMngr:
@@ -58,7 +111,6 @@ class CompactionStatsMngr:
 
     def add_lines(self, time, cf_name, db_stats_lines):
         db_stats_lines = [line.strip() for line in db_stats_lines]
-        assert len(db_stats_lines) >= 4
         assert cf_name ==\
                CompactionStatsMngr.parse_start_line(db_stats_lines[0])
 
@@ -71,7 +123,8 @@ class CompactionStatsMngr:
 
     def parse_level_lines(self, time, cf_name, db_stats_lines):
         header_line_parts = db_stats_lines[1].split()
-        assert len(header_line_parts) == 21
+        # TODO - The code should adapt to the actual number of columns
+        ##### assert len(header_line_parts) == 21
         assert header_line_parts[0] == 'Level' and header_line_parts[1] == \
                "Files" and header_line_parts[2] == "Size"
 
@@ -82,7 +135,8 @@ class CompactionStatsMngr:
                     self.level_entries[cf_name] = list()
                 sum_line_parts = line.split()
                 # One more since Size has both a value and a unit
-                assert len(sum_line_parts) == 22
+                # TODO - The code should adapt to the actual number of columns
+                ########## assert len(sum_line_parts) == 22
                 self.level_entries[cf_name].append(
                     {"time": time,
                      "files": sum_line_parts[1],
@@ -95,6 +149,11 @@ class CompactionStatsMngr:
         assert found_sum_line
 
     def parse_priority_lines(self, time, cf_name, db_stats_lines):
+        # TODO - Consider issuing an info message as Redis (e.g.) don not
+        #  have any content here
+        if len(db_stats_lines) < 4:
+            return
+
         # TODO: Parse when doing something with the data
         pass
 
@@ -166,8 +225,44 @@ class CfNoFileStatsMngr:
     def is_start_line(line):
         return parse_uptime_line(line, allow_mismatch=True)
 
-    def add_lines(self, time, cf_name, db_stats_lines):
-        pass
+    def __init__(self):
+        self.stall_counts = {}
+
+    def try_parse_as_stalls_count_line(self, time, cf_name, line):
+        if not line.startswith(regexes.CF_STALLS_LINE_START):
+            return None
+
+        if cf_name not in self.stall_counts:
+            self.stall_counts[cf_name] = {}
+        # TODO - Redis have compaction stats for the same cf twice - WHY?
+        #######assert time not in self.stall_counts[cf_name]
+        self.stall_counts[cf_name][time] = {}
+
+        stall_count_and_reason_matches =\
+            re.compile(regexes.CF_STALLS_COUNT_AND_REASON_REGEX)
+        for match in stall_count_and_reason_matches.finditer(line):
+            self.stall_counts[cf_name][time][match[2]] = int(match[1])
+        assert self.stall_counts[cf_name][time]
+
+        total_count_match = re.findall(
+            regexes.CF_STALLS_INTERVAL_COUNT_REGEX, line)
+
+        # TODO - Last line of Redis's log was cropped in the middle
+        ###### assert total_count_match and len(total_count_match) == 1
+        if not total_count_match or len(total_count_match) != 1:
+            return None
+
+        self.stall_counts[cf_name][time]["interval_total_count"] = \
+            int(total_count_match[0])
+
+    def add_lines(self, time, cf_name, stats_lines):
+        for line in stats_lines:
+            line = line.strip()
+            if self.try_parse_as_stalls_count_line(time, cf_name, line):
+                continue
+
+    def get_stall_counts(self):
+        return self.stall_counts
 
 
 class CfFileHistogramStatsMngr:
@@ -389,6 +484,7 @@ class StatsMngr:
         line_idx = start_line_idx + 1
         next_stats_type = None
         cf_name = None
+        # DB Wide Stats must be the first and were verified above
         while line_idx < len(db_stats_lines) and next_stats_type is None:
             line = db_stats_lines[line_idx]
 
@@ -452,7 +548,7 @@ class StatsMngr:
         assert DbWideStatsMngr.is_start_line(db_stats_lines[0])
         entry_idx += 1
 
-        line_num = 1
+        line_num = 0
         stats_type = StatsMngr.StatsType.DB_WIDE
         curr_cf_name = defs_and_utils.NO_COL_FAMILY
         while line_num < len(db_stats_lines):

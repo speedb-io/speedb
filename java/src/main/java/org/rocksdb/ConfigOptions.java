@@ -12,14 +12,19 @@ public class ConfigOptions extends RocksObject {
   }
 
   /**
-   * Construct with default Options
+   * Construct with default ConfigOptions
    */
   public ConfigOptions() {
     super(newConfigOptions());
   }
 
-  public ConfigOptions(boolean unknown, boolean unsupported) {
-    super(newConfigOptions(unknown, unsupported));
+  /**
+   * Constructs a ConfigOptions with the input values
+   * @param ignore_unknown_options Sets the options property to the input value
+   * @param ignore_unsupported_options Sets the options property to the input value
+   */
+  public ConfigOptions(boolean ignore_unknown_options, boolean ignore_unsupported_options) {
+    super(newConfigOptions(ignore_unknown_options, ignore_unsupported_options));
   }
 
   public ConfigOptions setDelimiter(final String delimiter) {

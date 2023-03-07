@@ -11,7 +11,6 @@ import org.junit.ClassRule;
 import org.junit.Test;
 
 public class SpeedbFilterTest {
-
   @ClassRule
   public static final RocksNativeLibraryResource ROCKS_NATIVE_LIBRARY_RESOURCE =
       new RocksNativeLibraryResource();

@@ -12,6 +12,7 @@ NO_COL_FAMILY = 'DB_WIDE'
 
 OPTIONS_FILE_FOLDER = "options_files"
 
+LOGGER_NAME = "log-analyzer-logger"
 
 g_parsing_warnings = []
 
@@ -89,7 +90,7 @@ def get_value_by_unit(size_str, size_units_str):
         assert False, f"Unexpected size units ({size_units_str}"
 
     result = float(size_str) * multiplier
-    return result
+    return int(result)
 
 
 def get_size_for_display(size_in_bytes):

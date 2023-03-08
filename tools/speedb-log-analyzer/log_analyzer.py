@@ -4,6 +4,7 @@ import sys
 import argparse
 import textwrap
 import logging
+import logging.config
 import defs_and_utils
 import json_output
 import console_outputter
@@ -61,7 +62,7 @@ def handle_exception(e):
     if RAISE_EXCEPTION:
         raise e
     else:
-        logging.critical(f"\n{e}", exc_info=True)
+        logging.exception(f"\n{e}")
         exit(1)
 
 
@@ -73,12 +74,12 @@ def print_warnings_if_applicable():
 
 
 def setup_logger():
-    logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
+    logging.config.fileConfig(fname='logger.conf',
+                              disable_existing_loggers=True)
 
 
 if __name__ == '__main__':
     setup_logger()
-
     parser = setup_cmd_line_parser()
     cmdline_args = parser.parse_args()
     validate_and_sanitize_cmd_line_args(cmdline_args)

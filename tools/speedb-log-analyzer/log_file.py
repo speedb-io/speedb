@@ -1,6 +1,7 @@
 import re
 import defs_and_utils
 import regexes
+import logging
 from log_entry import LogEntry
 from log_file_options_parser import LogFileOptionsParser
 from database_options import DatabaseOptions

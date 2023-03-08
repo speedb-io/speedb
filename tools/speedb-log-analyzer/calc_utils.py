@@ -139,10 +139,10 @@ def get_db_wide_info(parsed_log: ParsedLog):
     avg_key_size_bytes = 0
     avg_value_size_bytes = 0
     if total_num_table_created_entries > 0:
-        avg_key_size_bytes =\
+        avg_key_size_bytes = \
             int(total_keys_sizes / total_num_table_created_entries)
         avg_value_size_bytes = \
-            int(total_values_size / total_num_table_created_entries),
+            int(total_values_size / total_num_table_created_entries)
 
     info = {
         "version": metadata.get_version(),
@@ -200,8 +200,11 @@ def calc_all_events_histogram(cf_names, events_mngr):
         for event_type in EventType:
             cf_events_of_type = events_mngr.get_cf_events_by_type(cf_name,
                                                                   event_type)
+            if cf_name not in histogram:
+                histogram[cf_name] = {}
+
             if cf_events_of_type:
-                histogram[cf_name] = cf_events_of_type
+                histogram[cf_name][event_type] = len(cf_events_of_type)
     return histogram
 
 

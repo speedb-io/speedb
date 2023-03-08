@@ -8,6 +8,7 @@ def get_json(parsed_log):
 
     cf_names = parsed_log.get_cf_names()
     events_mngr = parsed_log.get_events_mngr()
+    stats_mngr = parsed_log.get_stats_mngr()
 
     j["General"] = display_utils.prepare_db_wide_info_for_display(parsed_log)
     j["General"]["CF-s"] = \
@@ -36,9 +37,12 @@ def get_json(parsed_log):
     j["Stalls"] = \
         {"DB-Wide":
             display_utils.prepare_db_wide_stalls_entries_for_display(
-                 parsed_log),
-            "CF-s": display_utils.prepare_cf_stalls_entries_for_display(
-                parsed_log)}
+                parsed_log),
+         "CF-s":
+             display_utils.prepare_cf_stalls_entries_for_display(parsed_log)}
+
+    j["Compaction-Stats"] = \
+        stats_mngr.get_compaction_stats_mngr().get_level_entries()
 
     return j
 

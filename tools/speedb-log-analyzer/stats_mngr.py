@@ -103,6 +103,12 @@ class DbWideStatsMngr:
 
 
 class CompactionStatsMngr:
+    class LineType(Enum):
+        LEVEL = auto()
+        SUM = auto()
+        INTERVAL = auto()
+        USER = auto()
+
     @staticmethod
     def parse_start_line(line, allow_mismatch=False):
         return parse_line_with_cf(line, regexes.COMPACTION_STATS_REGEX,
@@ -117,60 +123,140 @@ class CompactionStatsMngr:
         self.level_entries = dict()
         self.priority_entries = dict()
 
-    def add_lines(self, time, cf_name, db_stats_lines):
-        db_stats_lines = [line.strip() for line in db_stats_lines]
+    def add_lines(self, time, cf_name, stats_lines):
+        stats_lines = [line.strip() for line in stats_lines]
         assert cf_name ==\
-               CompactionStatsMngr.parse_start_line(db_stats_lines[0])
+               CompactionStatsMngr.parse_start_line(stats_lines[0])
 
-        if db_stats_lines[1].startswith('Level'):
-            self.parse_level_lines(time, cf_name, db_stats_lines)
-        elif db_stats_lines[1].startswith('Priority'):
-            self.parse_priority_lines(time, cf_name, db_stats_lines)
+        if stats_lines[1].startswith('Level'):
+            self.parse_level_lines(time, cf_name, stats_lines[1:])
+        elif stats_lines[1].startswith('Priority'):
+            self.parse_priority_lines(time, cf_name, stats_lines[1:])
         else:
             assert 0
 
-    def parse_level_lines(self, time, cf_name, db_stats_lines):
-        header_line_parts = db_stats_lines[1].split()
+    @staticmethod
+    def parse_header_line(header_line, separator_line):
+        # separator line is expected to be all "-"-s
+        if set(separator_line.strip()) != {"-"}:
+            # TODO - Issue an error / warning
+            return None
+
+        header_fields = header_line.split()
+
         # TODO - The code should adapt to the actual number of columns
-        ##### assert len(header_line_parts) == 21   # noqa
-        assert header_line_parts[0] == 'Level' and header_line_parts[1] == \
-               "Files" and header_line_parts[2] == "Size"
+        ##### assert len(header_fields) == 21   # noqa
+        if header_fields[0] != 'Level' or header_fields[1] != "Files" or \
+                header_fields[2] != "Size":
+            # TODO - Issue an error / warning
+            return None
 
-        found_sum_line = False
-        for line in db_stats_lines:
-            if line.strip().startswith("Sum"):
-                if cf_name not in self.level_entries:
-                    self.level_entries[cf_name] = list()
-                sum_line_parts = line.split()
-                # One more since Size has both a value and a unit
-                # TODO - The code should adapt to the actual number of columns
-                ########## assert len(sum_line_parts) == 22 # noqa
-                self.level_entries[cf_name].append(
-                    {"time": time,
-                     "files": sum_line_parts[1],
-                     "size":
-                         defs_and_utils.get_value_by_unit(sum_line_parts[2],
-                                                          sum_line_parts[3])})
-                found_sum_line = True
-                break
+        return header_fields
 
-        assert found_sum_line
+    @staticmethod
+    def determine_line_type(type_field_str):
+        type_field_str = type_field_str.strip()
+        level_num = None
+        line_type = None
+        if type_field_str == "Sum":
+            line_type = CompactionStatsMngr.LineType.SUM
+        elif type_field_str == "Int":
+            line_type = CompactionStatsMngr.LineType.INTERVAL
+        elif type_field_str == "User":
+            line_type = CompactionStatsMngr.LineType.USER
+        else:
+            level_match = re.findall(r"L(\d+)", type_field_str)
+            if level_match:
+                line_type = CompactionStatsMngr.LineType.LEVEL
+                level_num = int(level_match[0])
+            else:
+                # TODO - Error
+                pass
 
-    def parse_priority_lines(self, time, cf_name, db_stats_lines):
+        return line_type, level_num
+
+    @staticmethod
+    def parse_files_field(files_field):
+        files_parts = re.findall(r"(\d+)/(\d+)", files_field)
+        if not files_parts:
+            # TODO - Error
+            return None
+
+        return files_parts[0][0], files_parts[0][1]
+
+    @staticmethod
+    def parse_size_field(size_value, size_units):
+        return defs_and_utils.get_value_by_unit(size_value, size_units)
+
+    def parse_level_lines(self, time, cf_name, stats_lines):
+        header_fields = CompactionStatsMngr.parse_header_line(stats_lines[0],
+                                                              stats_lines[1])
+        if header_fields is None:
+            # TODO - Error?
+            return
+
+        new_entry = {}
+        for line in stats_lines[2:]:
+            line_fields = line.strip().split()
+            if not line_fields:
+                continue
+            line_type, level_num = \
+                CompactionStatsMngr.determine_line_type(line_fields[0])
+            if line_type is None:
+                # TODO - Error
+                return
+
+            num_files, cf_num_files =\
+                CompactionStatsMngr.parse_files_field(line_fields[1])
+            if cf_num_files is None:
+                # TODO - Error
+                return
+
+            size_in_units = line_fields[2]
+            size_units = line_fields[3]
+
+            key = line_type.name
+            if line_type is CompactionStatsMngr.LineType.LEVEL:
+                key += f"-{level_num}"
+
+            new_entry[key] = {
+                "CF-Num-Files": cf_num_files,
+                "Num-Files": num_files,
+                "size_bytes":
+                    CompactionStatsMngr.parse_size_field(size_in_units,
+                                                         size_units)
+            }
+            new_entry[key].update({
+                header_fields[i]: line_fields[i]
+                for i in range(2, len(header_fields))
+            })
+
+        assert CompactionStatsMngr.LineType.SUM.name in new_entry
+
+        if cf_name not in self.level_entries:
+            self.level_entries[cf_name] = []
+
+        self.level_entries[cf_name].append({time: new_entry})
+
+    def parse_priority_lines(self, time, cf_name, stats_lines):
         # TODO - Consider issuing an info message as Redis (e.g.) don not
         #  have any content here
-        if len(db_stats_lines) < 4:
+        if len(stats_lines) < 4:
             return
 
         # TODO: Parse when doing something with the data
         pass
 
+    def get_level_entries(self):
+        return self.level_entries
+
     def get_cf_size_bytes(self, cf_name):
         size_bytes = 0
 
         if cf_name in self.level_entries:
-            last_entry = self.level_entries[cf_name][-1]
-            size_bytes = last_entry["size"]
+            temp = list(self.level_entries[cf_name][-1].values())[0]
+            last_entry = temp[CompactionStatsMngr.LineType.SUM.name]
+            size_bytes = last_entry["size_bytes"]
 
         return size_bytes
 

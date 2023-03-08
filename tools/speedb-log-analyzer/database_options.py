@@ -13,41 +13,6 @@ class DatabaseOptions:
         # name
         return '.' not in option_name
 
-    @staticmethod
-    def get_cfs_options_diff(opt_old, old_cf_name, opt_new, new_cf_name):
-        # type: Dict(option, Tuple(old value, new value) -> # noqa
-        # note: diff should contain a tuple of values only if they are
-        # different from each other
-        diff = {}
-
-        options_union = set(opt_old.keys()).union(set(opt_new.keys()))
-        for opt in options_union:
-            # if option in options_union, then it must be in one of the configs
-            if opt not in opt_old:
-                if new_cf_name in opt_new[opt]:
-                    diff[opt] = (None, opt_new[opt][new_cf_name])
-            elif opt not in opt_new:
-                if old_cf_name in opt_old[opt]:
-                    diff[opt] = (opt_old[opt][old_cf_name], None)
-            else:
-                if old_cf_name in opt_old[opt]:
-                    if new_cf_name in opt_new[opt]:
-                        if opt_old[opt][old_cf_name] != \
-                                opt_new[opt][new_cf_name]:
-                            diff[opt] = (
-                                opt_old[opt][old_cf_name],
-                                opt_new[opt][new_cf_name]
-                            )
-                    else:
-                        diff[opt] = (opt_old[opt][old_cf_name], None)
-                elif new_cf_name in opt_new[opt]:
-                    diff[opt] = (None, opt_new[opt][new_cf_name])
-
-        if diff:
-            diff["cf names"] = (old_cf_name, new_cf_name)
-
-        return diff
-
     def __init__(self, options_dict=None, misc_options=None):
         # The options are stored in the following data structure:
         # Dict[section_type, Dict[section_name, Dict[option_name, value]]]
@@ -333,7 +298,42 @@ class DatabaseOptions:
         return diff
 
     @staticmethod
-    def get_db_wide_options_diff(options_diff):
+    def get_cfs_options_diff(opt_old, old_cf_name, opt_new, new_cf_name):
+        # type: Dict(option, Tuple(old value, new value) -> # noqa
+        # note: diff should contain a tuple of values only if they are
+        # different from each other
+        diff = {}
+
+        options_union = set(opt_old.keys()).union(set(opt_new.keys()))
+        for opt in options_union:
+            # if option in options_union, then it must be in one of the configs
+            if opt not in opt_old:
+                if new_cf_name in opt_new[opt]:
+                    diff[opt] = (None, opt_new[opt][new_cf_name])
+            elif opt not in opt_new:
+                if old_cf_name in opt_old[opt]:
+                    diff[opt] = (opt_old[opt][old_cf_name], None)
+            else:
+                if old_cf_name in opt_old[opt]:
+                    if new_cf_name in opt_new[opt]:
+                        if opt_old[opt][old_cf_name] != \
+                                opt_new[opt][new_cf_name]:
+                            diff[opt] = (
+                                opt_old[opt][old_cf_name],
+                                opt_new[opt][new_cf_name]
+                            )
+                    else:
+                        diff[opt] = (opt_old[opt][old_cf_name], None)
+                elif new_cf_name in opt_new[opt]:
+                    diff[opt] = (None, opt_new[opt][new_cf_name])
+
+        if diff:
+            diff["cf names"] = (old_cf_name, new_cf_name)
+
+        return diff
+
+    @staticmethod
+    def extract_db_wide_diff_from_options_diff(options_diff):
         db_wide_diff = {}
         for diff_key in options_diff.keys():
             if str(diff_key).startswith(DatabaseOptions.DB_WIDE_KEY):
@@ -350,7 +350,7 @@ class DatabaseOptions:
         return db_wide_diff
 
     @staticmethod
-    def get_cf_options_diff(options_diff, cf_name):
+    def extract_cf_diff_from_options_diff(options_diff, cf_name):
         cf_diff = {}
         for diff_key in options_diff.keys():
             if cf_name not in options_diff[diff_key]:

@@ -162,11 +162,14 @@ def get_options_baseline_diff_for_display(parsed_log):
 
     display_diff = {
         "Baseline": str(baseline_version),
-        "DB-Wide": DatabaseOptions.get_db_wide_options_diff(options_diff)}
+        "DB-Wide":
+            DatabaseOptions.extract_db_wide_diff_from_options_diff(
+                options_diff)}
 
     for cf_name in parsed_log.get_cf_names():
         cf_options_diff = \
-            DatabaseOptions.get_cf_options_diff(options_diff, cf_name)
+            DatabaseOptions.extract_cf_diff_from_options_diff(options_diff,
+                                                              cf_name)
         if cf_options_diff:
             if "CF-s" not in display_diff:
                 display_diff["CF-s"] = {}

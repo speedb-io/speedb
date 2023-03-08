@@ -1,7 +1,6 @@
 import datetime
 from enum import Enum, auto
 import re
-import os
 import time
 from calendar import timegm
 from dataclasses import dataclass
@@ -18,13 +17,29 @@ g_parsing_warnings = []
 
 
 class ParsingError(Exception):
-    pass
+    def __init__(self, msg, file_path=None, line_idx=None):
+        self.file_path = file_path
+        self.line_idx = line_idx
+        self.msg = msg
+
+    def set_context(self, file_path, line_idx):
+        self.file_path = file_path
+        self.line_idx = line_idx
+
+    def __str__(self):
+        file_path = self.file_path if self.file_path is not None else ""
+        line_num = self.line_idx+1 if self.line_idx is not None else -1
+        return f"[{file_path} (line:{line_num})] - {self.msg}"
 
 
-class FileTypeParsingError(Exception):
-    def __init__(self, file_name):
-        stream = os.popen(f"file {file_name}")
-        self.msg = f"{file_name} [{stream.read().split()[1]}]"
+class LogFileNotFoundError(Exception):
+    def __init__(self, file_path):
+        self.msg = f"{file_path} Not Found"
+
+
+class ParsingAssertion(ParsingError):
+    def __init__(self, msg, file_path=None, line_idx=None):
+        super().__init__(msg, file_path, line_idx)
 
 
 class PointerResult(Enum):

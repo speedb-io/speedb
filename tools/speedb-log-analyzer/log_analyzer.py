@@ -1,6 +1,5 @@
 import os
 import io
-import sys
 import argparse
 import textwrap
 import logging
@@ -11,12 +10,9 @@ import console_outputter
 from log_file import ParsedLog
 
 
-RAISE_EXCEPTION = 0
-
-
 def parse_log(log_file_path):
     if not os.path.isfile(log_file_path):
-        raise defs_and_utils.FileTypeParsingError(log_file_path)
+        raise defs_and_utils.LogFileNotFoundError(log_file_path)
 
     with open(log_file_path) as log_file:
         log_lines = log_file.readlines()
@@ -50,28 +46,25 @@ def setup_cmd_line_parser():
 
 
 def validate_and_sanitize_cmd_line_args(cmdline_args):
+    # The default is short console output
     if not cmdline_args.console and not cmdline_args.json_file_name:
         cmdline_args.console = defs_and_utils.ConsoleOutputType.SHORT
 
 
 def report_error(e):
-    print(f"\nERROR:{e}\n", file=sys.stderr)
+    logging.error(e.msg)
 
 
 def handle_exception(e):
-    if RAISE_EXCEPTION:
-        raise e
-    else:
-        logging.exception(f"\n{e}")
-        exit(1)
+    logging.exception(f"\n{e}")
+    exit(1)
 
 
-def print_warnings_if_applicable():
-    if len(defs_and_utils.g_parsing_warnings) > 0:
-        print("Warnings:", file=sys.stderr)
-        for i, warn_msg in enumerate(defs_and_utils.g_parsing_warnings):
-            print(f"#{i}:\n{warn_msg}\n", file=sys.stderr)
-
+# def print_warnings_if_applicable():
+#     if len(defs_and_utils.g_parsing_warnings) > 0:
+#         print("Warnings:", file=sys.stderr)
+#         for i, warn_msg in enumerate(defs_and_utils.g_parsing_warnings):
+#             print(f"#{i}:\n{warn_msg}\n", file=sys.stderr)
 
 def setup_logger():
     logging.config.fileConfig(fname='logger.conf',
@@ -85,13 +78,12 @@ if __name__ == '__main__':
     validate_and_sanitize_cmd_line_args(cmdline_args)
 
     e = None
-
     try:
         f = io.StringIO()
         log_file_path = cmdline_args.log
-
         parsed_log = parse_log(log_file_path)
 
+        # Console Output
         if cmdline_args.console:
             f.write(
                 console_outputter.get_console_output(
@@ -100,19 +92,22 @@ if __name__ == '__main__':
                     cmdline_args.console))
             print(f"{f.getvalue()}")
 
+        # JSON Output
         if cmdline_args.json_file_name:
             json_content = json_output.get_json(parsed_log)
             json_output.write_json(cmdline_args.json_file_name,
                                    json_content)
             print(f"JSON Output is in {cmdline_args.json_file_name}\n")
 
-        print_warnings_if_applicable()
+        # print_warnings_if_applicable()
 
-    except defs_and_utils.FileTypeParsingError as e:
+    except defs_and_utils.ParsingError as e:
         report_error(e)
-    except FileNotFoundError as e:
+    except defs_and_utils.LogFileNotFoundError as e:
         report_error(e)
     except ValueError as e:
+        handle_exception(e)
+    except AssertionError as e:
         handle_exception(e)
     except Exception as e:  # noqa
         handle_exception(e)

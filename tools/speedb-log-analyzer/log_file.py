@@ -125,47 +125,41 @@ class ParsedLog:
         self.stats_mngr = StatsMngr()
 
         entry_idx = 0
-        try:
-            log_entries = self.parse_log_to_entries(log_lines)
+        log_entries = self.parse_log_to_entries(log_file_path, log_lines)
 
-            entry_idx = self.parse_metadata(log_entries, entry_idx)
-            self.set_end_time(log_entries)
-            self.parse_rest_of_log(log_entries, entry_idx)
-
-        except defs_and_utils.ParsingError as e:
-            print(f"Error parsing log (entry index = {entry_idx}\n{e}")
+        entry_idx = self.parse_metadata(log_entries, entry_idx)
+        self.set_end_time(log_entries)
+        self.parse_rest_of_log(log_entries, entry_idx)
 
     @staticmethod
-    def parse_log_to_entries(log_lines):
+    def parse_log_to_entries(log_file_path, log_lines):
         line_idx = 0
-        try:
-            if len(log_lines) < 1:
-                raise defs_and_utils.ParsingError("No log lines to parse)")
+        if len(log_lines) < 1:
+            raise defs_and_utils.ParsingError(log_file_path, 1,
+                                              "Empty File")
 
-            # first line must be the beginning of a log entry
-            if not LogEntry.is_entry_start(log_lines[0]):
-                raise defs_and_utils.ParsingError(
-                    f"First log line is not as expected {log_lines[0]}")
+        # first line must be the beginning of a log entry
+        if not LogEntry.is_entry_start(log_lines[0]):
+            raise defs_and_utils.ParsingError(log_file_path, 1,
+                                              f"Unexpected first log line:"
+                                              f"\n{log_lines[0]}")
 
-            log_entries = []
-            new_entry = None
-            for line_idx, line in enumerate(log_lines):
-                if LogEntry.is_entry_start(line):
-                    if new_entry:
-                        log_entries.append(new_entry.all_lines_added())
-                    new_entry = LogEntry(line_idx, line)
-                else:
-                    # To account for logs split into multiple lines
-                    new_entry.add_line(line)
+        log_entries = []
+        new_entry = None
+        for line_idx, line in enumerate(log_lines):
+            if LogEntry.is_entry_start(line):
+                if new_entry:
+                    log_entries.append(new_entry.all_lines_added())
+                new_entry = LogEntry(line_idx, line)
+            else:
+                # To account for logs split into multiple lines
+                new_entry.add_line(line)
 
-            # Handle the last entry in the file.
-            if new_entry:
-                log_entries.append(new_entry.all_lines_added())
+        # Handle the last entry in the file.
+        if new_entry:
+            log_entries.append(new_entry.all_lines_added())
 
-            return log_entries
-
-        except Exception as e:
-            print(f"Error parsing log (entry index = {line_idx}\n{e}")
+        return log_entries
 
     def parse_metadata(self, log_entries, start_entry_idx):
         self.metadata = LogFileMetadata(log_entries, start_entry_idx)

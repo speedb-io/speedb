@@ -1,3 +1,4 @@
+import pytest
 import defs_and_utils
 from database_options import DatabaseOptions
 from log_file import ParsedLog
@@ -7,7 +8,7 @@ import test.test_utils as test_utils
 
 def test_parse_log_to_entries():
     log_lines = test_utils.read_file(SampleInfo.FILE_PATH)
-    entries = ParsedLog.parse_log_to_entries(log_lines)
+    entries = ParsedLog.parse_log_to_entries(SampleInfo.FILE_PATH, log_lines)
     assert len(entries) == SampleInfo.NUM_ENTRIES
 
 
@@ -70,3 +71,18 @@ def test_parse_db_wide_stats():
     db_wide_stats_mngr = mngr.get_db_wide_stats_mngr()
     assert db_wide_stats_mngr.get_stalls_entries() == \
            SampleInfo.DB_WIDE_STALLS_ENTRIES
+
+
+def test_empty_log_file():
+    with pytest.raises(defs_and_utils.ParsingError) as e:
+        ParsedLog("DummyPath", [])
+    assert str(e.value) == "[DummyPath (line:1)] - Empty File"
+
+
+def test_unexpected_1st_log_line():
+    with pytest.raises(defs_and_utils.ParsingError) as e:
+        ParsedLog("DummyPath", ["Dummy Line", "Another Dummy Line"])
+
+    expected_msg =\
+        "[DummyPath (line:1)] - Unexpected first log line:\nDummy Line"
+    assert str(e.value) == expected_msg

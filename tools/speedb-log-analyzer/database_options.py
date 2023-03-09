@@ -15,7 +15,9 @@ class DatabaseOptions:
 
     def __init__(self, options_dict=None, misc_options=None):
         # The options are stored in the following data structure:
-        # Dict[section_type, Dict[section_name, Dict[option_name, value]]]
+        # {
+        # DBOptions.<option-name>: {DB_WIDE: {<option-name>: <option-value>}},
+        # CFOptions.<option-name>: {<cf
         self.misc_options = None
         self.options_dict = options_dict if options_dict else dict()
         self.column_families = None
@@ -27,8 +29,13 @@ class DatabaseOptions:
         # OPTIONS file, so they are provided separately
         self.setup_misc_options(misc_options)
 
+    def __str__(self):
+        return "DatabaseOptions"
+
     def set_db_wide_options(self, db_wide_options_dict):
-        assert not self.are_db_wide_options_set()
+        if self.are_db_wide_options_set():
+            raise defs_and_utils.ParsingAssertion(
+                "DB Wide Options Already Set")
 
         # The input dictionary is expected to be like this:
         # Dict[<option_name>: <option_value>]
@@ -38,19 +45,17 @@ class DatabaseOptions:
 
     def set_cf_options(self, cf_name, non_table_options_dict,
                        table_options_dict):
-        assert non_table_options_dict and\
-               isinstance(non_table_options_dict, dict)
-        assert table_options_dict and isinstance(table_options_dict, dict)
-
-        if DatabaseOptions.CF_KEY in self.options_dict:
-            assert cf_name not in self.options_dict[DatabaseOptions.CF_KEY]
-        else:
+        if DatabaseOptions.CF_KEY not in self.options_dict:
             self.options_dict[DatabaseOptions.CF_KEY] = dict()
-
-        if DatabaseOptions.TABLE_OPTIONS_KEY in self.options_dict:
-            assert cf_name not in self.options_dict[DatabaseOptions.CF_KEY]
-        else:
+        if DatabaseOptions.TABLE_OPTIONS_KEY not in self.options_dict:
             self.options_dict[DatabaseOptions.TABLE_OPTIONS_KEY] = dict()
+
+        if cf_name not in self.options_dict[DatabaseOptions.CF_KEY]:
+            raise defs_and_utils.ParsingAssertion(
+                f"CF Options Already Set for this CF ({cf_name})")
+        if cf_name in self.options_dict[DatabaseOptions.TABLE_OPTIONS_KEY]:
+            raise defs_and_utils.ParsingAssertion(
+                f"CF Table Options Already Set for this CF ({cf_name})")
 
         # The input dictionaries is expected to be like this:
         # Dict[<option_name>: <option_value>]
@@ -133,17 +138,26 @@ class DatabaseOptions:
         return options_for_display
 
     def get_db_wide_option(self, option_name):
-        db_wide = self.options_dict[DatabaseOptions.DB_WIDE_KEY]
-        if option_name not in db_wide[defs_and_utils.NO_COL_FAMILY]:
+        key = f"{DatabaseOptions.DB_WIDE_KEY}.{option_name}"
+        option_value_dict = self.get_options({key})
+        if not option_value_dict:
             return None
-
-        return db_wide[defs_and_utils.NO_COL_FAMILY][option_name]
+        else:
+            return option_value_dict[key][defs_and_utils.NO_COL_FAMILY]
 
     def set_db_wide_option(self, option_name, option_value,
                            allow_new_option=False):
         if not allow_new_option:
-            assert self.get_db_wide_option(option_name) is not None
+            assert self.get_db_wide_option(option_name) is not None,\
+                "Trying to update a non-existent DB Wide Option." \
+                f"{option_name} = {option_value}"
 
+        if DatabaseOptions.DB_WIDE_KEY not in self.options_dict:
+            self.options_dict[DatabaseOptions.DB_WIDE_KEY] = dict()
+        if defs_and_utils.NO_COL_FAMILY not in \
+                self.options_dict[DatabaseOptions.DB_WIDE_KEY]:
+            self.options_dict[DatabaseOptions.DB_WIDE_KEY][
+                defs_and_utils.NO_COL_FAMILY] = {}
         self.options_dict[DatabaseOptions.DB_WIDE_KEY][
             defs_and_utils.NO_COL_FAMILY][option_name] = option_value
 
@@ -151,8 +165,6 @@ class DatabaseOptions:
         # This method returns all the options that are stored in this object as
         # a: Dict[<sec_type>.<option_name>: Dict[col_fam, option_value]]
         cf_options = []
-        # Example: in the section header '[CFOptions "default"]' read from the
-        # OPTIONS file, sec_type='CFOptions'
         for sec_type in self.options_dict:
             if cf_name in self.options_dict[sec_type]:
                 for opt_name in self.options_dict[sec_type][cf_name]:
@@ -182,40 +194,45 @@ class DatabaseOptions:
         return options_for_display, table_options_for_display
 
     def get_cf_option(self, cf_name, option_name):
-        # This method returns the value of the option_name for cf_name
-        if cf_name not in self.options_dict[DatabaseOptions.CF_KEY]:
+        key = f"{DatabaseOptions.CF_KEY}.{option_name}"
+        option_value_dict = self.get_options({key}, cf_name)
+        if not option_value_dict:
             return None
-        if option_name not in \
-                self.options_dict[DatabaseOptions.CF_KEY][cf_name]:
-            return None
-
-        return self.options_dict[DatabaseOptions.CF_KEY][cf_name][option_name]
+        else:
+            return option_value_dict[key][cf_name]
 
     def set_cf_option(self, cf_name, option_name, option_value,
                       allow_new_option=False):
         if not allow_new_option:
             assert self.get_cf_option(cf_name, option_name) is not None
 
+        if DatabaseOptions.CF_KEY not in self.options_dict:
+            self.options_dict[DatabaseOptions.CF_KEY] = {}
+        if cf_name not in self.options_dict[DatabaseOptions.CF_KEY]:
+            self.options_dict[DatabaseOptions.CF_KEY][cf_name] = {}
         self.options_dict[DatabaseOptions.CF_KEY][cf_name][option_name] = \
             option_value
 
     def get_cf_table_option(self, cf_name, option_name):
         # This method returns the value of the option_name for cf_name table
         # options
-        table_opts = self.options_dict[DatabaseOptions.TABLE_OPTIONS_KEY]
-        if cf_name not in table_opts:
+        key = f"{DatabaseOptions.TABLE_OPTIONS_KEY}.{option_name}"
+        option_value_dict = self.get_options({key}, cf_name)
+        if not option_value_dict:
             return None
-        if option_name not in table_opts[cf_name]:
-            return None
-
-        return table_opts[cf_name][option_name]
+        else:
+            return option_value_dict[key][cf_name]
 
     def set_cf_table_option(self, cf_name, option_name, option_value,
                             allow_new_option=False):
         if not allow_new_option:
             assert self.get_cf_table_option(cf_name, option_name) is not None
 
+        if DatabaseOptions.TABLE_OPTIONS_KEY not in self.options_dict:
+            self.options_dict[DatabaseOptions.TABLE_OPTIONS_KEY] = {}
         table_opts = self.options_dict[DatabaseOptions.TABLE_OPTIONS_KEY]
+        if cf_name not in table_opts:
+            table_opts[cf_name] = {}
         table_opts[cf_name][option_name] = option_value
 
     def get_options(self, reqd_options, cf_name=None):
@@ -248,6 +265,8 @@ class DatabaseOptions:
                     cf_names = [cf_name]
 
                 for col_fam in cf_names:
+                    if col_fam not in self.options_dict[sec_type]:
+                        continue
                     if opt_name in self.options_dict[sec_type][col_fam]:
                         if option not in reqd_options_dict:
                             reqd_options_dict[option] = {}
@@ -258,10 +277,16 @@ class DatabaseOptions:
 
     @staticmethod
     def get_options_diff(opt_old, opt_new):
-        # type: Dict(option, Dict[col_fam, value]] X 2 -> # noqa
-        # Dict[option, Dict[col_fam, Tuple(old_value, new_value)]]
-        # note: diff should contain a tuple of values only if they are
-        # different from each other
+        # Receives 2 sets of options and returns the difference between them.
+        # Three cases exist:
+        # 1. An option exists in the old but not in the new
+        # 2. An option exists in the new but not in the old
+        # 3. The option exists in both but the values differ
+        #
+        # The resulting diff is a dictionary of the form:
+        # Notes:
+        # The resulting diff will only contain a diff tuple if the old and
+        # the new differ for that option
         options_union = set(opt_old.keys()).union(set(opt_new.keys()))
         diff = {}
         for opt in options_union:
@@ -299,9 +324,12 @@ class DatabaseOptions:
 
     @staticmethod
     def get_cfs_options_diff(opt_old, old_cf_name, opt_new, new_cf_name):
-        # type: Dict(option, Tuple(old value, new value) -> # noqa
-        # note: diff should contain a tuple of values only if they are
-        # different from each other
+        # Same as get_options_diff, but for specific column families.
+        # This is needed to compare a parsed log file with a baseline version.
+        # The baseline version contains options only for the default column
+        # family. So, there is a need to compare the options for all column
+        # families in the parsed log with the same default column family in
+        # the base version
         diff = {}
 
         options_union = set(opt_old.keys()).union(set(opt_new.keys()))
@@ -334,13 +362,19 @@ class DatabaseOptions:
 
     @staticmethod
     def extract_db_wide_diff_from_options_diff(options_diff):
+        # Receives a diff result (as described in the diff utilities above)
+        # and extracts the db-wide diff part of it
         db_wide_diff = {}
         for diff_key in options_diff.keys():
             if str(diff_key).startswith(DatabaseOptions.DB_WIDE_KEY):
-                assert defs_and_utils.NO_COL_FAMILY in options_diff[diff_key]
-                values_diff = options_diff[diff_key][
-                               defs_and_utils.NO_COL_FAMILY]
-                assert len(values_diff) == 2
+                assert defs_and_utils.NO_COL_FAMILY in options_diff[diff_key],\
+                    f"options[{diff_key}] = {options_diff[diff_key]}"
+
+                values_diff =\
+                    options_diff[diff_key][defs_and_utils.NO_COL_FAMILY]
+
+                assert len(values_diff) == 2,\
+                    f"options[{diff_key}] = {options_diff[diff_key]}"
 
                 option_name = str(diff_key)[len(
                     DatabaseOptions.DB_WIDE_KEY)+1:]
@@ -349,28 +383,32 @@ class DatabaseOptions:
 
         return db_wide_diff
 
-    @staticmethod
-    def extract_cf_diff_from_options_diff(options_diff, cf_name):
-        cf_diff = {}
-        for diff_key in options_diff.keys():
-            if cf_name not in options_diff[diff_key]:
-                continue
-
-            values_diff = options_diff[diff_key][cf_name]
-            assert len(values_diff) == 2
-
-            if str(diff_key).startswith(DatabaseOptions.CF_KEY):
-                option_name = str(diff_key)[len(
-                    DatabaseOptions.CF_KEY)+1:]
-                cf_diff[option_name] = {"Base": values_diff[0],
-                                        "Log": values_diff[1]}
-            elif str(diff_key).startswith(DatabaseOptions.TABLE_OPTIONS_KEY):
-                option_name = str(diff_key)[len(
-                    DatabaseOptions.TABLE_OPTIONS_KEY)+1:]
-                if "Table-Options" not in cf_diff:
-                    cf_diff["Table-Options"] = {}
-                cf_diff["Table-Options"][option_name] =\
-                    {"Base": values_diff[0],
-                     "Log": values_diff[1]}
-
-        return cf_diff
+    # @staticmethod
+    # def extract_cf_diff_from_options_diff(options_diff, base_cf_name,
+    #                                       log_cf_name):
+    #     # Receives a diff result (as described in the diff utilities above)
+    #     # and the names of 2 column families and extracts the diff part
+    #     cf_diff = {}
+    #     for diff_key in options_diff.keys():
+    #         if base_cf_name not in options_diff[diff_key] or\
+    #                 log_cf_name not in options_diff[diff_key]:
+    #             continue
+    #
+    #         values_diff = options_diff[diff_key][cf_name]
+    #         assert len(values_diff) == 2
+    #
+    #         if str(diff_key).startswith(DatabaseOptions.CF_KEY):
+    #             option_name = str(diff_key)[len(
+    #                 DatabaseOptions.CF_KEY)+1:]
+    #             cf_diff[option_name] = {"Base": values_diff[0],
+    #                                     "Log": values_diff[1]}
+    #         elif str(diff_key).startswith(DatabaseOptions.TABLE_OPTIONS_KEY):
+    #             option_name = str(diff_key)[len(
+    #                 DatabaseOptions.TABLE_OPTIONS_KEY)+1:]
+    #             if "Table-Options" not in cf_diff:
+    #                 cf_diff["Table-Options"] = {}
+    #             cf_diff["Table-Options"][option_name] =\
+    #                 {"Base": values_diff[0],
+    #                  "Log": values_diff[1]}
+    #
+    #     return cf_diff

@@ -1,11 +1,71 @@
+import pytest
 import defs_and_utils
 from database_options import DatabaseOptions
 
 
 def test_empty_db_options():
     db_options = DatabaseOptions()
-    assert db_options.get_column_families() == []
+    assert db_options.get_all_options() == {}
     assert db_options.get_db_wide_options() == {}
+    assert not db_options.are_db_wide_options_set()
+    assert db_options.get_column_families() == []
+    assert db_options.get_db_wide_options_for_display() == {}
+    assert db_options.get_db_wide_option("manual_wal_flush") is None
+
+    with pytest.raises(AssertionError):
+        db_options.set_db_wide_option("manual_wal_flush", "1",
+                                      allow_new_option=False)
+    db_options.set_db_wide_option("manual_wal_flush", "1",
+                                  allow_new_option=True)
+    assert db_options.get_db_wide_option("manual_wal_flush") == "1"
+    assert db_options.get_db_wide_option("Dummy-Options") is None
+    assert db_options.get_options({"DBOptions.manual_wal_flush"}) ==\
+           {'DBOptions.manual_wal_flush': {"DB_WIDE": "1"}}
+    assert db_options.get_options({"DBOptions.Dummy-Option"}) == {}
+
+    assert db_options.get_cf_options("default") == {}
+    assert db_options.get_cf_options_for_display("default") == ({}, {})
+    assert db_options.get_cf_option("default", "write_buffer_size") is None
+    with pytest.raises(AssertionError):
+        db_options.set_cf_option("default", "write_buffer_size", "100",
+                                 allow_new_option=False)
+    db_options.set_cf_option("default", "write_buffer_size", "100",
+                             allow_new_option=True)
+    assert db_options.get_cf_option("default", "write_buffer_size") == "100"
+    assert db_options.get_cf_option("default", "Dummmy-Options") is None
+    assert db_options.get_cf_option("Dummy-CF", "write_buffer_size") is None
+    assert db_options.get_options({"CFOptions.write_buffer_size"}) ==\
+           {'CFOptions.write_buffer_size': {'default': '100'}}
+    assert db_options.get_options({"CFOptions.write_buffer_size"}, "default")\
+           == {'CFOptions.write_buffer_size': {'default': '100'}}
+    assert db_options.get_options({"CFOptions.write_buffer_size"}, "Dummy-CF")\
+           == {}
+    assert db_options.get_options({"CFOptions.Dummy-Options"}, "default") == {}
+
+    assert db_options.get_cf_table_option("default", "write_buffer_size") is\
+           None
+
+    assert db_options.get_options("TableOptions.BlockBasedTable.block_align",
+                                  "CF1") == {}
+
+    with pytest.raises(AssertionError):
+        db_options.set_cf_table_option("CF1", "index_type", "3",
+                                       allow_new_option=False)
+    db_options.set_cf_table_option("CF1", "index_type", "3",
+                                   allow_new_option=True)
+    assert db_options.get_cf_table_option("CF1", "index_type") == "3"
+    assert db_options.get_cf_table_option("CF1", "Dummy-Options") is None
+    assert db_options.get_cf_table_option("default", "index_type") is None
+
+    assert db_options.get_options({"TableOptions.BlockBasedTable.index_type"})\
+           == {'TableOptions.BlockBasedTable.index_type': {'CF1': '3'}}
+    assert db_options.get_options({"TableOptions.BlockBasedTable.index_type"},
+                                  "CF1") ==\
+           {'TableOptions.BlockBasedTable.index_type': {'CF1': '3'}}
+    assert db_options.get_options({
+        "TableOptions.BlockBasedTable.index_type"}, "Dummy-CF") == {}
+    assert db_options.get_options({
+        "TableOptions.BlockBasedTable.Dummy-Option"}) == {}
 
 
 def test_set_db_wide_options():

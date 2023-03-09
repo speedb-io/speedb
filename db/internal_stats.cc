@@ -748,13 +748,13 @@ std::string InternalStats::CacheEntryRoleStats::CacheOwnerStatsToString(
     const std::array<size_t, kNumCacheEntryRoles>& cf_charges_per_role =
         cf_charges_per_role_pos->second;
     for (auto role : roles) {
-      auto role_idx = static_cast<uint>(role);
+      auto role_idx = static_cast<unsigned int>(role);
       roles_total_charge[role_idx] = cf_charges_per_role[role_idx];
     }
   }
 
   for (auto role : roles) {
-    auto role_idx = static_cast<uint>(role);
+    auto role_idx = static_cast<unsigned int>(role);
     str << " " << kCacheEntryRoleToCamelString[role_idx] << "("
         << BytesToHumanString(roles_total_charge[role_idx]) << ")";
   }

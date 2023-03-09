@@ -1,6 +1,7 @@
 import re
 import defs_and_utils
 import regexes
+import logging
 from log_entry import LogEntry
 from log_file_options_parser import LogFileOptionsParser
 from database_options import DatabaseOptions
@@ -11,7 +12,7 @@ from stats_mngr import StatsMngr
 
 class LogFileMetadata:
     """
-    Contains the metadata information about a log file:
+    (Possibly) Contains the metadata information about a log file:
     - Product Name (RocksDB / Speedb)
     - S/W Version
     - Git Hash
@@ -19,64 +20,82 @@ class LogFileMetadata:
     - Times of first and last log entries in the file
     """
     def __init__(self, log_entries, start_entry_idx):
-        entry_idx = start_entry_idx
-        entry = log_entries[entry_idx]
-
-        # 1st entry assumed to be the Version Line
-        self.product_name, self.version =\
-            LogFileMetadata.extract_version_info(entry)
-        entry_idx += 1
-
-        # Start / end times of file log's entries
-        self.start_time = entry.get_time()
+        self.product_name = None
+        self.version = None
+        self.db_session_id = None
+        self.git_hash = None
+        self.start_time = None
         # Will be set later (when file is fully parsed)
         self.end_time = None
 
-        # GIT Hash Line
-        # example:
-        # "... Git sha UNKNOWN:0a396684d6c08f6fe4a37572c0429d91176c51d1 ..."
-        self.git_hash = \
-            LogFileMetadata.extract_git_hash(log_entries[entry_idx])
-        entry_idx += 1
+        if len(log_entries) == 0:
+            logging.warning("Empty Metadata pars (no entries)")
+            return
 
-        # Skip Compile Time Line & "DB SUMMARY" lines
-        # TODO - verify that the lines indeed contain these strings
-        entry_idx += 2
+        self.start_time = log_entries[0].get_time()
 
-        self.db_session_id = LogFileMetadata.extract_db_session_id(
-            log_entries[entry_idx])
-        entry_idx += 1
+        # Parsing all entries and searching for predefined metadata
+        # entities. Some may or may not exist (e.g., the DB Session Id is
+        # not present in rolled logs). Also, no fixed order is assumed.
+        # However, it is a parsing error if the same entitiy is found more
+        # than once
+        for i, entry in enumerate(log_entries):
+            if self.try_parse_as_product_and_version_entry(entry):
+                continue
+            elif self.try_parse_as_git_hash_entry(entry):
+                continue
+            elif self.try_parse_as_db_session_id_entry(entry):
+                continue
 
-        self.num_lines = entry_idx - start_entry_idx
+    def __str__(self):
+        start_time = self.start_time if self.start_time else "UNKNOWN"
+        end_time = self.end_time if self.end_time else "UNKNOWN"
+        return f"LogFileMetadata: Start:{start_time}, End:{end_time}"
 
-    @staticmethod
-    def extract_version_info(log_entry):
-        product_name_and_version = str(log_entry.msg_lines[0]).strip()
-        match_parts = re.findall(regexes.VERSION_PARTS_REGEX,
-                                 product_name_and_version)
-        assert len(match_parts) == 1,\
-            f"Failed parsing product & version line " \
-            f"({product_name_and_version})"
-        return match_parts[0]
+    def try_parse_as_product_and_version_entry(self, log_entry):
+        lines = str(log_entry.msg_lines[0]).strip()
+        match_parts = re.findall(regexes.PRODUCT_AND_VERSION_REGEX, lines)
 
-    @staticmethod
-    def extract_git_hash(log_entry):
-        git_hash_parts = re.findall(regexes.GIT_HASH_LINE_REGEX,
-                                    log_entry.msg_lines[0])
-        assert git_hash_parts and len(git_hash_parts) == 1
-        return git_hash_parts[0]
+        if not match_parts or len(match_parts) != 1:
+            return False
 
-    @staticmethod
-    def extract_db_session_id(log_entry):
-        session_id_str = str(log_entry.msg_lines).strip()
-        session_id_parts = re.findall(r"DB Session ID:  ([0-9A-Z]*)",
-                                      session_id_str)
-        # TODO - Check why Redis do not have a session id
-        if not session_id_parts:
-            return ""
+        if self.product_name or self.version:
+            raise defs_and_utils.ParsingError(
+                    f"Product / Version already parsed. Product:"
+                    f"{self.product_name}, Version:{self.version})."
+                    f"\n{log_entry}")
 
-        assert len(session_id_parts) == 1
-        return session_id_parts[0]
+        self.product_name, self.version = match_parts[0]
+        return True
+
+    def try_parse_as_git_hash_entry(self, log_entry):
+        lines = str(log_entry.msg_lines[0]).strip()
+        match_parts = re.findall(regexes.GIT_HASH_LINE_REGEX, lines)
+
+        if not match_parts or len(match_parts) != 1:
+            return False
+
+        if self.git_hash:
+            raise defs_and_utils.ParsingError(
+                f"Git Hash Already Parsed ({self.git_hash})\n{log_entry}")
+
+        self.git_hash = match_parts[0]
+        return True
+
+    def try_parse_as_db_session_id_entry(self, log_entry):
+        lines = str(log_entry.msg_lines[0]).strip()
+        match_parts = re.findall(regexes.DB_SESSION_ID_REGEX, lines)
+
+        if not match_parts or len(match_parts) != 1:
+            return False
+
+        if self.db_session_id:
+            raise defs_and_utils.ParsingError(
+                f"DB Session Id Already Parsed ({self.db_session_id})"
+                f"n{log_entry}")
+
+        self.db_session_id = match_parts[0]
+        return True
 
     def set_end_time(self, end_time):
         assert not self.end_time,\
@@ -85,9 +104,6 @@ class LogFileMetadata:
                defs_and_utils.parse_date_time(self.start_time)
 
         self.end_time = end_time
-
-    def get_num_lines(self):
-        return self.num_lines
 
     def get_product_name(self):
         return self.product_name
@@ -98,6 +114,9 @@ class LogFileMetadata:
     def get_git_hash(self):
         return self.git_hash
 
+    def get_db_session_id(self):
+        return self.db_session_id
+
     def get_start_time(self):
         return self.start_time
 
@@ -105,7 +124,8 @@ class LogFileMetadata:
         return self.end_time
 
     def get_log_time_span_seconds(self):
-        assert self.end_time, "Unknown end time"
+        if not self.end_time:
+            raise defs_and_utils.ParsingAssertion(f"Unknown end time.\n{self}")
 
         return ((defs_and_utils.parse_date_time(self.end_time) -
                  defs_and_utils.parse_date_time(self.start_time)).seconds)
@@ -126,34 +146,48 @@ class ParsedLog:
 
         entry_idx = 0
         log_entries = self.parse_log_to_entries(log_file_path, log_lines)
-
         entry_idx = self.parse_metadata(log_entries, entry_idx)
         self.set_end_time(log_entries)
         self.parse_rest_of_log(log_entries, entry_idx)
 
     @staticmethod
     def parse_log_to_entries(log_file_path, log_lines):
-        line_idx = 0
         if len(log_lines) < 1:
-            raise defs_and_utils.ParsingError(log_file_path, 1,
-                                              "Empty File")
+            raise defs_and_utils.ParsingError("Empty File", log_file_path, 1)
 
         # first line must be the beginning of a log entry
         if not LogEntry.is_entry_start(log_lines[0]):
-            raise defs_and_utils.ParsingError(log_file_path, 1,
-                                              f"Unexpected first log line:"
-                                              f"\n{log_lines[0]}")
+            raise defs_and_utils.ParsingError(f"Unexpected first log line:"
+                                              f"\n{log_lines[0]}",
+                                              log_file_path, 1,)
 
+        # Failure to parse an entry should just skip that entry
+        # (best effort)
         log_entries = []
         new_entry = None
+        skip_until_next_entry_start = False
         for line_idx, line in enumerate(log_lines):
-            if LogEntry.is_entry_start(line):
-                if new_entry:
-                    log_entries.append(new_entry.all_lines_added())
-                new_entry = LogEntry(line_idx, line)
-            else:
-                # To account for logs split into multiple lines
-                new_entry.add_line(line)
+            try:
+                if LogEntry.is_entry_start(line):
+                    skip_until_next_entry_start = False
+                    if new_entry:
+                        log_entries.append(new_entry.all_lines_added())
+                    new_entry = LogEntry(line_idx, line)
+                else:
+                    # To account for logs split into multiple lines
+                    if new_entry:
+                        new_entry.add_line(line)
+                    else:
+                        if not skip_until_next_entry_start:
+                            raise defs_and_utils.ParsingAssertion(
+                                "Bug while parsing log to entries.",
+                                log_file_path, line_idx)
+            except defs_and_utils.ParsingError as e:
+                logging.error(str(e.value))
+                # Discarding the "bad" entry and skipping all lines until
+                # finding the start of the next one.
+                new_entry = None
+                skip_until_next_entry_start = True
 
         # Handle the last entry in the file.
         if new_entry:
@@ -161,9 +195,26 @@ class ParsedLog:
 
         return log_entries
 
+    @staticmethod
+    def find_next_options_entry(log_entries, start_entry_idx):
+        entry_idx = start_entry_idx
+        while entry_idx < len(log_entries) and \
+                not LogFileOptionsParser.is_options_entry(
+                    log_entries[entry_idx]):
+            entry_idx += 1
+
+        return (entry_idx < len(log_entries)), entry_idx
+
     def parse_metadata(self, log_entries, start_entry_idx):
-        self.metadata = LogFileMetadata(log_entries, start_entry_idx)
-        return start_entry_idx + self.metadata.num_lines
+        # Metadata must be at the top of the log and surely doesn't extend
+        # beyond the first options line
+        has_found, options_entry_idx = \
+            ParsedLog.find_next_options_entry(log_entries, start_entry_idx)
+
+        self.metadata = \
+            LogFileMetadata(log_entries[start_entry_idx:options_entry_idx],
+                            start_entry_idx)
+        return options_entry_idx
 
     def parse_db_wide_options(self, log_entries, start_entry_idx):
         support_info_entry_idx = \

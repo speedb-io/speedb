@@ -13,6 +13,11 @@ def create_parsed_log():
     return ParsedLog(SampleInfo.FILE_PATH, log_lines)
 
 
+def line_to_entry(line):
+    assert LogEntry.is_entry_start(line)
+    return LogEntry(0, line)
+
+
 def lines_to_entries(lines):
     entries = []
     entry = None

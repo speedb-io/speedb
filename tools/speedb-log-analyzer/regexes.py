@@ -18,9 +18,9 @@ START_LINE_PARTS_REGEX = \
     fr"(?:{ORIG_TIME_REGEX})?\s*({CODE_POS_REGEX})?(.*)"
 
 # <product name> version: <version number>
-VERSION_PARTS_REGEX = r"(\S+) version: ([0-9.]+)"
+PRODUCT_AND_VERSION_REGEX = r"(\S+) version: ([0-9.]+)"
 
-GIT_HASH_LINE_REGEX = r"Git sha (\S+)"
+GIT_HASH_LINE_REGEX = r"Git sha \s*(\S+)"
 
 JOB_REGEX = r"\[JOB [0-9]+\]"
 
@@ -101,3 +101,5 @@ DB_WIDE_CUMULATIVE_STALL_REGEX = \
 CF_STALLS_LINE_START = "Stalls(count):"
 CF_STALLS_COUNT_AND_REASON_REGEX = r"\b(\d+) (.*?),"
 CF_STALLS_INTERVAL_COUNT_REGEX = r".*interval (\d+) total count$"
+
+DB_SESSION_ID_REGEX = r"DB Session ID:\s*([0-9A-Z]+)"

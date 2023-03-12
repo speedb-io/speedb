@@ -234,7 +234,8 @@ class ParsedLog:
         self.metadata.set_end_time(end_time)
 
     def parse_cf_options(self, log_entries, start_entry_idx):
-        cf_name, options_dict, table_options_dict, entry_idx = \
+        cf_name, options_dict, table_options_dict, entry_idx,\
+        duplicate_option = \
             LogFileOptionsParser.parse_cf_options(log_entries, start_entry_idx)
 
         self.db_options.set_cf_options(cf_name,

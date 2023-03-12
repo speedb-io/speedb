@@ -1,10 +1,10 @@
 from log_file_options_parser import LogFileOptionsParser
 from log_entry import LogEntry
-from test.sample_log_info import SampleInfo
+from test.sample_log_info import SampleLogInfo, SampleRolledLogInfo
 
 
-def read_sample_file():
-    f = open(SampleInfo.FILE_PATH)
+def read_sample_file(InfoClass):
+    f = open(InfoClass.FILE_PATH)
     lines = f.readlines()
     entries = []
     entry = None
@@ -20,7 +20,7 @@ def read_sample_file():
     if entry:
         entries.append(entry.all_lines_added())
 
-    assert len(entries) == SampleInfo.NUM_ENTRIES
+    assert len(entries) == InfoClass.NUM_ENTRIES
 
     return entries
 
@@ -103,40 +103,64 @@ def test_try_parsing_as_table_options_entry():
 
 
 def test_parse_db_wide_options():
-    log_entries = read_sample_file()
+    log_entries = read_sample_file(SampleLogInfo)
 
-    start_entry_idx = SampleInfo.DB_WIDE_OPTIONS_START_ENTRY_IDX
+    start_entry_idx = SampleLogInfo.DB_WIDE_OPTIONS_START_ENTRY_IDX
     actual_options_dict =\
         LogFileOptionsParser.parse_db_wide_options(
             log_entries,
             start_entry_idx,
-            SampleInfo.SUPPORT_INFO_START_ENTRY_IDX)
+            SampleLogInfo.SUPPORT_INFO_START_ENTRY_IDX)
 
-    assert actual_options_dict == SampleInfo.DB_WIDE_OPTIONS_DICT
+    assert actual_options_dict == SampleLogInfo.DB_WIDE_OPTIONS_DICT
 
 
 def test_parsing_as_table_options_entry():
-    log_entries = read_sample_file()
+    log_entries = read_sample_file(SampleLogInfo)
 
-    for i, idx in enumerate(SampleInfo.TABLE_OPTIONS_ENTRIES_INDICES):
+    for i, idx in enumerate(SampleLogInfo.TABLE_OPTIONS_ENTRIES_INDICES):
         actual_options_dict = \
             LogFileOptionsParser.try_parsing_as_table_options_entry(
                 log_entries[idx])
-        assert SampleInfo.TABLE_OPTIONS_DICTS[i] == actual_options_dict
+        assert SampleLogInfo.TABLE_OPTIONS_DICTS[i] == actual_options_dict
 
 
-def test_parse_cf_options():
-    log_entries = read_sample_file()
+def test_parse_cf_options_with_cf_options_header():
+    log_entries = read_sample_file(SampleLogInfo)
 
-    for i, idx in enumerate(SampleInfo.OPTIONS_ENTRIES_INDICES):
-        cf_name, options_dict, table_options_dict, entry_idx = \
+    for i, idx in enumerate(SampleLogInfo.OPTIONS_ENTRIES_INDICES):
+        cf_name, options_dict, table_options_dict, entry_idx, \
+            duplicate_option =\
             LogFileOptionsParser.parse_cf_options(log_entries, idx)
 
-        assert cf_name == SampleInfo.CF_NAMES[i]
-        assert options_dict == SampleInfo.OPTIONS_DICTS[i]
-        assert table_options_dict == SampleInfo.TABLE_OPTIONS_DICTS[i]
+        assert cf_name == SampleLogInfo.CF_NAMES[i]
+        assert options_dict == SampleLogInfo.OPTIONS_DICTS[i]
+        assert table_options_dict == SampleLogInfo.TABLE_OPTIONS_DICTS[i]
+        assert not duplicate_option
 
         # +1 entry for the cf options start line (not a cf-options entry)
         # +1 for the table options entry (single entry)
         num_parsed_entries = 1 + len(options_dict) + 1
+        assert entry_idx == idx + num_parsed_entries
+
+
+def test_parse_cf_options_without_cf_options_header():
+    log_entries = read_sample_file(SampleRolledLogInfo)
+
+    for i, idx in enumerate(SampleRolledLogInfo.OPTIONS_ENTRIES_INDICES):
+        provided_cf_name = SampleLogInfo.CF_NAMES[i]
+        cf_name, options_dict, table_options_dict, entry_idx, \
+            duplicate_option =\
+            LogFileOptionsParser.parse_cf_options(log_entries, idx,
+                                                  provided_cf_name)
+
+        assert cf_name == provided_cf_name
+        assert options_dict == SampleLogInfo.OPTIONS_DICTS[i]
+        assert table_options_dict == SampleLogInfo.TABLE_OPTIONS_DICTS[i]
+        # the last cf should NOT have a duplicate, the ones befire it should
+        assert duplicate_option == (i+1 < len(
+            SampleRolledLogInfo.OPTIONS_ENTRIES_INDICES))
+
+        # +1 for the table options entry (single entry)
+        num_parsed_entries = len(options_dict) + 1
         assert entry_idx == idx + num_parsed_entries

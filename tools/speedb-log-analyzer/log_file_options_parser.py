@@ -100,23 +100,33 @@ class LogFileOptionsParser:
         return options_dict
 
     @staticmethod
-    def parse_cf_options(log_entries, start_entry_idx):
+    def parse_cf_options(log_entries, start_entry_idx, cf_name=None):
         entry_idx = start_entry_idx
 
-        cf_name = LogFileOptionsParser.try_parsing_as_cf_options_start_entry(
-            log_entries[entry_idx])
+        # If cf_name was specified, it means we have received cf options
+        # without the CF options header entry
+        if cf_name is None:
+            cf_name = LogFileOptionsParser. \
+                try_parsing_as_cf_options_start_entry(log_entries[entry_idx])
+            entry_idx += 1
+
         # cf_name may be the emtpy string, but not None
         assert cf_name is not None
-        entry_idx += 1
 
         options_dict = {}
         table_options_dict = None
+        duplicate_option = False
         while entry_idx < len(log_entries):
             entry = log_entries[entry_idx]
             options_kv = \
                 LogFileOptionsParser.try_parsing_as_options_entry(entry)
             if options_kv:
                 option_name, option_value = options_kv
+                if option_name in options_dict:
+                    # finding the same option twice implies that the options
+                    # for this cf are over.
+                    duplicate_option = True
+                    break
                 options_dict[option_name] = option_value
             else:
                 temp_table_options_dict = \
@@ -134,4 +144,5 @@ class LogFileOptionsParser:
         assert options_dict, "No Options for Column Family"
         assert table_options_dict, "Missing table options in CF options"
 
-        return cf_name, options_dict, table_options_dict, entry_idx
+        return cf_name, options_dict, table_options_dict, entry_idx, \
+            duplicate_option

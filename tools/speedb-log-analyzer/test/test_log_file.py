@@ -3,7 +3,7 @@ import itertools
 import defs_and_utils
 from database_options import DatabaseOptions
 from log_file import LogFileMetadata, ParsedLog
-from test.sample_log_info import SampleInfo
+from test.sample_log_info import SampleLogInfo
 import test.test_utils as test_utils
 
 
@@ -214,22 +214,22 @@ def test_parse_metadata1():
     parsed_log = test_utils.create_parsed_log()
     metadata = parsed_log.get_metadata()
 
-    assert metadata.get_product_name() == SampleInfo.PRODUCT_NAME
-    assert metadata.get_version() == SampleInfo.VERSION
-    assert metadata.get_git_hash() == SampleInfo.GIT_HASH
+    assert metadata.get_product_name() == SampleLogInfo.PRODUCT_NAME
+    assert metadata.get_version() == SampleLogInfo.VERSION
+    assert metadata.get_git_hash() == SampleLogInfo.GIT_HASH
 
-    assert metadata.get_start_time() == SampleInfo.START_TIME
-    assert metadata.get_end_time() == SampleInfo.END_TIME
+    assert metadata.get_start_time() == SampleLogInfo.START_TIME
+    assert metadata.get_end_time() == SampleLogInfo.END_TIME
 
     expected_time_span = \
-        (defs_and_utils.parse_date_time(SampleInfo.END_TIME) -
-         defs_and_utils.parse_date_time(SampleInfo.START_TIME)).seconds
+        (defs_and_utils.parse_date_time(SampleLogInfo.END_TIME) -
+         defs_and_utils.parse_date_time(SampleLogInfo.START_TIME)).seconds
     assert metadata.get_log_time_span_seconds() == expected_time_span
 
 
 def test_parse_options():
     parsed_log = test_utils.create_parsed_log()
-    assert parsed_log.get_cf_names() == SampleInfo.CF_NAMES
+    assert parsed_log.get_cf_names() == SampleLogInfo.CF_NAMES
 
     actual_db_options = parsed_log.get_database_options()
     assert actual_db_options.are_db_wide_options_set()
@@ -237,18 +237,19 @@ def test_parse_options():
 
     # Assuming LogFileOptionsParser is fully tested and may be used
     expected_db_options = DatabaseOptions()
-    expected_db_options.set_db_wide_options(SampleInfo.DB_WIDE_OPTIONS_DICT)
-    for i in range(len(SampleInfo.CF_NAMES)):
-        expected_db_options.set_cf_options(SampleInfo.CF_NAMES[i],
-                                           SampleInfo.OPTIONS_DICTS[i],
-                                           SampleInfo.TABLE_OPTIONS_DICTS[i])
+    expected_db_options.set_db_wide_options(SampleLogInfo.DB_WIDE_OPTIONS_DICT)
+    for i in range(len(SampleLogInfo.CF_NAMES)):
+        expected_db_options.set_cf_options(
+            SampleLogInfo.CF_NAMES[i],
+            SampleLogInfo.OPTIONS_DICTS[i],
+            SampleLogInfo.TABLE_OPTIONS_DICTS[i])
 
     actual_db_wide_options = actual_db_options.get_db_wide_options()
     expected_db_wide_options = expected_db_options.get_db_wide_options()
     assert expected_db_wide_options == actual_db_wide_options
 
-    for i in range(len(SampleInfo.CF_NAMES)):
-        cf_name = SampleInfo.CF_NAMES[i]
+    for i in range(len(SampleLogInfo.CF_NAMES)):
+        cf_name = SampleLogInfo.CF_NAMES[i]
         actual_options = actual_db_options.get_cf_options(cf_name)
         expected_options = expected_db_options.get_cf_options(cf_name)
         assert expected_options == actual_options
@@ -267,7 +268,7 @@ def test_parse_db_wide_stats():
     mngr = parsed_log.get_stats_mngr()
     db_wide_stats_mngr = mngr.get_db_wide_stats_mngr()
     assert db_wide_stats_mngr.get_stalls_entries() == \
-           SampleInfo.DB_WIDE_STALLS_ENTRIES
+           SampleLogInfo.DB_WIDE_STALLS_ENTRIES
 
 
 def test_empty_log_file():

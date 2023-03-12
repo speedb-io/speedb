@@ -1,7 +1,7 @@
 from datetime import timedelta
 
 
-class SampleInfo:
+class SampleLogInfo:
     FILE_PATH = "input_files/LOG_sample.txt"
     START_TIME = "2022/04/17-14:13:10.723796"
     END_TIME = "2022/04/17-14:14:32.645120"
@@ -99,6 +99,59 @@ class SampleInfo:
         'flush_block_policy_factory':
             'FlushBlockBySizePolicyFactory (0x7f4af4030f30)',
         'pin_top_level_index_and_filter': '1'}
+
+    OPTIONS_DICTS = [
+        DEFAULT_OPTIONS_DICT,
+        SAMPLE_CF1_OPTIONS_DICT,
+        SAMPLE_CF2_OPTIONS_DICT,
+        EMPTY_CF_OPTIONS_DICT
+    ]
+
+    TABLE_OPTIONS_DICTS = [
+        DEFAULT_TABLE_OPTIONS_DICT,
+        SAMPLE_CF1_TABLE_OPTIONS_DICT,
+        SAMPLE_CF2_TABLE_OPTIONS_DICT,
+        EMPTY_CF_TABLE_OPTIONS_DICT
+    ]
+
+    DB_STATS_ENTRY_TIME = "2022/04/17-14:14:28.645150"
+    CUMULATIVE_DURATION = \
+        timedelta(hours=12, minutes=10, seconds=56, milliseconds=123)
+    INTERVAL_DURATION = \
+        timedelta(hours=45, minutes=34, seconds=12, milliseconds=789)
+    DB_WIDE_STALLS_ENTRIES = \
+        {DB_STATS_ENTRY_TIME: {"cumulative_duration": CUMULATIVE_DURATION,
+                               "cumulative_percent": 98.7,
+                               "interval_duration": INTERVAL_DURATION,
+                               "interval_percent": 12.3}}
+
+
+class SampleRolledLogInfo:
+    FILE_PATH = "input_files/Rolled_LOG_sample.txt"
+    START_TIME = "2022/04/17-14:13:10.723796"
+    END_TIME = "2022/04/17-14:14:32.645120"
+    PRODUCT_NAME = "SpeeDB"
+    GIT_HASH = "UNKNOWN:0a396684d6c08f6fe4a37572c0429d91176c51d1"
+    VERSION = "6.22.1"
+    NUM_ENTRIES = 60
+    CF_NAMES = ['default', 'Unknown-1', 'Unknown-2', '']
+    DB_WIDE_OPTIONS_START_ENTRY_IDX = 7
+    SUPPORT_INFO_START_ENTRY_IDX = 15
+
+    NUM_WARNS = 1
+
+    OPTIONS_ENTRIES_INDICES = [19, 25, 32, 38]
+    TABLE_OPTIONS_ENTRIES_INDICES = [21, 29, 34, 42]
+
+    DB_WIDE_OPTIONS_DICT = SampleLogInfo.DB_WIDE_OPTIONS_DICT
+    DEFAULT_OPTIONS_DICT = SampleLogInfo.DEFAULT_OPTIONS_DICT
+    SAMPLE_CF1_OPTIONS_DICT = SampleLogInfo.SAMPLE_CF1_OPTIONS_DICT
+    SAMPLE_CF2_OPTIONS_DICT = SampleLogInfo.SAMPLE_CF2_OPTIONS_DICT
+    EMPTY_CF_OPTIONS_DICT = SampleLogInfo.EMPTY_CF_OPTIONS_DICT
+    DEFAULT_TABLE_OPTIONS_DICT = SampleLogInfo.DEFAULT_TABLE_OPTIONS_DICT
+    SAMPLE_CF1_TABLE_OPTIONS_DICT = SampleLogInfo.SAMPLE_CF1_TABLE_OPTIONS_DICT
+    SAMPLE_CF2_TABLE_OPTIONS_DICT = SampleLogInfo.SAMPLE_CF2_TABLE_OPTIONS_DICT
+    EMPTY_CF_TABLE_OPTIONS_DICT = SampleLogInfo.EMPTY_CF_TABLE_OPTIONS_DICT
 
     OPTIONS_DICTS = [
         DEFAULT_OPTIONS_DICT,

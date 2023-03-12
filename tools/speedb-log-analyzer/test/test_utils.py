@@ -1,6 +1,6 @@
 from log_entry import LogEntry
 from log_file import ParsedLog
-from test.sample_log_info import SampleInfo
+from test.sample_log_info import SampleLogInfo
 
 
 def read_file(file_path):
@@ -9,8 +9,8 @@ def read_file(file_path):
 
 
 def create_parsed_log():
-    log_lines = read_file(SampleInfo.FILE_PATH)
-    return ParsedLog(SampleInfo.FILE_PATH, log_lines)
+    log_lines = read_file(SampleLogInfo.FILE_PATH)
+    return ParsedLog(SampleLogInfo.FILE_PATH, log_lines)
 
 
 def line_to_entry(line):

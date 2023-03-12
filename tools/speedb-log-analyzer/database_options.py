@@ -50,7 +50,7 @@ class DatabaseOptions:
         if DatabaseOptions.TABLE_OPTIONS_KEY not in self.options_dict:
             self.options_dict[DatabaseOptions.TABLE_OPTIONS_KEY] = dict()
 
-        if cf_name not in self.options_dict[DatabaseOptions.CF_KEY]:
+        if cf_name in self.options_dict[DatabaseOptions.CF_KEY]:
             raise defs_and_utils.ParsingAssertion(
                 f"CF Options Already Set for this CF ({cf_name})")
         if cf_name in self.options_dict[DatabaseOptions.TABLE_OPTIONS_KEY]:
@@ -383,32 +383,32 @@ class DatabaseOptions:
 
         return db_wide_diff
 
-    # @staticmethod
-    # def extract_cf_diff_from_options_diff(options_diff, base_cf_name,
-    #                                       log_cf_name):
-    #     # Receives a diff result (as described in the diff utilities above)
-    #     # and the names of 2 column families and extracts the diff part
-    #     cf_diff = {}
-    #     for diff_key in options_diff.keys():
-    #         if base_cf_name not in options_diff[diff_key] or\
-    #                 log_cf_name not in options_diff[diff_key]:
-    #             continue
-    #
-    #         values_diff = options_diff[diff_key][cf_name]
-    #         assert len(values_diff) == 2
-    #
-    #         if str(diff_key).startswith(DatabaseOptions.CF_KEY):
-    #             option_name = str(diff_key)[len(
-    #                 DatabaseOptions.CF_KEY)+1:]
-    #             cf_diff[option_name] = {"Base": values_diff[0],
-    #                                     "Log": values_diff[1]}
-    #         elif str(diff_key).startswith(DatabaseOptions.TABLE_OPTIONS_KEY):
-    #             option_name = str(diff_key)[len(
-    #                 DatabaseOptions.TABLE_OPTIONS_KEY)+1:]
-    #             if "Table-Options" not in cf_diff:
-    #                 cf_diff["Table-Options"] = {}
-    #             cf_diff["Table-Options"][option_name] =\
-    #                 {"Base": values_diff[0],
-    #                  "Log": values_diff[1]}
-    #
-    #     return cf_diff
+    @staticmethod
+    def extract_cfs_diff_from_options_diff(options_diff, base_cf_name,
+                                           log_cf_name):
+        # Receives a diff result (as described in the diff utilities above)
+        # and the names of 2 column families and extracts the diff part
+        assert 'cf names' in options_diff
+        cf_names = options_diff['cf names']
+        assert cf_names[0] == base_cf_name
+        assert cf_names[1] == log_cf_name
+
+        cfs_diff = {}
+        cfs_table_diff = {}
+
+        for diff_key in options_diff.keys():
+            if diff_key == 'cf names':
+                continue
+
+            if str(diff_key).startswith(DatabaseOptions.CF_KEY):
+                option_name = str(diff_key)[len(
+                    DatabaseOptions.CF_KEY)+1:]
+                cfs_diff[option_name] = options_diff[diff_key]
+            elif str(diff_key).startswith(DatabaseOptions.TABLE_OPTIONS_KEY):
+                option_name = str(diff_key)[len(
+                    DatabaseOptions.TABLE_OPTIONS_KEY)+1:]
+                cfs_table_diff[option_name] = options_diff[diff_key]
+            else:
+                assert False, f"Unexpected diff_key ({diff_key})"
+
+        return cfs_diff, cfs_table_diff

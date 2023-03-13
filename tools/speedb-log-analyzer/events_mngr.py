@@ -124,7 +124,7 @@ class EventsMngr:
     Dictionary of cf events is itself a dictionary of the following format:
     <event-type>: List of Event-s, ordered by their time
     """
-    def __init__(self, cf_names):
+    def __init__(self, cf_names=[]):
         self.cf_names = cf_names
         self.preambles = dict()
         self.events = dict()
@@ -148,13 +148,15 @@ class EventsMngr:
         return True
 
     def try_adding_entry(self, entry):
+        event_cf_name = None
+
         # A preamble event is an entry that will be pending for its
         # associated event entry to provide the event with its cf name
         if self.try_parsing_as_preamble(entry):
-            return True
+            return True, event_cf_name
 
         if not Event.is_an_event_entry(entry, self.cf_names):
-            return False
+            return False, event_cf_name
 
         event = Event(entry, self.cf_names)
 
@@ -175,7 +177,11 @@ class EventsMngr:
             self.events[event_cf_name][event_type] = []
         self.events[event_cf_name][event_type].append(event)
 
-        return True
+        return True, event_cf_name
+
+    def add_cf_name(self, cf_name):
+        if cf_name not in self.cf_names:
+            self.cf_names.append(cf_name)
 
     def get_cf_events(self, cf_name):
         if cf_name not in self.events:

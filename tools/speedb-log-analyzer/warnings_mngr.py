@@ -15,7 +15,7 @@ class WarningElementInfo:
 
 
 class WarningsMngr:
-    def __init__(self, cf_names):
+    def __init__(self, cf_names=[]):
         self.cf_names = cf_names
         self.warnings = {warning_type: {} for warning_type
                          in defs_and_utils.WarningType}
@@ -24,8 +24,10 @@ class WarningsMngr:
 
     def try_adding_entry(self, entry):
         assert isinstance(entry, LogEntry)
+
+        returned_cf_name = None
         if not entry.is_warn_msg():
-            return False
+            return False, returned_cf_name
 
         warning_type = entry.get_warning_type()
         warning_type_id = entry.get_code_pos()
@@ -52,7 +54,10 @@ class WarningsMngr:
         elif self.is_stop_msg(warning_msg):
             self.num_stops += 1
 
-        return True
+        if cf_name and cf_name != defs_and_utils.NO_COL_FAMILY:
+            returned_cf_name = cf_name
+
+        return True, returned_cf_name
 
     @staticmethod
     def is_stall_msg(warn_msg):
@@ -61,6 +66,10 @@ class WarningsMngr:
     @staticmethod
     def is_stop_msg(warn_msg):
         return warn_msg.strip().startswith(regexes.STOPS_WARN_MSG_PREFIX)
+
+    def add_cf_name(self, cf_name):
+        if cf_name not in self.cf_names:
+            self.cf_names.append(cf_name)
 
     def get_total_num_warns(self):
         return len(self.warnings[defs_and_utils.WarningType.WARN])

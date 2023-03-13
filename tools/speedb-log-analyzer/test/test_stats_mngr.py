@@ -252,7 +252,14 @@ def test_stats_mngr():
 
     mngr = StatsMngr()
 
-    mngr.try_adding_entries(entries, start_entry_idx=0) == (True, 3)
+    expected_entry_idx = 1
+    expected_cfs_names_found = set()
+    assert mngr.try_adding_entries(entries, start_entry_idx=1) == \
+           (False, expected_entry_idx, expected_cfs_names_found)
+    expected_entry_idx = 3
+    expected_cfs_names_found = {"default", "CF1"}
+    assert mngr.try_adding_entries(entries, start_entry_idx=0) == \
+           (True, expected_entry_idx, expected_cfs_names_found)
 
 
 def test_compaction_stats_mngr():

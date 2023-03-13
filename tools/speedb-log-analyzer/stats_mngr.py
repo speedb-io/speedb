@@ -635,11 +635,12 @@ class StatsMngr:
             assert False, f"Unexpected stats type ({stats_type})"
 
     def try_adding_entries(self, log_entries, start_entry_idx):
+        cf_names_found = set()
         entry_idx = start_entry_idx
 
         # Our entries starts with the "------- DUMPING STATS -------" entry
         if not StatsMngr.is_dump_stats_start(log_entries[entry_idx]):
-            return False, entry_idx
+            return False, entry_idx, cf_names_found
         entry_idx += 1
 
         db_stats_entry = log_entries[entry_idx]
@@ -663,6 +664,9 @@ class StatsMngr:
 
             if next_cf_name is not None:
                 curr_cf_name = next_cf_name
+                if next_cf_name != defs_and_utils.NO_COL_FAMILY:
+                    cf_names_found.add(curr_cf_name)
+
             self.parse_next_db_stats_entry_lines(db_stats_time,
                                                  curr_cf_name,
                                                  stats_type,
@@ -682,7 +686,7 @@ class StatsMngr:
                 self.counter_and_histograms_mngr.add_entry(entry)
                 entry_idx += 1
 
-        return True, entry_idx
+        return True, entry_idx, cf_names_found
 
     def get_db_wide_stats_mngr(self):
         return self.db_wide_stats_mngr

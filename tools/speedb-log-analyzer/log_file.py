@@ -136,19 +136,24 @@ class ParsedLog:
         self.log_file_path = log_file_path
         self.metadata = None
         self.db_options = DatabaseOptions()
-        self.cf_names = []
+        self.cf_names = {}
+        self.next_unknown_cf_name_suffix = None
 
         # These entities need to support dynamic addition of cf-s
         # The cf names will be added when they are detected during parsing
-        self.events_mngr = EventsMngr(self.cf_names)
-        self.warnings_mngr = WarningsMngr(self.cf_names)
+        self.events_mngr = EventsMngr()
+        self.warnings_mngr = WarningsMngr()
         self.stats_mngr = StatsMngr()
+        self.not_parsed_entries = []
 
-        entry_idx = 0
+        self.entry_idx = 0
         log_entries = self.parse_log_to_entries(log_file_path, log_lines)
-        entry_idx = self.parse_metadata(log_entries, entry_idx)
+        self.parse_metadata(log_entries)
         self.set_end_time(log_entries)
-        self.parse_rest_of_log(log_entries, entry_idx)
+        self.parse_rest_of_log(log_entries)
+
+    def __str__(self):
+        return f"ParsedLog ({self.log_file_path})"
 
     @staticmethod
     def parse_log_to_entries(log_file_path, log_lines):
@@ -205,47 +210,76 @@ class ParsedLog:
 
         return (entry_idx < len(log_entries)), entry_idx
 
-    def parse_metadata(self, log_entries, start_entry_idx):
+    def parse_metadata(self, log_entries):
         # Metadata must be at the top of the log and surely doesn't extend
         # beyond the first options line
         has_found, options_entry_idx = \
-            ParsedLog.find_next_options_entry(log_entries, start_entry_idx)
+            ParsedLog.find_next_options_entry(log_entries, self.entry_idx)
 
         self.metadata = \
-            LogFileMetadata(log_entries[start_entry_idx:options_entry_idx],
-                            start_entry_idx)
-        return options_entry_idx
+            LogFileMetadata(log_entries[self.entry_idx:options_entry_idx],
+                            self.entry_idx)
+        self.entry_idx = options_entry_idx
 
-    def parse_db_wide_options(self, log_entries, start_entry_idx):
-        support_info_entry_idx = \
-            ParsedLog.find_support_info_start_index(log_entries,
-                                                    start_entry_idx)
-        options_dict =\
-            LogFileOptionsParser.parse_db_wide_options(log_entries,
-                                                       start_entry_idx,
-                                                       support_info_entry_idx)
-        entry_idx = support_info_entry_idx
-        self.db_options.set_db_wide_options(options_dict)
-        return entry_idx
+    def get_next_unknown_cf_name(self):
+        # The first one is always "default"
+        if self.next_unknown_cf_name_suffix is not None:
+            self.next_unknown_cf_name_suffix = 1
+            return "default"
+        else:
+            next_cf_name = f"Unknown-CF-#{self.next_unknown_cf_name_suffix}"
+            self.next_unknown_cf_name_suffix += 1
+            return next_cf_name
 
-    def set_end_time(self, log_entries):
-        last_entry = log_entries[-1]
-        end_time = last_entry.get_time()
-        self.metadata.set_end_time(end_time)
+    def parse_cf_options(self, log_entries, cf_options_header_available):
+        if cf_options_header_available:
+            auto_generated_cf_name = None
+        else:
+            auto_generated_cf_name = self.get_next_unknown_cf_name()
 
-    def parse_cf_options(self, log_entries, start_entry_idx):
-        cf_name, options_dict, table_options_dict, entry_idx,\
-        duplicate_option = \
-            LogFileOptionsParser.parse_cf_options(log_entries, start_entry_idx)
-
+        cf_name, options_dict, table_options_dict, self.entry_idx, \
+            duplicate_option = \
+            LogFileOptionsParser.parse_cf_options(log_entries,
+                                                  self.entry_idx,
+                                                  auto_generated_cf_name)
         self.db_options.set_cf_options(cf_name,
                                        options_dict,
                                        table_options_dict)
-        return entry_idx, cf_name
 
-    def add_cf_name(self, cf_name):
+        self.add_cf_name(cf_name, auto_generated_cf_name, has_options=True)
+
+    def add_cf_name(self, cf_name, auto_generated_cf_name, has_options):
+
+        # "default" may have been auto-generated, but it is always the actual
+        # name of the first CF
+        if auto_generated_cf_name is None or cf_name == "default":
+            is_auto_generated_cf_name = False
+        else:
+            is_auto_generated_cf_name = True
+
         assert cf_name not in self.cf_names
-        self.cf_names.append(cf_name)
+        self.cf_names[cf_name] = {"auto_generated": is_auto_generated_cf_name,
+                                  "has_options": has_options}
+
+        # We don't expect to see our auto-generated cf names in events /
+        # warnings. In these we expect to find only actual cf names
+        if not auto_generated_cf_name:
+            self.events_mngr.add_cf_name(cf_name)
+            self.warnings_mngr.add_cf_name(cf_name)
+
+    def handle_cf_name_found_during_parsing(self, cf_name):
+        # a name found during parsing can't be one of the auto-generated ones
+        if cf_name in self.cf_names:
+            assert not self.cf_names[cf_name]["auto_generated"]
+            return
+
+        # The cf's options may have been at the top of the log file, but
+        # it's impossible to know which one => has_options=False
+        self.cf_names[cf_name] = {"auto_generated": False,
+                                  "has_options": False}
+
+        self.events_mngr.add_cf_name(cf_name)
+        self.warnings_mngr.add_cf_name(cf_name)
 
     @staticmethod
     def find_support_info_start_index(log_entries, start_entry_idx):
@@ -255,37 +289,111 @@ class ParsedLog:
                           log_entries[entry_idx].get_msg_lines()[0]):
                 return entry_idx
             entry_idx += 1
-        assert False
 
-    def parse_rest_of_log(self, log_entries, start_entry_idx):
+        raise defs_and_utils.ParsingError(
+            f"Failed finding Support Info. start-idx:{start_entry_idx}")
+
+    def are_dw_wide_options_set(self):
+        return self.db_options.are_db_wide_options_set()
+
+    def try_parse_as_db_wide_options(self, log_entries):
+        if self.are_dw_wide_options_set() or \
+                not LogFileOptionsParser.is_options_entry(
+                    log_entries[self.entry_idx]):
+            return False
+
+        support_info_entry_idx = \
+            ParsedLog.find_support_info_start_index(log_entries,
+                                                    self.entry_idx)
+
+        options_dict =\
+            LogFileOptionsParser.parse_db_wide_options(log_entries,
+                                                       self.entry_idx,
+                                                       support_info_entry_idx)
+        if not options_dict:
+            raise defs_and_utils.ParsingError(
+                f"Empy db-wide options dictionary ({self})."
+                f"self.entry_idx:{self.entry_idx}.")
+
+        self.db_options.set_db_wide_options(options_dict)
+        self.entry_idx = support_info_entry_idx
+
+        return True
+
+    def try_parse_as_cf_options(self, log_entries):
+        entry = log_entries[self.entry_idx]
+        result = False
+        if LogFileOptionsParser.is_cf_options_start_entry(entry):
+            self.parse_cf_options(log_entries,
+                                  cf_options_header_available=True)
+            result = True
+        elif LogFileOptionsParser.is_options_entry(entry):
+            assert self.are_dw_wide_options_set()
+            self.parse_cf_options(log_entries,
+                                  cf_options_header_available=False)
+            result = True
+
+        return result
+
+    def try_parse_as_warning_entries(self, log_entries):
+        entry = log_entries[self.entry_idx]
+
+        result, cf_name = self.warnings_mngr.try_adding_entry(entry)
+        if result:
+            if cf_name is not None:
+                self.handle_cf_name_found_during_parsing(cf_name)
+            self.entry_idx += 1
+
+        return result
+
+    def try_parse_as_event_entries(self, log_entries):
+        entry = log_entries[self.entry_idx]
+
+        result, cf_name = self.events_mngr.try_adding_entry(entry)
+        if not result:
+            return False
+
+        if cf_name is not None:
+            self.handle_cf_name_found_during_parsing(cf_name)
+        self.entry_idx += 1
+
+        return True
+
+    def try_parse_as_stats_entries(self, log_entries):
+        result, self.entry_idx, cfs_names = \
+            self.stats_mngr.try_adding_entries(log_entries, self.entry_idx)
+
+        if result:
+            for cf_name in cfs_names:
+                self.handle_cf_name_found_during_parsing(cf_name)
+
+        return result
+
+    def parse_rest_of_log(self, log_entries):
         # Parse all the entries and process those that are required
-        entry_idx = start_entry_idx
-        while entry_idx < len(log_entries):
-            entry = log_entries[entry_idx]
+        while self.entry_idx < len(log_entries):
+            if self.try_parse_as_db_wide_options(log_entries):
+                continue
 
-            if LogFileOptionsParser.is_cf_options_start_entry(entry):
-                entry_idx, cf_name =\
-                    self.parse_cf_options(log_entries, entry_idx)
-                self.add_cf_name(cf_name)
+            if self.try_parse_as_cf_options(log_entries):
+                continue
 
-            elif LogFileOptionsParser.is_options_entry(entry):
-                entry_idx = self.parse_db_wide_options(log_entries, entry_idx)
+            if self.try_parse_as_warning_entries(log_entries):
+                continue
 
-            elif entry.is_warn_msg():
-                assert self.warnings_mngr.try_adding_entry(entry)
-                entry_idx += 1
+            if self.try_parse_as_event_entries(log_entries):
+                continue
 
-            elif self.events_mngr.try_adding_entry(entry):
-                entry_idx += 1
+            if self.try_parse_as_stats_entries(log_entries):
+                continue
 
-            else:
-                prev_entry_idx = entry_idx
-                is_stats, entry_idx = \
-                    self.stats_mngr.try_adding_entries(log_entries, entry_idx)
-                if is_stats:
-                    assert entry_idx > prev_entry_idx
-                else:
-                    entry_idx += 1
+            self.not_parsed_entries.append(log_entries[self.entry_idx])
+            self.entry_idx += 1
+
+    def set_end_time(self, log_entries):
+        last_entry = log_entries[-1]
+        end_time = last_entry.get_time()
+        self.metadata.set_end_time(end_time)
 
     def get_log_file_path(self):
         return self.log_file_path
@@ -294,10 +402,10 @@ class ParsedLog:
         return self.metadata
 
     def get_cf_names(self):
-        return self.cf_names
+        return list(self.cf_names.keys())
 
     def get_num_cfs(self):
-        return len(self.cf_names)
+        return len(self.get_cf_names())
 
     def get_database_options(self):
         return self.db_options

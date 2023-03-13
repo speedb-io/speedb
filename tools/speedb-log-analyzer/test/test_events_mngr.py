@@ -110,45 +110,47 @@ def test_event_preamble(cf_name):
 
 
 def test_adding_events_to_events_mngr():
-    cf_names = ["cf1", "cf2"]
+    cf1 = "cf1"
+    cf2 = "cf2"
+    cf_names = [cf1, cf2]
     events_mngr = EventsMngr(cf_names)
 
-    assert not events_mngr.get_cf_events("cf1")
-    assert not events_mngr.get_cf_events_by_type("cf2",
+    assert not events_mngr.get_cf_events(cf1)
+    assert not events_mngr.get_cf_events_by_type(cf2,
                                                  EventType.FLUSH_FINISHED)
 
-    expected_events_entries = {"cf1": [], "cf2": []}
+    expected_events_entries = {cf1: [], cf2: []}
 
     event1_entry = create_event_entry("2022/04/17-14:42:19.220573",
-                                      EventType.FLUSH_FINISHED, "cf1")
-    assert events_mngr.try_adding_entry(event1_entry)
-    expected_events_entries["cf1"] = [event1_entry]
+                                      EventType.FLUSH_FINISHED, cf1)
+    assert events_mngr.try_adding_entry(event1_entry) == (True, cf1)
+    expected_events_entries[cf1] = [event1_entry]
     verify_expected_events(events_mngr, expected_events_entries)
 
     event2_entry = create_event_entry("2022/04/18-14:42:19.220573",
-                                      EventType.FLUSH_STARTED, "cf2")
-    assert events_mngr.try_adding_entry(event2_entry)
-    expected_events_entries["cf2"] = [event2_entry]
+                                      EventType.FLUSH_STARTED, cf2)
+    assert events_mngr.try_adding_entry(event2_entry) == (True, cf2)
+    expected_events_entries[cf2] = [event2_entry]
     verify_expected_events(events_mngr, expected_events_entries)
 
     # Create another cf1 event, but set its time to EARLIER than event1
     event3_entry = create_event_entry("2022/03/17-14:42:19.220573",
-                                      EventType.FLUSH_FINISHED, "cf1")
-    assert events_mngr.try_adding_entry(event3_entry)
+                                      EventType.FLUSH_FINISHED, cf1)
+    assert events_mngr.try_adding_entry(event3_entry) == (True, cf1)
     # Expecting event3 to be before event1
-    expected_events_entries["cf1"] = [event3_entry, event1_entry]
+    expected_events_entries[cf1] = [event3_entry, event1_entry]
     verify_expected_events(events_mngr, expected_events_entries)
 
     # Create some more cf21 event, later in time
     event4_entry = create_event_entry("2022/05/17-14:42:19.220573",
-                                      EventType.COMPACTION_STARTED, "cf2")
+                                      EventType.COMPACTION_STARTED, cf2)
     event5_entry = create_event_entry("2022/05/17-15:42:19.220573",
-                                      EventType.COMPACTION_STARTED, "cf2")
+                                      EventType.COMPACTION_STARTED, cf2)
     event6_entry = create_event_entry("2022/05/17-16:42:19.220573",
-                                      EventType.COMPACTION_FINISHED, "cf2")
-    assert events_mngr.try_adding_entry(event4_entry)
-    assert events_mngr.try_adding_entry(event5_entry)
-    assert events_mngr.try_adding_entry(event6_entry)
-    expected_events_entries["cf2"] = [event2_entry, event4_entry,
-                                      event5_entry, event6_entry]
+                                      EventType.COMPACTION_FINISHED, cf2)
+    assert events_mngr.try_adding_entry(event4_entry) == (True, cf2)
+    assert events_mngr.try_adding_entry(event5_entry) == (True, cf2)
+    assert events_mngr.try_adding_entry(event6_entry) == (True, cf2)
+    expected_events_entries[cf2] = [event2_entry, event4_entry,
+                                    event5_entry, event6_entry]
     verify_expected_events(events_mngr, expected_events_entries)

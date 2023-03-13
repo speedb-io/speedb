@@ -17,9 +17,6 @@
 2022/04/17-14:13:10.725889 7f4a9fdff700 	kZSTDNotFinalCompression supported: 1
 2022/04/17-14:13:10.725892 7f4a9fdff700 	kZSTD supported: 1
 2022/04/17-14:13:10.725921 7f4a9fdff700 Fast CRC32 supported: Not supported on x86
-2022/04/17-14:13:10.729516 7f4a9fdff700 [/db_impl/db_impl_open.cc:297] Creating manifest 1
-2022/04/17-14:13:10.733593 7f4a9fdff700 [/version_set.cc:4594] Recovering from manifest file: /data/rocksdb2/job_5a1bdc6ee6ac56392239a57560b7b7f2_op_KeyedProcessOperator_0a448493b4782967b150582570326227__1_5__uuid_ac3aad78-f1e3-4c63-aecc-5c83a00022bc/db/MANIFEST-000001
-2022/04/17-14:13:10.738586 7f4a9fdff700 [/column_family.cc:610] --------------- Options for column family [default]:
 2022/04/17-14:13:10.738590 7f4a9fdff700               Options.comparator: leveldb.BytewiseComparator
 2022/04/17-14:13:10.738592 7f4a9fdff700           Options.merge_operator: StringAppendTESTOperator
 2022/04/17-14:13:10.740750 7f4a9fdff700            table_factory options:   flush_block_policy_factory: FlushBlockBySizePolicyFactory (0x7f4af401f570)
@@ -36,12 +33,6 @@
 2022/04/17-14:13:10.740763 7f4a9fdff700        Options.write_buffer_size: 67108864
 2022/04/17-14:13:10.740769 7f4a9fdff700  Options.max_write_buffer_number: 2
 2022/04/17-14:13:10.741031 7f4a9fdff700                               Options.ttl: 2592000
-2022/04/17-14:13:10.779593 7f4a9fdff700 [/version_set.cc:4634] Recovered from manifest file:/data/rocksdb2/job_5a1bdc6ee6ac56392239a57560b7b7f2_op_KeyedProcessOperator_0a448493b4782967b150582570326227__1_5__uuid_ac3aad78-f1e3-4c63-aecc-5c83a00022bc/db/MANIFEST-000001 succeeded,manifest_file_number is 1, next_file_number is 3, last_sequence is 0, log_number is 0,prev_log_number is 0,max_column_family is 0,min_log_number_to_keep is 0
-2022/04/17-14:13:10.779601 7f4a9fdff700 [/version_set.cc:4649] Column family [default] (ID 0), log number is 0
-2022/04/17-14:13:10.779710 7f4a9fdff700 [/version_set.cc:4140] Creating manifest 4
-2022/04/17-14:13:10.790967 7f4a9fdff700 [/db_impl/db_impl_open.cc:1771] SstFileManager instance 0x7f4af4022cc0
-2022/04/17-14:13:10.791009 7f4a9fdff700 DB pointer 0x7f4af4021240
-2022/04/17-14:13:10.803298 7f4a9fdff700 [/column_family.cc:610] --------------- Options for column family [_sample/CF_1]:
 2022/04/17-14:13:10.803304 7f4a9fdff700               Options.comparator: leveldb.BytewiseComparator-XXX
 2022/04/17-14:13:10.803304 7f4a9fdff700           Options.merge_operator: StringAppendTESTOperator-XXX
 2022/04/17-14:13:10.803305 7f4a9fdff700        Options.compaction_filter: None
@@ -58,8 +49,6 @@
   block_cache_compressed: (nil)
 2022/04/17-14:13:10.803971 7f4a9fdff700        Options.write_buffer_size: 67108864
 2022/04/17-14:13:10.803975 7f4a9fdff700  Options.max_write_buffer_number: 2
-2022/04/17-14:13:10.833174 7f4a9fdff700 [/db_impl/db_impl.cc:2773] Created column family [_sample/CF_1] (ID 1)
-2022/04/17-14:13:10.873630 7f4a9fdff700 [/column_family.cc:610] --------------- Options for column family [_sample/CF-2]:
 2022/04/17-14:13:10.873636 7f4a9fdff700               Options.comparator: leveldb.BytewiseComparator-YYY
 2022/04/17-14:13:10.873652 7f4a9fdff700            Options.table_factory: BlockBasedTable-YYY
 2022/04/17-14:13:10.876990 7f4a9fdff700            table_factory options:   flush_block_policy_factory: FlushBlockBySizePolicyFactory (0x7f4af4091b90)
@@ -68,8 +57,6 @@
 2022/04/17-14:13:10.876998 7f4a9fdff700        Options.write_buffer_size: 123467108864
 2022/04/17-14:13:10.877001 7f4a9fdff700  Options.max_write_buffer_number: 10
 2022/04/17-14:13:10.877005 7f4a9fdff700          Options.compression: Snappy
-2022/04/17-14:13:10.877314 7f4a9fdff700 [/db_impl/db_impl.cc:2773] Created column family [_sample/CF-2] (ID 2)
-2022/04/17-14:13:10.996381 7f4a9fdff700 [/column_family.cc:610] --------------- Options for column family []:
 2022/04/17-14:13:10.996386 7f4a9fdff700               Options.comparator: leveldb.BytewiseComparator-ZZZ
 2022/04/17-14:13:10.996389 7f4a9fdff700           Options.merge_operator: StringAppendTESTOperator-ZZZ
 2022/04/17-14:13:10.996391 7f4a9fdff700        Options.compaction_filter: None
@@ -126,7 +113,7 @@ Stalls(count): 0 level0_slowdown, 0 level0_slowdown_with_compaction, 0 level0_nu
 Block cache LRUCache@0x5600bb634770#32819 capacity: 8.00 MB collections: 1 last_copies: 0 last_secs: 4.9e-05 secs_since: 0
 Block cache entry stats(count,size,portion): Misc(3,8.12 KB,0.0991821%)
 
-** File Read Latency Histogram By Level [] **
+** File Read Latency Histogram By Level [CF1] **
 ** Level 0 read latency histogram (micros):
 Count: 5 Average: 206.8000  StdDev: 308.37
 Min: 0  Median: 5.0000  Max: 798

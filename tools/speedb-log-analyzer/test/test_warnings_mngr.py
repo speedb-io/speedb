@@ -84,8 +84,8 @@ def test_non_warnings_entries():
     assert LogEntry.is_entry_start(line2)
     entry2 = LogEntry(0, line2, True)
 
-    assert not warnings_mngr.try_adding_entry(entry1)
-    assert not warnings_mngr.try_adding_entry(entry2)
+    assert warnings_mngr.try_adding_entry(entry1) == (False, None)
+    assert warnings_mngr.try_adding_entry(entry2) == (False, None)
 
 
 def test_warn_entries():

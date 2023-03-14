@@ -165,6 +165,7 @@ def get_options_baseline_diff_for_display(parsed_log):
 
     db_wide_diff = \
         DatabaseOptions.get_db_wide_options_diff(baseline_opts, log_opts)
+    db_wide_diff = db_wide_diff.get_diff_dict()
 
     display_diff = {
         "Baseline": str(baseline_version),
@@ -179,7 +180,7 @@ def get_options_baseline_diff_for_display(parsed_log):
         if cf_options_diff:
             assert cf_options_diff[CfsOptionsDiff.CF_NAMES_KEY]["New"] == \
                    log_cf_name
-            # del(cf_options_diff[CfsOptionsDiff.CF_NAMES_KEY])
+            del(cf_options_diff[CfsOptionsDiff.CF_NAMES_KEY])
             display_diff["CF-s"][f"{log_cf_name}-vs-default"] = cf_options_diff
 
     return display_diff

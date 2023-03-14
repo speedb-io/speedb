@@ -111,7 +111,7 @@ def test_find_options_diff():
             defs_and_utils.ProductName.SPEEDB,
             v("2.1.0"),
             database_options_2_1_0)
-    assert options_diff_2_1_0_vs_itself == {}
+    assert options_diff_2_1_0_vs_itself is None
     assert closest_version == defs_and_utils.Version("2.1.0")
 
     expected_diff = {}

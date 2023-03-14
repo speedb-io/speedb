@@ -445,12 +445,15 @@ def test_cfs_options_diff_class():
 
 
 def test_get_db_wide_options_diff():
-    assert DatabaseOptions.get_db_wide_options_diff(baseline, baseline) == {}
+    assert DatabaseOptions.get_db_wide_options_diff(baseline, baseline) is None
 
     expected_diff = {'bloom_bits': (None, '4'),
                      'DBOptions.max_log_file_size': ('128000000', '0'),
                      'DBOptions.stats_dump_freq_sec': ('20', None),
-                     'cf names': ('DB_WIDE', 'DB_WIDE')}
+                     CfsOptionsDiff.CF_NAMES_KEY:
+                         {"Base": 'DB_WIDE',
+                          "New": 'DB_WIDE'}}
+
     assert DatabaseOptions.get_db_wide_options_diff(baseline, new) == \
            expected_diff
 
@@ -474,12 +477,9 @@ def test_get_cfs_options_diff():
 
     assert not DatabaseOptions.get_cfs_options_diff(new, default,
                                                     new, default)
-    assert not DatabaseOptions.get_cfs_options_diff(new, cf1,
-                                                    new, cf1)
-    assert not DatabaseOptions.get_cfs_options_diff(new, cf2,
-                                                    new, cf2)
-    assert not DatabaseOptions.get_cfs_options_diff(new, cf3,
-                                                    new, cf3)
+    assert not DatabaseOptions.get_cfs_options_diff(new, cf1, new, cf1)
+    assert not DatabaseOptions.get_cfs_options_diff(new, cf2, new, cf2)
+    assert not DatabaseOptions.get_cfs_options_diff(new, cf3, new, cf3)
 
     expected_diff = {
         'cf names': (default, default),
@@ -528,80 +528,3 @@ def test_get_cfs_options_diff():
     assert DatabaseOptions.get_cfs_options_diff(baseline, cf3,
                                                 new, cf3) == \
            expected_diff
-
-
-# def test_extract_db_wide_diff_from_options_diff():
-#     assert DatabaseOptions.extract_db_wide_diff_from_options_diff({}) == {}
-#
-#     option_diff_without_db_wide = {
-#         'bloom_bits': {defs_and_utils.NO_COL_FAMILY: '4'},
-#         'CFOptions.write_buffer_size': {
-#             default: '128000000',
-#             cf1: '128000',
-#             cf3: '128000000'
-#         },
-#         'TableOptions.BlockBasedTable.index_type': {cf1: '2'},
-#     }
-#     assert DatabaseOptions.extract_db_wide_diff_from_options_diff(
-#         option_diff_without_db_wide) == {}
-#
-#     option_diff_with_db_wide = {
-#         'bloom_bits': {defs_and_utils.NO_COL_FAMILY: '4'},
-#         'CFOptions.write_buffer_size': {
-#             default: '128000000',
-#             cf1: '128000',
-#             cf3: '128000000'
-#         },
-#         'TableOptions.BlockBasedTable.index_type': {cf1: '2'},
-#         'DBOptions.max_log_file_size':
-#             {defs_and_utils.NO_COL_FAMILY: ('128000000', '0')},
-#     }
-#     expected_db_wide_diff = {'max_log_file_size': {'Base': '128000000',
-#                                                    'Log': '0'}}
-#     assert DatabaseOptions.extract_db_wide_diff_from_options_diff(
-#         option_diff_with_db_wide) == expected_db_wide_diff
-#
-#
-# def test_extract_cfs_diff_from_options_diff():
-#     option_diff_no_cfs = {
-#         'cf names': (cf1, cf2),
-#     }
-#     assert DatabaseOptions.extract_cfs_diff_from_options_diff(
-#         option_diff_no_cfs, cf1, cf2) == ({}, {})
-#
-#     option_diff_with_cfs_no_table_diff = {
-#         'cf names': (default, default),
-#         'CFOptions.write_buffer_size': ('128000000', '10000')
-#     }
-#
-#     assert DatabaseOptions.extract_cfs_diff_from_options_diff(
-#         option_diff_with_cfs_no_table_diff, default, default) == (
-#                {'write_buffer_size': ('128000000', '10000')}, {})
-#
-#     option_diff_no_cfs_with_table_diff = {
-#         'cf names': (cf2, default),
-#         'TableOptions.BlockBasedTable.index_type': ('1', None),
-#         'TableOptions.BlockBasedTable.checksum': (None, 'true'),
-#         'TableOptions.BlockBasedTable.format_version': ('4', '5'),
-#     }
-#
-#     assert DatabaseOptions.extract_cfs_diff_from_options_diff(
-#         option_diff_no_cfs_with_table_diff, cf2, default) ==\
-#         ({}, {'index_type': ('1', None),
-#               'checksum': (None, 'true'),
-#               'format_version': ('4', '5')})
-#
-#     option_diff_with_cfs_and_with_table_diff = {
-#         'cf names': (cf2, default),
-#         'TableOptions.BlockBasedTable.index_type': ('1', None),
-#         'TableOptions.BlockBasedTable.checksum': (None, 'true'),
-#         'TableOptions.BlockBasedTable.format_version': ('4', '5'),
-#         'CFOptions.write_buffer_size': ('128000000', '10000')
-#     }
-#
-#     assert DatabaseOptions.extract_cfs_diff_from_options_diff(
-#         option_diff_with_cfs_and_with_table_diff, cf2, default) ==\
-#         ({'write_buffer_size': ('128000000', '10000')},
-#          {'index_type': ('1', None),
-#           'checksum': (None, 'true'),
-#           'format_version': ('4', '5')})

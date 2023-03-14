@@ -209,6 +209,9 @@ class OptionsDiff:
         if full_option_name not in self.diff_dict:
             self.diff_dict[full_option_name] = {}
 
+    def is_empty_diff(self):
+        return self.diff_dict == {}
+
     def get_diff_dict(self):
         return self.diff_dict
 
@@ -217,19 +220,21 @@ class CfsOptionsDiff:
     CF_NAMES_KEY = "cf names"
 
     def __init__(self, baseline_options, baseline_cf_name,
-                 new_options, new_cf_name):
+                 new_options, new_cf_name, diff_dict=None):
         self.baseline_options = baseline_options
         self.baseline_cf_name = baseline_cf_name
         self.new_options = new_options
         self.new_cf_name = new_cf_name
         self.diff_dict = {}
+        if diff_dict is not None:
+            self.diff_dict = diff_dict
 
     def __eq__(self, other):
         new_dict = None
         if isinstance(other, CfsOptionsDiff):
             new_dict = other.get_diff_dict()
         elif isinstance(other, dict):
-            new_dict == other
+            new_dict = other
         else:
             assert False, "Comparing to an invalid type " \
                           f"({type(other)})"
@@ -267,12 +272,17 @@ class CfsOptionsDiff:
         if full_option_name not in self.diff_dict:
             self.diff_dict[full_option_name] = {}
 
+    def is_empty_diff(self):
+        return self.diff_dict == {}
+
     def get_diff_dict(self):
+        if self.is_empty_diff():
+            return {}
+
         result_dict = self.diff_dict
-        if result_dict:
-            result_dict.update({CfsOptionsDiff.CF_NAMES_KEY:
-                                {"Base": self.baseline_cf_name,
-                                 "New": self.new_cf_name}})
+        result_dict.update({CfsOptionsDiff.CF_NAMES_KEY:
+                            {"Base": self.baseline_cf_name,
+                             "New": self.new_cf_name}})
         return result_dict
 
 
@@ -617,7 +627,7 @@ class DatabaseOptions:
                     else:
                         diff.diff_in_new(cf_name, full_option_name)
 
-        return diff
+        return diff if not diff.is_empty_diff() else None
 
     def get_options_diff_relative_to_me(self, new):
         baseline = self.get_all_options()
@@ -634,10 +644,11 @@ class DatabaseOptions:
         # family. So, there is a need to compare the options for all column
         # families in the parsed log with the same default column family in
         # the base version
-        diff = {}
-
         baseline_opts_dict = baseline.get_options_dict()
         new_opts_dict = new.get_options_dict()
+
+        diff = CfsOptionsDiff(baseline_opts_dict, baseline_cf_name,
+                              new_opts_dict, new_cf_name)
 
         options_union = set(baseline_opts_dict.keys()).union(
             set(new_opts_dict.keys()))
@@ -647,13 +658,11 @@ class DatabaseOptions:
             if full_option_name not in baseline_opts_dict:
                 new_option_values = new_opts_dict[full_option_name]
                 if new_cf_name in new_option_values:
-                    diff[full_option_name] = \
-                        (None, new_option_values[new_cf_name])
+                    diff.diff_in_new(full_option_name)
             elif full_option_name not in new_opts_dict:
                 baseline_option_values = baseline_opts_dict[full_option_name]
                 if baseline_cf_name in baseline_option_values:
-                    diff[full_option_name] = \
-                        (baseline_option_values[baseline_cf_name], None)
+                    diff.diff_in_base(full_option_name)
             else:
                 baseline_option_values = baseline_opts_dict[full_option_name]
                 new_option_values = new_opts_dict[full_option_name]
@@ -662,21 +671,13 @@ class DatabaseOptions:
                     if new_cf_name in new_option_values:
                         if baseline_option_values[baseline_cf_name] !=\
                                 new_option_values[new_cf_name]:
-                            diff[full_option_name] = (
-                                baseline_option_values[baseline_cf_name],
-                                new_option_values[new_cf_name]
-                            )
+                            diff.diff_between(full_option_name)
                     else:
-                        diff[full_option_name] = \
-                            (baseline_option_values[baseline_cf_name], None)
+                        diff.diff_in_base(full_option_name)
                 elif new_cf_name in new_option_values:
-                    diff[full_option_name] = (None,
-                                              new_option_values[new_cf_name])
+                    diff.diff_in_new(full_option_name)
 
-        if diff:
-            diff["cf names"] = (baseline_cf_name, new_cf_name)
-
-        return diff
+        return diff if not diff.is_empty_diff() else None
 
     @staticmethod
     def get_db_wide_options_diff(opt_old, opt_new):
@@ -685,56 +686,3 @@ class DatabaseOptions:
             DB_WIDE_CF_NAME,
             opt_new,
             DB_WIDE_CF_NAME)
-
-    # @staticmethod
-    # def extract_db_wide_diff_from_options_diff(options_diff):
-    #     # Receives a diff result (as described in the diff utilities above)
-    #     # and extracts the db-wide diff part of it
-    #     db_wide_diff = {}
-    #     for diff_key in options_diff.keys():
-    #         if str(diff_key).startswith(SectionType.DB_WIDE):
-    #             assert DB_WIDE_CF_NAME in options_diff[diff_key],\
-    #                 f"options[{diff_key}] = {options_diff[diff_key]}"
-    #
-    #             values_diff =\
-    #                 options_diff[diff_key][DB_WIDE_CF_NAME]
-    #
-    #             assert len(values_diff) == 2,\
-    #                 f"options[{diff_key}] = {options_diff[diff_key]}"
-    #
-    #             option_name = str(diff_key)[len(
-    #                 SectionType.DB_WIDE)+1:]
-    #             db_wide_diff[option_name] = {"Base": values_diff[0],
-    #                                          "Log": values_diff[1]}
-    #
-    #     return db_wide_diff
-    #
-    # @staticmethod
-    # def extract_cfs_diff_from_options_diff(options_diff, base_cf_name,
-    #                                        log_cf_name):
-    #     # Receives a diff result (as described in the diff utilities above)
-    #     # and the names of 2 column families and extracts the diff part
-    #     assert 'cf names' in options_diff
-    #     cf_names = options_diff['cf names']
-    #     assert cf_names[0] == base_cf_name
-    #     assert cf_names[1] == log_cf_name
-    #
-    #     cfs_diff = {}
-    #     cfs_table_diff = {}
-    #
-    #     for diff_key in options_diff.keys():
-    #         if diff_key == 'cf names':
-    #             continue
-    #
-    #         if str(diff_key).startswith(SectionType.CF):
-    #             option_name = str(diff_key)[len(
-    #                 SectionType.CF)+1:]
-    #             cfs_diff[option_name] = options_diff[diff_key]
-    #         elif str(diff_key).startswith(SectionType.TABLE_OPTIONS):
-    #             option_name = str(diff_key)[len(
-    #                 SectionType.TABLE_OPTIONS)+1:]
-    #             cfs_table_diff[option_name] = options_diff[diff_key]
-    #         else:
-    #             assert False, f"Unexpected diff_key ({diff_key})"
-    #
-    #     return cfs_diff, cfs_table_diff

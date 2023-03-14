@@ -1,7 +1,7 @@
 import defs_and_utils
 import calc_utils
 import options_files_utils
-from database_options import DatabaseOptions
+from database_options import DatabaseOptions, CfsOptionsDiff
 
 
 def prepare_db_wide_user_opers_stats_for_display(db_wide_info):
@@ -171,19 +171,16 @@ def get_options_baseline_diff_for_display(parsed_log):
         "DB-Wide": db_wide_diff
     }
 
-    # for cf_name in database_options.get_cfs_names():
-    #     DatabaseOptions.get_cfs_options_diff(opt_old, old_cf_name, opt_new,
-    #                                           new_cf_name):
-    #
-    #     get_cfs_options_diff
-    #     cf_options_diff = \
-    #         DatabaseOptions.extract_cfs_diff_from_options_diff(
-    #             options_diff, cf_name, parsed_log.get_log_file_path())
-    #
-    #     if cf_options_diff:
-    #         if "CF-s" not in display_diff:
-    #             display_diff["CF-s"] = {}
-    #         display_diff["CF-s"][cf_name] = cf_options_diff
+    for log_cf_name in log_database_options.get_cfs_names():
+        cf_options_diff = DatabaseOptions.get_cfs_options_diff(
+            baseline_opts, "default", log_opts, log_cf_name).get_diff_dict()
+        if "CF-s" not in display_diff:
+            display_diff["CF-s"] = {}
+        if cf_options_diff:
+            assert cf_options_diff[CfsOptionsDiff.CF_NAMES_KEY]["New"] == \
+                   log_cf_name
+            # del(cf_options_diff[CfsOptionsDiff.CF_NAMES_KEY])
+            display_diff["CF-s"][f"{log_cf_name}-vs-default"] = cf_options_diff
 
     return display_diff
 

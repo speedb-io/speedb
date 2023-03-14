@@ -20,6 +20,8 @@
 #include <event2/event.h>
 #include <event2/http.h>
 #include <event2/bufferevent.h>
+#include <mutex>
+#include <cstring>
 
 using namespace std;
 

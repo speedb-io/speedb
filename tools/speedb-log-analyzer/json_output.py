@@ -19,30 +19,30 @@ def get_json(parsed_log):
             display_utils.get_options_baseline_diff_for_display(parsed_log),
         "All Options": display_utils.get_all_options_for_display(parsed_log)
     }
-
-    j["Warnings"] = display_utils.prepare_warnings_for_display(parsed_log)
-
-    events = calc_utils.calc_all_events_histogram(cf_names, events_mngr)
-    if events:
-        j["Events"] = events
-    else:
-        j["Events"] = "No Events"
-
-    flushes = display_utils.prepare_flushes_histogram_for_display(parsed_log)
-    if flushes:
-        j["Flushes"] = flushes
-    else:
-        j["Flushes"] = "No Flushes"
-
-    j["Stalls"] = \
-        {"DB-Wide":
-            display_utils.prepare_db_wide_stalls_entries_for_display(
-                parsed_log),
-         "CF-s":
-             display_utils.prepare_cf_stalls_entries_for_display(parsed_log)}
-
-    j["Compaction-Stats"] = \
-        stats_mngr.get_compaction_stats_mngr().get_level_entries()
+    #
+    # j["Warnings"] = display_utils.prepare_warnings_for_display(parsed_log)
+    #
+    # events = calc_utils.calc_all_events_histogram(cf_names, events_mngr)
+    # if events:
+    #     j["Events"] = events
+    # else:
+    #     j["Events"] = "No Events"
+    #
+    # flushes = display_utils.prepare_flushes_histogram_for_display(parsed_log)
+    # if flushes:
+    #     j["Flushes"] = flushes
+    # else:
+    #     j["Flushes"] = "No Flushes"
+    #
+    # j["Stalls"] = \
+    #     {"DB-Wide":
+    #         display_utils.prepare_db_wide_stalls_entries_for_display(
+    #             parsed_log),
+    #      "CF-s":
+    #          display_utils.prepare_cf_stalls_entries_for_display(parsed_log)}
+    #
+    # j["Compaction-Stats"] = \
+    #     stats_mngr.get_compaction_stats_mngr().get_level_entries()
 
     return j
 

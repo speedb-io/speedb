@@ -31,11 +31,20 @@ class SectionType(str, Enum):
 
     @staticmethod
     def extract_section_type(full_option_name):
-        try:
-            return SectionType('.'.join(full_option_name.split('.')[:-1]))
-        except ValueError:
-            raise defs_and_utils.ParsingError(
-                f"Invalid full option name ({full_option_name}")
+        # Try to match a section type by combining dot-delimited words
+        # in the full name. Longer combinations are tested before shorter
+        # ones ("TableOptions.BlockBasedTable" will be tested before
+        # "CFOptions")
+        name_parts = full_option_name.split('.')
+        for i in range(len(name_parts)):
+            try:
+                potential_section_type = '.'.join(name_parts[:-i])
+                return SectionType(potential_section_type)
+            except Exception: # noqa
+                continue
+
+        raise defs_and_utils.ParsingError(
+            f"Invalid full option name ({full_option_name}")
 
 
 def validate_section(section_type, expected_type=None):
@@ -615,7 +624,10 @@ class DatabaseOptions:
         return DatabaseOptions.get_options_diff(baseline, new)
 
     @staticmethod
-    def get_cfs_options_diff(opt_old, old_cf_name, opt_new, new_cf_name):
+    def get_cfs_options_diff(baseline, baseline_cf_name, new, new_cf_name):
+        assert isinstance(baseline, FullNamesOptionsDict)
+        assert isinstance(new, FullNamesOptionsDict)
+
         # Same as get_options_diff, but for specific column families.
         # This is needed to compare a parsed log file with a baseline version.
         # The baseline version contains options only for the default column
@@ -624,31 +636,45 @@ class DatabaseOptions:
         # the base version
         diff = {}
 
-        options_union = set(opt_old.keys()).union(set(opt_new.keys()))
-        for opt in options_union:
+        baseline_opts_dict = baseline.get_options_dict()
+        new_opts_dict = new.get_options_dict()
+
+        options_union = set(baseline_opts_dict.keys()).union(
+            set(new_opts_dict.keys()))
+
+        for full_option_name in options_union:
             # if option in options_union, then it must be in one of the configs
-            if opt not in opt_old:
-                if new_cf_name in opt_new[opt]:
-                    diff[opt] = (None, opt_new[opt][new_cf_name])
-            elif opt not in opt_new:
-                if old_cf_name in opt_old[opt]:
-                    diff[opt] = (opt_old[opt][old_cf_name], None)
+            if full_option_name not in baseline_opts_dict:
+                new_option_values = new_opts_dict[full_option_name]
+                if new_cf_name in new_option_values:
+                    diff[full_option_name] = \
+                        (None, new_option_values[new_cf_name])
+            elif full_option_name not in new_opts_dict:
+                baseline_option_values = baseline_opts_dict[full_option_name]
+                if baseline_cf_name in baseline_option_values:
+                    diff[full_option_name] = \
+                        (baseline_option_values[baseline_cf_name], None)
             else:
-                if old_cf_name in opt_old[opt]:
-                    if new_cf_name in opt_new[opt]:
-                        if opt_old[opt][old_cf_name] != \
-                                opt_new[opt][new_cf_name]:
-                            diff[opt] = (
-                                opt_old[opt][old_cf_name],
-                                opt_new[opt][new_cf_name]
+                baseline_option_values = baseline_opts_dict[full_option_name]
+                new_option_values = new_opts_dict[full_option_name]
+
+                if baseline_cf_name in baseline_option_values:
+                    if new_cf_name in new_option_values:
+                        if baseline_option_values[baseline_cf_name] !=\
+                                new_option_values[new_cf_name]:
+                            diff[full_option_name] = (
+                                baseline_option_values[baseline_cf_name],
+                                new_option_values[new_cf_name]
                             )
                     else:
-                        diff[opt] = (opt_old[opt][old_cf_name], None)
-                elif new_cf_name in opt_new[opt]:
-                    diff[opt] = (None, opt_new[opt][new_cf_name])
+                        diff[full_option_name] = \
+                            (baseline_option_values[baseline_cf_name], None)
+                elif new_cf_name in new_option_values:
+                    diff[full_option_name] = (None,
+                                              new_option_values[new_cf_name])
 
         if diff:
-            diff["cf names"] = (old_cf_name, new_cf_name)
+            diff["cf names"] = (baseline_cf_name, new_cf_name)
 
         return diff
 

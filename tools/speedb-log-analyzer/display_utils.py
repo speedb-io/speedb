@@ -168,9 +168,7 @@ def get_options_baseline_diff_for_display(parsed_log):
 
     display_diff = {
         "Baseline": str(baseline_version),
-        "DB-Wide":
-            DatabaseOptions.extract_db_wide_diff_from_options_diff(
-                db_wide_diff)
+        "DB-Wide": db_wide_diff
     }
 
     # for cf_name in database_options.get_cfs_names():

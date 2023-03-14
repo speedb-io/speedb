@@ -42,6 +42,9 @@ new_options = {
     'DBOptions.max_log_file_size': {defs_and_utils.NO_COL_FAMILY: '0'}
 }
 
+baseline = FullNamesOptionsDict(baseline_options)
+new = FullNamesOptionsDict(new_options)
+
 
 def test_extract_section_type():
     assert SectionType.extract_section_type("Version.option-name1") == \
@@ -442,55 +445,49 @@ def test_cfs_options_diff_class():
 
 
 def test_get_db_wide_options_diff():
-    assert DatabaseOptions.get_db_wide_options_diff(baseline_options,
-                                                    baseline_options) == {}
+    assert DatabaseOptions.get_db_wide_options_diff(baseline, baseline) == {}
 
     expected_diff = {'bloom_bits': (None, '4'),
                      'DBOptions.max_log_file_size': ('128000000', '0'),
                      'DBOptions.stats_dump_freq_sec': ('20', None),
                      'cf names': ('DB_WIDE', 'DB_WIDE')}
-    assert DatabaseOptions.get_db_wide_options_diff(baseline_options,
-                                                    new_options) == \
+    assert DatabaseOptions.get_db_wide_options_diff(baseline, new) == \
            expected_diff
 
 
 def test_get_cfs_options_diff():
     assert DatabaseOptions.get_cfs_options_diff(
-        baseline_options, defs_and_utils.NO_COL_FAMILY,
-        baseline_options, defs_and_utils.NO_COL_FAMILY) == {}
-    assert not DatabaseOptions.get_cfs_options_diff(baseline_options, default,
-                                                    baseline_options, default)
-    assert not DatabaseOptions.get_cfs_options_diff(baseline_options, cf1,
-                                                    baseline_options, cf1)
-    assert not DatabaseOptions.get_cfs_options_diff(baseline_options, cf2,
-                                                    baseline_options, cf2)
-    assert not DatabaseOptions.get_cfs_options_diff(baseline_options, cf3,
-                                                    baseline_options, cf3)
-
-    print(DatabaseOptions.get_cfs_options_diff(baseline_options, "DB_WIDE",
-                                               new_options, cf3))
-    return
+        baseline, defs_and_utils.NO_COL_FAMILY,
+        baseline, defs_and_utils.NO_COL_FAMILY) == {}
+    assert not DatabaseOptions.get_cfs_options_diff(baseline, default,
+                                                    baseline, default)
+    assert not DatabaseOptions.get_cfs_options_diff(baseline, cf1,
+                                                    baseline, cf1)
+    assert not DatabaseOptions.get_cfs_options_diff(baseline, cf2,
+                                                    baseline, cf2)
+    assert not DatabaseOptions.get_cfs_options_diff(baseline, cf3,
+                                                    baseline, cf3)
 
     assert DatabaseOptions.get_cfs_options_diff(
-        new_options, defs_and_utils.NO_COL_FAMILY,
-        new_options, defs_and_utils.NO_COL_FAMILY) == {}
+        new, defs_and_utils.NO_COL_FAMILY,
+        new, defs_and_utils.NO_COL_FAMILY) == {}
 
-    assert not DatabaseOptions.get_cfs_options_diff(new_options, default,
-                                                    new_options, default)
-    assert not DatabaseOptions.get_cfs_options_diff(new_options, cf1,
-                                                    new_options, cf1)
-    assert not DatabaseOptions.get_cfs_options_diff(new_options, cf2,
-                                                    new_options, cf2)
-    assert not DatabaseOptions.get_cfs_options_diff(new_options, cf3,
-                                                    new_options, cf3)
+    assert not DatabaseOptions.get_cfs_options_diff(new, default,
+                                                    new, default)
+    assert not DatabaseOptions.get_cfs_options_diff(new, cf1,
+                                                    new, cf1)
+    assert not DatabaseOptions.get_cfs_options_diff(new, cf2,
+                                                    new, cf2)
+    assert not DatabaseOptions.get_cfs_options_diff(new, cf3,
+                                                    new, cf3)
 
     expected_diff = {
         'cf names': (default, default),
         'CFOptions.write_buffer_size': ('1024000', '128000000'),
     }
 
-    assert DatabaseOptions.get_cfs_options_diff(baseline_options, default,
-                                                new_options, default) == \
+    assert DatabaseOptions.get_cfs_options_diff(baseline, default,
+                                                new, default) == \
            expected_diff
 
     expected_diff = {
@@ -500,8 +497,8 @@ def test_get_cfs_options_diff():
         'TableOptions.BlockBasedTable.format_version': (None, '5'),
         'TableOptions.BlockBasedTable.block_size': (None, '4096')
     }
-    assert DatabaseOptions.get_cfs_options_diff(baseline_options, default,
-                                                new_options, cf1) == \
+    assert DatabaseOptions.get_cfs_options_diff(baseline, default,
+                                                new, cf1) == \
            expected_diff
 
     expected_diff = {
@@ -511,8 +508,8 @@ def test_get_cfs_options_diff():
         'TableOptions.BlockBasedTable.format_version': ('5', None),
         'TableOptions.BlockBasedTable.block_size': ('4096', None)
     }
-    assert DatabaseOptions.get_cfs_options_diff(new_options, cf1,
-                                                baseline_options, default) == \
+    assert DatabaseOptions.get_cfs_options_diff(new, cf1,
+                                                baseline, default) == \
            expected_diff
 
     expected_diff = {
@@ -521,15 +518,15 @@ def test_get_cfs_options_diff():
         'TableOptions.BlockBasedTable.index_type': ('1', None),
 
     }
-    assert DatabaseOptions.get_cfs_options_diff(baseline_options, cf2,
-                                                new_options, cf2) == \
+    assert DatabaseOptions.get_cfs_options_diff(baseline, cf2,
+                                                new, cf2) == \
            expected_diff
 
     expected_diff = {
         'cf names': (cf3, cf3),
         'CFOptions.write_buffer_size': (None, '128000000')}
-    assert DatabaseOptions.get_cfs_options_diff(baseline_options, cf3,
-                                                new_options, cf3) == \
+    assert DatabaseOptions.get_cfs_options_diff(baseline, cf3,
+                                                new, cf3) == \
            expected_diff
 
 

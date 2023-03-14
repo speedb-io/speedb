@@ -581,8 +581,8 @@ void TestBoundary(InternalKey& ik1, std::string& v1, InternalKey& ik2,
   const bool kImmortal = true;
   ASSERT_OK(ioptions.table_factory->NewTableReader(
       TableReaderOptions(ioptions, moptions.prefix_extractor, soptions,
-                         internal_comparator, !kSkipFilters, !kImmortal,
-                         level_),
+                         TablePinningOptions(level_), internal_comparator,
+                         !kSkipFilters, !kImmortal),
       std::move(file_reader), sink->contents().size(), &table_reader));
   // Search using Get()
   ReadOptions ro;

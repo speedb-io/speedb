@@ -62,10 +62,11 @@ Status VerifySstFileChecksum(const Options& options,
           nullptr /* stats */, 0 /* hist_type */, nullptr /* file_read_hist */,
           ioptions.rate_limiter.get()));
   const bool kImmortal = true;
+  TablePinningOptions pinning_options;
   auto reader_options = TableReaderOptions(
-      ioptions, options.prefix_extractor, env_options, internal_comparator,
-      false /* skip_filters */, !kImmortal, false /* force_direct_prefetch */,
-      -1 /* level */);
+      ioptions, options.prefix_extractor, env_options, pinning_options,
+      internal_comparator, false /* skip_filters */, !kImmortal,
+      false /* force_direct_prefetch */);
   reader_options.largest_seqno = largest_seqno;
   s = ioptions.table_factory->NewTableReader(
       reader_options, std::move(file_reader), file_size, &table_reader,

@@ -448,6 +448,7 @@ class CompactionJobTestBase : public testing::Test {
       Status s = cf_options_.table_factory->NewTableReader(
           read_opts,
           TableReaderOptions(*cfd->ioptions(), nullptr, FileOptions(),
+                             TablePinningOptions(),
                              cfd_->internal_comparator()),
           std::move(freader), file_size, &table_reader, false);
       ASSERT_OK(s);

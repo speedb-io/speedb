@@ -30,30 +30,46 @@ namespace ROCKSDB_NAMESPACE {
 class Slice;
 class Status;
 
+struct TablePinningOptions {
+  TablePinningOptions(int _level = -1,
+                      size_t _max_file_size_for_l0_meta_pin = 0,
+                      bool _is_bottommost = false)
+      : level(_level),
+        max_file_size_for_l0_meta_pin(_max_file_size_for_l0_meta_pin),
+        is_bottommost(_is_bottommost) {}
+  // What level this table/file is on, -1 for "not set, don't know." Used
+  // for level-specific statistics.
+  int level = -1;
+  // Largest L0 file size whose meta-blocks may be pinned (can be zero when
+  // unknown).
+  const size_t max_file_size_for_l0_meta_pin = 0u;
+
+  bool is_bottommost = false;
+};
+
 struct TableReaderOptions {
   // @param skip_filters Disables loading/accessing the filter block
   TableReaderOptions(
       const ImmutableOptions& _ioptions,
       const std::shared_ptr<const SliceTransform>& _prefix_extractor,
       const EnvOptions& _env_options,
+      const TablePinningOptions& _pinning_options,
       const InternalKeyComparator& _internal_comparator,
       bool _skip_filters = false, bool _immortal = false,
-      bool _force_direct_prefetch = false, int _level = -1,
+      bool _force_direct_prefetch = false,
       BlockCacheTracer* const _block_cache_tracer = nullptr,
-      size_t _max_file_size_for_l0_meta_pin = 0,
       const std::string& _cur_db_session_id = "", uint64_t _cur_file_num = 0,
       UniqueId64x2 _unique_id = {}, SequenceNumber _largest_seqno = 0)
       : ioptions(_ioptions),
         prefix_extractor(_prefix_extractor),
         env_options(_env_options),
+        pinning_options(_pinning_options),
         internal_comparator(_internal_comparator),
         skip_filters(_skip_filters),
         immortal(_immortal),
         force_direct_prefetch(_force_direct_prefetch),
-        level(_level),
         largest_seqno(_largest_seqno),
         block_cache_tracer(_block_cache_tracer),
-        max_file_size_for_l0_meta_pin(_max_file_size_for_l0_meta_pin),
         cur_db_session_id(_cur_db_session_id),
         cur_file_num(_cur_file_num),
         unique_id(_unique_id) {}
@@ -61,6 +77,7 @@ struct TableReaderOptions {
   const ImmutableOptions& ioptions;
   const std::shared_ptr<const SliceTransform>& prefix_extractor;
   const EnvOptions& env_options;
+  TablePinningOptions pinning_options;
   const InternalKeyComparator& internal_comparator;
   // This is only used for BlockBasedTable (reader)
   bool skip_filters;
@@ -70,15 +87,9 @@ struct TableReaderOptions {
   // fetch into RocksDB's buffer, rather than relying
   // RandomAccessFile::Prefetch().
   bool force_direct_prefetch;
-  // What level this table/file is on, -1 for "not set, don't know." Used
-  // for level-specific statistics.
-  int level;
   // largest seqno in the table (or 0 means unknown???)
   SequenceNumber largest_seqno;
   BlockCacheTracer* const block_cache_tracer;
-  // Largest L0 file size whose meta-blocks may be pinned (can be zero when
-  // unknown).
-  const size_t max_file_size_for_l0_meta_pin;
 
   std::string cur_db_session_id;
 

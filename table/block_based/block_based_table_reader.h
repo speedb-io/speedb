@@ -27,6 +27,7 @@
 #include "table/block_based/uncompression_dict_reader.h"
 #include "table/format.h"
 #include "table/persistent_cache_options.h"
+#include "table/table_builder.h"
 #include "table/table_properties_internal.h"
 #include "table/table_reader.h"
 #include "table/two_level_iterator.h"
@@ -95,6 +96,7 @@ class BlockBasedTable : public TableReader {
       const ReadOptions& ro, const ImmutableOptions& ioptions,
       const EnvOptions& env_options,
       const BlockBasedTableOptions& table_options,
+      const TablePinningOptions& pinning_options,
       const InternalKeyComparator& internal_key_comparator,
       std::unique_ptr<RandomAccessFileReader>&& file, uint64_t file_size,
       std::unique_ptr<TableReader>* table_reader,
@@ -102,12 +104,10 @@ class BlockBasedTable : public TableReader {
           nullptr,
       const std::shared_ptr<const SliceTransform>& prefix_extractor = nullptr,
       bool prefetch_index_and_filter_in_cache = true, bool skip_filters = false,
-      int level = -1, const bool immortal_table = false,
-      const SequenceNumber largest_seqno = 0,
+      const bool immortal_table = false, const SequenceNumber largest_seqno = 0,
       bool force_direct_prefetch = false,
       TailPrefetchStats* tail_prefetch_stats = nullptr,
       BlockCacheTracer* const block_cache_tracer = nullptr,
-      size_t max_file_size_for_l0_meta_pin = 0,
       const std::string& cur_db_session_id = "", uint64_t cur_file_num = 0,
       UniqueId64x2 expected_unique_id = {},
       Cache::ItemOwnerId cache_owner_id = Cache::kUnknownItemId);
@@ -487,7 +487,7 @@ class BlockBasedTable : public TableReader {
       const ReadOptions& ro, FilePrefetchBuffer* prefetch_buffer,
       InternalIterator* meta_iter, BlockBasedTable* new_table,
       bool prefetch_all, const BlockBasedTableOptions& table_options,
-      const int level, size_t file_size, size_t max_file_size_for_l0_meta_pin,
+      const TablePinningOptions& pinning_options, size_t file_size,
       BlockCacheLookupContext* lookup_context);
 
   static BlockType GetBlockTypeForMetaBlockByName(const Slice& meta_block_name);
@@ -550,12 +550,14 @@ class BlockBasedTable::PartitionedIndexIteratorState
 struct BlockBasedTable::Rep {
   Rep(const ImmutableOptions& _ioptions, const EnvOptions& _env_options,
       const BlockBasedTableOptions& _table_opt,
+      const TablePinningOptions& _pinning_options,
       const InternalKeyComparator& _internal_comparator, bool skip_filters,
-      uint64_t _file_size, int _level, const bool _immortal_table,
+      uint64_t _file_size, const bool _immortal_table,
       Cache::ItemOwnerId _cache_owner_id = Cache::kUnknownItemId)
       : ioptions(_ioptions),
         env_options(_env_options),
         table_options(_table_opt),
+        pinning_options(_pinning_options),
         filter_policy(skip_filters ? nullptr : _table_opt.filter_policy.get()),
         internal_comparator(_internal_comparator),
         filter_type(FilterType::kNoFilter),
@@ -564,13 +566,13 @@ struct BlockBasedTable::Rep {
         prefix_filtering(true),
         global_seqno(kDisableGlobalSequenceNumber),
         file_size(_file_size),
-        level(_level),
         immortal_table(_immortal_table),
         cache_owner_id(_cache_owner_id) {}
   ~Rep() { status.PermitUncheckedError(); }
   const ImmutableOptions& ioptions;
   const EnvOptions& env_options;
   const BlockBasedTableOptions table_options;
+  const TablePinningOptions pinning_options;
   const FilterPolicy* const filter_policy;
   const InternalKeyComparator& internal_comparator;
   Status status;
@@ -614,7 +616,7 @@ struct BlockBasedTable::Rep {
 
   // the level when the table is opened, could potentially change when trivial
   // move is involved
-  int level;
+  int Level() { return pinning_options.level; }
 
   // If false, blocks in this file are definitely all uncompressed. Knowing this
   // before reading individual blocks enables certain optimizations.
@@ -656,7 +658,9 @@ struct BlockBasedTable::Rep {
                             : BlockCacheTraceHelper::kUnknownColumnFamilyName;
   }
 
-  uint32_t level_for_tracing() const { return level >= 0 ? level : UINT32_MAX; }
+  uint32_t level_for_tracing() const {
+    return pinning_options.level >= 0 ? pinning_options.level : UINT32_MAX;
+  }
 
   uint64_t sst_number_for_tracing() const {
     return file ? TableFileNameToNumber(file->file_name()) : UINT64_MAX;

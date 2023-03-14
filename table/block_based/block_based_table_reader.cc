@@ -183,7 +183,7 @@ void BlockBasedTable::UpdateCacheHitMetrics(BlockType block_type,
 
   PERF_COUNTER_ADD(block_cache_hit_count, 1);
   PERF_COUNTER_BY_LEVEL_ADD(block_cache_hit_count, 1,
-                            static_cast<uint32_t>(rep_->level));
+                            static_cast<uint32_t>(rep_->Level()));
 
   if (get_context) {
     ++get_context->get_context_stats_.num_cache_hit;
@@ -242,7 +242,7 @@ void BlockBasedTable::UpdateCacheMissMetrics(BlockType block_type,
 
   // TODO: introduce aggregate (not per-level) block cache miss count
   PERF_COUNTER_BY_LEVEL_ADD(block_cache_miss_count, 1,
-                            static_cast<uint32_t>(rep_->level));
+                            static_cast<uint32_t>(rep_->Level()));
 
   if (get_context) {
     ++get_context->get_context_stats_.num_cache_miss;
@@ -579,19 +579,18 @@ CacheKey BlockBasedTable::GetCacheKey(const OffsetableCacheKey& base_cache_key,
 Status BlockBasedTable::Open(
     const ReadOptions& read_options, const ImmutableOptions& ioptions,
     const EnvOptions& env_options, const BlockBasedTableOptions& table_options,
+    const TablePinningOptions& pinning_options,
     const InternalKeyComparator& internal_comparator,
     std::unique_ptr<RandomAccessFileReader>&& file, uint64_t file_size,
     std::unique_ptr<TableReader>* table_reader,
     std::shared_ptr<CacheReservationManager> table_reader_cache_res_mgr,
     const std::shared_ptr<const SliceTransform>& prefix_extractor,
     const bool prefetch_index_and_filter_in_cache, const bool skip_filters,
-    const int level, const bool immortal_table,
-    const SequenceNumber largest_seqno, const bool force_direct_prefetch,
-    TailPrefetchStats* tail_prefetch_stats,
+    const bool immortal_table, const SequenceNumber largest_seqno,
+    const bool force_direct_prefetch, TailPrefetchStats* tail_prefetch_stats,
     BlockCacheTracer* const block_cache_tracer,
-    size_t max_file_size_for_l0_meta_pin, const std::string& cur_db_session_id,
-    uint64_t cur_file_num, UniqueId64x2 expected_unique_id,
-    Cache::ItemOwnerId cache_owner_id) {
+    const std::string& cur_db_session_id, uint64_t cur_file_num,
+    UniqueId64x2 expected_unique_id, Cache::ItemOwnerId cache_owner_id) {
   table_reader->reset();
 
   Status s;
@@ -609,7 +608,8 @@ Status BlockBasedTable::Open(
   ro.rate_limiter_priority = read_options.rate_limiter_priority;
 
   // prefetch both index and filters, down to all partitions
-  const bool prefetch_all = prefetch_index_and_filter_in_cache || level == 0;
+  const bool prefetch_all =
+      prefetch_index_and_filter_in_cache || pinning_options.level == 0;
   const bool preload_all = !table_options.cache_index_and_filter_blocks;
 
   if (!ioptions.allow_mmap_reads) {
@@ -651,9 +651,10 @@ Status BlockBasedTable::Open(
   }
 
   BlockCacheLookupContext lookup_context{TableReaderCaller::kPrefetch};
-  Rep* rep = new BlockBasedTable::Rep(
-      ioptions, env_options, table_options, internal_comparator, skip_filters,
-      file_size, level, immortal_table, cache_owner_id);
+  Rep* rep = new BlockBasedTable::Rep(ioptions, env_options, table_options,
+                                      pinning_options, internal_comparator,
+                                      skip_filters, file_size, immortal_table,
+                                      cache_owner_id);
   rep->file = std::move(file);
   rep->footer = footer;
 
@@ -779,8 +780,7 @@ Status BlockBasedTable::Open(
   }
   s = new_table->PrefetchIndexAndFilterBlocks(
       ro, prefetch_buffer.get(), metaindex_iter.get(), new_table.get(),
-      prefetch_all, table_options, level, file_size,
-      max_file_size_for_l0_meta_pin, &lookup_context);
+      prefetch_all, table_options, pinning_options, file_size, &lookup_context);
 
   if (s.ok()) {
     // Update tail prefetch stats
@@ -990,8 +990,8 @@ Status BlockBasedTable::ReadRangeDelBlock(
 Status BlockBasedTable::PrefetchIndexAndFilterBlocks(
     const ReadOptions& ro, FilePrefetchBuffer* prefetch_buffer,
     InternalIterator* meta_iter, BlockBasedTable* new_table, bool prefetch_all,
-    const BlockBasedTableOptions& table_options, const int level,
-    size_t file_size, size_t max_file_size_for_l0_meta_pin,
+    const BlockBasedTableOptions& table_options,
+    const TablePinningOptions& pinning_options, size_t file_size,
     BlockCacheLookupContext* lookup_context) {
   // Find filter handle and filter type
   if (rep_->filter_policy) {
@@ -1080,7 +1080,8 @@ Status BlockBasedTable::PrefetchIndexAndFilterBlocks(
   const bool use_cache = table_options.cache_index_and_filter_blocks;
 
   const bool maybe_flushed =
-      level == 0 && file_size <= max_file_size_for_l0_meta_pin;
+      (pinning_options.level == 0 &&
+       file_size <= pinning_options.max_file_size_for_l0_meta_pin);
   std::function<bool(PinningTier, PinningTier)> is_pinned =
       [maybe_flushed, &is_pinned](PinningTier pinning_tier,
                                   PinningTier fallback_pinning_tier) {
@@ -2054,7 +2055,7 @@ bool BlockBasedTable::FullFilterKeyMayMatch(
   }
   if (may_match) {
     RecordTick(rep_->ioptions.stats, BLOOM_FILTER_FULL_POSITIVE);
-    PERF_COUNTER_BY_LEVEL_ADD(bloom_filter_full_positive, 1, rep_->level);
+    PERF_COUNTER_BY_LEVEL_ADD(bloom_filter_full_positive, 1, rep_->Level());
   }
   return may_match;
 }
@@ -2075,13 +2076,13 @@ void BlockBasedTable::FullFilterKeysMayMatch(
     if (after_keys) {
       RecordTick(rep_->ioptions.stats, BLOOM_FILTER_FULL_POSITIVE, after_keys);
       PERF_COUNTER_BY_LEVEL_ADD(bloom_filter_full_positive, after_keys,
-                                rep_->level);
+                                rep_->Level());
     }
     uint64_t filtered_keys = before_keys - after_keys;
     if (filtered_keys) {
       RecordTick(rep_->ioptions.stats, BLOOM_FILTER_USEFUL, filtered_keys);
       PERF_COUNTER_BY_LEVEL_ADD(bloom_filter_useful, filtered_keys,
-                                rep_->level);
+                                rep_->Level());
     }
   } else if (!PrefixExtractorChanged(prefix_extractor)) {
     // FIXME ^^^: there should be no reason for MultiGet() to depend on current
@@ -2180,7 +2181,7 @@ Status BlockBasedTable::Get(const ReadOptions& read_options, const Slice& key,
   TEST_SYNC_POINT("BlockBasedTable::Get:AfterFilterMatch");
   if (!may_match) {
     RecordTick(rep_->ioptions.stats, BLOOM_FILTER_USEFUL);
-    PERF_COUNTER_BY_LEVEL_ADD(bloom_filter_useful, 1, rep_->level);
+    PERF_COUNTER_BY_LEVEL_ADD(bloom_filter_useful, 1, rep_->Level());
   } else {
     IndexBlockIter iiter_on_stack;
     // if prefix_extractor found in block differs from options, disable
@@ -2311,7 +2312,7 @@ Status BlockBasedTable::Get(const ReadOptions& read_options, const Slice& key,
     if (matched && filter != nullptr) {
       RecordTick(rep_->ioptions.stats, BLOOM_FILTER_FULL_TRUE_POSITIVE);
       PERF_COUNTER_BY_LEVEL_ADD(bloom_filter_full_true_positive, 1,
-                                rep_->level);
+                                rep_->Level());
     }
     if (s.ok() && !iiter->status().IsNotFound()) {
       s = iiter->status();

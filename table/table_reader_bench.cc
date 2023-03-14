@@ -144,7 +144,7 @@ void TableReaderBenchmark(Options& opts, EnvOptions& env_options,
         new RandomAccessFileReader(std::move(raf), file_name));
     s = opts.table_factory->NewTableReader(
         TableReaderOptions(ioptions, moptions.prefix_extractor, env_options,
-                           ikc),
+                           TablePinningOptions(), ikc),
         std::move(file_reader), file_size, &table_reader);
     if (!s.ok()) {
       fprintf(stderr, "Open Table Error: %s\n", s.ToString().c_str());

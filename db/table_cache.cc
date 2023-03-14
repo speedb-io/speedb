@@ -162,11 +162,13 @@ Status TableCache::GetTableReader(
     } else {
       expected_unique_id = kNullUniqueId64x2;  // null ID == no verification
     }
+    TablePinningOptions pinning_options(level, max_file_size_for_l0_meta_pin,
+                                        level == ioptions_.num_levels - 1);
     TableReaderOptions table_reader_options(
-        ioptions_, prefix_extractor, file_options, internal_comparator,
-        skip_filters, immortal_tables_, false /* force_direct_prefetch */,
-        level, block_cache_tracer_, max_file_size_for_l0_meta_pin,
-        db_session_id_, file_meta.fd.GetNumber(), expected_unique_id,
+        ioptions_, prefix_extractor, file_options, pinning_options,
+        internal_comparator, skip_filters, immortal_tables_,
+        false /* force_direct_prefetch */, block_cache_tracer_, db_session_id_,
+        file_meta.fd.GetNumber(), expected_unique_id,
         file_meta.fd.largest_seqno);
     table_reader_options.cache_owner_id = cache_owner_id_;
 

@@ -443,11 +443,12 @@ class TableConstructor : public Constructor {
 
     file_reader_.reset(new RandomAccessFileReader(std::move(source), "test"));
     return ioptions.table_factory->NewTableReader(
-        TableReaderOptions(ioptions, moptions.prefix_extractor, soptions,
-                           *last_internal_comparator_, /*skip_filters*/ false,
-                           /*immortal*/ false, false, level_,
-                           &block_cache_tracer_, moptions.write_buffer_size, "",
-                           file_num_, kNullUniqueId64x2, largest_seqno_),
+        TableReaderOptions(
+            ioptions, moptions.prefix_extractor, soptions,
+            TablePinningOptions(level_, moptions.write_buffer_size),
+            *last_internal_comparator_, /*skip_filters*/ false,
+            /*immortal*/ false, false, &block_cache_tracer_, "", file_num_,
+            kNullUniqueId64x2, largest_seqno_),
         std::move(file_reader_), TEST_GetSink()->contents().size(),
         &table_reader_);
   }
@@ -4569,7 +4570,7 @@ TEST_P(BlockBasedTableTest, DISABLED_TableWithGlobalSeqno) {
 
     options.table_factory->NewTableReader(
         TableReaderOptions(ioptions, moptions.prefix_extractor, EnvOptions(),
-                           ikc),
+                           TablePinningOptions(), ikc),
         std::move(file_reader), ss_rw.contents().size(), &table_reader);
 
     return table_reader->NewIterator(
@@ -4737,6 +4738,7 @@ TEST_P(BlockBasedTableTest, BlockAlignTest) {
 
   ASSERT_OK(ioptions.table_factory->NewTableReader(
       TableReaderOptions(ioptions2, moptions2.prefix_extractor, EnvOptions(),
+                         TablePinningOptions(),
                          GetPlainInternalComparator(options2.comparator)),
       std::move(file_reader), sink->contents().size(), &table_reader));
 

@@ -21,6 +21,7 @@
 #include <event2/http.h>
 #include <event2/bufferevent.h>
 #include <mutex>
+#include <condition_variable>
 #include <cstring>
 
 using namespace std;

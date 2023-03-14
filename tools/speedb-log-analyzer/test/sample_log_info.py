@@ -1,4 +1,5 @@
 from datetime import timedelta
+import defs_and_utils
 
 
 class SampleLogInfo:
@@ -12,6 +13,15 @@ class SampleLogInfo:
     CF_NAMES = ['default', '_sample/CF_1', '_sample/CF-2', '']
     DB_WIDE_OPTIONS_START_ENTRY_IDX = 7
     SUPPORT_INFO_START_ENTRY_IDX = 15
+
+    CF_SIZE_BYTES = \
+        {'default': defs_and_utils.get_value_by_unit("82.43", "GB"),
+         '_sample/CF_1': 0,
+         '_sample/CF-2': 0,
+         '': 0,
+         }
+
+    DB_SIZE_BYTES = sum([size for size in CF_SIZE_BYTES.values()])
 
     NUM_WARNS = 1
 
@@ -125,6 +135,12 @@ class SampleLogInfo:
                                "interval_duration": INTERVAL_DURATION,
                                "interval_percent": 12.3}}
 
+    EVENTS_HISTOGRAM = {'default': {"table_file_creation": 2},
+                        '_sample/CF_1': {},
+                        '_sample/CF-2': {},
+                        '': {'flush_started': 1,
+                             "table_file_creation": 1}}
+
 
 class SampleRolledLogInfo:
     FILE_PATH = "input_files/Rolled_LOG_sample.txt"
@@ -134,7 +150,10 @@ class SampleRolledLogInfo:
     GIT_HASH = "UNKNOWN:0a396684d6c08f6fe4a37572c0429d91176c51d1"
     VERSION = "6.22.1"
     NUM_ENTRIES = 60
-    CF_NAMES = ['default', 'Unknown-1', 'Unknown-2', '']
+    CF_NAMES = ["default", "", "CF1"]
+    AUTO_GENERATED_CF_NAMES = ["Unknown-CF-#1",
+                               "Unknown-CF-#2",
+                               "Unknown-CF-#3"]
     DB_WIDE_OPTIONS_START_ENTRY_IDX = 7
     SUPPORT_INFO_START_ENTRY_IDX = 15
 

@@ -36,13 +36,13 @@ def test_is_misc_option():
 
 
 def test_set_up(setup):
-    options = setup.get_all_options()
+    options = setup.get_all_options().get_options_dict()
     assert 22 == len(options.keys())
     expected_misc_options = {
         'bloom_bits': '4', 'rate_limiter_bytes_per_sec': '1024000'
     }
     assert expected_misc_options == setup.get_misc_options()
-    assert ['default', 'col_fam_A'], setup.get_column_families()
+    assert ['default', 'col_fam_A'], setup.get_cfs_names()
 
 
 def test_get_options(setup):
@@ -52,7 +52,6 @@ def test_get_options(setup):
         'CFOptions.num_levels', 'rate_limiter_bytes_per_sec',
         'TableOptions.BlockBasedTable.block_align', 'random_option'
     ]
-    options = setup.get_options(opt_to_get)
     expected_options = {
         'DBOptions.manual_wal_flush': {defs_and_utils.NO_COL_FAMILY: 'false'},
         'DBOptions.db_write_buffer_size': {defs_and_utils.NO_COL_FAMILY: '0'},
@@ -67,11 +66,12 @@ def test_get_options(setup):
             'default': 'false', 'col_fam_A': 'true'
         }
     }
-    assert expected_options == options
+    options = setup.get_options(opt_to_get).get_options_dict()
+    assert options == expected_options
 
 
 def test_get_column_families(setup):
-    column_families = setup.get_column_families()
+    column_families = setup.get_cfs_names()
     column_families.sort()
 
     expected_column_families = ["default", "col_fam_A"]

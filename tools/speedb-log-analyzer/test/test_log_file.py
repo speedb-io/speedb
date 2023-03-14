@@ -3,7 +3,7 @@ import itertools
 import defs_and_utils
 from database_options import DatabaseOptions
 from log_file import LogFileMetadata, ParsedLog
-from test.sample_log_info import SampleLogInfo
+from test.sample_log_info import SampleLogInfo, SampleRolledLogInfo
 import test.test_utils as test_utils
 
 
@@ -211,7 +211,7 @@ def test_parse_metadata():
 
 
 def test_parse_metadata1():
-    parsed_log = test_utils.create_parsed_log()
+    parsed_log = test_utils.create_parsed_log(SampleLogInfo.FILE_PATH)
     metadata = parsed_log.get_metadata()
 
     assert metadata.get_product_name() == SampleLogInfo.PRODUCT_NAME
@@ -228,12 +228,12 @@ def test_parse_metadata1():
 
 
 def test_parse_options():
-    parsed_log = test_utils.create_parsed_log()
+    parsed_log = test_utils.create_parsed_log(SampleLogInfo.FILE_PATH)
     assert parsed_log.get_cf_names() == SampleLogInfo.CF_NAMES
 
     actual_db_options = parsed_log.get_database_options()
     assert actual_db_options.are_db_wide_options_set()
-    assert actual_db_options.get_column_families() == parsed_log.get_cf_names()
+    assert actual_db_options.get_cfs_names() == parsed_log.get_cf_names()
 
     # Assuming LogFileOptionsParser is fully tested and may be used
     expected_db_options = DatabaseOptions()
@@ -255,15 +255,49 @@ def test_parse_options():
         assert expected_options == actual_options
 
 
+def test_parse_options_in_rolled_log():
+    parsed_log = test_utils.create_parsed_log(SampleRolledLogInfo.FILE_PATH)
+    assert parsed_log.get_cf_names() == SampleRolledLogInfo.CF_NAMES
+    assert parsed_log.get_auto_generated_cf_names() ==\
+           SampleRolledLogInfo.AUTO_GENERATED_CF_NAMES
+
+    actual_db_options = parsed_log.get_database_options()
+    assert actual_db_options.are_db_wide_options_set()
+
+    expected_cfs_names_with_options = ["default"] + \
+        SampleRolledLogInfo.AUTO_GENERATED_CF_NAMES
+    assert actual_db_options.get_cfs_names() == \
+           expected_cfs_names_with_options
+
+    # Assuming LogFileOptionsParser is fully tested and may be used
+    expected_db_options = DatabaseOptions()
+    expected_db_options.set_db_wide_options(SampleLogInfo.DB_WIDE_OPTIONS_DICT)
+    for i in range(len(expected_cfs_names_with_options)):
+        expected_db_options.set_cf_options(
+            expected_cfs_names_with_options[i],
+            SampleLogInfo.OPTIONS_DICTS[i],
+            SampleLogInfo.TABLE_OPTIONS_DICTS[i])
+
+    actual_db_wide_options = actual_db_options.get_db_wide_options()
+    expected_db_wide_options = expected_db_options.get_db_wide_options()
+    assert expected_db_wide_options == actual_db_wide_options
+
+    for i in range(len(expected_cfs_names_with_options)):
+        cf_name = expected_cfs_names_with_options[i]
+        actual_options = actual_db_options.get_cf_options(cf_name)
+        expected_options = expected_db_options.get_cf_options(cf_name)
+        assert expected_options == actual_options
+
+
 def test_parse_warns():
-    parsed_log = test_utils.create_parsed_log()
+    parsed_log = test_utils.create_parsed_log(SampleLogInfo.FILE_PATH)
 
     warns_mngr = parsed_log.get_warnings_mngr()
     assert warns_mngr.get_total_num_warns() == 1
 
 
 def test_parse_db_wide_stats():
-    parsed_log = test_utils.create_parsed_log()
+    parsed_log = test_utils.create_parsed_log(SampleLogInfo.FILE_PATH)
 
     mngr = parsed_log.get_stats_mngr()
     db_wide_stats_mngr = mngr.get_db_wide_stats_mngr()

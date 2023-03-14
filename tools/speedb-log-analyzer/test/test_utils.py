@@ -8,8 +8,8 @@ def read_file(file_path):
         return f.readlines()
 
 
-def create_parsed_log():
-    log_lines = read_file(SampleLogInfo.FILE_PATH)
+def create_parsed_log(file_path):
+    log_lines = read_file(file_path)
     return ParsedLog(SampleLogInfo.FILE_PATH, log_lines)
 
 

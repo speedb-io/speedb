@@ -106,7 +106,7 @@ def test_find_options_diff():
             options_files_path + "/OPTIONS-speedb-2.1.0")
 
     options_diff_2_1_0_vs_itself, closest_version =\
-        options_files_utils.find_options_diff(
+        options_files_utils.find_options_diff_relative_to_baseline(
             options_files_path,
             defs_and_utils.ProductName.SPEEDB,
             v("2.1.0"),
@@ -166,7 +166,7 @@ def test_find_options_diff():
         {'default': (None, "NEW_CF_TABLE_VALUE1")}
 
     options_diff_2_1_0_vs_itself, closest_version =\
-        options_files_utils.find_options_diff(
+        options_files_utils.find_options_diff_relative_to_baseline(
             options_files_path,
             defs_and_utils.ProductName.SPEEDB,
             v("2.1.0"),

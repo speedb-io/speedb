@@ -57,13 +57,19 @@ def find_closest_baseline_options_file(options_folder, product_name, version):
         return None
 
 
-def find_options_diff(options_folder, product_name, version, database_options):
+def get_baseline_database_options(options_folder, product_name, version):
     closest_options_file, closest_version =\
         find_closest_baseline_options_file(options_folder,
                                            product_name,
                                            version)
-    baseline_database_options = OptionsFileParser.load_options_file(
-        closest_options_file)
+    return OptionsFileParser.load_options_file(closest_options_file), \
+        closest_version
+
+
+def find_options_diff_relative_to_baseline(options_folder, product_name,
+                                           version, database_options):
+    baseline_database_options, closest_version =\
+        get_baseline_database_options(options_folder, product_name, version)
 
     return \
         DatabaseOptions.get_options_diff(

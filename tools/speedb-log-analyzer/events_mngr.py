@@ -177,6 +177,9 @@ class EventsMngr:
             self.events[event_cf_name][event_type] = []
         self.events[event_cf_name][event_type].append(event)
 
+        if event_cf_name == defs_and_utils.NO_COL_FAMILY:
+            event_cf_name = None
+
         return True, event_cf_name
 
     def add_cf_name(self, cf_name):

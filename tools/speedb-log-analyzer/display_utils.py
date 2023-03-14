@@ -151,29 +151,41 @@ def get_all_options_for_display(parsed_log):
 
 
 def get_options_baseline_diff_for_display(parsed_log):
-    metadata = parsed_log.get_metadata()
+    log_metadata = parsed_log.get_metadata()
+    log_database_options = parsed_log.get_database_options()
 
-    options_diff, baseline_version = \
-        options_files_utils.find_options_diff(
+    baseline_database_options, baseline_version =\
+        options_files_utils.get_baseline_database_options(
             defs_and_utils.OPTIONS_FILE_FOLDER,
-            metadata.get_product_name(),
-            metadata.get_version(),
-            parsed_log.get_database_options())
+            log_metadata.get_product_name(),
+            log_metadata.get_version())
+    baseline_opts = baseline_database_options.get_all_options()
+
+    log_opts = log_database_options.get_all_options()
+
+    db_wide_diff = \
+        DatabaseOptions.get_db_wide_options_diff(baseline_opts, log_opts)
 
     display_diff = {
         "Baseline": str(baseline_version),
         "DB-Wide":
             DatabaseOptions.extract_db_wide_diff_from_options_diff(
-                options_diff)}
+                db_wide_diff)
+    }
 
-    for cf_name in parsed_log.get_cf_names():
-        cf_options_diff = \
-            DatabaseOptions.extract_cf_diff_from_options_diff(options_diff,
-                                                              cf_name)
-        if cf_options_diff:
-            if "CF-s" not in display_diff:
-                display_diff["CF-s"] = {}
-            display_diff["CF-s"][cf_name] = cf_options_diff
+    # for cf_name in database_options.get_cfs_names():
+    #     DatabaseOptions.get_cfs_options_diff(opt_old, old_cf_name, opt_new,
+    #                                           new_cf_name):
+    #
+    #     get_cfs_options_diff
+    #     cf_options_diff = \
+    #         DatabaseOptions.extract_cfs_diff_from_options_diff(
+    #             options_diff, cf_name, parsed_log.get_log_file_path())
+    #
+    #     if cf_options_diff:
+    #         if "CF-s" not in display_diff:
+    #             display_diff["CF-s"] = {}
+    #         display_diff["CF-s"][cf_name] = cf_options_diff
 
     return display_diff
 

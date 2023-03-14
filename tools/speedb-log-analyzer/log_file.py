@@ -223,7 +223,7 @@ class ParsedLog:
 
     def get_next_unknown_cf_name(self):
         # The first one is always "default"
-        if self.next_unknown_cf_name_suffix is not None:
+        if self.next_unknown_cf_name_suffix is None:
             self.next_unknown_cf_name_suffix = 1
             return "default"
         else:
@@ -273,13 +273,8 @@ class ParsedLog:
             assert not self.cf_names[cf_name]["auto_generated"]
             return
 
-        # The cf's options may have been at the top of the log file, but
-        # it's impossible to know which one => has_options=False
-        self.cf_names[cf_name] = {"auto_generated": False,
-                                  "has_options": False}
-
-        self.events_mngr.add_cf_name(cf_name)
-        self.warnings_mngr.add_cf_name(cf_name)
+        self.add_cf_name(cf_name, auto_generated_cf_name=None,
+                         has_options=False)
 
     @staticmethod
     def find_support_info_start_index(log_entries, start_entry_idx):
@@ -402,7 +397,14 @@ class ParsedLog:
         return self.metadata
 
     def get_cf_names(self):
-        return list(self.cf_names.keys())
+        # Return only the names of cf-s which have been actually present in
+        # the log (also implicitly, like "default")
+        return [cf_name for cf_name in self.cf_names.keys() if not
+                self.cf_names[cf_name]["auto_generated"]]
+
+    def get_auto_generated_cf_names(self):
+        return [cf_name for cf_name in self.cf_names.keys() if
+                self.cf_names[cf_name]["auto_generated"]]
 
     def get_num_cfs(self):
         return len(self.get_cf_names())

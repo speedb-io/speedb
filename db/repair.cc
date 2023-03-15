@@ -557,13 +557,14 @@ class Repairer {
     if (status.ok()) {
       ReadOptions ropts;
       ropts.total_order_seek = true;
+      TablePinningOptions tpoptions(/*level=*/-1,
+                                    /*max_file_size_for_l0_meta_pin=*/0, false);
       InternalIterator* iter = table_cache_->NewIterator(
-          ropts, file_options_, cfd->internal_comparator(), t->meta,
+          ropts, file_options_, tpoptions, cfd->internal_comparator(), t->meta,
           nullptr /* range_del_agg */,
           cfd->GetLatestMutableCFOptions()->prefix_extractor,
           /*table_reader_ptr=*/nullptr, /*file_read_hist=*/nullptr,
           TableReaderCaller::kRepair, /*arena=*/nullptr, /*skip_filters=*/false,
-          /*level=*/-1, /*max_file_size_for_l0_meta_pin=*/0,
           /*smallest_compaction_key=*/nullptr,
           /*largest_compaction_key=*/nullptr,
           /*allow_unprepared_value=*/false);
@@ -603,9 +604,11 @@ class Repairer {
       // from compaction_job.cc around call to UpdateBoundariesForRange (to
       // handle range tombstones extendingg beyond range of other entries).
       ReadOptions ropts;
+      TablePinningOptions tpopts(/*level=*/-1,
+                                 /*max_file_size_for_l0_meta_pin=*/0, false);
       std::unique_ptr<FragmentedRangeTombstoneIterator> r_iter;
       status = table_cache_->GetRangeTombstoneIterator(
-          ropts, cfd->internal_comparator(), t->meta, &r_iter);
+          ropts, tpopts, cfd->internal_comparator(), t->meta, &r_iter);
 
       if (r_iter) {
         r_iter->SeekToFirst();

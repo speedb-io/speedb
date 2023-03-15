@@ -22,12 +22,13 @@ DEFINE_SYNC_AND_ASYNC(Status, Version::MultiGetFromSST)
                        get_perf_context()->per_level_perf_context_enabled;
 
   Status s;
+  TablePinningOptions tpo(hit_file_level, 0, false);  //***MJR
   StopWatchNano timer(clock_, timer_enabled /* auto_start */);
   s = CO_AWAIT(table_cache_->MultiGet)(
-      read_options, *internal_comparator(), *f->file_metadata, &file_range,
+      read_options, tpo, *internal_comparator(), *f->file_metadata, &file_range,
       mutable_cf_options_.prefix_extractor,
       cfd_->internal_stats()->GetFileReadHist(hit_file_level), skip_filters,
-      skip_range_deletions, hit_file_level, table_handle);
+      skip_range_deletions, table_handle);
   // TODO: examine the behavior for corrupted key
   if (timer_enabled) {
     PERF_COUNTER_BY_LEVEL_ADD(get_from_table_nanos, timer.ElapsedNanos(),

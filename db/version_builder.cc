@@ -1245,7 +1245,11 @@ class VersionBuilder::Rep {
     // <file metadata, level>
     std::vector<std::pair<FileMetaData*, int>> files_meta;
     std::vector<Status> statuses;
+    int bottommost_level = num_levels_ - 1;
     for (int level = 0; level < num_levels_; level++) {
+      if (level > 0 && always_load && levels_[level].added_files.size()) {
+        bottommost_level = level;
+      }
       for (auto& file_meta_pair : levels_[level].added_files) {
         auto* file_meta = file_meta_pair.second;
         // If the file has been opened before, just skip it.
@@ -1272,14 +1276,15 @@ class VersionBuilder::Rep {
 
         auto* file_meta = files_meta[file_idx].first;
         int level = files_meta[file_idx].second;
+        TablePinningOptions tpo(level, max_file_size_for_l0_meta_pin,
+                                level >= bottommost_level);
         statuses[file_idx] = table_cache_->FindTable(
-            ReadOptions(), file_options_,
+            ReadOptions(), file_options_, tpo,
             *(base_vstorage_->InternalComparator()), *file_meta,
             &file_meta->table_reader_handle, prefix_extractor, false /*no_io */,
             true /* record_read_stats */,
-            internal_stats->GetFileReadHist(level), false, level,
-            prefetch_index_and_filter_in_cache, max_file_size_for_l0_meta_pin,
-            file_meta->temperature);
+            internal_stats->GetFileReadHist(level), false,
+            prefetch_index_and_filter_in_cache, file_meta->temperature);
         if (file_meta->table_reader_handle != nullptr) {
           // Load table_reader
           file_meta->fd.table_reader = table_cache_->GetTableReaderFromHandle(

@@ -357,15 +357,17 @@ Status BuildTable(
       // No matter whether use_direct_io_for_flush_and_compaction is true,
       // the goal is to cache it here for further user reads.
       ReadOptions read_options;
+      TablePinningOptions tpoptions(tboptions.level_at_creation,
+                                    MaxFileSizeForL0MetaPin(mutable_cf_options),
+                                    tboptions.is_bottommost);
       std::unique_ptr<InternalIterator> it(table_cache->NewIterator(
-          read_options, file_options, tboptions.internal_comparator, *meta,
-          nullptr /* range_del_agg */, mutable_cf_options.prefix_extractor,
-          nullptr,
+          read_options, file_options, tpoptions, tboptions.internal_comparator,
+          *meta, nullptr /* range_del_agg */,
+          mutable_cf_options.prefix_extractor, nullptr,
           (internal_stats == nullptr) ? nullptr
                                       : internal_stats->GetFileReadHist(0),
           TableReaderCaller::kFlush, /*arena=*/nullptr,
-          /*skip_filter=*/false, tboptions.level_at_creation,
-          MaxFileSizeForL0MetaPin(mutable_cf_options),
+          /*skip_filter=*/false,
           /*smallest_compaction_key=*/nullptr,
           /*largest_compaction_key*/ nullptr,
           /*allow_unprepared_value*/ false));

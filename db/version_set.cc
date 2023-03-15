@@ -943,11 +943,12 @@ class LevelIterator final : public InternalIterator {
   // @param read_options Must outlive this iterator.
   LevelIterator(
       TableCache* table_cache, const ReadOptions& read_options,
-      const FileOptions& file_options, const InternalKeyComparator& icomparator,
-      const LevelFilesBrief* flevel,
+      const FileOptions& file_options,
+      const TablePinningOptions& pinning_options,
+      const InternalKeyComparator& icomparator, const LevelFilesBrief* flevel,
       const std::shared_ptr<const SliceTransform>& prefix_extractor,
       bool should_sample, HistogramImpl* file_read_hist,
-      TableReaderCaller caller, bool skip_filters, int level,
+      TableReaderCaller caller, bool skip_filters,
       RangeDelAggregator* range_del_agg,
       const std::vector<AtomicCompactionUnitBoundary>* compaction_boundaries =
           nullptr,
@@ -956,6 +957,7 @@ class LevelIterator final : public InternalIterator {
       : table_cache_(table_cache),
         read_options_(read_options),
         file_options_(file_options),
+        pinning_options_(pinning_options),
         icomparator_(icomparator),
         user_comparator_(icomparator.user_comparator()),
         flevel_(flevel),
@@ -966,7 +968,6 @@ class LevelIterator final : public InternalIterator {
         skip_filters_(skip_filters),
         allow_unprepared_value_(allow_unprepared_value),
         file_index_(flevel_->num_files),
-        level_(level),
         range_del_agg_(range_del_agg),
         pinned_iters_mgr_(nullptr),
         compaction_boundaries_(compaction_boundaries),
@@ -1111,11 +1112,10 @@ class LevelIterator final : public InternalIterator {
     CheckMayBeOutOfLowerBound();
     ClearRangeTombstoneIter();
     return table_cache_->NewIterator(
-        read_options_, file_options_, icomparator_, *file_meta.file_metadata,
-        range_del_agg_, prefix_extractor_,
+        read_options_, file_options_, pinning_options_, icomparator_,
+        *file_meta.file_metadata, range_del_agg_, prefix_extractor_,
         nullptr /* don't need reference to table */, file_read_hist_, caller_,
-        /*arena=*/nullptr, skip_filters_, level_,
-        /*max_file_size_for_l0_meta_pin=*/0, smallest_compaction_key,
+        /*arena=*/nullptr, skip_filters_, smallest_compaction_key,
         largest_compaction_key, allow_unprepared_value_, range_tombstone_iter_);
   }
 
@@ -1136,6 +1136,7 @@ class LevelIterator final : public InternalIterator {
   TableCache* table_cache_;
   const ReadOptions& read_options_;
   const FileOptions& file_options_;
+  const TablePinningOptions pinning_options_;
   const InternalKeyComparator& icomparator_;
   const UserComparatorWrapper user_comparator_;
   const LevelFilesBrief* flevel_;
@@ -1152,7 +1153,6 @@ class LevelIterator final : public InternalIterator {
   bool allow_unprepared_value_;
   bool may_be_out_of_lower_bound_ = true;
   size_t file_index_;
-  int level_;
   RangeDelAggregator* range_del_agg_;
   IteratorWrapper file_iter_;  // May be nullptr
   PinnedIteratorsManager* pinned_iters_mgr_;
@@ -1624,8 +1624,8 @@ Status Version::TablesRangeTombstoneSummary(int max_entries_to_print,
       std::unique_ptr<FragmentedRangeTombstoneIterator> tombstone_iter;
 
       Status s = table_cache->GetRangeTombstoneIterator(
-          ReadOptions(), cfd_->internal_comparator(), *file_meta,
-          &tombstone_iter);
+          ReadOptions(), TablePinningOptions(), cfd_->internal_comparator(),
+          *file_meta, &tombstone_iter);
       if (!s.ok()) {
         return s;
       }
@@ -1838,13 +1838,14 @@ InternalIterator* Version::TEST_GetLevelIterator(
     int level, bool allow_unprepared_value) {
   auto* arena = merge_iter_builder->GetArena();
   auto* mem = arena->AllocateAligned(sizeof(LevelIterator));
+  TablePinningOptions tpo(level);
   TruncatedRangeDelIterator*** tombstone_iter_ptr = nullptr;
   auto level_iter = new (mem) LevelIterator(
-      cfd_->table_cache(), read_options, file_options_,
+      cfd_->table_cache(), read_options, file_options_, tpo,
       cfd_->internal_comparator(), &storage_info_.LevelFilesBrief(level),
       mutable_cf_options_.prefix_extractor, should_sample_file_read(),
       cfd_->internal_stats()->GetFileReadHist(level),
-      TableReaderCaller::kUserIterator, IsFilterSkipped(level), level,
+      TableReaderCaller::kUserIterator, IsFilterSkipped(level),
       nullptr /* range_del_agg */, nullptr /* compaction_boundaries */,
       allow_unprepared_value, &tombstone_iter_ptr);
   if (read_options.ignore_range_deletions) {
@@ -1932,17 +1933,18 @@ void Version::AddIteratorsForLevel(const ReadOptions& read_options,
 
   auto* arena = merge_iter_builder->GetArena();
   if (level == 0) {
+    TablePinningOptions tpo(level, max_file_size_for_l0_meta_pin_, false);
     // Merge all level zero files together since they may overlap
     TruncatedRangeDelIterator* tombstone_iter = nullptr;
     for (size_t i = 0; i < storage_info_.LevelFilesBrief(0).num_files; i++) {
       const auto& file = storage_info_.LevelFilesBrief(0).files[i];
       auto table_iter = cfd_->table_cache()->NewIterator(
-          read_options, soptions, cfd_->internal_comparator(),
+          read_options, soptions, tpo, cfd_->internal_comparator(),
           *file.file_metadata, /*range_del_agg=*/nullptr,
           mutable_cf_options_.prefix_extractor, nullptr,
           cfd_->internal_stats()->GetFileReadHist(0),
           TableReaderCaller::kUserIterator, arena,
-          /*skip_filters=*/false, /*level=*/0, max_file_size_for_l0_meta_pin_,
+          /*skip_filters=*/false,
           /*smallest_compaction_key=*/nullptr,
           /*largest_compaction_key=*/nullptr, allow_unprepared_value,
           &tombstone_iter);
@@ -1966,14 +1968,15 @@ void Version::AddIteratorsForLevel(const ReadOptions& read_options,
     // For levels > 0, we can use a concatenating iterator that sequentially
     // walks through the non-overlapping files in the level, opening them
     // lazily.
+    TablePinningOptions tpo(level, 0, storage_info_.num_non_empty_levels() - 1);
     auto* mem = arena->AllocateAligned(sizeof(LevelIterator));
     TruncatedRangeDelIterator*** tombstone_iter_ptr = nullptr;
     auto level_iter = new (mem) LevelIterator(
-        cfd_->table_cache(), read_options, soptions,
+        cfd_->table_cache(), read_options, soptions, tpo,
         cfd_->internal_comparator(), &storage_info_.LevelFilesBrief(level),
         mutable_cf_options_.prefix_extractor, should_sample_file_read(),
         cfd_->internal_stats()->GetFileReadHist(level),
-        TableReaderCaller::kUserIterator, IsFilterSkipped(level), level,
+        TableReaderCaller::kUserIterator, IsFilterSkipped(level),
         /*range_del_agg=*/nullptr, /*compaction_boundaries=*/nullptr,
         allow_unprepared_value, &tombstone_iter_ptr);
     if (read_options.ignore_range_deletions) {
@@ -2009,13 +2012,15 @@ Status Version::OverlapWithLevelIterator(const ReadOptions& read_options,
           BeforeFile(ucmp, &largest_user_key, file)) {
         continue;
       }
+      TablePinningOptions pinning_options(
+          /*level=*/0, max_file_size_for_l0_meta_pin_, false);
       ScopedArenaIterator iter(cfd_->table_cache()->NewIterator(
-          read_options, file_options, cfd_->internal_comparator(),
-          *file->file_metadata, &range_del_agg,
+          read_options, file_options, pinning_options,
+          cfd_->internal_comparator(), *file->file_metadata, &range_del_agg,
           mutable_cf_options_.prefix_extractor, nullptr,
           cfd_->internal_stats()->GetFileReadHist(0),
           TableReaderCaller::kUserIterator, &arena,
-          /*skip_filters=*/false, /*level=*/0, max_file_size_for_l0_meta_pin_,
+          /*skip_filters=*/false,
           /*smallest_compaction_key=*/nullptr,
           /*largest_compaction_key=*/nullptr,
           /*allow_unprepared_value=*/false));
@@ -2027,12 +2032,14 @@ Status Version::OverlapWithLevelIterator(const ReadOptions& read_options,
     }
   } else if (storage_info_.LevelFilesBrief(level).num_files > 0) {
     auto mem = arena.AllocateAligned(sizeof(LevelIterator));
+    TablePinningOptions pinning_options(
+        level, 0, level >= storage_info_.num_non_empty_levels() - 1);
     ScopedArenaIterator iter(new (mem) LevelIterator(
-        cfd_->table_cache(), read_options, file_options,
+        cfd_->table_cache(), read_options, file_options, pinning_options,
         cfd_->internal_comparator(), &storage_info_.LevelFilesBrief(level),
         mutable_cf_options_.prefix_extractor, should_sample_file_read(),
         cfd_->internal_stats()->GetFileReadHist(level),
-        TableReaderCaller::kUserIterator, IsFilterSkipped(level), level,
+        TableReaderCaller::kUserIterator, IsFilterSkipped(level),
         &range_del_agg));
     status = OverlapWithIterator(
         ucmp, smallest_user_key, largest_user_key, iter.get(), overlap);
@@ -2287,6 +2294,10 @@ void Version::Get(const ReadOptions& read_options, const LookupKey& k,
                 &storage_info_.file_indexer_, user_comparator(),
                 internal_comparator());
   FdWithKeyRange* f = fp.GetNextFile();
+  int level = static_cast<int>(fp.GetHitFileLevel());
+  TablePinningOptions tp_options(
+      level, MaxFileSizeForL0MetaPin(*cfd_->GetCurrentMutableCFOptions()),
+      level >= storage_info_.num_non_empty_levels() - 1);
 
   while (f != nullptr) {
     if (*max_covering_tombstone_seq > 0) {
@@ -2303,12 +2314,11 @@ void Version::Get(const ReadOptions& read_options, const LookupKey& k,
         get_perf_context()->per_level_perf_context_enabled;
     StopWatchNano timer(clock_, timer_enabled /* auto_start */);
     *status = table_cache_->Get(
-        read_options, *internal_comparator(), *f->file_metadata, ikey,
-        &get_context, mutable_cf_options_.prefix_extractor,
+        read_options, tp_options, *internal_comparator(), *f->file_metadata,
+        ikey, &get_context, mutable_cf_options_.prefix_extractor,
         cfd_->internal_stats()->GetFileReadHist(fp.GetHitFileLevel()),
         IsFilterSkipped(static_cast<int>(fp.GetHitFileLevel()),
-                        fp.IsHitFileLastInLevel()),
-        fp.GetHitFileLevel(), max_file_size_for_l0_meta_pin_);
+                        fp.IsHitFileLastInLevel()));
     // TODO: examine the behavior for corrupted key
     if (timer_enabled) {
       PERF_COUNTER_BY_LEVEL_ADD(get_from_table_nanos, timer.ElapsedNanos(),
@@ -6478,7 +6488,12 @@ InternalIterator* VersionSet::MakeInputIterator(
   size_t num = 0;
   for (size_t which = 0; which < c->num_input_levels(); which++) {
     if (c->input_levels(which)->num_files != 0) {
-      if (c->level(which) == 0) {
+      auto level = c->level(which);
+      auto sv = cfd->current()->storage_info();
+      TablePinningOptions pinning_options(
+          level, MaxFileSizeForL0MetaPin(*cfd->GetCurrentMutableCFOptions()),
+          level >= sv->num_non_empty_levels() - 1);
+      if (level == 0) {
         const LevelFilesBrief* flevel = c->input_levels(which);
         for (size_t i = 0; i < flevel->num_files; i++) {
           const FileMetaData& fmd = *flevel->files[i].file_metadata;
@@ -6497,15 +6512,13 @@ InternalIterator* VersionSet::MakeInputIterator(
           }
 
           list[num++] = cfd->table_cache()->NewIterator(
-              read_options, file_options_compactions,
+              read_options, file_options_compactions, pinning_options,
               cfd->internal_comparator(), fmd, range_del_agg,
               c->mutable_cf_options()->prefix_extractor,
               /*table_reader_ptr=*/nullptr,
               /*file_read_hist=*/nullptr, TableReaderCaller::kCompaction,
               /*arena=*/nullptr,
               /*skip_filters=*/false,
-              /*level=*/static_cast<int>(c->level(which)),
-              MaxFileSizeForL0MetaPin(*c->mutable_cf_options()),
               /*smallest_compaction_key=*/nullptr,
               /*largest_compaction_key=*/nullptr,
               /*allow_unprepared_value=*/false);
@@ -6514,13 +6527,12 @@ InternalIterator* VersionSet::MakeInputIterator(
         // Create concatenating iterator for the files from this level
         list[num++] = new LevelIterator(
             cfd->table_cache(), read_options, file_options_compactions,
-            cfd->internal_comparator(), c->input_levels(which),
+            pinning_options, cfd->internal_comparator(), c->input_levels(which),
             c->mutable_cf_options()->prefix_extractor,
             /*should_sample=*/false,
             /*no per level latency histogram=*/nullptr,
             TableReaderCaller::kCompaction, /*skip_filters=*/false,
-            /*level=*/static_cast<int>(c->level(which)), range_del_agg,
-            c->boundaries(which));
+            range_del_agg, c->boundaries(which));
       }
     }
   }

@@ -77,12 +77,12 @@ class TableCache {
   // @param level The level this table is at, -1 for "not set / don't know"
   InternalIterator* NewIterator(
       const ReadOptions& options, const FileOptions& toptions,
+      const TablePinningOptions& poptions,
       const InternalKeyComparator& internal_comparator,
       const FileMetaData& file_meta, RangeDelAggregator* range_del_agg,
       const std::shared_ptr<const SliceTransform>& prefix_extractor,
       TableReader** table_reader_ptr, HistogramImpl* file_read_hist,
-      TableReaderCaller caller, Arena* arena, bool skip_filters, int level,
-      size_t max_file_size_for_l0_meta_pin,
+      TableReaderCaller caller, Arena* arena, bool skip_filters,
       const InternalKey* smallest_compaction_key,
       const InternalKey* largest_compaction_key, bool allow_unprepared_value,
       TruncatedRangeDelIterator** range_del_iter = nullptr);
@@ -98,17 +98,16 @@ class TableCache {
   // @param skip_filters Disables loading/accessing the filter block
   // @param level The level this table is at, -1 for "not set / don't know"
   Status Get(
-      const ReadOptions& options,
+      const ReadOptions& options, const TablePinningOptions& poptions,
       const InternalKeyComparator& internal_comparator,
       const FileMetaData& file_meta, const Slice& k, GetContext* get_context,
       const std::shared_ptr<const SliceTransform>& prefix_extractor = nullptr,
-      HistogramImpl* file_read_hist = nullptr, bool skip_filters = false,
-      int level = -1, size_t max_file_size_for_l0_meta_pin = 0);
+      HistogramImpl* file_read_hist = nullptr, bool skip_filters = false);
 
   // Return the range delete tombstone iterator of the file specified by
   // `file_meta`.
   Status GetRangeTombstoneIterator(
-      const ReadOptions& options,
+      const ReadOptions& options, const TablePinningOptions& poptions,
       const InternalKeyComparator& internal_comparator,
       const FileMetaData& file_meta,
       std::unique_ptr<FragmentedRangeTombstoneIterator>* out_iter);
@@ -119,12 +118,12 @@ class TableCache {
   // is returned in table_handle. This handle should be passed back to
   // MultiGet() so it can be released.
   Status MultiGetFilter(
-      const ReadOptions& options,
+      const ReadOptions& options, const TablePinningOptions& pinning_options,
       const InternalKeyComparator& internal_comparator,
       const FileMetaData& file_meta,
       const std::shared_ptr<const SliceTransform>& prefix_extractor,
-      HistogramImpl* file_read_hist, int level,
-      MultiGetContext::Range* mget_range, Cache::Handle** table_handle);
+      HistogramImpl* file_read_hist, MultiGetContext::Range* mget_range,
+      Cache::Handle** table_handle);
 
   // If a seek to internal key "k" in specified file finds an entry,
   // call get_context->SaveValue() repeatedly until
@@ -137,12 +136,12 @@ class TableCache {
   // @param level The level this table is at, -1 for "not set / don't know"
   DECLARE_SYNC_AND_ASYNC(
       Status, MultiGet, const ReadOptions& options,
+      const TablePinningOptions& poptions,
       const InternalKeyComparator& internal_comparator,
       const FileMetaData& file_meta, const MultiGetContext::Range* mget_range,
       const std::shared_ptr<const SliceTransform>& prefix_extractor = nullptr,
       HistogramImpl* file_read_hist = nullptr, bool skip_filters = false,
-      bool skip_range_deletions = false, int level = -1,
-      Cache::Handle* table_handle = nullptr);
+      bool skip_range_deletions = false, Cache::Handle* table_handle = nullptr);
 
   // Evict any entry for the specified file number
   static void Evict(Cache* cache, uint64_t file_number);
@@ -159,13 +158,13 @@ class TableCache {
   // @param level == -1 means not specified
   Status FindTable(
       const ReadOptions& ro, const FileOptions& toptions,
+      const TablePinningOptions& poptions,
       const InternalKeyComparator& internal_comparator,
       const FileMetaData& file_meta, Cache::Handle**,
       const std::shared_ptr<const SliceTransform>& prefix_extractor = nullptr,
       const bool no_io = false, bool record_read_stats = true,
       HistogramImpl* file_read_hist = nullptr, bool skip_filters = false,
-      int level = -1, bool prefetch_index_and_filter_in_cache = true,
-      size_t max_file_size_for_l0_meta_pin = 0,
+      bool prefetch_index_and_filter_in_cache = true,
       Temperature file_temperature = Temperature::kUnknown);
 
   // Get TableReader from a cache handle.
@@ -237,14 +236,13 @@ class TableCache {
   // Build a table reader
   Status GetTableReader(
       const ReadOptions& ro, const FileOptions& file_options,
+      const TablePinningOptions& tpo,
       const InternalKeyComparator& internal_comparator,
       const FileMetaData& file_meta, bool sequential_mode,
       bool record_read_stats, HistogramImpl* file_read_hist,
       std::unique_ptr<TableReader>* table_reader,
       const std::shared_ptr<const SliceTransform>& prefix_extractor = nullptr,
-      bool skip_filters = false, int level = -1,
-      bool prefetch_index_and_filter_in_cache = true,
-      size_t max_file_size_for_l0_meta_pin = 0,
+      bool skip_filters = false, bool prefetch_index_and_filter_in_cache = true,
       Temperature file_temperature = Temperature::kUnknown);
 
   // Update the max_covering_tombstone_seq in the GetContext for each key based

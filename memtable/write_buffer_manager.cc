@@ -22,16 +22,19 @@
 
 namespace ROCKSDB_NAMESPACE {
 WriteBufferManager::WriteBufferManager(
-    size_t _buffer_size, std::shared_ptr<Cache> cache, bool allow_stall,
-    bool initiate_flushes,
-    const FlushInitiationOptions& flush_initiation_options)
+    size_t _buffer_size, std::shared_ptr<Cache> cache,
+    bool allow_delays_and_stalls, bool initiate_flushes,
+    const FlushInitiationOptions& flush_initiation_options,
+    uint16_t start_delay_percent)
     : buffer_size_(_buffer_size),
       mutable_limit_(buffer_size_ * 7 / 8),
       memory_used_(0),
       memory_inactive_(0),
       memory_being_freed_(0U),
       cache_res_mgr_(nullptr),
-      allow_stall_(allow_stall),
+      allow_delays_and_stalls_(allow_delays_and_stalls),
+      start_delay_percent_(start_delay_percent),
+      wbm_rate_id_(reinterpret_cast<uint64_t>(this)),
       stall_active_(false),
       initiate_flushes_(initiate_flushes),
       flush_initiation_options_(flush_initiation_options),
@@ -53,6 +56,10 @@ WriteBufferManager::WriteBufferManager(
 
   if (initiate_flushes_) {
     InitFlushInitiationVars(buffer_size());
+  }
+  if (start_delay_percent_ >= 100) {
+    // unsuitable value, sanitizing to Dflt. TODO: add reporting
+    start_delay_percent_ = 70U;
   }
 }
 
@@ -84,6 +91,7 @@ void WriteBufferManager::ReserveMem(size_t mem) {
     new_memory_used = old_memory_used + mem;
   }
   if (is_enabled) {
+    UpdateUsageState(new_memory_used, mem, buffer_size());
     // Checking outside the locks is not reliable, but avoids locking
     // unnecessarily which is expensive
     if (UNLIKELY(ShouldInitiateAnotherFlushMemOnly(new_memory_used))) {
@@ -161,6 +169,8 @@ void WriteBufferManager::FreeMem(size_t mem) {
 
     assert(curr_memory_inactive >= mem);
     assert(curr_memory_being_freed >= mem);
+
+    UpdateUsageState(new_memory_used, -mem, buffer_size());
   }
 
   // Check if stall is active and can be ended.
@@ -203,7 +213,7 @@ size_t WriteBufferManager::FreeMemWithCache(size_t mem) {
 
 void WriteBufferManager::BeginWriteStall(StallInterface* wbm_stall) {
   assert(wbm_stall != nullptr);
-  assert(allow_stall_);
+  assert(allow_delays_and_stalls_);
 
   // Allocate outside of the lock.
   std::list<StallInterface*> new_node = {wbm_stall};
@@ -228,7 +238,7 @@ void WriteBufferManager::BeginWriteStall(StallInterface* wbm_stall) {
 void WriteBufferManager::MaybeEndWriteStall() {
   // Cannot early-exit on !enabled() because SetBufferSize(0) needs to unblock
   // the writers.
-  if (!allow_stall_) {
+  if (!allow_delays_and_stalls_) {
     return;
   }
 
@@ -260,7 +270,7 @@ void WriteBufferManager::RemoveDBFromQueue(StallInterface* wbm_stall) {
   // Deallocate the removed nodes outside of the lock.
   std::list<StallInterface*> cleanup;
 
-  if (enabled() && allow_stall_) {
+  if (enabled() && allow_delays_and_stalls_) {
     std::unique_lock<std::mutex> lock(mu_);
     for (auto it = queue_.begin(); it != queue_.end();) {
       auto next = std::next(it);
@@ -295,8 +305,8 @@ std::string WriteBufferManager::GetPrintableOptions() const {
   snprintf(buffer, kBufferSize, "%*s: %p\n", field_width, "wbm.cache", cache);
   ret.append(buffer);
 
-  snprintf(buffer, kBufferSize, "%*s: %d\n", field_width, "wbm.allow_stalls",
-           allow_stall_);
+  snprintf(buffer, kBufferSize, "%*s: %d\n", field_width,
+           "wbm.allow_delays_and_stalls", allow_delays_and_stalls_);
   ret.append(buffer);
 
   snprintf(buffer, kBufferSize, "%*s: %d\n", field_width,
@@ -306,7 +316,239 @@ std::string WriteBufferManager::GetPrintableOptions() const {
   return ret;
 }
 
-// ================================================================================================
+void WriteBufferManager::RegisterWriteController(WriteController* wc) {
+  bool first_entry = AddToControllersMap(wc);
+  if (first_entry) {
+    wc->AddDBToRateMap(wbm_rate_id_);
+  }
+}
+
+void WriteBufferManager::DeregisterWriteController(WriteController* wc) {
+  bool last_entry = RemoveFromControllersMap(wc);
+  if (last_entry) {
+    wc->RemoveDBFromRateMap(wbm_rate_id_);
+  }
+}
+
+bool WriteBufferManager::AddToControllersMap(WriteController* wc) {
+  std::lock_guard<std::mutex> lock(controllers_map_mutex_);
+  if (controllers_to_refcount_map_.count(wc)) {
+    controllers_to_refcount_map_[wc]++;
+    return false;
+  } else {
+    controllers_to_refcount_map_.insert({wc, 1});
+    return true;
+  }
+}
+
+bool WriteBufferManager::RemoveFromControllersMap(WriteController* wc) {
+  std::lock_guard<std::mutex> lock(controllers_map_mutex_);
+  if (controllers_to_refcount_map_.count(wc)) {
+    assert(controllers_to_refcount_map_[wc] > 0);
+    controllers_to_refcount_map_[wc]--;
+    if (controllers_to_refcount_map_[wc] == 0) {
+      controllers_to_refcount_map_.erase(wc);
+      return true;
+    } else {
+      return false;
+    }
+  }
+  return false;
+}
+
+namespace {
+
+// highest delay factor is kMaxDelayedWriteFactor - 1 and the write rate is:
+// max_write_rate * (kMaxDelayedWriteFactor - factor / kMaxDelayedWriteFactor)
+uint64_t CalcDelayFactor(size_t quota, size_t updated_memory_used,
+                         size_t usage_start_delay_threshold) {
+  assert(updated_memory_used >= usage_start_delay_threshold);
+  double extra_used_memory = updated_memory_used - usage_start_delay_threshold;
+  double max_used_memory = quota - usage_start_delay_threshold;
+
+  uint64_t delay_factor = (extra_used_memory / max_used_memory) *
+                          WriteBufferManager::kMaxDelayedWriteFactor;
+  if (delay_factor < 1U) {
+    delay_factor = 1U;
+  }
+  return delay_factor;
+}
+
+uint64_t CalcDelayFromFactor(uint64_t max_write_rate, uint64_t delay_factor) {
+  assert(delay_factor > 0U);
+  auto wbm_write_rate = max_write_rate;
+  if (max_write_rate >= WriteController::kMinWriteRate) {
+    // If user gives rate less than kMinWriteRate, don't adjust it.
+    assert(delay_factor <= WriteBufferManager::kMaxDelayedWriteFactor);
+    auto write_rate_factor =
+        static_cast<double>(WriteBufferManager::kMaxDelayedWriteFactor -
+                            delay_factor) /
+        WriteBufferManager::kMaxDelayedWriteFactor;
+    wbm_write_rate = max_write_rate * write_rate_factor;
+    if (wbm_write_rate < WriteController::kMinWriteRate) {
+      wbm_write_rate = WriteController::kMinWriteRate;
+    }
+  }
+
+  return wbm_write_rate;
+}
+
+}  // Unnamed Namespace
+
+void WriteBufferManager::WBMSetupDelay(uint64_t delay_factor) {
+  for (auto& wc_and_ref_count : controllers_to_refcount_map_) {
+    // the final rate is dependant on the write controllers max rate so
+    // each wc can have a different delay requirement.
+    WriteController* wc = wc_and_ref_count.first;
+    uint64_t wbm_write_rate =
+        CalcDelayFromFactor(wc->max_delayed_write_rate(), delay_factor);
+    wc->HandleNewDelayReq(kWBMId /*id*/, wbm_rate_id_, wbm_write_rate);
+  }
+}
+
+void WriteBufferManager::ResetDelay() {
+  for (auto& wc_and_ref_count : controllers_to_refcount_map_) {
+    wc_and_ref_count.first->HandleRemoveDelayReq(kWBMId, wbm_rate_id_);
+  }
+}
+
+void WriteBufferManager::UpdateControllerDelayState() {
+  auto [usage_state, delay_factor] = GetUsageStateInfo();
+
+  if (usage_state == UsageState::kDelay) {
+    WBMSetupDelay(delay_factor);
+  } else {
+    // check if this WMB has an active delay request.
+    // if yes, remove it and maybe set a different rate.
+    ResetDelay();
+  }
+  // TODO: things to report:
+  //   1. that WBM initiated reset/delay.
+  //   2. list all connected WCs and their write rate.
+}
+
+uint64_t WriteBufferManager::CalcNewCodedUsageState(
+    size_t new_memory_used, ssize_t memory_changed_size, size_t quota,
+    uint64_t old_coded_usage_state) {
+  auto [old_usage_state, old_delay_factor] =
+      ParseCodedUsageState(old_coded_usage_state);
+
+  auto new_usage_state = old_usage_state;
+  auto new_delay_factor = old_delay_factor;
+  size_t usage_start_delay_threshold =
+      (static_cast<double>(start_delay_percent_) / 100) * quota;
+  auto step_size =
+      (quota - usage_start_delay_threshold) / kMaxDelayedWriteFactor;
+
+  if (new_memory_used < usage_start_delay_threshold) {
+    new_usage_state = WriteBufferManager::UsageState::kNone;
+  } else if (new_memory_used >= quota) {
+    new_usage_state = WriteBufferManager::UsageState::kStop;
+  } else {
+    new_usage_state = WriteBufferManager::UsageState::kDelay;
+  }
+
+  auto calc_new_delay_factor = false;
+
+  if (new_usage_state != old_usage_state) {
+    if (new_usage_state == WriteBufferManager::UsageState::kDelay) {
+      calc_new_delay_factor = true;
+    }
+  } else if (new_usage_state == WriteBufferManager::UsageState::kDelay) {
+    if (memory_changed_size == 0) {
+      calc_new_delay_factor = true;
+    } else {
+      auto old_memory_used = new_memory_used - memory_changed_size;
+      // Calculate & notify only if the memory usage changed "steps"
+      if ((old_memory_used / step_size) != (new_memory_used / step_size)) {
+        calc_new_delay_factor = true;
+      }
+    }
+  }
+
+  if (calc_new_delay_factor) {
+    new_delay_factor =
+        CalcDelayFactor(quota, new_memory_used, usage_start_delay_threshold);
+  }
+
+  return CalcCodedUsageState(new_usage_state, new_delay_factor);
+}
+
+uint64_t WriteBufferManager::CalcCodedUsageState(UsageState usage_state,
+                                                 uint64_t delay_factor) {
+  switch (usage_state) {
+    case UsageState::kNone:
+      return kNoneCodedUsageState;
+    case UsageState::kDelay:
+      assert((delay_factor > kNoneCodedUsageState) &&
+             (delay_factor <= kStopCodedUsageState));
+
+      if (delay_factor <= kNoneCodedUsageState) {
+        return kNoneCodedUsageState + 1;
+      } else if (delay_factor > kStopCodedUsageState) {
+        delay_factor = kStopCodedUsageState;
+      }
+      return delay_factor;
+    case UsageState::kStop:
+      return kStopCodedUsageState;
+    default:
+      assert(0);
+      // We should never get here (BUG).
+      return kNoneCodedUsageState;
+  }
+}
+
+auto WriteBufferManager::ParseCodedUsageState(uint64_t coded_usage_state)
+    -> std::pair<UsageState, uint64_t> {
+  if (coded_usage_state <= kNoneCodedUsageState) {
+    return {UsageState::kNone, kNoneDelayedWriteFactor};
+  } else if (coded_usage_state < kStopCodedUsageState) {
+    return {UsageState::kDelay, coded_usage_state};
+  } else {
+    return {UsageState::kStop, kStopDelayedWriteFactor};
+  }
+}
+
+void WriteBufferManager::UpdateUsageState(size_t new_memory_used,
+                                          ssize_t memory_changed_size,
+                                          size_t quota) {
+  assert(enabled());
+  if (allow_delays_and_stalls_ == false ||
+      controllers_to_refcount_map_.empty()) {
+    return;
+  }
+
+  auto done = false;
+  auto old_coded_usage_state = coded_usage_state_.load();
+  auto new_coded_usage_state = old_coded_usage_state;
+  while (done == false) {
+    new_coded_usage_state = CalcNewCodedUsageState(
+        new_memory_used, memory_changed_size, quota, old_coded_usage_state);
+
+    if (old_coded_usage_state != new_coded_usage_state) {
+      // Try to update the usage state with the usage state calculated by the
+      // current thread. Failure (has_update_succeeded == false) means one or
+      // more threads have updated the current state, rendering our own
+      // calculation irrelevant. In case has_update_succeeded==false,
+      // old_coded_usage_state will be the value of the state that was updated
+      // by the other thread(s).
+      done = coded_usage_state_.compare_exchange_weak(old_coded_usage_state,
+                                                      new_coded_usage_state);
+      if (done == false) {
+        // Retry. However,
+        new_memory_used = memory_usage();
+        memory_changed_size = 0U;
+      } else {
+        // WBM state has changed. need to update the WCs.
+        UpdateControllerDelayState();
+      }
+    } else {
+      done = true;
+    }
+  }
+}
+
+// =============================================================================
 void WriteBufferManager::RegisterFlushInitiator(
     void* initiator, InitiateFlushRequestCb request) {
   {
@@ -348,6 +590,7 @@ void WriteBufferManager::InitFlushInitiationVars(size_t quota) {
 
   {
     InstrumentedMutexLock lock(flushes_mu_.get());
+    // TODO: udi - is this not an overflow issue?
     additional_flush_step_size_ =
         quota * kStartFlushPercentThreshold / 100 /
         flush_initiation_options_.max_num_parallel_flushes;

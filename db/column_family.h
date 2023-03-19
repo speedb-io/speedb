@@ -500,18 +500,15 @@ class ColumnFamilyData {
       WriteStallCause& write_stall_cause);
 
  private:
-  std::unique_ptr<WriteControllerToken> DynamicSetupDelay(
-      WriteController* write_controller, uint64_t compaction_needed_bytes,
-      const MutableCFOptions& mutable_cf_options,
-      WriteStallCause& write_stall_cause);
+  void DynamicSetupDelay(WriteController* write_controller,
+                         uint64_t compaction_needed_bytes,
+                         const MutableCFOptions& mutable_cf_options,
+                         WriteStallCause& write_stall_cause);
 
   double CalculateWriteDelayDividerAndMaybeUpdateWriteStallCause(
       uint64_t compaction_needed_bytes,
       const MutableCFOptions& mutable_cf_options,
       WriteStallCause& write_stall_cause);
-
-  // returns the min rate to set
-  uint64_t UpdateCFRate(uint32_t id, uint64_t write_rate);
 
  public:
   void set_initialized() { initialized_.store(true); }
@@ -750,16 +747,11 @@ class ColumnFamilySet {
   const std::shared_ptr<WriteController>& write_controller() const {
     return write_controller_;
   }
-
-  uint64_t UpdateCFRate(uint32_t id, uint64_t write_rate);
-
-  bool IsInRateMap(uint32_t id) { return cf_id_to_write_rate_.count(id); }
-
-  // try and remove the cf id from WriteController::cf_id_to_write_rate_.
-  // if successful and it was the min rate, set the current minimum value.
-  void DeleteSelfFromMapAndMaybeUpdateDelayRate(uint32_t id);
-
   WriteController* write_controller_ptr() { return write_controller_.get(); }
+
+  void UpdateCFRate(uint32_t id, uint64_t write_rate);
+
+  void DeleteSelfFromMapAndMaybeUpdateDelayRate(uint32_t id);
 
  private:
   friend class ColumnFamilyData;
@@ -797,7 +789,7 @@ class ColumnFamilySet {
   const std::string& db_id_;
   std::string db_session_id_;
 
-  std::unordered_map<uint32_t, uint64_t> cf_id_to_write_rate_;
+  uint64_t db_rate_id_;
 };
 
 // A wrapper for ColumnFamilySet that supports releasing DB mutex during each

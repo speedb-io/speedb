@@ -549,7 +549,7 @@ DEFINE_int64(db_write_buffer_size,
 DEFINE_bool(cost_write_buffer_to_cache, false,
             "The usage of memtable is costed to the block cache");
 
-DEFINE_bool(allow_wbm_stalls, false, "Enable WBM write stalls and delays");
+DEFINE_bool(allow_wbm_stalls, true, "Enable WBM write stalls and delays");
 
 DEFINE_bool(initiate_wbm_flushes, false,
             "WBM will proactively initiate flushes (Speedb)."

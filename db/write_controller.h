@@ -95,17 +95,28 @@ class WriteController {
 
   bool is_dynamic_delay() const { return dynamic_delay_; }
 
+  int TEST_total_delayed_count() const { return total_delayed_.load(); }
+
+  // methods and members used when dynamic_delay_ == true.
   using CfIdToRateMap = std::unordered_map<uint32_t, uint64_t>;
 
-  void AddToDbRateMap(CfIdToRateMap* cf_map);
+  void AddDBToRateMap(uint64_t db_id);
+  void RemoveDBFromRateMap(uint64_t db_id);
 
-  void RemoveFromDbRateMap(CfIdToRateMap* cf_map);
+  // the usual case is to set the write_rate of this cf only if its lower than
+  // the current min (delayed_write_rate_) but theres also the case where this
+  // cf was the min rate (was_min) and now its write_rate is higher than the
+  // delayed_write_rate_ so we need to find a new min from all cfs via call to
+  // GetMapMinRate()
+  void HandleNewDelayReq(uint32_t cf_id, uint64_t db_id,
+                         uint64_t cf_write_rate);
 
-  void DeleteSelfFromMapAndMaybeUpdateDelayRate(uint32_t id,
-                                                CfIdToRateMap* cf_map);
-
-  uint64_t InsertToMapAndGetMinRate(uint32_t id, CfIdToRateMap* cf_map,
-                                    uint64_t cf_write_rate);
+  // Checks if the cf is in the db_id_to_write_rate_map_ , if it is:
+  // 1. remove it
+  // 2. total_delayed_--
+  // 3. in case this cf had min rate, also set up a new min from the map.
+  // 4. if total_delayed_ == 0, reset next_refill_time_ and credit_in_bytes_
+  void HandleRemoveDelayReq(uint32_t cf_id, uint64_t db_id);
 
   uint64_t TEST_GetMapMinRate();
 
@@ -113,7 +124,13 @@ class WriteController {
   void NotifyCV();
 
  private:
-  bool IsMinRate(uint32_t id, CfIdToRateMap* cf_map);
+  // methods and members used when dynamic_delay_ == true.
+  bool IsMinRate(uint32_t cf_id, CfIdToRateMap& cf_map);
+  bool IsInRateMap(uint32_t cf_id, CfIdToRateMap& cf_map);
+  // REQUIRES: cf_id is in the rate map.
+  // returns if the element removed had min rate == delayed_write_rate_
+  bool RemoveDelayReq(uint32_t cf_id, CfIdToRateMap& cf_map);
+  void MaybeResetCounters();
 
   // returns the min rate from db_id_to_write_rate_map_
   // REQUIRES: write_controller map_mu_ mutex held.
@@ -123,7 +140,7 @@ class WriteController {
   bool dynamic_delay_;
 
   std::mutex map_mu_;
-  std::unordered_set<CfIdToRateMap*> db_id_to_write_rate_map_;
+  std::unordered_map<uint64_t, CfIdToRateMap> db_id_to_write_rate_map_;
 
   // The mutex used by stop_cv_
   std::mutex stop_mu_;

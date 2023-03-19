@@ -895,6 +895,8 @@ class DBImpl : public DB {
 
   WriteController* write_controller_ptr() { return write_controller_.get(); }
 
+  WriteBufferManager* write_buffer_manager() { return write_buffer_manager_; }
+
   // hollow transactions shell used for recovery.
   // these will then be passed to TransactionDB so that
   // locks can be reacquired before writing can resume.

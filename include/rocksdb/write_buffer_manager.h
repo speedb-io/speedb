@@ -30,6 +30,8 @@ struct Options;
 class CacheReservationManager;
 class InstrumentedMutex;
 class InstrumentedCondVar;
+// including write_controller.h leads to compilation errors.
+class WriteController;
 
 // Interface to block and signal DB instances, intended for RocksDB
 // internal use only. Each DB instance contains ptr to StallInterface.
@@ -44,6 +46,14 @@ class StallInterface {
 
 class WriteBufferManager final {
  public:
+  // Delay Mechanism (allow_delays_and_stalls == true) definitions
+  static constexpr uint16_t kDfltStartDelayPercentThreshold = 70U;
+  static constexpr uint64_t kNoneDelayedWriteFactor = 0U;
+  static constexpr uint64_t kMaxDelayedWriteFactor = 100U;
+  static constexpr uint64_t kStopDelayedWriteFactor = kMaxDelayedWriteFactor;
+  enum class UsageState { kNone, kDelay, kStop };
+
+ public:
   // TODO: Need to find an alternative name as it is misleading
   // we start flushes in kStartFlushPercentThreshold / number of parallel
   // flushes
@@ -56,7 +66,7 @@ class WriteBufferManager final {
     size_t max_num_parallel_flushes = kDfltMaxNumParallelFlushes;
   };
 
-  static constexpr bool kDfltAllowStall = false;
+  static constexpr bool kDfltAllowStall = true;
   static constexpr bool kDfltInitiateFlushes = true;
 
  public:
@@ -68,9 +78,15 @@ class WriteBufferManager final {
   // cost the memory allocated to the cache. It can be used even if _buffer_size
   // = 0.
   //
-  // allow_stall: if set true, it will enable stalling of writes when
-  // memory_usage() exceeds buffer_size. It will wait for flush to complete and
-  // memory usage to drop down.
+  // allow_delays_and_stalls: if set true, will enable delays and stall as
+  // described below:
+  //  Delays: delay writes when memory_usage() exceeds the
+  //    start_delay_percent percent threshold of the buffer size.
+  //    The WBM calculates a delay factor that is increasing as memory_usage()
+  //    increases. Whenever the state changes, the WBM will notify registered
+  //    Write Controllers about the applicable delay factor.
+  //  Stalls: stalling of writes when memory_usage() exceeds buffer_size. It
+  //    will wait for flush to complete and memory usage to drop down.
   //
   // initiate_flushes: if set true, the WBM will proactively request registered
   // DB-s to flush. The mechanism is based on initiating an increasing number of
@@ -80,10 +96,11 @@ class WriteBufferManager final {
   // write-path of a DB.
   explicit WriteBufferManager(
       size_t _buffer_size, std::shared_ptr<Cache> cache = {},
-      bool allow_stall = kDfltAllowStall,
+      bool allow_delays_and_stalls = kDfltAllowStall,
       bool initiate_flushes = kDfltInitiateFlushes,
       const FlushInitiationOptions& flush_initiation_options =
-          FlushInitiationOptions());
+          FlushInitiationOptions(),
+      uint16_t start_delay_percent = kDfltStartDelayPercentThreshold);
 
   // No copying allowed
   WriteBufferManager(const WriteBufferManager&) = delete;
@@ -103,6 +120,8 @@ class WriteBufferManager final {
   size_t memory_usage() const {
     return memory_used_.load(std::memory_order_relaxed);
   }
+
+  void TEST_set_memory_usage(u_int64_t mem) { memory_used_.store(mem); }
 
   // Returns the total memory used by active memtables.
   size_t mutable_memtable_memory_usage() const {
@@ -144,6 +163,7 @@ class WriteBufferManager final {
     // Check if stall is active and can be ended.
     MaybeEndWriteStall();
     if (enabled()) {
+      UpdateUsageState(memory_usage(), 0 /* mem_changed_size */, new_size);
       if (initiate_flushes_) {
         InitFlushInitiationVars(new_size);
       }
@@ -175,11 +195,12 @@ class WriteBufferManager final {
   // We stall the writes untill memory_usage drops below buffer_size. When the
   // function returns true, all writer threads (including one checking this
   // condition) across all DBs will be stalled. Stall is allowed only if user
-  // pass allow_stall = true during WriteBufferManager instance creation.
+  // pass allow_delays_and_stalls = true during WriteBufferManager instance
+  // creation.
   //
   // Should only be called by RocksDB internally .
   bool ShouldStall() const {
-    if (!allow_stall_ || !enabled()) {
+    if (!allow_delays_and_stalls_ || !enabled()) {
       return false;
     }
 
@@ -253,6 +274,70 @@ class WriteBufferManager final {
 
   void TEST_WakeupFlushInitiationThread();
 
+ public:
+  bool IsDelayAllowed() const { return allow_delays_and_stalls_; }
+
+  uint16_t TEST_get_start_delay_percent() const { return start_delay_percent_; }
+
+  std::pair<UsageState, uint64_t> GetUsageStateInfo() const {
+    return ParseCodedUsageState(GetCodedUsageState());
+  }
+
+  void RegisterWriteController(WriteController* wc);
+  void DeregisterWriteController(WriteController* wc);
+
+ private:
+  // The usage + delay factor are coded in a single (atomic) uint64_t value as
+  // follows: kNone - as 0 (kNoneCodedUsageState) kStop - as 1 + max delay
+  // factor (kStopCodedUsageState) kDelay - as the delay factor itself, which
+  // will actually be used for the delay token
+  static constexpr uint64_t kNoneCodedUsageState = 0U;
+  static constexpr uint64_t kStopCodedUsageState = kMaxDelayedWriteFactor + 1;
+  static constexpr uint64_t kWBMId = 0U;
+
+  void UpdateUsageState(size_t new_memory_used, ssize_t mem_changed_size,
+                        size_t quota);
+
+  uint64_t CalcNewCodedUsageState(size_t new_memory_used,
+                                  ssize_t memory_changed_size, size_t quota,
+                                  uint64_t old_coded_usage_state);
+
+  uint64_t GetCodedUsageState() const {
+    return coded_usage_state_.load(std::memory_order_relaxed);
+  }
+
+  static uint64_t CalcCodedUsageState(UsageState usage_state,
+                                      uint64_t delay_factor);
+  static std::pair<UsageState, uint64_t> ParseCodedUsageState(
+      uint64_t coded_usage_state);
+
+  std::atomic<uint64_t> coded_usage_state_ = kNoneCodedUsageState;
+
+ private:
+  // Add this Write Controller(WC) to controllers_to_refcount_map_
+  // which the WBM is responsible for updating (when stalling is allowed).
+  // each time db is opened with this WC-WBM, add a ref count so we know when
+  // to remove this WC from the WBM when the last is no longer used.
+  //
+  // returns true if wc added for the first time.
+  bool AddToControllersMap(WriteController* wc);
+  // returns true if wc was removed from controllers_to_refcount_map_
+  // which means its ref count reached 0.
+  bool RemoveFromControllersMap(WriteController* wc);
+
+  void UpdateControllerDelayState();
+
+  void ResetDelay();
+
+  void WBMSetupDelay(uint64_t delay_factor);
+
+  // a list of all write controllers which are associated with this WBM.
+  // the WBM needs to update them when its delay requirements change.
+  // the key is the WC to update and the value is a ref count of how many dbs
+  // are using this WC with the WBM.
+  std::unordered_map<WriteController*, uint64_t> controllers_to_refcount_map_;
+  std::mutex controllers_map_mutex_;
+
  private:
   std::atomic<size_t> buffer_size_;
   std::atomic<size_t> mutable_limit_;
@@ -268,7 +353,10 @@ class WriteBufferManager final {
   std::list<StallInterface*> queue_;
   // Protects the queue_ and stall_active_.
   std::mutex mu_;
-  bool allow_stall_;
+  bool allow_delays_and_stalls_;
+  uint16_t start_delay_percent_ = kDfltStartDelayPercentThreshold;
+
+  uint64_t wbm_rate_id_;
   // Value should only be changed by BeginWriteStall() and MaybeEndWriteStall()
   // while holding mu_, but it can be read without a lock.
   std::atomic<bool> stall_active_;

@@ -23,13 +23,12 @@ std::unique_ptr<WriteControllerToken> WriteController::GetStopToken() {
 
 std::unique_ptr<WriteControllerToken> WriteController::GetDelayToken(
     uint64_t write_rate) {
-  {
-    std::lock_guard<std::mutex> lock(metrics_mu_);
-    if (0 == total_delayed_++) {
-      // Starting delay, so reset counters.
-      next_refill_time_ = 0;
-      credit_in_bytes_ = 0;
-    }
+  // this is now only accessed when use_dynamic_delay = false so no need to
+  // protect
+  if (0 == total_delayed_++) {
+    // Starting delay, so reset counters.
+    next_refill_time_ = 0;
+    credit_in_bytes_ = 0;
   }
   // NOTE: for simplicity, any current credit_in_bytes_ or "debt" in
   // next_refill_time_ will be based on an old rate. This rate will apply
@@ -40,35 +39,43 @@ std::unique_ptr<WriteControllerToken> WriteController::GetDelayToken(
 
 uint64_t WriteController::TEST_GetMapMinRate() { return GetMapMinRate(); }
 
-void WriteController::AddToDbRateMap(CfIdToRateMap* cf_map) {
+void WriteController::AddDBToRateMap(uint64_t db_id) {
   std::lock_guard<std::mutex> lock(map_mu_);
-  db_id_to_write_rate_map_.insert(cf_map);
+  db_id_to_write_rate_map_[db_id] = {};
 }
 
-void WriteController::RemoveFromDbRateMap(CfIdToRateMap* cf_map) {
-  std::lock_guard<std::mutex> lock(map_mu_);
-  db_id_to_write_rate_map_.erase(cf_map);
+void WriteController::RemoveDBFromRateMap(uint64_t db_id) {
+  {
+    std::lock_guard<std::mutex> lock(map_mu_);
+    if (db_id_to_write_rate_map_.count(db_id)) {
+      if (!db_id_to_write_rate_map_[db_id].empty()) {
+        total_delayed_.fetch_sub(db_id_to_write_rate_map_[db_id].size());
+        set_delayed_write_rate(GetMapMinRate());
+      }
+      db_id_to_write_rate_map_.erase(db_id);
+    }
+  }
+  MaybeResetCounters();
 }
 
-// REQUIRES: write_controller map mutex held.
 uint64_t WriteController::GetMapMinRate() {
   uint64_t min_rate = max_delayed_write_rate();
-  for (auto cf_id_to_write_rate_ : db_id_to_write_rate_map_) {
-    for (const auto& key_val : *cf_id_to_write_rate_) {
-      if (key_val.second < min_rate) {
-        min_rate = key_val.second;
+  for (const auto& db_id_to_rate : db_id_to_write_rate_map_) {
+    for (const auto& cf_id_and_rate : db_id_to_rate.second) {
+      if (cf_id_and_rate.second < min_rate) {
+        min_rate = cf_id_and_rate.second;
       }
     }
   }
   return min_rate;
 }
 
-bool WriteController::IsMinRate(uint32_t id, CfIdToRateMap* cf_map) {
-  if (!cf_map->count(id)) {
+bool WriteController::IsMinRate(uint32_t cf_id, CfIdToRateMap& cf_map) {
+  if (!IsInRateMap(cf_id, cf_map)) {
     return false;
   }
   uint64_t min_rate = delayed_write_rate();
-  auto cf_rate = (*cf_map)[id];
+  auto cf_rate = cf_map[cf_id];
   // the cf is already in the map so it shouldnt be possible for it to have a
   // lower rate than the delayed_write_rate_ unless set_max_delayed_write_rate
   // has been used which also sets delayed_write_rate_
@@ -76,33 +83,58 @@ bool WriteController::IsMinRate(uint32_t id, CfIdToRateMap* cf_map) {
   return cf_rate <= min_rate;
 }
 
-void WriteController::DeleteSelfFromMapAndMaybeUpdateDelayRate(
-    uint32_t id, CfIdToRateMap* cf_map) {
+bool WriteController::IsInRateMap(uint32_t cf_id, CfIdToRateMap& cf_map) {
+  return cf_map.count(cf_id);
+}
+
+void WriteController::HandleNewDelayReq(uint32_t cf_id, uint64_t db_id,
+                                        uint64_t cf_write_rate) {
+  assert(db_id_to_write_rate_map_.count(db_id));
+  CfIdToRateMap& cf_map = db_id_to_write_rate_map_[db_id];
   std::lock_guard<std::mutex> lock(map_mu_);
-  bool was_min = IsMinRate(id, cf_map);
-  cf_map->erase(id);
-  if (was_min) {
-    set_delayed_write_rate(GetMapMinRate());
+  bool was_min = IsMinRate(cf_id, cf_map);
+  bool inserted = cf_map.insert_or_assign(cf_id, cf_write_rate).second;
+  if (inserted) {
+    total_delayed_++;
+  }
+  uint64_t min_rate = delayed_write_rate();
+  if (cf_write_rate <= min_rate) {
+    min_rate = cf_write_rate;
+  } else if (was_min) {
+    min_rate = GetMapMinRate();
+  }
+  set_delayed_write_rate(min_rate);
+}
+
+void WriteController::HandleRemoveDelayReq(uint32_t cf_id, uint64_t db_id) {
+  assert(db_id_to_write_rate_map_.count(db_id));
+  CfIdToRateMap& cf_map = db_id_to_write_rate_map_[db_id];
+  if (IsInRateMap(cf_id, cf_map)) {
+    {
+      std::lock_guard<std::mutex> lock(map_mu_);
+      bool was_min = RemoveDelayReq(cf_id, cf_map);
+      if (was_min) {
+        set_delayed_write_rate(GetMapMinRate());
+      }
+    }
+    MaybeResetCounters();
   }
 }
 
-// the usual case is to set the write_rate of this cf only if its lower than the
-// current min (delayed_write_rate_) but theres also the case where this cf was
-// the min rate (was_min) and now its write_rate is higher than the
-// delayed_write_rate_ so we need to find a new min from all cfs
-// (GetMapMinRate())
-uint64_t WriteController::InsertToMapAndGetMinRate(uint32_t id,
-                                                   CfIdToRateMap* cf_map,
-                                                   uint64_t cf_write_rate) {
-  std::lock_guard<std::mutex> lock(map_mu_);
-  bool was_min = IsMinRate(id, cf_map);
-  cf_map->insert_or_assign(id, cf_write_rate);
-  if (cf_write_rate <= delayed_write_rate()) {
-    return cf_write_rate;
-  } else if (was_min) {
-    return GetMapMinRate();
-  } else {
-    return delayed_write_rate();
+bool WriteController::RemoveDelayReq(uint32_t cf_id, CfIdToRateMap& cf_map) {
+  bool was_min = IsMinRate(cf_id, cf_map);
+  [[maybe_unused]] bool erased = cf_map.erase(cf_id);
+  assert(erased);
+  total_delayed_--;
+  return was_min;
+}
+
+void WriteController::MaybeResetCounters() {
+  std::lock_guard<std::mutex> lock(metrics_mu_);
+  if (total_delayed_ == 0) {
+    // reset counters.
+    next_refill_time_ = 0;
+    credit_in_bytes_ = 0;
   }
 }
 

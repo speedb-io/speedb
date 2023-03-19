@@ -909,11 +909,7 @@ double ColumnFamilyData::TEST_CalculateWriteDelayDivider(
       compaction_needed_bytes, mutable_cf_options, write_stall_cause);
 }
 
-uint64_t ColumnFamilyData::UpdateCFRate(uint32_t id, uint64_t write_rate) {
-  return column_family_set_->UpdateCFRate(id, write_rate);
-}
-
-std::unique_ptr<WriteControllerToken> ColumnFamilyData::DynamicSetupDelay(
+void ColumnFamilyData::DynamicSetupDelay(
     WriteController* write_controller, uint64_t compaction_needed_bytes,
     const MutableCFOptions& mutable_cf_options,
     WriteStallCause& write_stall_cause) {
@@ -932,7 +928,7 @@ std::unique_ptr<WriteControllerToken> ColumnFamilyData::DynamicSetupDelay(
   // delayed_write_rate_ which is used by all cfs and dbs using this write
   // controller. because it also sets the delayed_write_rate_, we need to set
   // only the smallest active delay request.
-  return write_controller->GetDelayToken(UpdateCFRate(id_, write_rate));
+  column_family_set_->UpdateCFRate(id_, write_rate);
 }
 
 std::pair<WriteStallCondition, ColumnFamilyData::WriteStallCause>
@@ -1079,9 +1075,9 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
     // write_stall_cause. this is only relevant in the kDelayed case.
     if (dynamic_delay) {
       if (write_stall_condition == WriteStallCondition::kDelayed) {
-        write_controller_token_ =
-            DynamicSetupDelay(write_controller, compaction_needed_bytes,
-                              mutable_cf_options, write_stall_cause);
+        DynamicSetupDelay(write_controller, compaction_needed_bytes,
+                          mutable_cf_options, write_stall_cause);
+        write_controller_token_.reset();
       } else {
         column_family_set_->DeleteSelfFromMapAndMaybeUpdateDelayRate(id_);
       }
@@ -1703,10 +1699,18 @@ ColumnFamilySet::ColumnFamilySet(
   // initialize linked list
   dummy_cfd_->prev_ = dummy_cfd_;
   dummy_cfd_->next_ = dummy_cfd_;
-  write_controller_->AddToDbRateMap(&cf_id_to_write_rate_);
+  db_rate_id_ = reinterpret_cast<uint64_t>(this);
+  if (write_controller_->is_dynamic_delay()) {
+    write_controller_->AddDBToRateMap(db_rate_id_);
+    write_buffer_manager_->RegisterWriteController(write_controller_ptr());
+  }
 }
 
 ColumnFamilySet::~ColumnFamilySet() {
+  if (write_controller_->is_dynamic_delay()) {
+    write_controller_->RemoveDBFromRateMap(db_rate_id_);
+    write_buffer_manager_->DeregisterWriteController(write_controller_ptr());
+  }
   while (column_family_data_.size() > 0) {
     // cfd destructor will delete itself from column_family_data_
     auto cfd = column_family_data_.begin()->second;
@@ -1717,7 +1721,6 @@ ColumnFamilySet::~ColumnFamilySet() {
   bool dummy_last_ref __attribute__((__unused__));
   dummy_last_ref = dummy_cfd_->UnrefAndTryDelete();
   assert(dummy_last_ref);
-  write_controller_->RemoveFromDbRateMap(&cf_id_to_write_rate_);
 }
 
 ColumnFamilyData* ColumnFamilySet::GetDefault() const {
@@ -1784,19 +1787,12 @@ ColumnFamilyData* ColumnFamilySet::CreateColumnFamily(
   return new_cfd;
 }
 
-// returns the min rate to set
-uint64_t ColumnFamilySet::UpdateCFRate(uint32_t id, uint64_t write_rate) {
-  return write_controller_->InsertToMapAndGetMinRate(id, &cf_id_to_write_rate_,
-                                                     write_rate);
+void ColumnFamilySet::UpdateCFRate(uint32_t id, uint64_t write_rate) {
+  write_controller_->HandleNewDelayReq(id, db_rate_id_, write_rate);
 }
 
-// Removes the cf from the cf_id_to_write_rate_ map if it exists and if this cf
-// was the one with the min write rate then find and set a new min.
 void ColumnFamilySet::DeleteSelfFromMapAndMaybeUpdateDelayRate(uint32_t id) {
-  if (IsInRateMap(id)) {
-    write_controller_->DeleteSelfFromMapAndMaybeUpdateDelayRate(
-        id, &cf_id_to_write_rate_);
-  }
+  write_controller_->HandleRemoveDelayReq(id, db_rate_id_);
 }
 
 // under a DB mutex AND from a write thread

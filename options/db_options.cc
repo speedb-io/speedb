@@ -22,6 +22,7 @@
 #include "rocksdb/system_clock.h"
 #include "rocksdb/utilities/options_type.h"
 #include "rocksdb/wal_filter.h"
+#include "rocksdb/write_buffer_manager.h"
 #include "util/string_util.h"
 
 namespace ROCKSDB_NAMESPACE {

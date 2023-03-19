@@ -1,6 +1,6 @@
 # This workflow will build Speedb on a Mac OS server
 #
-# This workflow assumes the self hosted runner on a Windows machine is ready.
+# This workflow assumes the self hosted runner on a Mac machine is ready.
 # The Mac OS server must have all the tools and software required for Speedb building to be installed
 
 
@@ -11,7 +11,7 @@ on:
 
 jobs:
   build-and-deploy:
-    runs-on: macOSi86 # a test self hosted runner on a win vm
+    runs-on: macOSi86 # a test self hosted runner on a vm with MacOS
     steps:
     - name: 'Checkout GitHub Action'
       uses: actions/checkout@v3

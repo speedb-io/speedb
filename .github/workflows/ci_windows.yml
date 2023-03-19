@@ -1,0 +1,28 @@
+# This workflow will build Speedb on a Windows server
+#
+# This workflow assumes the self hosted runner on a Windows machine is ready.
+# The Windows server must have all the tools and software required for Speedb building to be installed
+
+
+name: Build on Windows 
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: win1 # a test self hosted runner on a win vm
+    steps:
+    - name: 'Checkout GitHub Action'
+      uses: actions/checkout@v3
+
+    - name: 'build and present'
+      shell: powershell # For Linux, use bash
+      run: |
+        mkdir runner_bld
+        cd runner_bld
+        echo "seeing thirdparty_home"
+        $env:THIRDPARTY_HOME='C:/Users/builder/code'
+                
+        cmake -G "Visual Studio 16 2019" -A x64 -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=20 -DJNI=1 -DGFLAGS=1 -DSNAPPY=1 -DLZ4=1 -DZLIB=1 -DZSTD=1 -DXPRESS=1 -DFAIL_ON_WARNINGS=0 ..
+        msbuild speedb.sln /p:Configuration=Release /t:speedbjni-shared

@@ -1,0 +1,47 @@
+name: test check lic
+
+on:
+  workflow_call:
+  workflow_dispatch:
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  changedfiles:
+    runs-on: ubuntu-latest
+    outputs:
+      output1: ${{ steps.changes.outputs.diff_list }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Get changed files
+        id: changes       
+        run: |
+          git diff --name-only --diff-filter=ACMRT ${{ github.event.pull_request.base.sha }} ${{ github.sha }} 
+          echo "Next "
+          diff_list=$(git diff --name-only --diff-filter=ACMRT ${{ github.event.pull_request.base.sha }} ${{ github.sha }}) 
+          echo "diff_list<<EOF" >> $GITHUB_OUTPUT
+          git diff --name-only --diff-filter=ACMRT ${{ github.event.pull_request.base.sha }} ${{ github.sha }} >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+      - name: list new files
+        run: |
+          echo "New files in this PR ${{ steps.changes.outputs.diff_list }}"
+  lint:
+    runs-on: ubuntu-latest
+    needs: changedfiles
+    env: 
+      OUTPUT1: ${{needs.changedfiles.outputs.output1}}
+    steps:
+      - name: Use prior output
+        run: |  
+          exit_code=0
+          for file in $(echo $OUTPUT1)
+          do         
+            if ! grep -qE "Copyright \(C\) 20[0-9]{2} Speedb Ltd\. All rights reserved\." "$file"; then
+              echo $file does not have the Apache 2.0 license header && exit_code=222
+            fi
+          done
+          exit $exit_code

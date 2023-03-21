@@ -64,6 +64,7 @@ const std::string LDBCommand::ARG_KEY_HEX = "key_hex";
 const std::string LDBCommand::ARG_VALUE_HEX = "value_hex";
 const std::string LDBCommand::ARG_CF_NAME = "column_family";
 const std::string LDBCommand::ARG_TTL = "ttl";
+const std::string LDBCommand::ARG_SKIP_EXPIRED_DATA = "skip_expired_data";
 const std::string LDBCommand::ARG_TTL_START = "start_time";
 const std::string LDBCommand::ARG_TTL_END = "end_time";
 const std::string LDBCommand::ARG_TIMESTAMP = "timestamp";
@@ -379,6 +380,7 @@ LDBCommand::LDBCommand(const std::map<std::string, std::string>& options,
       is_key_hex_(false),
       is_value_hex_(false),
       is_db_ttl_(false),
+      is_skip_expired_data_(false),
       timestamp_(false),
       try_load_options_(false),
       create_if_missing_(false),
@@ -416,6 +418,7 @@ LDBCommand::LDBCommand(const std::map<std::string, std::string>& options,
   is_key_hex_ = IsKeyHex(options, flags);
   is_value_hex_ = IsValueHex(options, flags);
   is_db_ttl_ = IsFlagPresent(flags, ARG_TTL);
+  is_skip_expired_data_ = IsFlagPresent(flags, ARG_SKIP_EXPIRED_DATA);
   timestamp_ = IsFlagPresent(flags, ARG_TIMESTAMP);
   try_load_options_ = IsTryLoadOptions(options, flags);
   force_consistency_checks_ =
@@ -456,6 +459,10 @@ void LDBCommand::OpenDB() {
     }
     db_ = db_ttl_;
   } else {
+    if (is_skip_expired_data_) {
+      exec_state_ = LDBCommandExecuteResult::Failed(
+          "Open with --" + ARG_SKIP_EXPIRED_DATA + " but without --" + ARG_TTL);
+    }
     if (is_read_only_ && secondary_path_.empty()) {
       if (column_families_.empty()) {
         st = DB::OpenForReadOnly(options_, db_path_, &db_);
@@ -1923,7 +1930,7 @@ DBDumperCommand::DBDumperCommand(
     : LDBCommand(
           options, flags, true,
           BuildCmdLineOptions(
-              {ARG_TTL, ARG_HEX, ARG_KEY_HEX, ARG_VALUE_HEX, ARG_FROM, ARG_TO,
+              {ARG_TTL, ARG_SKIP_EXPIRED_DATA, ARG_HEX, ARG_KEY_HEX, ARG_VALUE_HEX, ARG_FROM, ARG_TO,
                ARG_MAX_KEYS, ARG_COUNT_ONLY, ARG_COUNT_DELIM, ARG_STATS,
                ARG_TTL_START, ARG_TTL_END, ARG_TTL_BUCKET, ARG_TIMESTAMP,
                ARG_PATH, ARG_DECODE_BLOB_INDEX, ARG_DUMP_UNCOMPRESSED_BLOBS})),
@@ -1999,6 +2006,7 @@ void DBDumperCommand::Help(std::string& ret) {
   ret.append(DBDumperCommand::Name());
   ret.append(HelpRangeCmdArgs());
   ret.append(" [--" + ARG_TTL + "]");
+  ret.append(" [--" + ARG_SKIP_EXPIRED_DATA + "]");
   ret.append(" [--" + ARG_MAX_KEYS + "=<N>]");
   ret.append(" [--" + ARG_TIMESTAMP + "]");
   ret.append(" [--" + ARG_COUNT_ONLY + "]");
@@ -2085,6 +2093,7 @@ void DBDumperCommand::DoDumpCommand() {
   // Setup key iterator
   ReadOptions scan_read_opts;
   scan_read_opts.total_order_seek = true;
+  scan_read_opts.skip_expired_data = is_skip_expired_data_;
   Iterator* iter = db_->NewIterator(scan_read_opts, GetCfHandle());
   Status st = iter->status();
   if (!st.ok()) {
@@ -2770,6 +2779,7 @@ void GetCommand::Help(std::string& ret) {
   ret.append(GetCommand::Name());
   ret.append(" <key>");
   ret.append(" [--" + ARG_TTL + "]");
+  ret.append(" [--" + ARG_SKIP_EXPIRED_DATA + "]");
   ret.append("\n");
 }
 
@@ -2779,7 +2789,9 @@ void GetCommand::DoCommand() {
     return;
   }
   std::string value;
-  Status st = db_->Get(ReadOptions(), GetCfHandle(), key_, &value);
+  ReadOptions read_opts;
+  read_opts.skip_expired_data = is_skip_expired_data_;
+  Status st = db_->Get(read_opts, GetCfHandle(), key_, &value);
   if (st.ok()) {
     if (is_value_hex_) {
       value = StringToHex(value);
@@ -2928,7 +2940,7 @@ ScanCommand::ScanCommand(const std::vector<std::string>& /*params*/,
                          const std::vector<std::string>& flags)
     : LDBCommand(
           options, flags, true,
-          BuildCmdLineOptions({ARG_TTL, ARG_NO_VALUE, ARG_HEX, ARG_KEY_HEX,
+          BuildCmdLineOptions({ARG_TTL, ARG_SKIP_EXPIRED_DATA, ARG_NO_VALUE, ARG_HEX, ARG_KEY_HEX,
                                ARG_TO, ARG_VALUE_HEX, ARG_FROM, ARG_TIMESTAMP,
                                ARG_MAX_KEYS, ARG_TTL_START, ARG_TTL_END})),
       start_key_specified_(false),
@@ -2981,6 +2993,7 @@ void ScanCommand::Help(std::string& ret) {
   ret.append(ScanCommand::Name());
   ret.append(HelpRangeCmdArgs());
   ret.append(" [--" + ARG_TTL + "]");
+  ret.append(" [--" + ARG_SKIP_EXPIRED_DATA + "]");
   ret.append(" [--" + ARG_TIMESTAMP + "]");
   ret.append(" [--" + ARG_MAX_KEYS + "=<N>q] ");
   ret.append(" [--" + ARG_TTL_START + "=<N>:- is inclusive]");
@@ -2998,6 +3011,7 @@ void ScanCommand::DoCommand() {
   int num_keys_scanned = 0;
   ReadOptions scan_read_opts;
   scan_read_opts.total_order_seek = true;
+  scan_read_opts.skip_expired_data = is_skip_expired_data_;
   Iterator* it = db_->NewIterator(scan_read_opts, GetCfHandle());
   if (start_key_specified_) {
     it->Seek(start_key_);
@@ -3317,6 +3331,7 @@ void DBQuerierCommand::DoCommand() {
         oss << "put " << key << "=>" << value << " failed: " << s.ToString();
       }
     } else if (cmd == GET_CMD && tokens.size() == 2) {
+      read_options.skip_expired_data = is_skip_expired_data_;
       key = (is_key_hex_ ? HexToString(tokens[1]) : tokens[1]);
       s = db_->Get(read_options, GetCfHandle(), Slice(key), &value);
       if (s.ok()) {

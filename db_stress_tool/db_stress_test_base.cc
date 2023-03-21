@@ -793,6 +793,11 @@ void StressTest::OperateDb(ThreadState* thread) {
       int64_t rand_key = GenerateOneKey(thread, i);
       std::string keystr = Key(rand_key);
       Slice key = keystr;
+      std::unique_ptr<MutexLock> lock;
+      if (ShouldAcquireMutexOnKey()) {
+        lock.reset(new MutexLock(
+            shared->GetMutexForKey(rand_column_family, rand_key)));
+      }
 
       if (thread->rand.OneInOpt(FLAGS_compact_range_one_in)) {
         TestCompactRange(thread, rand_key, key, column_family);
@@ -865,7 +870,7 @@ void StressTest::OperateDb(ThreadState* thread) {
       std::vector<int64_t> rand_keys = GenerateKeys(rand_key);
 
       if (thread->rand.OneInOpt(FLAGS_ingest_external_file_one_in)) {
-        TestIngestExternalFile(thread, rand_column_families, rand_keys);
+        TestIngestExternalFile(thread, rand_column_families, rand_keys, lock);
       }
 
       if (thread->rand.OneInOpt(FLAGS_backup_one_in)) {
@@ -921,7 +926,7 @@ void StressTest::OperateDb(ThreadState* thread) {
       std::string write_ts_str;
       Slice read_ts;
       Slice write_ts;
-      if (FLAGS_user_timestamp_size > 0) {
+      if (ShouldAcquireMutexOnKey() && FLAGS_user_timestamp_size > 0) {
         read_ts_str = GetNowNanos();
         read_ts = read_ts_str;
         read_opts.timestamp = &read_ts;
@@ -963,15 +968,16 @@ void StressTest::OperateDb(ThreadState* thread) {
         assert(prefix_bound <= prob_op);
         // OPERATION write
         TestPut(thread, write_opts, read_opts, rand_column_families, rand_keys,
-                value);
+                value, lock);
       } else if (prob_op < del_bound) {
         assert(write_bound <= prob_op);
         // OPERATION delete
-        TestDelete(thread, write_opts, rand_column_families, rand_keys);
+        TestDelete(thread, write_opts, rand_column_families, rand_keys, lock);
       } else if (prob_op < delrange_bound) {
         assert(del_bound <= prob_op);
         // OPERATION delete range
-        TestDeleteRange(thread, write_opts, rand_column_families, rand_keys);
+        TestDeleteRange(thread, write_opts, rand_column_families, rand_keys,
+                        lock);
       } else if (prob_op < iterate_bound) {
         assert(delrange_bound <= prob_op);
         // OPERATION iterate
@@ -979,7 +985,7 @@ void StressTest::OperateDb(ThreadState* thread) {
             thread->rand.OneInOpt(
                 FLAGS_verify_iterator_with_expected_state_one_in)) {
           TestIterateAgainstExpected(thread, read_opts, rand_column_families,
-                                     rand_keys);
+                                     rand_keys, lock);
         } else {
           int num_seeks = static_cast<int>(
               std::min(static_cast<uint64_t>(thread->rand.Uniform(4)),
@@ -1455,15 +1461,6 @@ void StressTest::TestCompactFiles(ThreadState* /* thread */,
 Status StressTest::TestBackupRestore(
     ThreadState* thread, const std::vector<int>& rand_column_families,
     const std::vector<int64_t>& rand_keys) {
-  std::vector<std::unique_ptr<MutexLock>> locks;
-  if (ShouldAcquireMutexOnKey()) {
-    for (int rand_column_family : rand_column_families) {
-      // `rand_keys[0]` on each chosen CF will be verified.
-      locks.emplace_back(new MutexLock(
-          thread->shared->GetMutexForKey(rand_column_family, rand_keys[0])));
-    }
-  }
-
   const std::string backup_dir =
       FLAGS_db + "/.backup" + std::to_string(thread->tid);
   const std::string restore_dir =
@@ -1765,15 +1762,6 @@ Status StressTest::TestApproximateSize(
 Status StressTest::TestCheckpoint(ThreadState* thread,
                                   const std::vector<int>& rand_column_families,
                                   const std::vector<int64_t>& rand_keys) {
-  std::vector<std::unique_ptr<MutexLock>> locks;
-  if (ShouldAcquireMutexOnKey()) {
-    for (int rand_column_family : rand_column_families) {
-      // `rand_keys[0]` on each chosen CF will be verified.
-      locks.emplace_back(new MutexLock(
-          thread->shared->GetMutexForKey(rand_column_family, rand_keys[0])));
-    }
-  }
-
   std::string checkpoint_dir =
       FLAGS_db + "/.checkpoint" + std::to_string(thread->tid);
   Options tmp_opts(options_);

@@ -416,7 +416,8 @@ Status MultiOpsTxnsStressTest::TestPut(ThreadState* /*thread*/,
                                        const ReadOptions& /*read_opts*/,
                                        const std::vector<int>& /*cf_ids*/,
                                        const std::vector<int64_t>& /*keys*/,
-                                       char (&value)[100]) {
+                                       char (&value)[100],
+                                       std::unique_ptr<MutexLock>& /*lock*/) {
   (void)value;
   return Status::NotSupported();
 }
@@ -425,7 +426,8 @@ Status MultiOpsTxnsStressTest::TestPut(ThreadState* /*thread*/,
 Status MultiOpsTxnsStressTest::TestDelete(
     ThreadState* /*thread*/, WriteOptions& /*write_opts*/,
     const std::vector<int>& /*rand_column_families*/,
-    const std::vector<int64_t>& /*rand_keys*/) {
+    const std::vector<int64_t>& /*rand_keys*/,
+    std::unique_ptr<MutexLock>& /*lock*/) {
   return Status::NotSupported();
 }
 
@@ -433,13 +435,15 @@ Status MultiOpsTxnsStressTest::TestDelete(
 Status MultiOpsTxnsStressTest::TestDeleteRange(
     ThreadState* /*thread*/, WriteOptions& /*write_opts*/,
     const std::vector<int>& /*rand_column_families*/,
-    const std::vector<int64_t>& /*rand_keys*/) {
+    const std::vector<int64_t>& /*rand_keys*/,
+    std::unique_ptr<MutexLock>& /*lock*/) {
   return Status::NotSupported();
 }
 
 void MultiOpsTxnsStressTest::TestIngestExternalFile(
     ThreadState* thread, const std::vector<int>& rand_column_families,
-    const std::vector<int64_t>& /*rand_keys*/) {
+    const std::vector<int64_t>& /*rand_keys*/,
+    std::unique_ptr<MutexLock>& /*lock*/) {
   // TODO (yanqin)
   (void)thread;
   (void)rand_column_families;

@@ -24,8 +24,8 @@ class BatchedOpsStressTest : public StressTest {
   Status TestPut(ThreadState* thread, WriteOptions& write_opts,
                  const ReadOptions& /* read_opts */,
                  const std::vector<int>& rand_column_families,
-                 const std::vector<int64_t>& rand_keys,
-                 char (&value)[100]) override {
+                 const std::vector<int64_t>& rand_keys, char (&value)[100],
+                 std::unique_ptr<MutexLock>& /* lock */) override {
     uint32_t value_base =
         thread->rand.Next() % thread->shared->UNKNOWN_SENTINEL;
     size_t sz = GenerateValue(value_base, value, sizeof(value));
@@ -66,7 +66,8 @@ class BatchedOpsStressTest : public StressTest {
   // in DB atomically i.e in a single batch. Also refer MultiGet.
   Status TestDelete(ThreadState* thread, WriteOptions& writeoptions,
                     const std::vector<int>& rand_column_families,
-                    const std::vector<int64_t>& rand_keys) override {
+                    const std::vector<int64_t>& rand_keys,
+                    std::unique_ptr<MutexLock>& /* lock */) override {
     std::string keys[10] = {"9", "7", "5", "3", "1", "8", "6", "4", "2", "0"};
 
     WriteBatch batch(0 /* reserved_bytes */, 0 /* max_bytes */,
@@ -94,7 +95,8 @@ class BatchedOpsStressTest : public StressTest {
   Status TestDeleteRange(ThreadState* /* thread */,
                          WriteOptions& /* write_opts */,
                          const std::vector<int>& /* rand_column_families */,
-                         const std::vector<int64_t>& /* rand_keys */) override {
+                         const std::vector<int64_t>& /* rand_keys */,
+                         std::unique_ptr<MutexLock>& /* lock */) override {
     assert(false);
     return Status::NotSupported(
         "BatchedOpsStressTest does not support "
@@ -104,7 +106,8 @@ class BatchedOpsStressTest : public StressTest {
   void TestIngestExternalFile(
       ThreadState* /* thread */,
       const std::vector<int>& /* rand_column_families */,
-      const std::vector<int64_t>& /* rand_keys */) override {
+      const std::vector<int64_t>& /* rand_keys */,
+      std::unique_ptr<MutexLock>& /* lock */) override {
     assert(false);
     fprintf(stderr,
             "BatchedOpsStressTest does not support "

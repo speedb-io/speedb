@@ -898,7 +898,6 @@ int GetL0ThresholdSpeedupCompaction(int level0_file_num_compaction_trigger,
 namespace {
 const uint64_t Gb = 1ull << 30;
 const uint64_t Mb = 1ull << 20;
-const uint64_t kMinWriteRate = 16 * 1024u;  // Minimum write rate 16KB/s.
 const int kMemtablePenalty = 10;
 }  // namespace
 
@@ -925,8 +924,8 @@ std::unique_ptr<WriteControllerToken> ColumnFamilyData::DynamicSetupDelay(
           compaction_needed_bytes, mutable_cf_options, write_stall_cause);
   assert(rate_divider >= 1);
   auto write_rate = static_cast<uint64_t>(max_write_rate / rate_divider);
-  if (write_rate < kMinWriteRate) {
-    write_rate = kMinWriteRate;
+  if (write_rate < WriteController::kMinWriteRate) {
+    write_rate = WriteController::kMinWriteRate;
   }
 
   // GetDelayToken returns a DelayWriteToken and also sets the

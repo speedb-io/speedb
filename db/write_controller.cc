@@ -24,7 +24,7 @@ std::unique_ptr<WriteControllerToken> WriteController::GetStopToken() {
 std::unique_ptr<WriteControllerToken> WriteController::GetDelayToken(
     uint64_t write_rate) {
   {
-    std::lock_guard<std::mutex> lock(mu_);
+    std::lock_guard<std::mutex> lock(metrics_mu_);
     if (0 == total_delayed_++) {
       // Starting delay, so reset counters.
       next_refill_time_ = 0;
@@ -41,12 +41,12 @@ std::unique_ptr<WriteControllerToken> WriteController::GetDelayToken(
 uint64_t WriteController::TEST_GetMapMinRate() { return GetMapMinRate(); }
 
 void WriteController::AddToDbRateMap(CfIdToRateMap* cf_map) {
-  std::lock_guard<std::mutex> lock(mu_for_map_);
+  std::lock_guard<std::mutex> lock(map_mu_);
   db_id_to_write_rate_map_.insert(cf_map);
 }
 
 void WriteController::RemoveFromDbRateMap(CfIdToRateMap* cf_map) {
-  std::lock_guard<std::mutex> lock(mu_for_map_);
+  std::lock_guard<std::mutex> lock(map_mu_);
   db_id_to_write_rate_map_.erase(cf_map);
 }
 
@@ -78,7 +78,7 @@ bool WriteController::IsMinRate(uint32_t id, CfIdToRateMap* cf_map) {
 
 void WriteController::DeleteSelfFromMapAndMaybeUpdateDelayRate(
     uint32_t id, CfIdToRateMap* cf_map) {
-  std::lock_guard<std::mutex> lock(mu_for_map_);
+  std::lock_guard<std::mutex> lock(map_mu_);
   bool was_min = IsMinRate(id, cf_map);
   cf_map->erase(id);
   if (was_min) {
@@ -94,7 +94,7 @@ void WriteController::DeleteSelfFromMapAndMaybeUpdateDelayRate(
 uint64_t WriteController::InsertToMapAndGetMinRate(uint32_t id,
                                                    CfIdToRateMap* cf_map,
                                                    uint64_t cf_write_rate) {
-  std::lock_guard<std::mutex> lock(mu_for_map_);
+  std::lock_guard<std::mutex> lock(map_mu_);
   bool was_min = IsMinRate(id, cf_map);
   cf_map->insert_or_assign(id, cf_write_rate);
   if (cf_write_rate <= delayed_write_rate()) {
@@ -107,7 +107,7 @@ uint64_t WriteController::InsertToMapAndGetMinRate(uint32_t id,
 }
 
 void WriteController::WaitOnCV(const ErrorHandler& error_handler) {
-  std::unique_lock<std::mutex> lock(stop_mutex_);
+  std::unique_lock<std::mutex> lock(stop_mu_);
   while (error_handler.GetBGError().ok() && IsStopped()) {
     TEST_SYNC_POINT("WriteController::WaitOnCV");
     stop_cv_.wait(lock);
@@ -135,10 +135,11 @@ uint64_t WriteController::GetDelay(SystemClock* clock, uint64_t num_bytes) {
     return 0;
   }
 
-  auto credits = credit_in_bytes_.load();
-  while (credits >= num_bytes) {
-    if (credit_in_bytes_.compare_exchange_weak(credits, credits - num_bytes))
-      return 0;
+  std::lock_guard<std::mutex> lock(metrics_mu_);
+
+  if (credit_in_bytes_ >= num_bytes) {
+    credit_in_bytes_ -= num_bytes;
+    return 0;
   }
   // The frequency to get time inside DB mutex is less than one per refill
   // interval.
@@ -147,8 +148,6 @@ uint64_t WriteController::GetDelay(SystemClock* clock, uint64_t num_bytes) {
   const uint64_t kMicrosPerSecond = 1000000;
   // Refill every 1 ms
   const uint64_t kMicrosPerRefill = 1000;
-
-  std::lock_guard<std::mutex> lock(mu_);
 
   if (next_refill_time_ == 0) {
     // Start with an initial allotment of bytes for one interval
@@ -188,7 +187,7 @@ uint64_t WriteController::NowMicrosMonotonic(SystemClock* clock) {
 void WriteController::NotifyCV() {
   assert(total_stopped_ >= 1);
   {
-    std::lock_guard<std::mutex> lock(stop_mutex_);
+    std::lock_guard<std::mutex> lock(stop_mu_);
     --total_stopped_;
   }
   stop_cv_.notify_all();

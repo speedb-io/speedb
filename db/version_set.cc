@@ -6489,10 +6489,9 @@ InternalIterator* VersionSet::MakeInputIterator(
   for (size_t which = 0; which < c->num_input_levels(); which++) {
     if (c->input_levels(which)->num_files != 0) {
       auto level = c->level(which);
-      auto sv = cfd->current()->storage_info();
       TablePinningOptions pinning_options(
-          level, MaxFileSizeForL0MetaPin(*cfd->GetCurrentMutableCFOptions()),
-          level >= sv->num_non_empty_levels() - 1);
+          level, MaxFileSizeForL0MetaPin(*c->mutable_cf_options()),
+          c->bottommost_level());
       if (level == 0) {
         const LevelFilesBrief* flevel = c->input_levels(which);
         for (size_t i = 0; i < flevel->num_files; i++) {

@@ -29,17 +29,20 @@ class WriteController {
   explicit WriteController(bool dynamic_delay,
                            uint64_t _delayed_write_rate = 1024u * 1024u * 16u,
                            int64_t low_pri_rate_bytes_per_sec = 1024 * 1024)
-      : total_stopped_(0),
+      : dynamic_delay_(dynamic_delay),
+        total_stopped_(0),
         total_delayed_(0),
         total_compaction_pressure_(0),
         credit_in_bytes_(0),
         next_refill_time_(0),
-        dynamic_delay_(dynamic_delay),
         low_pri_rate_limiter_(
             NewGenericRateLimiter(low_pri_rate_bytes_per_sec)) {
     set_max_delayed_write_rate(_delayed_write_rate);
   }
   ~WriteController() = default;
+
+  static constexpr uint64_t kMinWriteRate =
+      16 * 1024u;  // Minimum write rate 16KB/s.
 
   // When an actor (column family) requests a stop token, all writes will be
   // stopped until the stop token is released (deleted)
@@ -92,8 +95,6 @@ class WriteController {
 
   bool is_dynamic_delay() const { return dynamic_delay_; }
 
-  std::mutex& GetMapMutex() { return mu_for_map_; }
-
   using CfIdToRateMap = std::unordered_map<uint32_t, uint64_t>;
 
   void AddToDbRateMap(CfIdToRateMap* cf_map);
@@ -115,7 +116,19 @@ class WriteController {
   bool IsMinRate(uint32_t id, CfIdToRateMap* cf_map);
 
   // returns the min rate from db_id_to_write_rate_map_
+  // REQUIRES: write_controller map_mu_ mutex held.
   uint64_t GetMapMinRate();
+
+  // Whether Speedb's dynamic delay is used
+  bool dynamic_delay_;
+
+  std::mutex map_mu_;
+  std::unordered_set<CfIdToRateMap*> db_id_to_write_rate_map_;
+
+  // The mutex used by stop_cv_
+  std::mutex stop_mu_;
+  std::condition_variable stop_cv_;
+  // end of methods and members used when dynamic_delay_ == true.
 
   uint64_t NowMicrosMonotonic(SystemClock* clock);
 
@@ -129,7 +142,7 @@ class WriteController {
   std::atomic<int> total_compaction_pressure_;
 
   // mutex to protect below 4 members
-  std::mutex mu_;
+  std::mutex metrics_mu_;
   // Number of bytes allowed to write without delay
   std::atomic<uint64_t> credit_in_bytes_;
   // Next time that we can add more credit of bytes
@@ -138,16 +151,6 @@ class WriteController {
   std::atomic<uint64_t> max_delayed_write_rate_;
   // Current write rate (bytes / second)
   std::atomic<uint64_t> delayed_write_rate_;
-
-  // Whether Speedb's dynamic delay is used
-  bool dynamic_delay_;
-
-  std::mutex mu_for_map_;
-  std::unordered_set<CfIdToRateMap*> db_id_to_write_rate_map_;
-
-  std::condition_variable stop_cv_;
-  // The mutex used by stop_cv_
-  std::mutex stop_mutex_;
 
   std::unique_ptr<RateLimiter> low_pri_rate_limiter_;
 };

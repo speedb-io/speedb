@@ -581,7 +581,7 @@ Status ExternalSstFileIngestionJob::GetIngestedFileInfo(
   status = cfd_->ioptions()->table_factory->NewTableReader(
       TableReaderOptions(
           *cfd_->ioptions(), sv->mutable_cf_options.prefix_extractor,
-          env_options_, TablePinningOptions(), cfd_->internal_comparator(),
+          env_options_, TableMemoryOptions(), cfd_->internal_comparator(),
           /*skip_filters*/ false, /*immortal*/ false,
           /*force_direct_prefetch*/ false,
           /*block_cache_tracer*/ nullptr, versions_->DbSessionId(),

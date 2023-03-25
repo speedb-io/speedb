@@ -1276,10 +1276,10 @@ class VersionBuilder::Rep {
 
         auto* file_meta = files_meta[file_idx].first;
         int level = files_meta[file_idx].second;
-        TablePinningOptions tpo(level, max_file_size_for_l0_meta_pin,
-                                level >= bottommost_level);
+        TableMemoryOptions tmo(level, max_file_size_for_l0_meta_pin,
+                               level >= bottommost_level);
         statuses[file_idx] = table_cache_->FindTable(
-            ReadOptions(), file_options_, tpo,
+            ReadOptions(), file_options_, tmo,
             *(base_vstorage_->InternalComparator()), *file_meta,
             &file_meta->table_reader_handle, prefix_extractor, false /*no_io */,
             true /* record_read_stats */,

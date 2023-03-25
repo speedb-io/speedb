@@ -77,7 +77,7 @@ class TableCache {
   // @param level The level this table is at, -1 for "not set / don't know"
   InternalIterator* NewIterator(
       const ReadOptions& options, const FileOptions& toptions,
-      const TablePinningOptions& poptions,
+      const TableMemoryOptions& tmoptions,
       const InternalKeyComparator& internal_comparator,
       const FileMetaData& file_meta, RangeDelAggregator* range_del_agg,
       const std::shared_ptr<const SliceTransform>& prefix_extractor,
@@ -98,7 +98,7 @@ class TableCache {
   // @param skip_filters Disables loading/accessing the filter block
   // @param level The level this table is at, -1 for "not set / don't know"
   Status Get(
-      const ReadOptions& options, const TablePinningOptions& poptions,
+      const ReadOptions& options, const TableMemoryOptions& tmoptions,
       const InternalKeyComparator& internal_comparator,
       const FileMetaData& file_meta, const Slice& k, GetContext* get_context,
       const std::shared_ptr<const SliceTransform>& prefix_extractor = nullptr,
@@ -107,7 +107,7 @@ class TableCache {
   // Return the range delete tombstone iterator of the file specified by
   // `file_meta`.
   Status GetRangeTombstoneIterator(
-      const ReadOptions& options, const TablePinningOptions& poptions,
+      const ReadOptions& options, const TableMemoryOptions& tmoptions,
       const InternalKeyComparator& internal_comparator,
       const FileMetaData& file_meta,
       std::unique_ptr<FragmentedRangeTombstoneIterator>* out_iter);
@@ -118,7 +118,7 @@ class TableCache {
   // is returned in table_handle. This handle should be passed back to
   // MultiGet() so it can be released.
   Status MultiGetFilter(
-      const ReadOptions& options, const TablePinningOptions& pinning_options,
+      const ReadOptions& options, const TableMemoryOptions& tmoptions,
       const InternalKeyComparator& internal_comparator,
       const FileMetaData& file_meta,
       const std::shared_ptr<const SliceTransform>& prefix_extractor,
@@ -136,7 +136,7 @@ class TableCache {
   // @param level The level this table is at, -1 for "not set / don't know"
   DECLARE_SYNC_AND_ASYNC(
       Status, MultiGet, const ReadOptions& options,
-      const TablePinningOptions& poptions,
+      const TableMemoryOptions& tmoptions,
       const InternalKeyComparator& internal_comparator,
       const FileMetaData& file_meta, const MultiGetContext::Range* mget_range,
       const std::shared_ptr<const SliceTransform>& prefix_extractor = nullptr,
@@ -158,7 +158,7 @@ class TableCache {
   // @param level == -1 means not specified
   Status FindTable(
       const ReadOptions& ro, const FileOptions& toptions,
-      const TablePinningOptions& poptions,
+      const TableMemoryOptions& tmoptions,
       const InternalKeyComparator& internal_comparator,
       const FileMetaData& file_meta, Cache::Handle**,
       const std::shared_ptr<const SliceTransform>& prefix_extractor = nullptr,
@@ -236,7 +236,7 @@ class TableCache {
   // Build a table reader
   Status GetTableReader(
       const ReadOptions& ro, const FileOptions& file_options,
-      const TablePinningOptions& tpo,
+      const TableMemoryOptions& tmo,
       const InternalKeyComparator& internal_comparator,
       const FileMetaData& file_meta, bool sequential_mode,
       bool record_read_stats, HistogramImpl* file_read_hist,

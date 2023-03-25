@@ -15,7 +15,7 @@ namespace ROCKSDB_NAMESPACE {
 
 // Batched version of TableCache::MultiGet.
 DEFINE_SYNC_AND_ASYNC(Status, TableCache::MultiGet)
-(const ReadOptions& options, const TablePinningOptions& pinning_options,
+(const ReadOptions& options, const TableMemoryOptions& tmoptions,
  const InternalKeyComparator& internal_comparator,
  const FileMetaData& file_meta, const MultiGetContext::Range* mget_range,
  const std::shared_ptr<const SliceTransform>& prefix_extractor,
@@ -68,8 +68,8 @@ DEFINE_SYNC_AND_ASYNC(Status, TableCache::MultiGet)
   if (s.ok() && !table_range.empty()) {
     if (t == nullptr) {
       assert(handle == nullptr);
-      s = FindTable(options, file_options_, pinning_options,
-                    internal_comparator, file_meta, &handle, prefix_extractor,
+      s = FindTable(options, file_options_, tmoptions, internal_comparator,
+                    file_meta, &handle, prefix_extractor,
                     options.read_tier == kBlockCacheTier /* no_io */,
                     true /* record_read_stats */, file_read_hist, skip_filters,
                     true /* prefetch_index_and_filter_in_cache */,

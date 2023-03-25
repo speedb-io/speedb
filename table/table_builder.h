@@ -30,10 +30,9 @@ namespace ROCKSDB_NAMESPACE {
 class Slice;
 class Status;
 
-struct TablePinningOptions {
-  TablePinningOptions(int _level = -1,
-                      size_t _max_file_size_for_l0_meta_pin = 0,
-                      bool _is_bottommost = false)
+struct TableMemoryOptions {
+  TableMemoryOptions(int _level = -1, size_t _max_file_size_for_l0_meta_pin = 0,
+                     bool _is_bottommost = false)
       : level(_level),
         max_file_size_for_l0_meta_pin(_max_file_size_for_l0_meta_pin),
         is_bottommost(_is_bottommost) {}
@@ -52,8 +51,7 @@ struct TableReaderOptions {
   TableReaderOptions(
       const ImmutableOptions& _ioptions,
       const std::shared_ptr<const SliceTransform>& _prefix_extractor,
-      const EnvOptions& _env_options,
-      const TablePinningOptions& _pinning_options,
+      const EnvOptions& _env_options, const TableMemoryOptions& _memory_options,
       const InternalKeyComparator& _internal_comparator,
       bool _skip_filters = false, bool _immortal = false,
       bool _force_direct_prefetch = false,
@@ -63,7 +61,7 @@ struct TableReaderOptions {
       : ioptions(_ioptions),
         prefix_extractor(_prefix_extractor),
         env_options(_env_options),
-        pinning_options(_pinning_options),
+        memory_options(_memory_options),
         internal_comparator(_internal_comparator),
         skip_filters(_skip_filters),
         immortal(_immortal),
@@ -77,7 +75,7 @@ struct TableReaderOptions {
   const ImmutableOptions& ioptions;
   const std::shared_ptr<const SliceTransform>& prefix_extractor;
   const EnvOptions& env_options;
-  TablePinningOptions pinning_options;
+  TableMemoryOptions memory_options;
   const InternalKeyComparator& internal_comparator;
   // This is only used for BlockBasedTable (reader)
   bool skip_filters;

@@ -579,7 +579,7 @@ CacheKey BlockBasedTable::GetCacheKey(const OffsetableCacheKey& base_cache_key,
 Status BlockBasedTable::Open(
     const ReadOptions& read_options, const ImmutableOptions& ioptions,
     const EnvOptions& env_options, const BlockBasedTableOptions& table_options,
-    const TablePinningOptions& pinning_options,
+    const TableMemoryOptions& memory_options,
     const InternalKeyComparator& internal_comparator,
     std::unique_ptr<RandomAccessFileReader>&& file, uint64_t file_size,
     std::unique_ptr<TableReader>* table_reader,
@@ -609,7 +609,7 @@ Status BlockBasedTable::Open(
 
   // prefetch both index and filters, down to all partitions
   const bool prefetch_all =
-      prefetch_index_and_filter_in_cache || pinning_options.level == 0;
+      prefetch_index_and_filter_in_cache || memory_options.level == 0;
   const bool preload_all = !table_options.cache_index_and_filter_blocks;
 
   if (!ioptions.allow_mmap_reads) {
@@ -651,10 +651,9 @@ Status BlockBasedTable::Open(
   }
 
   BlockCacheLookupContext lookup_context{TableReaderCaller::kPrefetch};
-  Rep* rep = new BlockBasedTable::Rep(ioptions, env_options, table_options,
-                                      pinning_options, internal_comparator,
-                                      skip_filters, file_size, immortal_table,
-                                      cache_owner_id);
+  Rep* rep = new BlockBasedTable::Rep(
+      ioptions, env_options, table_options, memory_options, internal_comparator,
+      skip_filters, file_size, immortal_table, cache_owner_id);
   rep->file = std::move(file);
   rep->footer = footer;
 
@@ -780,7 +779,7 @@ Status BlockBasedTable::Open(
   }
   s = new_table->PrefetchIndexAndFilterBlocks(
       ro, prefetch_buffer.get(), metaindex_iter.get(), new_table.get(),
-      prefetch_all, table_options, pinning_options, file_size, &lookup_context);
+      prefetch_all, table_options, memory_options, file_size, &lookup_context);
 
   if (s.ok()) {
     // Update tail prefetch stats
@@ -991,7 +990,7 @@ Status BlockBasedTable::PrefetchIndexAndFilterBlocks(
     const ReadOptions& ro, FilePrefetchBuffer* prefetch_buffer,
     InternalIterator* meta_iter, BlockBasedTable* new_table, bool prefetch_all,
     const BlockBasedTableOptions& table_options,
-    const TablePinningOptions& pinning_options, size_t file_size,
+    const TableMemoryOptions& memory_options, size_t file_size,
     BlockCacheLookupContext* lookup_context) {
   // Find filter handle and filter type
   if (rep_->filter_policy) {
@@ -1080,8 +1079,8 @@ Status BlockBasedTable::PrefetchIndexAndFilterBlocks(
   const bool use_cache = table_options.cache_index_and_filter_blocks;
 
   const bool maybe_flushed =
-      (pinning_options.level == 0 &&
-       file_size <= pinning_options.max_file_size_for_l0_meta_pin);
+      (memory_options.level == 0 &&
+       file_size <= memory_options.max_file_size_for_l0_meta_pin);
   std::function<bool(PinningTier, PinningTier)> is_pinned =
       [maybe_flushed, &is_pinned](PinningTier pinning_tier,
                                   PinningTier fallback_pinning_tier) {

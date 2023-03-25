@@ -79,10 +79,10 @@ class ForwardLevelIterator : public InternalIterator {
 
     ReadRangeDelAggregator range_del_agg(&cfd_->internal_comparator(),
                                          kMaxSequenceNumber /* upper_bound */);
-    TablePinningOptions tpoptions(/*level=*/-1,
-                                  /*max_file_size_for_l0_meta_pin=*/0, false);
+    TableMemoryOptions tmoptions(/*level=*/-1,
+                                 /*max_file_size_for_l0_meta_pin=*/0, false);
     file_iter_ = cfd_->table_cache()->NewIterator(
-        read_options_, *(cfd_->soptions()), tpoptions,
+        read_options_, *(cfd_->soptions()), tmoptions,
         cfd_->internal_comparator(), *files_[file_index_],
         read_options_.ignore_range_deletions ? nullptr : &range_del_agg,
         prefix_extractor_, /*table_reader_ptr=*/nullptr,
@@ -692,10 +692,10 @@ void ForwardIterator::RebuildIterators(bool refresh_sv) {
       l0_iters_.push_back(nullptr);
       continue;
     }
-    TablePinningOptions tpoptions(
+    TableMemoryOptions tmoptions(
         /*level=*/-1, MaxFileSizeForL0MetaPin(sv_->mutable_cf_options), false);
     l0_iters_.push_back(cfd_->table_cache()->NewIterator(
-        read_options_, *cfd_->soptions(), tpoptions,
+        read_options_, *cfd_->soptions(), tmoptions,
         cfd_->internal_comparator(), *l0,
         read_options_.ignore_range_deletions ? nullptr : &range_del_agg,
         sv_->mutable_cf_options.prefix_extractor,
@@ -774,11 +774,11 @@ void ForwardIterator::RenewIterators() {
       }
       continue;
     }
-    TablePinningOptions tpoptions(
+    TableMemoryOptions tmoptions(
         /*level=*/-1, MaxFileSizeForL0MetaPin(svnew->mutable_cf_options),
         false);
     l0_iters_new.push_back(cfd_->table_cache()->NewIterator(
-        read_options_, *cfd_->soptions(), tpoptions,
+        read_options_, *cfd_->soptions(), tmoptions,
         cfd_->internal_comparator(), *l0_files_new[inew],
         read_options_.ignore_range_deletions ? nullptr : &range_del_agg,
         svnew->mutable_cf_options.prefix_extractor,
@@ -843,11 +843,11 @@ void ForwardIterator::ResetIncompleteIterators() {
       continue;
     }
     DeleteIterator(l0_iters_[i]);
-    TablePinningOptions tpoptions(
+    TableMemoryOptions tmoptions(
         /*level=*/-1, MaxFileSizeForL0MetaPin(sv_->mutable_cf_options), false);
 
     l0_iters_[i] = cfd_->table_cache()->NewIterator(
-        read_options_, *cfd_->soptions(), tpoptions,
+        read_options_, *cfd_->soptions(), tmoptions,
         cfd_->internal_comparator(), *l0_files[i], /*range_del_agg=*/nullptr,
         sv_->mutable_cf_options.prefix_extractor,
         /*table_reader_ptr=*/nullptr, /*file_read_hist=*/nullptr,

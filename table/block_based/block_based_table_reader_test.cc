@@ -118,7 +118,7 @@ class BlockBasedTableReaderBaseTest : public testing::Test {
     const MutableCFOptions moptions(options_);
     TableReaderOptions table_reader_options =
         TableReaderOptions(ioptions, moptions.prefix_extractor, EnvOptions(),
-                           TablePinningOptions(), comparator);
+                           TableMemoryOptions(), comparator);
 
     std::unique_ptr<RandomAccessFileReader> file;
     NewFileReader(table_name, foptions, &file);

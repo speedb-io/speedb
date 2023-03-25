@@ -445,7 +445,7 @@ class TableConstructor : public Constructor {
     return ioptions.table_factory->NewTableReader(
         TableReaderOptions(
             ioptions, moptions.prefix_extractor, soptions,
-            TablePinningOptions(level_, moptions.write_buffer_size),
+            TableMemoryOptions(level_, moptions.write_buffer_size),
             *last_internal_comparator_, /*skip_filters*/ false,
             /*immortal*/ false, false, &block_cache_tracer_, "", file_num_,
             kNullUniqueId64x2, largest_seqno_),
@@ -4570,7 +4570,7 @@ TEST_P(BlockBasedTableTest, DISABLED_TableWithGlobalSeqno) {
 
     options.table_factory->NewTableReader(
         TableReaderOptions(ioptions, moptions.prefix_extractor, EnvOptions(),
-                           TablePinningOptions(), ikc),
+                           TableMemoryOptions(), ikc),
         std::move(file_reader), ss_rw.contents().size(), &table_reader);
 
     return table_reader->NewIterator(
@@ -4738,7 +4738,7 @@ TEST_P(BlockBasedTableTest, BlockAlignTest) {
 
   ASSERT_OK(ioptions.table_factory->NewTableReader(
       TableReaderOptions(ioptions2, moptions2.prefix_extractor, EnvOptions(),
-                         TablePinningOptions(),
+                         TableMemoryOptions(),
                          GetPlainInternalComparator(options2.comparator)),
       std::move(file_reader), sink->contents().size(), &table_reader));
 

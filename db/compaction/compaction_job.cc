@@ -680,13 +680,13 @@ Status CompactionJob::Run() {
         // we will regard this verification as user reads since the goal is
         // to cache it here for further user reads
         ReadOptions read_options;
-        TablePinningOptions tpoptions(
+        TableMemoryOptions tmoptions(
             compact_->compaction->output_level(),
             MaxFileSizeForL0MetaPin(
                 *compact_->compaction->mutable_cf_options()),
             compact_->compaction->bottommost_level());
         InternalIterator* iter = cfd->table_cache()->NewIterator(
-            read_options, file_options_, tpoptions, cfd->internal_comparator(),
+            read_options, file_options_, tmoptions, cfd->internal_comparator(),
             files_output[file_idx]->meta, /*range_del_agg=*/nullptr,
             prefix_extractor,
             /*table_reader_ptr=*/nullptr,
@@ -1077,7 +1077,7 @@ void CompactionJob::ProcessKeyValueCompaction(SubcompactionState* sub_compact) {
   }
 
   // Although the v2 aggregator is what the level iterator(s) know about,
-  // the AddTombstones calls will be propagated down to the v1 aggregator.
+  // the AddTombstones[ calls will be propagated down to the v1 aggregator.
   std::unique_ptr<InternalIterator> raw_input(versions_->MakeInputIterator(
       read_options, sub_compact->compaction, range_del_agg.get(),
       file_options_for_read_, start, end));

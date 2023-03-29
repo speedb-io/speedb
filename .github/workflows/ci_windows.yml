@@ -23,5 +23,5 @@ jobs:
         cp  $env:THIRDPARTY_HOME\thirdparty.inc .   # copy the thirdparty.inc that reflects the env on the runner machine
         mkdir runner_bld
         cd runner_bld
-        cmake -G "Visual Studio 16 2019" -A x64 -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=20 -DJNI=1 -DGFLAGS=1 -DSNAPPY=1 -DLZ4=1 -DZLIB=1 -DZSTD=1 -DXPRESS=1 -DFAIL_ON_WARNINGS=0 ..
+        cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=20 -DJNI=1 -DGFLAGS=1 -DSNAPPY=1 -DLZ4=1 -DZLIB=1 -DZSTD=1 -DXPRESS=1 -DFAIL_ON_WARNINGS=0 ..
         msbuild speedb.sln /p:Configuration=Release /t:speedbjni-shared

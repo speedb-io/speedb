@@ -121,7 +121,7 @@ class WriteBufferManager final {
     return memory_used_.load(std::memory_order_relaxed);
   }
 
-  void TEST_set_memory_usage(u_int64_t mem) { memory_used_.store(mem); }
+  void TEST_set_memory_usage(size_t mem) { memory_used_.store(mem); }
 
   // Returns the total memory used by active memtables.
   size_t mutable_memtable_memory_usage() const {

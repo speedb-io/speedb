@@ -30,6 +30,7 @@
 #include "rocksdb/table.h"
 #include "rocksdb/table_properties.h"
 #include "rocksdb/wal_filter.h"
+#include "rocksdb/write_buffer_manager.h"
 #include "table/block_based/block_based_table_factory.h"
 #include "util/compression.h"
 

@@ -744,7 +744,7 @@ def finalize_and_sanitize(src_params, counter):
         dest_params["txn_write_policy"] = 1
         dest_params["allow_concurrent_memtable_write"] = 1
     if dest_params.get("allow_concurrent_memtable_write", 0) == 1:
-        if (dest_params.get("memtablerep") != "skip_list" or 
+        if (dest_params.get("memtablerep") != "skip_list" and 
             dest_params.get("memtablerep") != "speedb.HashSpdRepFactory"):
                 dest_params["memtablerep"] = random.choice(
                     ["skip_list", "speedb.HashSpdRepFactory"]

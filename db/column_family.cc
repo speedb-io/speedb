@@ -761,7 +761,7 @@ void ColumnFamilyData::SetDropped() {
   assert(id_ != 0);
   dropped_ = true;
   if (column_family_set_->write_controller()->is_dynamic_delay()) {
-    column_family_set_->DeleteSelfFromMapAndMaybeUpdateDelayRate(id_);
+    column_family_set_->ResetCFRate(this);
   }
   write_controller_token_.reset();
 
@@ -928,7 +928,7 @@ void ColumnFamilyData::DynamicSetupDelay(
   // delayed_write_rate_ which is used by all cfs and dbs using this write
   // controller. because it also sets the delayed_write_rate_, we need to set
   // only the smallest active delay request.
-  column_family_set_->UpdateCFRate(id_, write_rate);
+  column_family_set_->UpdateCFRate(this, write_rate);
 }
 
 std::pair<WriteStallCondition, ColumnFamilyData::WriteStallCause>
@@ -1079,7 +1079,7 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
                           mutable_cf_options, write_stall_cause);
         write_controller_token_.reset();
       } else {
-        column_family_set_->DeleteSelfFromMapAndMaybeUpdateDelayRate(id_);
+        column_family_set_->ResetCFRate(this);
       }
     }
 
@@ -1699,21 +1699,19 @@ ColumnFamilySet::ColumnFamilySet(
   // initialize linked list
   dummy_cfd_->prev_ = dummy_cfd_;
   dummy_cfd_->next_ = dummy_cfd_;
-  db_rate_id_ = reinterpret_cast<uint64_t>(this);
   if (write_controller_->is_dynamic_delay()) {
-    write_controller_->AddDBToRateMap(db_rate_id_);
     write_buffer_manager_->RegisterWriteController(write_controller_ptr());
   }
 }
 
 ColumnFamilySet::~ColumnFamilySet() {
   if (write_controller_->is_dynamic_delay()) {
-    write_controller_->RemoveDBFromRateMap(db_rate_id_);
     write_buffer_manager_->DeregisterWriteController(write_controller_ptr());
   }
   while (column_family_data_.size() > 0) {
     // cfd destructor will delete itself from column_family_data_
     auto cfd = column_family_data_.begin()->second;
+    write_controller_->HandleRemoveDelayReq(cfd);
     bool last_ref __attribute__((__unused__));
     last_ref = cfd->UnrefAndTryDelete();
     assert(last_ref);
@@ -1787,12 +1785,12 @@ ColumnFamilyData* ColumnFamilySet::CreateColumnFamily(
   return new_cfd;
 }
 
-void ColumnFamilySet::UpdateCFRate(uint32_t id, uint64_t write_rate) {
-  write_controller_->HandleNewDelayReq(id, db_rate_id_, write_rate);
+void ColumnFamilySet::UpdateCFRate(void* client_id, uint64_t write_rate) {
+  write_controller_->HandleNewDelayReq(client_id, write_rate);
 }
 
-void ColumnFamilySet::DeleteSelfFromMapAndMaybeUpdateDelayRate(uint32_t id) {
-  write_controller_->HandleRemoveDelayReq(id, db_rate_id_);
+void ColumnFamilySet::ResetCFRate(void* client_id) {
+  write_controller_->HandleRemoveDelayReq(client_id);
 }
 
 // under a DB mutex AND from a write thread

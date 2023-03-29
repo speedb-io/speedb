@@ -749,9 +749,9 @@ class ColumnFamilySet {
   }
   WriteController* write_controller_ptr() { return write_controller_.get(); }
 
-  void UpdateCFRate(uint32_t id, uint64_t write_rate);
+  void UpdateCFRate(void* client_id, uint64_t write_rate);
 
-  void DeleteSelfFromMapAndMaybeUpdateDelayRate(uint32_t id);
+  void ResetCFRate(void* client_id);
 
  private:
   friend class ColumnFamilyData;
@@ -788,8 +788,6 @@ class ColumnFamilySet {
   std::shared_ptr<IOTracer> io_tracer_;
   const std::string& db_id_;
   std::string db_session_id_;
-
-  uint64_t db_rate_id_;
 };
 
 // A wrapper for ColumnFamilySet that supports releasing DB mutex during each

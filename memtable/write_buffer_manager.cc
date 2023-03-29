@@ -317,27 +317,18 @@ std::string WriteBufferManager::GetPrintableOptions() const {
 }
 
 void WriteBufferManager::RegisterWriteController(WriteController* wc) {
-  bool first_entry = AddToControllersMap(wc);
-  if (first_entry) {
-    wc->AddDBToRateMap(wbm_rate_id_);
+  std::lock_guard<std::mutex> lock(controllers_map_mutex_);
+  if (controllers_to_refcount_map_.count(wc)) {
+    controllers_to_refcount_map_[wc]++;
+  } else {
+    controllers_to_refcount_map_.insert({wc, 1});
   }
 }
 
 void WriteBufferManager::DeregisterWriteController(WriteController* wc) {
   bool last_entry = RemoveFromControllersMap(wc);
   if (last_entry) {
-    wc->RemoveDBFromRateMap(wbm_rate_id_);
-  }
-}
-
-bool WriteBufferManager::AddToControllersMap(WriteController* wc) {
-  std::lock_guard<std::mutex> lock(controllers_map_mutex_);
-  if (controllers_to_refcount_map_.count(wc)) {
-    controllers_to_refcount_map_[wc]++;
-    return false;
-  } else {
-    controllers_to_refcount_map_.insert({wc, 1});
-    return true;
+    wc->HandleRemoveDelayReq(this);
   }
 }
 
@@ -397,18 +388,18 @@ uint64_t CalcDelayFromFactor(uint64_t max_write_rate, uint64_t delay_factor) {
 
 void WriteBufferManager::WBMSetupDelay(uint64_t delay_factor) {
   for (auto& wc_and_ref_count : controllers_to_refcount_map_) {
-    // the final rate is dependant on the write controllers max rate so
-    // each wc can have a different delay requirement.
+    // the final rate depends on the write controllers max rate so
+    // each wc can receive a different delay requirement.
     WriteController* wc = wc_and_ref_count.first;
     uint64_t wbm_write_rate =
         CalcDelayFromFactor(wc->max_delayed_write_rate(), delay_factor);
-    wc->HandleNewDelayReq(kWBMId /*id*/, wbm_rate_id_, wbm_write_rate);
+    wc->HandleNewDelayReq(this, wbm_write_rate);
   }
 }
 
 void WriteBufferManager::ResetDelay() {
   for (auto& wc_and_ref_count : controllers_to_refcount_map_) {
-    wc_and_ref_count.first->HandleRemoveDelayReq(kWBMId, wbm_rate_id_);
+    wc_and_ref_count.first->HandleRemoveDelayReq(this);
   }
 }
 

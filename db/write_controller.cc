@@ -39,43 +39,23 @@ std::unique_ptr<WriteControllerToken> WriteController::GetDelayToken(
 
 uint64_t WriteController::TEST_GetMapMinRate() { return GetMapMinRate(); }
 
-void WriteController::AddDBToRateMap(uint64_t db_id) {
-  std::lock_guard<std::mutex> lock(map_mu_);
-  db_id_to_write_rate_map_[db_id] = {};
-}
-
-void WriteController::RemoveDBFromRateMap(uint64_t db_id) {
-  {
-    std::lock_guard<std::mutex> lock(map_mu_);
-    if (db_id_to_write_rate_map_.count(db_id)) {
-      if (!db_id_to_write_rate_map_[db_id].empty()) {
-        total_delayed_.fetch_sub(db_id_to_write_rate_map_[db_id].size());
-        set_delayed_write_rate(GetMapMinRate());
-      }
-      db_id_to_write_rate_map_.erase(db_id);
-    }
-  }
-  MaybeResetCounters();
-}
-
 uint64_t WriteController::GetMapMinRate() {
-  uint64_t min_rate = max_delayed_write_rate();
-  for (const auto& db_id_to_rate : db_id_to_write_rate_map_) {
-    for (const auto& cf_id_and_rate : db_id_to_rate.second) {
-      if (cf_id_and_rate.second < min_rate) {
-        min_rate = cf_id_and_rate.second;
-      }
-    }
+  if (id_to_write_rate_map_.size() > 0) {
+    auto min_elem_iter = std::min_element(
+        id_to_write_rate_map_.begin(), id_to_write_rate_map_.end(),
+        [](const auto& a, const auto& b) { return a.second < b.second; });
+    return std::min(min_elem_iter->second, max_delayed_write_rate());
+  } else {
+    return max_delayed_write_rate();
   }
-  return min_rate;
 }
 
-bool WriteController::IsMinRate(uint32_t cf_id, CfIdToRateMap& cf_map) {
-  if (!IsInRateMap(cf_id, cf_map)) {
+bool WriteController::IsMinRate(void* client_id) {
+  if (!IsInRateMap(client_id)) {
     return false;
   }
   uint64_t min_rate = delayed_write_rate();
-  auto cf_rate = cf_map[cf_id];
+  auto cf_rate = id_to_write_rate_map_[client_id];
   // the cf is already in the map so it shouldnt be possible for it to have a
   // lower rate than the delayed_write_rate_ unless set_max_delayed_write_rate
   // has been used which also sets delayed_write_rate_
@@ -83,17 +63,16 @@ bool WriteController::IsMinRate(uint32_t cf_id, CfIdToRateMap& cf_map) {
   return cf_rate <= min_rate;
 }
 
-bool WriteController::IsInRateMap(uint32_t cf_id, CfIdToRateMap& cf_map) {
-  return cf_map.count(cf_id);
+bool WriteController::IsInRateMap(void* client_id) {
+  return id_to_write_rate_map_.count(client_id);
 }
 
-void WriteController::HandleNewDelayReq(uint32_t cf_id, uint64_t db_id,
+void WriteController::HandleNewDelayReq(void* client_id,
                                         uint64_t cf_write_rate) {
-  assert(db_id_to_write_rate_map_.count(db_id));
-  CfIdToRateMap& cf_map = db_id_to_write_rate_map_[db_id];
   std::lock_guard<std::mutex> lock(map_mu_);
-  bool was_min = IsMinRate(cf_id, cf_map);
-  bool inserted = cf_map.insert_or_assign(cf_id, cf_write_rate).second;
+  bool was_min = IsMinRate(client_id);
+  bool inserted =
+      id_to_write_rate_map_.insert_or_assign(client_id, cf_write_rate).second;
   if (inserted) {
     total_delayed_++;
   }
@@ -106,24 +85,23 @@ void WriteController::HandleNewDelayReq(uint32_t cf_id, uint64_t db_id,
   set_delayed_write_rate(min_rate);
 }
 
-void WriteController::HandleRemoveDelayReq(uint32_t cf_id, uint64_t db_id) {
-  assert(db_id_to_write_rate_map_.count(db_id));
-  CfIdToRateMap& cf_map = db_id_to_write_rate_map_[db_id];
-  if (IsInRateMap(cf_id, cf_map)) {
-    {
-      std::lock_guard<std::mutex> lock(map_mu_);
-      bool was_min = RemoveDelayReq(cf_id, cf_map);
-      if (was_min) {
-        set_delayed_write_rate(GetMapMinRate());
-      }
+void WriteController::HandleRemoveDelayReq(void* client_id) {
+  {
+    std::lock_guard<std::mutex> lock(map_mu_);
+    if (!IsInRateMap(client_id)) {
+      return;
     }
-    MaybeResetCounters();
+    bool was_min = RemoveDelayReq(client_id);
+    if (was_min) {
+      set_delayed_write_rate(GetMapMinRate());
+    }
   }
+  MaybeResetCounters();
 }
 
-bool WriteController::RemoveDelayReq(uint32_t cf_id, CfIdToRateMap& cf_map) {
-  bool was_min = IsMinRate(cf_id, cf_map);
-  [[maybe_unused]] bool erased = cf_map.erase(cf_id);
+bool WriteController::RemoveDelayReq(void* client_id) {
+  bool was_min = IsMinRate(client_id);
+  [[maybe_unused]] bool erased = id_to_write_rate_map_.erase(client_id);
   assert(erased);
   total_delayed_--;
   return was_min;

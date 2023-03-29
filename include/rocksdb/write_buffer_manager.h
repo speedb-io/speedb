@@ -283,6 +283,10 @@ class WriteBufferManager final {
     return ParseCodedUsageState(GetCodedUsageState());
   }
 
+  // Add this Write Controller(WC) to controllers_to_refcount_map_
+  // which the WBM is responsible for updating (when stalling is allowed).
+  // each time db is opened with this WC-WBM, add a ref count so we know when
+  // to remove this WC from the WBM when the last is no longer used.
   void RegisterWriteController(WriteController* wc);
   void DeregisterWriteController(WriteController* wc);
 
@@ -314,13 +318,6 @@ class WriteBufferManager final {
   std::atomic<uint64_t> coded_usage_state_ = kNoneCodedUsageState;
 
  private:
-  // Add this Write Controller(WC) to controllers_to_refcount_map_
-  // which the WBM is responsible for updating (when stalling is allowed).
-  // each time db is opened with this WC-WBM, add a ref count so we know when
-  // to remove this WC from the WBM when the last is no longer used.
-  //
-  // returns true if wc added for the first time.
-  bool AddToControllersMap(WriteController* wc);
   // returns true if wc was removed from controllers_to_refcount_map_
   // which means its ref count reached 0.
   bool RemoveFromControllersMap(WriteController* wc);

@@ -458,10 +458,11 @@ void SpdbVectorContainer::SortThread() {
     for (; sort_iter_anchor != last; ++sort_iter_anchor) {
       (*sort_iter_anchor)->Sort(comparator_);
     }
-
-    if (spdb_vectors_.size() > kMergedVectorsMax) {
-      if (TryMergeVectors(last)) {
-        sort_iter_anchor = spdb_vectors_.begin();
+    if (!use_seek_parralel_threshold_) {
+      if (spdb_vectors_.size() > kMergedVectorsMax) {
+        if (TryMergeVectors(last)) {
+          sort_iter_anchor = spdb_vectors_.begin();
+        }
       }
     }
   }
@@ -522,7 +523,8 @@ HashSpdRep::HashSpdRep(const MemTableRep::KeyComparator& compare,
                        Allocator* allocator, size_t bucket_size,
                        bool use_seek_parralel_threshold)
     : HashSpdRep(allocator, bucket_size, use_seek_parralel_threshold) {
-  spdb_vectors_cont_ = std::make_shared<SpdbVectorContainer>(compare);
+  spdb_vectors_cont_ = std::make_shared<SpdbVectorContainer>(
+      compare, use_seek_parralel_threshold_);
 }
 
 HashSpdRep::HashSpdRep(Allocator* allocator, size_t bucket_size,
@@ -534,7 +536,8 @@ HashSpdRep::HashSpdRep(Allocator* allocator, size_t bucket_size,
 void HashSpdRep::PostCreate(const MemTableRep::KeyComparator& compare,
                             Allocator* allocator) {
   allocator_ = allocator;
-  spdb_vectors_cont_ = std::make_shared<SpdbVectorContainer>(compare);
+  spdb_vectors_cont_ = std::make_shared<SpdbVectorContainer>(
+      compare, use_seek_parralel_threshold_);
 }
 
 HashSpdRep::~HashSpdRep() {

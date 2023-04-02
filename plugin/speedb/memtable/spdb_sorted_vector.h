@@ -185,11 +185,13 @@ using IterAnchors = std::list<SortHeapItem*>;
 
 class SpdbVectorContainer {
  public:
-  SpdbVectorContainer(const MemTableRep::KeyComparator& comparator)
+  SpdbVectorContainer(const MemTableRep::KeyComparator& comparator,
+                      bool use_seek_parralel_threshold)
       : comparator_(comparator),
         switch_spdb_vector_limit_(10000),
         immutable_(false),
-        num_elements_(0) {
+        num_elements_(0),
+        use_seek_parralel_threshold_(use_seek_parralel_threshold) {
     SpdbVectorPtr spdb_vector(new SpdbVector(switch_spdb_vector_limit_));
     spdb_vectors_.push_front(spdb_vector);
     spdb_vector->SetVectorListIter(std::prev(spdb_vectors_.end()));
@@ -253,6 +255,7 @@ class SpdbVectorContainer {
   std::atomic<bool> immutable_;
   // sort thread info
   std::atomic<size_t> num_elements_;
+  bool use_seek_parralel_threshold_;
   std::thread sort_thread_;
   std::mutex sort_thread_mutex_;
   std::condition_variable sort_thread_cv_;

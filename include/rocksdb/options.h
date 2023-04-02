@@ -29,6 +29,7 @@
 #include "rocksdb/types.h"
 #include "rocksdb/universal_compaction.h"
 #include "rocksdb/version.h"
+#include "rocksdb/write_buffer_manager.h"
 
 #ifdef max
 #undef max
@@ -54,7 +55,6 @@ class Slice;
 class Statistics;
 class InternalKeyComparator;
 class WalFilter;
-class WriteBufferManager;
 class FileSystem;
 class WriteController;
 
@@ -1190,6 +1190,10 @@ struct DBOptions {
   // Default: nullptr (disabled)
   // Not supported in ROCKSDB_LITE mode!
   std::shared_ptr<Cache> row_cache = nullptr;
+
+  // If true during flush we skip any entry that  phas a followed delete
+  // entry (#411)
+  bool use_clean_delete_during_flush = false;
 
 #ifndef ROCKSDB_LITE
   // A filter object supplied to be invoked while processing write-ahead-logs

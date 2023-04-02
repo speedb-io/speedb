@@ -871,9 +871,8 @@ int GetL0ThresholdSpeedupCompaction(int level0_file_num_compaction_trigger,
 }  // anonymous namespace
 
 namespace {
-const uint64_t Gb = 1ull << 30;
-const uint64_t Mb = 1ull << 20;
 const int kMemtablePenalty = 10;
+const int kNumPendingSteps = 100;
 }  // namespace
 
 double ColumnFamilyData::TEST_CalculateWriteDelayDivider(
@@ -976,21 +975,18 @@ ColumnFamilyData::CalculateWriteDelayDividerAndMaybeUpdateWriteStallCause(
   // Pending Compaction Bytes
   double pending_divider = 1;
   auto soft_limit = mutable_cf_options.soft_pending_compaction_bytes_limit;
-  if (soft_limit > 0 && compaction_needed_bytes >= soft_limit) {
+  if (soft_limit > 0 && compaction_needed_bytes > soft_limit) {
     auto hard_limit = mutable_cf_options.hard_pending_compaction_bytes_limit;
     // soft_limit != hard_limit here. we're in a kDelayed state here and not
     // stop.
     assert(hard_limit > soft_limit);
     uint64_t soft_hard_range = hard_limit - soft_limit;
-    // change rate every 1G change or 100Mb if soft_hard_range is too small.
-    auto step_size = soft_hard_range > Gb ? Gb : 100 * Mb;
-    uint64_t num_steps = soft_hard_range / step_size;
-    auto extra_bytes = compaction_needed_bytes - soft_limit;
-    auto step_num = static_cast<uint64_t>(extra_bytes / step_size);
-    assert(step_num < num_steps);
-    if (num_steps > 0) {
-      pending_divider = 1 / (1 - (static_cast<double>(step_num) / num_steps));
-    }
+    uint64_t step_size = ceil(soft_hard_range / kNumPendingSteps);
+    uint64_t extra_bytes = compaction_needed_bytes - soft_limit;
+    uint64_t step_num = extra_bytes / step_size;
+    assert(step_num < kNumPendingSteps);
+    pending_divider =
+        1 / (1 - (static_cast<double>(step_num) / kNumPendingSteps));
   }
 
   double biggest_divider = 1;

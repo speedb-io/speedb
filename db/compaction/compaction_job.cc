@@ -1982,6 +1982,7 @@ std::string CompactionJob::GetTableFileName(uint64_t file_number) {
 Env::IOPriority CompactionJob::GetRateLimiterPriority() {
   if (versions_ && versions_->GetColumnFamilySet() &&
       versions_->GetColumnFamilySet()->write_controller()) {
+    // Please use a const pointer
     WriteController* write_controller =
         versions_->GetColumnFamilySet()->write_controller_ptr();
     if (write_controller->NeedsDelay() || write_controller->IsStopped()) {

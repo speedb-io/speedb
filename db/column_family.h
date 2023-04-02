@@ -747,6 +747,7 @@ class ColumnFamilySet {
   const std::shared_ptr<WriteController>& write_controller() const {
     return write_controller_;
   }
+  // Please add a const version and use wherever possible
   WriteController* write_controller_ptr() { return write_controller_.get(); }
 
   void UpdateCFRate(void* client_id, uint64_t write_rate);

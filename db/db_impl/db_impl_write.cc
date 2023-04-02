@@ -1748,6 +1748,17 @@ Status DBImpl::DelayWrite(uint64_t num_bytes,
     StopWatch sw(immutable_db_options_.clock, stats_, WRITE_STALL,
                  &time_delayed);
     mutex_.AssertHeld();
+
+    // Why are you releasing the mutex here? Please add documentation to justify it.
+    // Are you sure that releasing the mutex here is not going to cause any issues?
+    // Will it allow any other activity to occur in this DB that relies on the db_mutex to be locked?
+
+    // Worth consider the user of InstrumentedMutexUnlock:
+    //
+    // uint64_t delay = 0;
+    // {  InstrumentedMutexUnlock(mutex_);
+    //    delay = ...}
+    //
     mutex_.Unlock();
     uint64_t delay =
         write_controller_->GetDelay(immutable_db_options_.clock, num_bytes);
@@ -1797,6 +1808,12 @@ Status DBImpl::DelayWrite(uint64_t num_bytes,
       // fail any pending writers with no_slowdown
       write_thread_.BeginWriteStall();
       TEST_SYNC_POINT("DBImpl::DelayWrite:Wait");
+
+      // 1. Please use InstrumentedMutexUnlock
+      // 2. Per the comment - Is this indeed for unit testing? If it is indeed for unit testing you should consider
+      //      an alternative solutio            
+      // 3. Again - are you certain that it's safe to unlock the mutex here?
+
       // check here if another db is able to wake all the others.
       // in a unit test:
       // this db stops writing since another db is in a stop condition. make

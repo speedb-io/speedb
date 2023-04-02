@@ -93,10 +93,16 @@ DBOptions SanitizeOptions(const std::string& dbname, const DBOptions& src,
     }
   }
 
+  // A preferable design IMO would be to prevent the user from being able to 
+  // create a WC with a false dynamic delay. There are multiple ways to achieve that. A crude and
+  // simple one would be to have a private ctor that only this class would be able to call (friend class)
+  // that would accept the dynamic delay boolean. The official ctor (that external users would use), would 
+  // always set the dynamic delay to be true so the user can't go wrong by accident.
   if (!result.write_controller) {
     result.write_controller.reset(new WriteController(
         result.use_dynamic_delay, result.delayed_write_rate));
   } else if (result.use_dynamic_delay == false) {
+    // I may be missing something, but is the WC updated with dynamic-delay == true afterwards?
     result.use_dynamic_delay = true;
     ROCKS_LOG_WARN(
         result.info_log,

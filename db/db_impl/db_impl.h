@@ -892,7 +892,9 @@ class DBImpl : public DB {
   const std::shared_ptr<WriteController>& write_controller() const {
     return write_controller_;
   }
-
+  
+  // Please add a const version and use wherever possible
+  // It may very well be preferable to only have a const version here and remove the non-const version
   WriteController* write_controller_ptr() { return write_controller_.get(); }
 
   WriteBufferManager* write_buffer_manager() { return write_buffer_manager_; }
@@ -1154,6 +1156,7 @@ class DBImpl : public DB {
 
   Cache* TEST_table_cache() { return table_cache_.get(); }
 
+  // Adding the const version above would make this method unnecessary
   const std::shared_ptr<WriteController>& TEST_write_controler() {
     return write_controller_;
   }

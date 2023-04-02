@@ -2131,11 +2131,16 @@ TEST_P(DBCompactionTestWithParam, LevelCompactionThirdPath) {
   // After that, (100K, 200K)
   for (int num = 0; num < 3; num++) {
     GenerateNewFile(&rnd, &key_idx);
+    std::cout << "Num files (" << options.db_paths[0].path << ") = " << GetSstFileCount(options.db_paths[0].path) << '\n';
   }
+
+  std::cout << "Num files (" << options.db_paths[0].path << ") = " << GetSstFileCount(options.db_paths[0].path) << '\n';
 
   // Another 110KB triggers a compaction to 400K file to fill up first path
   GenerateNewFile(&rnd, &key_idx);
   ASSERT_EQ(3, GetSstFileCount(options.db_paths[1].path));
+
+  std::cout << "Num files (" << options.db_paths[0].path << ") = " << GetSstFileCount(options.db_paths[0].path) << '\n';
 
   // (1, 4)
   GenerateNewFile(&rnd, &key_idx);

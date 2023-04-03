@@ -163,6 +163,7 @@ DECLARE_uint64(compaction_ttl);
 DECLARE_bool(fifo_allow_compaction);
 DECLARE_bool(allow_concurrent_memtable_write);
 DECLARE_double(experimental_mempurge_threshold);
+DECLARE_bool(use_spdb_writes);
 DECLARE_bool(enable_write_thread_adaptive_yield);
 DECLARE_int32(reopen);
 DECLARE_string(filter_uri);

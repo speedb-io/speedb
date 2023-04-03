@@ -408,6 +408,8 @@ DEFINE_bool(fifo_allow_compaction, false,
             "If true, set `Options::compaction_options_fifo.allow_compaction = "
             "true`. It only take effect when FIFO compaction is used.");
 
+DEFINE_bool(use_spdb_writes, false, "Use optimized Speedb write flow");
+
 DEFINE_bool(allow_concurrent_memtable_write, false,
             "Allow multi-writers to update mem tables in parallel.");
 

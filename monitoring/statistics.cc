@@ -330,6 +330,10 @@ const std::vector<std::pair<Histograms, std::string>> HistogramsNameMap = {
     {MULTIGET_IO_BATCH_SIZE, "rocksdb.multiget.io.batch.size"},
     {NUM_LEVEL_READ_PER_MULTIGET, "rocksdb.num.level.read.per.multiget"},
     {ASYNC_PREFETCH_ABORT_MICROS, "rocksdb.async.prefetch.abort.micros"},
+    {DB_GET_MEMTABLE, "rocksdb.db.get.mem.micros"},
+    {DB_WAL_WRITE_TIME, "rocksdb.db.wal.write.micros"},
+    {DB_WRITE_WAIT_FOR_WAL, "rocksdb.db.write_wait_for_wal.micros"},
+    {DB_WRITE_WAIT_FOR_WAL_WITH_MUTEX, "rocksdb.db.write_wait_mutex.micros"},
     {TABLE_OPEN_PREFETCH_TAIL_READ_BYTES,
      "rocksdb.table.open.prefetch.tail.read.bytes"},
 };

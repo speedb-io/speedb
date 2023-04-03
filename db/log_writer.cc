@@ -63,7 +63,8 @@ IOStatus Writer::Close() {
 }
 
 IOStatus Writer::AddRecord(const Slice& slice,
-                           Env::IOPriority rate_limiter_priority) {
+                           Env::IOPriority rate_limiter_priority,
+                           bool /*do_flush*/) {
   const char* ptr = slice.data();
   size_t left = slice.size();
 
@@ -151,11 +152,31 @@ IOStatus Writer::AddRecord(const Slice& slice,
   } while (s.ok() && (left > 0 || compress_remaining > 0));
 
   if (s.ok()) {
-    if (!manual_flush_) {
+    if (!manual_flush_ /*&& do_flush*/) {
       s = dest_->Flush(rate_limiter_priority);
     }
   }
 
+  return s;
+}
+
+IOStatus Writer::AddRecordWithStartOffsetAndSize(
+    const Slice& slice, Env::IOPriority rate_limiter_priority, bool do_flush,
+    uint64_t* offset, uint64_t* size) {
+  IOStatus s;
+  *offset = dest_->GetFileSize();
+  s = AddRecord(slice, rate_limiter_priority, do_flush);
+  *size = dest_->GetFileSize() - *offset + 1;
+  return s;
+}
+
+IOStatus Writer::SyncRange(bool use_fsync, uint64_t offset, uint64_t size) {
+  IOStatus s;
+  if (!manual_flush_) {
+    s = dest_->RangeSync(offset, size);
+  } else {
+    s = dest_->Sync(use_fsync);
+  }
   return s;
 }
 

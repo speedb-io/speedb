@@ -39,7 +39,7 @@ jobs:
         apk add git
         echo "nameserver 8.8.8.8" > /etc/resolv.conf
         apk add bash python3 py3-pip clang clang-extra-tools shellcheck gcc g++ cmake ninja ccache \
-        openjdk10 gflags-dev snappy-dev lz4-dev bzip2-dev zstd-dev zlib-dev linux-headers openssh-client tar
+        openjdk10 gflags-dev snappy-dev lz4-dev bzip2-dev zstd-dev zlib-dev linux-headers openssh-client tar readline-dev
         python3 -m pip install lint-diffs flake8
         
         

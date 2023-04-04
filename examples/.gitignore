@@ -8,4 +8,6 @@ options_file_example
 rocksdb_backup_restore_example
 simple_example
 transaction_example
+rocksdb_backup_restore_example
 speedb_is_awesome_example
+speedb_with_ttl_example

@@ -399,6 +399,7 @@ class TtlTest : public testing::Test {
 
   // Choose carefully so that Put, Gets & Compaction complete in 1 second buffer
   static const int64_t kSampleSize_ = 100;
+  static const int32_t ttl_ = 1;
   std::string dbname_;
   DBWithTTL* db_ttl_;
   std::unique_ptr<SpecialTimeEnv> env_;
@@ -735,6 +736,467 @@ TEST_F(TtlTest, DeleteRangeTest) {
     ASSERT_OK(db_ttl_->Get(ReadOptions(), "e", &value));
   }
   CloseTtl();
+}
+
+// This test is a placeholder and disabled as the current ttl compaction deletes
+// kv pair although they are part of a snapshot
+TEST_F(TtlTest, DISABLED_CompactionTTLDoNotAffectSnapTest) {
+  OpenTtl(ttl_);
+  std::string key_1 = "a";
+  std::string put_value = "val";
+  auto ropts = ReadOptions();
+  std::string value;
+  ASSERT_OK(db_ttl_->Put(WriteOptions(), key_1, put_value));
+  ropts.snapshot = db_ttl_->GetSnapshot();
+  ASSERT_NE(ropts.snapshot, nullptr);
+  env_->Sleep(ttl_ + 1);
+  ASSERT_OK(db_ttl_->CompactRange(CompactRangeOptions(), nullptr, nullptr));
+  // TODO prevent from ttl compaction to delete keys referenced by snapshot
+  // ASSERT_OK(db_ttl_->Get(ropts, key_1, &value));
+  db_ttl_->ReleaseSnapshot(ropts.snapshot);
+  CloseTtl();
+}
+
+// Test if Merge is updating the timestamp after it has been ran
+TEST_F(TtlTest, CompactionTTLConsiderLatestMergeTest) {
+  Options options;
+  options.create_if_missing = true;
+  options.merge_operator = MergeOperators::CreateStringAppendOperator();
+  std::string key_1 = "a";
+  std::string put_value = "1";
+  ASSERT_OK(DBWithTTL::Open(options, dbname_, &db_ttl_, ttl_));
+  auto ropts = ReadOptions();
+  std::string value;
+  ASSERT_OK(db_ttl_->Put(WriteOptions(), key_1, put_value));
+  env_->Sleep(ttl_ + 1);
+  ASSERT_OK(db_ttl_->Merge(WriteOptions(), key_1, put_value));
+  ASSERT_OK(db_ttl_->CompactRange(CompactRangeOptions(), nullptr, nullptr));
+  ASSERT_OK(db_ttl_->Get(ropts, key_1, &value));
+  ASSERT_TRUE(value.compare(put_value + "," + put_value) == 0);
+  db_ttl_->ReleaseSnapshot(ropts.snapshot);
+  CloseTtl();
+}
+
+// Check that strict ttl is taking into account new updated timestamp by merge
+TEST_F(TtlTest, CompactionStrictTTLConsiderLatestMergeTest) {
+  Options options;
+  options.create_if_missing = true;
+  options.merge_operator = MergeOperators::CreateStringAppendOperator();
+  std::string key_1 = "a";
+  std::string put_value = "1";
+  ASSERT_OK(DBWithTTL::Open(options, dbname_, &db_ttl_, ttl_));
+  auto ropts = ReadOptions();
+  ropts.skip_expired_data = true;
+  std::string value;
+  ASSERT_OK(db_ttl_->Put(WriteOptions(), key_1, put_value));
+  env_->Sleep(ttl_ + 1);
+  ASSERT_OK(db_ttl_->Merge(WriteOptions(), key_1, put_value));
+  ASSERT_OK(db_ttl_->CompactRange(CompactRangeOptions(), nullptr, nullptr));
+  ASSERT_OK(db_ttl_->Get(ropts, key_1, &value));
+  ASSERT_TRUE(value.compare(put_value + "," + put_value) == 0);
+  db_ttl_->ReleaseSnapshot(ropts.snapshot);
+  CloseTtl();
+}
+
+// Test if strict ttl skip expired keys
+TEST_F(TtlTest, SkipExpiredTtlGetTest) {
+  OpenTtl(ttl_);
+  std::string key = "a";
+  std::string put_value = "val";
+  ASSERT_OK(db_ttl_->Put(WriteOptions(), key, put_value));
+  env_->Sleep(ttl_ + 1);
+  auto ropts = ReadOptions();
+  ropts.skip_expired_data = true;
+  std::string value;
+  ASSERT_TRUE(db_ttl_->Get(ropts, key, &value).IsNotFound());
+  CloseTtl();
+}
+
+// Test if strict ttl skip expired keys accessed by iterators seek to first
+TEST_F(TtlTest, SkipExpiredTtlIterFirstTest) {
+  OpenTtl(ttl_);
+  auto ropts = ReadOptions();
+  ropts.skip_expired_data = true;
+  std::string key_1 = "a";
+  std::string key_2 = "b";
+  std::string put_value = "val";
+  ASSERT_OK(db_ttl_->Put(WriteOptions(), key_1, put_value));
+  env_->Sleep(ttl_ + 1);
+  ASSERT_OK(db_ttl_->Put(WriteOptions(), key_2, put_value));
+  auto itr = db_ttl_->NewIterator(ropts);
+  std::string value;
+  itr->SeekToFirst();
+  ASSERT_TRUE(itr->Valid());
+  ASSERT_TRUE(itr->key().ToString().compare(key_2) == 0);
+  delete itr;
+  CloseTtl();
+}
+
+// Test if strict ttl skip expired keys accessed by iterators seek to last
+TEST_F(TtlTest, SkipExpiredTtlIterLastTest) {
+  OpenTtl(ttl_);
+  auto ropts = ReadOptions();
+  ropts.skip_expired_data = true;
+  std::string key_1 = "a";
+  std::string key_2 = "b";
+  std::string put_value = "val";
+  ASSERT_OK(db_ttl_->Put(WriteOptions(), key_1, put_value));
+  env_->Sleep(ttl_ + 1);
+  ASSERT_OK(db_ttl_->Put(WriteOptions(), key_2, put_value));
+  auto itr = db_ttl_->NewIterator(ropts);
+  std::string value;
+  itr->SeekToLast();
+  ASSERT_TRUE(itr->Valid());
+  ASSERT_TRUE(itr->key().ToString().compare(key_2) == 0);
+  delete itr;
+  CloseTtl();
+}
+
+// Test if strict ttl skip expired keys accessed by iterators seek next
+TEST_F(TtlTest, SkipExpiredTtlIterNextTest) {
+  OpenTtl(ttl_);
+  std::string key_1 = "a";
+  std::string key_2 = "b";
+  std::string key_3 = "c";
+  std::string key_4 = "d";
+  std::string put_value = "val";
+  auto ropts = ReadOptions();
+  ropts.skip_expired_data = true;
+  ASSERT_OK(db_ttl_->Put(WriteOptions(), key_4, put_value));
+  ASSERT_OK(db_ttl_->Put(WriteOptions(), key_2, put_value));
+  env_->Sleep(ttl_ + 1);
+  ASSERT_OK(db_ttl_->Put(WriteOptions(), key_1, put_value));
+  ASSERT_OK(db_ttl_->Put(WriteOptions(), key_3, put_value));
+  auto itr = db_ttl_->NewIterator(ropts);
+  std::string value;
+  itr->SeekToFirst();
+  ASSERT_TRUE(itr->Valid());
+  itr->Next();
+  ASSERT_TRUE(itr->Valid());
+  ASSERT_TRUE(itr->key().ToString().compare(key_3) == 0);
+  delete itr;
+  CloseTtl();
+}
+
+// Test if strict ttl skip expired keys accessed by iterators seek prev
+TEST_F(TtlTest, SkipExpiredTtlIterPrevTest) {
+  OpenTtl(ttl_);
+  std::string key_1 = "a";
+  std::string key_2 = "b";
+  std::string key_3 = "c";
+  std::string key_4 = "d";
+  std::string put_value = "val";
+  auto ropts = ReadOptions();
+  ropts.skip_expired_data = true;
+  ASSERT_OK(db_ttl_->Put(WriteOptions(), key_4, put_value));
+  ASSERT_OK(db_ttl_->Put(WriteOptions(), key_2, put_value));
+  env_->Sleep(ttl_ + 1);
+  ASSERT_OK(db_ttl_->Put(WriteOptions(), key_1, put_value));
+  ASSERT_OK(db_ttl_->Put(WriteOptions(), key_3, put_value));
+  auto itr = db_ttl_->NewIterator(ropts);
+  std::string value;
+  itr->SeekToLast();
+  ASSERT_TRUE(itr->Valid());
+  itr->Prev();
+  ASSERT_TRUE(itr->Valid());
+  ASSERT_TRUE(itr->key().ToString().compare(key_1) == 0);
+  delete itr;
+  CloseTtl();
+}
+
+// Test if strict ttl skip expired keys accessed by iterators seek
+TEST_F(TtlTest, SkipExpiredTtlIterSeekTest) {
+  OpenTtl(ttl_);
+  std::string key_1 = "a";
+  std::string key_2 = "b";
+  std::string key_3 = "c";
+  std::string key_4 = "d";
+  std::string put_value = "val";
+  auto ropts = ReadOptions();
+  ropts.skip_expired_data = true;
+  ASSERT_OK(db_ttl_->Put(WriteOptions(), key_4, put_value));
+  ASSERT_OK(db_ttl_->Put(WriteOptions(), key_2, put_value));
+  env_->Sleep(ttl_ + 1);
+  ASSERT_OK(db_ttl_->Put(WriteOptions(), key_1, put_value));
+  ASSERT_OK(db_ttl_->Put(WriteOptions(), key_3, put_value));
+  auto itr = db_ttl_->NewIterator(ropts);
+  std::string value;
+  itr->Seek("b");
+  ASSERT_TRUE(itr->Valid());
+  ASSERT_TRUE(itr->key().ToString().compare(key_3) == 0);
+  delete itr;
+  CloseTtl();
+}
+
+// Test if strict ttl skip expired keys accessed by iterators seek prev
+TEST_F(TtlTest, SkipExpiredTtlIterSeekPrevTest) {
+  OpenTtl(ttl_);
+  auto ropts = ReadOptions();
+  ropts.skip_expired_data = true;
+  std::string key_1 = "a";
+  std::string key_2 = "b";
+  std::string key_3 = "c";
+  std::string key_4 = "d";
+  std::string put_value = "val";
+  ASSERT_OK(db_ttl_->Put(WriteOptions(), key_4, put_value));
+  ASSERT_OK(db_ttl_->Put(WriteOptions(), key_2, put_value));
+  env_->Sleep(ttl_ + 1);
+  ASSERT_OK(db_ttl_->Put(WriteOptions(), key_1, put_value));
+  ASSERT_OK(db_ttl_->Put(WriteOptions(), key_3, put_value));
+  auto itr = db_ttl_->NewIterator(ropts);
+  std::string value;
+  itr->SeekForPrev(key_2);
+  ASSERT_TRUE(itr->Valid());
+  ASSERT_TRUE(itr->key().ToString().compare(key_1) == 0);
+  delete itr;
+  CloseTtl();
+}
+
+// Test if strict ttl skip expired keys when multiget is being used
+TEST_F(TtlTest, SkipExpiredTtlGetMultiTest) {
+  OpenTtl(1);
+  std::string key = "a";
+  std::string put_value = "val";
+  ASSERT_OK(db_ttl_->Put(WriteOptions(), key, put_value));
+  env_->Sleep(4);
+  auto ropts = ReadOptions();
+  ropts.skip_expired_data = true;
+  std::vector<std::string> values;
+  ASSERT_TRUE(db_ttl_->MultiGet(ropts, {key}, &values)[0].IsNotFound());
+  CloseTtl();
+}
+
+// Test if strict ttl returns non expired items
+TEST_F(TtlTest, GetNotExpiredTtlGetTest) {
+  OpenTtl(ttl_ + 1);
+  std::string key = "a";
+  std::string put_value = "val";
+  ASSERT_OK(db_ttl_->Put(WriteOptions(), key, put_value));
+  env_->Sleep(ttl_);
+  auto ropts = ReadOptions();
+  ropts.skip_expired_data = true;
+  std::string value;
+  ASSERT_OK(db_ttl_->Get(ropts, "a", &value));
+  CloseTtl();
+}
+
+// Test if strict ttl skip expired as read only
+TEST_F(TtlTest, SkipExpiredReadOnlyTtlMultiGetTest) {
+  Options options;
+  options.create_if_missing = true;
+  options.env = env_.get();
+  auto ropts = ReadOptions();
+  ropts.skip_expired_data = true;
+  std::string key_1 = "a";
+  std::string key_2 = "b";
+  std::string put_value = "val";
+  std::vector<std::string> values;
+  ASSERT_OK(DBWithTTL::Open(options, dbname_, &db_ttl_, ttl_));
+  ASSERT_OK(db_ttl_->Put(WriteOptions(), key_1, put_value));
+  ASSERT_OK(db_ttl_->Put(WriteOptions(), key_2, put_value));
+  db_ttl_->Close();
+  ASSERT_OK(DBWithTTL::Open(options, dbname_, &db_ttl_, ttl_, true));
+  env_->Sleep(ttl_ + 1);
+  auto statuses = db_ttl_->MultiGet(ropts, {key_1, key_2}, &values);
+  for (auto& status : statuses) {
+    ASSERT_TRUE(status.IsNotFound());
+  }
+  CloseTtl();
+}
+
+// Test if strict ttl does not skip unexpired as read only
+TEST_F(TtlTest, GetNotExpiredReadOnlyTtlGetTest) {
+  Options options;
+  options.create_if_missing = true;
+  options.env = env_.get();
+  auto ropts = ReadOptions();
+  ropts.skip_expired_data = true;
+  std::string value;
+  std::string key = "a";
+  std::string put_value = "val";
+  ASSERT_OK(DBWithTTL::Open(options, dbname_, &db_ttl_, ttl_));
+  ASSERT_OK(db_ttl_->Put(WriteOptions(), key, put_value));
+  db_ttl_->Close();
+  // open ttl as read only
+  ASSERT_OK(DBWithTTL::Open(options, dbname_, &db_ttl_, ttl_, true));
+  env_->Sleep(ttl_ + 1);
+  ASSERT_TRUE(db_ttl_->Get(ropts, key, &value).IsNotFound());
+  CloseTtl();
+}
+
+// Test if the expiration time is based on snapshot creation and not the current
+// time (should not skip here)
+TEST_F(TtlTest, GetFromSnapshotTtlGetTest) {
+  Options options;
+  options.create_if_missing = true;
+  options.env = env_.get();
+  auto ropts = ReadOptions();
+  ropts.skip_expired_data = true;
+  std::string value;
+  std::string key = "a";
+  std::string put_value = "val";
+  const Snapshot* snap;
+  int ttl = 2;
+  ASSERT_OK(DBWithTTL::Open(options, dbname_, &db_ttl_, ttl));
+  ASSERT_OK(db_ttl_->Put(WriteOptions(), key, put_value));
+  snap = db_ttl_->GetSnapshot();
+  ropts.snapshot = snap;
+  env_->Sleep(ttl + 1);
+  ASSERT_TRUE(db_ttl_->Get(ropts, "a", &value).ok());
+  db_ttl_->ReleaseSnapshot(snap);
+  CloseTtl();
+}
+
+// Test if the expiration time is based on snapshot creation and not the current
+// time (should skip here)
+TEST_F(TtlTest, ExpireSnapshotTtlGetTest) {
+  Options options;
+  options.create_if_missing = true;
+  options.env = env_.get();
+  auto ropts = ReadOptions();
+  ropts.skip_expired_data = true;
+  std::string value;
+  std::string key = "a";
+  std::string put_value = "val";
+  const Snapshot* snap;
+  ASSERT_OK(DBWithTTL::Open(options, dbname_, &db_ttl_, ttl_));
+  ASSERT_OK(db_ttl_->Put(WriteOptions(), key, put_value));
+  env_->Sleep(ttl_ + 1);
+  snap = db_ttl_->GetSnapshot();
+  ropts.snapshot = snap;
+  ASSERT_TRUE(db_ttl_->Get(ropts, "a", &value).IsNotFound());
+  db_ttl_->ReleaseSnapshot(snap);
+  CloseTtl();
+}
+
+// Test if the expiration time is based on iterator creation and not the current
+// time (should not skip here)
+TEST_F(TtlTest, GetFromIteratorTtlGetTest) {
+  Options options;
+  options.create_if_missing = true;
+  options.env = env_.get();
+  auto ropts = ReadOptions();
+  ropts.skip_expired_data = true;
+  std::string key = "a";
+  std::string put_value = "val";
+  std::string value;
+  Iterator* iter;
+  ASSERT_OK(DBWithTTL::Open(options, dbname_, &db_ttl_, ttl_));
+  ASSERT_OK(db_ttl_->Put(WriteOptions(), key, put_value));
+  iter = db_ttl_->NewIterator(ropts);
+  env_->Sleep(ttl_ + 1);
+  ASSERT_NE(iter, nullptr);
+  iter->Seek(key);
+  ASSERT_TRUE(iter->Valid());
+  ASSERT_TRUE(iter->value().ToString().compare(put_value) == 0);
+  delete iter;
+  CloseTtl();
+}
+
+// Test if the expiration time is based on iterator creation and not the current
+// time (should skip here)
+TEST_F(TtlTest, ExpireIteratorTtlGetTest) {
+  Options options;
+  options.create_if_missing = true;
+  options.env = env_.get();
+  auto ropts = ReadOptions();
+  ropts.skip_expired_data = true;
+  std::string value;
+  Iterator* iter;
+  std::string key = "a";
+  std::string put_value = "val";
+  ASSERT_OK(DBWithTTL::Open(options, dbname_, &db_ttl_, ttl_));
+  ASSERT_OK(db_ttl_->Put(WriteOptions(), key, put_value));
+  env_->Sleep(ttl_ + 1);
+  iter = db_ttl_->NewIterator(ropts);
+  iter->Seek(key);
+  ASSERT_FALSE(iter->Valid());
+  delete iter;
+  CloseTtl();
+}
+
+// Test if the expiration time is based on snapshot creation and not the
+// iterator creation (should not skip here)
+TEST_F(TtlTest, GetFromSnapshotIteratorTtlGetTest) {
+  Options options;
+  options.create_if_missing = true;
+  options.env = env_.get();
+  auto ropts = ReadOptions();
+  ropts.skip_expired_data = true;
+  std::string value;
+  const Snapshot* snap;
+  std::string key = "a";
+  std::string put_value = "val";
+  Iterator* iter;
+  ASSERT_OK(DBWithTTL::Open(options, dbname_, &db_ttl_, ttl_));
+  ASSERT_OK(db_ttl_->Put(WriteOptions(), key, put_value));
+  snap = db_ttl_->GetSnapshot();
+  ropts.snapshot = snap;
+  env_->Sleep(ttl_ + 1);
+  iter = db_ttl_->NewIterator(ropts);
+  iter->Seek(key);
+  ASSERT_TRUE(iter->Valid());
+  ASSERT_TRUE(iter->value().ToString().compare(put_value) == 0);
+  delete iter;
+  db_ttl_->ReleaseSnapshot(snap);
+  CloseTtl();
+}
+
+// Test if the expiration time is based on snapshot creation and not the
+// iterator creation (should skip here)
+TEST_F(TtlTest, ExpireIteratorFromSnapshotTtlGetTest) {
+  Options options;
+  options.create_if_missing = true;
+  options.env = env_.get();
+  auto ropts = ReadOptions();
+  ropts.skip_expired_data = true;
+  std::string value;
+  const Snapshot* snap;
+  std::string key = "a";
+  std::string put_value = "val";
+  Iterator* iter;
+  ASSERT_OK(DBWithTTL::Open(options, dbname_, &db_ttl_, ttl_));
+  ASSERT_OK(db_ttl_->Put(WriteOptions(), key, put_value));
+  env_->Sleep(ttl_ + 1);
+  snap = db_ttl_->GetSnapshot();
+  ropts.snapshot = snap;
+  iter = db_ttl_->NewIterator(ropts);
+  iter->Seek(key);
+  ASSERT_FALSE(iter->Valid());
+  delete iter;
+  db_ttl_->ReleaseSnapshot(snap);
+  CloseTtl();
+}
+
+// Test strict ttl with multiple CFs
+TEST_F(TtlTest, SkipExpiredColumnFamiliesTest) {
+  Options options;
+  options.create_if_missing = true;
+  options.env = env_.get();
+  auto ropts = ReadOptions();
+  ropts.skip_expired_data = true;
+  std::string key = "a";
+  std::string put_value = "val";
+  std::string value;
+  std::vector<ColumnFamilyHandle*> handles;
+  ASSERT_OK(DBWithTTL::Open(options, dbname_, &db_ttl_));
+  ColumnFamilyHandle* first_handle;
+  ColumnFamilyHandle* second_handle;
+  ASSERT_OK(db_ttl_->CreateColumnFamilyWithTtl(options, "ttl_column_family_1",
+                                               &first_handle, ttl_));
+  handles.push_back(first_handle);
+  ASSERT_OK(db_ttl_->CreateColumnFamilyWithTtl(options, "ttl_column_family_2",
+                                               &second_handle, 0));
+  handles.push_back(second_handle);
+  ASSERT_OK(db_ttl_->Put(WriteOptions(), handles[0], key, put_value));
+  ASSERT_OK(db_ttl_->Put(WriteOptions(), handles[1], key, put_value));
+  env_->Sleep(ttl_ + 1);
+  ASSERT_TRUE(db_ttl_->Get(ropts, handles[0], key, &value).IsNotFound());
+  ASSERT_OK(db_ttl_->Get(ropts, handles[1], key, &value));
+  for (auto& h : handles) {
+    delete h;
+    h = nullptr;
+  }
 }
 
 class DummyFilter : public CompactionFilter {

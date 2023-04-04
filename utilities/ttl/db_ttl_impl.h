@@ -85,6 +85,10 @@ class DBWithTTLImpl : public DBWithTTL {
 
   static bool IsStale(const Slice& value, int32_t ttl, SystemClock* clock);
 
+  // IsStale for strict ttl
+  bool IsStaleStrictTtl(const Slice& value, ColumnFamilyHandle* column_family,
+                        const ReadOptions& options);
+
   static Status AppendTS(const Slice& val, std::string* val_with_ts,
                          SystemClock* clock);
 
@@ -111,23 +115,52 @@ class DBWithTTLImpl : public DBWithTTL {
 
 class TtlIterator : public Iterator {
  public:
-  explicit TtlIterator(Iterator* iter) : iter_(iter) { assert(iter_); }
+  explicit TtlIterator(Iterator* iter, int32_t ttl, bool skip_expired_data,
+                       int64_t creation_time)
+      : iter_(iter),
+        ttl_(ttl),
+        skip_expired_data_(skip_expired_data),
+        creation_time_(creation_time)
+
+  {
+    assert(iter_);
+  }
 
   ~TtlIterator() { delete iter_; }
 
   bool Valid() const override { return iter_->Valid(); }
 
-  void SeekToFirst() override { iter_->SeekToFirst(); }
+  void SeekToFirst() override {
+    iter_->SeekToFirst();
+    HandleExpired(true);
+  }
 
-  void SeekToLast() override { iter_->SeekToLast(); }
+  void SeekToLast() override {
+    iter_->SeekToLast();
+    HandleExpired(false);
+  }
 
-  void Seek(const Slice& target) override { iter_->Seek(target); }
+  void Seek(const Slice& target) override {
+    iter_->Seek(target);
+    HandleExpired(true);
+  }
 
-  void SeekForPrev(const Slice& target) override { iter_->SeekForPrev(target); }
+  void SeekForPrev(const Slice& target) override {
+    iter_->SeekForPrev(target);
+    HandleExpired(false);
+  }
 
-  void Next() override { iter_->Next(); }
+  void Next() override {
+    iter_->Next();
+    HandleExpired(true);
+  }
 
-  void Prev() override { iter_->Prev(); }
+  void Prev() override {
+    iter_->Prev();
+    HandleExpired(false);
+  }
+
+  void HandleExpired(bool is_next);
 
   Slice key() const override { return iter_->key(); }
 
@@ -148,6 +181,9 @@ class TtlIterator : public Iterator {
 
  private:
   Iterator* iter_;
+  int32_t ttl_ = 0;
+  bool skip_expired_data_ = false;
+  int64_t creation_time_;
 };
 
 class TtlCompactionFilter : public LayeredCompactionFilterBase {
@@ -188,6 +224,7 @@ class TtlCompactionFilterFactory : public CompactionFilterFactory {
   std::unique_ptr<CompactionFilter> CreateCompactionFilter(
       const CompactionFilter::Context& context) override;
   void SetTtl(int32_t ttl) { ttl_ = ttl; }
+  int32_t GetTtl() { return ttl_; }
 
   const char* Name() const override { return kClassName(); }
   static const char* kClassName() { return "TtlCompactionFilterFactory"; }

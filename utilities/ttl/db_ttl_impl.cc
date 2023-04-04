@@ -433,7 +433,7 @@ Status DBWithTTLImpl::SanityCheckTimestamp(const Slice& str) {
     return Status::Corruption("Error: value's length less than timestamp's\n");
   }
   // Checks that TS is not lesser than kMinTimestamp
-  // Gaurds against corruption & normal database opened incorrectly in ttl mode
+  // Guards against corruption & normal database opened incorrectly in ttl mode
   int32_t timestamp_value = DecodeFixed32(str.data() + str.size() - kTSLength);
   if (timestamp_value < kMinTimestamp) {
     return Status::Corruption("Error: Timestamp < ttl feature release time!\n");
@@ -442,6 +442,7 @@ Status DBWithTTLImpl::SanityCheckTimestamp(const Slice& str) {
 }
 
 // Checks if the string is stale or not according to TTl provided
+// Generic IsStale implementation
 bool DBWithTTLImpl::IsStale(const Slice& value, int32_t ttl,
                             SystemClock* clock) {
   if (ttl <= 0) {  // Data is fresh if TTL is non-positive
@@ -458,6 +459,30 @@ bool DBWithTTLImpl::IsStale(const Slice& value, int32_t ttl,
   int64_t timestamp_value =
       DecodeFixed32(value.data() + value.size() - kTSLength);
   return (timestamp_value + ttl) < curtime;
+}
+
+// IsStale for strict ttl
+bool DBWithTTLImpl::IsStaleStrictTtl(const Slice& value,
+                                     ColumnFamilyHandle* column_family,
+                                     const ReadOptions& options) {
+  Options opts = GetOptions(column_family);
+  auto filter = std::static_pointer_cast<TtlCompactionFilterFactory>(
+      opts.compaction_filter_factory);
+  int32_t ttl = filter->GetTtl();
+  if (ttl <= 0) {
+    return false;
+  }
+  if (options.snapshot == nullptr) {
+    SystemClock* clock = (opts.env == nullptr)
+                             ? SystemClock::Default().get()
+                             : opts.env->GetSystemClock().get();
+    return IsStale(value, ttl, clock);
+  } else {
+    int64_t snapshot_time = options.snapshot->GetUnixTime();
+    int32_t timestamp_value =
+        DecodeFixed32(value.data() + value.size() - kTSLength);
+    return (timestamp_value + ttl) < snapshot_time;
+  }
 }
 
 // Strips the TS from the end of the slice
@@ -502,6 +527,11 @@ Status DBWithTTLImpl::Get(const ReadOptions& options,
   if (!st.ok()) {
     return st;
   }
+  if (options.skip_expired_data) {
+    if (IsStaleStrictTtl(*value, column_family, options)) {
+      return Status::NotFound();
+    }
+  }
   return StripTS(value);
 }
 
@@ -518,7 +548,20 @@ std::vector<Status> DBWithTTLImpl::MultiGet(
     if (!statuses[i].ok()) {
       continue;
     }
-    statuses[i] = StripTS(&(*values)[i]);
+    // check if the key has been expired if is_stale == true it's expired
+    // re-check if the key expired for each key requested by the multiget
+    bool is_stale = false;
+    if (options.skip_expired_data) {
+      if (IsStaleStrictTtl((*values)[i], column_family[i], options)) {
+        statuses[i] = Status::NotFound();
+        is_stale = true;
+      }
+    }
+    if (!is_stale) {
+      statuses[i] = StripTS(&(*values)[i]);
+    } else {
+      (*values)[i] = "";
+    }
   }
   return statuses;
 }
@@ -606,7 +649,41 @@ Iterator* DBWithTTLImpl::NewIterator(const ReadOptions& _read_options,
   if (read_options.io_activity == Env::IOActivity::kUnknown) {
     read_options.io_activity = Env::IOActivity::kDBIterator;
   }
-  return new TtlIterator(db_->NewIterator(read_options, column_family));
+
+  Options cfopts = GetOptions(column_family);
+  auto filter = std::static_pointer_cast<TtlCompactionFilterFactory>(
+      cfopts.compaction_filter_factory);
+  int32_t ttl = filter->GetTtl();
+  bool skip_expired = read_options.skip_expired_data;
+  int64_t creation_time;
+  if (read_options.snapshot == nullptr) {
+    auto status =
+        cfopts.env->GetSystemClock().get()->GetCurrentTime(&creation_time);
+    if (!status.ok()) {
+      return NewErrorIterator(status);
+    }
+  } else {
+    creation_time = read_options.snapshot->GetUnixTime();
+  }
+  return new TtlIterator(db_->NewIterator(read_options, column_family), ttl,
+                         skip_expired, creation_time);
+}
+
+void TtlIterator::HandleExpired(bool move_forward) {
+  if (!skip_expired_data_) {
+    return;
+  }
+  while (Valid()) {
+    if ((ttl_timestamp() + ttl_) < creation_time_) {
+      if (move_forward) {
+        iter_->Next();
+      } else {
+        iter_->Prev();
+      }
+    } else {
+      return;
+    }
+  }
 }
 
 void DBWithTTLImpl::SetTtl(ColumnFamilyHandle* h, int32_t ttl) {

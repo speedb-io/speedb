@@ -43,3 +43,13 @@ add_executable(multi_processes_example
   multi_processes_example.cc)
 target_link_libraries(multi_processes_example
   ${ROCKSDB_LIB})
+
+add_executable(speedb_with_ttl_example
+  speedb_with_ttl_example.cc)
+  target_link_libraries(speedb_with_ttl_example
+    ${ROCKSDB_LIB})
+
+add_executable(speedb_is_awesome_example
+  speedb_is_awesome_example.cc)
+  target_link_libraries(speedb_is_awesome_example
+    ${ROCKSDB_LIB})

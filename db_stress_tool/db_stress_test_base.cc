@@ -866,6 +866,12 @@ void StressTest::OperateDb(ThreadState* thread) {
   read_opts.adaptive_readahead = FLAGS_adaptive_readahead;
   read_opts.readahead_size = FLAGS_readahead_size;
   read_opts.auto_readahead_size = FLAGS_auto_readahead_size;
+  if (gflags::GetCommandLineFlagInfoOrDie("ttl").is_default &&
+      FLAGS_skip_expired_data && FLAGS_ttl < 1) {
+    auto error_msg =
+        IOStatus::InvalidArgument("skip_expired_data must be set with ttl");
+  }
+  read_opts.skip_expired_data = FLAGS_skip_expired_data;
   WriteOptions write_opts;
   if (FLAGS_rate_limit_auto_wal_flush) {
     write_opts.rate_limiter_priority = Env::IO_USER;
@@ -2721,7 +2727,6 @@ void StressTest::Open(SharedState* shared, bool reopen) {
 
   Status s;
 
-  if (FLAGS_ttl == -1) {
     std::vector<std::string> existing_column_families;
     s = DB::ListColumnFamilies(DBOptions(options_), FLAGS_db,
                                &existing_column_families);  // ignore errors
@@ -2840,11 +2845,44 @@ void StressTest::Open(SharedState* shared, bool reopen) {
           }
         } else {
           if (db_preload_finished_.load() && FLAGS_read_only) {
-            s = DB::OpenForReadOnly(DBOptions(options_), FLAGS_db,
-                                    cf_descriptors, &column_families_, &db_);
+            if (FLAGS_ttl == -1) {
+              s = DB::OpenForReadOnly(DBOptions(options_), FLAGS_db,
+                                      cf_descriptors, &column_families_, &db_);
+            } else {
+              DBWithTTL* dbttl;
+              std::vector<int32_t> ttls;
+              for (size_t i = 0; i < cf_descriptors.size(); ++i) {
+                ttls.push_back(FLAGS_ttl);
+              }
+              s = DBWithTTL::Open(DBOptions(options_), FLAGS_db, cf_descriptors,
+                                  &column_families_, &dbttl, ttls, true);
+              if (!s.ok()) {
+                fprintf(stderr, "Cannot read only open db with ttl. %s\n",
+                        s.ToString().c_str());
+                exit(1);
+              }
+              db_ = dbttl;
+            }
           } else {
-            s = DB::Open(DBOptions(options_), FLAGS_db, cf_descriptors,
-                         &column_families_, &db_);
+            if (FLAGS_ttl == -1) {
+              s = DB::Open(DBOptions(options_), FLAGS_db, cf_descriptors,
+                           &column_families_, &db_);
+            } else {
+              std::vector<int32_t> ttls;
+              for (size_t i = 0; i < cf_descriptors.size(); ++i) {
+                ttls.push_back(FLAGS_ttl);
+              }
+              DBWithTTL* dbttl;
+
+              s = DBWithTTL::Open(DBOptions(options_), FLAGS_db, cf_descriptors,
+                                  &column_families_, &dbttl, ttls);
+              if (!s.ok()) {
+                fprintf(stderr, "Cannot open db with ttl. %s\n",
+                        s.ToString().c_str());
+                exit(1);
+              }
+              db_ = dbttl;
+            }
           }
         }
 
@@ -2982,18 +3020,6 @@ void StressTest::Open(SharedState* shared, bool reopen) {
       assert(s.ok());
       assert(cmp_cfhs_.size() == static_cast<size_t>(FLAGS_column_families));
     }
-  } else {
-    DBWithTTL* db_with_ttl;
-    s = DBWithTTL::Open(options_, FLAGS_db, &db_with_ttl, FLAGS_ttl);
-    db_ = db_with_ttl;
-    assert(options_.disable_auto_compactions);
-    if (s.ok()) {
-      s = db_->DisableFileDeletions();
-    }
-    if (s.ok()) {
-      s = db_->EnableAutoCompaction(column_families_);
-    }
-  }
 
   if (!s.ok()) {
     fprintf(stderr, "open error: %s\n", s.ToString().c_str());

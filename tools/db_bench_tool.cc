@@ -66,6 +66,7 @@
 #include "rocksdb/stats_history.h"
 #include "rocksdb/table.h"
 #include "rocksdb/utilities/backup_engine.h"
+#include "rocksdb/utilities/db_ttl.h"
 #include "rocksdb/utilities/object_registry.h"
 #include "rocksdb/utilities/optimistic_transaction_db.h"
 #include "rocksdb/utilities/options_type.h"
@@ -1936,6 +1937,9 @@ DEFINE_bool(track_and_verify_wals_in_manifest,
             ROCKSDB_NAMESPACE::Options().track_and_verify_wals_in_manifest,
             "If true, enable WAL tracking in the MANIFEST");
 
+DEFINE_bool(skip_expired_data, false, "If true, will skip keys expired by TTL");
+
+DEFINE_int32(ttl, -1, "Opens the db with this ttl value if value is positive");
 namespace {
 // Auxiliary collection of the indices of the DB-s to be used in the next group
 std::vector<uint64_t> db_idxs_to_use;
@@ -3717,6 +3721,7 @@ class Benchmark {
       read_options_.async_io = FLAGS_async_io;
       read_options_.optimize_multiget_for_io = FLAGS_optimize_multiget_for_io;
       read_options_.auto_readahead_size = FLAGS_auto_readahead_size;
+      read_options_.skip_expired_data = FLAGS_skip_expired_data;
 
       void (Benchmark::*method)(ThreadState*) = nullptr;
       void (Benchmark::*post_process_method)() = nullptr;
@@ -3726,6 +3731,14 @@ class Benchmark {
 
       int num_repeat = 1;
       int num_warmup = 0;
+      if (!gflags::GetCommandLineFlagInfoOrDie("ttl").is_default &&
+          FLAGS_ttl < 1) {
+        ErrorExit("ttl must be positive value");
+      }
+      if (gflags::GetCommandLineFlagInfoOrDie("ttl").is_default &&
+          FLAGS_skip_expired_data) {
+        ErrorExit("ttl must be set to use skip_expired_data");
+      }
       if (!name.empty() && *name.rbegin() == ']') {
         auto it = name.find('[');
         if (it == std::string::npos) {
@@ -5198,8 +5211,19 @@ class Benchmark {
         }
       }
       if (FLAGS_readonly) {
-        s = DB::OpenForReadOnly(options, db_name, column_families, &db->cfh,
-                                &db->db);
+        if (FLAGS_ttl > 0) {
+          DBWithTTL* db_with_ttl;
+          // true means read only
+          std::vector<int32_t> ttls(column_families.size(), FLAGS_ttl);
+          s = DBWithTTL::Open(options, db_name, column_families, &db->cfh,
+                              &db_with_ttl, ttls, true);
+          if (s.ok()) {
+            db->db = db_with_ttl;
+          }
+        } else {
+          s = DB::OpenForReadOnly(options, db_name, column_families, &db->cfh,
+                                  &db->db);
+        }
       } else if (FLAGS_optimistic_transaction_db) {
         s = OptimisticTransactionDB::Open(options, db_name, column_families,
                                           &db->cfh, &db->opt_txn_db);
@@ -5220,14 +5244,33 @@ class Benchmark {
           db->db = ptr;
         }
       } else {
-        s = DB::Open(options, db_name, column_families, &db->cfh, &db->db);
+        if (FLAGS_ttl > 0) {
+          DBWithTTL* db_with_ttl;
+          std::vector<int32_t> ttls(column_families.size(), FLAGS_ttl);
+          s = DBWithTTL::Open(options, db_name, column_families, &db->cfh,
+                              &db_with_ttl, ttls);
+          if (s.ok()) {
+            db->db = db_with_ttl;
+          }
+        } else {
+          s = DB::Open(options, db_name, column_families, &db->cfh, &db->db);
+        }
       }
       db->cfh.resize(FLAGS_num_column_families);
       db->num_created = num_hot;
       db->num_hot = num_hot;
       db->cfh_idx_to_prob = std::move(cfh_idx_to_prob);
     } else if (FLAGS_readonly) {
-      s = DB::OpenForReadOnly(options, db_name, &db->db);
+      if (FLAGS_ttl > 0) {
+        DBWithTTL* db_with_ttl;
+        // true means read only
+        s = DBWithTTL::Open(options, db_name, &db_with_ttl, FLAGS_ttl, true);
+        if (s.ok()) {
+          db->db = db_with_ttl;
+        }
+      } else {
+        s = DB::OpenForReadOnly(options, db_name, &db->db);
+      }
     } else if (FLAGS_optimistic_transaction_db) {
       s = OptimisticTransactionDB::Open(options, db_name, &db->opt_txn_db);
       if (s.ok()) {
@@ -5290,6 +5333,20 @@ class Benchmark {
               }
             },
             FLAGS_secondary_update_interval, db));
+      }
+    } else if (FLAGS_ttl > 0) {
+      std::vector<ColumnFamilyDescriptor> column_families;
+      column_families.push_back(ColumnFamilyDescriptor(
+          kDefaultColumnFamilyName, ColumnFamilyOptions(options)));
+      DBWithTTL* db_with_ttl;
+      std::vector<int32_t> ttls(column_families.size(), FLAGS_ttl);
+      s = DBWithTTL::Open(options, db_name, column_families, &db->cfh,
+                          &db_with_ttl, ttls);
+      if (s.ok()) {
+        db->db = db_with_ttl;
+        db->cfh.resize(1);
+        db->num_created = 1;
+        db->num_hot = 1;
       }
     } else {
       std::vector<ColumnFamilyDescriptor> column_families;
@@ -6275,7 +6332,12 @@ class Benchmark {
           options.timestamp = &ts;
           ts_ptr = &ts_ret;
         }
-        auto status = db->Get(options, key, &value, ts_ptr);
+        Status status;
+        if (user_timestamp_size_ > 0) {
+          status = db->Get(options, key, &value, ts_ptr);
+        } else {
+          status = db->Get(options, key, &value);
+        }
         if (status.ok()) {
           ++found;
         } else if (!status.IsNotFound()) {
@@ -6410,8 +6472,10 @@ class Benchmark {
               options, cfh, key, pinnable_vals.data(),
               &get_merge_operands_options, &number_of_operands);
         }
-      } else {
+      } else if (user_timestamp_size_ > 0) {
         s = db_with_cfh->db->Get(options, cfh, key, &pinnable_val, ts_ptr);
+      } else {
+        s = db_with_cfh->db->Get(options, cfh, key, &pinnable_val);
       }
 
       if (s.ok()) {

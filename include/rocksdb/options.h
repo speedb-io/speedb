@@ -1802,6 +1802,10 @@ struct ReadOptions {
   ReadOptions() {}
   ReadOptions(bool _verify_checksums, bool _fill_cache);
   explicit ReadOptions(Env::IOActivity _io_activity);
+
+  // If true, DB with TTL will not Get keys that reached their timeout
+  // Default: false
+  bool skip_expired_data = false;
 };
 
 // Options that control write operations

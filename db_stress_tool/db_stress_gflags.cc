@@ -101,6 +101,8 @@ DEFINE_int32(ttl, -1,
              "Carefully specify a large value such that verifications on "
              "deleted values don't fail");
 
+DEFINE_bool(skip_expired_data, false, "If true, will skip keys expired by TTL");
+
 DEFINE_int32(value_size_mult, 8,
              "Size of value will be this number times rand_int(1,3) bytes");
 

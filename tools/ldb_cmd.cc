@@ -108,6 +108,7 @@ const std::string LDBCommand::ARG_PREPOPULATE_BLOB_CACHE =
 const std::string LDBCommand::ARG_DECODE_BLOB_INDEX = "decode_blob_index";
 const std::string LDBCommand::ARG_DUMP_UNCOMPRESSED_BLOBS =
     "dump_uncompressed_blobs";
+const std::string LDBCommand::ARG_INTERACTIVE = "interactive";
 
 const char* LDBCommand::DELIM = " ==> ";
 
@@ -219,6 +220,9 @@ LDBCommand* LDBCommand::SelectCommand(const ParsedParams& parsed_params) {
                                 parsed_params.option_map, parsed_params.flags);
   } else if (parsed_params.cmd == BatchPutCommand::Name()) {
     return new BatchPutCommand(parsed_params.cmd_params,
+                               parsed_params.option_map, parsed_params.flags);
+  } else if (parsed_params.cmd == MultiGetCommand::Name()) {
+    return new MultiGetCommand(parsed_params.cmd_params,
                                parsed_params.option_map, parsed_params.flags);
   } else if (parsed_params.cmd == ScanCommand::Name()) {
     return new ScanCommand(parsed_params.cmd_params, parsed_params.option_map,
@@ -390,7 +394,8 @@ LDBCommand::LDBCommand(const std::map<std::string, std::string>& options,
       create_if_missing_(false),
       option_map_(options),
       flags_(flags),
-      valid_cmd_line_options_(valid_cmd_line_options) {
+      valid_cmd_line_options_(valid_cmd_line_options),
+      ttl_(-1) {
   auto itr = options.find(ARG_DB);
   if (itr != options.end()) {
     db_path_ = itr->second;
@@ -421,7 +426,9 @@ LDBCommand::LDBCommand(const std::map<std::string, std::string>& options,
 
   is_key_hex_ = IsKeyHex(options, flags);
   is_value_hex_ = IsValueHex(options, flags);
-  is_db_ttl_ = IsFlagPresent(flags, ARG_TTL);
+  ParseIntOption(option_map_, ARG_TTL, ttl_, exec_state_);
+  is_db_ttl_ = ((ttl_ != -1) || IsFlagPresent(flags, ARG_TTL));
+  is_no_value_ = IsFlagPresent(flags, ARG_NO_VALUE);
   timestamp_ = IsFlagPresent(flags, ARG_TIMESTAMP);
   try_load_options_ = IsTryLoadOptions(options, flags);
   force_consistency_checks_ =
@@ -446,19 +453,28 @@ void LDBCommand::OpenDB() {
   Status st;
   std::vector<ColumnFamilyHandle*> handles_opened;
   if (is_db_ttl_) {
-    // ldb doesn't yet support TTL DB with multiple column families
-    if (!column_family_name_.empty() || !column_families_.empty()) {
-      exec_state_ = LDBCommandExecuteResult::Failed(
-          "ldb doesn't support TTL DB with multiple column families");
-    }
     if (!secondary_path_.empty()) {
       exec_state_ = LDBCommandExecuteResult::Failed(
           "Open as secondary is not supported for TTL DB yet.");
     }
+    std::vector<int32_t> ttls;
+    for (size_t i = 0; i < column_families_.size(); ++i) {
+      ttls.push_back(ttl_);
+    }
     if (is_read_only_) {
-      st = DBWithTTL::Open(options_, db_path_, &db_ttl_, 0, true);
+      if (!column_families_.empty()) {
+        st = DBWithTTL::Open(options_, db_path_, column_families_,
+                             &handles_opened, &db_ttl_, ttls, true);
+      } else {
+        st = DBWithTTL::Open(options_, db_path_, &db_ttl_, ttl_, true);
+      }
     } else {
-      st = DBWithTTL::Open(options_, db_path_, &db_ttl_);
+      if (!column_families_.empty()) {
+        st = DBWithTTL::Open(options_, db_path_, column_families_,
+                             &handles_opened, &db_ttl_, ttls);
+      } else {
+        st = DBWithTTL::Open(options_, db_path_, &db_ttl_, ttl_);
+      }
     }
     db_ = db_ttl_;
   } else {
@@ -506,7 +522,6 @@ void LDBCommand::OpenDB() {
     }
   } else {
     // We successfully opened DB in single column family mode.
-    assert(column_families_.empty());
     if (column_family_name_ != kDefaultColumnFamilyName) {
       exec_state_ = LDBCommandExecuteResult::Failed(
           "Non-existing column family " + column_family_name_);
@@ -1123,6 +1138,7 @@ std::string LDBCommand::HelpRangeCmdArgs() {
   str_stream << " ";
   str_stream << "[--" << ARG_FROM << "] ";
   str_stream << "[--" << ARG_TO << "] ";
+  str_stream << "[--" << ARG_TTL << "[=<ttl>]] ";
   return str_stream.str();
 }
 
@@ -1154,8 +1170,7 @@ bool LDBCommand::IsTryLoadOptions(
   // to false. TODO: TTL_DB may need to fix that, otherwise it's unable to open
   // DB which has incompatible setting with default options.
   bool default_val = (options.find(ARG_DB) != options.end()) &&
-                     !IsFlagPresent(flags, ARG_CREATE_IF_MISSING) &&
-                     !IsFlagPresent(flags, ARG_TTL);
+                     !IsFlagPresent(flags, ARG_CREATE_IF_MISSING);
   return ParseBooleanOption(options, ARG_TRY_LOAD_OPTIONS, default_val);
 }
 
@@ -1804,11 +1819,12 @@ InternalDumpCommand::InternalDumpCommand(
     const std::vector<std::string>& /*params*/,
     const std::map<std::string, std::string>& options,
     const std::vector<std::string>& flags)
-    : LDBCommand(options, flags, true,
-                 BuildCmdLineOptions(
-                     {ARG_HEX, ARG_KEY_HEX, ARG_VALUE_HEX, ARG_FROM, ARG_TO,
-                      ARG_MAX_KEYS, ARG_COUNT_ONLY, ARG_COUNT_DELIM, ARG_STATS,
-                      ARG_INPUT_KEY_HEX, ARG_DECODE_BLOB_INDEX})),
+    : LDBCommand(
+          options, flags, true,
+          BuildCmdLineOptions(
+              {ARG_HEX, ARG_KEY_HEX, ARG_VALUE_HEX, ARG_NO_VALUE, ARG_FROM,
+               ARG_TO, ARG_MAX_KEYS, ARG_COUNT_ONLY, ARG_COUNT_DELIM, ARG_STATS,
+               ARG_INPUT_KEY_HEX, ARG_DECODE_BLOB_INDEX, ARG_TTL})),
       has_from_(false),
       has_to_(false),
       max_keys_(-1),
@@ -1854,9 +1870,11 @@ void InternalDumpCommand::Help(std::string& ret) {
   ret.append(" [--" + ARG_INPUT_KEY_HEX + "]");
   ret.append(" [--" + ARG_MAX_KEYS + "=<N>]");
   ret.append(" [--" + ARG_COUNT_ONLY + "]");
+  ret.append(" [--" + ARG_NO_VALUE + "]");
   ret.append(" [--" + ARG_COUNT_DELIM + "=<char>]");
   ret.append(" [--" + ARG_STATS + "]");
   ret.append(" [--" + ARG_DECODE_BLOB_INDEX + "]");
+  ret.append(" [--" + ARG_TTL + "[=<ttl>]]");
   ret.append("\n");
 }
 
@@ -1865,7 +1883,8 @@ void InternalDumpCommand::DoCommand() {
     assert(GetExecuteState().IsFailed());
     return;
   }
-
+  HistogramImpl vsize;
+  HistogramImpl ksize;
   if (print_stats_) {
     std::string stats;
     if (db_->GetProperty(GetCfHandle(), "rocksdb.stats", &stats)) {
@@ -1923,6 +1942,31 @@ void InternalDumpCommand::DoCommand() {
     if (!count_only_ && !count_delim_) {
       std::string key = ikey.DebugString(is_key_hex_);
       Slice value(key_version.value);
+      std::string valuestr = value.ToString(is_value_hex_);
+      if (print_stats_) {
+        ksize.Add(key.size());
+        vsize.Add(valuestr.size());
+      }
+      // support value with ts
+      if (is_db_ttl_) {
+        // keep in mind it might in some scenarios strip the value if opened a
+        // non ttl db with ttl. The sanity check is unable to test if the value
+        // stripped is ok or not. do not open a regular db with the ttl flag
+        st = DBWithTTLImpl::SanityCheckTimestamp(valuestr);
+        if (!st.ok()) {
+          fprintf(stderr, "%s => error striping ts, error: %s \n", key.c_str(),
+                  st.ToString().c_str());
+          continue;
+        }
+        // keep in mind it might in some scenarios strip the value if opened a
+        // non ttl db with ttl.
+        st = DBWithTTLImpl::StripTS(&valuestr);
+        if (!st.ok()) {
+          fprintf(stderr, "%s => error striping ts, error: %s \n", key.c_str(),
+                  st.ToString().c_str());
+          continue;
+        }
+      }
       if (!decode_blob_index_ || value_type != kTypeBlobIndex) {
         if (value_type == kTypeWideColumnEntity) {
           std::ostringstream oss;
@@ -1934,9 +1978,10 @@ void InternalDumpCommand::DoCommand() {
           } else {
             fprintf(stdout, "%s => %s\n", key.c_str(), oss.str().c_str());
           }
+        } else if (is_no_value_) {
+          fprintf(stdout, "%s\n", key.c_str());
         } else {
-          fprintf(stdout, "%s => %s\n", key.c_str(),
-                  value.ToString(is_value_hex_).c_str());
+          fprintf(stdout, "%s => %s\n", key.c_str(), valuestr.c_str());
         }
       } else {
         BlobIndex blob_index;
@@ -1945,8 +1990,12 @@ void InternalDumpCommand::DoCommand() {
         if (!s.ok()) {
           fprintf(stderr, "%s => error decoding blob index =>\n", key.c_str());
         } else {
-          fprintf(stdout, "%s => %s\n", key.c_str(),
-                  blob_index.DebugString(is_value_hex_).c_str());
+          if (is_no_value_) {
+            fprintf(stdout, "%s\n", key.c_str());
+          } else {
+            fprintf(stdout, "%s => %s\n", key.c_str(),
+                    blob_index.DebugString(is_value_hex_).c_str());
+          }
         }
       }
     }
@@ -1960,6 +2009,16 @@ void InternalDumpCommand::DoCommand() {
   } else {
     fprintf(stdout, "Internal keys in range: %lld\n", count);
   }
+  if (count_only_ || print_stats_) {
+    fprintf(stdout, "\nKey size distribution: \n");
+    fprintf(stdout, "\nSum of keys' sizes in range: %" PRIu64 "\n",
+            ksize.sum());
+    fprintf(stdout, "%s\n", ksize.ToString().c_str());
+    fprintf(stdout, "Value size distribution: \n");
+    fprintf(stdout, "\nSum of values' sizes in range: %" PRIu64 "\n",
+            vsize.sum());
+    fprintf(stdout, "%s\n", vsize.ToString().c_str());
+  }
 }
 
 const std::string DBDumperCommand::ARG_COUNT_ONLY = "count_only";
@@ -1971,13 +2030,13 @@ DBDumperCommand::DBDumperCommand(
     const std::vector<std::string>& /*params*/,
     const std::map<std::string, std::string>& options,
     const std::vector<std::string>& flags)
-    : LDBCommand(
-          options, flags, true,
-          BuildCmdLineOptions(
-              {ARG_TTL, ARG_HEX, ARG_KEY_HEX, ARG_VALUE_HEX, ARG_FROM, ARG_TO,
-               ARG_MAX_KEYS, ARG_COUNT_ONLY, ARG_COUNT_DELIM, ARG_STATS,
-               ARG_TTL_START, ARG_TTL_END, ARG_TTL_BUCKET, ARG_TIMESTAMP,
-               ARG_PATH, ARG_DECODE_BLOB_INDEX, ARG_DUMP_UNCOMPRESSED_BLOBS})),
+    : LDBCommand(options, flags, true,
+                 BuildCmdLineOptions(
+                     {ARG_TTL, ARG_HEX, ARG_KEY_HEX, ARG_VALUE_HEX,
+                      ARG_NO_VALUE, ARG_FROM, ARG_TO, ARG_MAX_KEYS,
+                      ARG_COUNT_ONLY, ARG_COUNT_DELIM, ARG_STATS, ARG_TTL_START,
+                      ARG_TTL_END, ARG_TTL_BUCKET, ARG_TIMESTAMP, ARG_PATH,
+                      ARG_DECODE_BLOB_INDEX, ARG_DUMP_UNCOMPRESSED_BLOBS})),
       null_from_(true),
       null_to_(true),
       max_keys_(-1),
@@ -2049,7 +2108,7 @@ void DBDumperCommand::Help(std::string& ret) {
   ret.append("  ");
   ret.append(DBDumperCommand::Name());
   ret.append(HelpRangeCmdArgs());
-  ret.append(" [--" + ARG_TTL + "]");
+  ret.append(" [--" + ARG_TTL + "[=<ttl>]]");
   ret.append(" [--" + ARG_MAX_KEYS + "=<N>]");
   ret.append(" [--" + ARG_TIMESTAMP + "]");
   ret.append(" [--" + ARG_COUNT_ONLY + "]");
@@ -2187,7 +2246,7 @@ void DBDumperCommand::DoDumpCommand() {
   }
 
   HistogramImpl vsize_hist;
-
+  HistogramImpl ksize_hist;
   for (; iter->Valid(); iter->Next()) {
     int rawtime = 0;
     // If end marker was specified, we stop before it
@@ -2229,14 +2288,16 @@ void DBDumperCommand::DoDumpCommand() {
       }
     }
 
-    if (count_only_) {
+    if (count_only_ || print_stats_) {
       vsize_hist.Add(iter->value().size());
+      ksize_hist.Add(iter->key().size());
     }
 
     if (!count_only_ && !count_delim_) {
       if (is_db_ttl_ && timestamp_) {
         fprintf(stdout, "%s ", TimeToHumanString(rawtime).c_str());
       }
+<<<<<<< HEAD
       // (TODO) TTL Iterator does not support wide columns yet.
       std::string str =
           is_db_ttl_
@@ -2246,6 +2307,18 @@ void DBDumperCommand::DoDumpCommand() {
                                            iter->columns(), is_key_hex_,
                                            is_value_hex_);
       fprintf(stdout, "%s\n", str.c_str());
+=======
+      if (is_no_value_) {
+        std::string str = is_key_hex_ ? StringToHex(iter->key().ToString())
+                                      : iter->key().ToString();
+        fprintf(stdout, "%s\n", str.c_str());
+      } else {
+        std::string str =
+            PrintKeyValue(iter->key().ToString(), iter->value().ToString(),
+                          is_key_hex_, is_value_hex_);
+        fprintf(stdout, "%s\n", str.c_str());
+      }
+>>>>>>> c7bab4f78... adding beezcli and ttl support (#427)
     }
   }
 
@@ -2259,8 +2332,14 @@ void DBDumperCommand::DoDumpCommand() {
     fprintf(stdout, "Keys in range: %" PRIu64 "\n", count);
   }
 
-  if (count_only_) {
+  if (count_only_ || print_stats_) {
+    fprintf(stdout, "\nKey size distribution: \n");
+    fprintf(stdout, "\nSum of keys' sizes in range: %" PRIu64 "\n",
+            ksize_hist.sum());
+    fprintf(stdout, "%s\n", ksize_hist.ToString().c_str());
     fprintf(stdout, "Value size distribution: \n");
+    fprintf(stdout, "\nSum of values' sizes in range: %" PRIu64 "\n",
+            vsize_hist.sum());
     fprintf(stdout, "%s\n", vsize_hist.ToString().c_str());
   }
   // Clean up
@@ -2831,7 +2910,7 @@ void GetCommand::Help(std::string& ret) {
   ret.append("  ");
   ret.append(GetCommand::Name());
   ret.append(" <key>");
-  ret.append(" [--" + ARG_TTL + "]");
+  ret.append(" [--" + ARG_TTL + "[=<ttl>]]");
   ret.append("\n");
 }
 
@@ -3033,6 +3112,55 @@ void BatchPutCommand::OverrideBaseOptions() {
 }
 
 // ----------------------------------------------------------------------------
+MultiGetCommand::MultiGetCommand(
+    const std::vector<std::string>& params,
+    const std::map<std::string, std::string>& options,
+    const std::vector<std::string>& flags)
+    : LDBCommand(
+          options, flags, false,
+          BuildCmdLineOptions({ARG_TTL, ARG_HEX, ARG_KEY_HEX, ARG_VALUE_HEX})) {
+  if (params.size() < 1) {
+    exec_state_ = LDBCommandExecuteResult::Failed(
+        "At least one <key> must be specified multiget.");
+  }
+  keys_ = params;
+}
+void MultiGetCommand::Help(std::string& ret) {
+  ret.append("  ");
+  ret.append(MultiGetCommand::Name());
+  ret.append(" <key> [<key>] [..]");
+  ret.append(" [--" + ARG_TTL + "[=<ttl>]]");
+  ret.append("\n");
+}
+
+void MultiGetCommand::DoCommand() {
+  if (!db_) {
+    assert(GetExecuteState().IsFailed());
+    return;
+  }
+
+  Status st;
+  std::vector<Status> statuses;
+  std::vector<std::string> values;
+  ReadOptions ropts;
+  std::vector<Slice> keys;
+  for (const auto& key : keys_) {
+    keys.push_back(key);
+  }
+  statuses = db_->MultiGet(ropts, keys, &values);
+  for (size_t i = 0; i < statuses.size(); ++i) {
+    if (statuses[i].ok()) {
+      fprintf(stdout, "%s\n",
+              PrintKeyValue(keys[i].ToString().c_str(), values[i], is_key_hex_,
+                            is_value_hex_)
+                  .c_str());
+    } else {
+      fprintf(stderr, "Cannot get: %s, error: %s\n", keys[i].ToString().c_str(),
+              statuses[i].ToString().c_str());
+    }
+  }
+}
+// ----------------------------------------------------------------------------
 
 ScanCommand::ScanCommand(const std::vector<std::string>& /*params*/,
                          const std::map<std::string, std::string>& options,
@@ -3091,7 +3219,6 @@ void ScanCommand::Help(std::string& ret) {
   ret.append("  ");
   ret.append(ScanCommand::Name());
   ret.append(HelpRangeCmdArgs());
-  ret.append(" [--" + ARG_TTL + "]");
   ret.append(" [--" + ARG_TIMESTAMP + "]");
   ret.append(" [--" + ARG_MAX_KEYS + "=<N>q] ");
   ret.append(" [--" + ARG_TTL_START + "=<N>:- is inclusive]");
@@ -3434,7 +3561,7 @@ DBQuerierCommand::DBQuerierCommand(
 void DBQuerierCommand::Help(std::string& ret) {
   ret.append("  ");
   ret.append(DBQuerierCommand::Name());
-  ret.append(" [--" + ARG_TTL + "]");
+  ret.append(" [--" + ARG_TTL + "[=<ttl>]]");
   ret.append("\n");
   ret.append(
       "    Starts a REPL shell.  Type help for list of available "

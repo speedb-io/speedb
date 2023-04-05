@@ -23,6 +23,9 @@ void LDBCommandRunner::PrintHelp(const LDBOptions& ldb_options,
              "=<full_path_to_db_directory> when necessary\n");
   ret.append("\n");
   ret.append("commands can optionally specify\n");
+  ret.append("  --" + LDBCommand::ARG_INTERACTIVE +
+             " to enter interactive interface");
+  ret.append("\n");
   ret.append("  --" + LDBCommand::ARG_ENV_URI + "=<uri_of_environment> or --" +
              LDBCommand::ARG_FS_URI + "=<uri_of_filesystem> if necessary");
   ret.append("\n");
@@ -47,9 +50,14 @@ void LDBCommandRunner::PrintHelp(const LDBOptions& ldb_options,
       "  --" + LDBCommand::ARG_CF_NAME +
       "=<string> : name of the column family to operate on. default: default "
       "column family\n");
-  ret.append("  --" + LDBCommand::ARG_TTL +
-             " with 'put','get','scan','dump','query','batchput'"
-             " : DB supports ttl and value is internally timestamp-suffixed\n");
+  ret.append(
+      "  --" + LDBCommand::ARG_TTL +
+      " with 'put','get','scan','dump','query','batchput','multiget','compact'"
+      " : DB supports ttl and value is internally timestamp-suffixed\n"
+      "  Make sure to use --" +
+      LDBCommand::ARG_TTL +
+      " only for db created with ttl otherwise you may lead to a data "
+      "corruption\n");
   ret.append("  --" + LDBCommand::ARG_TRY_LOAD_OPTIONS +
              " : Try to load option file from DB. Default to true if " +
              LDBCommand::ARG_DB +
@@ -92,6 +100,7 @@ void LDBCommandRunner::PrintHelp(const LDBOptions& ldb_options,
   PutCommand::Help(ret);
   GetCommand::Help(ret);
   BatchPutCommand::Help(ret);
+  MultiGetCommand::Help(ret);
   ScanCommand::Help(ret);
   DeleteCommand::Help(ret);
   SingleDeleteCommand::Help(ret);
@@ -174,9 +183,12 @@ int LDBCommandRunner::RunCommand(
 
 void LDBTool::Run(int argc, char** argv, Options options,
                   const LDBOptions& ldb_options,
-                  const std::vector<ColumnFamilyDescriptor>* column_families) {
+                  const std::vector<ColumnFamilyDescriptor>* column_families,
+                  bool exit_with_retcode) {
   int error_code = LDBCommandRunner::RunCommand(argc, argv, options,
                                                 ldb_options, column_families);
-  exit(error_code);
+  if (exit_with_retcode) {
+    exit(error_code);
+  }
 }
 }  // namespace ROCKSDB_NAMESPACE

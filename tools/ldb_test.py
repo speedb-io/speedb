@@ -201,6 +201,12 @@ class LDBTestCase(unittest.TestCase):
         self.assertRunFAIL("batchput k1")
         self.assertRunFAIL("batchput k1 v1 k2")
 
+    def testMultiGet(self):
+        print("Running testMultiGet...")
+        self.assertRunOK("batchput x1 y1 x2 y2 --create_if_missing", "OK")
+        self.assertRunOK("multiget x1 x2", "x1 ==> y1\nx2 ==> y2")
+        self.assertRunFAIL("multiget x2 x3")
+
     def testBlobBatchPut(self):
         print("Running testBlobBatchPut...")
 

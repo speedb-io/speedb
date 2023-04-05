@@ -1,4 +1,4 @@
-name: Create release artifacts
+name: Manually test Create release artifacts
 
 on:
   push:

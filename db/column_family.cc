@@ -529,6 +529,7 @@ const uint32_t ColumnFamilyData::kDummyColumnFamilyDataId =
 ColumnFamilyData::ColumnFamilyData(
     uint32_t id, const std::string& name, Version* _dummy_versions,
     Cache* _table_cache, WriteBufferManager* write_buffer_manager,
+    std::shared_ptr<WriteController> write_controller,
     const ColumnFamilyOptions& cf_options, const ImmutableDBOptions& db_options,
     const FileOptions* file_options, ColumnFamilySet* column_family_set,
     BlockCacheTracer* const block_cache_tracer,
@@ -548,6 +549,7 @@ ColumnFamilyData::ColumnFamilyData(
       is_delete_range_supported_(
           cf_options.table_factory->IsDeleteRangeSupported()),
       write_buffer_manager_(write_buffer_manager),
+      write_controller_(write_controller),
       mem_(nullptr),
       imm_(ioptions_.min_write_buffer_number_to_merge,
            ioptions_.max_write_buffer_number_to_maintain,
@@ -668,6 +670,7 @@ ColumnFamilyData::ColumnFamilyData(
 // DB mutex held
 ColumnFamilyData::~ColumnFamilyData() {
   assert(refs_.load(std::memory_order_relaxed) == 0);
+  ResetCFRate(this);
   // remove from linked list
   auto prev = prev_;
   auto next = next_;
@@ -760,9 +763,7 @@ void ColumnFamilyData::SetDropped() {
   // can't drop default CF
   assert(id_ != 0);
   dropped_ = true;
-  if (column_family_set_->write_controller()->is_dynamic_delay()) {
-    column_family_set_->ResetCFRate(this);
-  }
+  ResetCFRate(this);
   write_controller_token_.reset();
 
   // remove from column_family_set
@@ -910,11 +911,9 @@ double ColumnFamilyData::TEST_CalculateWriteDelayDivider(
 }
 
 void ColumnFamilyData::DynamicSetupDelay(
-    WriteController* write_controller, uint64_t compaction_needed_bytes,
+    uint64_t max_write_rate, uint64_t compaction_needed_bytes,
     const MutableCFOptions& mutable_cf_options,
     WriteStallCause& write_stall_cause) {
-  uint64_t max_write_rate = write_controller->max_delayed_write_rate();
-
   const double rate_divider =
       CalculateWriteDelayDividerAndMaybeUpdateWriteStallCause(
           compaction_needed_bytes, mutable_cf_options, write_stall_cause);
@@ -924,11 +923,7 @@ void ColumnFamilyData::DynamicSetupDelay(
     write_rate = WriteController::kMinWriteRate;
   }
 
-  // GetDelayToken returns a DelayWriteToken and also sets the
-  // delayed_write_rate_ which is used by all cfs and dbs using this write
-  // controller. because it also sets the delayed_write_rate_, we need to set
-  // only the smallest active delay request.
-  column_family_set_->UpdateCFRate(this, write_rate);
+  UpdateCFRate(this, write_rate);
 }
 
 std::pair<WriteStallCondition, ColumnFamilyData::WriteStallCause>
@@ -1054,7 +1049,7 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
   auto write_stall_condition = WriteStallCondition::kNormal;
   if (current_ != nullptr) {
     auto* vstorage = current_->storage_info();
-    auto write_controller = column_family_set_->write_controller_ptr();
+    auto write_controller = write_controller_ptr();
     uint64_t compaction_needed_bytes =
         vstorage->estimated_compaction_needed_bytes();
 
@@ -1075,11 +1070,12 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
     // write_stall_cause. this is only relevant in the kDelayed case.
     if (dynamic_delay) {
       if (write_stall_condition == WriteStallCondition::kDelayed) {
-        DynamicSetupDelay(write_controller, compaction_needed_bytes,
-                          mutable_cf_options, write_stall_cause);
+        DynamicSetupDelay(write_controller->max_delayed_write_rate(),
+                          compaction_needed_bytes, mutable_cf_options,
+                          write_stall_cause);
         write_controller_token_.reset();
       } else {
-        column_family_set_->ResetCFRate(this);
+        write_controller->HandleRemoveDelayReq(this);
       }
     }
 
@@ -1684,8 +1680,8 @@ ColumnFamilySet::ColumnFamilySet(
       file_options_(file_options),
       dummy_cfd_(new ColumnFamilyData(
           ColumnFamilyData::kDummyColumnFamilyDataId, "", nullptr, nullptr,
-          nullptr, ColumnFamilyOptions(), *db_options, &file_options_, nullptr,
-          block_cache_tracer, io_tracer, db_id, db_session_id)),
+          nullptr, nullptr, ColumnFamilyOptions(), *db_options, &file_options_,
+          nullptr, block_cache_tracer, io_tracer, db_id, db_session_id)),
       default_cfd_cache_(nullptr),
       db_name_(dbname),
       db_options_(db_options),
@@ -1699,19 +1695,14 @@ ColumnFamilySet::ColumnFamilySet(
   // initialize linked list
   dummy_cfd_->prev_ = dummy_cfd_;
   dummy_cfd_->next_ = dummy_cfd_;
-  if (write_controller_->is_dynamic_delay()) {
-    write_buffer_manager_->RegisterWriteController(write_controller_ptr());
-  }
+  write_buffer_manager_->RegisterWriteController(write_controller_ptr());
 }
 
 ColumnFamilySet::~ColumnFamilySet() {
-  if (write_controller_->is_dynamic_delay()) {
-    write_buffer_manager_->DeregisterWriteController(write_controller_ptr());
-  }
+  write_buffer_manager_->DeregisterWriteController(write_controller_ptr());
   while (column_family_data_.size() > 0) {
     // cfd destructor will delete itself from column_family_data_
     auto cfd = column_family_data_.begin()->second;
-    write_controller_->HandleRemoveDelayReq(cfd);
     bool last_ref __attribute__((__unused__));
     last_ref = cfd->UnrefAndTryDelete();
     assert(last_ref);
@@ -1767,9 +1758,9 @@ ColumnFamilyData* ColumnFamilySet::CreateColumnFamily(
     const ColumnFamilyOptions& options) {
   assert(column_families_.find(name) == column_families_.end());
   ColumnFamilyData* new_cfd = new ColumnFamilyData(
-      id, name, dummy_versions, table_cache_, write_buffer_manager_, options,
-      *db_options_, &file_options_, this, block_cache_tracer_, io_tracer_,
-      db_id_, db_session_id_);
+      id, name, dummy_versions, table_cache_, write_buffer_manager_,
+      write_controller_, options, *db_options_, &file_options_, this,
+      block_cache_tracer_, io_tracer_, db_id_, db_session_id_);
   column_families_.insert({name, id});
   column_family_data_.insert({id, new_cfd});
   max_column_family_ = std::max(max_column_family_, id);
@@ -1785,12 +1776,14 @@ ColumnFamilyData* ColumnFamilySet::CreateColumnFamily(
   return new_cfd;
 }
 
-void ColumnFamilySet::UpdateCFRate(void* client_id, uint64_t write_rate) {
+void ColumnFamilyData::UpdateCFRate(void* client_id, uint64_t write_rate) {
   write_controller_->HandleNewDelayReq(client_id, write_rate);
 }
 
-void ColumnFamilySet::ResetCFRate(void* client_id) {
-  write_controller_->HandleRemoveDelayReq(client_id);
+void ColumnFamilyData::ResetCFRate(void* client_id) {
+  if (write_controller_ && write_controller_->is_dynamic_delay()) {
+    write_controller_->HandleRemoveDelayReq(client_id);
+  }
 }
 
 // under a DB mutex AND from a write thread

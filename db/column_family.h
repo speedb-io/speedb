@@ -500,7 +500,10 @@ class ColumnFamilyData {
       WriteStallCause& write_stall_cause);
 
  private:
-  void DynamicSetupDelay(WriteController* write_controller,
+  void UpdateCFRate(void* client_id, uint64_t write_rate);
+  void ResetCFRate(void* client_id);
+
+  void DynamicSetupDelay(uint64_t max_write_rate,
                          uint64_t compaction_needed_bytes,
                          const MutableCFOptions& mutable_cf_options,
                          WriteStallCause& write_stall_cause);
@@ -545,6 +548,13 @@ class ColumnFamilyData {
 
   ThreadLocalPtr* TEST_GetLocalSV() { return local_sv_.get(); }
   WriteBufferManager* write_buffer_mgr() { return write_buffer_manager_; }
+
+  WriteController* write_controller_ptr() { return write_controller_.get(); }
+
+  const WriteController* write_controller_ptr() const {
+    return write_controller_.get();
+  }
+
   std::shared_ptr<CacheReservationManager>
   GetFileMetadataCacheReservationManager() {
     return file_metadata_cache_res_mgr_;
@@ -570,6 +580,7 @@ class ColumnFamilyData {
   ColumnFamilyData(uint32_t id, const std::string& name,
                    Version* dummy_versions, Cache* table_cache,
                    WriteBufferManager* write_buffer_manager,
+                   std::shared_ptr<WriteController> write_controller,
                    const ColumnFamilyOptions& options,
                    const ImmutableDBOptions& db_options,
                    const FileOptions* file_options,
@@ -605,6 +616,7 @@ class ColumnFamilyData {
   std::unique_ptr<InternalStats> internal_stats_;
 
   WriteBufferManager* write_buffer_manager_;
+  std::shared_ptr<WriteController> write_controller_;
 
   MemTable* mem_;
   MemTableList imm_;
@@ -749,9 +761,9 @@ class ColumnFamilySet {
   }
   WriteController* write_controller_ptr() { return write_controller_.get(); }
 
-  void UpdateCFRate(void* client_id, uint64_t write_rate);
-
-  void ResetCFRate(void* client_id);
+  const WriteController* write_controller_ptr() const {
+    return write_controller_.get();
+  }
 
  private:
   friend class ColumnFamilyData;

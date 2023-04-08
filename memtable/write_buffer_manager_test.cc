@@ -40,9 +40,10 @@ void ScheduleBeginAndFreeMem(WriteBufferManager& wbf, size_t size) {
 
 TEST_F(WriteBufferManagerTest, ShouldFlush) {
   // A write buffer manager of size 10MB
-  std::unique_ptr<WriteBufferManager> wbf(new WriteBufferManager(
-      10 * 1024 * 1024, {} /* cache */, WriteBufferManager::kDfltAllowStall,
-      false /* initiate_flushes */));
+  std::unique_ptr<WriteBufferManager> wbf(
+      new WriteBufferManager(10 * 1024 * 1024, {} /* cache */,
+                             WriteBufferManager::kDfltAllowDelaysAndStalls,
+                             false /* initiate_flushes */));
 
   wbf->ReserveMem(8 * 1024 * 1024);
   ASSERT_FALSE(wbf->ShouldFlush());
@@ -113,7 +114,7 @@ TEST_F(ChargeWriteBufferTest, Basic) {
   std::shared_ptr<Cache> cache = NewLRUCache(co);
   // A write buffer manager of size 50MB
   std::unique_ptr<WriteBufferManager> wbf(new WriteBufferManager(
-      50 * 1024 * 1024, cache, WriteBufferManager::kDfltAllowStall,
+      50 * 1024 * 1024, cache, WriteBufferManager::kDfltAllowDelaysAndStalls,
       false /* initiate_flushes */));
 
   // Allocate 333KB will allocate 512KB, memory_used_ = 333KB

@@ -338,9 +338,10 @@ int db_stress_tool(int argc, char** argv) {
   }
 
   if (FLAGS_db_write_buffer_size == 0) {
-    if (FLAGS_allow_wbm_stalls) {
+    if (FLAGS_allow_wbm_delays_and_stalls) {
       fprintf(stderr,
-              "-allow_wbm_stalls is useless if db_write_buffer_size == 0\n");
+              "-allow_wbm_delays_and_stalls is useless if db_write_buffer_size "
+              "== 0\n");
       exit(1);
     }
     if (FLAGS_initiate_wbm_flushes) {

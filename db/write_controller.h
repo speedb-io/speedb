@@ -12,14 +12,13 @@
 #include <memory>
 #include <mutex>
 
-#include "db/error_handler.h"
 #include "rocksdb/rate_limiter.h"
 
 namespace ROCKSDB_NAMESPACE {
 
 class SystemClock;
 class WriteControllerToken;
-
+class ErrorHandler;
 // WriteController is controlling write stalls in our write code-path. Write
 // stalls happen when compaction can't keep up with write rate.
 // All of the methods here (including WriteControllerToken's destructors) need
@@ -97,23 +96,15 @@ class WriteController {
 
   int TEST_total_delayed_count() const { return total_delayed_.load(); }
 
-  // methods and members used when dynamic_delay_ == true.
+  /////// methods and members used when dynamic_delay_ == true. ///////
   // for now, clients can be column families or WriteBufferManagers
   // and the Id (void*) is simply the pointer to their obj
   using ClientIdToRateMap = std::unordered_map<void*, uint64_t>;
 
-  // the usual case is to set the write_rate of this client (cf, write buffer
-  // manager) only if its lower than the current min (delayed_write_rate_) but
-  // theres also the case where this client was the min rate (was_min) and now
-  // its write_rate is higher than the delayed_write_rate_ so we need to find a
-  // new min from all clients via call to GetMapMinRate()
   void HandleNewDelayReq(void* client_id, uint64_t cf_write_rate);
 
-  // Checks if the client is in the id_to_write_rate_map_ , if it is:
-  // 1. remove it
-  // 2. total_delayed_--
-  // 3. in case this client had min rate, also set up a new min from the map.
-  // 4. if total_delayed_ == 0, reset next_refill_time_ and credit_in_bytes_
+  // Removes a client's delay and updates the Write Controller's effective
+  // delayed write rate if applicable
   void HandleRemoveDelayReq(void* client_id);
 
   uint64_t TEST_GetMapMinRate();
@@ -122,7 +113,6 @@ class WriteController {
   void NotifyCV();
 
  private:
-  // methods and members used when dynamic_delay_ == true.
   bool IsMinRate(void* client_id);
   bool IsInRateMap(void* client_id);
   // REQUIRES: cf_id is in the rate map.
@@ -143,7 +133,7 @@ class WriteController {
   // The mutex used by stop_cv_
   std::mutex stop_mu_;
   std::condition_variable stop_cv_;
-  // end of methods and members used when dynamic_delay_ == true.
+  /////// end of methods and members used when dynamic_delay_ == true. ///////
 
   uint64_t NowMicrosMonotonic(SystemClock* clock);
 

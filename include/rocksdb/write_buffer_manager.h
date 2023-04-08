@@ -30,7 +30,6 @@ struct Options;
 class CacheReservationManager;
 class InstrumentedMutex;
 class InstrumentedCondVar;
-// including write_controller.h leads to compilation errors.
 class WriteController;
 
 // Interface to block and signal DB instances, intended for RocksDB
@@ -48,7 +47,7 @@ class WriteBufferManager final {
  public:
   // Delay Mechanism (allow_delays_and_stalls == true) definitions
   static constexpr uint16_t kDfltStartDelayPercentThreshold = 70U;
-  static constexpr uint64_t kNoneDelayedWriteFactor = 0U;
+  static constexpr uint64_t kNoDelayedWriteFactor = 0U;
   static constexpr uint64_t kMaxDelayedWriteFactor = 100U;
   static constexpr uint64_t kStopDelayedWriteFactor = kMaxDelayedWriteFactor;
   enum class UsageState { kNone, kDelay, kStop };
@@ -66,7 +65,7 @@ class WriteBufferManager final {
     size_t max_num_parallel_flushes = kDfltMaxNumParallelFlushes;
   };
 
-  static constexpr bool kDfltAllowStall = true;
+  static constexpr bool kDfltAllowDelaysAndStalls = true;
   static constexpr bool kDfltInitiateFlushes = true;
 
  public:
@@ -96,7 +95,7 @@ class WriteBufferManager final {
   // write-path of a DB.
   explicit WriteBufferManager(
       size_t _buffer_size, std::shared_ptr<Cache> cache = {},
-      bool allow_delays_and_stalls = kDfltAllowStall,
+      bool allow_delays_and_stalls = kDfltAllowDelaysAndStalls,
       bool initiate_flushes = kDfltInitiateFlushes,
       const FlushInitiationOptions& flush_initiation_options =
           FlushInitiationOptions(),
@@ -121,7 +120,7 @@ class WriteBufferManager final {
     return memory_used_.load(std::memory_order_relaxed);
   }
 
-  void TEST_set_memory_usage(size_t mem) { memory_used_.store(mem); }
+  void TEST_reset_memory_usage() { memory_used_.store(0); }
 
   // Returns the total memory used by active memtables.
   size_t mutable_memtable_memory_usage() const {
@@ -275,13 +274,7 @@ class WriteBufferManager final {
   void TEST_WakeupFlushInitiationThread();
 
  public:
-  bool IsDelayAllowed() const { return allow_delays_and_stalls_; }
-
-  uint16_t TEST_get_start_delay_percent() const { return start_delay_percent_; }
-
-  std::pair<UsageState, uint64_t> GetUsageStateInfo() const {
-    return ParseCodedUsageState(GetCodedUsageState());
-  }
+  uint16_t get_start_delay_percent() const { return start_delay_percent_; }
 
   // Add this Write Controller(WC) to controllers_to_refcount_map_
   // which the WBM is responsible for updating (when stalling is allowed).
@@ -297,7 +290,10 @@ class WriteBufferManager final {
   // will actually be used for the delay token
   static constexpr uint64_t kNoneCodedUsageState = 0U;
   static constexpr uint64_t kStopCodedUsageState = kMaxDelayedWriteFactor + 1;
-  static constexpr uint64_t kWBMId = 0U;
+
+  std::pair<UsageState, uint64_t> GetUsageStateInfo() const {
+    return ParseCodedUsageState(GetCodedUsageState());
+  }
 
   void UpdateUsageState(size_t new_memory_used, ssize_t mem_changed_size,
                         size_t quota);
@@ -350,10 +346,9 @@ class WriteBufferManager final {
   std::list<StallInterface*> queue_;
   // Protects the queue_ and stall_active_.
   std::mutex mu_;
-  bool allow_delays_and_stalls_;
+  bool allow_delays_and_stalls_ = kDfltAllowDelaysAndStalls;
   uint16_t start_delay_percent_ = kDfltStartDelayPercentThreshold;
 
-  uint64_t wbm_rate_id_;
   // Value should only be changed by BeginWriteStall() and MaybeEndWriteStall()
   // while holding mu_, but it can be read without a lock.
   std::atomic<bool> stall_active_;

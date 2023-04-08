@@ -8,9 +8,9 @@
 #include <algorithm>
 #include <atomic>
 #include <cassert>
-#include <mutex>
 #include <ratio>
 
+#include "db/error_handler.h"
 #include "rocksdb/system_clock.h"
 #include "test_util/sync_point.h"
 
@@ -40,6 +40,7 @@ std::unique_ptr<WriteControllerToken> WriteController::GetDelayToken(
 uint64_t WriteController::TEST_GetMapMinRate() { return GetMapMinRate(); }
 
 uint64_t WriteController::GetMapMinRate() {
+  assert(is_dynamic_delay());
   if (id_to_write_rate_map_.size() > 0) {
     auto min_elem_iter = std::min_element(
         id_to_write_rate_map_.begin(), id_to_write_rate_map_.end(),
@@ -51,6 +52,7 @@ uint64_t WriteController::GetMapMinRate() {
 }
 
 bool WriteController::IsMinRate(void* client_id) {
+  assert(is_dynamic_delay());
   if (!IsInRateMap(client_id)) {
     return false;
   }
@@ -67,8 +69,14 @@ bool WriteController::IsInRateMap(void* client_id) {
   return id_to_write_rate_map_.count(client_id);
 }
 
+// the usual case is to set the write_rate of this client (cf, write buffer
+// manager) only if its lower than the current min (delayed_write_rate_) but
+// theres also the case where this client was the min rate (was_min) and now
+// its write_rate is higher than the delayed_write_rate_ so we need to find a
+// new min from all clients via call to GetMapMinRate()
 void WriteController::HandleNewDelayReq(void* client_id,
                                         uint64_t cf_write_rate) {
+  assert(is_dynamic_delay());
   std::lock_guard<std::mutex> lock(map_mu_);
   bool was_min = IsMinRate(client_id);
   bool inserted =
@@ -85,7 +93,13 @@ void WriteController::HandleNewDelayReq(void* client_id,
   set_delayed_write_rate(min_rate);
 }
 
+// Checks if the client is in the id_to_write_rate_map_ , if it is:
+// 1. remove it
+// 2. decrement total_delayed_
+// 3. in case this client had min rate, also set up a new min from the map.
+// 4. if total_delayed_ == 0, reset next_refill_time_ and credit_in_bytes_
 void WriteController::HandleRemoveDelayReq(void* client_id) {
+  assert(is_dynamic_delay());
   {
     std::lock_guard<std::mutex> lock(map_mu_);
     if (!IsInRateMap(client_id)) {

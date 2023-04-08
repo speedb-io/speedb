@@ -34,7 +34,6 @@ WriteBufferManager::WriteBufferManager(
       cache_res_mgr_(nullptr),
       allow_delays_and_stalls_(allow_delays_and_stalls),
       start_delay_percent_(start_delay_percent),
-      wbm_rate_id_(reinterpret_cast<uint64_t>(this)),
       stall_active_(false),
       initiate_flushes_(initiate_flushes),
       flush_initiation_options_(flush_initiation_options),
@@ -58,8 +57,9 @@ WriteBufferManager::WriteBufferManager(
     InitFlushInitiationVars(buffer_size());
   }
   if (start_delay_percent_ >= 100) {
-    // unsuitable value, sanitizing to Dflt. TODO: add reporting
-    start_delay_percent_ = 70U;
+    // unsuitable value, sanitizing to Dflt.
+    // TODO: add reporting
+    start_delay_percent_ = kDfltStartDelayPercentThreshold;
   }
 }
 
@@ -313,13 +313,17 @@ std::string WriteBufferManager::GetPrintableOptions() const {
            "wbm.initiate_flushes", IsInitiatingFlushes());
   ret.append(buffer);
 
+  snprintf(buffer, kBufferSize, "%*s: %d\n", field_width,
+           "wbm.start_delay_percent", start_delay_percent_);
+  ret.append(buffer);
+
   return ret;
 }
 
 void WriteBufferManager::RegisterWriteController(WriteController* wc) {
   std::lock_guard<std::mutex> lock(controllers_map_mutex_);
   if (controllers_to_refcount_map_.count(wc)) {
-    controllers_to_refcount_map_[wc]++;
+    ++controllers_to_refcount_map_[wc];
   } else {
     controllers_to_refcount_map_.insert({wc, 1});
   }
@@ -334,17 +338,15 @@ void WriteBufferManager::DeregisterWriteController(WriteController* wc) {
 
 bool WriteBufferManager::RemoveFromControllersMap(WriteController* wc) {
   std::lock_guard<std::mutex> lock(controllers_map_mutex_);
-  if (controllers_to_refcount_map_.count(wc)) {
-    assert(controllers_to_refcount_map_[wc] > 0);
-    controllers_to_refcount_map_[wc]--;
-    if (controllers_to_refcount_map_[wc] == 0) {
-      controllers_to_refcount_map_.erase(wc);
-      return true;
-    } else {
-      return false;
-    }
+  assert(controllers_to_refcount_map_.count(wc));
+  assert(controllers_to_refcount_map_[wc] > 0);
+  --controllers_to_refcount_map_[wc];
+  if (controllers_to_refcount_map_[wc] == 0) {
+    controllers_to_refcount_map_.erase(wc);
+    return true;
+  } else {
+    return false;
   }
-  return false;
 }
 
 namespace {
@@ -387,19 +389,25 @@ uint64_t CalcDelayFromFactor(uint64_t max_write_rate, uint64_t delay_factor) {
 }  // Unnamed Namespace
 
 void WriteBufferManager::WBMSetupDelay(uint64_t delay_factor) {
+  std::lock_guard<std::mutex> lock(controllers_map_mutex_);
   for (auto& wc_and_ref_count : controllers_to_refcount_map_) {
     // the final rate depends on the write controllers max rate so
     // each wc can receive a different delay requirement.
     WriteController* wc = wc_and_ref_count.first;
-    uint64_t wbm_write_rate =
-        CalcDelayFromFactor(wc->max_delayed_write_rate(), delay_factor);
-    wc->HandleNewDelayReq(this, wbm_write_rate);
+    if (wc->is_dynamic_delay()) {
+      uint64_t wbm_write_rate =
+          CalcDelayFromFactor(wc->max_delayed_write_rate(), delay_factor);
+      wc->HandleNewDelayReq(this, wbm_write_rate);
+    }
   }
 }
 
 void WriteBufferManager::ResetDelay() {
+  std::lock_guard<std::mutex> lock(controllers_map_mutex_);
   for (auto& wc_and_ref_count : controllers_to_refcount_map_) {
-    wc_and_ref_count.first->HandleRemoveDelayReq(this);
+    if (wc_and_ref_count.first->is_dynamic_delay()) {
+      wc_and_ref_count.first->HandleRemoveDelayReq(this);
+    }
   }
 }
 
@@ -492,7 +500,7 @@ uint64_t WriteBufferManager::CalcCodedUsageState(UsageState usage_state,
 auto WriteBufferManager::ParseCodedUsageState(uint64_t coded_usage_state)
     -> std::pair<UsageState, uint64_t> {
   if (coded_usage_state <= kNoneCodedUsageState) {
-    return {UsageState::kNone, kNoneDelayedWriteFactor};
+    return {UsageState::kNone, kNoDelayedWriteFactor};
   } else if (coded_usage_state < kStopCodedUsageState) {
     return {UsageState::kDelay, coded_usage_state};
   } else {
@@ -518,9 +526,9 @@ void WriteBufferManager::UpdateUsageState(size_t new_memory_used,
 
     if (old_coded_usage_state != new_coded_usage_state) {
       // Try to update the usage state with the usage state calculated by the
-      // current thread. Failure (has_update_succeeded == false) means one or
+      // current thread. Failure (done == false) means one or
       // more threads have updated the current state, rendering our own
-      // calculation irrelevant. In case has_update_succeeded==false,
+      // calculation irrelevant. In case done == false,
       // old_coded_usage_state will be the value of the state that was updated
       // by the other thread(s).
       done = coded_usage_state_.compare_exchange_weak(old_coded_usage_state,
@@ -581,7 +589,6 @@ void WriteBufferManager::InitFlushInitiationVars(size_t quota) {
 
   {
     InstrumentedMutexLock lock(flushes_mu_.get());
-    // TODO: udi - is this not an overflow issue?
     additional_flush_step_size_ =
         quota * kStartFlushPercentThreshold / 100 /
         flush_initiation_options_.max_num_parallel_flushes;

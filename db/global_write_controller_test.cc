@@ -414,7 +414,7 @@ TEST_F(GlobalWriteControllerTest, GlobalAndWBMCalcDelay) {
   ASSERT_EQ(wc->delayed_write_rate(), 16 mb);
 
   // reset memory usage to get an exact change
-  wbm->TEST_set_memory_usage(0);
+  wbm->TEST_reset_memory_usage();
   size_t mem_to_set = 28 kb;
   wbm->ReserveMem(mem_to_set);
 
@@ -430,7 +430,7 @@ TEST_F(GlobalWriteControllerTest, GlobalAndWBMCalcDelay) {
   // kMaxDelayedWriteFactor = 100;
   uint64_t max_rate = wc->max_delayed_write_rate();
   size_t mem_quota = wbm->buffer_size();
-  auto start_delay_percent = wbm->TEST_get_start_delay_percent();
+  auto start_delay_percent = wbm->get_start_delay_percent();
   // since factor is 0 -> sanitized to 1
   uint64_t wbm_delay_req =
       CalcWBMDelay(max_rate, mem_quota, mem_to_set, start_delay_percent);
@@ -476,7 +476,7 @@ TEST_F(GlobalWriteControllerTest, GlobalAndWBMCompetingRequests) {
   uint64_t max_rate = wc->max_delayed_write_rate();
 
   // reset memory usage to get an exact change
-  wbm->TEST_set_memory_usage(0);
+  wbm->TEST_reset_memory_usage();
   // reserve to be halfway through [slowdown, stop] range.
   size_t mem_to_set = 34 kb;
   wbm->ReserveMem(mem_to_set);
@@ -505,7 +505,7 @@ TEST_F(GlobalWriteControllerTest, GlobalAndWBMCompetingRequests) {
   wbm->ReserveMem(4 kb);
   ASSERT_EQ(wc->TEST_total_delayed_count(), 3);
   // calculating in both ways to make sure they match
-  auto start_delay_percent = wbm->TEST_get_start_delay_percent();
+  auto start_delay_percent = wbm->get_start_delay_percent();
   uint64_t wbm_delay_req = CalcWBMDelay(max_rate, wbm->buffer_size(),
                                         mem_to_set + 4 kb, start_delay_percent);
   ASSERT_EQ(wc->delayed_write_rate(), wbm_delay_req);
@@ -518,7 +518,7 @@ TEST_F(GlobalWriteControllerTest, GlobalAndWBMCompetingRequests) {
       wbm_delay_req);
 
   // remove all delay requests and make sure they clean up
-  wbm->TEST_set_memory_usage(0);
+  wbm->TEST_reset_memory_usage();
   wbm->ReserveMem(12 kb);
   ASSERT_EQ(wc->TEST_total_delayed_count(), 2);
   ASSERT_EQ(wc->delayed_write_rate(), db1_l0_delay);

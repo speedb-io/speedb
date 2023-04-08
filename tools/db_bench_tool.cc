@@ -549,7 +549,9 @@ DEFINE_int64(db_write_buffer_size,
 DEFINE_bool(cost_write_buffer_to_cache, false,
             "The usage of memtable is costed to the block cache");
 
-DEFINE_bool(allow_wbm_stalls, true, "Enable WBM write stalls and delays");
+DEFINE_bool(allow_wbm_delays_and_stalls,
+            ROCKSDB_NAMESPACE::WriteBufferManager::kDfltAllowDelaysAndStalls,
+            "Enable WBM write stalls and delays");
 
 DEFINE_bool(initiate_wbm_flushes, false,
             "WBM will proactively initiate flushes (Speedb)."
@@ -563,6 +565,12 @@ DEFINE_uint32(max_num_parallel_flushes,
               "In case FLAGGS_initiate_wbm_flushes is true, this flag will "
               "overwrite the default "
               "max number of parallel flushes.");
+
+DEFINE_uint32(
+    start_delay_percent,
+    ROCKSDB_NAMESPACE::WriteBufferManager::kDfltStartDelayPercentThreshold,
+    "The percent threshold of the buffer size after which WBM will "
+    "initiate delays.");
 
 DEFINE_int64(arena_block_size, ROCKSDB_NAMESPACE::Options().arena_block_size,
              "The size, in bytes, of one block in arena memory allocation.");
@@ -5000,8 +5008,10 @@ class Benchmark {
         FLAGS_track_and_verify_wals_in_manifest;
 
     if (FLAGS_db_write_buffer_size == 0) {
-      if (FLAGS_allow_wbm_stalls) {
-        ErrorExit("-allow_wbm_stalls is useless if db_write_buffer_size == 0");
+      if (FLAGS_allow_wbm_delays_and_stalls) {
+        ErrorExit(
+            "-allow_wbm_delays_and_stalls is useless if db_write_buffer_size "
+            "== 0");
       }
       if (FLAGS_initiate_wbm_flushes) {
         ErrorExit(
@@ -5016,8 +5026,9 @@ class Benchmark {
       }
 
       options.write_buffer_manager.reset(new WriteBufferManager(
-          FLAGS_db_write_buffer_size, cache_, FLAGS_allow_wbm_stalls,
-          FLAGS_initiate_wbm_flushes, flush_initiation_options));
+          FLAGS_db_write_buffer_size, cache_, FLAGS_allow_wbm_delays_and_stalls,
+          FLAGS_initiate_wbm_flushes, flush_initiation_options,
+          static_cast<uint16_t>(FLAGS_start_delay_percent)));
     }
 
     if (FLAGS_use_dynamic_delay && FLAGS_num_multi_db > 1) {

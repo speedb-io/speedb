@@ -1748,10 +1748,12 @@ Status DBImpl::DelayWrite(uint64_t num_bytes,
     StopWatch sw(immutable_db_options_.clock, stats_, WRITE_STALL,
                  &time_delayed);
     mutex_.AssertHeld();
-    mutex_.Unlock();
-    uint64_t delay =
-        write_controller_->GetDelay(immutable_db_options_.clock, num_bytes);
-    mutex_.Lock();
+    uint64_t delay = 0;
+    {
+      InstrumentedMutexUnlock unlock_guard(&mutex_);
+      delay =
+          write_controller_->GetDelay(immutable_db_options_.clock, num_bytes);
+    }
     if (delay > 0) {
       if (write_options.no_slowdown) {
         return Status::Incomplete("Write stall");
@@ -1797,15 +1799,11 @@ Status DBImpl::DelayWrite(uint64_t num_bytes,
       // fail any pending writers with no_slowdown
       write_thread_.BeginWriteStall();
       TEST_SYNC_POINT("DBImpl::DelayWrite:Wait");
-      // check here if another db is able to wake all the others.
-      // in a unit test:
-      // this db stops writing since another db is in a stop condition. make
-      // sure this db exits the stop condition.
-      mutex_.Unlock();
 
-      write_controller_->WaitOnCV(error_handler_);
-
-      mutex_.Lock();
+      {
+        InstrumentedMutexUnlock unlock_guard(&mutex_);
+        write_controller_->WaitOnCV(error_handler_);
+      }
       write_thread_.EndWriteStall();
     }
   }

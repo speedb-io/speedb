@@ -331,7 +331,7 @@ void WriteBufferManager::RegisterWriteController(WriteController* wc) {
 
 void WriteBufferManager::DeregisterWriteController(WriteController* wc) {
   bool last_entry = RemoveFromControllersMap(wc);
-  if (last_entry) {
+  if (last_entry && wc->is_dynamic_delay()) {
     wc->HandleRemoveDelayReq(this);
   }
 }

@@ -1749,6 +1749,11 @@ Status DBImpl::DelayWrite(uint64_t num_bytes,
                  &time_delayed);
     mutex_.AssertHeld();
 
+    // im releasing here since im taking another mutex in GetDelay and i dont
+    // want to take 2 simultaneously i've noticed that the db mutex needs to be
+    // held before calling write_thread_.BeginWriteStall() and the respective
+    // write_thread_.EndWriteStall();
+
     // Why are you releasing the mutex here? Please add documentation to justify it.
     // Are you sure that releasing the mutex here is not going to cause any issues?
     // Will it allow any other activity to occur in this DB that relies on the db_mutex to be locked?

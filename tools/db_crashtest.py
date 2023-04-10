@@ -728,7 +728,7 @@ def finalize_and_sanitize(src_params, counter):
                                          random.lognormvariate(2.3, 1.3)])
 
     # If initiate_wbm_flushes is enabled, db_write_buffer_size must be > 0, otherwise db_stress crashes 
-    if dest_params.get("initiate_wbm_flushes") == 1:
+    if dest_params.get("initiate_wbm_flushes") == 1 or dest_params.get("allow_wbm_delays_and_stalls") == 1:
       dest_params["db_write_buffer_size"]= random.choice([1024 * 1024, 8 * 1024 * 1024, 128 * 1024 * 1024, 1024 * 1024 * 1024])
 
     return dest_params

@@ -261,9 +261,8 @@ void SpdbWriteImpl::PublishedSeq() {
       }
     }
     if (published_seq != 0) {
-      ROCKS_LOG_INFO(db_->immutable_db_options().info_log,
-                     "PublishedSeq %" PRIu64, published_seq);
-
+      /*ROCKS_LOG_INFO(db_->immutable_db_options().info_log,
+                     "PublishedSeq %" PRIu64, published_seq);*/
       db_->SetLastSequence(published_seq);
     }
   }
@@ -279,10 +278,10 @@ void SpdbWriteImpl::SwitchAndWriteBatchGroup(WritesBatchList* batch_group) {
 
   wal_write_mutex_.Lock();
   SwitchBatchGroupIfNeeded();
-  ROCKS_LOG_INFO(db_->immutable_db_options().info_log,
+  /*ROCKS_LOG_INFO(db_->immutable_db_options().info_log,
                  "SwitchBatchGroup last batch group with %d batches and with "
                  "publish seq %" PRIu64,
-                 batch_group->elements_num_, batch_group->GetMaxSeq());
+                 batch_group->elements_num_, batch_group->GetMaxSeq());*/
 
   if (!batch_group->wal_writes_.empty()) {
     auto const& immutable_db_options = db_->immutable_db_options();
@@ -360,9 +359,9 @@ void SpdbWriteImpl::SwitchAndWriteBatchGroup(WritesBatchList* batch_group) {
   }
 
   batch_group->WriteBatchComplete(true);
-  ROCKS_LOG_INFO(db_->immutable_db_options().info_log,
+  /*ROCKS_LOG_INFO(db_->immutable_db_options().info_log,
                  "Complete batch group with publish seq %" PRIu64,
-                 batch_group->GetMaxSeq());
+                 batch_group->GetMaxSeq());*/
 
   PublishedSeq();
 }
@@ -438,16 +437,16 @@ IOStatus DBImpl::SpdbSyncWAL(uint64_t offset, uint64_t size) {
     InstrumentedMutexLock l(&log_write_mutex_);
     log::Writer* log_writer = logs_.back().writer;
     io_s = log_writer->SyncRange(immutable_db_options_.use_fsync, offset, size);
-    ROCKS_LOG_INFO(immutable_db_options().info_log,
+    /*ROCKS_LOG_INFO(immutable_db_options().info_log,
                    "Complete SyncRange offset %" PRIu64 " size %" PRIu64,
-                   offset, size);
+                   offset, size);*/
   }
   if (io_s.ok() && !log_dir_synced_) {
     io_s = directories_.GetWalDir()->FsyncWithDirOptions(
         IOOptions(), nullptr,
         DirFsyncOptions(DirFsyncOptions::FsyncReason::kNewFileSynced));
     log_dir_synced_ = true;
-    ROCKS_LOG_INFO(immutable_db_options().info_log, "Complete Sync dir");
+    /*ROCKS_LOG_INFO(immutable_db_options().info_log, "Complete Sync dir");*/
   }
   return io_s;
 }

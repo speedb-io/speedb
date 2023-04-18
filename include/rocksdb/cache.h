@@ -22,9 +22,12 @@
 
 #pragma once
 
+#include <atomic>
 #include <cstdint>
 #include <functional>
-#include <memory>
+#include <limits>
+#include <list>
+#include <mutex>
 #include <string>
 
 #include "rocksdb/compression_type.h"
@@ -304,6 +307,12 @@ class Cache {
   // are prioritized over them.
   enum class Priority { HIGH, LOW, BOTTOM };
 
+  using ItemOwnerId = uint16_t;
+  static constexpr ItemOwnerId kUnknownItemId = 0U;
+  static constexpr ItemOwnerId kMinOwnerItemId = 1U;
+  static constexpr ItemOwnerId kMaxOwnerItemId =
+      std::numeric_limits<ItemOwnerId>::max();
+
   // A set of callbacks to allow objects in the primary block cache to be
   // be persisted in a secondary cache. The purpose of the secondary cache
   // is to support other ways of caching the object, such as persistent or
@@ -416,9 +425,11 @@ class Cache {
   // value will be passed to "deleter" which must delete the value.
   // (The Cache is responsible for copying and reclaiming space for
   // the key.)
+  static constexpr Priority kDefaultPriority = Priority::LOW;
   virtual Status Insert(const Slice& key, void* value, size_t charge,
                         DeleterFn deleter, Handle** handle = nullptr,
-                        Priority priority = Priority::LOW) = 0;
+                        Priority priority = kDefaultPriority,
+                        Cache::ItemOwnerId item_owner_id = kUnknownItemId) = 0;
 
   // If the cache has no mapping for "key", returns nullptr.
   //
@@ -534,16 +545,18 @@ class Cache {
   // also.
   virtual void ApplyToAllEntries(
       const std::function<void(const Slice& key, void* value, size_t charge,
-                               DeleterFn deleter)>& callback,
+                               DeleterFn deleter,
+                               Cache::ItemOwnerId item_owner_id)>& callback,
       const ApplyToAllEntriesOptions& opts) = 0;
 
   // DEPRECATED version of above. (Default implementation uses above.)
   virtual void ApplyToAllCacheEntries(void (*callback)(void* value,
                                                        size_t charge),
                                       bool /*thread_safe*/) {
-    ApplyToAllEntries([callback](const Slice&, void* value, size_t charge,
-                                 DeleterFn) { callback(value, charge); },
-                      {});
+    ApplyToAllEntries(
+        [callback](const Slice&, void* value, size_t charge, DeleterFn,
+                   uint64_t) { callback(value, charge); },
+        {});
   }
 
   // Remove all entries.
@@ -596,11 +609,13 @@ class Cache {
   virtual Status Insert(const Slice& key, void* value,
                         const CacheItemHelper* helper, size_t charge,
                         Handle** handle = nullptr,
-                        Priority priority = Priority::LOW) {
+                        Priority priority = Priority::LOW,
+                        Cache::ItemOwnerId item_owner_id = kUnknownItemId) {
     if (!helper) {
       return Status::InvalidArgument();
     }
-    return Insert(key, value, charge, helper->del_cb, handle, priority);
+    return Insert(key, value, charge, helper->del_cb, handle, priority,
+                  item_owner_id);
   }
 
   // Lookup the key in the primary and secondary caches (if one is configured).
@@ -656,8 +671,28 @@ class Cache {
   // to each of the handles.
   virtual void WaitAll(std::vector<Handle*>& /*handles*/) {}
 
+  ItemOwnerId GetNextItemOwnerId();
+  // On return will set the owner id to kUnknownItemId
+  void DiscardItemOwnerId(ItemOwnerId*);
+
+  static constexpr size_t kMaxFreeItemOwnersIdListSize = 10000U;
+
  private:
   std::shared_ptr<MemoryAllocator> memory_allocator_;
+
+  class ItemOwnerIdAllocator {
+   public:
+    ItemOwnerId Allocate();
+    void Free(ItemOwnerId* id);
+
+   private:
+    ItemOwnerId next_item_owner_id_ = kMinOwnerItemId;
+    bool has_wrapped_around_ = false;
+    std::mutex free_ids_mutex_;
+    std::list<ItemOwnerId> free_ids_;
+  };
+
+  ItemOwnerIdAllocator owner_id_allocator_;
 };
 
 // Classifications of block cache entries.
@@ -718,6 +753,15 @@ struct BlockCacheEntryStatsMapKeys {
   static std::string EntryCount(CacheEntryRole);
   static std::string UsedBytes(CacheEntryRole);
   static std::string UsedPercent(CacheEntryRole);
+};
+
+// For use with `GetMapProperty()` for property
+// `DB::Properties::kBlockCacheCfStats`. On success, the map will
+// be populated with all keys that can be obtained from these functions.
+struct BlockCacheCfStatsMapKeys {
+  static const std::string& CfName();
+  static const std::string& CacheId();
+  static std::string UsedBytes(CacheEntryRole);
 };
 
 }  // namespace ROCKSDB_NAMESPACE

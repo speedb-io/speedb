@@ -29,7 +29,6 @@
 #include "rocksdb/types.h"
 #include "rocksdb/universal_compaction.h"
 #include "rocksdb/version.h"
-#include "rocksdb/write_buffer_manager.h"
 
 #ifdef max
 #undef max
@@ -55,7 +54,9 @@ class Slice;
 class Statistics;
 class InternalKeyComparator;
 class WalFilter;
+class WriteBufferManager;
 class FileSystem;
+class WriteController;
 
 struct Options;
 struct DbPath;
@@ -921,6 +922,15 @@ struct DBOptions {
   // Default: null
   std::shared_ptr<WriteBufferManager> write_buffer_manager = nullptr;
 
+  // This object tracks and enforces the delay requirements of all cfs in all
+  // the dbs where its passed
+  //
+  // Only supported together with use_dynamic_delay. passing a WriteController
+  // here forces use_dynamic_delay.
+  //
+  // Default: null
+  std::shared_ptr<WriteController> write_controller = nullptr;
+
   // Specify the file access pattern once a compaction is started.
   // It will be applied to all input files of a compaction.
   // Default: NORMAL
@@ -1115,6 +1125,15 @@ struct DBOptions {
   //
   // Default: true
   bool allow_concurrent_memtable_write = true;
+
+  // If true, uses an optimized write path that pipelines writes better in the
+  // presence of multiple writers. Only some memtable_factory-s would really
+  // benefit from this write flow, as it requires support for fast concurrent
+  // insertion in order to be effective.
+  // This is an experimental feature.
+  //
+  // Default: false
+  bool use_spdb_writes = false;
 
   // If true, threads synchronizing with the write batch group leader will
   // wait for up to write_thread_max_yield_usec before blocking on a mutex.
@@ -1407,6 +1426,14 @@ struct DBOptions {
   // of the contract leads to undefined behaviors with high possibility of data
   // inconsistency, e.g. deleted old data become visible again, etc.
   bool enforce_single_del_contracts = true;
+
+  // If non-zero, a task will be started to check for a new
+  // "refresh_options_file" If found, the refresh task will update the mutable
+  // options from the settings in this file
+  // Defaults to check once per hour.  Set to 0 to disable the task.
+  // Not supported in ROCKSDB_LITE mode!
+  unsigned int refresh_options_sec = 60 * 60;
+  std::string refresh_options_file;
 };
 
 // Options to control the behavior of a database (passed to DB::Open)
@@ -1712,6 +1739,10 @@ struct ReadOptions {
   //
   // Default: true
   bool optimize_multiget_for_io;
+
+  // If true, DB with TTL will not Get keys that reached their timeout
+  // Default: false
+  bool skip_expired_data = false;
 
   ReadOptions();
   ReadOptions(bool cksum, bool cache);

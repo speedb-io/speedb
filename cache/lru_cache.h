@@ -103,6 +103,8 @@ struct LRUHandle {
 
   uint16_t flags;
 
+  Cache::ItemOwnerId item_owner_id = Cache::kUnknownItemId;
+
 #ifdef __SANITIZE_THREAD__
   // TSAN can report a false data race on flags, where one thread is writing
   // to one of the mutable bits and another thread is reading this immutable
@@ -359,16 +361,18 @@ class ALIGN_AS(CACHE_LINE_SIZE) LRUCacheShard final : public CacheShard {
   // Like Cache methods, but with an extra "hash" parameter.
   virtual Status Insert(const Slice& key, uint32_t hash, void* value,
                         size_t charge, Cache::DeleterFn deleter,
-                        Cache::Handle** handle,
-                        Cache::Priority priority) override {
-    return Insert(key, hash, value, charge, deleter, nullptr, handle, priority);
+                        Cache::Handle** handle, Cache::Priority priority,
+                        Cache::ItemOwnerId item_owner_id) override {
+    return Insert(key, hash, value, charge, deleter, nullptr, handle, priority,
+                  item_owner_id);
   }
   virtual Status Insert(const Slice& key, uint32_t hash, void* value,
                         const Cache::CacheItemHelper* helper, size_t charge,
-                        Cache::Handle** handle,
-                        Cache::Priority priority) override {
+                        Cache::Handle** handle, Cache::Priority priority,
+                        Cache::ItemOwnerId item_owner_id) override {
     assert(helper);
-    return Insert(key, hash, value, charge, nullptr, helper, handle, priority);
+    return Insert(key, hash, value, charge, nullptr, helper, handle, priority,
+                  item_owner_id);
   }
   // If helper_cb is null, the values of the following arguments don't matter.
   virtual Cache::Handle* Lookup(const Slice& key, uint32_t hash,
@@ -402,7 +406,8 @@ class ALIGN_AS(CACHE_LINE_SIZE) LRUCacheShard final : public CacheShard {
 
   virtual void ApplyToSomeEntries(
       const std::function<void(const Slice& key, void* value, size_t charge,
-                               DeleterFn deleter)>& callback,
+                               DeleterFn deleter,
+                               Cache::ItemOwnerId item_owner_id)>& callback,
       uint32_t average_entries_per_lock, uint32_t* state) override;
 
   virtual void EraseUnRefEntries() override;
@@ -432,7 +437,8 @@ class ALIGN_AS(CACHE_LINE_SIZE) LRUCacheShard final : public CacheShard {
                     bool free_handle_on_fail);
   Status Insert(const Slice& key, uint32_t hash, void* value, size_t charge,
                 DeleterFn deleter, const Cache::CacheItemHelper* helper,
-                Cache::Handle** handle, Cache::Priority priority);
+                Cache::Handle** handle, Cache::Priority priority,
+                Cache::ItemOwnerId item_owner_id);
   // Promote an item looked up from the secondary cache to the LRU cache.
   // The item may be still in the secondary cache.
   // It is only inserted into the hash table and not the LRU list, and only

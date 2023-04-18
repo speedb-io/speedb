@@ -167,7 +167,7 @@ class SimCacheImpl : public SimCache {
   using Cache::Insert;
   Status Insert(const Slice& key, void* value, size_t charge,
                 void (*deleter)(const Slice& key, void* value), Handle** handle,
-                Priority priority) override {
+                Priority priority, Cache::ItemOwnerId item_owner_id) override {
     // The handle and value passed in are for real cache, so we pass nullptr
     // to key_only_cache_ for both instead. Also, the deleter function pointer
     // will be called by user to perform some external operation which should
@@ -178,7 +178,7 @@ class SimCacheImpl : public SimCache {
       // TODO: Check for error here?
       auto s = key_only_cache_->Insert(
           key, nullptr, charge, [](const Slice& /*k*/, void* /*v*/) {}, nullptr,
-          priority);
+          priority, item_owner_id);
       s.PermitUncheckedError();
     } else {
       key_only_cache_->Release(h);
@@ -188,7 +188,8 @@ class SimCacheImpl : public SimCache {
     if (!cache_) {
       return Status::OK();
     }
-    return cache_->Insert(key, value, charge, deleter, handle, priority);
+    return cache_->Insert(key, value, charge, deleter, handle, priority,
+                          item_owner_id);
   }
 
   using Cache::Lookup;
@@ -261,7 +262,8 @@ class SimCacheImpl : public SimCache {
 
   void ApplyToAllEntries(
       const std::function<void(const Slice& key, void* value, size_t charge,
-                               DeleterFn deleter)>& callback,
+                               DeleterFn deleter,
+                               Cache::ItemOwnerId item_owner_id)>& callback,
       const ApplyToAllEntriesOptions& opts) override {
     cache_->ApplyToAllEntries(callback, opts);
   }

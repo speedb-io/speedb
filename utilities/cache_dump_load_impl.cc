@@ -107,10 +107,10 @@ bool CacheDumperImpl::ShouldFilterOut(const Slice& key) {
 // Cache::ApplyToAllEntries. In this callback function, we will get the block
 // type, decide if the block needs to be dumped based on the filter, and write
 // the block through the provided writer.
-std::function<void(const Slice&, void*, size_t, Cache::DeleterFn)>
+std::function<void(const Slice&, void*, size_t, Cache::DeleterFn, uint64_t)>
 CacheDumperImpl::DumpOneBlockCallBack() {
   return [&](const Slice& key, void* value, size_t /*charge*/,
-             Cache::DeleterFn deleter) {
+             Cache::DeleterFn deleter, Cache::ItemOwnerId /* item_owner_id */) {
     // Step 1: get the type of the block from role_map_
     auto e = role_map_.find(deleter);
     CacheEntryRole role;

@@ -31,7 +31,8 @@ fi
 
 git grep -n 'using namespace' -- ':!build_tools' ':!docs' \
     ':!third-party/folly/folly/lang/Align.h' \
-    ':!third-party/gtest-1.8.1/fused-src/gtest/gtest.h'
+    ':!third-party/gtest-1.8.1/fused-src/gtest/gtest.h' \
+    ':!examples/speedb_with_ttl_example.cc'
 if [ "$?" != "1" ]; then
   echo '^^^^ Do not use "using namespace"'
   BAD=1
@@ -40,6 +41,12 @@ fi
 git grep -n -P "[\x80-\xFF]" -- ':!docs' ':!*.md' ':!*.gif'
 if [ "$?" != "1" ]; then
   echo '^^^^ Use only ASCII characters in source files'
+  BAD=1
+fi
+
+git grep -Li -E "license|copyright" -- ':*speed*.cc' ':*spdb*.h' ':*speed*.h' ':*spdb*.cc'
+if [ "$?" != "1" ]; then
+  echo '^^^^ Source files do not contain license'
   BAD=1
 fi
 

@@ -123,6 +123,7 @@ DBOptions BuildDBOptions(const ImmutableDBOptions& immutable_db_options,
   options.advise_random_on_open = immutable_db_options.advise_random_on_open;
   options.db_write_buffer_size = immutable_db_options.db_write_buffer_size;
   options.write_buffer_manager = immutable_db_options.write_buffer_manager;
+  options.write_controller = immutable_db_options.write_controller;
   options.access_hint_on_compaction_start =
       immutable_db_options.access_hint_on_compaction_start;
   options.compaction_readahead_size =
@@ -187,6 +188,8 @@ DBOptions BuildDBOptions(const ImmutableDBOptions& immutable_db_options,
   options.lowest_used_cache_tier = immutable_db_options.lowest_used_cache_tier;
   options.enforce_single_del_contracts =
       immutable_db_options.enforce_single_del_contracts;
+  options.refresh_options_sec = mutable_db_options.refresh_options_sec;
+  options.refresh_options_file = mutable_db_options.refresh_options_file;
   return options;
 }
 

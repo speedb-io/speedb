@@ -895,11 +895,13 @@ class FilterConstructResPeakTrackingCache : public CacheWrapper {
         cache_res_increments_sum_(0) {}
 
   using Cache::Insert;
-  Status Insert(const Slice& key, void* value, size_t charge,
-                void (*deleter)(const Slice& key, void* value),
-                Handle** handle = nullptr,
-                Priority priority = Priority::LOW) override {
-    Status s = target_->Insert(key, value, charge, deleter, handle, priority);
+  Status Insert(
+      const Slice& key, void* value, size_t charge,
+      void (*deleter)(const Slice& key, void* value), Handle** handle = nullptr,
+      Priority priority = Priority::LOW,
+      Cache::ItemOwnerId item_owner_id = Cache::kUnknownItemId) override {
+    Status s = target_->Insert(key, value, charge, deleter, handle, priority,
+                               item_owner_id);
     if (deleter == kNoopDeleterForFilterConstruction) {
       if (last_peak_tracked_) {
         cache_res_peak_ = 0;

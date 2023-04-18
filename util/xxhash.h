@@ -4158,8 +4158,9 @@ typedef void (*XXH3_f_accumulate_512)(void* XXH_RESTRICT, const void*, const voi
 typedef void (*XXH3_f_scrambleAcc)(void* XXH_RESTRICT, const void*);
 typedef void (*XXH3_f_initCustomSecret)(void* XXH_RESTRICT, xxh_u64);
 
-
-#if (XXH_VECTOR == XXH_AVX512)
+// using the functions below (AVX512), cause ASAN errors during stress testing 
+// which is why we avoid using them with MUST_FREE_HEAP_ALLOCATIONS (COMPILE_WITH_ASAN)
+#if (XXH_VECTOR == XXH_AVX512) && !defined(MUST_FREE_HEAP_ALLOCATIONS)
 
 #define XXH3_accumulate_512 XXH3_accumulate_512_avx512
 #define XXH3_scrambleAcc    XXH3_scrambleAcc_avx512

@@ -84,7 +84,14 @@ class Writer {
   ~Writer();
 
   IOStatus AddRecord(const Slice& slice,
-                     Env::IOPriority rate_limiter_priority = Env::IO_TOTAL);
+                     Env::IOPriority rate_limiter_priority = Env::IO_TOTAL,
+                     bool do_flush = true);
+  IOStatus AddRecordWithStartOffsetAndSize(
+      const Slice& slice, Env::IOPriority rate_limiter_priority = Env::IO_TOTAL,
+      bool do_flush = true, uint64_t* offset = nullptr,
+      uint64_t* size = nullptr);
+
+  IOStatus SyncRange(bool use_fsync, uint64_t offset, uint64_t size);
   IOStatus AddCompressionTypeRecord();
 
   WritableFileWriter* file() { return dest_.get(); }

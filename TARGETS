@@ -61,6 +61,7 @@ cpp_library_wrapper(name="rocksdb_lib", srcs=[
         "db/db_impl/db_impl_readonly.cc",
         "db/db_impl/db_impl_secondary.cc",
         "db/db_impl/db_impl_write.cc",
+        "db/db_impl/db_spdb_impl_write.cc",
         "db/db_info_dumper.cc",
         "db/db_iter.cc",
         "db/dbformat.cc",
@@ -282,6 +283,7 @@ cpp_library_wrapper(name="rocksdb_lib", srcs=[
         "utilities/fault_injection_env.cc",
         "utilities/fault_injection_fs.cc",
         "utilities/fault_injection_secondary_cache.cc",
+        "utilities/injection_fs.cc",
         "utilities/leveldb_options/leveldb_options.cc",
         "utilities/memory/memory_util.cc",
         "utilities/merge_operators.cc",
@@ -292,6 +294,7 @@ cpp_library_wrapper(name="rocksdb_lib", srcs=[
         "utilities/merge_operators/string_append/stringappend.cc",
         "utilities/merge_operators/string_append/stringappend2.cc",
         "utilities/merge_operators/uint64add.cc",
+        "utilities/nosync_fs.cc",
         "utilities/object_registry.cc",
         "utilities/option_change_migration/option_change_migration.cc",
         "utilities/options/options_util.cc",
@@ -400,6 +403,7 @@ cpp_library_wrapper(name="rocksdb_whole_archive_lib", srcs=[
         "db/db_impl/db_impl_readonly.cc",
         "db/db_impl/db_impl_secondary.cc",
         "db/db_impl/db_impl_write.cc",
+        "db/db_impl/db_spdb_impl_write.cc",
         "db/db_info_dumper.cc",
         "db/db_iter.cc",
         "db/dbformat.cc",
@@ -621,6 +625,7 @@ cpp_library_wrapper(name="rocksdb_whole_archive_lib", srcs=[
         "utilities/fault_injection_env.cc",
         "utilities/fault_injection_fs.cc",
         "utilities/fault_injection_secondary_cache.cc",
+        "utilities/injection_fs.cc",
         "utilities/leveldb_options/leveldb_options.cc",
         "utilities/memory/memory_util.cc",
         "utilities/merge_operators.cc",
@@ -631,6 +636,7 @@ cpp_library_wrapper(name="rocksdb_whole_archive_lib", srcs=[
         "utilities/merge_operators/string_append/stringappend.cc",
         "utilities/merge_operators/string_append/stringappend2.cc",
         "utilities/merge_operators/uint64add.cc",
+        "utilities/nosync_fs.cc",
         "utilities/object_registry.cc",
         "utilities/option_change_migration/option_change_migration.cc",
         "utilities/options/options_util.cc",
@@ -5406,6 +5412,12 @@ cpp_unittest_wrapper(name="flush_job_test",
 
 cpp_unittest_wrapper(name="full_filter_block_test",
             srcs=["table/block_based/full_filter_block_test.cc"],
+            deps=[":rocksdb_test_lib"],
+            extra_compiler_flags=[])
+
+
+cpp_unittest_wrapper(name="global_write_controller_test",
+            srcs=["db/global_write_controller_test.cc"],
             deps=[":rocksdb_test_lib"],
             extra_compiler_flags=[])
 

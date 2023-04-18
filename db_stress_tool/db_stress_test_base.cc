@@ -682,6 +682,12 @@ void StressTest::OperateDb(ThreadState* thread) {
   read_opts.async_io = FLAGS_async_io;
   read_opts.adaptive_readahead = FLAGS_adaptive_readahead;
   read_opts.readahead_size = FLAGS_readahead_size;
+  if (gflags::GetCommandLineFlagInfoOrDie("ttl").is_default &&
+      FLAGS_skip_expired_data && FLAGS_ttl < 1) {
+    auto error_msg =
+        IOStatus::InvalidArgument("skip_expired_data must be set with ttl");
+  }
+  read_opts.skip_expired_data = FLAGS_skip_expired_data;
   WriteOptions write_opts;
   if (FLAGS_rate_limit_auto_wal_flush) {
     write_opts.rate_limiter_priority = Env::IO_USER;
@@ -2492,7 +2498,6 @@ void StressTest::Open(SharedState* shared) {
 
   Status s;
 
-  if (FLAGS_ttl == -1) {
     std::vector<std::string> existing_column_families;
     s = DB::ListColumnFamilies(DBOptions(options_), FLAGS_db,
                                &existing_column_families);  // ignore errors
@@ -2611,11 +2616,44 @@ void StressTest::Open(SharedState* shared) {
 #endif  // !ROCKSDB_LITE
         {
           if (db_preload_finished_.load() && FLAGS_read_only) {
-            s = DB::OpenForReadOnly(DBOptions(options_), FLAGS_db,
-                                    cf_descriptors, &column_families_, &db_);
+            if (FLAGS_ttl == -1) {
+              s = DB::OpenForReadOnly(DBOptions(options_), FLAGS_db,
+                                      cf_descriptors, &column_families_, &db_);
+            } else {
+              DBWithTTL* dbttl;
+              std::vector<int32_t> ttls;
+              for (size_t i = 0; i < cf_descriptors.size(); ++i) {
+                ttls.push_back(FLAGS_ttl);
+              }
+              s = DBWithTTL::Open(DBOptions(options_), FLAGS_db, cf_descriptors,
+                                  &column_families_, &dbttl, ttls, true);
+              if (!s.ok()) {
+                fprintf(stderr, "Cannot read only open db with ttl. %s\n",
+                        s.ToString().c_str());
+                exit(1);
+              }
+              db_ = dbttl;
+            }
           } else {
-            s = DB::Open(DBOptions(options_), FLAGS_db, cf_descriptors,
-                         &column_families_, &db_);
+            if (FLAGS_ttl == -1) {
+              s = DB::Open(DBOptions(options_), FLAGS_db, cf_descriptors,
+                           &column_families_, &db_);
+            } else {
+              std::vector<int32_t> ttls;
+              for (size_t i = 0; i < cf_descriptors.size(); ++i) {
+                ttls.push_back(FLAGS_ttl);
+              }
+              DBWithTTL* dbttl;
+
+              s = DBWithTTL::Open(DBOptions(options_), FLAGS_db, cf_descriptors,
+                                  &column_families_, &dbttl, ttls);
+              if (!s.ok()) {
+                fprintf(stderr, "Cannot open db with ttl. %s\n",
+                        s.ToString().c_str());
+                exit(1);
+              }
+              db_ = dbttl;
+            }
           }
         }
 
@@ -2743,16 +2781,6 @@ void StressTest::Open(SharedState* shared) {
       exit(1);
 #endif  // !ROCKSDB_LITE
     }
-  } else {
-#ifndef ROCKSDB_LITE
-    DBWithTTL* db_with_ttl;
-    s = DBWithTTL::Open(options_, FLAGS_db, &db_with_ttl, FLAGS_ttl);
-    db_ = db_with_ttl;
-#else
-    fprintf(stderr, "TTL is not supported in LITE mode\n");
-    exit(1);
-#endif
-  }
 
   if (FLAGS_preserve_unverified_changes) {
     // Up until now, no live file should have become obsolete due to these
@@ -3136,6 +3164,10 @@ void InitializeOptionsFromFlags(
       FLAGS_verify_sst_unique_id_in_manifest;
   options.memtable_protection_bytes_per_key =
       FLAGS_memtable_protection_bytes_per_key;
+#ifndef ROCKSDB_LITE
+  options.refresh_options_sec = FLAGS_refresh_options_sec;
+  options.refresh_options_file = FLAGS_refresh_options_file;
+#endif  // ROCKSDB_LITE
   options.use_dynamic_delay = FLAGS_use_dynamic_delay;
 
   // Integrated BlobDB

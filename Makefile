@@ -192,6 +192,15 @@ ifeq ($(COERCE_CONTEXT_SWITCH), 1)
 OPT += -DCOERCE_CONTEXT_SWITCH
 endif
 
+# Controls the mode and switches for sync and fsync
+# Valid modes are:
+# - FULL: Use F_FULLFSYNC for both sync and fsync
+# - BARRIER: Use F_BARRIERFSYNC for both sync and fsync
+# - AUTO: Detect what is available.  Favor barrier for sync, full for fsync
+#         (if available)
+# - OFF: Use fdatasync and fsync
+FSYNC_MODE ?= AUTO
+
 #-----------------------------------------------
 include src.mk
 
@@ -268,6 +277,7 @@ dummy := $(shell (export CXXFLAGS="$(EXTRA_CXXFLAGS)"; \
                   export LIB_MODE="$(LIB_MODE)"; \
 		  export ROCKSDB_CXX_STANDARD="$(ROCKSDB_CXX_STANDARD)"; \
 		  export USE_FOLLY="$(USE_FOLLY)"; \
+		  export FSYNC_MODE="$(FSYNC_MODE)"; \
                   "$(CURDIR)/build_tools/build_detect_platform" "$(CURDIR)/make_config.mk"))
 
 endif
@@ -1637,6 +1647,9 @@ write_batch_test: $(OBJ_DIR)/db/write_batch_test.o $(TEST_LIBRARY) $(LIBRARY)
 write_controller_test: $(OBJ_DIR)/db/write_controller_test.o $(TEST_LIBRARY) $(LIBRARY)
 	$(AM_LINK)
 
+global_write_controller_test: $(OBJ_DIR)/db/global_write_controller_test.o $(TEST_LIBRARY) $(LIBRARY)
+	$(AM_LINK)
+
 merge_helper_test: $(OBJ_DIR)/db/merge_helper_test.o $(TEST_LIBRARY) $(LIBRARY)
 	$(AM_LINK)
 
@@ -2376,27 +2389,27 @@ build_size:
 	# === normal build, static ===
 	$(MAKE) clean
 	$(MAKE) static_lib
-	$(REPORT_BUILD_STATISTIC) rocksdb.build_size.static_lib $$(stat --printf="%s" librocksdb.a)
-	strip librocksdb.a
-	$(REPORT_BUILD_STATISTIC) rocksdb.build_size.static_lib_stripped $$(stat --printf="%s" librocksdb.a)
+	$(REPORT_BUILD_STATISTIC) $(PROJECT_NAME).build_size.static_lib $$(stat --printf="%s" $(LIBNAME).a)
+	strip -x $(LIBNAME).a
+	$(REPORT_BUILD_STATISTIC) $(PROJECT_NAME).build_size.static_lib_stripped $$(stat --printf="%s" $(LIBNAME).a)
 	# === normal build, shared ===
 	$(MAKE) clean
 	$(MAKE) shared_lib
-	$(REPORT_BUILD_STATISTIC) rocksdb.build_size.shared_lib $$(stat --printf="%s" `readlink -f librocksdb.so`)
-	strip `readlink -f librocksdb.so`
-	$(REPORT_BUILD_STATISTIC) rocksdb.build_size.shared_lib_stripped $$(stat --printf="%s" `readlink -f librocksdb.so`)
+	$(REPORT_BUILD_STATISTIC) $(PROJECT_NAME).build_size.shared_lib $$(stat --printf="%s" `readlink $(LIBNAME).$(PLATFORM_SHARED_EXT)`)
+	strip -x `readlink $(LIBNAME).$(PLATFORM_SHARED_EXT)`
+	$(REPORT_BUILD_STATISTIC) $(PROJECT_NAME).build_size.shared_lib_stripped $$(stat --printf="%s" `readlink $(LIBNAME).$(PLATFORM_SHARED_EXT)`)
 	# === lite build, static ===
 	$(MAKE) clean
 	$(MAKE) LITE=1 static_lib
-	$(REPORT_BUILD_STATISTIC) rocksdb.build_size.static_lib_lite $$(stat --printf="%s" librocksdb.a)
-	strip librocksdb.a
-	$(REPORT_BUILD_STATISTIC) rocksdb.build_size.static_lib_lite_stripped $$(stat --printf="%s" librocksdb.a)
+	$(REPORT_BUILD_STATISTIC) $(PROJECT_NAME).build_size.static_lib_lite $$(stat --printf="%s" $(LIBNAME).$(PLATFORM_SHARED_EXT))
+	strip -x $(LIBNAME).a
+	$(REPORT_BUILD_STATISTIC) $(PROJECT_NAME).build_size.static_lib_lite_stripped $$(stat --printf="%s" $(LIBNAME).$(PLATFORM_SHARED_EXT))
 	# === lite build, shared ===
 	$(MAKE) clean
 	$(MAKE) LITE=1 shared_lib
-	$(REPORT_BUILD_STATISTIC) rocksdb.build_size.shared_lib_lite $$(stat --printf="%s" `readlink -f librocksdb.so`)
-	strip `readlink -f librocksdb.so`
-	$(REPORT_BUILD_STATISTIC) rocksdb.build_size.shared_lib_lite_stripped $$(stat --printf="%s" `readlink -f librocksdb.so`)
+	$(REPORT_BUILD_STATISTIC) $(PROJECT_NAME).build_size.shared_lib_lite $$(stat --printf="%s" `readlink $(LIBNAME).$(PLATFORM_SHARED_EXT)`)
+	strip -x `readlink $(LIBNAME).$(PLATFORM_SHARED_EXT)`
+	$(REPORT_BUILD_STATISTIC) $(PROJECT_NAME).build_size.shared_lib_lite_stripped $$(stat --printf="%s" `readlink $(LIBNAME).$(PLATFORM_SHARED_EXT)`)
 
 # ---------------------------------------------------------------------------
 #  	Platform-specific compilation

@@ -22,6 +22,7 @@
 #include "rocksdb/system_clock.h"
 #include "rocksdb/utilities/options_type.h"
 #include "rocksdb/wal_filter.h"
+#include "rocksdb/write_buffer_manager.h"
 #include "util/string_util.h"
 
 namespace ROCKSDB_NAMESPACE {
@@ -101,6 +102,14 @@ static std::unordered_map<std::string, OptionTypeInfo>
         {"stats_persist_period_sec",
          {offsetof(struct MutableDBOptions, stats_persist_period_sec),
           OptionType::kUInt, OptionVerificationType::kNormal,
+          OptionTypeFlags::kMutable}},
+        {"refresh_options_sec",
+         {offsetof(struct MutableDBOptions, refresh_options_sec),
+          OptionType::kUInt, OptionVerificationType::kNormal,
+          OptionTypeFlags::kMutable}},
+        {"refresh_options_file",
+         {offsetof(struct MutableDBOptions, refresh_options_file),
+          OptionType::kString, OptionVerificationType::kNormal,
           OptionTypeFlags::kMutable}},
         {"stats_history_buffer_size",
          {offsetof(struct MutableDBOptions, stats_history_buffer_size),
@@ -325,6 +334,10 @@ static std::unordered_map<std::string, OptionTypeInfo>
           OptionTypeFlags::kNone}},
         {"allow_concurrent_memtable_write",
          {offsetof(struct ImmutableDBOptions, allow_concurrent_memtable_write),
+          OptionType::kBoolean, OptionVerificationType::kNormal,
+          OptionTypeFlags::kNone}},
+        {"use_spdb_writes",
+         {offsetof(struct ImmutableDBOptions, use_spdb_writes),
           OptionType::kBoolean, OptionVerificationType::kNormal,
           OptionTypeFlags::kNone}},
         {"wal_recovery_mode",
@@ -720,6 +733,7 @@ ImmutableDBOptions::ImmutableDBOptions(const DBOptions& options)
       advise_random_on_open(options.advise_random_on_open),
       db_write_buffer_size(options.db_write_buffer_size),
       write_buffer_manager(options.write_buffer_manager),
+      write_controller(options.write_controller),
       access_hint_on_compaction_start(options.access_hint_on_compaction_start),
       random_access_max_buffer_size(options.random_access_max_buffer_size),
       use_adaptive_mutex(options.use_adaptive_mutex),
@@ -728,6 +742,7 @@ ImmutableDBOptions::ImmutableDBOptions(const DBOptions& options)
       enable_pipelined_write(options.enable_pipelined_write),
       unordered_write(options.unordered_write),
       allow_concurrent_memtable_write(options.allow_concurrent_memtable_write),
+      use_spdb_writes(options.use_spdb_writes),
       enable_write_thread_adaptive_yield(
           options.enable_write_thread_adaptive_yield),
       write_thread_max_yield_usec(options.write_thread_max_yield_usec),
@@ -851,6 +866,8 @@ void ImmutableDBOptions::Dump(Logger* log) const {
                    advise_random_on_open);
   ROCKS_LOG_HEADER(log, "                      Options.use_dynamic_delay: %d",
                    use_dynamic_delay);
+  ROCKS_LOG_HEADER(log, "                   Options.write_controller: %p",
+                   write_controller.get());
   ROCKS_LOG_HEADER(
       log, "                   Options.db_write_buffer_size: %" ROCKSDB_PRIszt,
       db_write_buffer_size);
@@ -882,6 +899,7 @@ void ImmutableDBOptions::Dump(Logger* log) const {
                    unordered_write);
   ROCKS_LOG_HEADER(log, "        Options.allow_concurrent_memtable_write: %d",
                    allow_concurrent_memtable_write);
+  ROCKS_LOG_HEADER(log, "        Options.use_spdb_writes: %d", use_spdb_writes);
   ROCKS_LOG_HEADER(log, "     Options.enable_write_thread_adaptive_yield: %d",
                    enable_write_thread_adaptive_yield);
   ROCKS_LOG_HEADER(log,
@@ -989,6 +1007,7 @@ MutableDBOptions::MutableDBOptions()
       delete_obsolete_files_period_micros(6ULL * 60 * 60 * 1000000),
       stats_dump_period_sec(600),
       stats_persist_period_sec(600),
+      refresh_options_sec(0),
       stats_history_buffer_size(1024 * 1024),
       max_open_files(-1),
       bytes_per_sync(0),
@@ -1009,6 +1028,8 @@ MutableDBOptions::MutableDBOptions(const DBOptions& options)
           options.delete_obsolete_files_period_micros),
       stats_dump_period_sec(options.stats_dump_period_sec),
       stats_persist_period_sec(options.stats_persist_period_sec),
+      refresh_options_sec(options.refresh_options_sec),
+      refresh_options_file(options.refresh_options_file),
       stats_history_buffer_size(options.stats_history_buffer_size),
       max_open_files(options.max_open_files),
       bytes_per_sync(options.bytes_per_sync),
@@ -1040,6 +1061,12 @@ void MutableDBOptions::Dump(Logger* log) const {
                    stats_dump_period_sec);
   ROCKS_LOG_HEADER(log, "                Options.stats_persist_period_sec: %d",
                    stats_persist_period_sec);
+  ROCKS_LOG_HEADER(log, "                Options.refresh_options_sec: %d",
+                   refresh_options_sec);
+  if (refresh_options_sec > 0 && !refresh_options_file.empty()) {
+    ROCKS_LOG_HEADER(log, "                Options.refresh_options_file: %s",
+                     refresh_options_file.c_str());
+  }
   ROCKS_LOG_HEADER(
       log,
       "                Options.stats_history_buffer_size: %" ROCKSDB_PRIszt,

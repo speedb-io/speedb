@@ -73,6 +73,7 @@
 #ifndef ROCKSDB_LITE
 #include "rocksdb/utilities/replayer.h"
 #endif  // ROCKSDB_LITE
+#include "rocksdb/utilities/db_ttl.h"
 #include "rocksdb/utilities/sim_cache.h"
 #include "rocksdb/utilities/transaction.h"
 #include "rocksdb/utilities/transaction_db.h"
@@ -860,19 +861,23 @@ DEFINE_int32(file_opening_threads,
              "threads that will be used to open files during DB::Open()");
 
 DEFINE_int32(compaction_readahead_size,
-             ROCKSDB_NAMESPACE::Options().compaction_readahead_size,
+             static_cast<int32_t>(
+                 ROCKSDB_NAMESPACE::Options().compaction_readahead_size),
              "Compaction readahead size");
 
-DEFINE_int32(log_readahead_size,
-             ROCKSDB_NAMESPACE::Options().log_readahead_size,
-             "WAL and manifest readahead size");
+DEFINE_int32(
+    log_readahead_size,
+    static_cast<int32_t>(ROCKSDB_NAMESPACE::Options().log_readahead_size),
+    "WAL and manifest readahead size");
 
 DEFINE_int32(random_access_max_buffer_size,
-             ROCKSDB_NAMESPACE::Options().random_access_max_buffer_size,
+             static_cast<int32_t>(
+                 ROCKSDB_NAMESPACE::Options().random_access_max_buffer_size),
              "Maximum windows randomaccess buffer size");
 
 DEFINE_int32(writable_file_max_buffer_size,
-             ROCKSDB_NAMESPACE::Options().writable_file_max_buffer_size,
+             static_cast<int32_t>(
+                 ROCKSDB_NAMESPACE::Options().writable_file_max_buffer_size),
              "Maximum write buffer for Writable File");
 
 DEFINE_double(bloom_bits, -1,
@@ -1488,6 +1493,12 @@ DEFINE_int32(table_cache_numshardbits, 4, "");
 DEFINE_string(filter_uri, "", "URI for registry FilterPolicy");
 
 #ifndef ROCKSDB_LITE
+DEFINE_int32(
+    refresh_options_sec, 0,
+    "Frequency (in secs) to look for a new options file (off by default)");
+DEFINE_string(refresh_options_file, "",
+              "File in which to look for new options");
+
 DEFINE_string(env_uri, "",
               "URI for registry Env lookup. Mutually exclusive with --fs_uri");
 DEFINE_string(fs_uri, "",
@@ -1573,6 +1584,7 @@ DEFINE_double(experimental_mempurge_threshold,
               ROCKSDB_NAMESPACE::Options().experimental_mempurge_threshold,
               "Maximum useful payload ratio estimate that triggers a mempurge "
               "(memtable garbage collection).");
+DEFINE_bool(use_spdb_writes, true, "Use optimized Speedb write flow");
 
 DEFINE_bool(inplace_update_support,
             ROCKSDB_NAMESPACE::Options().inplace_update_support,
@@ -1842,7 +1854,9 @@ DEFINE_int64(multiread_stride, 0,
 DEFINE_bool(multiread_batched, false, "Use the new MultiGet API");
 
 DEFINE_string(memtablerep, "speedb.HashSpdRepFactory", "");
-DEFINE_int64(hash_bucket_count, 1024 * 1024, "hash bucket count");
+DEFINE_int64(hash_bucket_count, 1000000, "hash bucket count");
+DEFINE_bool(use_seek_parralel_threshold, true,
+            "if use seek parralel threshold .");
 DEFINE_bool(use_plain_table, false, "if use plain table "
             "instead of block-based table format");
 DEFINE_bool(use_cuckoo_table, false, "if use cuckoo table format");
@@ -1861,8 +1875,10 @@ DEFINE_int32(skip_list_lookahead, 0, "Used with skip_list memtablerep; try "
 DEFINE_bool(report_file_operations, false, "if report number of file "
             "operations");
 DEFINE_bool(report_open_timing, false, "if report open timing");
-DEFINE_int32(readahead_size, ROCKSDB_NAMESPACE::ReadOptions().readahead_size,
-             "Iterator readahead size");
+DEFINE_int32(
+    readahead_size,
+    static_cast<int32_t>(ROCKSDB_NAMESPACE::ReadOptions().readahead_size),
+    "Iterator readahead size");
 
 DEFINE_bool(read_with_latest_user_timestamp, true,
             "If true, always use the current latest timestamp for read. If "
@@ -1919,6 +1935,9 @@ DEFINE_bool(track_and_verify_wals_in_manifest,
             ROCKSDB_NAMESPACE::Options().track_and_verify_wals_in_manifest,
             "If true, enable WAL tracking in the MANIFEST");
 
+DEFINE_bool(skip_expired_data, false, "If true, will skip keys expired by TTL");
+
+DEFINE_int32(ttl, -1, "Opens the db with this ttl value if value is positive");
 namespace {
 // Auxiliary collection of the indices of the DB-s to be used in the next group
 std::vector<uint64_t> db_idxs_to_use;
@@ -1940,8 +1959,10 @@ static Status CreateMemTableRepFactory(
 #endif  // ROCKSDB_LITE
   } else {
     std::unique_ptr<MemTableRepFactory> unique;
-    s = MemTableRepFactory::CreateFromString(config_options, FLAGS_memtablerep,
-                                             &unique);
+    std::string memtable_opt;
+    memtable_opt = ":" + std::to_string(0);
+    s = MemTableRepFactory::CreateFromString(
+        config_options, FLAGS_memtablerep + memtable_opt, &unique);
     if (s.ok()) {
       factory->reset(unique.release());
     }
@@ -2919,6 +2940,32 @@ class Benchmark {
   std::mutex mutex_;
   bool seek_started_;
 
+  inline void LimitReadOrWriteRate(RateLimiter::OpType op_type,
+                                   ThreadState* thread,
+                                   int64_t bytes_to_request) {
+    RateLimiter* rate_limiter_to_use;
+    switch (op_type) {
+      case RateLimiter::OpType::kRead: {
+        rate_limiter_to_use = thread->shared->read_rate_limiter.get();
+        break;
+      }
+      case RateLimiter::OpType::kWrite: {
+        rate_limiter_to_use = thread->shared->write_rate_limiter.get();
+        break;
+      }
+      default:
+        assert(false);
+    }
+    if (rate_limiter_to_use != nullptr) {
+      rate_limiter_to_use->Request(bytes_to_request, Env::IO_HIGH,
+                                   nullptr /* stats */, op_type);
+      // Set time at which last op finished to Now() to hide latency and
+      // sleep from rate limiter. Also, do the check once per batch, not
+      // once per write.
+      thread->stats.ResetLastOpTime();
+    }
+  }
+
   // Use this to access the DB when context requires a Single-DB mode
   DBWithColumnFamilies& SingleDb() {
     if (IsSingleDb() == false) {
@@ -2941,7 +2988,6 @@ class Benchmark {
   }
 
   void OpenAllDbs(Options options) {
-    assert(dbs_.empty());
     assert(FLAGS_num_multi_db > 0);
 
     // dbs_to_use_ is NOT initialized here since we open the db-s once for all
@@ -2953,6 +2999,19 @@ class Benchmark {
     } else {
       auto wal_dir = options.wal_dir;
       for (int i = 0; i < FLAGS_num_multi_db; i++) {
+#ifndef ROCKSDB_LITE
+        if (FLAGS_optimistic_transaction_db) {
+          if (dbs_[i].opt_txn_db) {
+            continue;
+          }
+        } else if (dbs_[i].db) {
+          continue;
+        }
+#else   // ROCKSDB_LITE
+        if (dbs_[i].db) {
+          continue;
+        }
+#endif  // ROCKSDB_LITE
         if (!wal_dir.empty()) {
           options.wal_dir = GetPathForMultiple(wal_dir, i);
         }
@@ -2962,17 +3021,17 @@ class Benchmark {
     }
   }
 
-  void DestroyAllDbs() {
-    // Record the number of db-s as dbs_ is cleared inside DeleteDBs()
-    auto num_dbs = dbs_.size();
+  void DestroyUsedDbs() {
+    for (auto i : db_idxs_to_use) {
+      dbs_[i].DeleteDBs();
+    }
+    dbs_to_use_.clear();
 
-    DeleteDBs();
-
-    if (num_dbs == 1U) {
+    if (IsSingleDb()) {
       DestroyDB(FLAGS_db, open_options_);
-    } else if (num_dbs > 1U) {
+    } else if (IsMultiDb()) {
       Options options = open_options_;
-      for (auto i = 0U; i < num_dbs; ++i) {
+      for (auto i : db_idxs_to_use) {
         if (!open_options_.wal_dir.empty()) {
           options.wal_dir = GetPathForMultiple(open_options_.wal_dir, i);
         }
@@ -3690,6 +3749,7 @@ class Benchmark {
       read_options_.adaptive_readahead = FLAGS_adaptive_readahead;
       read_options_.async_io = FLAGS_async_io;
       read_options_.optimize_multiget_for_io = FLAGS_optimize_multiget_for_io;
+      read_options_.skip_expired_data = FLAGS_skip_expired_data;
 
       void (Benchmark::*method)(ThreadState*) = nullptr;
       void (Benchmark::*post_process_method)() = nullptr;
@@ -3699,6 +3759,14 @@ class Benchmark {
 
       int num_repeat = 1;
       int num_warmup = 0;
+      if (!gflags::GetCommandLineFlagInfoOrDie("ttl").is_default &&
+          FLAGS_ttl < 1) {
+        ErrorExit("ttl must be positive value");
+      }
+      if (gflags::GetCommandLineFlagInfoOrDie("ttl").is_default &&
+          FLAGS_skip_expired_data) {
+        ErrorExit("ttl must be set to use skip_expired_data");
+      }
       if (!name.empty() && *name.rbegin() == ']') {
         auto it = name.find('[');
         if (it == std::string::npos) {
@@ -4006,7 +4074,7 @@ class Benchmark {
               "--use_existing_db",
               name.c_str());
         } else {
-          DestroyAllDbs();
+          DestroyUsedDbs();
           Open(&open_options_);  // use open_options for the last accessed
           // There are new DB-s => Re-initialize dbs_to_use_
           InitDbsToUse();
@@ -4490,6 +4558,8 @@ class Benchmark {
     options.manual_wal_flush = FLAGS_manual_wal_flush;
     options.wal_compression = FLAGS_wal_compression_e;
 #ifndef ROCKSDB_LITE
+    options.refresh_options_sec = FLAGS_refresh_options_sec;
+    options.refresh_options_file = FLAGS_refresh_options_file;
     options.ttl = FLAGS_fifo_compaction_ttl;
     options.compaction_options_fifo = CompactionOptionsFIFO(
         FLAGS_fifo_compaction_max_table_files_size_mb * 1024 * 1024,
@@ -4865,6 +4935,7 @@ class Benchmark {
         FLAGS_allow_concurrent_memtable_write;
     options.experimental_mempurge_threshold =
         FLAGS_experimental_mempurge_threshold;
+    options.use_spdb_writes = FLAGS_use_spdb_writes;
     options.inplace_update_support = FLAGS_inplace_update_support;
     options.inplace_update_num_locks = FLAGS_inplace_update_num_locks;
     options.enable_write_thread_adaptive_yield =
@@ -4962,6 +5033,14 @@ class Benchmark {
       options.write_buffer_manager.reset(new WriteBufferManager(
           FLAGS_db_write_buffer_size, cache_, FLAGS_allow_wbm_stalls,
           FLAGS_initiate_wbm_flushes, flush_initiation_options));
+    }
+
+    if (FLAGS_use_dynamic_delay && FLAGS_num_multi_db > 1) {
+      if (options.delayed_write_rate <= 0) {
+        options.delayed_write_rate = 16 * 1024 * 1024;
+      }
+      options.write_controller.reset(new WriteController(
+          options.use_dynamic_delay, options.delayed_write_rate));
     }
 
     // Integrated BlobDB
@@ -5184,8 +5263,19 @@ class Benchmark {
       }
 #ifndef ROCKSDB_LITE
       if (FLAGS_readonly) {
-        s = DB::OpenForReadOnly(options, db_name, column_families,
-            &db->cfh, &db->db);
+        if (FLAGS_ttl > 0) {
+          DBWithTTL* db_with_ttl;
+          // true means read only
+          std::vector<int32_t> ttls(column_families.size(), FLAGS_ttl);
+          s = DBWithTTL::Open(options, db_name, column_families, &db->cfh,
+                              &db_with_ttl, ttls, true);
+          if (s.ok()) {
+            db->db = db_with_ttl;
+          }
+        } else {
+          s = DB::OpenForReadOnly(options, db_name, column_families, &db->cfh,
+                                  &db->db);
+        }
       } else if (FLAGS_optimistic_transaction_db) {
         s = OptimisticTransactionDB::Open(options, db_name, column_families,
                                           &db->cfh, &db->opt_txn_db);
@@ -5206,7 +5296,17 @@ class Benchmark {
           db->db = ptr;
         }
       } else {
-        s = DB::Open(options, db_name, column_families, &db->cfh, &db->db);
+        if (FLAGS_ttl > 0) {
+          DBWithTTL* db_with_ttl;
+          std::vector<int32_t> ttls(column_families.size(), FLAGS_ttl);
+          s = DBWithTTL::Open(options, db_name, column_families, &db->cfh,
+                              &db_with_ttl, ttls);
+          if (s.ok()) {
+            db->db = db_with_ttl;
+          }
+        } else {
+          s = DB::Open(options, db_name, column_families, &db->cfh, &db->db);
+        }
       }
 #else
       s = DB::Open(options, db_name, column_families, &db->cfh, &db->db);
@@ -5217,7 +5317,16 @@ class Benchmark {
       db->cfh_idx_to_prob = std::move(cfh_idx_to_prob);
 #ifndef ROCKSDB_LITE
     } else if (FLAGS_readonly) {
-      s = DB::OpenForReadOnly(options, db_name, &db->db);
+      if (FLAGS_ttl > 0) {
+        DBWithTTL* db_with_ttl;
+        // true means read only
+        s = DBWithTTL::Open(options, db_name, &db_with_ttl, FLAGS_ttl, true);
+        if (s.ok()) {
+          db->db = db_with_ttl;
+        }
+      } else {
+        s = DB::OpenForReadOnly(options, db_name, &db->db);
+      }
     } else if (FLAGS_optimistic_transaction_db) {
       s = OptimisticTransactionDB::Open(options, db_name, &db->opt_txn_db);
       if (s.ok()) {
@@ -5282,6 +5391,20 @@ class Benchmark {
             FLAGS_secondary_update_interval, db));
       }
 #endif  // ROCKSDB_LITE
+    } else if (FLAGS_ttl > 0) {
+      std::vector<ColumnFamilyDescriptor> column_families;
+      column_families.push_back(ColumnFamilyDescriptor(
+          kDefaultColumnFamilyName, ColumnFamilyOptions(options)));
+      DBWithTTL* db_with_ttl;
+      std::vector<int32_t> ttls(column_families.size(), FLAGS_ttl);
+      s = DBWithTTL::Open(options, db_name, column_families, &db->cfh,
+                          &db_with_ttl, ttls);
+      if (s.ok()) {
+        db->db = db_with_ttl;
+        db->cfh.resize(1);
+        db->num_created = 1;
+        db->num_hot = 1;
+      }
     } else {
       std::vector<ColumnFamilyDescriptor> column_families;
       column_families.push_back(ColumnFamilyDescriptor(
@@ -6282,7 +6405,12 @@ class Benchmark {
           options.timestamp = &ts;
           ts_ptr = &ts_ret;
         }
-        auto status = db->Get(options, key, &value, ts_ptr);
+        Status status;
+        if (user_timestamp_size_ > 0) {
+          status = db->Get(options, key, &value, ts_ptr);
+        } else {
+          status = db->Get(options, key, &value);
+        }
         if (status.ok()) {
           ++found;
         } else if (!status.IsNotFound()) {
@@ -6357,7 +6485,6 @@ class Benchmark {
 
     Duration duration(FLAGS_duration, reads_);
     while (!duration.Done(1)) {
-      DBWithColumnFamilies* db_with_cfh = SelectDBWithCfh(thread);
       // We use same key_rand as seed for key and column family so that we can
       // deterministically find the cfh corresponding to a particular key, as it
       // is done in DoWrite method.
@@ -6375,6 +6502,7 @@ class Benchmark {
       } else {
         key_rand = GetRandomKey(&thread->rand);
       }
+      DBWithColumnFamilies* db_with_cfh = SelectDBWithCfh(key_rand);
       GenerateKeyFromInt(key_rand, FLAGS_num, &key);
       read++;
       std::string ts_ret;
@@ -6415,8 +6543,10 @@ class Benchmark {
               options, cfh, key, pinnable_vals.data(),
               &get_merge_operands_options, &number_of_operands);
         }
-      } else {
+      } else if (user_timestamp_size_ > 0) {
         s = db_with_cfh->db->Get(options, cfh, key, &pinnable_val, ts_ptr);
+      } else {
+        s = db_with_cfh->db->Get(options, cfh, key, &pinnable_val);
       }
 
       if (s.ok()) {
@@ -7062,10 +7192,10 @@ class Benchmark {
       options.timestamp = &ts;
     }
 
-    std::vector<Iterator*> tailing_iters;
+    std::vector<std::unique_ptr<Iterator>> tailing_iters;
     if (FLAGS_use_tailing_iterator) {
       for (const auto& db_with_cfh : dbs_to_use_) {
-        tailing_iters.push_back(db_with_cfh.db->NewIterator(options));
+        tailing_iters.emplace_back(db_with_cfh.db->NewIterator(options));
       }
     }
     options.auto_prefix_mode = FLAGS_auto_prefix_mode;
@@ -7111,12 +7241,12 @@ class Benchmark {
       }
 
       // Pick a Iterator to use
-      uint64_t db_idx_to_use =
-          static_cast<uint64_t>(key_rand) % dbs_to_use_.size();
       std::unique_ptr<Iterator> single_iter;
       Iterator* iter_to_use;
       if (FLAGS_use_tailing_iterator) {
-        iter_to_use = tailing_iters[db_idx_to_use];
+        uint64_t db_idx_to_use =
+            static_cast<uint64_t>(key_rand) % dbs_to_use_.size();
+        iter_to_use = tailing_iters[db_idx_to_use].get();
       } else {
         single_iter.reset(db_with_cfh->db->NewIterator(
             options, db_with_cfh->GetCfh(key_rand)));
@@ -7154,10 +7284,7 @@ class Benchmark {
         thread->stats.ResetLastOpTime();
       }
 
-      thread->stats.FinishedOps(&FirstDb(), FirstDb().db, 1, kSeek);
-    }
-    for (auto iter : tailing_iters) {
-      delete iter;
+      thread->stats.FinishedOps(db_with_cfh, db_with_cfh->db, 1, kSeek);
     }
 
     char msg[100];
@@ -7251,6 +7378,7 @@ class Benchmark {
     // Special thread that keeps writing until other threads are done.
     RandomGenerator gen;
     int64_t bytes = 0;
+    int64_t key_rand = 0;
 
     std::unique_ptr<RateLimiter> write_rate_limiter;
     if (FLAGS_benchmark_write_rate_limit > 0) {
@@ -7284,7 +7412,9 @@ class Benchmark {
     bool hint_printed = false;
 
     while (true) {
-      DB* db = SelectDB(thread);
+      key_rand = GetRandomKey(&thread->rand);
+      DBWithColumnFamilies* db_with_cfh = SelectDBWithCfh(key_rand);
+      DB* db = db_with_cfh->db;
       {
         MutexLock l(&thread->shared->mu);
         if (FLAGS_finish_after_writes && written == writes_) {
@@ -7307,7 +7437,7 @@ class Benchmark {
         }
       }
 
-      GenerateKeyFromInt(thread->rand.Next() % FLAGS_num, FLAGS_num, &key);
+      GenerateKeyFromInt(key_rand, FLAGS_num, &key);
       Status s;
 
       Slice val = gen.Generate();
@@ -7315,14 +7445,15 @@ class Benchmark {
       if (user_timestamp_size_ > 0) {
         ts = mock_app_clock_->Allocate(ts_guard.get());
       }
+      ColumnFamilyHandle* cfh = db_with_cfh->GetCfh(key_rand);
       if (write_merge == kWrite) {
         if (user_timestamp_size_ == 0) {
-          s = db->Put(write_options_, key, val);
+          s = db->Put(write_options_, cfh, key, val);
         } else {
-          s = db->Put(write_options_, key, ts, val);
+          s = db->Put(write_options_, cfh, key, ts, val);
         }
       } else {
-        s = db->Merge(write_options_, key, val);
+        s = db->Merge(write_options_, cfh, key, val);
       }
       // Restore write_options_
       written++;
@@ -7331,7 +7462,7 @@ class Benchmark {
         ErrorExit("put or merge error: %s", s.ToString().c_str());
       }
       bytes += key.size() + val.size() + user_timestamp_size_;
-      thread->stats.FinishedOps(&FirstDb(), FirstDb().db, 1, kWrite);
+      thread->stats.FinishedOps(db_with_cfh, db_with_cfh->db, 1, kWrite);
 
       if (FLAGS_benchmark_write_rate_limit > 0) {
         write_rate_limiter->Request(
@@ -7352,7 +7483,7 @@ class Benchmark {
                   writes_per_range_tombstone_ ==
               0) {
         num_range_deletions++;
-        int64_t begin_num = thread->rand.Next() % FLAGS_num;
+        int64_t begin_num = key_rand;
         if (FLAGS_expand_range_tombstones) {
           for (int64_t offset = 0; offset < range_tombstone_width_; ++offset) {
             GenerateKeyFromInt(begin_num + offset, FLAGS_num,
@@ -7365,13 +7496,11 @@ class Benchmark {
           GenerateKeyFromInt(begin_num, FLAGS_num, &begin_key);
           GenerateKeyFromInt(begin_num + range_tombstone_width_, FLAGS_num,
                              &end_key);
-          if (!db->DeleteRange(write_options_, db->DefaultColumnFamily(),
-                               begin_key, end_key)
-                   .ok()) {
+          if (!db->DeleteRange(write_options_, cfh, begin_key, end_key).ok()) {
             ErrorExit("deleterange error: %s\n", s.ToString().c_str());
           }
         }
-        thread->stats.FinishedOps(&FirstDb(), FirstDb().db, 1, kWrite);
+        thread->stats.FinishedOps(db_with_cfh, db_with_cfh->db, 1, kWrite);
         // TODO: DeleteRange is not included in calculcation of bytes/rate
         // limiter request
       }
@@ -7878,25 +8007,36 @@ class Benchmark {
         }
         get_weight--;
         reads_done++;
-        thread->stats.FinishedOps(db_with_cfh, db, 1, kRead);
+
+        if (reads_done % 256 == 255) {
+          LimitReadOrWriteRate(RateLimiter::OpType::kRead, thread, 256);
+        }
+
+        thread->stats.FinishedOps(db_with_cfh, db_with_cfh->db, 1, kRead);
       } else  if (put_weight > 0) {
         // then do all the corresponding number of puts
         // for all the gets we have done earlier
+        Slice put_val = gen.Generate();
+        size_t size_to_request =
+            put_val.size() + key.size() + user_timestamp_size_;
+        LimitReadOrWriteRate(RateLimiter::OpType::kWrite, thread,
+                             size_to_request);
+
         Status s;
         if (user_timestamp_size_ > 0) {
           Slice ts = mock_app_clock_->Allocate(ts_guard.get());
           s = db->Put(write_options_, db_with_cfh->GetCfh(key_rand), key, ts,
-                      gen.Generate());
+                      put_val);
         } else {
           s = db->Put(write_options_, db_with_cfh->GetCfh(key_rand), key,
-                      gen.Generate());
+                      put_val);
         }
         if (!s.ok()) {
           ErrorExit("put error: %s", s.ToString().c_str());
         }
         put_weight--;
         writes_done++;
-        thread->stats.FinishedOps(db_with_cfh, db, 1, kWrite);
+        thread->stats.FinishedOps(db_with_cfh, db_with_cfh->db, 1, kWrite);
       }
     }
     char msg[100];
@@ -7918,19 +8058,17 @@ class Benchmark {
     int64_t seeks = 0;
     int64_t found = 0;
     int64_t bytes = 0;
+    int64_t key_rand = 0;
     ReadOptions options(FLAGS_verify_checksum, true);
     options.total_order_seek = FLAGS_total_order_seek;
     options.prefix_same_as_start = FLAGS_prefix_same_as_start;
     options.tailing = FLAGS_use_tailing_iterator;
     options.readahead_size = FLAGS_readahead_size;
 
-    std::unique_ptr<Iterator> single_iter;
-    std::vector<std::unique_ptr<Iterator>> multi_iters;
-    if (IsSingleDb()) {
-      single_iter.reset(SingleDb().db->NewIterator(options));
-    } else {
+    std::vector<std::unique_ptr<Iterator>> tailing_iters;
+    if (FLAGS_use_tailing_iterator) {
       for (const auto& db_with_cfh : dbs_to_use_) {
-        multi_iters.emplace_back(db_with_cfh.db->NewIterator(options));
+        tailing_iters.emplace_back(db_with_cfh.db->NewIterator(options));
       }
     }
 
@@ -7955,6 +8093,9 @@ class Benchmark {
     // the number of iterations is the larger of read_ or write_
     while (!duration.Done(1)) {
       int prob_op = static_cast<int>(thread->rand.Uniform(100));
+      key_rand = GetRandomKey(&thread->rand);
+      DBWithColumnFamilies* db_with_cfh = SelectDBWithCfh(key_rand);
+      DB* db = db_with_cfh->db;
 
       // Seek
       if (prob_op >= 0 && prob_op < static_cast<int>(FLAGS_readwritepercent)) {
@@ -7965,7 +8106,7 @@ class Benchmark {
           options.timestamp = &ts;
         }
 
-        int64_t seek_pos = thread->rand.Next() % FLAGS_num;
+        int64_t seek_pos = key_rand;
         GenerateKeyFromIntForSeek(static_cast<uint64_t>(seek_pos), FLAGS_num,
                                   &key);
         if (FLAGS_max_scan_distance != 0) {
@@ -7984,68 +8125,67 @@ class Benchmark {
           }
         }
 
-        if (!FLAGS_use_tailing_iterator) {
-          if (IsSingleDb()) {
-            single_iter.reset(SingleDb().db->NewIterator(options));
-          } else {
-            multi_iters.clear();
-            for (const auto& db_with_cfh : dbs_to_use_) {
-              multi_iters.emplace_back(db_with_cfh.db->NewIterator(options));
-            }
-          }
-        }
-
         // Pick an Iterator to use
-        Iterator* iter_to_use = single_iter.get();
-        if (iter_to_use == nullptr) {
-          iter_to_use =
-              multi_iters[thread->rand.Next() % multi_iters.size()].get();
+        Iterator* iter_to_use;
+        std::unique_ptr<Iterator> single_iter;
+        if (FLAGS_use_tailing_iterator) {
+          uint64_t db_idx_to_use =
+              static_cast<uint64_t>(key_rand) % dbs_to_use_.size();
+          iter_to_use = tailing_iters[db_idx_to_use].get();
+        } else {
+          single_iter.reset(
+              db->NewIterator(options, db_with_cfh->GetCfh(key_rand)));
+          iter_to_use = single_iter.get();
         }
 
         iter_to_use->Seek(key);
         seeks++;
-        if (iter_to_use->Valid() && iter_to_use->key().compare(key) == 0) {
-          found++;
+        if (iter_to_use->Valid()) {
+          bytes += iter_to_use->key().size() + iter_to_use->value().size();
+          if (iter_to_use->key().compare(key) == 0) {
+            found++;
+          }
         }
 
         for (int j = 0; j < FLAGS_seek_nexts && iter_to_use->Valid(); ++j) {
-          // Copy out iterator's value to make sure we read them.
-          bytes += iter_to_use->key().size() + iter_to_use->value().size();
-
           if (!FLAGS_reverse_iterator) {
             iter_to_use->Next();
           } else {
             iter_to_use->Prev();
           }
           assert(iter_to_use->status().ok());
+          bytes += iter_to_use->key().size() + iter_to_use->value().size();
         }
 
-        if (thread->shared->read_rate_limiter.get() != nullptr &&
-            seeks % 256 == 255) {
-          thread->shared->read_rate_limiter->Request(
-              256, Env::IO_HIGH, nullptr /* stats */,
-              RateLimiter::OpType::kRead);
+        if (seeks % 256 == 255) {
+          LimitReadOrWriteRate(RateLimiter::OpType::kRead, thread, 256);
         }
-
-        thread->stats.FinishedOps(&FirstDb(), FirstDb().db, 1, kSeek);
-        // Write
+        thread->stats.FinishedOps(db_with_cfh, db_with_cfh->db, 1, kSeek);
       } else {
-        DB* db = SelectDB(thread);
-        GenerateKeyFromInt(thread->rand.Next() % FLAGS_num, FLAGS_num, &key);
+        // Write Operation
+        GenerateKeyFromInt(key_rand, FLAGS_num, &key);
+        Slice value = gen.Generate();
+        size_t size_to_request =
+            value.size() + key.size() + user_timestamp_size_;
+
+        LimitReadOrWriteRate(RateLimiter::OpType::kWrite, thread,
+                             size_to_request);
 
         Status s;
         if (user_timestamp_size_ > 0) {
           Slice ts = mock_app_clock_->Allocate(ts_guard.get());
-          s = db->Put(write_options_, key, ts, gen.Generate());
+          s = db->Put(write_options_, db_with_cfh->GetCfh(key_rand), key, ts,
+                      value);
         } else {
-          s = db->Put(write_options_, key, gen.Generate());
+          s = db->Put(write_options_, db_with_cfh->GetCfh(key_rand), key,
+                      value);
         }
-
+        bytes += size_to_request;
         if (!s.ok()) {
           ErrorExit("put error: %s", s.ToString().c_str());
         }
         writes_done++;
-        thread->stats.FinishedOps(nullptr, db, 1, kWrite);
+        thread->stats.FinishedOps(db_with_cfh, db_with_cfh->db, 1, kWrite);
       }
     }
 

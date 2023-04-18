@@ -25,7 +25,7 @@ namespace ROCKSDB_NAMESPACE {
 namespace speedb_filter {
 inline constexpr size_t kPairedBloomBatchSizeInBlocks = 32U;
 // Max supported BPK. Filters using higher BPK-s will use the max
-inline constexpr int kMinMillibitsPerKey = 1000.0;
+inline constexpr int kMinMillibitsPerKey = 1000;
 
 // Types of proprietary Speedb's filters
 enum class FilterType : uint8_t {
@@ -89,7 +89,7 @@ class SpdbPairedBloomBitsBuilder : public XXPH3FilterBitsBuilder {
       std::atomic<int64_t>* aggregate_rounding_balance,
       const std::shared_ptr<CacheReservationManager>& cache_res_mgr,
       bool detect_filter_construct_corruption,
-      const FilterBitsReaderCreateFunc& reader_create_func);
+      const FilterBitsReaderCreateFunc& reader_create_func, bool is_bottomost);
 
   ~SpdbPairedBloomBitsBuilder() override {}
 
@@ -120,7 +120,7 @@ class SpdbPairedBloomBitsBuilder : public XXPH3FilterBitsBuilder {
 
   // Records the info about a block's pair in the batch
   struct PairingInfo {
-    uint8_t pair_in_batch_block_idx;
+    uint32_t pair_in_batch_block_idx;
     uint8_t hash_set_selector;
   };
 
@@ -163,6 +163,7 @@ class SpdbPairedBloomBitsBuilder : public XXPH3FilterBitsBuilder {
   // Target allocation per added key, in thousandths of a bit.
   int millibits_per_key_;
 
+  bool is_bottomost_;
   size_t num_blocks_ = 0U;
   size_t num_batches_ = 0U;
   size_t num_probes_ = 0U;

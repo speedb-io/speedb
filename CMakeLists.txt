@@ -587,9 +587,25 @@ if(HAVE_AUXV_GETAUXVAL)
   add_definitions(-DROCKSDB_AUXV_GETAUXVAL_PRESENT)
 endif()
 
-check_cxx_symbol_exists(F_FULLFSYNC "fcntl.h" HAVE_FULLFSYNC)
-if(HAVE_FULLFSYNC)
-  add_definitions(-DHAVE_FULLFSYNC)
+set(FSYNC_MODE AUTO CACHE STRING "Enable RTTI in builds")
+set_property(CACHE FSYNC_MODE PROPERTY STRINGS AUTO FULL BARRIER OFF)
+if(NOT FSYNC_MODE STREQUAL "OFF")
+  if (NOT FSYNC_MODE STREQUAL "BARRIER") 
+     check_cxx_symbol_exists(F_FULLFSYNC "fcntl.h" HAVE_FULLFSYNC)
+     if(HAVE_FULLFSYNC)
+       add_definitions(-DHAVE_FULLFSYNC)
+     elseif(FSYNC_MODE STREQUAL "FULL")
+       message(FATAL_ERROR "FSYNC_MODE is FULL, but unable to compile with F_FULLFSYNC")
+     endif()
+  endif()
+  if (NOT FSYNC_MODE STREQUAL "FULL") 
+     check_cxx_symbol_exists(F_BARRIERFSYNC "fcntl.h" HAVE_BARRIERFSYNC)
+     if(HAVE_BARRIERFSYNC)
+       add_definitions(-DHAVE_BARRIERFSYNC)
+     elseif(FSYNC_MODE STREQUAL "BARRIER")
+       message(FATAL_ERROR "FSYNC_MODE is , but unable to compile with F_BARRIERFSYNC")
+     endif()
+  endif()
 endif()
 
 include_directories(${PROJECT_SOURCE_DIR})
@@ -700,6 +716,7 @@ set(SOURCES
         db/db_impl/compacted_db_impl.cc
         db/db_impl/db_impl.cc
         db/db_impl/db_impl_write.cc
+        db/db_impl/db_spdb_impl_write.cc
         db/db_impl/db_impl_compaction_flush.cc
         db/db_impl/db_impl_files.cc
         db/db_impl/db_impl_open.cc
@@ -917,6 +934,7 @@ set(SOURCES
         utilities/fault_injection_env.cc
         utilities/fault_injection_fs.cc
         utilities/fault_injection_secondary_cache.cc
+        utilities/injection_fs.cc
         utilities/leveldb_options/leveldb_options.cc
         utilities/memory/memory_util.cc
         utilities/merge_operators.cc
@@ -927,6 +945,7 @@ set(SOURCES
         utilities/merge_operators/string_append/stringappend.cc
         utilities/merge_operators/string_append/stringappend2.cc
         utilities/merge_operators/uint64add.cc
+        utilities/nosync_fs.cc
         utilities/object_registry.cc
         utilities/option_change_migration/option_change_migration.cc
         utilities/options/options_util.cc
@@ -1434,6 +1453,7 @@ if(WITH_TESTS)
         db/write_batch_test.cc
         db/write_callback_test.cc
         db/write_controller_test.cc
+        db/global_write_controller_test.cc
         env/env_test.cc
         env/io_posix_test.cc
         env/mock_env_test.cc

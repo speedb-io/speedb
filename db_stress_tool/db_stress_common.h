@@ -91,6 +91,7 @@ DECLARE_bool(test_cf_consistency);
 DECLARE_bool(test_multi_ops_txns);
 DECLARE_int32(threads);
 DECLARE_int32(ttl);
+DECLARE_bool(skip_expired_data);
 DECLARE_int32(value_size_mult);
 DECLARE_int32(compaction_readahead_size);
 DECLARE_bool(enable_pipelined_write);
@@ -155,6 +156,7 @@ DECLARE_uint64(periodic_compaction_seconds);
 DECLARE_uint64(compaction_ttl);
 DECLARE_bool(allow_concurrent_memtable_write);
 DECLARE_double(experimental_mempurge_threshold);
+DECLARE_bool(use_spdb_writes);
 DECLARE_bool(enable_write_thread_adaptive_yield);
 DECLARE_int32(reopen);
 DECLARE_string(filter_uri);
@@ -306,6 +308,8 @@ DECLARE_bool(two_write_queues);
 DECLARE_bool(use_only_the_last_commit_time_batch_for_recovery);
 DECLARE_uint64(wp_snapshot_cache_bits);
 DECLARE_uint64(wp_commit_cache_bits);
+DECLARE_int32(refresh_options_sec);
+DECLARE_string(refresh_options_file);
 #endif  // !ROCKSDB_LITE
 
 DECLARE_bool(adaptive_readahead);

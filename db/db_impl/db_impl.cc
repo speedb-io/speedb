@@ -197,8 +197,7 @@ DBImpl::DBImpl(const DBOptions& options, const std::string& dbname,
       write_buffer_manager_(immutable_db_options_.write_buffer_manager.get()),
       write_thread_(immutable_db_options_),
       nonmem_write_thread_(immutable_db_options_),
-      write_controller_(immutable_db_options_.use_dynamic_delay,
-                        mutable_db_options_.delayed_write_rate),
+      write_controller_(immutable_db_options_.write_controller),
       last_batch_group_size_(0),
       unscheduled_flushes_(0),
       unscheduled_compactions_(0),
@@ -277,11 +276,13 @@ DBImpl::DBImpl(const DBOptions& options, const std::string& dbname,
   periodic_task_functions_.emplace(
       PeriodicTaskType::kRecordSeqnoTime,
       [this]() { this->RecordSeqnoToTimeMapping(); });
+  periodic_task_functions_.emplace(PeriodicTaskType::kRefreshOptions,
+                                   [this]() { this->RefreshOptions(); });
 #endif  // ROCKSDB_LITE
 
   versions_.reset(new VersionSet(dbname_, &immutable_db_options_, file_options_,
                                  table_cache_.get(), write_buffer_manager_,
-                                 &write_controller_, &block_cache_tracer_,
+                                 write_controller_, &block_cache_tracer_,
                                  io_tracer_, db_id_, db_session_id_));
   column_family_memtables_.reset(
       new ColumnFamilyMemTablesImpl(versions_->GetColumnFamilySet()));
@@ -296,6 +297,10 @@ DBImpl::DBImpl(const DBOptions& options, const std::string& dbname,
                             std::memory_order_relaxed);
   if (write_buffer_manager_) {
     wbm_stall_.reset(new WBMStallInterface());
+  }
+
+  if (immutable_db_options_.use_spdb_writes) {
+    spdb_write_.reset(new SpdbWriteImpl(this));
   }
 }
 
@@ -573,6 +578,11 @@ Status DBImpl::CloseHelper() {
   }
   mutex_.Unlock();
 
+  // Shutdown Spdb write in order to ensure no writes will be handled
+  if (spdb_write_) {
+    spdb_write_->Shutdown();
+  }
+
   // Below check is added as recovery_error_ is not checked and it causes crash
   // in DBSSTTest.DBWithMaxSpaceAllowedWithBlobFiles when space limit is
   // reached.
@@ -833,6 +843,15 @@ Status DBImpl::StartPeriodicTaskScheduler() {
         PeriodicTaskType::kPersistStats,
         periodic_task_functions_.at(PeriodicTaskType::kPersistStats),
         mutable_db_options_.stats_persist_period_sec);
+    if (!s.ok()) {
+      return s;
+    }
+  }
+  if (mutable_db_options_.refresh_options_sec > 0) {
+    Status s = periodic_task_scheduler_.Register(
+        PeriodicTaskType::kRefreshOptions,
+        periodic_task_functions_.at(PeriodicTaskType::kRefreshOptions),
+        mutable_db_options_.refresh_options_sec);
     if (!s.ok()) {
       return s;
     }
@@ -1135,6 +1154,82 @@ void DBImpl::FlushInfoLog() {
   LogFlush(immutable_db_options_.info_log);
 }
 
+#ifndef ROCKSDB_LITE
+// Periodically checks to see if the new options should be loaded into the
+// process. log.
+void DBImpl::RefreshOptions() {
+  if (shutdown_initiated_) {
+    return;
+  }
+  std::string new_options_file = mutable_db_options_.refresh_options_file;
+  if (new_options_file.empty()) {
+    new_options_file = "Options.new";
+  }
+  if (new_options_file[0] != kFilePathSeparator) {
+    new_options_file = NormalizePath(immutable_db_options_.db_paths[0].path +
+                                     kFilePathSeparator + new_options_file);
+  }
+  TEST_SYNC_POINT("DBImpl::RefreshOptions::Start");
+  Status s = fs_->FileExists(new_options_file, IOOptions(), nullptr);
+  TEST_SYNC_POINT_CALLBACK("DBImpl::RefreshOptions::FileExists", &s);
+  if (!s.ok()) {
+    return;
+  }
+  ROCKS_LOG_INFO(immutable_db_options_.info_log,
+                 "Refreshing Options from file: %s\n",
+                 new_options_file.c_str());
+
+  ConfigOptions cfg_opts;
+  cfg_opts.ignore_unknown_options = true;
+  cfg_opts.mutable_options_only = true;
+  RocksDBOptionsParser op;
+  s = op.Parse(cfg_opts, new_options_file, fs_.get());
+  TEST_SYNC_POINT_CALLBACK("DBImpl::RefreshOptions::Parse", &s);
+  if (!s.ok()) {
+    ROCKS_LOG_WARN(immutable_db_options_.info_log,
+                   "Failed to parse Options file (%s): %s\n",
+                   new_options_file.c_str(), s.ToString().c_str());
+  } else if (!op.db_opt_map()->empty()) {
+    s = SetDBOptions(*(op.db_opt_map()));
+    TEST_SYNC_POINT_CALLBACK("DBImpl::RefreshOptions::SetDBOptions", &s);
+    if (!s.ok()) {
+      ROCKS_LOG_WARN(immutable_db_options_.info_log,
+                     "Failed to refresh DBOptions, Aborting: %s\n",
+                     s.ToString().c_str());
+    }
+  }
+  if (s.ok()) {
+    int idx = 0;
+    for (const auto& cf_opt_map : *(op.cf_opt_maps())) {
+      if (!cf_opt_map.empty()) {
+        const auto& cf_name = (*op.cf_names())[idx];
+        auto cfd = versions_->GetColumnFamilySet()->GetColumnFamily(cf_name);
+        if (cfd == nullptr) {
+          ROCKS_LOG_WARN(immutable_db_options_.info_log,
+                         "RefreshOptions failed locating CF: %s\n",
+                         cf_name.c_str());
+        } else if (!cfd->IsDropped()) {
+          s = SetCFOptionsImpl(cfd, cf_opt_map);
+          TEST_SYNC_POINT_CALLBACK("DBImpl::RefreshOptions::SetCFOptions", &s);
+          if (!s.ok()) {
+            ROCKS_LOG_WARN(immutable_db_options_.info_log,
+                           "Failed to refresh CFOptions for CF %s: %s\n",
+                           cf_name.c_str(), s.ToString().c_str());
+          }
+        }
+      }
+      idx++;
+    }
+  }
+  s = fs_->DeleteFile(new_options_file, IOOptions(), nullptr);
+  TEST_SYNC_POINT_CALLBACK("DBImpl::RefreshOptions::DeleteFile", &s);
+  ROCKS_LOG_INFO(immutable_db_options_.info_log,
+                 "RefreshOptions Complete, deleting options file %s: %s\n",
+                 new_options_file.c_str(), s.ToString().c_str());
+  TEST_SYNC_POINT("DBImpl::RefreshOptions::Complete");
+}
+#endif  // ROCKSDB_LITE
+
 Status DBImpl::TablesRangeTombstoneSummary(ColumnFamilyHandle* column_family,
                                            int max_entries_to_print,
                                            std::string* out_str) {
@@ -1186,7 +1281,14 @@ Status DBImpl::SetOptions(
                    cfd->GetName().c_str());
     return Status::InvalidArgument("empty input");
   }
+  return SetCFOptionsImpl(cfd, options_map);
+#endif  // ROCKSDB_LITE
+}
 
+#ifndef ROCKSDB_LITE
+Status DBImpl::SetCFOptionsImpl(
+    ColumnFamilyData* cfd,
+    const std::unordered_map<std::string, std::string>& options_map) {
   MutableCFOptions new_options;
   Status s;
   Status persist_options_status;
@@ -1235,8 +1337,8 @@ Status DBImpl::SetOptions(
   }
   LogFlush(immutable_db_options_.info_log);
   return s;
-#endif  // ROCKSDB_LITE
 }
+#endif  // ROCKSDB_LITE
 
 Status DBImpl::SetDBOptions(
     const std::unordered_map<std::string, std::string>& options_map) {
@@ -1344,12 +1446,24 @@ Status DBImpl::SetDBOptions(
               new_options.stats_persist_period_sec);
         }
       }
+      if (s.ok()) {
+        if (new_options.refresh_options_sec == 0) {
+          s = periodic_task_scheduler_.Unregister(
+              PeriodicTaskType::kRefreshOptions);
+        } else {
+          s = periodic_task_scheduler_.Register(
+              PeriodicTaskType::kRefreshOptions,
+              periodic_task_functions_.at(PeriodicTaskType::kRefreshOptions),
+              new_options.refresh_options_sec);
+        }
+      }
+
       mutex_.Lock();
       if (!s.ok()) {
         return s;
       }
 
-      write_controller_.set_max_delayed_write_rate(
+      write_controller_->set_max_delayed_write_rate(
           new_options.delayed_write_rate);
       table_cache_.get()->SetCapacity(new_options.max_open_files == -1
                                           ? TableCache::kInfiniteCapacity

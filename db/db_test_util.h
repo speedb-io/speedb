@@ -883,11 +883,13 @@ class CacheWrapper : public Cache {
   const char* Name() const override { return target_->Name(); }
 
   using Cache::Insert;
-  Status Insert(const Slice& key, void* value, size_t charge,
-                void (*deleter)(const Slice& key, void* value),
-                Handle** handle = nullptr,
-                Priority priority = Priority::LOW) override {
-    return target_->Insert(key, value, charge, deleter, handle, priority);
+  Status Insert(
+      const Slice& key, void* value, size_t charge,
+      void (*deleter)(const Slice& key, void* value), Handle** handle = nullptr,
+      Priority priority = Priority::LOW,
+      Cache::ItemOwnerId item_owner_id = Cache::kUnknownItemId) override {
+    return target_->Insert(key, value, charge, deleter, handle, priority,
+                           item_owner_id);
   }
 
   using Cache::Lookup;
@@ -942,7 +944,8 @@ class CacheWrapper : public Cache {
 
   void ApplyToAllEntries(
       const std::function<void(const Slice& key, void* value, size_t charge,
-                               DeleterFn deleter)>& callback,
+                               DeleterFn deleter,
+                               Cache::ItemOwnerId item_owner_id)>& callback,
       const ApplyToAllEntriesOptions& opts) override {
     target_->ApplyToAllEntries(callback, opts);
   }
@@ -971,10 +974,11 @@ class TargetCacheChargeTrackingCache : public CacheWrapper {
   explicit TargetCacheChargeTrackingCache(std::shared_ptr<Cache> target);
 
   using Cache::Insert;
-  Status Insert(const Slice& key, void* value, size_t charge,
-                void (*deleter)(const Slice& key, void* value),
-                Handle** handle = nullptr,
-                Priority priority = Priority::LOW) override;
+  Status Insert(
+      const Slice& key, void* value, size_t charge,
+      void (*deleter)(const Slice& key, void* value), Handle** handle = nullptr,
+      Priority priority = Priority::LOW,
+      Cache::ItemOwnerId item_owner_id = Cache::kUnknownItemId) override;
 
   using Cache::Release;
   bool Release(Handle* handle, bool erase_if_last_ref = false) override;
@@ -1087,6 +1091,14 @@ class DBTestBase : public testing::Test {
   DBTestBase(const std::string path, bool env_do_fsync);
 
   ~DBTestBase();
+
+  void RecalculateWriteStallConditions(
+      DBImpl* db, ColumnFamilyData* cfd,
+      const MutableCFOptions& mutable_cf_options);
+
+  bool IsDbWriteStopped(DBImpl* dbimpl);
+
+  bool IsDbWriteDelayed(DBImpl* dbimpl);
 
   static std::string Key(int i) {
     char buf[100];

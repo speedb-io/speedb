@@ -26,3 +26,5 @@ speedb_HEADERS = 																  								\
 
 speedb_TESTS = 																										\
      speedb_customizable_test.cc																	\
+
+speedb_JAVA_TESTS = org.rocksdb.SpeedbFilterTest \

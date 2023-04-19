@@ -12,10 +12,19 @@ public class ConfigOptions extends RocksObject {
   }
 
   /**
-   * Construct with default Options
+   * Construct with default ConfigOptions
    */
   public ConfigOptions() {
     super(newConfigOptions());
+  }
+
+  /**
+   * Constructs a ConfigOptions with the input values
+   * @param ignore_unknown_options Sets the options property to the input value
+   * @param ignore_unsupported_options Sets the options property to the input value
+   */
+  public ConfigOptions(boolean ignore_unknown_options, boolean ignore_unsupported_options) {
+    super(newConfigOptions(ignore_unknown_options, ignore_unsupported_options));
   }
 
   public ConfigOptions setDelimiter(final String delimiter) {
@@ -24,6 +33,21 @@ public class ConfigOptions extends RocksObject {
   }
   public ConfigOptions setIgnoreUnknownOptions(final boolean ignore) {
     setIgnoreUnknownOptions(nativeHandle_, ignore);
+    return this;
+  }
+
+  public ConfigOptions setIgnoreUnsupportedOptions(final boolean ignore) {
+    setIgnoreUnsupportedOptions(nativeHandle_, ignore);
+    return this;
+  }
+
+  public ConfigOptions setInvokePrepareOptions(final boolean prepare) {
+    setInvokePrepareOptions(nativeHandle_, prepare);
+    return this;
+  }
+
+  public ConfigOptions setMutableOptionsOnly(final boolean only) {
+    setMutableOptionsOnly(nativeHandle_, only);
     return this;
   }
 
@@ -45,9 +69,13 @@ public class ConfigOptions extends RocksObject {
   @Override protected final native void disposeInternal(final long handle);
 
   private native static long newConfigOptions();
+  private native static long newConfigOptions(boolean unknown, boolean unsupported);
   private native static void setEnv(final long handle, final long envHandle);
   private native static void setDelimiter(final long handle, final String delimiter);
   private native static void setIgnoreUnknownOptions(final long handle, final boolean ignore);
+  private native static void setIgnoreUnsupportedOptions(final long handle, final boolean ignore);
+  private native static void setInvokePrepareOptions(final long handle, final boolean prepare);
+  private native static void setMutableOptionsOnly(final long handle, final boolean only);
   private native static void setInputStringsEscaped(final long handle, final boolean escaped);
   private native static void setSanityLevel(final long handle, final byte level);
 }

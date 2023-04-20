@@ -247,6 +247,7 @@ static const std::string cf_file_histogram = "cf-file-histogram";
 static const std::string dbstats = "dbstats";
 static const std::string levelstats = "levelstats";
 static const std::string block_cache_entry_stats = "block-cache-entry-stats";
+static const std::string block_cache_cf_stats = "block-cache-cf-stats";
 static const std::string num_immutable_mem_table = "num-immutable-mem-table";
 static const std::string num_immutable_mem_table_flushed =
     "num-immutable-mem-table-flushed";
@@ -326,6 +327,8 @@ const std::string DB::Properties::kDBStats = rocksdb_prefix + dbstats;
 const std::string DB::Properties::kLevelStats = rocksdb_prefix + levelstats;
 const std::string DB::Properties::kBlockCacheEntryStats =
     rocksdb_prefix + block_cache_entry_stats;
+const std::string DB::Properties::kBlockCacheCfStats =
+    rocksdb_prefix + block_cache_cf_stats;
 const std::string DB::Properties::kNumImmutableMemTable =
     rocksdb_prefix + num_immutable_mem_table;
 const std::string DB::Properties::kNumImmutableMemTableFlushed =
@@ -446,6 +449,9 @@ const UnorderedMap<std::string, DBPropertyInfo>
         {DB::Properties::kBlockCacheEntryStats,
          {true, &InternalStats::HandleBlockCacheEntryStats, nullptr,
           &InternalStats::HandleBlockCacheEntryStatsMap, nullptr}},
+        {DB::Properties::kBlockCacheCfStats,
+         {true, &InternalStats::HandleBlockCacheCfStats, nullptr,
+          &InternalStats::HandleBlockCacheCfStatsMap, nullptr}},
         {DB::Properties::kSSTables,
          {false, &InternalStats::HandleSsTables, nullptr, nullptr, nullptr}},
         {DB::Properties::kAggregatedTableProperties,
@@ -644,10 +650,11 @@ void InternalStats::CollectCacheEntryStats(bool foreground) {
                                              min_interval_factor);
 }
 
-std::function<void(const Slice&, void*, size_t, Cache::DeleterFn)>
+std::function<void(const Slice&, void*, size_t, Cache::DeleterFn,
+                   Cache::ItemOwnerId)>
 InternalStats::CacheEntryRoleStats::GetEntryCallback() {
-  return [&](const Slice& /*key*/, void* /*value*/, size_t charge,
-             Cache::DeleterFn deleter) {
+  return [&](const Slice& /*key*/, void* /* value */, size_t charge,
+             Cache::DeleterFn deleter, Cache::ItemOwnerId item_owner_id) {
     auto e = role_map_.find(deleter);
     size_t role_idx;
     if (e == role_map_.end()) {
@@ -657,6 +664,7 @@ InternalStats::CacheEntryRoleStats::GetEntryCallback() {
     }
     entry_counts[role_idx]++;
     total_charges[role_idx] += charge;
+    charge_per_item_owner[item_owner_id][role_idx] += charge;
   };
 }
 
@@ -674,6 +682,8 @@ void InternalStats::CacheEntryRoleStats::BeginCollection(
   cache_usage = cache->GetUsage();
   table_size = cache->GetTableAddressCount();
   occupancy = cache->GetOccupancyCount();
+  // Currently only LRUCache supports this feature
+  charge_per_item_owner_supported = (cache->Name() == std::string("LRUCache"));
 }
 
 void InternalStats::CacheEntryRoleStats::EndCollection(
@@ -717,6 +727,41 @@ std::string InternalStats::CacheEntryRoleStats::ToString(
   return str.str();
 }
 
+std::string InternalStats::CacheEntryRoleStats::CacheOwnerStatsToString(
+    const std::string& cf_name, Cache::ItemOwnerId cache_owner_id) {
+  if (charge_per_item_owner_supported == false) {
+    return "";
+  }
+
+  std::ostringstream str;
+  const auto& cf_charges_per_role_pos =
+      charge_per_item_owner.find(cache_owner_id);
+
+  std::vector<CacheEntryRole> roles{CacheEntryRole::kDataBlock,
+                                    CacheEntryRole::kFilterBlock,
+                                    CacheEntryRole::kIndexBlock};
+  std::array<size_t, kNumCacheEntryRoles> roles_total_charge{};
+
+  str << "Block cache [" << cf_name << "] ";
+
+  if (cf_charges_per_role_pos != charge_per_item_owner.end()) {
+    const std::array<size_t, kNumCacheEntryRoles>& cf_charges_per_role =
+        cf_charges_per_role_pos->second;
+    for (auto role : roles) {
+      auto role_idx = static_cast<unsigned int>(role);
+      roles_total_charge[role_idx] = cf_charges_per_role[role_idx];
+    }
+  }
+
+  for (auto role : roles) {
+    auto role_idx = static_cast<unsigned int>(role);
+    str << " " << kCacheEntryRoleToCamelString[role_idx] << "("
+        << BytesToHumanString(roles_total_charge[role_idx]) << ")";
+  }
+  str << '\n';
+  return str.str();
+}
+
 void InternalStats::CacheEntryRoleStats::ToMap(
     std::map<std::string, std::string>* values, SystemClock* clock) const {
   values->clear();
@@ -736,6 +781,29 @@ void InternalStats::CacheEntryRoleStats::ToMap(
         std::to_string(total_charges[i]);
     v[BlockCacheEntryStatsMapKeys::UsedPercent(role)] =
         std::to_string(100.0 * total_charges[i] / cache_capacity);
+  }
+}
+
+void InternalStats::CacheEntryRoleStats::CacheOwnerStatsToMap(
+    const std::string& cf_name, Cache::ItemOwnerId cache_owner_id,
+    std::map<std::string, std::string>* values) const {
+  if (charge_per_item_owner_supported == false) {
+    return;
+  }
+
+  values->clear();
+  auto& v = *values;
+  v[BlockCacheCfStatsMapKeys::CfName()] = cf_name;
+  v[BlockCacheCfStatsMapKeys::CacheId()] = cache_id;
+  const auto& cache_owner_charges = charge_per_item_owner.find(cache_owner_id);
+  for (size_t i = 0; i < kNumCacheEntryRoles; ++i) {
+    auto role = static_cast<CacheEntryRole>(i);
+    if (cache_owner_charges != charge_per_item_owner.end()) {
+      v[BlockCacheCfStatsMapKeys::UsedBytes(role)] =
+          std::to_string(charge_per_item_owner.at(cache_owner_id)[i]);
+    } else {
+      v[BlockCacheCfStatsMapKeys::UsedBytes(role)] = "0";
+    }
   }
 }
 
@@ -760,6 +828,31 @@ bool InternalStats::HandleBlockCacheEntryStatsMap(
   CacheEntryRoleStats stats;
   cache_entry_stats_collector_->GetStats(&stats);
   stats.ToMap(values, clock_);
+  return true;
+}
+
+bool InternalStats::HandleBlockCacheCfStats(std::string* value,
+                                            Slice /*suffix*/) {
+  if (!cache_entry_stats_collector_) {
+    return false;
+  }
+  CollectCacheEntryStats(/*foreground*/ true);
+  CacheEntryRoleStats stats;
+  cache_entry_stats_collector_->GetStats(&stats);
+  *value =
+      stats.CacheOwnerStatsToString(cfd_->GetName(), cfd_->GetCacheOwnerId());
+  return true;
+}
+
+bool InternalStats::HandleBlockCacheCfStatsMap(
+    std::map<std::string, std::string>* values, Slice /*suffix*/) {
+  if (!cache_entry_stats_collector_) {
+    return false;
+  }
+  CollectCacheEntryStats(/*foreground*/ true);
+  CacheEntryRoleStats stats;
+  cache_entry_stats_collector_->GetStats(&stats);
+  stats.CacheOwnerStatsToMap(cfd_->GetName(), cfd_->GetCacheOwnerId(), values);
   return true;
 }
 
@@ -1321,18 +1414,18 @@ bool InternalStats::HandleMinObsoleteSstNumberToKeep(uint64_t* value,
 
 bool InternalStats::HandleActualDelayedWriteRate(uint64_t* value, DBImpl* db,
                                                  Version* /*version*/) {
-  const WriteController& wc = db->write_controller();
-  if (!wc.NeedsDelay()) {
+  const WriteController* wc = db->write_controller_ptr();
+  if (!wc->NeedsDelay()) {
     *value = 0;
   } else {
-    *value = wc.delayed_write_rate();
+    *value = wc->delayed_write_rate();
   }
   return true;
 }
 
 bool InternalStats::HandleIsWriteStopped(uint64_t* value, DBImpl* db,
                                          Version* /*version*/) {
-  *value = db->write_controller().IsStopped() ? 1 : 0;
+  *value = db->write_controller()->IsStopped() ? 1 : 0;
   return true;
 }
 
@@ -1892,6 +1985,8 @@ void InternalStats::DumpCFStatsNoFileHistogram(std::string* value) {
     // Skip if stats are extremely old (> 1 day, incl not yet populated)
     if (now_micros - stats.last_end_time_micros_ < kDayInMicros) {
       value->append(stats.ToString(clock_));
+      value->append(stats.CacheOwnerStatsToString(cfd_->GetName(),
+                                                  cfd_->GetCacheOwnerId()));
     }
   }
 }

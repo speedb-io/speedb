@@ -106,6 +106,7 @@ public:
   virtual const char* Name() const = 0;
   virtual uint64_t min() const = 0;
   virtual uint64_t max() const = 0;
+  virtual uint64_t sum() const = 0;
   virtual uint64_t num() const = 0;
   virtual double Median() const = 0;
   virtual double Percentile(double p) const = 0;
@@ -132,6 +133,7 @@ class HistogramImpl : public Histogram {
   virtual uint64_t min() const override { return stats_.min(); }
   virtual uint64_t max() const override { return stats_.max(); }
   virtual uint64_t num() const override { return stats_.num(); }
+  virtual uint64_t sum() const override { return stats_.sum(); }
   virtual double Median() const override;
   virtual double Percentile(double p) const override;
   virtual double Average() const override;

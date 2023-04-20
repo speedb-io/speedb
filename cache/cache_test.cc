@@ -942,7 +942,8 @@ TEST_P(CacheTest, ApplyToAllCacheEntriesTest) {
 TEST_P(CacheTest, ApplyToAllEntriesTest) {
   std::vector<std::string> callback_state;
   const auto callback = [&](const Slice& key, void* value, size_t charge,
-                            Cache::DeleterFn deleter) {
+                            Cache::DeleterFn deleter,
+                            Cache::ItemOwnerId /* item_owner_id */) {
     callback_state.push_back(std::to_string(DecodeKey(key)) + "," +
                              std::to_string(DecodeValue(value)) + "," +
                              std::to_string(charge));
@@ -986,7 +987,8 @@ TEST_P(CacheTest, ApplyToAllEntriesDuringResize) {
   // For callback
   int special_count = 0;
   const auto callback = [&](const Slice&, void*, size_t charge,
-                            Cache::DeleterFn) {
+                            Cache::DeleterFn,
+                            Cache::ItemOwnerId /* item_owner_id */) {
     if (charge == static_cast<size_t>(kSpecialCharge)) {
       ++special_count;
     }

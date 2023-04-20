@@ -60,6 +60,7 @@ struct ImmutableDBOptions {
   bool advise_random_on_open;
   size_t db_write_buffer_size;
   std::shared_ptr<WriteBufferManager> write_buffer_manager;
+  std::shared_ptr<WriteController> write_controller;
   DBOptions::AccessHint access_hint_on_compaction_start;
   size_t random_access_max_buffer_size;
   bool use_adaptive_mutex;
@@ -68,6 +69,7 @@ struct ImmutableDBOptions {
   bool enable_pipelined_write;
   bool unordered_write;
   bool allow_concurrent_memtable_write;
+  bool use_spdb_writes;
   bool enable_write_thread_adaptive_yield;
   uint64_t write_thread_max_yield_usec;
   uint64_t write_thread_slow_yield_usec;
@@ -131,6 +133,8 @@ struct MutableDBOptions {
   uint64_t delete_obsolete_files_period_micros;
   unsigned int stats_dump_period_sec;
   unsigned int stats_persist_period_sec;
+  unsigned int refresh_options_sec;
+  std::string refresh_options_file;
   size_t stats_history_buffer_size;
   int max_open_files;
   uint64_t bytes_per_sync;

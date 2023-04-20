@@ -22,6 +22,7 @@
 #include "db/column_family.h"
 #include "db/compaction/compaction_iterator.h"
 #include "db/compaction/compaction_job.h"
+#include "db/db_impl/db_spdb_impl_write.h"
 #include "db/error_handler.h"
 #include "db/event_helpers.h"
 #include "db/external_sst_file_ingestion_job.h"
@@ -889,7 +890,11 @@ class DBImpl : public DB {
     return num_running_compactions_;
   }
 
-  const WriteController& write_controller() { return write_controller_; }
+  const std::shared_ptr<WriteController>& write_controller() const {
+    return write_controller_;
+  }
+
+  WriteController* write_controller_ptr() { return write_controller_.get(); }
 
   // hollow transactions shell used for recovery.
   // these will then be passed to TransactionDB so that
@@ -1148,7 +1153,9 @@ class DBImpl : public DB {
 
   Cache* TEST_table_cache() { return table_cache_.get(); }
 
-  WriteController& TEST_write_controler() { return write_controller_; }
+  const std::shared_ptr<WriteController>& TEST_write_controler() {
+    return write_controller_;
+  }
 
   uint64_t TEST_FindMinLogContainingOutstandingPrep();
   uint64_t TEST_FindMinPrepLogReferencedByMemTable();
@@ -1189,6 +1196,11 @@ class DBImpl : public DB {
 
   // record current sequence number to time mapping
   void RecordSeqnoToTimeMapping();
+
+#ifndef ROCKSDB_LITE
+  // Checks if the options should be updated
+  void RefreshOptions();
+#endif  // ROCKSDB_LITE
 
   // Interface to block and signal the DB in case of stalling writes by
   // WriteBufferManager. Each DBImpl object contains ptr to WBMStallInterface.
@@ -1245,6 +1257,25 @@ class DBImpl : public DB {
   static void TEST_ResetDbSessionIdGen();
   static std::string GenerateDbSessionId(Env* env);
 
+ public:
+  // SPDB write
+  bool CheckIfActionNeeded();
+  Status RegisterFlushOrTrim();
+  void SetLastSequence(uint64_t seq_inc) {
+    versions_->SetLastSequence(seq_inc);
+  }
+  uint64_t FetchAddLastAllocatedSequence(uint64_t batch_count) {
+    return versions_->FetchAddLastAllocatedSequence(batch_count);
+  }
+  Status SpdbWrite(const WriteOptions& write_options, WriteBatch* my_batch,
+                   bool disable_memtable);
+  IOStatus SpdbWriteToWAL(WriteBatch* merged_batch, size_t write_with_wal,
+                          const WriteBatch* to_be_cached_state, bool do_flush,
+                          uint64_t* offset, uint64_t* size);
+  IOStatus SpdbSyncWAL(uint64_t offset, uint64_t size);
+
+  void SuspendSpdbWrites();
+  void ResumeSpdbWrites();
   bool seq_per_batch() const { return seq_per_batch_; }
 
  protected:
@@ -1781,7 +1812,11 @@ class DBImpl : public DB {
                                 ColumnFamilyHandle** handle);
 
   Status DropColumnFamilyImpl(ColumnFamilyHandle* column_family);
-
+#ifndef ROCKSDB_LITE
+  Status SetCFOptionsImpl(
+      ColumnFamilyData* cfd,
+      const std::unordered_map<std::string, std::string>& options_map);
+#endif  // ROCKSDB_LITE
   // Delete any unneeded files and stale in-memory entries.
   void DeleteObsoleteFiles();
   // Delete obsolete files and log status and information of file deletion
@@ -2451,7 +2486,7 @@ class DBImpl : public DB {
   // in 2PC to batch the prepares separately from the serial commit.
   WriteThread nonmem_write_thread_;
 
-  WriteController write_controller_;
+  std::shared_ptr<WriteController> write_controller_;
 
   // Size of the last batch group. In slowdown mode, next write needs to
   // sleep if it uses up the quota.
@@ -2669,6 +2704,9 @@ class DBImpl : public DB {
   std::atomic<uint64_t> max_total_wal_size_;
 
   BlobFileCompletionCallback blob_callback_;
+
+  // Pointer to Speedb write flow
+  std::unique_ptr<SpdbWriteImpl> spdb_write_;
 
   // Pointer to WriteBufferManager stalling interface.
   std::unique_ptr<StallInterface> wbm_stall_;

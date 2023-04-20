@@ -101,6 +101,8 @@ DEFINE_int32(ttl, -1,
              "Carefully specify a large value such that verifications on "
              "deleted values don't fail");
 
+DEFINE_bool(skip_expired_data, false, "If true, will skip keys expired by TTL");
+
 DEFINE_int32(value_size_mult, 8,
              "Size of value will be this number times rand_int(1,3) bytes");
 
@@ -382,6 +384,8 @@ DEFINE_uint64(periodic_compaction_seconds, 1000,
 
 DEFINE_uint64(compaction_ttl, 1000,
               "Files older than TTL will be compacted to the next level.");
+
+DEFINE_bool(use_spdb_writes, false, "Use optimized Speedb write flow");
 
 DEFINE_bool(allow_concurrent_memtable_write, false,
             "Allow multi-writers to update mem tables in parallel.");
@@ -1023,6 +1027,12 @@ DEFINE_uint64(
 DEFINE_uint64(wp_commit_cache_bits, 23ull,
               "Number of bits to represent write-prepared transaction db's "
               "commit cache. Default: 23 (8M entries)");
+DEFINE_int32(
+    refresh_options_sec, 0,
+    "Frequency (in secs) to look for a new options file (off by default)");
+DEFINE_string(refresh_options_file, "",
+              "File in which to look for new options");
+
 #endif  // !ROCKSDB_LITE
 
 DEFINE_bool(adaptive_readahead, false,

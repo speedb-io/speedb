@@ -161,7 +161,8 @@ void LRUCacheShard::EraseUnRefEntries() {
 
 void LRUCacheShard::ApplyToSomeEntries(
     const std::function<void(const Slice& key, void* value, size_t charge,
-                             DeleterFn deleter)>& callback,
+                             DeleterFn deleter,
+                             Cache::ItemOwnerId item_owner_id)>& callback,
     uint32_t average_entries_per_lock, uint32_t* state) {
   // The state is essentially going to be the starting hash, which works
   // nicely even if we resize between calls because we use upper-most
@@ -192,7 +193,7 @@ void LRUCacheShard::ApplyToSomeEntries(
                                 ? h->info_.helper->del_cb
                                 : h->info_.deleter;
         callback(h->key(), h->value, h->GetCharge(metadata_charge_policy),
-                 deleter);
+                 deleter, h->item_owner_id);
       },
       index_begin, index_end);
 }
@@ -468,7 +469,7 @@ void LRUCacheShard::Promote(LRUHandle* e) {
           e->IsHighPri() ? Cache::Priority::HIGH : Cache::Priority::LOW;
       s = Insert(e->key(), e->hash, /*value=*/nullptr, 0,
                  /*deleter=*/nullptr, /*helper=*/nullptr, /*handle=*/nullptr,
-                 priority);
+                 priority, e->item_owner_id);
     } else {
       e->SetInCache(true);
       e->SetIsStandalone(false);
@@ -679,7 +680,8 @@ Status LRUCacheShard::Insert(const Slice& key, uint32_t hash, void* value,
                              size_t charge,
                              void (*deleter)(const Slice& key, void* value),
                              const Cache::CacheItemHelper* helper,
-                             Cache::Handle** handle, Cache::Priority priority) {
+                             Cache::Handle** handle, Cache::Priority priority,
+                             Cache::ItemOwnerId item_owner_id) {
   // Allocate the memory here outside of the mutex.
   // If the cache is full, we'll have to release it.
   // It shouldn't happen very often though.
@@ -706,6 +708,7 @@ Status LRUCacheShard::Insert(const Slice& key, uint32_t hash, void* value,
   memcpy(e->key_data, key.data(), key.size());
   e->CalcTotalCharge(charge, metadata_charge_policy_);
 
+  e->item_owner_id = item_owner_id;
   return InsertItem(e, handle, /* free_handle_on_fail */ true);
 }
 

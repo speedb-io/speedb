@@ -123,6 +123,25 @@ DBTestBase::~DBTestBase() {
   delete env_;
 }
 
+void DBTestBase::RecalculateWriteStallConditions(
+    DBImpl* dbimpl, ColumnFamilyData* cfd,
+    const MutableCFOptions& mutable_cf_options) {
+  // add lock to avoid race condition between
+  // `RecalculateWriteStallConditions` which writes to CFStats and
+  // background `DBImpl::DumpStats()` threads which read CFStats
+  dbimpl->TEST_LockMutex();
+  cfd->RecalculateWriteStallConditions(mutable_cf_options);
+  dbimpl->TEST_UnlockMutex();
+}
+
+bool DBTestBase::IsDbWriteStopped(DBImpl* dbimpl) {
+  return dbimpl->TEST_write_controler()->IsStopped();
+}
+
+bool DBTestBase::IsDbWriteDelayed(DBImpl* dbimpl) {
+  return dbimpl->TEST_write_controler()->NeedsDelay();
+}
+
 bool DBTestBase::ShouldSkipOptions(int option_config, int skip_mask) {
 #ifdef ROCKSDB_LITE
     // These options are not supported in ROCKSDB_LITE
@@ -1706,8 +1725,9 @@ template <CacheEntryRole R>
 Status TargetCacheChargeTrackingCache<R>::Insert(
     const Slice& key, void* value, size_t charge,
     void (*deleter)(const Slice& key, void* value), Handle** handle,
-    Priority priority) {
-  Status s = target_->Insert(key, value, charge, deleter, handle, priority);
+    Priority priority, Cache::ItemOwnerId item_owner_id) {
+  Status s = target_->Insert(key, value, charge, deleter, handle, priority,
+                             item_owner_id);
   if (deleter == kNoopDeleter) {
     if (last_peak_tracked_) {
       cache_charge_peak_ = 0;

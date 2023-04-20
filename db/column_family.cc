@@ -658,6 +658,11 @@ ColumnFamilyData::ColumnFamilyData(
               CacheReservationManagerImpl<CacheEntryRole::kFileMetadata>>(
               bbto->block_cache)));
     }
+
+    if (bbto->block_cache && table_cache_) {
+      cache_owner_id_ = bbto->block_cache->GetNextItemOwnerId();
+      table_cache_->SetBlockCacheOwnerId(cache_owner_id_);
+    }
   }
 }
 
@@ -669,6 +674,12 @@ ColumnFamilyData::~ColumnFamilyData() {
   auto next = next_;
   prev->next_ = next;
   next->prev_ = prev;
+
+  const BlockBasedTableOptions* bbto =
+      ioptions_.table_factory->GetOptions<BlockBasedTableOptions>();
+  if (bbto && bbto->block_cache) {
+    bbto->block_cache->DiscardItemOwnerId(&cache_owner_id_);
+  }
 
   if (!dropped_ && column_family_set_ != nullptr) {
     // If it's dropped, it's already removed from column family set
@@ -750,6 +761,9 @@ void ColumnFamilyData::SetDropped() {
   // can't drop default CF
   assert(id_ != 0);
   dropped_ = true;
+  if (column_family_set_->write_controller()->is_dynamic_delay()) {
+    column_family_set_->DeleteSelfFromMapAndMaybeUpdateDelayRate(id_);
+  }
   write_controller_token_.reset();
 
   // remove from column_family_set
@@ -883,10 +897,8 @@ int GetL0ThresholdSpeedupCompaction(int level0_file_num_compaction_trigger,
 }  // namespace
 
 namespace {
-const uint64_t Gb = 1ull << 30;
-const uint64_t Mb = 1ull << 20;
-const uint64_t kMinWriteRate = 16 * 1024u;  // Minimum write rate 16KB/s.
 const int kMemtablePenalty = 10;
+const int kNumPendingSteps = 100;
 }  // namespace
 
 double ColumnFamilyData::TEST_CalculateWriteDelayDivider(
@@ -895,6 +907,10 @@ double ColumnFamilyData::TEST_CalculateWriteDelayDivider(
     WriteStallCause& write_stall_cause) {
   return CalculateWriteDelayDividerAndMaybeUpdateWriteStallCause(
       compaction_needed_bytes, mutable_cf_options, write_stall_cause);
+}
+
+uint64_t ColumnFamilyData::UpdateCFRate(uint32_t id, uint64_t write_rate) {
+  return column_family_set_->UpdateCFRate(id, write_rate);
 }
 
 std::unique_ptr<WriteControllerToken> ColumnFamilyData::DynamicSetupDelay(
@@ -908,11 +924,15 @@ std::unique_ptr<WriteControllerToken> ColumnFamilyData::DynamicSetupDelay(
           compaction_needed_bytes, mutable_cf_options, write_stall_cause);
   assert(rate_divider >= 1);
   auto write_rate = static_cast<uint64_t>(max_write_rate / rate_divider);
-  if (write_rate < kMinWriteRate) {
-    write_rate = kMinWriteRate;
+  if (write_rate < WriteController::kMinWriteRate) {
+    write_rate = WriteController::kMinWriteRate;
   }
 
-  return write_controller->GetDelayToken(write_rate);
+  // GetDelayToken returns a DelayWriteToken and also sets the
+  // delayed_write_rate_ which is used by all cfs and dbs using this write
+  // controller. because it also sets the delayed_write_rate_, we need to set
+  // only the smallest active delay request.
+  return write_controller->GetDelayToken(UpdateCFRate(id_, write_rate));
 }
 
 std::pair<WriteStallCondition, ColumnFamilyData::WriteStallCause>
@@ -981,21 +1001,18 @@ ColumnFamilyData::CalculateWriteDelayDividerAndMaybeUpdateWriteStallCause(
   // Pending Compaction Bytes
   double pending_divider = 1;
   auto soft_limit = mutable_cf_options.soft_pending_compaction_bytes_limit;
-  if (soft_limit > 0 && compaction_needed_bytes >= soft_limit) {
+  if (soft_limit > 0 && compaction_needed_bytes > soft_limit) {
     auto hard_limit = mutable_cf_options.hard_pending_compaction_bytes_limit;
     // soft_limit != hard_limit here. we're in a kDelayed state here and not
     // stop.
     assert(hard_limit > soft_limit);
     uint64_t soft_hard_range = hard_limit - soft_limit;
-    // change rate every 1G change or 100Mb if soft_hard_range is too small.
-    auto step_size = soft_hard_range > Gb ? Gb : 100 * Mb;
-    uint64_t num_steps = soft_hard_range / step_size;
-    auto extra_bytes = compaction_needed_bytes - soft_limit;
-    auto step_num = static_cast<uint64_t>(extra_bytes / step_size);
-    assert(step_num < num_steps);
-    if (num_steps > 0) {
-      pending_divider = 1 / (1 - (static_cast<double>(step_num) / num_steps));
-    }
+    uint64_t step_size = ceil(soft_hard_range / kNumPendingSteps);
+    uint64_t extra_bytes = compaction_needed_bytes - soft_limit;
+    uint64_t step_num = extra_bytes / step_size;
+    assert(step_num < kNumPendingSteps);
+    pending_divider =
+        1 / (1 - (static_cast<double>(step_num) / kNumPendingSteps));
   }
 
   double biggest_divider = 1;
@@ -1038,7 +1055,7 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
   auto write_stall_condition = WriteStallCondition::kNormal;
   if (current_ != nullptr) {
     auto* vstorage = current_->storage_info();
-    auto write_controller = column_family_set_->write_controller_;
+    auto write_controller = column_family_set_->write_controller_ptr();
     uint64_t compaction_needed_bytes =
         vstorage->estimated_compaction_needed_bytes();
 
@@ -1055,13 +1072,16 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
 
     // GetWriteStallConditionAndCause returns the first condition met, so its
     // possible that a later condition will require a harder rate limiting.
-    // calculate all conditions with DynamicSetupDelay and reavaluate the
+    // calculate all conditions with DynamicSetupDelay and reevaluate the
     // write_stall_cause. this is only relevant in the kDelayed case.
-    if (dynamic_delay &&
-        write_stall_condition == WriteStallCondition::kDelayed) {
-      write_controller_token_ =
-          DynamicSetupDelay(write_controller, compaction_needed_bytes,
-                            mutable_cf_options, write_stall_cause);
+    if (dynamic_delay) {
+      if (write_stall_condition == WriteStallCondition::kDelayed) {
+        write_controller_token_ =
+            DynamicSetupDelay(write_controller, compaction_needed_bytes,
+                              mutable_cf_options, write_stall_cause);
+      } else {
+        column_family_set_->DeleteSelfFromMapAndMaybeUpdateDelayRate(id_);
+      }
     }
 
     if (write_stall_condition == WriteStallCondition::kStopped &&
@@ -1197,7 +1217,7 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
       // If the DB recovers from delay conditions, we reward with reducing
       // double the slowdown ratio. This is to balance the long term slowdown
       // increase signal.
-      if (needed_delay) {
+      if (needed_delay && !dynamic_delay) {
         uint64_t write_rate = write_controller->delayed_write_rate();
         write_controller->set_delayed_write_rate(static_cast<uint64_t>(
             static_cast<double>(write_rate) * kDelayRecoverSlowdownRatio));
@@ -1653,16 +1673,14 @@ FSDirectory* ColumnFamilyData::GetDataDir(size_t path_id) const {
   return data_dirs_[path_id].get();
 }
 
-ColumnFamilySet::ColumnFamilySet(const std::string& dbname,
-                                 const ImmutableDBOptions* db_options,
-                                 const FileOptions& file_options,
-                                 Cache* table_cache,
-                                 WriteBufferManager* _write_buffer_manager,
-                                 WriteController* _write_controller,
-                                 BlockCacheTracer* const block_cache_tracer,
-                                 const std::shared_ptr<IOTracer>& io_tracer,
-                                 const std::string& db_id,
-                                 const std::string& db_session_id)
+ColumnFamilySet::ColumnFamilySet(
+    const std::string& dbname, const ImmutableDBOptions* db_options,
+    const FileOptions& file_options, Cache* table_cache,
+    WriteBufferManager* _write_buffer_manager,
+    std::shared_ptr<WriteController> _write_controller,
+    BlockCacheTracer* const block_cache_tracer,
+    const std::shared_ptr<IOTracer>& io_tracer, const std::string& db_id,
+    const std::string& db_session_id)
     : max_column_family_(0),
       file_options_(file_options),
       dummy_cfd_(new ColumnFamilyData(
@@ -1682,6 +1700,7 @@ ColumnFamilySet::ColumnFamilySet(const std::string& dbname,
   // initialize linked list
   dummy_cfd_->prev_ = dummy_cfd_;
   dummy_cfd_->next_ = dummy_cfd_;
+  write_controller_->AddToDbRateMap(&cf_id_to_write_rate_);
 }
 
 ColumnFamilySet::~ColumnFamilySet() {
@@ -1695,6 +1714,7 @@ ColumnFamilySet::~ColumnFamilySet() {
   bool dummy_last_ref __attribute__((__unused__));
   dummy_last_ref = dummy_cfd_->UnrefAndTryDelete();
   assert(dummy_last_ref);
+  write_controller_->RemoveFromDbRateMap(&cf_id_to_write_rate_);
 }
 
 ColumnFamilyData* ColumnFamilySet::GetDefault() const {
@@ -1759,6 +1779,21 @@ ColumnFamilyData* ColumnFamilySet::CreateColumnFamily(
     default_cfd_cache_ = new_cfd;
   }
   return new_cfd;
+}
+
+// returns the min rate to set
+uint64_t ColumnFamilySet::UpdateCFRate(uint32_t id, uint64_t write_rate) {
+  return write_controller_->InsertToMapAndGetMinRate(id, &cf_id_to_write_rate_,
+                                                     write_rate);
+}
+
+// Removes the cf from the cf_id_to_write_rate_ map if it exists and if this cf
+// was the one with the min write rate then find and set a new min.
+void ColumnFamilySet::DeleteSelfFromMapAndMaybeUpdateDelayRate(uint32_t id) {
+  if (IsInRateMap(id)) {
+    write_controller_->DeleteSelfFromMapAndMaybeUpdateDelayRate(
+        id, &cf_id_to_write_rate_);
+  }
 }
 
 // under a DB mutex AND from a write thread

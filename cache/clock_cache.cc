@@ -970,7 +970,8 @@ void ClockCacheShard::EraseUnRefEntries() { table_.EraseUnRefEntries(); }
 
 void ClockCacheShard::ApplyToSomeEntries(
     const std::function<void(const Slice& key, void* value, size_t charge,
-                             DeleterFn deleter)>& callback,
+                             DeleterFn deleter,
+                             Cache::ItemOwnerId item_owner_id)>& callback,
     uint32_t average_entries_per_lock, uint32_t* state) {
   // The state is essentially going to be the starting hash, which works
   // nicely even if we resize between calls because we use upper-most
@@ -995,7 +996,8 @@ void ClockCacheShard::ApplyToSomeEntries(
 
   table_.ConstApplyToEntriesRange(
       [callback](const ClockHandle& h) {
-        callback(h.KeySlice(), h.value, h.total_charge, h.deleter);
+        callback(h.KeySlice(), h.value, h.total_charge, h.deleter,
+                 Cache::kUnknownItemId);
       },
       index_begin, index_end, false);
 }
@@ -1035,8 +1037,8 @@ void ClockCacheShard::SetStrictCapacityLimit(bool strict_capacity_limit) {
 
 Status ClockCacheShard::Insert(const Slice& key, uint32_t hash, void* value,
                                size_t charge, Cache::DeleterFn deleter,
-                               Cache::Handle** handle,
-                               Cache::Priority priority) {
+                               Cache::Handle** handle, Cache::Priority priority,
+                               Cache::ItemOwnerId /* item_owner_id */) {
   if (UNLIKELY(key.size() != kCacheKeySize)) {
     return Status::NotSupported("ClockCache only supports key size " +
                                 std::to_string(kCacheKeySize) + "B");

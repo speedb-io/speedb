@@ -52,6 +52,7 @@ LIB_SOURCES =                                                   \
   db/db_impl/db_impl_readonly.cc                                \
   db/db_impl/db_impl_secondary.cc                               \
   db/db_impl/db_impl_write.cc                                   \
+  db/db_impl/db_spdb_impl_write.cc                              \
   db/db_info_dumper.cc                                          \
   db/db_iter.cc                                                 \
   db/dbformat.cc                                                \
@@ -521,6 +522,7 @@ TEST_MAIN_SOURCES =                                                     \
   db/write_batch_test.cc                                                \
   db/write_callback_test.cc                                             \
   db/write_controller_test.cc                                           \
+  db/global_write_controller_test.cc                                    \
   env/env_basic_test.cc                                                 \
   env/env_test.cc                                                       \
   env/io_posix_test.cc                                                  \

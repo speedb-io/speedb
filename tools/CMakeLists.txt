@@ -1,11 +1,12 @@
 set(CORE_TOOLS
   sst_dump.cc
-  ldb.cc)
+  ldb.cc
+  beezcli.cc)
 foreach(src ${CORE_TOOLS})
   get_filename_component(exename ${src} NAME_WE)
   add_executable(${exename}${ARTIFACT_SUFFIX}
     ${src})
-  target_link_libraries(${exename}${ARTIFACT_SUFFIX} ${ROCKSDB_LIB})
+  target_link_libraries(${exename}${ARTIFACT_SUFFIX} ${ROCKSDB_LIB} readline)
   list(APPEND core_tool_deps ${exename})
 endforeach()
 

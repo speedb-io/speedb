@@ -95,7 +95,8 @@ TBlockIter* BlockBasedTable::NewDataBlockIterator(
         CacheKey key = CacheKey::CreateUniqueForCacheLifetime(block_cache);
         s = block_cache->Insert(key.AsSlice(), nullptr,
                                 block.GetValue()->ApproximateMemoryUsage(),
-                                nullptr, &cache_handle);
+                                nullptr, &cache_handle, Cache::kDefaultPriority,
+                                rep_->table_properties->column_family_id);
 
         if (s.ok()) {
           assert(cache_handle != nullptr);
@@ -153,7 +154,8 @@ TBlockIter* BlockBasedTable::NewDataBlockIterator(const ReadOptions& ro,
         CacheKey key = CacheKey::CreateUniqueForCacheLifetime(block_cache);
         s = block_cache->Insert(key.AsSlice(), nullptr,
                                 block.GetValue()->ApproximateMemoryUsage(),
-                                nullptr, &cache_handle);
+                                nullptr, &cache_handle, Cache::kDefaultPriority,
+                                rep_->table_properties->column_family_id);
 
         if (s.ok()) {
           assert(cache_handle != nullptr);

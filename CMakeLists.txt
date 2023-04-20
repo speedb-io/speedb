@@ -716,6 +716,7 @@ set(SOURCES
         db/db_impl/compacted_db_impl.cc
         db/db_impl/db_impl.cc
         db/db_impl/db_impl_write.cc
+        db/db_impl/db_spdb_impl_write.cc
         db/db_impl/db_impl_compaction_flush.cc
         db/db_impl/db_impl_files.cc
         db/db_impl/db_impl_open.cc
@@ -1452,6 +1453,7 @@ if(WITH_TESTS)
         db/write_batch_test.cc
         db/write_callback_test.cc
         db/write_controller_test.cc
+        db/global_write_controller_test.cc
         env/env_test.cc
         env/io_posix_test.cc
         env/mock_env_test.cc

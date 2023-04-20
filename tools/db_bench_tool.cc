@@ -73,6 +73,7 @@
 #ifndef ROCKSDB_LITE
 #include "rocksdb/utilities/replayer.h"
 #endif  // ROCKSDB_LITE
+#include "rocksdb/utilities/db_ttl.h"
 #include "rocksdb/utilities/sim_cache.h"
 #include "rocksdb/utilities/transaction.h"
 #include "rocksdb/utilities/transaction_db.h"
@@ -1492,6 +1493,12 @@ DEFINE_int32(table_cache_numshardbits, 4, "");
 DEFINE_string(filter_uri, "", "URI for registry FilterPolicy");
 
 #ifndef ROCKSDB_LITE
+DEFINE_int32(
+    refresh_options_sec, 0,
+    "Frequency (in secs) to look for a new options file (off by default)");
+DEFINE_string(refresh_options_file, "",
+              "File in which to look for new options");
+
 DEFINE_string(env_uri, "",
               "URI for registry Env lookup. Mutually exclusive with --fs_uri");
 DEFINE_string(fs_uri, "",
@@ -1577,6 +1584,7 @@ DEFINE_double(experimental_mempurge_threshold,
               ROCKSDB_NAMESPACE::Options().experimental_mempurge_threshold,
               "Maximum useful payload ratio estimate that triggers a mempurge "
               "(memtable garbage collection).");
+DEFINE_bool(use_spdb_writes, true, "Use optimized Speedb write flow");
 
 DEFINE_bool(inplace_update_support,
             ROCKSDB_NAMESPACE::Options().inplace_update_support,
@@ -1927,6 +1935,9 @@ DEFINE_bool(track_and_verify_wals_in_manifest,
             ROCKSDB_NAMESPACE::Options().track_and_verify_wals_in_manifest,
             "If true, enable WAL tracking in the MANIFEST");
 
+DEFINE_bool(skip_expired_data, false, "If true, will skip keys expired by TTL");
+
+DEFINE_int32(ttl, -1, "Opens the db with this ttl value if value is positive");
 namespace {
 // Auxiliary collection of the indices of the DB-s to be used in the next group
 std::vector<uint64_t> db_idxs_to_use;
@@ -2977,7 +2988,6 @@ class Benchmark {
   }
 
   void OpenAllDbs(Options options) {
-    assert(dbs_.empty());
     assert(FLAGS_num_multi_db > 0);
 
     // dbs_to_use_ is NOT initialized here since we open the db-s once for all
@@ -2989,6 +2999,19 @@ class Benchmark {
     } else {
       auto wal_dir = options.wal_dir;
       for (int i = 0; i < FLAGS_num_multi_db; i++) {
+#ifndef ROCKSDB_LITE
+        if (FLAGS_optimistic_transaction_db) {
+          if (dbs_[i].opt_txn_db) {
+            continue;
+          }
+        } else if (dbs_[i].db) {
+          continue;
+        }
+#else   // ROCKSDB_LITE
+        if (dbs_[i].db) {
+          continue;
+        }
+#endif  // ROCKSDB_LITE
         if (!wal_dir.empty()) {
           options.wal_dir = GetPathForMultiple(wal_dir, i);
         }
@@ -2998,17 +3021,17 @@ class Benchmark {
     }
   }
 
-  void DestroyAllDbs() {
-    // Record the number of db-s as dbs_ is cleared inside DeleteDBs()
-    auto num_dbs = dbs_.size();
+  void DestroyUsedDbs() {
+    for (auto i : db_idxs_to_use) {
+      dbs_[i].DeleteDBs();
+    }
+    dbs_to_use_.clear();
 
-    DeleteDBs();
-
-    if (num_dbs == 1U) {
+    if (IsSingleDb()) {
       DestroyDB(FLAGS_db, open_options_);
-    } else if (num_dbs > 1U) {
+    } else if (IsMultiDb()) {
       Options options = open_options_;
-      for (auto i = 0U; i < num_dbs; ++i) {
+      for (auto i : db_idxs_to_use) {
         if (!open_options_.wal_dir.empty()) {
           options.wal_dir = GetPathForMultiple(open_options_.wal_dir, i);
         }
@@ -3726,6 +3749,7 @@ class Benchmark {
       read_options_.adaptive_readahead = FLAGS_adaptive_readahead;
       read_options_.async_io = FLAGS_async_io;
       read_options_.optimize_multiget_for_io = FLAGS_optimize_multiget_for_io;
+      read_options_.skip_expired_data = FLAGS_skip_expired_data;
 
       void (Benchmark::*method)(ThreadState*) = nullptr;
       void (Benchmark::*post_process_method)() = nullptr;
@@ -3735,6 +3759,14 @@ class Benchmark {
 
       int num_repeat = 1;
       int num_warmup = 0;
+      if (!gflags::GetCommandLineFlagInfoOrDie("ttl").is_default &&
+          FLAGS_ttl < 1) {
+        ErrorExit("ttl must be positive value");
+      }
+      if (gflags::GetCommandLineFlagInfoOrDie("ttl").is_default &&
+          FLAGS_skip_expired_data) {
+        ErrorExit("ttl must be set to use skip_expired_data");
+      }
       if (!name.empty() && *name.rbegin() == ']') {
         auto it = name.find('[');
         if (it == std::string::npos) {
@@ -4042,7 +4074,7 @@ class Benchmark {
               "--use_existing_db",
               name.c_str());
         } else {
-          DestroyAllDbs();
+          DestroyUsedDbs();
           Open(&open_options_);  // use open_options for the last accessed
           // There are new DB-s => Re-initialize dbs_to_use_
           InitDbsToUse();
@@ -4526,6 +4558,8 @@ class Benchmark {
     options.manual_wal_flush = FLAGS_manual_wal_flush;
     options.wal_compression = FLAGS_wal_compression_e;
 #ifndef ROCKSDB_LITE
+    options.refresh_options_sec = FLAGS_refresh_options_sec;
+    options.refresh_options_file = FLAGS_refresh_options_file;
     options.ttl = FLAGS_fifo_compaction_ttl;
     options.compaction_options_fifo = CompactionOptionsFIFO(
         FLAGS_fifo_compaction_max_table_files_size_mb * 1024 * 1024,
@@ -4901,6 +4935,7 @@ class Benchmark {
         FLAGS_allow_concurrent_memtable_write;
     options.experimental_mempurge_threshold =
         FLAGS_experimental_mempurge_threshold;
+    options.use_spdb_writes = FLAGS_use_spdb_writes;
     options.inplace_update_support = FLAGS_inplace_update_support;
     options.inplace_update_num_locks = FLAGS_inplace_update_num_locks;
     options.enable_write_thread_adaptive_yield =
@@ -4998,6 +5033,14 @@ class Benchmark {
       options.write_buffer_manager.reset(new WriteBufferManager(
           FLAGS_db_write_buffer_size, cache_, FLAGS_allow_wbm_stalls,
           FLAGS_initiate_wbm_flushes, flush_initiation_options));
+    }
+
+    if (FLAGS_use_dynamic_delay && FLAGS_num_multi_db > 1) {
+      if (options.delayed_write_rate <= 0) {
+        options.delayed_write_rate = 16 * 1024 * 1024;
+      }
+      options.write_controller.reset(new WriteController(
+          options.use_dynamic_delay, options.delayed_write_rate));
     }
 
     // Integrated BlobDB
@@ -5220,8 +5263,19 @@ class Benchmark {
       }
 #ifndef ROCKSDB_LITE
       if (FLAGS_readonly) {
-        s = DB::OpenForReadOnly(options, db_name, column_families,
-            &db->cfh, &db->db);
+        if (FLAGS_ttl > 0) {
+          DBWithTTL* db_with_ttl;
+          // true means read only
+          std::vector<int32_t> ttls(column_families.size(), FLAGS_ttl);
+          s = DBWithTTL::Open(options, db_name, column_families, &db->cfh,
+                              &db_with_ttl, ttls, true);
+          if (s.ok()) {
+            db->db = db_with_ttl;
+          }
+        } else {
+          s = DB::OpenForReadOnly(options, db_name, column_families, &db->cfh,
+                                  &db->db);
+        }
       } else if (FLAGS_optimistic_transaction_db) {
         s = OptimisticTransactionDB::Open(options, db_name, column_families,
                                           &db->cfh, &db->opt_txn_db);
@@ -5242,7 +5296,17 @@ class Benchmark {
           db->db = ptr;
         }
       } else {
-        s = DB::Open(options, db_name, column_families, &db->cfh, &db->db);
+        if (FLAGS_ttl > 0) {
+          DBWithTTL* db_with_ttl;
+          std::vector<int32_t> ttls(column_families.size(), FLAGS_ttl);
+          s = DBWithTTL::Open(options, db_name, column_families, &db->cfh,
+                              &db_with_ttl, ttls);
+          if (s.ok()) {
+            db->db = db_with_ttl;
+          }
+        } else {
+          s = DB::Open(options, db_name, column_families, &db->cfh, &db->db);
+        }
       }
 #else
       s = DB::Open(options, db_name, column_families, &db->cfh, &db->db);
@@ -5253,7 +5317,16 @@ class Benchmark {
       db->cfh_idx_to_prob = std::move(cfh_idx_to_prob);
 #ifndef ROCKSDB_LITE
     } else if (FLAGS_readonly) {
-      s = DB::OpenForReadOnly(options, db_name, &db->db);
+      if (FLAGS_ttl > 0) {
+        DBWithTTL* db_with_ttl;
+        // true means read only
+        s = DBWithTTL::Open(options, db_name, &db_with_ttl, FLAGS_ttl, true);
+        if (s.ok()) {
+          db->db = db_with_ttl;
+        }
+      } else {
+        s = DB::OpenForReadOnly(options, db_name, &db->db);
+      }
     } else if (FLAGS_optimistic_transaction_db) {
       s = OptimisticTransactionDB::Open(options, db_name, &db->opt_txn_db);
       if (s.ok()) {
@@ -5318,6 +5391,20 @@ class Benchmark {
             FLAGS_secondary_update_interval, db));
       }
 #endif  // ROCKSDB_LITE
+    } else if (FLAGS_ttl > 0) {
+      std::vector<ColumnFamilyDescriptor> column_families;
+      column_families.push_back(ColumnFamilyDescriptor(
+          kDefaultColumnFamilyName, ColumnFamilyOptions(options)));
+      DBWithTTL* db_with_ttl;
+      std::vector<int32_t> ttls(column_families.size(), FLAGS_ttl);
+      s = DBWithTTL::Open(options, db_name, column_families, &db->cfh,
+                          &db_with_ttl, ttls);
+      if (s.ok()) {
+        db->db = db_with_ttl;
+        db->cfh.resize(1);
+        db->num_created = 1;
+        db->num_hot = 1;
+      }
     } else {
       std::vector<ColumnFamilyDescriptor> column_families;
       column_families.push_back(ColumnFamilyDescriptor(
@@ -6318,7 +6405,12 @@ class Benchmark {
           options.timestamp = &ts;
           ts_ptr = &ts_ret;
         }
-        auto status = db->Get(options, key, &value, ts_ptr);
+        Status status;
+        if (user_timestamp_size_ > 0) {
+          status = db->Get(options, key, &value, ts_ptr);
+        } else {
+          status = db->Get(options, key, &value);
+        }
         if (status.ok()) {
           ++found;
         } else if (!status.IsNotFound()) {
@@ -6451,8 +6543,10 @@ class Benchmark {
               options, cfh, key, pinnable_vals.data(),
               &get_merge_operands_options, &number_of_operands);
         }
-      } else {
+      } else if (user_timestamp_size_ > 0) {
         s = db_with_cfh->db->Get(options, cfh, key, &pinnable_val, ts_ptr);
+      } else {
+        s = db_with_cfh->db->Get(options, cfh, key, &pinnable_val);
       }
 
       if (s.ok()) {

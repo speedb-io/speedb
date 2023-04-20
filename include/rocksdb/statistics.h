@@ -573,6 +573,11 @@ enum Histograms : uint32_t {
   // Wait time for aborting async read in FilePrefetchBuffer destructor
   ASYNC_PREFETCH_ABORT_MICROS,
 
+  DB_GET_MEMTABLE,
+  DB_WAL_WRITE_TIME,
+  DB_WRITE_WAIT_FOR_WAL,
+  DB_WRITE_WAIT_FOR_WAL_WITH_MUTEX,
+
   HISTOGRAM_ENUM_MAX,
 };
 

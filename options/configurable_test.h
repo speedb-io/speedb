@@ -23,12 +23,13 @@ struct DBOptions;
 namespace test {
 enum TestEnum { kTestA, kTestB };
 
-static const std::unordered_map<std::string, int> test_enum_map = {
+static const std::unordered_map<std::string, TestEnum> test_enum_map = {
     {"A", TestEnum::kTestA},
     {"B", TestEnum::kTestB},
 };
 
 struct TestOptions {
+  static const char* kName() { return "TestOptions"; }
   int i = 0;
   bool b = false;
   bool d = true;

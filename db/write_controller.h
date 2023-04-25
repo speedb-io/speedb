@@ -22,7 +22,13 @@ class ErrorHandler;
 // WriteController is controlling write stalls in our write code-path. Write
 // stalls happen when compaction can't keep up with write rate.
 // All of the methods here (including WriteControllerToken's destructors) need
-// to be called while holding DB mutex
+// to be called while holding DB mutex when dynamic_delay_ is false.
+// use_dynamic_delay is the options flag (in include/rocksdb/options.h) which
+// is passed to the ctor of WriteController for setting dynamic_delay_.
+// when dynamic_delay_ is true, then the WriteController can be shared across
+// many dbs which requires using metrics_mu_ and map_mu_.
+// In a shared state (global delay mechanism), the WriteController can also
+// receive delay requirements from the WriteBufferManager.
 class WriteController {
  public:
   explicit WriteController(bool dynamic_delay,
@@ -67,6 +73,7 @@ class WriteController {
   // Prerequisite: DB mutex held.
   uint64_t GetDelay(SystemClock* clock, uint64_t num_bytes);
   void set_delayed_write_rate(uint64_t write_rate) {
+    std::lock_guard<std::mutex> lock(metrics_mu_);
     // avoid divide 0
     if (write_rate == 0) {
       write_rate = 1u;
@@ -77,6 +84,7 @@ class WriteController {
   }
 
   void set_max_delayed_write_rate(uint64_t write_rate) {
+    std::lock_guard<std::mutex> lock(metrics_mu_);
     // avoid divide 0
     if (write_rate == 0) {
       write_rate = 1u;
@@ -125,7 +133,7 @@ class WriteController {
   uint64_t GetMapMinRate();
 
   // Whether Speedb's dynamic delay is used
-  bool dynamic_delay_;
+  bool dynamic_delay_ = true;
 
   std::mutex map_mu_;
   ClientIdToRateMap id_to_write_rate_map_;
@@ -146,7 +154,8 @@ class WriteController {
   std::atomic<int> total_delayed_;
   std::atomic<int> total_compaction_pressure_;
 
-  // mutex to protect below 4 members
+  // mutex to protect below 4 members which is required when WriteController is
+  // shared across several dbs.
   std::mutex metrics_mu_;
   // Number of bytes allowed to write without delay
   std::atomic<uint64_t> credit_in_bytes_;

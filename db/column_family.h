@@ -756,9 +756,10 @@ class ColumnFamilySet {
 
   WriteBufferManager* write_buffer_manager() { return write_buffer_manager_; }
 
-  const std::shared_ptr<WriteController>& write_controller() const {
+  std::shared_ptr<WriteController> write_controller() const {
     return write_controller_;
   }
+
   WriteController* write_controller_ptr() { return write_controller_.get(); }
 
   const WriteController* write_controller_ptr() const {

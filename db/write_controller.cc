@@ -25,6 +25,7 @@ std::unique_ptr<WriteControllerToken> WriteController::GetDelayToken(
     uint64_t write_rate) {
   // this is now only accessed when use_dynamic_delay = false so no need to
   // protect
+  assert(is_dynamic_delay() == false);
   if (0 == total_delayed_++) {
     // Starting delay, so reset counters.
     next_refill_time_ = 0;

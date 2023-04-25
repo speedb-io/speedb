@@ -889,7 +889,7 @@ class DBImpl : public DB {
     return num_running_compactions_;
   }
 
-  const std::shared_ptr<WriteController>& write_controller() const {
+  std::shared_ptr<WriteController> write_controller() const {
     return write_controller_;
   }
 
@@ -1153,10 +1153,6 @@ class DBImpl : public DB {
                                         MutableCFOptions* mutable_cf_options);
 
   Cache* TEST_table_cache() { return table_cache_.get(); }
-
-  const std::shared_ptr<WriteController>& TEST_write_controler() {
-    return write_controller_;
-  }
 
   uint64_t TEST_FindMinLogContainingOutstandingPrep();
   uint64_t TEST_FindMinPrepLogReferencedByMemTable();

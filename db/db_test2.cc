@@ -2012,8 +2012,7 @@ TEST_F(DBTest2, CompactionStall) {
   options.listeners.emplace_back(listener);
   DestroyAndReopen(options);
   // make sure all background compaction jobs can be scheduled
-  auto stop_token =
-      dbfull()->TEST_write_controler()->GetCompactionPressureToken();
+  auto stop_token = dbfull()->write_controller()->GetCompactionPressureToken();
 
   Random rnd(301);
 

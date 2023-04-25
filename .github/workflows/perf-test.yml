@@ -1,0 +1,21 @@
+name: Performance Test
+
+on:
+  workflow_call:
+  workflow_dispatch:
+  
+
+jobs:
+  perf_test:    
+    runs-on: perftest
+    
+    steps:
+
+      - name: Run autoperf script via remotnic
+        run: |
+          echo Run auto perf test
+          #echo  ${{ github.sender.login }} 
+          #ssh -i ~/remo.k remo@9.148.1.183 /home/remo/tremotnic.sh main HG_auto_T1 ${{ github.event.pusher.name }}  
+          ssh -i ~/remo.k remo@9.148.1.183 /home/remo/tremotnic.sh main HG_auto_T1 ${{ github.actor }} run_db_bench_large_obj
+          #ssh -i ~/remo.k remo@9.148.1.183 /home/remo/tremotnic.sh main HG_auto_T1 ${{ github.event.pusher.name }} run_db_bench_small_obj
+          #ssh -i ~/remo.k remo@9.148.1.183 /home/remo/tremotnic.sh main HG_auto_T1 ${{ github.event.pusher.name }} run_db_bench_huge_memtable

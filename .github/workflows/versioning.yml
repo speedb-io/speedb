@@ -1,0 +1,51 @@
+name: versioning
+
+on:
+  #push:
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  UpdateFullVer:
+    runs-on: [self-hosted, ubuntu, asrunner]
+    container:
+      image: ubuntu:latest
+    steps:
+    
+    - name: Checkout
+      uses: actions/checkout@v2 
+      
+    - name: Update version
+      run: |
+        git config --global --add safe.directory $GITHUB_WORKSPACE
+        git config user.name "GitHub Actions Bot"
+        git config user.email "<>"
+        git pull
+        git fetch --tags
+        echo $GITHUB_HEAD_REF
+        echo $GITHUB_REF_NAME
+        major=$(cat $GITHUB_WORKSPACE/include/rocksdb/version.h | grep '#define ROCKSDB_MAJOR' | grep -o '[^,]\+$' | tr ' ' '\n' | tail -n1)
+        minor=$(cat $GITHUB_WORKSPACE/include/rocksdb/version.h | grep '#define ROCKSDB_MINOR' | grep -o '[^,]\+$' | tr ' ' '\n' | tail -n1)
+        patch=$(cat $GITHUB_WORKSPACE/include/rocksdb/version.h | grep '#define ROCKSDB_PATCH' | grep -o '[^,]\+$' | tr ' ' '\n' | tail -n1)
+        if [ $GITHUB_REF_NAME == "main" ]; then
+          new_patch=$(echo $patch + 1 | bc)
+          sed -i -e "s/#define ROCKSDB_PATCH.*/#define ROCKSDB_PATCH $new_patch/g" include/rocksdb/version.h
+          sed -i -e "s/#define ROCKSDB_BRANCH.*/#define ROCKSDB_BRANCH $GITHUB_REF_NAME/g" include/rocksdb/version.h
+          git commit -am "updated version.h version"
+          git push
+          git tag "v$major.$minor.$new_patch-$GITHUB_REF_NAME"
+          git push --tags
+        elif echo $GITHUB_REF_NAME | grep -Eq 'release/'; then
+          echo "##### FEATURE BRANCH, SKIPPING #####"
+        else
+          if ( git tag -l --sort=-version:refname | grep "v$major.$minor.$patch" | grep -E -i "v([0-9]+).([0-9]+).([0-9]+).([0-9]+)" ); then
+            current_feature=$(git tag -l --sort=-version:refname | grep "v$major.$minor.$patch" | grep -E -i "v([0-9]+).([0-9]+).([0-9]+).([0-9]+)" | head -1 | tr '.' '\n' | tail -n1)
+            new_patch=$(echo $patch + 1 | bc)
+            new_feature=$(echo $current_feature + 1 | bc)
+            git tag "v$major.$minor.$patch.$new_feature"
+            git push --tags
+          else
+            git tag "v$major.$minor.$patch.0"
+            git push --tags
+          fi
+        fi

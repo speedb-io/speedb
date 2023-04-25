@@ -1,23 +1,28 @@
-# Speedb: A drop in replacement embedded solution for RocksDB
+# Speedb
 
-## Checking out the source
+![GitHub contributors](https://img.shields.io/github/contributors/speedb-io/speedb)
 
-	git clone https://github.com/speedb-io/speedb.git
 
-## Dynamically linking Speedb
-If speedb is in your default library path:
-
-In your `CMakeLists.txt` add:
-
-	target_link_libraries(${PROJECT_NAME} speedb)
-where `PROJECT_NAME` is the name of your target application which uses speedb
-
-Otherwise, you have to include the path to the folder the library is in like so:
-	
-	target_link_libraries(${PROJECT_NAME} /path/to/speedb/library/folder)
+Speedb is a library that provides persistent key-value stores. Keys and values are arbitrary byte arrays. The keys are ordered within the key value store according to a user-specified comparator function.
+It is maintained by Speedb and is forked from Rocksdb, developed by Facebook.
 
 ## Usage
-Usage of the library in your code is the same, regardless of whether you statically linked the library or dynamically linked it, and examples can be found under the [examples](examples) directory.
+* If speedb is in your default library path:
+
+  In your `CMakeLists.txt` add:
+  ```
+  target_link_libraries(${PROJECT_NAME} speedb)
+  ```
+  where `PROJECT_NAME` is the name of your target application which uses speedb
+
+* Otherwise, you have to include the path to the folder the library is in like so:
+	
+  ```
+  target_link_libraries(${PROJECT_NAME} /path/to/speedb/library/folder)
+  ```
+
+
+Usage of the library in your code is the same regardless of whether you statically linked the library or dynamically linked it, and examples can be found under the [examples](examples) directory.
 The public interface is in [include](include/rocksdb). Callers should not include or rely on the details of any other header files in this package. Those internal APIs may be changed without warning.
 
 ## Build dependencies
@@ -69,7 +74,9 @@ for example, `db_blob_basic_test`:
 The test will generate a random DB at the specified path. This is also where speedb will store the LOG files.
 
 ## Contributing code
-`TODO:` This section should point the reader to a dedicated file explaining how to contribute
+See the [contributing guide](CONTRIBUTING.md).
+
 
 ## License
-Speedb is licensed under Apache 2.0
+Speedb is open-source and licensed under the [Apache 2.0 License](LICENSE.Apache).
+

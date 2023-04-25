@@ -117,7 +117,7 @@ namespace {
 // between groups, and destroyed after running the last group
 std::unique_ptr<ROCKSDB_NAMESPACE::Benchmark> benchmark;
 
-void ErrorExit(const char* format, ...) {
+int ErrorExit(const char* format, ...) {
   std::string extended_format = std::string("\nERROR: ") + format + "\n";
   va_list arglist;
   va_start(arglist, format);
@@ -1379,9 +1379,7 @@ static enum ROCKSDB_NAMESPACE::CompressionType StringToCompressionType(
   else if (!strcasecmp(ctype, "zstd"))
     return ROCKSDB_NAMESPACE::kZSTD;
   else {
-    ErrorExit("Cannot parse compression type '%s'", ctype);
-    // Unnecessary, but the compilre complains of missing return value otherwise
-    exit(1);
+    exit(ErrorExit("Cannot parse compression type '%s'", ctype));
   }
 }
 
@@ -1911,9 +1909,7 @@ static enum DistributionType StringToDistributionType(const char* ctype) {
   else if (!strcasecmp(ctype, "normal"))
     return kNormal;
 
-  ErrorExit("Cannot parse distribution type '%s'", ctype);
-  // Unnecessary, but the compilre complains of missing return value otherwise
-  exit(1);
+  exit(ErrorExit("Cannot parse distribution type '%s'", ctype));
 }
 
 class BaseDistribution {
@@ -3133,15 +3129,13 @@ class Benchmark {
     if (FLAGS_use_cache_jemalloc_no_dump_allocator) {
       JemallocAllocatorOptions jemalloc_options;
       if (!NewJemallocNodumpAllocator(jemalloc_options, &allocator).ok()) {
-        fprintf(stderr, "JemallocNodumpAllocator not supported.\n");
-        exit(1);
+        ::ErrorExit("JemallocNodumpAllocator not supported.");
       }
     } else if (FLAGS_use_cache_memkind_kmem_allocator) {
 #ifdef MEMKIND
       allocator = std::make_shared<MemkindKmemAllocator>();
 #else
-      fprintf(stderr, "Memkind library is not linked with the binary.\n");
-      exit(1);
+      ::ErrorExit("Memkind library is not linked with the binary.");
 #endif
     }
 
@@ -3176,8 +3170,7 @@ class Benchmark {
       }
     }
     if (FLAGS_cache_type == "clock_cache") {
-      fprintf(stderr, "Old clock cache implementation has been removed.\n");
-      exit(1);
+      exit(::ErrorExit("Old clock cache implementation has been removed."));
     } else if (EndsWith(FLAGS_cache_type, "hyper_clock_cache")) {
       size_t estimated_entry_charge;
       if (FLAGS_cache_type == "fixed_hyper_clock_cache" ||
@@ -3186,8 +3179,7 @@ class Benchmark {
       } else if (FLAGS_cache_type == "auto_hyper_clock_cache") {
         estimated_entry_charge = 0;
       } else {
-        fprintf(stderr, "Cache type not supported.");
-        exit(1);
+        exit(::ErrorExit("Cache type not supported."));
       }
       HyperClockCacheOptions opts(FLAGS_cache_size, estimated_entry_charge,
                                   FLAGS_cache_numshardbits);
@@ -3234,8 +3226,7 @@ class Benchmark {
         return opts.MakeSharedCache();
       }
     } else {
-      fprintf(stderr, "Cache type not supported.");
-      exit(1);
+      exit(::ErrorExit("Cache type not supported."));
     }
   }
 
@@ -3477,7 +3468,7 @@ class Benchmark {
     fprintf(stderr, "...Verified\n");
   }
 
-  void ErrorExit(const char* format, ...) {
+  int ErrorExit(const char* format, ...) {
     std::string extended_format = std::string("\nERROR: ") + format + "\n";
     va_list arglist;
     va_start(arglist, format);
@@ -4619,11 +4610,9 @@ class Benchmark {
 
             options.blob_cache = NewLRUCache(co);
           } else {
-            fprintf(
-                stderr,
+            ErrorExit(
                 "Unable to create a standalone blob cache if blob_cache_size "
                 "<= 0.\n");
-            exit(1);
           }
         }
         switch (FLAGS_prepopulate_blob_cache) {
@@ -4634,8 +4623,7 @@ class Benchmark {
             options.prepopulate_blob_cache = PrepopulateBlobCache::kFlushOnly;
             break;
           default:
-            fprintf(stderr, "Unknown prepopulate blob cache mode\n");
-            exit(1);
+            ErrorExit("Unknown prepopulate blob cache mode\n");
         }
 
         fprintf(stdout,
@@ -7189,8 +7177,7 @@ class Benchmark {
             GenerateKeyFromInt(begin_num + offset, FLAGS_num,
                                &expanded_keys[offset]);
             if (!db->Delete(write_options_, expanded_keys[offset]).ok()) {
-              fprintf(stderr, "delete error: %s\n", s.ToString().c_str());
-              exit(1);
+              ErrorExit("delete error: %s\n", s.ToString().c_str());
             }
           }
         } else {
@@ -7200,8 +7187,7 @@ class Benchmark {
           if (!db->DeleteRange(write_options_, db->DefaultColumnFamily(),
                                begin_key, end_key)
                    .ok()) {
-            fprintf(stderr, "deleterange error: %s\n", s.ToString().c_str());
-            exit(1);
+            ErrorExit("deleterange error: %s\n", s.ToString().c_str());
           }
         }
         thread->stats.FinishedOps(&db_, db_.db, 1, kWrite);

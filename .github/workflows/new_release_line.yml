@@ -1,0 +1,83 @@
+name: New Release Line
+
+on:
+  workflow_dispatch:
+    inputs:
+      new_branch_major:
+        description: "Next release Major version (LEAVE EMPTY FOR AUTO-INCREMENT)"
+      new_branch_minor:
+        description: "Next release Minor version (LEAVE EMPTY FOR AUTO-INCREMENT)"
+
+
+jobs:
+  build:
+    runs-on: [self-hosted, ubuntu, asrunner]
+    container:
+      image: alpine:3.14
+
+    steps:
+      - name: pre-run
+        run: |
+          echo "nameserver 8.8.8.8" > /etc/resolv.conf
+          apk update && apk add git
+          
+      - uses: actions/checkout@v3
+
+      - name: Calculate tag
+        run: |
+          git config --global --add safe.directory /__w/rocksdb/rocksdb
+          git config user.name "GitHub Actions Bot"
+          git config user.email "<>"
+          git pull
+          major=$(cat $GITHUB_WORKSPACE/include/rocksdb/version.h | grep '#define ROCKSDB_MAJOR' | grep -o '[^,]\+$' | tr ' ' '\n' | tail -n1)
+          minor=$(cat $GITHUB_WORKSPACE/include/rocksdb/version.h | grep '#define ROCKSDB_MINOR' | grep -o '[^,]\+$' | tr ' ' '\n' | tail -n1)
+          patch=$(cat $GITHUB_WORKSPACE/include/rocksdb/version.h | grep '#define ROCKSDB_PATCH' | grep -o '[^,]\+$' | tr ' ' '\n' | tail -n1)
+          new_minor=$(echo $minor + 1 | bc)
+          echo $minor
+          echo "major=$major" >> $GITHUB_ENV
+          echo "minor=$minor" >> $GITHUB_ENV
+          echo "new_minor=$new_minor" >> $GITHUB_ENV
+          current_version="$major.$minor.99"
+          echo $current_version
+      
+      - name: Create release branch
+        run: |
+          if [ -z "${{ inputs.new_branch_major }}" ]; then
+            echo "empty"
+            new_branch="release/${{ env.major }}.${{ env.minor }}"
+            echo $new_branch
+            git checkout -b $new_branch
+            git push -u origin $new_branch
+          else
+            echo "minor=$new_minor" >> $GITHUB_ENV
+            echo "not empty"
+            new_branch="release/${{ inputs.new_branch_major }}.${{ inputs.new_branch_minor }}"
+            echo $new_branch
+            git checkout -b $new_branch
+            git push -u origin $new_branch
+          fi
+      - name: Update version.h
+        run: |
+          if [ -z "${{ inputs.new_branch_major }}" ]; then
+            git checkout main
+            git tag "v${{ env.major }}.${{ env.minor }}"
+            git push --tags
+            sed -i -e 's/#define ROCKSDB_MAJOR.*/#define ROCKSDB_MAJOR ${{ env.major }}/' include/rocksdb/version.h
+            sed -i -e 's/#define ROCKSDB_MINOR.*/#define ROCKSDB_MINOR ${{ env.new_minor }}/' include/rocksdb/version.h
+            sed -i -e 's/#define ROCKSDB_PATCH.*/#define ROCKSDB_PATCH 99/' include/rocksdb/version.h
+            cat include/rocksdb/version.h
+            git commit -am "updated version.h version"
+            git push
+          else
+            git checkout main
+            new_minor=$(echo ${{ inputs.new_branch_minor }} + 1 | bc)
+            echo $new_minor
+            git tag "v${{ inputs.new_branch_major }}.${{ inputs.new_branch_minor }}"
+            git push --tags
+            sed -i -e 's/#define ROCKSDB_MAJOR.*/#define ROCKSDB_MAJOR ${{ inputs.new_branch_major }}/' include/rocksdb/version.h
+            sed -i -e "s/#define ROCKSDB_MINOR.*/#define ROCKSDB_MINOR $new_minor/g" include/rocksdb/version.h
+            sed -i -e 's/#define ROCKSDB_PATCH.*/#define ROCKSDB_PATCH 99/' include/rocksdb/version.h
+            cat include/rocksdb/version.h
+            git commit -am "updated version.h version"
+            git push
+          fi

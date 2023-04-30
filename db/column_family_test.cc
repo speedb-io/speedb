@@ -488,8 +488,7 @@ class ColumnFamilyTestBase : public testing::Test {
       ColumnFamilyData* cfd, uint64_t compaction_needed_bytes,
       const MutableCFOptions& mutable_cf_options) {
     // add lock to guard current_ (*Version)
-    ROCKSDB_NAMESPACE::ColumnFamilyData::WriteStallCause write_stall_cause =
-        ROCKSDB_NAMESPACE::ColumnFamilyData::WriteStallCause::kNone;
+    WriteStallCause write_stall_cause = WriteStallCause::kNone;
 
     dbfull()->TEST_LockMutex();
     double divider = cfd->TEST_CalculateWriteDelayDivider(

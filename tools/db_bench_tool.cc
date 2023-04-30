@@ -2963,6 +2963,17 @@ class Benchmark {
     } else {
       auto wal_dir = options.wal_dir;
       for (int i = 0; i < FLAGS_num_multi_db; i++) {
+        if (FLAGS_optimistic_transaction_db) {
+          if (dbs_[i].opt_txn_db) {
+            continue;
+          }
+        } else if (dbs_[i].db) {
+          continue;
+        }
+        if (dbs_[i].db) {
+          continue;
+        }
+
         if (!wal_dir.empty()) {
           options.wal_dir = GetPathForMultiple(wal_dir, i);
         }

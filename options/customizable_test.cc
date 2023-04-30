@@ -195,7 +195,7 @@ struct SimpleOptions {
 };
 
 static std::unordered_map<std::string, OptionTypeInfo> simple_option_info = {
-#ifndef ROCKSDB_LITE
+
     {"bool",
      {offsetof(struct SimpleOptions, b), OptionType::kBoolean,
       OptionVerificationType::kNormal, OptionTypeFlags::kNone}},
@@ -211,7 +211,7 @@ static std::unordered_map<std::string, OptionTypeInfo> simple_option_info = {
      OptionTypeInfo::AsCustomRawPtr<TestCustomizable>(
          offsetof(struct SimpleOptions, cp), OptionVerificationType::kNormal,
          OptionTypeFlags::kAllowNull)},
-#endif  // ROCKSDB_LITE
+
 };
 
 class SimpleConfigurable : public Configurable {

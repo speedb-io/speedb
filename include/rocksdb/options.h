@@ -1483,7 +1483,6 @@ struct DBOptions {
   // "refresh_options_file" If found, the refresh task will update the mutable
   // options from the settings in this file
   // Defaults to check once per hour.  Set to 0 to disable the task.
-  // Not supported in ROCKSDB_LITE mode!
   unsigned int refresh_options_sec = 60 * 60;
   std::string refresh_options_file;
 };

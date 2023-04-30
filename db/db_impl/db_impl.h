@@ -1235,10 +1235,8 @@ class DBImpl : public DB {
   // populate_historical_seconds, now].
   void RecordSeqnoToTimeMapping(uint64_t populate_historical_seconds);
 
-#ifndef ROCKSDB_LITE
   // Checks if the options should be updated
   void RefreshOptions();
-#endif  // ROCKSDB_LITE
 
   // Interface to block and signal the DB in case of stalling writes by
   // WriteBufferManager. Each DBImpl object contains ptr to WBMStallInterface.
@@ -1877,11 +1875,11 @@ class DBImpl : public DB {
       const std::vector<const ColumnFamilyOptions*>& cf_options);
 
   Status DropColumnFamilyImpl(ColumnFamilyHandle* column_family);
-#ifndef ROCKSDB_LITE
+
   Status SetCFOptionsImpl(
       ColumnFamilyData* cfd,
       const std::unordered_map<std::string, std::string>& options_map);
-#endif  // ROCKSDB_LITE
+
   // Delete any unneeded files and stale in-memory entries.
   void DeleteObsoleteFiles();
   // Delete obsolete files and log status and information of file deletion

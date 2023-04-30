@@ -1216,7 +1216,6 @@ TEST_P(ColumnFamilyTest, DropBeforeInstallResults) {
   Destroy(descs);
 }
 
-#ifndef ROCKSDB_LITE  // EventListener is not supported
 TEST_P(ColumnFamilyTest, DropAfterPickMemtable) {
   class FlushBeginListener : public EventListener {
    public:
@@ -1315,7 +1314,6 @@ TEST_P(ColumnFamilyTest, DropAfterPickMemtable) {
   ASSERT_OK(db_->Close());
   Destroy(descs);
 }
-#endif  // !ROCKSDB_LITE
 
 TEST_P(ColumnFamilyTest, OpenNonexistentColumnFamily) {
   ASSERT_OK(TryOpen({"default"}));

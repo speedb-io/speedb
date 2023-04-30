@@ -67,7 +67,6 @@ TEST_F(LoadCustomizableTest, LoadSpdbPairedFilterPolicyTest) {
   ASSERT_NE(result, nullptr);
   ASSERT_STREQ(result->Name(), ReadOnlyBuiltinFilterPolicy::kClassName());
 
-#ifndef ROCKSDB_LITE
   std::string table_opts = "id=BlockBasedTable; filter_policy=";
   ASSERT_OK(TableFactory::CreateFromString(config_options_,
                                            table_opts + "nullptr", &table));
@@ -103,7 +102,6 @@ TEST_F(LoadCustomizableTest, LoadSpdbPairedFilterPolicyTest) {
     ASSERT_STREQ(bbto->filter_policy->Name(),
                  SpdbPairedBloomFilterPolicy::kClassName());
   }
-#endif  // ROCKSDB_LITE
 }
 
 }  // namespace ROCKSDB_NAMESPACE

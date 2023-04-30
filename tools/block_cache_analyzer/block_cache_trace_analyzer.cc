@@ -1813,10 +1813,9 @@ void BlockCacheTraceAnalyzer::PrintDataBlockAccessStats() const {
           return;
         }
         // Use four decimal points.
-        uint64_t percent_referenced_for_existing_keys =
-            (uint64_t)(((double)block.key_num_access_map.size() /
-                        (double)block.num_keys) *
-                       10000.0);
+        uint64_t percent_referenced_for_existing_keys = (uint64_t)(
+            ((double)block.key_num_access_map.size() / (double)block.num_keys) *
+            10000.0);
         uint64_t percent_referenced_for_non_existing_keys =
             (uint64_t)(((double)block.non_exist_key_num_access_map.size() /
                         (double)block.num_keys) *

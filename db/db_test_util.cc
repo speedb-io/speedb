@@ -141,7 +141,6 @@ bool DBTestBase::IsDbWriteDelayed(DBImpl* dbimpl) {
 }
 
 bool DBTestBase::ShouldSkipOptions(int option_config, int skip_mask) {
-
   if ((skip_mask & kSkipUniversalCompaction) &&
       (option_config == kUniversalCompaction ||
        option_config == kUniversalCompactionMultiLevel ||

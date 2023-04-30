@@ -234,10 +234,11 @@ bool CompactionIterator::InvokeFilterIfNeeded(bool* need_skip,
   CompactionFilter::Decision decision =
       CompactionFilter::Decision::kUndetermined;
   CompactionFilter::ValueType value_type =
-      ikey_.type == kTypeValue ? CompactionFilter::ValueType::kValue
-      : ikey_.type == kTypeBlobIndex
-          ? CompactionFilter::ValueType::kBlobIndex
-          : CompactionFilter::ValueType::kWideColumnEntity;
+      ikey_.type == kTypeValue
+          ? CompactionFilter::ValueType::kValue
+          : ikey_.type == kTypeBlobIndex
+                ? CompactionFilter::ValueType::kBlobIndex
+                : CompactionFilter::ValueType::kWideColumnEntity;
 
   // Hack: pass internal key to BlobIndexCompactionFilter since it needs
   // to get sequence number.

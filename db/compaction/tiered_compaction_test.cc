@@ -2138,7 +2138,6 @@ TEST_F(PrecludeLastLevelTest, RangeDelsCauseFileEndpointsToOverlap) {
   Close();
 }
 
-
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {

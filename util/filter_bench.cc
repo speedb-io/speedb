@@ -322,9 +322,9 @@ void FilterBench::Go() {
                                     FLAGS_average_keys_per_filter);
   const uint32_t variance_offset = variance_range / 2;
 
-  const std::vector<TestMode> &testModes = FLAGS_best_case ? bestCaseTestModes
-                                           : FLAGS_quick   ? quickTestModes
-                                                           : allTestModes;
+  const std::vector<TestMode> &testModes =
+      FLAGS_best_case ? bestCaseTestModes
+                      : FLAGS_quick ? quickTestModes : allTestModes;
 
   m_queries_ = FLAGS_m_queries;
   double working_mem_size_mb = FLAGS_working_mem_size_mb;

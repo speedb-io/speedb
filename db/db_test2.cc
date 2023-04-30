@@ -7434,7 +7434,6 @@ TEST_F(DBTest2, RecoverEpochNumber) {
   }
 }
 
-
 TEST_F(DBTest2, RenameDirectory) {
   Options options = CurrentOptions();
   DestroyAndReopen(options);

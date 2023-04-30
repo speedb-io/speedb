@@ -202,7 +202,6 @@ TEST_F(DBMergeOperatorTest, MergeErrorOnIteration) {
   VerifyDBInternal({{"k1", "v1"}, {"k2", "corrupted"}, {"k2", "v2"}});
 }
 
-
 TEST_F(DBMergeOperatorTest, MergeOperatorFailsWithMustMerge) {
   // This is like a mini-stress test dedicated to `OpFailureScope::kMustMerge`.
   // Some or most of it might be deleted upon adding that option to the actual
@@ -357,7 +356,6 @@ TEST_F(DBMergeOperatorTest, MergeOperatorFailsWithMustMerge) {
     ASSERT_EQ("", FilesPerLevel());
   }
 }
-
 
 class MergeOperatorPinningTest : public DBMergeOperatorTest,
                                  public testing::WithParamInterface<bool> {

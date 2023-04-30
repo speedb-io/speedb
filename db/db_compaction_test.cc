@@ -9135,7 +9135,6 @@ TEST_F(DBCompactionTest, BottommostFileCompactionAllowIngestBehind) {
   // ASSERT_OK(dbfull()->TEST_WaitForCompact(true /* wait_unscheduled */));
 }
 
-
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {

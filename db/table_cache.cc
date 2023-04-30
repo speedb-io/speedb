@@ -60,7 +60,6 @@ void AppendVarint64(IterKey* key, uint64_t v) {
   key->TrimAppend(key->Size(), buf, ptr - buf);
 }
 
-
 }  // anonymous namespace
 
 const int kLoadConcurency = 128;

@@ -1673,7 +1673,6 @@ TEST_F(DBWALTest, FixSyncWalOnObseletedWalWithNewManifestCausingMissingWAL) {
         wal_synced = true;
       });
 
-
   SyncPoint::GetInstance()->EnableProcessing();
 
   ASSERT_OK(Flush());

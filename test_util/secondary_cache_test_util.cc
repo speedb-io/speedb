@@ -82,9 +82,10 @@ const Cache::CacheItemHelper* WithCacheType::GetHelper(
       with_secondary = GenerateHelpersByRole(&without_secondary, false);
   static const std::array<Cache::CacheItemHelper, kNumCacheEntryRoles>
       with_secondary_fail = GenerateHelpersByRole(&without_secondary, true);
-  return &(fail                   ? with_secondary_fail
-           : secondary_compatible ? with_secondary
-                                  : without_secondary)[static_cast<int>(r)];
+  return &(fail
+               ? with_secondary_fail
+               : secondary_compatible ? with_secondary
+                                      : without_secondary)[static_cast<int>(r)];
 }
 
 const Cache::CacheItemHelper* WithCacheType::GetHelperFail(CacheEntryRole r) {

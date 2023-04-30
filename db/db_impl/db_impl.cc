@@ -1137,7 +1137,6 @@ void DBImpl::FlushInfoLog() {
   LogFlush(immutable_db_options_.info_log);
 }
 
-#ifndef ROCKSDB_LITE
 // Periodically checks to see if the new options should be loaded into the
 // process. log.
 void DBImpl::RefreshOptions() {
@@ -1211,7 +1210,6 @@ void DBImpl::RefreshOptions() {
                  new_options_file.c_str(), s.ToString().c_str());
   TEST_SYNC_POINT("DBImpl::RefreshOptions::Complete");
 }
-#endif  // ROCKSDB_LITE
 
 Status DBImpl::TablesRangeTombstoneSummary(ColumnFamilyHandle* column_family,
                                            int max_entries_to_print,
@@ -1260,10 +1258,8 @@ Status DBImpl::SetOptions(
     return Status::InvalidArgument("empty input");
   }
   return SetCFOptionsImpl(cfd, options_map);
-#endif  // ROCKSDB_LITE
 }
 
-#ifndef ROCKSDB_LITE
 Status DBImpl::SetCFOptionsImpl(
     ColumnFamilyData* cfd,
     const std::unordered_map<std::string, std::string>& options_map) {
@@ -1316,7 +1312,6 @@ Status DBImpl::SetCFOptionsImpl(
   LogFlush(immutable_db_options_.info_log);
   return s;
 }
-#endif  // ROCKSDB_LITE
 
 Status DBImpl::SetDBOptions(
     const std::unordered_map<std::string, std::string>& options_map) {

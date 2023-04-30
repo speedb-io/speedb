@@ -2948,7 +2948,6 @@ class Benchmark {
     } else {
       auto wal_dir = options.wal_dir;
       for (int i = 0; i < FLAGS_num_multi_db; i++) {
-#ifndef ROCKSDB_LITE
         if (FLAGS_optimistic_transaction_db) {
           if (dbs_[i].opt_txn_db) {
             continue;
@@ -2956,11 +2955,10 @@ class Benchmark {
         } else if (dbs_[i].db) {
           continue;
         }
-#else   // ROCKSDB_LITE
         if (dbs_[i].db) {
           continue;
         }
-#endif  // ROCKSDB_LITE
+
         if (!wal_dir.empty()) {
           options.wal_dir = GetPathForMultiple(wal_dir, i);
         }

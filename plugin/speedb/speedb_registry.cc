@@ -21,7 +21,6 @@
 
 namespace ROCKSDB_NAMESPACE {
 
-#ifndef ROCKSDB_LITE
 // Similar to the NewBuiltinFilterPolicyWithBits template for RocksDB built-in
 // filters
 SpdbPairedBloomFilterPolicy* NewSpdbPairedBloomFilterWithBits(
@@ -60,6 +59,5 @@ int register_SpeedbPlugins(ObjectLibrary& library, const std::string&) {
   size_t num_types;
   return static_cast<int>(library.GetFactoryCount(&num_types));
 }
-#endif  // ROCKSDB_LITE
 
 }  // namespace ROCKSDB_NAMESPACE

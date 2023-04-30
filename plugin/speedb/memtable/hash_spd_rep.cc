@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef ROCKSDB_LITE
-
 #include "plugin/speedb/memtable/hash_spd_rep.h"
 
 #include <algorithm>
@@ -613,14 +611,13 @@ MemTableRep::Iterator* HashSpdRep::GetIterator(Arena* arena) {
 }
 
 static std::unordered_map<std::string, OptionTypeInfo> hash_spd_factory_info = {
-#ifndef ROCKSDB_LITE
+
     {"hash_bucket_count",
      {0, OptionType::kSizeT, OptionVerificationType::kNormal,
       OptionTypeFlags::kDontSerialize /*Since it is part of the ID*/}},
     {"use_seek_parralel_threshold",
      {0, OptionType::kBoolean, OptionVerificationType::kNormal,
       OptionTypeFlags::kDontSerialize /*Since it is part of the ID*/}},
-#endif
 };
 }  // namespace
 
@@ -657,5 +654,3 @@ MemTableRep* HashSpdRepFactory::CreateMemTableRep(
 }
 
 }  // namespace ROCKSDB_NAMESPACE
-
-#endif  // ROCKSDB_LITE

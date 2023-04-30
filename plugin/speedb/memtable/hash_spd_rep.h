@@ -14,7 +14,6 @@
 
 #pragma once
 
-#ifndef ROCKSDB_LITE
 #include <condition_variable>  // std::condition_variable
 #include <mutex>
 #include <thread>
@@ -50,5 +49,3 @@ class HashSpdRepFactory : public MemTableRepFactory {
 };
 
 }  // namespace ROCKSDB_NAMESPACE
-
-#endif  // ROCKSDB_LITE

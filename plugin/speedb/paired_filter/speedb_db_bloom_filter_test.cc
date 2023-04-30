@@ -240,13 +240,12 @@ TEST_P(SpdbDBBloomFilterTestWithParam,
       3, (*(get_perf_context()->level_to_perf_context))[0].bloom_filter_useful);
 
   // No bloom on extractor changed
-#ifndef ROCKSDB_LITE
+
   ASSERT_OK(db_->SetOptions({{"prefix_extractor", "capped:10"}}));
   ASSERT_EQ("NOT_FOUND", Get("foobarbar"));
   ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_USEFUL), 3);
   ASSERT_EQ(
       3, (*(get_perf_context()->level_to_perf_context))[0].bloom_filter_useful);
-#endif  // ROCKSDB_LITE
 
   get_perf_context()->Reset();
 }
@@ -299,13 +298,12 @@ TEST_P(SpdbDBBloomFilterTestWithParam, GetFilterByPrefixBloom) {
       3, (*(get_perf_context()->level_to_perf_context))[0].bloom_filter_useful);
 
   // No bloom on extractor changed
-#ifndef ROCKSDB_LITE
+
   ASSERT_OK(db_->SetOptions({{"prefix_extractor", "capped:10"}}));
   ASSERT_EQ("NOT_FOUND", Get("foobarbar"));
   ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_USEFUL), 3);
   ASSERT_EQ(
       3, (*(get_perf_context()->level_to_perf_context))[0].bloom_filter_useful);
-#endif  // ROCKSDB_LITE
 
   get_perf_context()->Reset();
 }
@@ -545,7 +543,6 @@ TEST_P(SpdbDBBloomFilterTestWithParam, BloomFilter) {
       ASSERT_LE(reads, 3 * N / 100);
     }
 
-#ifndef ROCKSDB_LITE
     // Sanity check some table properties
     std::map<std::string, std::string> props;
     ASSERT_TRUE(db_->GetMapProperty(
@@ -565,7 +562,6 @@ TEST_P(SpdbDBBloomFilterTestWithParam, BloomFilter) {
 
     // // // fprintf(stderr, "filter_size:%d, num_filter_entries:%d,
     // nkeys:%d\n", (int)filter_size, (int)num_filter_entries, (int)nkeys);
-#endif  // ROCKSDB_LITE
 
     env_->delay_sstable_sync_.store(false, std::memory_order_release);
     Close();
@@ -631,10 +627,9 @@ TEST_P(SpdbDBBloomFilterTestWithParam, SkipFilterOnEssentiallyZeroBpk) {
     PutFn();
     GetFn();
   };
-#ifndef ROCKSDB_LITE
+
   std::map<std::string, std::string> props;
   const auto& kAggTableProps = DB::Properties::kAggregatedTableProperties;
-#endif  // ROCKSDB_LITE
 
   Options options = CurrentOptions();
   options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
@@ -656,11 +651,9 @@ TEST_P(SpdbDBBloomFilterTestWithParam, SkipFilterOnEssentiallyZeroBpk) {
   EXPECT_EQ(TestGetTickerCount(options, BLOOM_FILTER_FULL_POSITIVE), 0);
   EXPECT_EQ(TestGetTickerCount(options, BLOOM_FILTER_FULL_TRUE_POSITIVE), 0);
 
-#ifndef ROCKSDB_LITE
   props.clear();
   ASSERT_TRUE(db_->GetMapProperty(kAggTableProps, &props));
   EXPECT_EQ(props["filter_size"], "0");
-#endif  // ROCKSDB_LITE
 
   // Test 2: use custom API to skip filters -> no filter constructed
   // or read.
@@ -674,11 +667,9 @@ TEST_P(SpdbDBBloomFilterTestWithParam, SkipFilterOnEssentiallyZeroBpk) {
   EXPECT_EQ(TestGetTickerCount(options, BLOOM_FILTER_FULL_POSITIVE), 0);
   EXPECT_EQ(TestGetTickerCount(options, BLOOM_FILTER_FULL_TRUE_POSITIVE), 0);
 
-#ifndef ROCKSDB_LITE
   props.clear();
   ASSERT_TRUE(db_->GetMapProperty(kAggTableProps, &props));
   EXPECT_EQ(props["filter_size"], "0");
-#endif  // ROCKSDB_LITE
 
   // Control test: using an actual filter with 100% FP rate -> the filter
   // is constructed and checked on read.
@@ -694,11 +685,10 @@ TEST_P(SpdbDBBloomFilterTestWithParam, SkipFilterOnEssentiallyZeroBpk) {
   EXPECT_EQ(
       TestGetAndResetTickerCount(options, BLOOM_FILTER_FULL_TRUE_POSITIVE),
       maxKey);
-#ifndef ROCKSDB_LITE
+
   props.clear();
   ASSERT_TRUE(db_->GetMapProperty(kAggTableProps, &props));
   EXPECT_NE(props["filter_size"], "0");
-#endif  // ROCKSDB_LITE
 
   // Test 3 (options test): Able to read existing filters with longstanding
   // generated options file entry `filter_policy=rocksdb.BuiltinBloomFilter`
@@ -724,11 +714,9 @@ TEST_P(SpdbDBBloomFilterTestWithParam, SkipFilterOnEssentiallyZeroBpk) {
   EXPECT_EQ(TestGetTickerCount(options, BLOOM_FILTER_FULL_POSITIVE), 0);
   EXPECT_EQ(TestGetTickerCount(options, BLOOM_FILTER_FULL_TRUE_POSITIVE), 0);
 
-#ifndef ROCKSDB_LITE
   props.clear();
   ASSERT_TRUE(db_->GetMapProperty(kAggTableProps, &props));
   EXPECT_EQ(props["filter_size"], "0");
-#endif  // ROCKSDB_LITE
 }
 
 INSTANTIATE_TEST_CASE_P(DBBloomFilterTestWithParam,
@@ -1376,7 +1364,7 @@ TEST_P(DBFilterConstructionCorruptionTestWithParam, DetectCorruption) {
 }
 
 // RocksDB lite does not support dynamic options
-#ifndef ROCKSDB_LITE
+
 TEST_P(DBFilterConstructionCorruptionTestWithParam,
        DynamicallyTurnOnAndOffDetectConstructCorruption) {
   Options options = CurrentOptions();
@@ -1460,7 +1448,6 @@ TEST_P(DBFilterConstructionCorruptionTestWithParam,
       db_->GetOptions().table_factory->GetOptions<BlockBasedTableOptions>();
   EXPECT_FALSE(updated_table_options->detect_filter_construct_corruption);
 }
-#endif  // ROCKSDB_LITE
 
 namespace {
 // // // // NOTE: This class is referenced by HISTORY.md as a model for a
@@ -1648,7 +1635,7 @@ namespace {
 // // //         EXPECT_LE(useful_count, maxKey * 0.91);
 // // //       }
 // // //     } else {
-// // // #ifndef ROCKSDB_LITE
+// // //
 // // //       // Also try external SST file
 // // //       {
 // // //         std::string file_path = dbname_ + "/external.sst";
@@ -1884,7 +1871,6 @@ TEST_F(SpdbDBBloomFilterTest, MemtablePrefixBloomOutOfDomain) {
   ASSERT_EQ(kKey, iter->key());
 }
 
-#ifndef ROCKSDB_LITE
 namespace {
 static const std::string kPlainTable = "test_PlainTableBloom";
 }  // namespace
@@ -2729,8 +2715,6 @@ TEST_F(SpdbDBBloomFilterTest, DynamicBloomFilterOptions) {
   ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_CHECKED), 12);
   ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_USEFUL), 3);
 }
-
-#endif  // ROCKSDB_LITE
 
 }  // namespace ROCKSDB_NAMESPACE
 

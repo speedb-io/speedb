@@ -17,6 +17,7 @@
 #include <sstream>
 #include <string>
 
+#include "rocksdb/cache.h"
 #include "cache/cache_reservation_manager.h"
 #include "db/db_test_util.h"
 #include "options/options_helper.h"
@@ -933,9 +934,7 @@ class FilterConstructResPeakTrackingCache : public CacheWrapper {
     return cache_res_increments_sum_;
   }
 
-  static const char* kClassName() {
-    return "FilterConstructResPeakTrackingCache";
-  }
+  static const char* kClassName() { return "FilterConstructResPeakTrackingCache"; }
   const char* Name() const override { return kClassName(); }
 
  private:
@@ -950,15 +949,14 @@ class FilterConstructResPeakTrackingCache : public CacheWrapper {
   std::size_t cache_res_increments_sum_;
 };
 
-const Cache::CacheItemHelper FilterConstructResPeakTrackingCache::kHelper{
-    CacheEntryRole::kFilterConstruction,
-    FilterConstructResPeakTrackingCache::kNoopDeleterForFilterConstruction};
+const Cache::CacheItemHelper 
+  FilterConstructResPeakTrackingCache::kHelper{ CacheEntryRole::kFilterConstruction,
+                                                FilterConstructResPeakTrackingCache::kNoopDeleterForFilterConstruction};
 
 const Cache::DeleterFn
     FilterConstructResPeakTrackingCache::kNoopDeleterForFilterConstruction =
-        CacheReservationManagerImpl<CacheEntryRole::kFilterConstruction>::
-            TEST_GetCacheItemHelperForRole()
-                ->del_cb;
+        CacheReservationManagerImpl<
+            CacheEntryRole::kFilterConstruction>::TEST_GetCacheItemHelperForRole()->del_cb;
 
 // To align with the type of hash entry being reserved in implementation.
 using FilterConstructionReserveMemoryHash = uint64_t;

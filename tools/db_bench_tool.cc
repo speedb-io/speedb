@@ -9388,8 +9388,6 @@ int db_bench_tool(int argc, char** argv) {
 
   benchmark.reset();
   return result;
-#else
-return db_bench_tool_run_group(argc, argv);
 }
 
 }  // namespace ROCKSDB_NAMESPACE

@@ -15,6 +15,7 @@
 #include <atomic>
 #include <condition_variable>
 #include <cstddef>
+#include <functional>
 #include <list>
 #include <memory>
 #include <mutex>

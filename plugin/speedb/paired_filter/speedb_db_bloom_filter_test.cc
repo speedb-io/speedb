@@ -17,7 +17,7 @@
 #include <sstream>
 #include <string>
 
-#include "cache/cache_entry_roles.h"
+#include "rocksdb/cache.h"
 #include "cache/cache_reservation_manager.h"
 #include "db/db_test_util.h"
 #include "options/options_helper.h"
@@ -894,13 +894,12 @@ class FilterConstructResPeakTrackingCache : public CacheWrapper {
         last_peak_tracked_(false),
         cache_res_increments_sum_(0) {}
 
-  using Cache::Insert;
-  Status Insert(const Slice& key, void* value, size_t charge,
-                void (*deleter)(const Slice& key, void* value),
+  Status Insert(const Slice& key, ObjectPtr value,
+                const CacheItemHelper* helper, size_t charge,
                 Handle** handle = nullptr,
                 Priority priority = Priority::LOW) override {
-    Status s = target_->Insert(key, value, charge, deleter, handle, priority);
-    if (deleter == kNoopDeleterForFilterConstruction) {
+    Status s = target_->Insert(key, value, helper, charge, handle, priority);
+    if (helper->del_cb == kNoopDeleterForFilterConstruction) {
       if (last_peak_tracked_) {
         cache_res_peak_ = 0;
         cache_res_increment_ = 0;
@@ -915,8 +914,8 @@ class FilterConstructResPeakTrackingCache : public CacheWrapper {
 
   using Cache::Release;
   bool Release(Handle* handle, bool erase_if_last_ref = false) override {
-    auto deleter = GetDeleter(handle);
-    if (deleter == kNoopDeleterForFilterConstruction) {
+    auto helper = GetCacheItemHelper(handle);
+    if (helper->del_cb == kNoopDeleterForFilterConstruction) {
       if (!last_peak_tracked_) {
         cache_res_peaks_.push_back(cache_res_peak_);
         cache_res_increments_sum_ += cache_res_increment_;
@@ -934,8 +933,12 @@ class FilterConstructResPeakTrackingCache : public CacheWrapper {
     return cache_res_increments_sum_;
   }
 
+  static const char* kClassName() { return "FilterConstructResPeakTrackingCache"; }
+  const char* Name() const override { return kClassName(); }
+
  private:
   static const Cache::DeleterFn kNoopDeleterForFilterConstruction;
+  static const Cache::CacheItemHelper kHelper;
 
   std::size_t cur_cache_res_;
   std::size_t cache_res_peak_;
@@ -945,10 +948,14 @@ class FilterConstructResPeakTrackingCache : public CacheWrapper {
   std::size_t cache_res_increments_sum_;
 };
 
+const Cache::CacheItemHelper 
+  FilterConstructResPeakTrackingCache::kHelper{ CacheEntryRole::kFilterConstruction,
+                                                FilterConstructResPeakTrackingCache::kNoopDeleterForFilterConstruction};
+
 const Cache::DeleterFn
     FilterConstructResPeakTrackingCache::kNoopDeleterForFilterConstruction =
         CacheReservationManagerImpl<
-            CacheEntryRole::kFilterConstruction>::TEST_GetNoopDeleterForRole();
+            CacheEntryRole::kFilterConstruction>::TEST_GetCacheItemHelperForRole()->del_cb;
 
 // To align with the type of hash entry being reserved in implementation.
 using FilterConstructionReserveMemoryHash = uint64_t;

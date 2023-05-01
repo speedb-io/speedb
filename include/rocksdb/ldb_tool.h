@@ -27,7 +27,7 @@ struct LDBOptions {
   // Default: Slice::ToString()
   std::shared_ptr<SliceFormatter> key_formatter;
 
-  std::string print_help_header = "beezcli - Speedb Tool";
+  std::string print_help_header = "ldb - Speedb Tool";
 };
 
 class LDBTool {

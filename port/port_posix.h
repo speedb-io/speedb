@@ -55,7 +55,10 @@
 #include <stdint.h>
 #include <string.h>
 
+#include <atomic>
+#include <condition_variable>
 #include <limits>
+#include <mutex>
 #include <string>
 
 #ifndef PLATFORM_IS_LITTLE_ENDIAN

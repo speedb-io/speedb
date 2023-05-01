@@ -431,11 +431,11 @@ auto FilterMetadata::ReadMetadata(const char* metadata) -> Fields {
 SpdbPairedBloomBitsBuilder::SpdbPairedBloomBitsBuilder(
     const int millibits_per_key,
     std::atomic<int64_t>* aggregate_rounding_balance,
-    const std::shared_ptr<CacheReservationManager>& cache_res_mgr,
+    const std::shared_ptr<CacheReservationManager> cache_res_mgr,
     bool detect_filter_construct_corruption,
     const FilterBitsReaderCreateFunc& reader_create_func, bool is_bottomost)
     : XXPH3FilterBitsBuilder(aggregate_rounding_balance,
-                             std::move(cache_res_mgr),
+                             cache_res_mgr,
                              detect_filter_construct_corruption),
       millibits_per_key_(millibits_per_key),
       is_bottomost_(is_bottomost),

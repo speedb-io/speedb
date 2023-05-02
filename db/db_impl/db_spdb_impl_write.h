@@ -16,6 +16,7 @@
 #include <array>
 #include <atomic>
 #include <condition_variable>
+#include <list>
 #include <mutex>
 #include <thread>
 #include <vector>
@@ -27,6 +28,7 @@
 namespace ROCKSDB_NAMESPACE {
 
 class DBImpl;
+struct WriteOptions;
 
 struct WritesBatchList {
   std::list<WriteBatch*> wal_writes_;

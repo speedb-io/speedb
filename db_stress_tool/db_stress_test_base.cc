@@ -3021,6 +3021,21 @@ void StressTest::Open(SharedState* shared, bool reopen) {
       assert(cmp_cfhs_.size() == static_cast<size_t>(FLAGS_column_families));
     }
 
+    if (FLAGS_preserve_unverified_changes) {
+      // Up until now, no live file should have become obsolete due to these
+      // options. After `DisableFileDeletions()` we can reenable auto
+      // compactions since, even if live files become obsolete, they won't be
+      // deleted.
+      assert(options_.avoid_flush_during_recovery);
+      assert(options_.disable_auto_compactions);
+      if (s.ok()) {
+        s = db_->DisableFileDeletions();
+      }
+      if (s.ok()) {
+        s = db_->EnableAutoCompaction(column_families_);
+      }
+    }
+
   if (!s.ok()) {
     fprintf(stderr, "open error: %s\n", s.ToString().c_str());
     exit(1);

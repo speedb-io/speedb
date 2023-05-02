@@ -22,7 +22,7 @@ jobs:
           yum install -y centos-release-scl epel-release
           yum install -y make devtoolset-11-gcc-c++ \
             coreutils wget unzip which git python3 openssl openssl-devel \
-            libzstd-devel lz4-devel snappy-devel zlib-devel \
+            libzstd-devel lz4-devel snappy-devel zlib-devel readline-devel \
             java-1.8.0-openjdk-devel
           echo "PATH=/opt/rh/devtoolset-11/root/usr/bin:${PATH}" >> $GITHUB_ENV
           echo "RELEASE_VERSION=${GITHUB_REF_NAME#speedb/v}" >> $GITHUB_ENV

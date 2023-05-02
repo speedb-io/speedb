@@ -320,7 +320,8 @@ std::string WriteBufferManager::GetPrintableOptions() const {
   return ret;
 }
 
-void WriteBufferManager::RegisterWriteController(WriteController* wc) {
+void WriteBufferManager::RegisterWriteController(
+    std::shared_ptr<WriteController> wc) {
   std::lock_guard<std::mutex> lock(controllers_map_mutex_);
   if (controllers_to_refcount_map_.count(wc)) {
     ++controllers_to_refcount_map_[wc];
@@ -329,14 +330,16 @@ void WriteBufferManager::RegisterWriteController(WriteController* wc) {
   }
 }
 
-void WriteBufferManager::DeregisterWriteController(WriteController* wc) {
+void WriteBufferManager::DeregisterWriteController(
+    std::shared_ptr<WriteController> wc) {
   bool last_entry = RemoveFromControllersMap(wc);
   if (last_entry && wc->is_dynamic_delay()) {
     wc->HandleRemoveDelayReq(this);
   }
 }
 
-bool WriteBufferManager::RemoveFromControllersMap(WriteController* wc) {
+bool WriteBufferManager::RemoveFromControllersMap(
+    std::shared_ptr<WriteController> wc) {
   std::lock_guard<std::mutex> lock(controllers_map_mutex_);
   assert(controllers_to_refcount_map_.count(wc));
   assert(controllers_to_refcount_map_[wc] > 0);
@@ -391,9 +394,12 @@ uint64_t CalcDelayFromFactor(uint64_t max_write_rate, uint64_t delay_factor) {
 void WriteBufferManager::WBMSetupDelay(uint64_t delay_factor) {
   std::lock_guard<std::mutex> lock(controllers_map_mutex_);
   for (auto& wc_and_ref_count : controllers_to_refcount_map_) {
+    // make sure that controllers_to_refcount_map_ does not hold
+    // the last ref to the WC.
+    assert(wc_and_ref_count.first.unique() == false);
     // the final rate depends on the write controllers max rate so
     // each wc can receive a different delay requirement.
-    WriteController* wc = wc_and_ref_count.first;
+    WriteController* wc = wc_and_ref_count.first.get();
     if (wc->is_dynamic_delay()) {
       uint64_t wbm_write_rate =
           CalcDelayFromFactor(wc->max_delayed_write_rate(), delay_factor);
@@ -405,6 +411,9 @@ void WriteBufferManager::WBMSetupDelay(uint64_t delay_factor) {
 void WriteBufferManager::ResetDelay() {
   std::lock_guard<std::mutex> lock(controllers_map_mutex_);
   for (auto& wc_and_ref_count : controllers_to_refcount_map_) {
+    // make sure that controllers_to_refcount_map_ does not hold
+    // the last ref to the WC.
+    assert(wc_and_ref_count.first.unique() == false);
     if (wc_and_ref_count.first->is_dynamic_delay()) {
       wc_and_ref_count.first->HandleRemoveDelayReq(this);
     }

@@ -16,11 +16,6 @@
 #include "db/write_controller.h"
 #include "rocksdb/write_buffer_manager.h"
 
-namespace {
-#define kb *1024
-#define mb *1024 * 1024
-}  // namespace
-
 namespace ROCKSDB_NAMESPACE {
 
 class GlobalWriteControllerTest : public DBTestBase {
@@ -31,7 +26,7 @@ class GlobalWriteControllerTest : public DBTestBase {
   ~GlobalWriteControllerTest() { CloseAndDeleteDBs(); }
 
   void OpenDBsAndSetUp(int num_dbs, Options& options, bool add_wbm = false,
-                       uint64_t buffer_size = 40 kb) {
+                       uint64_t buffer_size = 40_kb) {
     db_names_.clear();
     for (int i = 0; i < num_dbs; i++) {
       dbs_.push_back(nullptr);
@@ -41,7 +36,7 @@ class GlobalWriteControllerTest : public DBTestBase {
 
     options.level0_slowdown_writes_trigger = 10;
     options.level0_stop_writes_trigger = 20;
-    options.delayed_write_rate = 16 mb;
+    options.delayed_write_rate = 16_mb;
     options.use_dynamic_delay = true;
     options.write_controller.reset(new WriteController(
         options.use_dynamic_delay, options.delayed_write_rate));
@@ -146,19 +141,19 @@ TEST_F(GlobalWriteControllerTest, TestGetMinRate) {
   // sets db0 to 16Mbs
   SetL0delayAndRecalcConditions(0 /*db_idx*/, 10 /*l0_files*/);
 
-  ASSERT_TRUE(options.write_controller->delayed_write_rate() == 16 mb);
-  ASSERT_TRUE(options.write_controller->TEST_GetMapMinRate() == 16 mb);
+  ASSERT_TRUE(options.write_controller->delayed_write_rate() == 16_mb);
+  ASSERT_TRUE(options.write_controller->TEST_GetMapMinRate() == 16_mb);
 
   // sets db1 to 8Mbs
   SetL0delayAndRecalcConditions(1 /*db_idx*/, 15 /*l0_files*/);
 
-  ASSERT_TRUE(options.write_controller->delayed_write_rate() == 8 mb);
-  ASSERT_TRUE(options.write_controller->TEST_GetMapMinRate() == 8 mb);
+  ASSERT_TRUE(options.write_controller->delayed_write_rate() == 8_mb);
+  ASSERT_TRUE(options.write_controller->TEST_GetMapMinRate() == 8_mb);
 
   // sets db0 to 8Mbs
   SetL0delayAndRecalcConditions(0 /*db_idx*/, 15 /*l0_files*/);
-  ASSERT_TRUE(options.write_controller->delayed_write_rate() == 8 mb);
-  ASSERT_TRUE(options.write_controller->TEST_GetMapMinRate() == 8 mb);
+  ASSERT_TRUE(options.write_controller->delayed_write_rate() == 8_mb);
+  ASSERT_TRUE(options.write_controller->TEST_GetMapMinRate() == 8_mb);
 
   // removes delay requirement from both dbs
   SetL0delayAndRecalcConditions(0 /*db_idx*/, 9 /*l0_files*/);
@@ -359,7 +354,7 @@ TEST_F(GlobalWriteControllerTest, GlobalAndWBMSetupDelay) {
   Options options = CurrentOptions();
   // memory quota is 40k.
   options.arena_block_size =
-      4 kb;  // this is the smallest unit of memory change
+      4_kb;  // this is the smallest unit of memory change
   int num_dbs = 2;
   OpenDBsAndSetUp(num_dbs, options, true);
   WriteOptions wo;
@@ -369,7 +364,7 @@ TEST_F(GlobalWriteControllerTest, GlobalAndWBMSetupDelay) {
     ASSERT_FALSE(IsDbWriteDelayed(dbimpls_[i]));
   }
 
-  std::string value(4 kb, 'x');
+  std::string value(4_kb, 'x');
   // insert into db1 just into the threshold - buffer size is 40k and
   // start_delay_percent is 70.
   // need to allocate more than 0.7 * 40k = 28k
@@ -382,8 +377,8 @@ TEST_F(GlobalWriteControllerTest, GlobalAndWBMSetupDelay) {
   for (int i = 0; i < 6; i++) {
     ASSERT_OK(dbs_[0]->Put(wo, Key(i), value));
   }
-  ASSERT_GT(options.write_buffer_manager->memory_usage(), 28 kb);
-  ASSERT_LT(options.write_buffer_manager->memory_usage(), 32 kb);
+  ASSERT_GT(options.write_buffer_manager->memory_usage(), 28_kb);
+  ASSERT_LT(options.write_buffer_manager->memory_usage(), 32_kb);
 
   // verify that both dbs are in a delay
   for (int i = 0; i < num_dbs; i++) {
@@ -393,7 +388,7 @@ TEST_F(GlobalWriteControllerTest, GlobalAndWBMSetupDelay) {
   // clear the memory usage
   ASSERT_OK(dbs_[0]->Flush(FlushOptions()));
   // there should only be 2k per memtable left
-  ASSERT_TRUE(options.write_buffer_manager->memory_usage() < 5 kb);
+  ASSERT_TRUE(options.write_buffer_manager->memory_usage() < 5_kb);
 
   // verify that theres no delay
   for (int i = 0; i < num_dbs; i++) {
@@ -411,11 +406,11 @@ TEST_F(GlobalWriteControllerTest, GlobalAndWBMCalcDelay) {
   WriteBufferManager* wbm = options.write_buffer_manager.get();
   WriteController* wc = options.write_controller.get();
   // initial default value
-  ASSERT_EQ(wc->delayed_write_rate(), 16 mb);
+  ASSERT_EQ(wc->delayed_write_rate(), 16_mb);
 
   // reset memory usage to get an exact change
   wbm->TEST_reset_memory_usage();
-  size_t mem_to_set = 28 kb;
+  size_t mem_to_set = 28_kb;
   wbm->ReserveMem(mem_to_set);
 
   // verify that both dbs are in a delay
@@ -437,7 +432,7 @@ TEST_F(GlobalWriteControllerTest, GlobalAndWBMCalcDelay) {
   ASSERT_EQ(wc->delayed_write_rate(), wbm_delay_req);
 
   // there are 12kb of memory from start of delay to max delay. reach halfway
-  wbm->ReserveMem(6 kb);
+  wbm->ReserveMem(6_kb);
   // rate should be half since we're decreasing linearly
   ASSERT_EQ(wc->delayed_write_rate(), max_rate / 2);
 
@@ -446,7 +441,7 @@ TEST_F(GlobalWriteControllerTest, GlobalAndWBMCalcDelay) {
   //
   // the last step is from (99 / 100) * (40 - 28 kb) until (40 - 28 kb)
   // from 12165.12 until 12288. so need to reserve 12288 - 6kb - 1
-  mem_to_set = 12288 - 6 kb - 1;
+  mem_to_set = 12288 - 6_kb - 1;
   wbm->ReserveMem(mem_to_set);
   ASSERT_EQ(wc->delayed_write_rate(),
             static_cast<uint64_t>(max_rate * (1.0 / 100)));
@@ -478,7 +473,7 @@ TEST_F(GlobalWriteControllerTest, GlobalAndWBMCompetingRequests) {
   // reset memory usage to get an exact change
   wbm->TEST_reset_memory_usage();
   // reserve to be halfway through [slowdown, stop] range.
-  size_t mem_to_set = 34 kb;
+  size_t mem_to_set = 34_kb;
   wbm->ReserveMem(mem_to_set);
 
   // verify that both dbs are in a delay
@@ -502,12 +497,12 @@ TEST_F(GlobalWriteControllerTest, GlobalAndWBMCompetingRequests) {
   ASSERT_EQ(wc->delayed_write_rate(), db1_l0_delay);
 
   // setup a bigger delay from wbm (currently at 34k) need factor > 60
-  wbm->ReserveMem(4 kb);
+  wbm->ReserveMem(4_kb);
   ASSERT_EQ(wc->TEST_total_delayed_count(), 3);
   // calculating in both ways to make sure they match
   auto start_delay_percent = wbm->get_start_delay_percent();
   uint64_t wbm_delay_req = CalcWBMDelay(max_rate, wbm->buffer_size(),
-                                        mem_to_set + 4 kb, start_delay_percent);
+                                        mem_to_set + 4_kb, start_delay_percent);
   ASSERT_EQ(wc->delayed_write_rate(), wbm_delay_req);
   // we're 10kb from 12 kb range. so factor is (10/12)*100 which is 83 (decimal
   // truncated). final rate is max_rate * (max_factor - 83 / max_factor)
@@ -519,7 +514,7 @@ TEST_F(GlobalWriteControllerTest, GlobalAndWBMCompetingRequests) {
 
   // remove all delay requests and make sure they clean up
   wbm->TEST_reset_memory_usage();
-  wbm->ReserveMem(12 kb);
+  wbm->ReserveMem(12_kb);
   ASSERT_EQ(wc->TEST_total_delayed_count(), 2);
   ASSERT_EQ(wc->delayed_write_rate(), db1_l0_delay);
 
@@ -537,13 +532,13 @@ TEST_F(GlobalWriteControllerTest, GlobalAndWBMCompetingRequests) {
 TEST_F(GlobalWriteControllerTest, GlobalAndWBMStressTest) {
   Options options = CurrentOptions();
   int num_dbs = 8;
-  auto memory_quota = 10 mb;
+  auto memory_quota = 10_mb;
   OpenDBsAndSetUp(num_dbs, options, true, memory_quota);
   const int num_threads = 16;
-  const int memory_to_ingest = 200 mb;
+  const int memory_to_ingest = 200_mb;
   const int mul = 64;
   const int num_keys =
-      memory_to_ingest / ((1 kb + (mul * num_threads / 2)) * num_threads);
+      memory_to_ingest / ((1_kb + (mul * num_threads / 2)) * num_threads);
   // total estimated ingest is:
   // (1 kb + mul * (num_threads/2)) * num_keys * num_threads
 
@@ -552,7 +547,7 @@ TEST_F(GlobalWriteControllerTest, GlobalAndWBMStressTest) {
 
   std::function<void(DB*, int)> write_db = [&](DB* db, int seed) {
     auto var = mul * seed;
-    std::string value(1 kb + var, 'x');
+    std::string value(1_kb + var, 'x');
     for (int i = 0; i < num_keys; i++) {
       Status s = db->Put(wo, Key(i), value);
       if (!s.ok()) {

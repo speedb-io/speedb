@@ -318,7 +318,7 @@ void CompactionJob::AcquireSubcompactionResources(
           mutable_db_options_copy_.max_background_compactions,
           mutable_db_options_copy_.max_background_jobs,
           versions_->GetColumnFamilySet()
-              ->write_controller()
+              ->write_controller_ptr()
               ->NeedSpeedupCompaction())
           .max_compactions;
   InstrumentedMutexLock l(db_mutex_);

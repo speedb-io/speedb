@@ -280,8 +280,8 @@ class WriteBufferManager final {
   // which the WBM is responsible for updating (when stalling is allowed).
   // each time db is opened with this WC-WBM, add a ref count so we know when
   // to remove this WC from the WBM when the last is no longer used.
-  void RegisterWriteController(WriteController* wc);
-  void DeregisterWriteController(WriteController* wc);
+  void RegisterWriteController(std::shared_ptr<WriteController> wc);
+  void DeregisterWriteController(std::shared_ptr<WriteController> wc);
 
  private:
   // The usage + delay factor are coded in a single (atomic) uint64_t value as
@@ -316,7 +316,7 @@ class WriteBufferManager final {
  private:
   // returns true if wc was removed from controllers_to_refcount_map_
   // which means its ref count reached 0.
-  bool RemoveFromControllersMap(WriteController* wc);
+  bool RemoveFromControllersMap(std::shared_ptr<WriteController> wc);
 
   void UpdateControllerDelayState();
 
@@ -328,7 +328,8 @@ class WriteBufferManager final {
   // the WBM needs to update them when its delay requirements change.
   // the key is the WC to update and the value is a ref count of how many dbs
   // are using this WC with the WBM.
-  std::unordered_map<WriteController*, uint64_t> controllers_to_refcount_map_;
+  std::unordered_map<std::shared_ptr<WriteController>, uint64_t>
+      controllers_to_refcount_map_;
   std::mutex controllers_map_mutex_;
 
  private:

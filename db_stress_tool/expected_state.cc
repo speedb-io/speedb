@@ -484,7 +484,7 @@ class ExpectedStateTraceRecordHandler : public TraceRecord::Handler,
         StripTimestampFromUserKey(begin_key_with_ts, FLAGS_user_timestamp_size);
     Slice end_key =
         StripTimestampFromUserKey(end_key_with_ts, FLAGS_user_timestamp_size);
-    uint64_t begin_key_id, end_key_id;
+    uint64_t begin_key_id = 0, end_key_id = 0;
     if (!GetIntVal(begin_key.ToString(), &begin_key_id)) {
       return Status::Corruption("unable to parse begin key",
                                 begin_key.ToString());

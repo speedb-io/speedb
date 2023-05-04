@@ -9,7 +9,7 @@ jobs:
     #runs-on: ubuntu:20.04
     runs-on: [self-hosted, ubuntu, asrunner]
     container:
-      image: ubuntu:latest
+      image: ubuntu:focal
     steps:
     
     - name: pre

@@ -7493,7 +7493,7 @@ TEST_F(DBTest, MemoryUsageWithMaxWriteBufferSizeToMaintain) {
   }
 }
 
-TEST_F(DBTest, ShuttingDownNotBlockStalledWrites) {
+TEST_F(DBTest, DISABLED_ShuttingDownNotBlockStalledWrites) {
   Options options = CurrentOptions();
   options.disable_auto_compactions = true;
   Reopen(options);

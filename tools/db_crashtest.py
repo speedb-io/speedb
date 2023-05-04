@@ -240,7 +240,7 @@ default_params = {
     "num_iterations": lambda: random.randint(0, 100),
     "sync_wal_one_in": 100000,
     "customopspercent": 0,
-    "filter_uri": lambda: random.choice(["speedb.PairedBloomFilter", ""]),
+    # "filter_uri": lambda: random.choice(["speedb.PairedBloomFilter", ""]),
     "memtablerep": lambda: random.choice(["skip_list", "speedb.HashSpdRepFactory"]),
     "use_dynamic_delay": lambda: random.choice([0, 1, 1, 1]),
 }

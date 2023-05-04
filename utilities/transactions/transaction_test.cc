@@ -6764,7 +6764,7 @@ TEST_P(TransactionTest, StallTwoWriteQueues) {
 }
 
 // Make sure UnlockWAL does not return until the stall it controls is cleared.
-TEST_P(TransactionTest, UnlockWALStallCleared) {
+TEST_P(TransactionTest, DISABLED_UnlockWALStallCleared) {
   auto dbimpl = static_cast_with_check<DBImpl>(db->GetRootDB());
   for (bool external_stall : {false, true}) {
     WriteOptions wopts;

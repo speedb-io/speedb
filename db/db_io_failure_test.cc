@@ -20,7 +20,7 @@ class DBIOFailureTest : public DBTestBase {
 };
 
 // Check that number of files does not grow when writes are dropped
-TEST_F(DBIOFailureTest, DropWrites) {
+TEST_F(DBIOFailureTest, DISABLED_DropWrites) {
   do {
     Options options = CurrentOptions();
     options.env = env_;

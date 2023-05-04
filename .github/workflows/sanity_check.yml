@@ -1,5 +1,5 @@
 name: Check buck targets and code format
-on: [push, pull_request, workflow_call, workflow_dispatch]
+on: [push, workflow_call, workflow_dispatch]
 permissions:
   contents: read
 

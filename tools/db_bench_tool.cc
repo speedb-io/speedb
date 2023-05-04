@@ -9576,6 +9576,9 @@ int db_bench_tool_run_group(int group_num, int num_groups, int argc,
   } else {
     fprintf(stdout, "\n");
   }
+
+  benchmark->Run(group_num, num_groups);
+
   if (last_group) {
     if (FLAGS_print_malloc_stats) {
       std::string stats_string;

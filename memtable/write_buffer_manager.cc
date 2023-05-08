@@ -411,11 +411,13 @@ void WriteBufferManager::WBMSetupDelay(uint64_t delay_factor) {
 void WriteBufferManager::ResetDelay() {
   std::lock_guard<std::mutex> lock(controllers_map_mutex_);
   for (auto& wc_and_ref_count : controllers_to_refcount_map_) {
-    // make sure that controllers_to_refcount_map_ does not hold
-    // the last ref to the WC.
+    // make sure that controllers_to_refcount_map_ does not hold the last ref to
+    // the WC since holding the last ref means that the last DB that was using
+    // this WC has destructed and using this WC is no longer valid.
     assert(wc_and_ref_count.first.unique() == false);
-    if (wc_and_ref_count.first->is_dynamic_delay()) {
-      wc_and_ref_count.first->HandleRemoveDelayReq(this);
+    WriteController* wc = wc_and_ref_count.first.get();
+    if (wc->is_dynamic_delay()) {
+      wc->HandleRemoveDelayReq(this);
     }
   }
 }

@@ -703,7 +703,7 @@ def finalize_and_sanitize(src_params, counter):
         else:
             dest_params["mock_direct_io"] = True
 
-    if dest_params["test_batches_snapshots"] == 1:
+    if dest_params.get("test_batches_snapshots") == 1:
         dest_params["enable_compaction_filter"] = 0
         if dest_params["prefix_size"] < 0:
             dest_params["prefix_size"] = 1
@@ -725,7 +725,7 @@ def finalize_and_sanitize(src_params, counter):
     if (
         dest_params.get("disable_wal") == 1
         or dest_params.get("sync_fault_injection") == 1
-        or dest_params.get("manual_wal_flush_one_in") > 0
+        or dest_params.get("manual_wal_flush_one_in", 0) > 0
     ):
         # File ingestion does not guarantee prefix-recoverability when unsynced
         # data can be lost. Ingesting a file syncs data immediately that is

@@ -15,6 +15,10 @@
 #define ROCKSDB_MINOR 1
 #define ROCKSDB_PATCH 1
 
+
+#define SPEEDB_MAJOR 2
+#define SPEEDB_MINOR 3
+#define SPEEDB_PATCH 0
 // Do not use these. We made the mistake of declaring macros starting with
 // double underscore. Now we have to live with our choice. We'll deprecate these
 // at some point

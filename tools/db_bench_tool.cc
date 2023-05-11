@@ -1406,6 +1406,9 @@ DEFINE_uint64(
     "num_file_reads_for_auto_readahead indicates after how many sequential "
     "reads into that file internal auto prefetching should be start.");
 
+DEFINE_bool(use_spdb_features, true,
+            "When true use enable all the spdb features");
+
 static enum ROCKSDB_NAMESPACE::CompressionType StringToCompressionType(
     const char* ctype) {
   assert(ctype);
@@ -5134,6 +5137,23 @@ class Benchmark {
               DBWithColumnFamilies* db) {
     uint64_t open_start = FLAGS_report_open_timing ? FLAGS_env->NowNanos() : 0;
     Status s;
+    ColumnFamilyOptions cf_options(options);
+    DBOptions db_options(options);
+    if (FLAGS_use_spdb_features) {
+      size_t cache_size = FLAGS_cache_size;
+      if (cache_size == 0) {
+	cache_size = 4ul<<30;
+      }
+      int total_threads = options.max_background_jobs;
+      if (total_threads <= 0) {
+	total_threads = 16;
+      }
+	
+      db_options.EnableSpeedbFeatures(cache_size, total_threads);
+      cf_options.EnableSpeedbFeatures(&db_options);
+    }
+
+
     // Open with column families if necessary.
     if (FLAGS_num_column_families > 1) {
       size_t num_hot = FLAGS_num_column_families;
@@ -5146,7 +5166,7 @@ class Benchmark {
       std::vector<ColumnFamilyDescriptor> column_families;
       for (size_t i = 0; i < num_hot; i++) {
         column_families.push_back(ColumnFamilyDescriptor(
-            ColumnFamilyName(i), ColumnFamilyOptions(options)));
+             ColumnFamilyName(i), cf_options));
       }
       std::vector<int> cfh_idx_to_prob;
       if (!FLAGS_column_family_distribution.empty()) {

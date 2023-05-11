@@ -30,9 +30,12 @@
 #include "rocksdb/table.h"
 #include "rocksdb/table_properties.h"
 #include "rocksdb/wal_filter.h"
+#include "rocksdb/convenience.h"
 #include "rocksdb/write_buffer_manager.h"
 #include "table/block_based/block_based_table_factory.h"
 #include "util/compression.h"
+#include "db/write_controller.h"
+
 
 namespace ROCKSDB_NAMESPACE {
 
@@ -531,6 +534,33 @@ Options* Options::OldDefaults(int rocksdb_major_version,
   return this;
 }
 
+static std::shared_ptr<Cache> shared_cache;
+static std::shared_ptr<WriteController> shared_write_controller;
+static std::shared_ptr<WriteBufferManager> shared_write_buffer_manager;
+
+DBOptions* DBOptions::EnableSpeedbFeatures(size_t total_ram_size_bytes,
+					   int total_threads,
+					   size_t _delayed_write_rate) {
+  IncreaseParallelism(total_threads);
+  if (!shared_cache.get()) {    
+    shared_cache = NewLRUCache(total_ram_size_bytes);
+    if (delayed_write_rate == 0) {
+      delayed_write_rate = _delayed_write_rate;
+    }
+    
+    shared_write_controller.reset(new WriteController(true, delayed_write_rate));
+    if (db_write_buffer_size == 0 || db_write_buffer_size > total_ram_size_bytes ) {
+      db_write_buffer_size = std::max<size_t> (total_ram_size_bytes / 4, 1<<30ul);
+    }
+    shared_write_buffer_manager.reset(new WriteBufferManager(
+        db_write_buffer_size, shared_cache /*,  shared_write_controler */));
+  } 
+  bytes_per_sync = 1ul << 20;
+  use_dynamic_delay = true;
+  write_buffer_manager = shared_write_buffer_manager;
+  return this;
+}
+
 DBOptions* DBOptions::OldDefaults(int rocksdb_major_version,
                                   int rocksdb_minor_version) {
   if (rocksdb_major_version < 4 ||
@@ -549,6 +579,57 @@ DBOptions* DBOptions::OldDefaults(int rocksdb_major_version,
   wal_recovery_mode = WALRecoveryMode::kTolerateCorruptedTailRecords;
   return this;
 }
+
+ColumnFamilyOptions* ColumnFamilyOptions::EnableSpeedbFeatures(
+    const DBOptions* ) {
+  assert(shared_cache.get());
+  if (!shared_cache.get()) {
+    // error must call enable_speedb_feature on the db first
+    return this;
+  }
+  // to disable flush due to write buffer full 
+  auto db_wbf_size = shared_write_buffer_manager->buffer_size();
+  write_buffer_size = std::min<size_t> (db_wbf_size/4, 64ul<<20);
+  max_write_buffer_number = int(db_wbf_size / write_buffer_size) + 2;
+  min_write_buffer_number_to_merge = max_write_buffer_number -1;
+  
+  // set the pinning option for indexes and filters 
+  {
+    BlockBasedTableOptions block_based_table_options;
+    block_based_table_options.cache_index_and_filter_blocks = false;
+    block_based_table_options.block_cache = shared_cache;
+    auto &cache_usage_options = block_based_table_options.cache_usage_options;
+    CacheEntryRoleOptions role_options;
+    role_options.charged = CacheEntryRoleOptions::Decision::kEnabled;
+    cache_usage_options.options_overrides.insert(					 
+        {CacheEntryRole::kIndexBlock, role_options});
+    cache_usage_options.options_overrides.insert(
+        {CacheEntryRole::kFilterBlock, role_options});
+    cache_usage_options.options_overrides.insert(
+        {CacheEntryRole::kCompressionDictionaryBuildingBuffer,
+         role_options});
+    cache_usage_options.options_overrides.insert(
+        {CacheEntryRole::kFileMetadata, role_options});
+    table_factory.reset(NewBlockBasedTableFactory(block_based_table_options));
+  }
+  if (prefix_extractor) {
+    memtable_factory.reset(NewHashSkipListRepFactory());
+  } else {
+    std::string memtablerep = "speedb.HashSpdRepFactory";
+    std::string memtable_opt;
+    memtable_opt = ":" + std::to_string(0);
+    std::unique_ptr<MemTableRepFactory> unique;
+    ConfigOptions config_options;
+
+    auto s = MemTableRepFactory::CreateFromString(
+        config_options, memtablerep + memtable_opt, &unique);
+    if (s.ok()) {
+      memtable_factory.reset(unique.release());
+    }
+  }
+  return this;
+}
+
 
 ColumnFamilyOptions* ColumnFamilyOptions::OldDefaults(
     int rocksdb_major_version, int rocksdb_minor_version) {

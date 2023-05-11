@@ -107,6 +107,7 @@ struct ColumnFamilyOptions : public AdvancedColumnFamilyOptions {
   ColumnFamilyOptions* OptimizeUniversalStyleCompaction(
       uint64_t memtable_memory_budget = 512 * 1024 * 1024);
 
+ColumnFamilyOptions* EnableSpeedbFeatures(const DBOptions *db_options);
   // -------------------
   // Parameters that affect behavior
 
@@ -472,6 +473,16 @@ struct DBOptions {
   // cores. You almost definitely want to call this function if your system is
   // bottlenecked by RocksDB.
   DBOptions* IncreaseParallelism(int total_threads = 16);
+
+// enable the spdb features
+  // the first call creates objects that will be shared between all the databases
+  // please note that a call to enable speedb options in the level of cf should follow
+  DBOptions* EnableSpeedbFeatures(size_t total_ram_size_bytes = 8ul<<30,
+				  int total_threads = 16,
+				  size_t delayed_write_rate = 64ul<<20);
+
+
+
 #endif  // ROCKSDB_LITE
 
   // If true, the database will be created if it is missing.

@@ -959,6 +959,7 @@ OUTPUT_DIR ?= /tmp
 .PHONY: check_0 check_1
 check_0: $(TESTS)
 	$(AM_V_GEN)./build_tools/gtest-parallel --output_dir=$(OUTPUT_DIR) --workers=$(J) --non_gtest_tests $(NON_PARALLEL_TESTS_LIST) $(PARALLEL_TESTS_LIST)
+	find ./build_tools | grep -E "(pycache|__pycache__|\.pyc$$)" | xargs rm -rf
 
 check_1: $(TESTS)
 	$(AM_V_GEN)for t in $(TESTS); do                          \
@@ -970,6 +971,7 @@ valgrind-exclude-regexp = InlineSkipTest.ConcurrentInsert|TransactionStressTest.
 .PHONY: valgrind_check_0 valgrind_check_1
 valgrind_check_0: $(TESTS)
 	$(AM_V_GEN) $(VALGRIND_VER) $(VALGRIND_OPTS) ./build_tools/gtest-parallel --output_dir=$(OUTPUT_DIR) --workers=$(J) --non_gtest_tests $(NON_PARALLEL_TESTS_LIST) $(PARALLEL_TESTS_LIST) 
+	find ./build_tools | grep -E "(pycache|__pycache__|\.pyc$$)" | xargs rm -rf
 
 valgrind_check_1: $(TESTS)
 	$(AM_V_GEN)for t in $(filter-out %skiplist_test options_settable_test,$(TESTS)); do \

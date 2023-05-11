@@ -1265,8 +1265,8 @@ class NonBatchedOpsStressTest : public StressTest {
       std::string from_db;
       Status s = db_->Get(read_opts, cfh, k, &from_db);
       if (!VerifyOrSyncValue(rand_column_family, rand_key, read_opts, shared,
-                             /* msg_prefix */ "Pre-Put Get verification",
-                             from_db, s)) {
+                             from_db,
+                             /* msg_prefix */ "Pre-Put Get verification", s)) {
         return s;
       }
     }

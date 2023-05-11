@@ -39,6 +39,8 @@ sst_dump
 blob_dump
 block_cache_trace_analyzer
 tools/block_cache_analyzer/*.pyc
+build_tools/*.pyc
+build_tools/pycache/
 column_aware_encoding_exp
 util/build_version.cc
 build_tools/VALGRIND_LOGS/

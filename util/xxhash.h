@@ -3221,7 +3221,7 @@ enum XXH_VECTOR_TYPE /* fake enum */ {
     || (defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__) \
    )
 #    define XXH_VECTOR XXH_NEON
-#  elif defined(__AVX512F__)
+#  elif defined(__AVX512F__) && !defined(MUST_FREE_HEAP_ALLOCATIONS)
 #    define XXH_VECTOR XXH_AVX512
 #  elif defined(__AVX2__)
 #    define XXH_VECTOR XXH_AVX2
@@ -5065,7 +5065,7 @@ typedef void (*XXH3_f_initCustomSecret)(void* XXH_RESTRICT, xxh_u64);
 
 // using the functions below (AVX512), cause ASAN errors during stress testing 
 // which is why we avoid using them with MUST_FREE_HEAP_ALLOCATIONS (COMPILE_WITH_ASAN)
-#if (XXH_VECTOR == XXH_AVX512) && !defined(MUST_FREE_HEAP_ALLOCATIONS)
+#if (XXH_VECTOR == XXH_AVX512)
 
 #define XXH3_accumulate_512 XXH3_accumulate_512_avx512
 #define XXH3_accumulate     XXH3_accumulate_avx512

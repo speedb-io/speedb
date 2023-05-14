@@ -1673,9 +1673,11 @@ ColumnFamilySet::ColumnFamilySet(
   // initialize linked list
   dummy_cfd_->prev_ = dummy_cfd_;
   dummy_cfd_->next_ = dummy_cfd_;
+  write_buffer_manager_->RegisterWriteController(write_controller_);
 }
 
 ColumnFamilySet::~ColumnFamilySet() {
+  write_buffer_manager_->DeregisterWriteController(write_controller_);
   while (column_family_data_.size() > 0) {
     // cfd destructor will delete itself from column_family_data_
     auto cfd = column_family_data_.begin()->second;

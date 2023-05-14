@@ -128,7 +128,7 @@ bool WriteController::IsStopped() const {
   return total_stopped_.load(std::memory_order_relaxed) > 0;
 }
 
-// This is inside DB mutex, so we can't sleep and need to minimize
+// This is inside the calling DB mutex, so we can't sleep and need to minimize
 // frequency to get time.
 // If it turns out to be a performance issue, we can redesign the thread
 // synchronization model here.

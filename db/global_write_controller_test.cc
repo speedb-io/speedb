@@ -14,10 +14,10 @@
 
 #include "db/db_test_util.h"
 #include "db/write_controller.h"
+#include "rocksdb/write_buffer_manager.h"
 
 namespace ROCKSDB_NAMESPACE {
 
-// The param is whether dynamic_delay is used or not
 class GlobalWriteControllerTest : public DBTestBase {
  public:
   GlobalWriteControllerTest()
@@ -25,7 +25,8 @@ class GlobalWriteControllerTest : public DBTestBase {
 
   ~GlobalWriteControllerTest() { CloseAndDeleteDBs(); }
 
-  void OpenDBsAndSetWC(int num_dbs, Options& options) {
+  void OpenDBsAndSetUp(int num_dbs, Options& options, bool add_wbm = false,
+                       uint64_t buffer_size = 40_kb) {
     db_names_.clear();
     for (int i = 0; i < num_dbs; i++) {
       dbs_.push_back(nullptr);
@@ -35,10 +36,15 @@ class GlobalWriteControllerTest : public DBTestBase {
 
     options.level0_slowdown_writes_trigger = 10;
     options.level0_stop_writes_trigger = 20;
-    options.delayed_write_rate = 16 * MB;
+    options.delayed_write_rate = 16_mb;
     options.use_dynamic_delay = true;
     options.write_controller.reset(new WriteController(
         options.use_dynamic_delay, options.delayed_write_rate));
+    if (add_wbm) {
+      options.write_buffer_manager.reset(new WriteBufferManager(
+          buffer_size, {}, true /*allow_delays_and_stalls*/,
+          false /*initiate_flushes*/));
+    }
 
     for (int i = 0; i < num_dbs; i++) {
       ASSERT_OK(DestroyDB(db_names_[i], options));
@@ -78,7 +84,6 @@ class GlobalWriteControllerTest : public DBTestBase {
                                     mutable_cf_options_);
   }
 
-  uint64_t const MB = 1024 * 1024;
   Options destroy_options_;
   MutableCFOptions mutable_cf_options_;
   std::vector<std::string> db_names_;
@@ -94,24 +99,24 @@ TEST_F(GlobalWriteControllerTest, TestGetMinRate) {
   Options options = CurrentOptions();
   int num_dbs = 2;
   // one set of dbs with one Write Controller(WC)
-  OpenDBsAndSetWC(num_dbs, options);
+  OpenDBsAndSetUp(num_dbs, options);
 
   // sets db0 to 16Mbs
   SetL0delayAndRecalcConditions(0 /*db_idx*/, 10 /*l0_files*/);
 
-  ASSERT_TRUE(options.write_controller->delayed_write_rate() == 16 * MB);
-  ASSERT_TRUE(options.write_controller->TEST_GetMapMinRate() == 16 * MB);
+  ASSERT_TRUE(options.write_controller->delayed_write_rate() == 16_mb);
+  ASSERT_TRUE(options.write_controller->TEST_GetMapMinRate() == 16_mb);
 
   // sets db1 to 8Mbs
   SetL0delayAndRecalcConditions(1 /*db_idx*/, 15 /*l0_files*/);
 
-  ASSERT_TRUE(options.write_controller->delayed_write_rate() == 8 * MB);
-  ASSERT_TRUE(options.write_controller->TEST_GetMapMinRate() == 8 * MB);
+  ASSERT_TRUE(options.write_controller->delayed_write_rate() == 8_mb);
+  ASSERT_TRUE(options.write_controller->TEST_GetMapMinRate() == 8_mb);
 
   // sets db0 to 8Mbs
   SetL0delayAndRecalcConditions(0 /*db_idx*/, 15 /*l0_files*/);
-  ASSERT_TRUE(options.write_controller->delayed_write_rate() == 8 * MB);
-  ASSERT_TRUE(options.write_controller->TEST_GetMapMinRate() == 8 * MB);
+  ASSERT_TRUE(options.write_controller->delayed_write_rate() == 8_mb);
+  ASSERT_TRUE(options.write_controller->TEST_GetMapMinRate() == 8_mb);
 
   // removes delay requirement from both dbs
   SetL0delayAndRecalcConditions(0 /*db_idx*/, 9 /*l0_files*/);
@@ -128,7 +133,7 @@ TEST_F(GlobalWriteControllerTest, SharedWriteControllerAcrossDB) {
   Options options = CurrentOptions();
   int num_dbs = 2;
 
-  OpenDBsAndSetWC(num_dbs, options);
+  OpenDBsAndSetUp(num_dbs, options);
 
   ASSERT_TRUE(dbimpls_[0]->write_controller() == options.write_controller);
   ASSERT_TRUE(dbimpls_[0]->write_controller() ==
@@ -141,7 +146,7 @@ TEST_F(GlobalWriteControllerTest, NonSharedWriteControllerAcrossDB) {
   Options options = CurrentOptions();
   int num_dbs = 2;
   // one set of dbs with one Write Controller(WC)
-  OpenDBsAndSetWC(num_dbs, options);
+  OpenDBsAndSetUp(num_dbs, options);
 
   // second db with a different WC
   Options options2 = CurrentOptions();
@@ -162,49 +167,56 @@ TEST_F(GlobalWriteControllerTest, NonSharedWriteControllerAcrossDB) {
 }
 
 // test scenario 2:
-// setting up 2 dbs, put one into delay and check that the other is also
-// delayed. then remove the delay condition and check that they're not delayed.
+// setting up 2 dbs, put one into delay and verify that the other is also
+// delayed. then remove the delay condition and verify that they're not delayed.
 TEST_F(GlobalWriteControllerTest, SharedWriteControllerAcrossDB2) {
   Options options = CurrentOptions();
   int num_dbs = 2;
-  OpenDBsAndSetWC(num_dbs, options);
+  OpenDBsAndSetUp(num_dbs, options);
 
-  ASSERT_FALSE(IsDbWriteDelayed(dbimpls_[0]));
-  ASSERT_FALSE(IsDbWriteDelayed(dbimpls_[1]));
+  for (int i = 0; i < num_dbs; i++) {
+    ASSERT_FALSE(IsDbWriteDelayed(dbimpls_[i]));
+  }
 
   SetL0delayAndRecalcConditions(0 /*db_idx*/, 10 /*l0_files*/);
-  ASSERT_TRUE(IsDbWriteDelayed(dbimpls_[0]));
-  ASSERT_TRUE(IsDbWriteDelayed(dbimpls_[1]));
+  for (int i = 0; i < num_dbs; i++) {
+    ASSERT_TRUE(IsDbWriteDelayed(dbimpls_[i]));
+  }
 
   SetL0delayAndRecalcConditions(0 /*db_idx*/, 5 /*l0_files*/);
-  ASSERT_FALSE(IsDbWriteDelayed(dbimpls_[0]));
-  ASSERT_FALSE(IsDbWriteDelayed(dbimpls_[1]));
+  for (int i = 0; i < num_dbs; i++) {
+    ASSERT_FALSE(IsDbWriteDelayed(dbimpls_[i]));
+  }
 
   SetL0delayAndRecalcConditions(1 /*db_idx*/, 15 /*l0_files*/);
-  ASSERT_TRUE(IsDbWriteDelayed(dbimpls_[0]));
-  ASSERT_TRUE(IsDbWriteDelayed(dbimpls_[1]));
+  for (int i = 0; i < num_dbs; i++) {
+    ASSERT_TRUE(IsDbWriteDelayed(dbimpls_[i]));
+  }
 
   SetL0delayAndRecalcConditions(0 /*db_idx*/, 20 /*l0_files*/);
-  ASSERT_TRUE(IsDbWriteStopped(dbimpls_[0]));
-  ASSERT_TRUE(IsDbWriteStopped(dbimpls_[1]));
+  for (int i = 0; i < num_dbs; i++) {
+    ASSERT_TRUE(IsDbWriteStopped(dbimpls_[i]));
+  }
 
   SetL0delayAndRecalcConditions(0 /*db_idx*/, 9 /*l0_files*/);
-  ASSERT_TRUE(IsDbWriteDelayed(dbimpls_[0]));
-  ASSERT_TRUE(IsDbWriteDelayed(dbimpls_[1]));
+  for (int i = 0; i < num_dbs; i++) {
+    ASSERT_TRUE(IsDbWriteDelayed(dbimpls_[i]));
+  }
 
   SetL0delayAndRecalcConditions(1 /*db_idx*/, 9 /*l0_files*/);
-  ASSERT_FALSE(IsDbWriteDelayed(dbimpls_[0]));
-  ASSERT_FALSE(IsDbWriteDelayed(dbimpls_[1]));
+  for (int i = 0; i < num_dbs; i++) {
+    ASSERT_FALSE(IsDbWriteDelayed(dbimpls_[i]));
+  }
 }
 
 // test scenario 3:
-// setting up 2 dbs, put one into stop and check that the other is also stopped.
-// then remove the stop condition and check that they're both proceeding with
-// the writes.
+// setting up 2 dbs, put one into stop and verify that the other is also
+// stopped. then remove the stop condition and verify that they're both
+// proceeding with the writes.
 TEST_F(GlobalWriteControllerTest, SharedWriteControllerAcrossDB3) {
   Options options = CurrentOptions();
   int num_dbs = 2;
-  OpenDBsAndSetWC(num_dbs, options);
+  OpenDBsAndSetUp(num_dbs, options);
 
   std::vector<port::Thread> threads;
   int wait_count_db = 0;

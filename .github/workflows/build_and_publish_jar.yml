@@ -79,7 +79,7 @@ jobs:
         export the_version=${{steps.find_version.outputs.verSion}}
         cd java
         mkdir src/main/resources
-        aws s3 --profile nd7 cp --recursive s3://spdb-builder/jar_test/v$VERSION/ java/src/main/resources/
+        aws s3 --profile nd7 cp --recursive s3://spdb-builder/jar_test/v$VERSION/java/src/main/resources/
         ls -l java/src/main/resources/
         cp ../../../../../templ/pom.xml .
         mvn versions:set -DnewVersion=$VERSION-SNAPSHOT

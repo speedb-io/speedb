@@ -1,0 +1,93 @@
+# This workflow will build Speedb on a Mac OS server
+#
+# This workflow assumes the self hosted runner on a Windows machine is ready.
+# The Mac OS server must have all the tools and software required for Speedb building to be installed
+
+
+name: build all and publish jar
+
+on:
+  workflow_dispatch:
+
+jobs:
+  pre_build:
+    runs-on: ubu4mvn 
+    env:
+      VERSION_FILE: speedb/version.h
+    outputs:
+      out1: ${{ steps.find_version.outputs.verSion }}
+    
+    steps:
+    - name: 'Cleanup build folder'
+      run: |
+        ls -la ./
+        rm -rf ./* || true
+        rm -rf ./.??* || true
+        ls -la ./
+    
+    - name: 'Checkout GitHub Action'
+      uses: actions/checkout@v3
+      
+    - name: 'find_version'
+      id: 'find_version'
+      run: |
+        major=$(grep '_MAJOR\s\+[0-9]\+' "$VERSION_FILE" | sed 's/[^0-9]\+//') && echo $major
+        minor=$(grep '_MINOR\s\+[0-9]\+' "$VERSION_FILE" | sed 's/[^0-9]\+//') && echo $minor
+        patch=$(( $(grep '_PATCH\s\+[0-9]\+' "$VERSION_FILE" | sed 's/[^0-9]\+//') + 1 )) && echo $patch
+        echo "verSion=$major.$minor.$patch"  >> $GITHUB_OUTPUT
+       
+  Mac_i86_Bld:
+    needs: pre_build
+    uses: ./.github/workflows/ci_macos.yml
+    with:
+      verSion: ${{ needs.pre_build.outputs.out1 }}     
+  
+  Windows_Bld:
+    needs: pre_build
+    uses: ./.github/workflows/ci_windows.yml
+    with:
+      verSion: ${{ needs.pre_build.outputs.out1 }}
+    secrets:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_BUCKET: ${{ secrets.AWS_BUCKET }}
+ 
+  Build_and_upload:
+    needs: [pre_build, Mac_i86_Bld, Windows_Bld]
+    runs-on: ubu4mvn 
+    env:
+      VERSION_FILE: speedb/version.h
+      VERSION: ${{needs.pre_build.outputs.out1}}
+    outputs:
+      out1: ${{ steps.find_version.outputs.verSion }}
+    
+    steps:
+    - name: 'Cleanup build folder'
+      run: |
+        ls -la ./
+        rm -rf ./* || true
+        rm -rf ./.??* || true
+        ls -la ./
+    
+    - name: 'Checkout GitHub Action'
+      uses: actions/checkout@v3
+      
+    - name: 'build'
+      run: |
+        export JAVA_HOME="$(jrunscript -e 'java.lang.System.out.println(java.lang.System.getProperty("java.home"));')"
+        export LIB_JAVA_VERSION=11.0.17
+        export the_version=${{steps.find_version.outputs.verSion}}
+        cd java
+        mkdir src/main/resources
+        aws s3 --profile nd7 cp --recursive s3://spdb-builder/jar_test/v$VERSION/ java/src/main/resources/
+        ls -l java/src/main/resources/
+        cp ../../../../../templ/pom.xml .
+        mvn versions:set -DnewVersion=$VERSION-SNAPSHOT
+        mvn deploy -X -e -DskipTests
+        
+        mvn versions:set -DnewVersion=$the_version
+        #mvn clean deploy -P release -X -e -DskipTests
+        
+    - name: show path
+      run: |
+        echo "versions:set -DnewVersion=$VERSION-SNAPSHOT"

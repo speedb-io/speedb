@@ -7,6 +7,19 @@
 name: Build on Windows 
 
 on:
+  workflow_call:
+    inputs:
+      verSion:
+        required: true
+        type: string
+    secrets:
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
+      AWS_BUCKET: 
+        required: true
+        
   workflow_dispatch:
 
 jobs:
@@ -25,3 +38,16 @@ jobs:
         cd runner_bld
         cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=20 -DJNI=1 -DGFLAGS=1 -DSNAPPY=1 -DLZ4=1 -DZLIB=1 -DZSTD=1 -DXPRESS=1 -DFAIL_ON_WARNINGS=0 ..
         msbuild speedb.sln /p:Configuration=Release /t:speedbjni-shared
+   
+    - name: Upload artifacts to S3
+      if: inputs.verSion != ' '
+      uses: NotCoffee418/s3-zip-upload@v1
+      env:
+        AWS_SECRET_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_BUCKET: ${{ secrets.AWS_BUCKET }}
+        BUCKET_NAME: spdb-builder
+        AWS_REGION:  us-east-1
+        SOURCE_MODE: FILE
+        SOURCE_PATH: runner_bld\java\Release\speedbjni-shared.dll
+        DEST_FILE: jar_test/v${{ inputs.verSion }}/speedbjni-shared.dll

@@ -214,58 +214,82 @@ TEST_F(DBTest, WriteEmptyBatch) {
 
 TEST_F(DBTest, SkipDelay) {
   Options options = CurrentOptions();
-  options.env = env_;
-  options.write_buffer_size = 100000;
-  CreateAndReopenWithCF({"pikachu"}, options);
+  for (bool dynamic_delay : {true, false}) {
+    options.use_dynamic_delay = dynamic_delay;
+    options.env = env_;
+    options.write_buffer_size = 100000;
+    DestroyAndReopen(options);
+    CreateAndReopenWithCF({"pikachu"}, options);
 
-  for (bool sync : {true, false}) {
-    for (bool disableWAL : {true, false}) {
-      if (sync && disableWAL) {
-        // sync and disableWAL is incompatible.
-        continue;
+    for (bool sync : {true, false}) {
+      for (bool disableWAL : {true, false}) {
+        if (sync && disableWAL) {
+          // sync and disableWAL is incompatible.
+          continue;
+        }
+        // Use a small number to ensure a large delay that is still effective
+        // when we do Put
+        // TODO(myabandeh): this is time dependent and could potentially make
+        // the test flaky
+        std::unique_ptr<rocksdb::WriteControllerToken> token;
+        auto write_controller = dbfull()->write_controller_ptr();
+        if (write_controller->is_dynamic_delay()) {
+          write_controller->HandleNewDelayReq(this, 1);
+        } else {
+          token = write_controller->GetDelayToken(1);
+        }
+        std::atomic<int> sleep_count(0);
+        ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
+            "DBImpl::DelayWrite:Sleep",
+            [&](void* /*arg*/) { sleep_count.fetch_add(1); });
+        std::atomic<int> wait_count(0);
+        ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
+            "DBImpl::DelayWrite:Wait",
+            [&](void* /*arg*/) { wait_count.fetch_add(1); });
+        ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->EnableProcessing();
+
+        WriteOptions wo;
+        wo.sync = sync;
+        wo.disableWAL = disableWAL;
+        wo.no_slowdown = true;
+        // Large enough to exceed allowance for one time interval
+        std::string large_value(1024, 'x');
+        // Perhaps ideally this first write would fail because of delay, but
+        // the current implementation does not guarantee that.
+        dbfull()->Put(wo, "foo", large_value).PermitUncheckedError();
+        // We need the 2nd write to trigger delay. This is because delay is
+        // estimated based on the last write size which is 0 for the first
+        // write.
+        ASSERT_NOK(dbfull()->Put(wo, "foo2", large_value));
+        ASSERT_GE(sleep_count.load(), 0);
+        ASSERT_GE(wait_count.load(), 0);
+        if (write_controller->is_dynamic_delay()) {
+          write_controller->HandleRemoveDelayReq(this);
+        } else {
+          token.reset();
+        }
+
+        if (write_controller->is_dynamic_delay()) {
+          write_controller->HandleNewDelayReq(this, 1000000);
+        } else {
+          token = write_controller->GetDelayToken(1000000);
+        }
+        wo.no_slowdown = false;
+        ASSERT_OK(dbfull()->Put(wo, "foo3", large_value));
+        ASSERT_GE(sleep_count.load(), 1);
+        if (write_controller->is_dynamic_delay()) {
+          write_controller->HandleRemoveDelayReq(this);
+        } else {
+          token.reset();
+        }
       }
-      // Use a small number to ensure a large delay that is still effective
-      // when we do Put
-      // TODO(myabandeh): this is time dependent and could potentially make
-      // the test flaky
-      auto token = dbfull()->write_controller_ptr()->GetDelayToken(1);
-      std::atomic<int> sleep_count(0);
-      ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
-          "DBImpl::DelayWrite:Sleep",
-          [&](void* /*arg*/) { sleep_count.fetch_add(1); });
-      std::atomic<int> wait_count(0);
-      ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
-          "DBImpl::DelayWrite:Wait",
-          [&](void* /*arg*/) { wait_count.fetch_add(1); });
-      ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->EnableProcessing();
-
-      WriteOptions wo;
-      wo.sync = sync;
-      wo.disableWAL = disableWAL;
-      wo.no_slowdown = true;
-      // Large enough to exceed allowance for one time interval
-      std::string large_value(1024, 'x');
-      // Perhaps ideally this first write would fail because of delay, but
-      // the current implementation does not guarantee that.
-      dbfull()->Put(wo, "foo", large_value).PermitUncheckedError();
-      // We need the 2nd write to trigger delay. This is because delay is
-      // estimated based on the last write size which is 0 for the first write.
-      ASSERT_NOK(dbfull()->Put(wo, "foo2", large_value));
-      ASSERT_GE(sleep_count.load(), 0);
-      ASSERT_GE(wait_count.load(), 0);
-      token.reset();
-
-      token = dbfull()->write_controller_ptr()->GetDelayToken(1000000);
-      wo.no_slowdown = false;
-      ASSERT_OK(dbfull()->Put(wo, "foo3", large_value));
-      ASSERT_GE(sleep_count.load(), 1);
-      token.reset();
     }
   }
 }
 
 TEST_F(DBTest, MixedSlowdownOptions) {
   Options options = CurrentOptions();
+  options.use_dynamic_delay = false;
   options.env = env_;
   options.write_buffer_size = 100000;
   CreateAndReopenWithCF({"pikachu"}, options);
@@ -327,6 +351,7 @@ TEST_F(DBTest, MixedSlowdownOptions) {
 
 TEST_F(DBTest, MixedSlowdownOptionsInQueue) {
   Options options = CurrentOptions();
+  options.use_dynamic_delay = false;
   options.env = env_;
   options.write_buffer_size = 100000;
   CreateAndReopenWithCF({"pikachu"}, options);

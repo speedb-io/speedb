@@ -1,12 +1,125 @@
 # Speedb Change Log 
 
-## Blueberry 2.1.0 (10/26/2022)
-## New Features
+
+## Speedb v2.4.1 ( 04/19/2023)
+### Enhancement
+* Add the ability to create any Filter Policy in java (including ribbon filter and the Speedb paired bloom filter) by @mrambacher in #387
+
+### Bug Fix
+* Write Flow: Reduce debug log size. Note: the write flow is still experimental in this release (#461) by @ayulas in #472
+
+## Ephedra v2.4.0 (04/05/2023)
+### New Features
+* New beezcli: Interactive CLI that offers data access and admin commands by @ofriedma in #427
+* Global delayed write rate: manage the delayed write rate across multiple CFs/databases by @Yuval-Ariel in #392
+* New write flow: Major improvement of writing while reading. Note: This feature is experimental and it consumes slightly more memory in this release by @ayulas in #445
+
+### Enhancements
+* Skip expired object while using DBWithTtl by @ofriedma in #403
+
+### Bug Fixes
+* Dynamic delay writes: fix pending bytes rate calculation by @Yuval-Ariel in #451
+* Global delay write: check again credits under mutex by @Yuval-Ariel in #438
+
+### Miscellaneous
+* Add back accidental revert in DropRandomUnsyncedData by @mrambacher in #402
+* Add speedb licenses to code by @ofriedma in #409
+* Enforce writing licenses inside a source file by @ofriedma in #410
+* Makefile: Use speedb libs in build_size target by @AmnonHanuhov in #399
+* Replace uint with unsinged int (Windows Build Failure) (#420) by @udi-speedb in #421
+* crashtest: dont reroll skip_list or HashSpdRepFactory by @Yuval-Ariel in #452
+* Options: Forward declare WriteBufferManager by @AmnonHanuhov in #433
+
+## Dragon Fruit v2.3.0 (02/15/2023)
+Based on RocksDB 7.7.8
+
+### New Features
+* New Live configuration changes: support changing immutable options on the fly by @mrambacher in #294
+
+### Enhancements
+* Improved performance while using the sorted-hash memtable (#298) by @ayulas in #299
+* Added prints and query option of Index size per CF - LRU Cache Only (#338) by @udi-speedb in #368
+* Add F_BARRIERFSYNC for Sync operations on MacOS (addresses the issue raised in rocksdb#11035) by @mrambacher in #319
+* Paired-Bloom-Filter: Balancing rounding to batches between the bottom-most level and other levels by @noamhaham in #371
+* db_bench: recreate only specified DBs in a group of benchmarks by @andy-byers in #370
+* Use a NoSyncFileSystem to skip Sync/FSync to reduce test times ( based on RocksDB PR 9545) by @mrambacher in #380
+
+### Bug Fixes
+* Delayed Writes: fix L0 calc bug by @Yuval-Ariel in #311
+* util: Fixed compilation failure on Fedora 35 with gcc 11.2.1 and gflag 2.2.2  by @AmnonHanuhov in #396
+* Fixed compilation failure on windows  by @ayulas in #384
+* Fixed compilation issues on Mac by @mrambacher in #393
+* Use the Test Name for the dbname when running unit tests by @mrambacher in #353
+
+### Miscellaneous
+* Added Speedb is awesome example to the getting started section by @RoyBenMoshe in #382
+* unit tests: fix CompactionServiceTest.RemoteEventListener (#314) by @Yuval-Ariel in #354
+* Artifacts check tool - readme file was updated by @RoyBenMoshe in #293
+* Don't use AVX512 with asan by @Yuval-Ariel in #398
+
+
+## Speedb v2.2.1 (01/30/2023)
+Based on RocksDB 7.7.8
+
+### Bug Fixes
+* Delayed Writes: fixed L0 calculation bug by @Yuval-Ariel in #311
+
+### Miscellaneous
+* Added WBM's cache info to the log (#312) by @udi-speedb in #313
+* db_bench: set db_bench defaults to Speedb (#61) by @Yuval-Ariel in #322
+* build: remove the dependency on GNU Parallel for running unit tests by @AmnonHanuhov in #243
+
+## Coconut v2.2.0 (12/22/2022)
+Based on RocksDB 7.7.3
+
+### New Features
+* Proactive flushes for better resources utilization by @udi-speedb #185
+* Dynamic delayed write mechanism for consistent performance by @Yuval-Ariel in #281
+
+### Enhancements 
+* Paired block bloom: Removed the bits-per-key limitation for better results by @udi-speedb in #163
+* Allow running multiple benchmark, each with its own configuration by @udi-speedb in #250
+* db_bench: Support '--groups' in addition to '-groups' (#283) by @udi-speedb in #295
+* db_stress enhancement: Support control over WBM's allow_stall by @udi-speedb in #289
+* Shorten latency while switch generic memtable by @ayulas in #297
+
+### Bug Fixes
+* db_bench: bug fix inserted in #200 (#263) by @Yuval-Ariel in #265
+* db_bench: ErrorExit from static func bug (#277) by @Yuval-Ariel in #278
+* Proactive Flushes: compilation warnings fix (#304) by @Yuval-Ariel in #307
+
+### Miscellaneous
+Added info to the log file for artifact testing by @RoyBenMoshe in #286
+Disable LoadCustomizableTest.LoadMemTableRepFactoryTest (#303) by @ayulas in #305
+
+## Speedb v2.1.1 (11/15/2022)
+### Bug Fixes
+* Shorten latency while switch memtable (#14)
+* Fixed a crash that occurred when using the hash memtable. (#98)
+* memtable_list: avoid rolling back memtable flush on CF drop (#144)
+* crashtest: fix 0 value of data_block_hash_table_util_ratio (#214)
+* deletefile_test: fix breakage caused by the compaction threads change (#218)
+* cmake: clean up on successful runs and randomise test scheduling (#202)
+* build: add a version build-tag for non-release builds (#156)
+* build: support ccache and sccache in the Makefile build (#170)
+* docs: fix instructions for building Speedb in README.md and INSTALL.md
+* readme typo fix by @azmisaquib (#223)
+* build_version: apply the build tag to the Speedb version string (#231)
+* build: correctly handle merge commits when calculating a build tag (#207)
+* db_test2: fix BackgroundPurgeTest (#236)
+* Update HISTORY.md (#239)
+* db_bench: Fix a bug when destructing a Benchmark with multiple db-s (#234)
+* db_bench: add benchmark - seektodeletedranges (#201)
+
+
+## Blueberry v2.1.0 (10/26/2022) 
+Based on RocksDB 7.2.2
+### New Features
 * Added new Paired bloom filter that reduces false positive rate with the same performance and memory. In some configurations, the memory consumption is even reduced by up to 30%.
 Note: Paired bloom filter is recommended to use when the number of bits per key is larger than 10. (#54)
 * Added Plugin Tests to builds (#143)
 
-## Enhancements
+### Enhancements
 * The default value for the number of compaction threads has changed to 8 (#194)
 * An infrastructure addition for a future feature: added API to retrieve the amount of immutable memory that can be freed. (#113)
 * cmake: allow running the tests in parallel like in the Makefile (#103)
@@ -16,7 +129,7 @@ Note: Paired bloom filter is recommended to use when the number of bits per key 
 * Added db_bench option to change the parameter: avoid_unnecessary_blocking_io (#184)
 * Allow construction of Filter Policy from uri to the tools (#83)
 
-## Miscellaneous
+### Miscellaneous
 * Remove the GPL as an alternative license (#119)
 * Fix shell tab-completions in makefile (#148)
 * Added Speedb change-log to the HISTORY.md file (#189)
@@ -24,12 +137,13 @@ Note: Paired bloom filter is recommended to use when the number of bits per key 
 * Change the name of the output artifacts to Speedb (#66)
 
 
-## Apricot 2.0.0 (08/04/2022)
-## New Features
+## Apricot v2.0.0 (08/04/2022)
+Based on RocksDB 7.2.2 
+### New Features
 * Added a new hash based memtable that supports concurrent reads and writes
 * Added ability to create MemTableFactory from URI/string to tools
 
-## Bug Fixes
+### Bug Fixes
 * Avoid comparing Status using == as it compares only status codes. The comparison breaks when comparing against status::NoSpace() since it has a status code of `Code::kIOError` and only a subcode of `SubCode::kNoSpace`
 * Fixed snapshots leak in optimistic_transaction_example: whenever the example is run under ASan, snapshots are acquired but not released, resulting in a memory leak error.
 * ldb: fix get to print the entire value

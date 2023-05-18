@@ -4916,17 +4916,19 @@ class Benchmark {
     options.track_and_verify_wals_in_manifest =
         FLAGS_track_and_verify_wals_in_manifest;
 
-    if (FLAGS_cost_write_buffer_to_cache || FLAGS_db_write_buffer_size != 0 ||
-        (FLAGS_initiate_wbm_flushes !=
-         ROCKSDB_NAMESPACE::WriteBufferManager::kDfltInitiateFlushes)) {
-      WriteBufferManager::FlushInitiationOptions flush_initiation_options;
-      if (FLAGS_max_num_parallel_flushes > 0U) {
-        flush_initiation_options.max_num_parallel_flushes =
-            FLAGS_max_num_parallel_flushes;
-      }
-
+    // Write-Buffer-Manager
+    WriteBufferManager::FlushInitiationOptions flush_initiation_options;
+    if (FLAGS_max_num_parallel_flushes > 0U) {
+      flush_initiation_options.max_num_parallel_flushes =
+          FLAGS_max_num_parallel_flushes;
+    }
+    if (FLAGS_cost_write_buffer_to_cache) {
       options.write_buffer_manager.reset(new WriteBufferManager(
           FLAGS_db_write_buffer_size, cache_, FLAGS_allow_wbm_stalls,
+          FLAGS_initiate_wbm_flushes, flush_initiation_options));
+    } else {
+      options.write_buffer_manager.reset(new WriteBufferManager(
+          FLAGS_db_write_buffer_size, {} /* cache */, FLAGS_allow_wbm_stalls,
           FLAGS_initiate_wbm_flushes, flush_initiation_options));
     }
 

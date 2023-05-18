@@ -199,6 +199,7 @@ DBImpl::DBImpl(const DBOptions& options, const std::string& dbname,
       nonmem_write_thread_(immutable_db_options_),
       write_controller_(immutable_db_options_.write_controller),
       last_batch_group_size_(0),
+      snapshots_(immutable_db_options_.clock),
       unscheduled_flushes_(0),
       unscheduled_compactions_(0),
       bg_bottom_compaction_scheduled_(0),
@@ -3714,27 +3715,22 @@ Status DBImpl::GetTimestampedSnapshots(
 
 SnapshotImpl* DBImpl::GetSnapshotImpl(bool is_write_conflict_boundary,
                                       bool lock) {
-  int64_t unix_time = 0;
-  immutable_db_options_.clock->GetCurrentTime(&unix_time)
-      .PermitUncheckedError();  // Ignore error
-  SnapshotImpl* s = new SnapshotImpl;
+  if (!is_snapshot_supported_) {
+    return nullptr;
+  }
+  SnapshotImpl* snapshot = snapshots_.RefSnapshot(is_write_conflict_boundary,
+                                                  GetLastPublishedSequence());
+  if (snapshot) {
+    return snapshot;
+  }
 
   if (lock) {
     mutex_.Lock();
   } else {
     mutex_.AssertHeld();
   }
-  // returns null if the underlying memtable does not support snapshot.
-  if (!is_snapshot_supported_) {
-    if (lock) {
-      mutex_.Unlock();
-    }
-    delete s;
-    return nullptr;
-  }
-  auto snapshot_seq = GetLastPublishedSequence();
-  SnapshotImpl* snapshot =
-      snapshots_.New(s, snapshot_seq, unix_time, is_write_conflict_boundary);
+  snapshot =
+      snapshots_.New(GetLastPublishedSequence(), is_write_conflict_boundary);
   if (lock) {
     mutex_.Unlock();
   }
@@ -3744,10 +3740,11 @@ SnapshotImpl* DBImpl::GetSnapshotImpl(bool is_write_conflict_boundary,
 std::pair<Status, std::shared_ptr<const SnapshotImpl>>
 DBImpl::CreateTimestampedSnapshotImpl(SequenceNumber snapshot_seq, uint64_t ts,
                                       bool lock) {
-  int64_t unix_time = 0;
-  immutable_db_options_.clock->GetCurrentTime(&unix_time)
-      .PermitUncheckedError();  // Ignore error
-  SnapshotImpl* s = new SnapshotImpl;
+  // returns null if the underlying memtable does not support snapshot.
+  if (!is_snapshot_supported_) {
+    return std::make_pair(
+        Status::NotSupported("Memtable does not support snapshot"), nullptr);
+  }
 
   const bool need_update_seq = (snapshot_seq != kMaxSequenceNumber);
 
@@ -3756,16 +3753,6 @@ DBImpl::CreateTimestampedSnapshotImpl(SequenceNumber snapshot_seq, uint64_t ts,
   } else {
     mutex_.AssertHeld();
   }
-  // returns null if the underlying memtable does not support snapshot.
-  if (!is_snapshot_supported_) {
-    if (lock) {
-      mutex_.Unlock();
-    }
-    delete s;
-    return std::make_pair(
-        Status::NotSupported("Memtable does not support snapshot"), nullptr);
-  }
-
   // Caller is not write thread, thus didn't provide a valid snapshot_seq.
   // Obtain seq from db.
   if (!need_update_seq) {
@@ -3815,7 +3802,6 @@ DBImpl::CreateTimestampedSnapshotImpl(SequenceNumber snapshot_seq, uint64_t ts,
       if (lock) {
         mutex_.Unlock();
       }
-      delete s;
       return std::make_pair(status, ret);
     } else {
       status.PermitUncheckedError();
@@ -3823,7 +3809,7 @@ DBImpl::CreateTimestampedSnapshotImpl(SequenceNumber snapshot_seq, uint64_t ts,
   }
 
   SnapshotImpl* snapshot =
-      snapshots_.New(s, snapshot_seq, unix_time,
+      snapshots_.New(snapshot_seq,
                      /*is_write_conflict_boundary=*/true, ts);
 
   std::shared_ptr<const SnapshotImpl> ret(
@@ -3870,9 +3856,13 @@ void DBImpl::ReleaseSnapshot(const Snapshot* s) {
     return;
   }
   const SnapshotImpl* casted_s = reinterpret_cast<const SnapshotImpl*>(s);
+  if (snapshots_.UnRefSnapshot(casted_s)) {
+    return;
+  }
   {
     InstrumentedMutexLock l(&mutex_);
     snapshots_.Delete(casted_s);
+    std::unique_lock<std::mutex> snapshotlist_lock(snapshots_.lock_);
     uint64_t oldest_snapshot;
     if (snapshots_.empty()) {
       oldest_snapshot = GetLastPublishedSequence();
@@ -3913,7 +3903,6 @@ void DBImpl::ReleaseSnapshot(const Snapshot* s) {
       bottommost_files_mark_threshold_ = new_bottommost_files_mark_threshold;
     }
   }
-  delete casted_s;
 }
 
 Status DBImpl::GetPropertiesOfAllTables(ColumnFamilyHandle* column_family,

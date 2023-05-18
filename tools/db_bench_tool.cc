@@ -4916,16 +4916,9 @@ class Benchmark {
     options.track_and_verify_wals_in_manifest =
         FLAGS_track_and_verify_wals_in_manifest;
 
-    if (FLAGS_db_write_buffer_size == 0) {
-      if (FLAGS_allow_wbm_stalls) {
-        ErrorExit("-allow_wbm_stalls is useless if db_write_buffer_size == 0");
-      }
-      if (FLAGS_initiate_wbm_flushes) {
-        ErrorExit(
-            "-initiate_wbm_flushes is useless if db_write_buffer_size == 0");
-      }
-    }
-    if (FLAGS_cost_write_buffer_to_cache || FLAGS_db_write_buffer_size != 0) {
+    if (FLAGS_cost_write_buffer_to_cache || FLAGS_db_write_buffer_size != 0 ||
+        (FLAGS_initiate_wbm_flushes !=
+         ROCKSDB_NAMESPACE::WriteBufferManager::kDfltInitiateFlushes)) {
       WriteBufferManager::FlushInitiationOptions flush_initiation_options;
       if (FLAGS_max_num_parallel_flushes > 0U) {
         flush_initiation_options.max_num_parallel_flushes =

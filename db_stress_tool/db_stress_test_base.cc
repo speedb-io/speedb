@@ -3095,7 +3095,9 @@ void InitializeOptionsFromFlags(
   block_based_options.num_file_reads_for_auto_readahead =
       FLAGS_num_file_reads_for_auto_readahead;
   options.table_factory.reset(NewBlockBasedTableFactory(block_based_options));
-  if (FLAGS_db_write_buffer_size > 0) {
+  if (FLAGS_db_write_buffer_size > 0 ||
+      (FLAGS_initiate_wbm_flushes !=
+       ROCKSDB_NAMESPACE::WriteBufferManager::kDfltInitiateFlushes)) {
     WriteBufferManager::FlushInitiationOptions flush_initiation_options;
     if (FLAGS_max_num_parallel_flushes > 0U) {
       flush_initiation_options.max_num_parallel_flushes =

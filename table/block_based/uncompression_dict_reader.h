@@ -22,10 +22,10 @@
 
 #include <cassert>
 
+#include "rocksdb/compressor.h"
 #include "rocksdb/table_pinning_policy.h"
 #include "table/block_based/cachable_entry.h"
 #include "table/format.h"
-#include "util/compressor.h"
 
 namespace ROCKSDB_NAMESPACE {
 

@@ -79,6 +79,7 @@ AdvancedColumnFamilyOptions::AdvancedColumnFamilyOptions(const Options& options)
       bloom_locality(options.bloom_locality),
       arena_block_size(options.arena_block_size),
       compression_per_level(options.compression_per_level),
+      compressor_per_level(options.compressor_per_level),
       num_levels(options.num_levels),
       level0_slowdown_writes_trigger(options.level0_slowdown_writes_trigger),
       level0_stop_writes_trigger(options.level0_stop_writes_trigger),
@@ -121,6 +122,7 @@ AdvancedColumnFamilyOptions::AdvancedColumnFamilyOptions(const Options& options)
       min_blob_size(options.min_blob_size),
       blob_file_size(options.blob_file_size),
       blob_compression_type(options.blob_compression_type),
+      blob_compressor(options.blob_compressor),
       enable_blob_garbage_collection(options.enable_blob_garbage_collection),
       blob_garbage_collection_age_cutoff(
           options.blob_garbage_collection_age_cutoff),

@@ -16,7 +16,7 @@
 #include "options/options_helper.h"
 #include "port/port.h"
 #include "port/stack_trace.h"
-#include "rocksdb/compression_type.h"
+#include "rocksdb/compressor.h"
 #include "rocksdb/db.h"
 #include "rocksdb/file_system.h"
 #include "table/block_based/block_based_table_builder.h"
@@ -25,7 +25,6 @@
 #include "table/format.h"
 #include "test_util/testharness.h"
 #include "test_util/testutil.h"
-#include "util/compressor.h"
 #include "util/random.h"
 
 namespace ROCKSDB_NAMESPACE {

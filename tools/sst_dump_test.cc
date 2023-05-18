@@ -11,6 +11,7 @@
 
 #include "file/random_access_file_reader.h"
 #include "port/stack_trace.h"
+#include "rocksdb/compressor.h"
 #include "rocksdb/convenience.h"
 #include "rocksdb/filter_policy.h"
 #include "rocksdb/sst_dump_tool.h"
@@ -18,7 +19,6 @@
 #include "table/table_builder.h"
 #include "test_util/testharness.h"
 #include "test_util/testutil.h"
-#include "util/compressor.h"
 
 namespace ROCKSDB_NAMESPACE {
 

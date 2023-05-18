@@ -9,11 +9,11 @@
 
 #pragma once
 #include "memory/memory_allocator_impl.h"
+#include "rocksdb/compressor.h"
 #include "table/block_based/block.h"
 #include "table/block_based/block_type.h"
 #include "table/format.h"
 #include "table/persistent_cache_options.h"
-#include "util/compressor.h"
 
 namespace ROCKSDB_NAMESPACE {
 

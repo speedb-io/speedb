@@ -1931,9 +1931,8 @@ Status DBImpl::ReFitLevel(ColumnFamilyData* cfd, int level, int target_level) {
                 ->compaction_style) /* output file size limit, not applicable */
         ,
         LLONG_MAX /* max compaction bytes, not applicable */,
-        0 /* output path ID, not applicable */, mutable_cf_options.compression,
-        mutable_cf_options.compression_opts, Temperature::kUnknown,
-        0 /* max_subcompactions, not applicable */,
+        0 /* output path ID, not applicable */, mutable_cf_options.compressor,
+        Temperature::kUnknown, 0 /* max_subcompactions, not applicable */,
         {} /* grandparents, not applicable */, false /* is manual */,
         "" /* trim_ts */, -1 /* score, not applicable */,
         false /* is deletion compaction, not applicable */,
@@ -4130,7 +4129,8 @@ void DBImpl::BuildCompactionJobInfo(
   compaction_job_info->stats = compaction_job_stats;
   compaction_job_info->table_properties = c->GetTableProperties();
   compaction_job_info->compaction_reason = c->compaction_reason();
-  compaction_job_info->compression = c->output_compression();
+  compaction_job_info->compression =
+      c->output_compressor()->GetCompressionType();
 
   const ReadOptions read_options(Env::IOActivity::kCompaction);
   for (size_t i = 0; i < c->num_input_levels(); ++i) {
@@ -4155,7 +4155,7 @@ void DBImpl::BuildCompactionJobInfo(
         newf.first, file_number, meta.oldest_blob_file_number});
   }
   compaction_job_info->blob_compression_type =
-      c->mutable_cf_options()->blob_compression_type;
+      c->mutable_cf_options()->blob_compressor->GetCompressionType();
 
   // Update BlobFilesInfo.
   for (const auto& blob_file : c->edit()->GetBlobFileAdditions()) {

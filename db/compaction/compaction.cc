@@ -238,12 +238,11 @@ Compaction::Compaction(
     const MutableDBOptions& _mutable_db_options,
     std::vector<CompactionInputFiles> _inputs, int _output_level,
     uint64_t _target_file_size, uint64_t _max_compaction_bytes,
-    uint32_t _output_path_id, CompressionType _compression,
-    CompressionOptions _compression_opts, Temperature _output_temperature,
-    uint32_t _max_subcompactions, std::vector<FileMetaData*> _grandparents,
-    bool _manual_compaction, const std::string& _trim_ts, double _score,
-    bool _deletion_compaction, bool l0_files_might_overlap,
-    CompactionReason _compaction_reason,
+    uint32_t _output_path_id, const std::shared_ptr<Compressor>& _compressor,
+    Temperature _output_temperature, uint32_t _max_subcompactions,
+    std::vector<FileMetaData*> _grandparents, bool _manual_compaction,
+    const std::string& _trim_ts, double _score, bool _deletion_compaction,
+    bool l0_files_might_overlap, CompactionReason _compaction_reason,
     BlobGarbageCollectionPolicy _blob_garbage_collection_policy,
     double _blob_garbage_collection_age_cutoff)
     : input_vstorage_(vstorage),
@@ -258,8 +257,7 @@ Compaction::Compaction(
       number_levels_(vstorage->num_levels()),
       cfd_(nullptr),
       output_path_id_(_output_path_id),
-      output_compression_(_compression),
-      output_compression_opts_(_compression_opts),
+      output_compressor_(_compressor),
       output_temperature_(_output_temperature),
       deletion_compaction_(_deletion_compaction),
       l0_files_might_overlap_(l0_files_might_overlap),
@@ -454,8 +452,9 @@ bool Compaction::WithinPenultimateLevelOutputRange(const Slice& key) const {
 bool Compaction::InputCompressionMatchesOutput() const {
   int base_level = input_vstorage_->base_level();
   bool matches =
-      (GetCompressionType(input_vstorage_, mutable_cf_options_, start_level_,
-                          base_level) == output_compression_);
+      (GetCompressor(input_vstorage_, mutable_cf_options_, start_level_,
+                     base_level)
+           ->GetCompressionType() == output_compressor_->GetCompressionType());
   if (matches) {
     TEST_SYNC_POINT("Compaction::InputCompressionMatchesOutput:Matches");
     return true;

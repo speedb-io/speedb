@@ -314,8 +314,9 @@ class CompactionJobTestBase : public testing::Test {
             TableBuilderOptions(*cfd_->ioptions(), mutable_cf_options_,
                                 cfd_->internal_comparator(),
                                 cfd_->int_tbl_prop_collector_factories(),
-                                CompressionType::kNoCompression,
-                                CompressionOptions(), 0 /* column_family_id */,
+                                BuiltinCompressor::GetCompressor(
+                                    CompressionType::kNoCompression),
+                                0 /* column_family_id */,
                                 kDefaultColumnFamilyName, -1 /* level */),
             file_writer.get()));
     // Build table.
@@ -659,9 +660,9 @@ class CompactionJobTestBase : public testing::Test {
         *cfd->GetLatestMutableCFOptions(), mutable_db_options_,
         compaction_input_files, output_level,
         mutable_cf_options_.target_file_size_base,
-        mutable_cf_options_.max_compaction_bytes, 0, kNoCompression,
-        cfd->GetLatestMutableCFOptions()->compression_opts,
-        Temperature::kUnknown, max_subcompactions, grandparents, true);
+        mutable_cf_options_.max_compaction_bytes, 0,
+        BuiltinCompressor::GetCompressor(kNoCompression), Temperature::kUnknown,
+        max_subcompactions, grandparents, true);
     compaction.SetInputVersion(cfd->current());
 
     assert(db_options_.info_log);

@@ -299,9 +299,10 @@ Status SstFileDumper::ShowCompressionSize(
 
   std::string column_family_name;
   int unknown_level = -1;
+  auto compressor =
+      BuiltinCompressor::GetCompressor(compress_type, compress_opt);
   TableBuilderOptions tb_opts(
-      imoptions, moptions, ikc, &block_based_table_factories, compress_type,
-      compress_opt,
+      imoptions, moptions, ikc, &block_based_table_factories, compressor,
       TablePropertiesCollectorFactory::Context::kUnknownColumnFamily,
       column_family_name, unknown_level);
   uint64_t num_data_blocks = 0;

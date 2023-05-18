@@ -16,6 +16,7 @@
 #include "table/block_based/block_type.h"
 #include "table/block_based/parsed_full_filter_block.h"
 #include "table/format.h"
+#include "util/compressor.h"
 
 namespace ROCKSDB_NAMESPACE {
 
@@ -70,14 +71,15 @@ class Block_kMetaIndex : public Block {
 struct BlockCreateContext : public Cache::CreateContext {
   BlockCreateContext() {}
   BlockCreateContext(const BlockBasedTableOptions* _table_options,
-                     Statistics* _statistics, bool _using_zstd,
+                     Statistics* _statistics,
+                     const std::shared_ptr<Compressor>& _compressor,
                      uint8_t _protection_bytes_per_key,
                      const Comparator* _raw_ucmp,
                      bool _index_value_is_full = false,
                      bool _index_has_first_key = false)
       : table_options(_table_options),
         statistics(_statistics),
-        using_zstd(_using_zstd),
+        compressor(_compressor),
         protection_bytes_per_key(_protection_bytes_per_key),
         raw_ucmp(_raw_ucmp),
         index_value_is_full(_index_value_is_full),
@@ -85,7 +87,7 @@ struct BlockCreateContext : public Cache::CreateContext {
 
   const BlockBasedTableOptions* table_options = nullptr;
   Statistics* statistics = nullptr;
-  bool using_zstd = false;
+  std::shared_ptr<Compressor> compressor;
   uint8_t protection_bytes_per_key = 0;
   const Comparator* raw_ucmp = nullptr;
   bool index_value_is_full;

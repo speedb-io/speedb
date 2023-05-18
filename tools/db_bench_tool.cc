@@ -544,7 +544,8 @@ DEFINE_bool(cost_write_buffer_to_cache, false,
 
 DEFINE_bool(allow_wbm_stalls, false, "Enable WBM write stalls and delays");
 
-DEFINE_bool(initiate_wbm_flushes, false,
+DEFINE_bool(initiate_wbm_flushes,
+            ROCKSDB_NAMESPACE::WriteBufferManager::kDfltInitiateFlushes,
             "WBM will proactively initiate flushes (Speedb)."
             "If false, WBM-related flushes will be initiated using the "
             "ShouldFlush() service "
@@ -4976,24 +4977,19 @@ class Benchmark {
     options.track_and_verify_wals_in_manifest =
         FLAGS_track_and_verify_wals_in_manifest;
 
-    if (FLAGS_db_write_buffer_size == 0) {
-      if (FLAGS_allow_wbm_stalls) {
-        ErrorExit("-allow_wbm_stalls is useless if db_write_buffer_size == 0");
-      }
-      if (FLAGS_initiate_wbm_flushes) {
-        ErrorExit(
-            "-initiate_wbm_flushes is useless if db_write_buffer_size == 0");
-      }
+    // Write-Buffer-Manager
+    WriteBufferManager::FlushInitiationOptions flush_initiation_options;
+    if (FLAGS_max_num_parallel_flushes > 0U) {
+      flush_initiation_options.max_num_parallel_flushes =
+          FLAGS_max_num_parallel_flushes;
     }
-    if (FLAGS_cost_write_buffer_to_cache || FLAGS_db_write_buffer_size != 0) {
-      WriteBufferManager::FlushInitiationOptions flush_initiation_options;
-      if (FLAGS_max_num_parallel_flushes > 0U) {
-        flush_initiation_options.max_num_parallel_flushes =
-            FLAGS_max_num_parallel_flushes;
-      }
-
+    if (FLAGS_cost_write_buffer_to_cache) {
       options.write_buffer_manager.reset(new WriteBufferManager(
           FLAGS_db_write_buffer_size, cache_, FLAGS_allow_wbm_stalls,
+          FLAGS_initiate_wbm_flushes, flush_initiation_options));
+    } else {
+      options.write_buffer_manager.reset(new WriteBufferManager(
+          FLAGS_db_write_buffer_size, {} /* cache */, FLAGS_allow_wbm_stalls,
           FLAGS_initiate_wbm_flushes, flush_initiation_options));
     }
 

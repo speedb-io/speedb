@@ -852,10 +852,6 @@ def finalize_and_sanitize(src_params, counter):
         dest_params["bloom_bits"] = random.choice([random.randint(1,19),
                                          random.lognormvariate(2.3, 1.3)])
 
-    # If initiate_wbm_flushes is enabled, db_write_buffer_size must be > 0, otherwise db_stress crashes 
-    if dest_params.get("initiate_wbm_flushes") == 1:
-      dest_params["db_write_buffer_size"]= random.choice([1024 * 1024, 8 * 1024 * 1024, 128 * 1024 * 1024, 1024 * 1024 * 1024])
-
     return dest_params
 
 

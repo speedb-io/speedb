@@ -3279,16 +3279,19 @@ void InitializeOptionsFromFlags(
   block_based_options.num_file_reads_for_auto_readahead =
       FLAGS_num_file_reads_for_auto_readahead;
   options.table_factory.reset(NewBlockBasedTableFactory(block_based_options));
-  if (FLAGS_db_write_buffer_size > 0) {
-    WriteBufferManager::FlushInitiationOptions flush_initiation_options;
-    if (FLAGS_max_num_parallel_flushes > 0U) {
-      flush_initiation_options.max_num_parallel_flushes =
-          FLAGS_max_num_parallel_flushes;
-    }
-    options.write_buffer_manager.reset(new WriteBufferManager(
-        FLAGS_db_write_buffer_size, {} /* cache */, FLAGS_allow_wbm_stalls,
-        FLAGS_initiate_wbm_flushes, flush_initiation_options));
+
+  // Write-Buffer-Manager
+  WriteBufferManager::FlushInitiationOptions flush_initiation_options;
+  if (FLAGS_max_num_parallel_flushes > 0U) {
+    flush_initiation_options.max_num_parallel_flushes =
+        FLAGS_max_num_parallel_flushes;
   }
+  // Unlike db-bench, db_stress currently has no cost-to-cache flag
+  // (see https://github.com/speedb-io/speedb/issues/512)
+  options.write_buffer_manager.reset(new WriteBufferManager(
+      FLAGS_db_write_buffer_size, {} /* cache */, FLAGS_allow_wbm_stalls,
+      FLAGS_initiate_wbm_flushes, flush_initiation_options));
+
   options.write_buffer_size = FLAGS_write_buffer_size;
   options.max_write_buffer_number = FLAGS_max_write_buffer_number;
   options.min_write_buffer_number_to_merge =

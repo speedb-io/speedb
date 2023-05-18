@@ -141,7 +141,8 @@ DEFINE_bool(use_write_buffer_manager, false,
             "Charge WriteBufferManager memory to the block cache");
 DEFINE_bool(allow_wbm_stalls, false, "Enable WBM write stalls and delays");
 
-DEFINE_bool(initiate_wbm_flushes, false,
+DEFINE_bool(initiate_wbm_flushes,
+            ROCKSDB_NAMESPACE::WriteBufferManager::kDfltInitiateFlushes,
             "WBM will proactively initiate flushes (Speedb)."
             "If false, WBM-related flushes will be initiated using the "
             "ShouldFlush() service "

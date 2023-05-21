@@ -306,16 +306,18 @@ void CompactionJob::Prepare() {
 
     auto status = seqno_to_time_mapping_.Sort();
     if (!status.ok()) {
-      ROCKS_LOG_WARN(db_options_.info_log,
-                     "Invalid sequence number to time mapping: Status: %s",
-                     status.ToString().c_str());
+      ROCKS_LOG_WARN(
+          db_options_.info_log,
+          "[%s] [JOB %d] Invalid sequence number to time mapping: Status: %s",
+          cfd->GetName().c_str(), job_id_, status.ToString().c_str());
     }
     int64_t _current_time = 0;
     status = db_options_.clock->GetCurrentTime(&_current_time);
     if (!status.ok()) {
-      ROCKS_LOG_WARN(db_options_.info_log,
-                     "Failed to get current time in compaction: Status: %s",
-                     status.ToString().c_str());
+      ROCKS_LOG_WARN(
+          db_options_.info_log,
+          "[%s] [JOB %d] Failed to get current time in compaction: Status: %s",
+          cfd->GetName().c_str(), job_id_, status.ToString().c_str());
       // preserve all time information
       preserve_time_min_seqno_ = 0;
       preclude_last_level_min_seqno_ = 0;
@@ -907,12 +909,12 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options,
 
   ROCKS_LOG_BUFFER(
       log_buffer_,
-      "[%s] compacted to: %s, MB/sec: %.1f rd, %.1f wr, level %d, "
+      "[%s] [JOB %d] compacted to: %s, MB/sec: %.1f rd, %.1f wr, level %d, "
       "files in(%d, %d) out(%d +%d blob) "
       "MB in(%.1f, %.1f +%.1f blob) out(%.1f +%.1f blob), "
       "read-write-amplify(%.1f) write-amplify(%.1f) %s, records in: %" PRIu64
       ", records dropped: %" PRIu64 " output_compression: %s\n",
-      column_family_name.c_str(), vstorage->LevelSummary(&tmp),
+      column_family_name.c_str(), job_id_, vstorage->LevelSummary(&tmp),
       bytes_read_per_sec, bytes_written_per_sec,
       compact_->compaction->output_level(),
       stats.num_input_files_in_non_output_levels,
@@ -930,19 +932,20 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options,
     assert(blob_files.front());
     assert(blob_files.back());
 
-    ROCKS_LOG_BUFFER(
-        log_buffer_,
-        "[%s] Blob file summary: head=%" PRIu64 ", tail=%" PRIu64 "\n",
-        column_family_name.c_str(), blob_files.front()->GetBlobFileNumber(),
-        blob_files.back()->GetBlobFileNumber());
+    ROCKS_LOG_BUFFER(log_buffer_,
+                     "[%s] [JOB %d] Blob file summary: head=%" PRIu64
+                     ", tail=%" PRIu64 "\n",
+                     column_family_name.c_str(), job_id_,
+                     blob_files.front()->GetBlobFileNumber(),
+                     blob_files.back()->GetBlobFileNumber());
   }
 
   if (compaction_stats_.has_penultimate_level_output) {
     ROCKS_LOG_BUFFER(
         log_buffer_,
-        "[%s] has Penultimate Level output: %" PRIu64
+        "[%s] [JOB %d] has Penultimate Level output: %" PRIu64
         ", level %d, number of files: %" PRIu64 ", number of records: %" PRIu64,
-        column_family_name.c_str(),
+        column_family_name.c_str(), job_id_,
         compaction_stats_.penultimate_level_stats.bytes_written,
         compact_->compaction->GetPenultimateLevel(),
         compaction_stats_.penultimate_level_stats.num_output_files,
@@ -954,8 +957,9 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options,
   auto stream = event_logger_->LogToBuffer(log_buffer_, 8192);
   stream << "job" << job_id_ << "event"
          << "compaction_finished"
-         << "compaction_time_micros" << stats.micros
-         << "compaction_time_cpu_micros" << stats.cpu_micros << "output_level"
+         << "compaction_time_micros" << stats.micros << "cf_name"
+         << column_family_name << "compaction_time_cpu_micros"
+         << stats.cpu_micros << "output_level"
          << compact_->compaction->output_level() << "num_output_files"
          << stats.num_output_files << "total_output_size"
          << stats.bytes_written;
@@ -1884,7 +1888,8 @@ Status CompactionJob::OpenCompactionOutputFile(SubcompactionState* sub_compact,
   // Safe to proceed even if GetCurrentTime fails. So, log and proceed.
   if (!get_time_status.ok()) {
     ROCKS_LOG_WARN(db_options_.info_log,
-                   "Failed to get current time. Status: %s",
+                   "[%s] [JOB %d] Failed to get current time. Status: %s",
+                   cfd->GetName().c_str(), job_id_,
                    get_time_status.ToString().c_str());
   }
   uint64_t current_time = static_cast<uint64_t>(temp_current_time);
@@ -2080,13 +2085,14 @@ void CompactionJob::LogCompaction() {
         compaction->InputLevelSummary(&inputs_summary), compaction->score());
     char scratch[2345];
     compaction->Summary(scratch, sizeof(scratch));
-    ROCKS_LOG_INFO(db_options_.info_log, "[%s]: Compaction start summary: %s\n",
-                   cfd->GetName().c_str(), scratch);
+    ROCKS_LOG_INFO(db_options_.info_log,
+                   "[%s] [JOB %d] Compaction start summary: %s\n",
+                   cfd->GetName().c_str(), job_id_, scratch);
     // build event logger report
     auto stream = event_logger_->Log();
     stream << "job" << job_id_ << "event"
            << "compaction_started"
-           << "compaction_reason"
+           << "cf_name" << cfd->GetName() << "compaction_reason"
            << GetCompactionReasonString(compaction->compaction_reason());
     for (size_t i = 0; i < compaction->num_input_levels(); ++i) {
       stream << ("files_L" + std::to_string(compaction->level(i)));

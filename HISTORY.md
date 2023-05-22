@@ -6,6 +6,7 @@ Based on RocksDB 8.1.1
 * CI: add a workflow for building and publishing jar to maven central (#507)
 * LOG: Compaction job traces - report cf name and job id (#511)
 * db_stress: Add cost_write_buffer_to_cache flag (#513)
+* Log Improvement: Report the name of cf-s whose options are skipped in the log (#520)
 
 ### Bug Fix
 * CI: fix sanity check to use clang-format 10

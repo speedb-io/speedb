@@ -2536,6 +2536,8 @@ void StressTest::PrintEnv() const {
   fprintf(stdout, "Custom ops percentage     : %d%%\n", FLAGS_customopspercent);
   fprintf(stdout, "DB-write-buffer-size      : %" PRIu64 "\n",
           FLAGS_db_write_buffer_size);
+  fprintf(stdout, "Cost To Cache (WBM)       : %s\n",
+          FLAGS_cost_write_buffer_to_cache ? "true" : "false");
   fprintf(stdout, "Allow WBM Stalls          : %s\n",
           FLAGS_allow_wbm_stalls ? "true" : "false");
   fprintf(stdout, "Initiate WBM Flushes      : %s\n",
@@ -3286,11 +3288,15 @@ void InitializeOptionsFromFlags(
     flush_initiation_options.max_num_parallel_flushes =
         FLAGS_max_num_parallel_flushes;
   }
-  // Unlike db-bench, db_stress currently has no cost-to-cache flag
-  // (see https://github.com/speedb-io/speedb/issues/512)
-  options.write_buffer_manager.reset(new WriteBufferManager(
-      FLAGS_db_write_buffer_size, {} /* cache */, FLAGS_allow_wbm_stalls,
-      FLAGS_initiate_wbm_flushes, flush_initiation_options));
+  if (FLAGS_cost_write_buffer_to_cache) {
+    options.write_buffer_manager.reset(new WriteBufferManager(
+        FLAGS_db_write_buffer_size, cache, FLAGS_allow_wbm_stalls,
+        FLAGS_initiate_wbm_flushes, flush_initiation_options));
+  } else {
+    options.write_buffer_manager.reset(new WriteBufferManager(
+        FLAGS_db_write_buffer_size, {} /* cache */, FLAGS_allow_wbm_stalls,
+        FLAGS_initiate_wbm_flushes, flush_initiation_options));
+  }
 
   options.write_buffer_size = FLAGS_write_buffer_size;
   options.max_write_buffer_number = FLAGS_max_write_buffer_number;

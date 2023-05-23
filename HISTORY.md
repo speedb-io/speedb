@@ -2,12 +2,20 @@
 ## Unreleased
 Based on RocksDB 8.1.1
 
-### Enhancement
+### New Features
+* Delay writes gradually based on memory usage of the WriteBufferManager (WBM).
+Before this PR, setting allow_stall in the WBM's constructor meant that writes are completely stopped when the WBM's memory usage exceeds its quota. The goal here is to gradually decrease
+the users write speed before that threshold is reached in order to gain stability.
+To use this feature, pass allow_delays_and_stalls = true to the ctor of WBM (renamed from allow_stall) and the db needs to be opened with options.use_dynamic_delay = true. The WBM will
+setup delay requests starting from (start_delay_percent * _buffer_size) / 100 (default value is 70) (start_delay_percent is another WBM ctor parameter). Changes to the WBM's memory are tracked in WriteBufferManager::ReserveMem and FreeMem.
+Once the WBM reached its capacity, writes will be stopped using the old ShouldStall() and WBMStallWrites(). (#423)
+
+### Enhancements
 * CI: add a workflow for building and publishing jar to maven central (#507)
 * LOG: Compaction job traces - report cf name and job id (#511)
 * db_stress: Add cost_write_buffer_to_cache flag (#513)
 
-### Bug Fix
+### Bug Fixes
 * CI: fix sanity check to use clang-format 10
 * CI: run sanity only once on PRs
 * Makefile: Remove pycache artifacts after running gtest-parallel (#495)
@@ -15,15 +23,16 @@ Based on RocksDB 8.1.1
 * stress test: fix decoding error (#498)
 * db_bench and stress: fix WBM initiation (#510)
 * Sanitize max_num_parallel_flushes in WBM if 0 (#460)
+
 ### Miscellaneous
 * disable failing unit tests and paired bloom filter stress testing
 * version: update Speedb patch version to 2.4.1 (#503)
 
 ## Speedb v2.4.1 ( 04/19/2023)
-### Enhancement
+### Enhancements
 * Add the ability to create any Filter Policy in java (including ribbon filter and the Speedb paired bloom filter) by @mrambacher in #387
 
-### Bug Fix
+### Bug Fixes
 * Write Flow: Reduce debug log size. Note: the write flow is still experimental in this release (#461) by @ayulas in #472
 
 ## Ephedra v2.4.0 (04/05/2023)

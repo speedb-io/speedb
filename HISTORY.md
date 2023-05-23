@@ -1,5 +1,23 @@
 # Speedb Change Log 
+## Unreleased
+Based on RocksDB 8.1.1
 
+### Enhancement
+* CI: add a workflow for building and publishing jar to maven central (#507)
+* LOG: Compaction job traces - report cf name and job id (#511)
+* db_stress: Add cost_write_buffer_to_cache flag (#513)
+
+### Bug Fix
+* CI: fix sanity check to use clang-format 10
+* CI: run sanity only once on PRs
+* Makefile: Remove pycache artifacts after running gtest-parallel (#495)
+* AVX512: fix disabling other optimizations (#489)
+* stress test: fix decoding error (#498)
+* db_bench and stress: fix WBM initiation (#510)
+
+### Miscellaneous
+* disable failing unit tests and paired bloom filter stress testing
+* version: update Speedb patch version to 2.4.1 (#503)
 
 ## Speedb v2.4.1 ( 04/19/2023)
 ### Enhancement

@@ -54,6 +54,12 @@ class WriteBufferManager final {
     static constexpr size_t kDfltMaxNumParallelFlushes = 4U;
 
     FlushInitiationOptions() {}
+
+    FlushInitiationOptions(size_t _max_num_parallel_flushes)
+        : max_num_parallel_flushes(_max_num_parallel_flushes) {}
+
+    FlushInitiationOptions Sanitize() const;
+
     size_t max_num_parallel_flushes = kDfltMaxNumParallelFlushes;
   };
 

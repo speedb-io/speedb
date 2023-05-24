@@ -7,6 +7,7 @@ Based on RocksDB 8.1.1
 * LOG: Compaction job traces - report cf name and job id (#511)
 * db_stress: Add cost_write_buffer_to_cache flag (#513)
 * LOG: Display cf names in rolled logs with their options (#419)
+* Log Improvement: Report the name of cf-s whose options are skipped in the log (#520)
 
 ### Bug Fix
 * CI: fix sanity check to use clang-format 10

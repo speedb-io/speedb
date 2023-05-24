@@ -6764,7 +6764,7 @@ TEST_P(TransactionTest, StallTwoWriteQueues) {
 }
 
 // Make sure UnlockWAL does not return until the stall it controls is cleared.
-TEST_P(TransactionTest, DISABLED_UnlockWALStallCleared) {
+TEST_P(TransactionTest, UnlockWALStallCleared) {
   auto dbimpl = static_cast_with_check<DBImpl>(db->GetRootDB());
   for (bool external_stall : {false, true}) {
     WriteOptions wopts;
@@ -6826,6 +6826,7 @@ TEST_P(TransactionTest, DISABLED_UnlockWALStallCleared) {
       ASSERT_OK(txn0->Put("k3", "val3"));
       ASSERT_OK(txn0->Prepare());  // nonmem
       ASSERT_OK(txn0->Commit());
+      t2_completed = true;
     }};
 
     // Be sure the test is set up appropriately
@@ -6833,9 +6834,6 @@ TEST_P(TransactionTest, DISABLED_UnlockWALStallCleared) {
     TEST_SYNC_POINT("TransactionTest::UnlockWALStallCleared:BeforeUnlockWAL2");
     ASSERT_FALSE(t1_completed.load());
     ASSERT_FALSE(t2_completed.load());
-
-    // Clear the stall
-    ASSERT_OK(db->UnlockWAL());
 
     WriteOptions wopts2 = wopts;
     if (external_stall) {
@@ -6854,6 +6852,10 @@ TEST_P(TransactionTest, DISABLED_UnlockWALStallCleared) {
       // the thread that did BeginWriteStall() can do EndWriteStall()
       wopts2.no_slowdown = true;
     }
+
+    // Clear the stall
+    ASSERT_OK(db->UnlockWAL());
+
     std::unique_ptr<Transaction> txn0{db->BeginTransaction(wopts2, {})};
     ASSERT_OK(txn0->SetName("x2"));
     ASSERT_OK(txn0->Put("k1", "val4"));

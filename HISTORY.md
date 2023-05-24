@@ -1,4 +1,5 @@
 # Speedb Change Log 
+
 ## Unreleased
 Based on RocksDB 8.1.1
 
@@ -19,6 +20,7 @@ Based on RocksDB 8.1.1
 * Sanitize max_num_parallel_flushes in WBM if 0 (#460)
 * WriteController: fix for stop while shutting down (#499)
 Also switch to waiting a sec on the CV each time. This is required since a bg error doesn't signal the CV in the WriteController.
+* fix UnlockWALStallCleared test in utilities/transactions/transaction_test.cc (#514)
 
 ### Miscellaneous
 * disable failing unit tests and paired bloom filter stress testing

@@ -51,7 +51,13 @@ FilterBitsBuilder* SpdbPairedBloomFilterPolicy::GetBuilderWithContext(
   // TODO: The code below is duplicates from
   // BloomLikeFilterPolicy::GetFastLocalBloomBuilderWithContext
   // TODO: See if it may be refactored to a static method
-  bool offm = context.table_options.optimize_filters_for_memory;
+
+  // The paired bloom filter is not supporting the 'optimize_filters_for_memory'
+  // option
+  // => offm is set to false unconditionally instead of to the value of
+  // context.table_options.optimize_filters_for_memory
+  // https://github.com/speedb-io/speedb/issues/488
+  bool offm = false;
   const auto options_overrides_iter =
       context.table_options.cache_usage_options.options_overrides.find(
           CacheEntryRole::kFilterConstruction);

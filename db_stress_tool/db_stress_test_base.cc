@@ -3108,7 +3108,7 @@ void InitializeOptionsFromFlags(
   }
   if (FLAGS_cost_write_buffer_to_cache) {
     options.write_buffer_manager.reset(new WriteBufferManager(
-        FLAGS_db_write_buffer_size, cache, FLAGS_allow_wbm_stalls,
+        FLAGS_db_write_buffer_size, cache, FLAGS_allow_wbm_delays_and_stalls,
         FLAGS_initiate_wbm_flushes, flush_initiation_options));
   } else {
     options.write_buffer_manager.reset(new WriteBufferManager(

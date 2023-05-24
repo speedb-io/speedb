@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cassert>
+#include <chrono>
 #include <mutex>
 #include <ratio>
 
@@ -106,11 +107,13 @@ uint64_t WriteController::InsertToMapAndGetMinRate(uint32_t id,
   }
 }
 
-void WriteController::WaitOnCV(const ErrorHandler& error_handler) {
+void WriteController::WaitOnCV(std::function<bool()> continue_wait) {
   std::unique_lock<std::mutex> lock(stop_mu_);
-  while (error_handler.GetBGError().ok() && IsStopped()) {
+  while (continue_wait() && IsStopped()) {
     TEST_SYNC_POINT("WriteController::WaitOnCV");
-    stop_cv_.wait(lock);
+    // need to time the wait since the stop_cv_ is not signalled if a bg error
+    // is raised.
+    stop_cv_.wait_for(lock, std::chrono::seconds(1));
   }
 }
 
@@ -125,7 +128,10 @@ bool WriteController::IsStopped() const {
   return total_stopped_.load(std::memory_order_relaxed) > 0;
 }
 
-// This function is no longer under db mutex since credit_in_bytes_ is atomic
+// This is inside the calling DB mutex, so we can't sleep and need to minimize
+// frequency to get time.
+// If it turns out to be a performance issue, we can redesign the thread
+// synchronization model here.
 // The function trust caller will sleep micros returned.
 uint64_t WriteController::GetDelay(SystemClock* clock, uint64_t num_bytes) {
   if (total_stopped_.load(std::memory_order_relaxed) > 0) {

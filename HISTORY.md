@@ -1,5 +1,5 @@
 # Speedb Change Log 
-
+* fix UnlockWALStallCleared test in utilities/transactions/transaction_test.cc (#514)
 ## Blueberry 2.1.0 (10/26/2022)
 ## New Features
 * Added new Paired bloom filter that reduces false positive rate with the same performance and memory. In some configurations, the memory consumption is even reduced by up to 30%.

@@ -619,7 +619,8 @@ ColumnFamilyData::ColumnFamilyData(
                      name.c_str());
       initial_cf_options_.Dump(ioptions_.logger);
     } else {
-      ROCKS_LOG_INFO(ioptions_.logger, "\t(skipping printing options)\n");
+      ROCKS_LOG_INFO(ioptions_.logger,
+                     "\t(skipping printing options of [%s])\n", name.c_str());
     }
   }
 

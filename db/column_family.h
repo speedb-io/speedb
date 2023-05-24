@@ -487,6 +487,8 @@ class ColumnFamilyData {
       const MutableCFOptions& mutable_cf_options,
       WriteStallCause& write_stall_cause);
 
+  void TEST_ResetWriteControllerToken() { write_controller_token_.reset(); }
+
  private:
   void UpdateCFRate(void* client_id, uint64_t write_rate);
   void ResetCFRate(void* client_id);

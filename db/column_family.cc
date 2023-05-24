@@ -619,12 +619,13 @@ ColumnFamilyData::ColumnFamilyData(
     }
 
     if (column_family_set_->NumberOfColumnFamilies() < 10) {
-      ROCKS_LOG_INFO(ioptions_.logger,
-                     "--------------- Options for column family [%s]:\n",
-                     name.c_str());
+      ROCKS_LOG_HEADER(ioptions_.logger,
+                       "--------------- Options for column family [%s]:\n",
+                       name.c_str());
       initial_cf_options_.Dump(ioptions_.logger);
     } else {
-      ROCKS_LOG_INFO(ioptions_.logger, "\t(skipping printing options)\n");
+      ROCKS_LOG_INFO(ioptions_.logger,
+                     "\t(skipping printing options of [%s])\n", name.c_str());
     }
   }
 

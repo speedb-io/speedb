@@ -1329,6 +1329,8 @@ class DBTestBase : public testing::Test {
   // supported
   void SetTimeElapseOnlySleepOnReopen(DBOptions* options);
 
+  void ResetWriteControllerTokens(DBImpl* db);
+
  private:  // Prone to error on direct use
   void MaybeInstallTimeElapseOnlySleep(const DBOptions& options);
 

@@ -1,4 +1,5 @@
 # Speedb Change Log 
+
 ## Unreleased
 Based on RocksDB 8.1.1
 
@@ -14,6 +15,8 @@ Once the WBM reached its capacity, writes will be stopped using the old ShouldSt
 * CI: add a workflow for building and publishing jar to maven central (#507)
 * LOG: Compaction job traces - report cf name and job id (#511)
 * db_stress: Add cost_write_buffer_to_cache flag (#513)
+* LOG: Display cf names in rolled logs with their options (#419)
+* Log Improvement: Report the name of cf-s whose options are skipped in the log (#520)
 
 ### Bug Fixes
 * CI: fix sanity check to use clang-format 10
@@ -23,6 +26,9 @@ Once the WBM reached its capacity, writes will be stopped using the old ShouldSt
 * stress test: fix decoding error (#498)
 * db_bench and stress: fix WBM initiation (#510)
 * Sanitize max_num_parallel_flushes in WBM if 0 (#460)
+* WriteController: fix for stop while shutting down (#499)
+Also switch to waiting a sec on the CV each time. This is required since a bg error doesn't signal the CV in the WriteController.
+* fix UnlockWALStallCleared test in utilities/transactions/transaction_test.cc (#514)
 
 ### Miscellaneous
 * disable failing unit tests and paired bloom filter stress testing

@@ -21,6 +21,17 @@
 #include "util/coding.h"
 
 namespace ROCKSDB_NAMESPACE {
+
+auto WriteBufferManager::FlushInitiationOptions::Sanitize() const
+    -> FlushInitiationOptions {
+  size_t sanitized_max_num_parallel_flushes = max_num_parallel_flushes;
+  if (sanitized_max_num_parallel_flushes == 0) {
+    sanitized_max_num_parallel_flushes = kDfltMaxNumParallelFlushes;
+  }
+
+  return FlushInitiationOptions(sanitized_max_num_parallel_flushes);
+}
+
 WriteBufferManager::WriteBufferManager(
     size_t _buffer_size, std::shared_ptr<Cache> cache, bool allow_stall,
     bool initiate_flushes,
@@ -34,7 +45,7 @@ WriteBufferManager::WriteBufferManager(
       allow_stall_(allow_stall),
       stall_active_(false),
       initiate_flushes_(initiate_flushes),
-      flush_initiation_options_(flush_initiation_options),
+      flush_initiation_options_(flush_initiation_options.Sanitize()),
       flushes_mu_(new InstrumentedMutex),
       flushes_initiators_mu_(new InstrumentedMutex),
       flushes_wakeup_cv_(new InstrumentedCondVar(flushes_mu_.get())) {
@@ -46,6 +57,7 @@ WriteBufferManager::WriteBufferManager(
         CacheReservationManagerImpl<CacheEntryRole::kWriteBuffer>>(
         cache, true /* delayed_decrease */);
   }
+
   if (initiate_flushes_) {
     InitFlushInitiationVars(buffer_size());
   }

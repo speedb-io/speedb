@@ -7,6 +7,11 @@
 name: Build on Mac 
 
 on:
+  workflow_call:
+    inputs:
+      verSion:
+        required: true
+        type: string
   workflow_dispatch:
 
 jobs:
@@ -22,3 +27,7 @@ jobs:
         export CPPFLAGS="-I/usr/local/opt/openjdk@11/include"
         export CXXFLAGS="-I/usr/local/opt/openjdk@11/include"
         DEBUG_LEVEL=0 make -j 4 rocksdbjavastatic
+    
+    - name: 'upload artifacts'    #This step executed only when this workflow is called by another and a version is provided
+      if: inputs.verSion != ' '
+      run: aws s3 cp java/target/libspeedbjni-osx-x86_64.jnilib s3://spdb-builder/jar_test/v${{ inputs.verSion }}/libspeedbjni-osx-x86_64.jnilib

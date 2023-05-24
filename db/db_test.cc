@@ -7340,7 +7340,7 @@ TEST_F(DBTest, MemoryUsageWithMaxWriteBufferSizeToMaintain) {
   }
 }
 
-TEST_F(DBTest, DISABLED_ShuttingDownNotBlockStalledWrites) {
+TEST_F(DBTest, ShuttingDownNotBlockStalledWrites) {
   Options options = CurrentOptions();
   options.disable_auto_compactions = true;
   Reopen(options);
@@ -7377,6 +7377,10 @@ TEST_F(DBTest, DISABLED_ShuttingDownNotBlockStalledWrites) {
 
   TEST_SYNC_POINT("DBTest::ShuttingDownNotBlockStalledWrites");
   CancelAllBackgroundWork(db_, true);
+  // In addition to raising the shutting_down_ flag, we need to reset the Write
+  // Controller tokens since only the detor of the StopWriteToken wakes up the
+  // condition variable which the stopped thread is waiting on.
+  ResetWriteControllerTokens(dbfull());
 
   thd.join();
 }

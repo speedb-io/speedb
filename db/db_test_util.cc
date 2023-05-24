@@ -1732,6 +1732,13 @@ void VerifySstUniqueIds(const TablePropertiesCollection& props) {
   }
 }
 
+void DBTestBase::ResetWriteControllerTokens(DBImpl* db) {
+  auto versions = db->GetVersionSet();
+  for (auto* cfd : versions->GetRefedColumnFamilySet()) {
+    cfd->TEST_ResetWriteControllerToken();
+  }
+}
+
 template <CacheEntryRole R>
 TargetCacheChargeTrackingCache<R>::TargetCacheChargeTrackingCache(
     std::shared_ptr<Cache> target)

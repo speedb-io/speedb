@@ -109,7 +109,7 @@ class WriteController {
 
   uint64_t TEST_GetMapMinRate();
 
-  void WaitOnCV(const ErrorHandler& error_handler);
+  void WaitOnCV(std::function<bool()> continue_wait);
   void NotifyCV();
 
  private:

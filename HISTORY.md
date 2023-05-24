@@ -17,6 +17,9 @@ Based on RocksDB 8.1.1
 * stress test: fix decoding error (#498)
 * db_bench and stress: fix WBM initiation (#510)
 * Sanitize max_num_parallel_flushes in WBM if 0 (#460)
+* WriteController: fix for stop while shutting down (#499)
+Also switch to waiting a sec on the CV each time. This is required since a bg error doesn't signal the CV in the WriteController.
+
 ### Miscellaneous
 * disable failing unit tests and paired bloom filter stress testing
 * version: update Speedb patch version to 2.4.1 (#503)

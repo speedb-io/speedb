@@ -1823,13 +1823,13 @@ Status DBImpl::DelayWrite(uint64_t num_bytes, WriteThread& write_thread,
   mutex_.AssertHeld();
   uint64_t time_delayed = 0;
   bool delayed = false;
+  bool stopped = false;
   {
     StopWatch sw(immutable_db_options_.clock, stats_, WRITE_STALL,
                  Histograms::HISTOGRAM_ENUM_MAX, &time_delayed);
     // To avoid parallel timed delays (bad throttling), only support them
     // on the primary write queue.
     uint64_t delay;
-    // TODO: yuval - check whether db_mutex can be unlocked during GetDelay
     if (&write_thread == &write_thread_) {
       delay =
           write_controller_->GetDelay(immutable_db_options_.clock, num_bytes);
@@ -1878,7 +1878,7 @@ Status DBImpl::DelayWrite(uint64_t num_bytes, WriteThread& write_thread,
       if (write_options.no_slowdown) {
         return Status::Incomplete("Write stall");
       }
-      delayed = true;
+      stopped = true;
 
       // Notify write_thread about the stall so it can setup a barrier and
       // fail any pending writers with no_slowdown
@@ -1889,16 +1889,19 @@ Status DBImpl::DelayWrite(uint64_t num_bytes, WriteThread& write_thread,
         TEST_SYNC_POINT("DBImpl::DelayWrite:NonmemWait");
       }
       mutex_.Unlock();
-
-      write_controller_->WaitOnCV(error_handler_);
+      auto continue_wait = [this]() -> bool {
+        return (this->error_handler_.GetBGError().ok() &&
+                !(this->shutting_down_.load(std::memory_order_relaxed)));
+      };
+      write_controller_->WaitOnCV(continue_wait);
 
       mutex_.Lock();
       TEST_SYNC_POINT_CALLBACK("DBImpl::DelayWrite:AfterWait", &mutex_);
       write_thread.EndWriteStall();
     }
   }
-  assert(!delayed || !write_options.no_slowdown);
-  if (delayed) {
+  assert((!delayed && !stopped) || !write_options.no_slowdown);
+  if (delayed || stopped) {
     default_cf_internal_stats_->AddDBStats(
         InternalStats::kIntStatsWriteStallMicros, time_delayed);
     RecordTick(stats_, STALL_MICROS, time_delayed);
@@ -1908,14 +1911,12 @@ Status DBImpl::DelayWrite(uint64_t num_bytes, WriteThread& write_thread,
   // writes, we can ignore any background errors and allow the write to
   // proceed
   Status s;
-  if (write_controller_->IsStopped()) {
-    if (!shutting_down_.load(std::memory_order_relaxed)) {
-      // If writes are still stopped and db not shutdown, it means we bailed
-      // due to a background error
-      s = Status::Incomplete(error_handler_.GetBGError().ToString());
-    } else {
-      s = Status::ShutdownInProgress("stalled writes");
-    }
+  if (stopped && shutting_down_.load(std::memory_order_relaxed)) {
+    s = Status::ShutdownInProgress("stalled writes");
+  } else if (write_controller_->IsStopped()) {
+    // If writes are still stopped and db not shutdown, it means we bailed
+    // due to a background error
+    s = Status::Incomplete(error_handler_.GetBGError().ToString());
   }
   if (error_handler_.IsDBStopped()) {
     s = error_handler_.GetBGError();

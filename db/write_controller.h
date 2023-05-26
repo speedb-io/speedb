@@ -12,18 +12,23 @@
 #include <memory>
 #include <mutex>
 
-#include "db/error_handler.h"
 #include "rocksdb/rate_limiter.h"
 
 namespace ROCKSDB_NAMESPACE {
 
 class SystemClock;
 class WriteControllerToken;
-
+class ErrorHandler;
 // WriteController is controlling write stalls in our write code-path. Write
 // stalls happen when compaction can't keep up with write rate.
 // All of the methods here (including WriteControllerToken's destructors) need
-// to be called while holding DB mutex
+// to be called while holding DB mutex when dynamic_delay_ is false.
+// use_dynamic_delay is the options flag (in include/rocksdb/options.h) which
+// is passed to the ctor of WriteController for setting dynamic_delay_.
+// when dynamic_delay_ is true, then the WriteController can be shared across
+// many dbs which requires using metrics_mu_ and map_mu_.
+// In a shared state (global delay mechanism), the WriteController can also
+// receive delay requirements from the WriteBufferManager.
 class WriteController {
  public:
   explicit WriteController(bool dynamic_delay,
@@ -68,6 +73,7 @@ class WriteController {
   // Prerequisite: DB mutex held.
   uint64_t GetDelay(SystemClock* clock, uint64_t num_bytes);
   void set_delayed_write_rate(uint64_t write_rate) {
+    std::lock_guard<std::mutex> lock(metrics_mu_);
     // avoid divide 0
     if (write_rate == 0) {
       write_rate = 1u;
@@ -78,6 +84,7 @@ class WriteController {
   }
 
   void set_max_delayed_write_rate(uint64_t write_rate) {
+    std::lock_guard<std::mutex> lock(metrics_mu_);
     // avoid divide 0
     if (write_rate == 0) {
       write_rate = 1u;
@@ -95,17 +102,18 @@ class WriteController {
 
   bool is_dynamic_delay() const { return dynamic_delay_; }
 
-  using CfIdToRateMap = std::unordered_map<uint32_t, uint64_t>;
+  int TEST_total_delayed_count() const { return total_delayed_.load(); }
 
-  void AddToDbRateMap(CfIdToRateMap* cf_map);
+  /////// methods and members used when dynamic_delay_ == true. ///////
+  // For now, clients can be column families or WriteBufferManagers
+  // and the Id (void*) is simply the pointer to their obj
+  using ClientIdToRateMap = std::unordered_map<void*, uint64_t>;
 
-  void RemoveFromDbRateMap(CfIdToRateMap* cf_map);
+  void HandleNewDelayReq(void* client_id, uint64_t cf_write_rate);
 
-  void DeleteSelfFromMapAndMaybeUpdateDelayRate(uint32_t id,
-                                                CfIdToRateMap* cf_map);
-
-  uint64_t InsertToMapAndGetMinRate(uint32_t id, CfIdToRateMap* cf_map,
-                                    uint64_t cf_write_rate);
+  // Removes a client's delay and updates the Write Controller's effective
+  // delayed write rate if applicable
+  void HandleRemoveDelayReq(void* client_id);
 
   uint64_t TEST_GetMapMinRate();
 
@@ -113,22 +121,27 @@ class WriteController {
   void NotifyCV();
 
  private:
-  bool IsMinRate(uint32_t id, CfIdToRateMap* cf_map);
+  bool IsMinRate(void* client_id);
+  bool IsInRateMap(void* client_id);
+  // REQUIRES: cf_id is in the rate map.
+  // returns if the element removed had rate == delayed_write_rate_
+  bool RemoveDelayReq(void* client_id);
+  void MaybeResetCounters();
 
-  // returns the min rate from db_id_to_write_rate_map_
+  // returns the min rate from id_to_write_rate_map_
   // REQUIRES: write_controller map_mu_ mutex held.
   uint64_t GetMapMinRate();
 
   // Whether Speedb's dynamic delay is used
-  bool dynamic_delay_;
+  bool dynamic_delay_ = true;
 
   std::mutex map_mu_;
-  std::unordered_set<CfIdToRateMap*> db_id_to_write_rate_map_;
+  ClientIdToRateMap id_to_write_rate_map_;
 
   // The mutex used by stop_cv_
   std::mutex stop_mu_;
   std::condition_variable stop_cv_;
-  // end of methods and members used when dynamic_delay_ == true.
+  /////// end of methods and members used when dynamic_delay_ == true. ///////
 
   uint64_t NowMicrosMonotonic(SystemClock* clock);
 
@@ -141,7 +154,8 @@ class WriteController {
   std::atomic<int> total_delayed_;
   std::atomic<int> total_compaction_pressure_;
 
-  // mutex to protect below 4 members
+  // mutex to protect below 4 members which is required when WriteController is
+  // shared across several dbs.
   std::mutex metrics_mu_;
   // Number of bytes allowed to write without delay
   std::atomic<uint64_t> credit_in_bytes_;

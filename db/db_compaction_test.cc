@@ -1687,7 +1687,7 @@ TEST_F(DBCompactionTest, DISABLED_ManualPartialFill) {
   DestroyAndReopen(options);
   // make sure all background compaction jobs can be scheduled
   auto stop_token =
-      dbfull()->TEST_write_controler()->GetCompactionPressureToken();
+      dbfull()->write_controller_ptr()->GetCompactionPressureToken();
   int32_t value_size = 10 * 1024;  // 10 KB
 
   // Add 2 non-overlapping files
@@ -3708,7 +3708,7 @@ TEST_F(DBCompactionTest, CompactFilesPendingL0Bug) {
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->EnableProcessing();
 
   auto schedule_multi_compaction_token =
-      dbfull()->TEST_write_controler()->GetCompactionPressureToken();
+      dbfull()->write_controller_ptr()->GetCompactionPressureToken();
 
   // Files 0-3 will be included in an L0->L1 compaction.
   //
@@ -5821,7 +5821,7 @@ TEST_P(RoundRobinSubcompactionsAgainstPressureToken, PressureTokenTest) {
   std::unique_ptr<WriteControllerToken> pressure_token;
   if (grab_pressure_token_) {
     pressure_token =
-        dbfull()->TEST_write_controler()->GetCompactionPressureToken();
+        dbfull()->write_controller_ptr()->GetCompactionPressureToken();
   }
   TEST_SYNC_POINT("RoundRobinSubcompactionsAgainstPressureToken:2");
 
@@ -5905,7 +5905,7 @@ TEST_P(RoundRobinSubcompactionsAgainstResources, SubcompactionsUsingResources) {
   TEST_SYNC_POINT("RoundRobinSubcompactionsAgainstResources:0");
   TEST_SYNC_POINT("RoundRobinSubcompactionsAgainstResources:1");
   auto pressure_token =
-      dbfull()->TEST_write_controler()->GetCompactionPressureToken();
+      dbfull()->write_controller_ptr()->GetCompactionPressureToken();
 
   TEST_SYNC_POINT("RoundRobinSubcompactionsAgainstResources:2");
   TEST_SYNC_POINT("RoundRobinSubcompactionsAgainstResources:3");

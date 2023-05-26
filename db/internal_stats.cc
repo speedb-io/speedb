@@ -1459,7 +1459,7 @@ bool InternalStats::HandleActualDelayedWriteRate(uint64_t* value, DBImpl* db,
 
 bool InternalStats::HandleIsWriteStopped(uint64_t* value, DBImpl* db,
                                          Version* /*version*/) {
-  *value = db->write_controller()->IsStopped() ? 1 : 0;
+  *value = db->write_controller_ptr()->IsStopped() ? 1 : 0;
   return true;
 }
 

@@ -25,6 +25,30 @@ class TimeSetClock : public SystemClockWrapper {
 class WriteControllerTest : public testing::TestWithParam<bool> {
  public:
   WriteControllerTest() { clock_ = std::make_shared<TimeSetClock>(); }
+
+  std::unique_ptr<rocksdb::WriteControllerToken> SetDelay(
+      WriteController& controller, uint64_t token_num, uint64_t write_rate) {
+    if (controller.is_dynamic_delay()) {
+      // need to add the token_num so that HandleNewDelayReq will believe these
+      // are new clients and the delayed count will raise per each token as in
+      // the GetDelayToken.
+      controller.HandleNewDelayReq(this + token_num, write_rate);
+      // need to return a DelayWriteToken in the case of dynamic delay as well
+      // so that theres as little changes to the test as possible. this allows
+      // having the detor of the token decrease the delay count instead of
+      // calling HandleRemoveDelayReq
+      return nullptr;
+    } else {
+      return controller.GetDelayToken(write_rate);
+    }
+  }
+
+  void RemoveDelay(WriteController& controller) {
+    if (controller.is_dynamic_delay()) {
+      controller.HandleRemoveDelayReq(this);
+    }
+  }
+
   std::shared_ptr<TimeSetClock> clock_;
 };
 
@@ -50,7 +74,7 @@ TEST_P(WriteControllerTest, BasicAPI) {
 
   {
     // set with token, get
-    auto delay_token_0 = controller.GetDelayToken(10 MBPS);
+    auto delay_token_0 = SetDelay(controller, 0, 10 MBPS);
     EXPECT_EQ(controller.delayed_write_rate(), 10 MBPS);
     EXPECT_FALSE(controller.IsStopped());
     EXPECT_TRUE(controller.NeedsDelay());
@@ -58,24 +82,50 @@ TEST_P(WriteControllerTest, BasicAPI) {
     EXPECT_EQ(2 SECS, controller.GetDelay(clock_.get(), 20 MB));
     clock_->now_micros_ += 2 SECS;  // pay the "debt"
 
-    auto delay_token_1 = controller.GetDelayToken(2 MBPS);
+    auto delay_token_1 = SetDelay(controller, 1, 2 MBPS);
     EXPECT_EQ(10 SECS, controller.GetDelay(clock_.get(), 20 MB));
     clock_->now_micros_ += 10 SECS;  // pay the "debt"
 
-    auto delay_token_2 = controller.GetDelayToken(1 MBPS);
+    auto delay_token_2 = SetDelay(controller, 2, 1 MBPS);
     EXPECT_EQ(20 SECS, controller.GetDelay(clock_.get(), 20 MB));
     clock_->now_micros_ += 20 SECS;  // pay the "debt"
 
-    auto delay_token_3 = controller.GetDelayToken(20 MBPS);
-    EXPECT_EQ(1 SECS, controller.GetDelay(clock_.get(), 20 MB));
-    clock_->now_micros_ += 1 SECS;  // pay the "debt"
+    // dynamic delay always sets the smallest delay requirement
+    // which at this point is 1 MBPS. so delay delay is 20 SECS.
+    auto delay_token_3 = SetDelay(controller, 3, 20 MBPS);
+    auto time_to_delay = 1 SECS;
+    if (controller.is_dynamic_delay()) {
+      time_to_delay = 20 SECS;
+    }
+    EXPECT_EQ(time_to_delay, controller.GetDelay(clock_.get(), 20 MB));
+    clock_->now_micros_ += time_to_delay;  // pay the "debt"
 
-    // 60M is more than the max rate of 40M. Max rate will be used.
-    EXPECT_EQ(controller.delayed_write_rate(), 20 MBPS);
+    // dynamic delay always sets the smallest delay requirement
+    // which at this point is 1 MBPS.
+    auto delayed_rate = 20 MBPS;
+    if (controller.is_dynamic_delay()) {
+      delayed_rate = 1 MBPS;
+    }
+    EXPECT_EQ(controller.delayed_write_rate(), delayed_rate);
     auto delay_token_4 =
-        controller.GetDelayToken(controller.delayed_write_rate() * 3);
-    EXPECT_EQ(controller.delayed_write_rate(), 40 MBPS);
-    EXPECT_EQ(static_cast<uint64_t>(0.5 SECS),
+        SetDelay(controller, 4, controller.delayed_write_rate() * 300);
+    // Verify that when setting a delay request that is higher than the
+    // max_delayed_write_rate_, the delay request is sanitized to
+    // max_delayed_write_rate_.
+
+    // dynamic delay always sets the smallest delay requirement
+    // which at this point is 1 MBPS.
+    delayed_rate = 40 MBPS;
+    if (controller.is_dynamic_delay()) {
+      delayed_rate = 1 MBPS;
+    }
+    EXPECT_EQ(controller.delayed_write_rate(), delayed_rate);
+
+    time_to_delay = 0.5 SECS;  // for 40 MBPS
+    if (controller.is_dynamic_delay()) {
+      time_to_delay = 20 SECS;  // for 1 MBPS
+    }
+    EXPECT_EQ(static_cast<uint64_t>(time_to_delay),
               controller.GetDelay(clock_.get(), 20 MB));
 
     EXPECT_FALSE(controller.IsStopped());
@@ -97,12 +147,26 @@ TEST_P(WriteControllerTest, BasicAPI) {
     // Stop tokens released
     EXPECT_FALSE(controller.IsStopped());
     EXPECT_TRUE(controller.NeedsDelay());
-    EXPECT_EQ(controller.delayed_write_rate(), 40 MBPS);
+    // dynamic delay always sets the smallest delay requirement
+    // which at this point is 1 MBPS.
+    delayed_rate = 40 MBPS;
+    if (controller.is_dynamic_delay()) {
+      delayed_rate = 1 MBPS;
+    }
+    EXPECT_EQ(controller.delayed_write_rate(), delayed_rate);
     // pay the previous "debt"
-    clock_->now_micros_ += static_cast<uint64_t>(0.5 SECS);
-    EXPECT_EQ(1 SECS, controller.GetDelay(clock_.get(), 40 MB));
+    clock_->now_micros_ += static_cast<uint64_t>(time_to_delay);
+    time_to_delay = 1 SECS;  // for 40 MBPS
+    if (controller.is_dynamic_delay()) {
+      time_to_delay = 40 SECS;  // for 1 MBPS
+    }
+    EXPECT_EQ(time_to_delay, controller.GetDelay(clock_.get(), 40 MB));
   }
-
+  if (controller.is_dynamic_delay()) {
+    for (int i = 0; i < 5; ++i) {
+      controller.HandleRemoveDelayReq(this + i);
+    }
+  }
   // Delay tokens released
   EXPECT_FALSE(controller.NeedsDelay());
 }
@@ -112,8 +176,7 @@ TEST_P(WriteControllerTest, StartFilled) {
 
   // Attempt to write two things that combined would be allowed within
   // a single refill interval
-  auto delay_token_0 =
-      controller.GetDelayToken(controller.delayed_write_rate());
+  auto delay_token_0 = SetDelay(controller, 0, controller.delayed_write_rate());
 
   // Verify no delay because write rate has not been exceeded within
   // refill interval.
@@ -133,17 +196,20 @@ TEST_P(WriteControllerTest, StartFilled) {
   EXPECT_LT(1.0 * delay, 1.001 SECS);
 }
 
+// TEST_F(WriteControllerTest, DebtAccumulation) {
+//   // TODO: yuval - adapt to dynamic_delay
 TEST_P(WriteControllerTest, DebtAccumulation) {
   WriteController controller(GetParam(), 10 MBPS);
 
-  std::array<std::unique_ptr<WriteControllerToken>, 10> tokens;
+  const auto num_tokens = 10;
+  std::array<std::unique_ptr<WriteControllerToken>, num_tokens> tokens;
 
   // Accumulate a time delay debt with no passage of time, like many column
   // families delaying writes simultaneously. (Old versions of WriteController
   // would reset the debt on every GetDelayToken.)
   uint64_t debt = 0;
-  for (unsigned i = 0; i < tokens.size(); ++i) {
-    tokens[i] = controller.GetDelayToken((i + 1u) MBPS);
+  for (auto i = num_tokens - 1; i >= 0; --i) {
+    tokens[i] = SetDelay(controller, i, (i + 1u) MBPS);
     uint64_t delay = controller.GetDelay(clock_.get(), 63 MB);
     ASSERT_GT(delay, debt);
     uint64_t incremental = delay - debt;
@@ -154,13 +220,20 @@ TEST_P(WriteControllerTest, DebtAccumulation) {
   // Pay down the debt
   clock_->now_micros_ += debt;
   debt = 0;
-
+  // reset for dynamic delay.
+  if (controller.is_dynamic_delay()) {
+    for (unsigned i = 0; i < tokens.size(); ++i) {
+      // need to set the min delay requirement to be what the non-dynamic path
+      // expects.
+      SetDelay(controller, i, 10u MBPS);
+    }
+  }
   // Now accumulate debt with some passage of time.
-  for (unsigned i = 0; i < tokens.size(); ++i) {
+  for (auto i = num_tokens - 1; i >= 0; --i) {
     // Debt is accumulated in time, not in bytes, so this new write
     // limit is not applied to prior requested delays, even it they are
     // in progress.
-    tokens[i] = controller.GetDelayToken((i + 1u) MBPS);
+    tokens[i] = SetDelay(controller, i, (i + 1u) MBPS);
     uint64_t delay = controller.GetDelay(clock_.get(), 63 MB);
     ASSERT_GT(delay, debt);
     uint64_t incremental = delay - debt;
@@ -185,16 +258,19 @@ TEST_P(WriteControllerTest, DebtAccumulation) {
     ASSERT_LT(0U, controller.GetDelay(clock_.get(), 63 MB));
     ASSERT_LT(0U, controller.GetDelay(clock_.get(), 100u /*small bytes*/));
     tokens[i].reset();
+    if (controller.is_dynamic_delay()) {
+      controller.HandleRemoveDelayReq(this + i);
+    }
   }
   // All tokens released.
   // Verify that releasing all tokens pays down debt, even with no time passage.
-  tokens[0] = controller.GetDelayToken(1 MBPS);
+  tokens[0] = SetDelay(controller, 0, (1 MBPS));
   ASSERT_EQ(0U, controller.GetDelay(clock_.get(), 100u /*small bytes*/));
 }
 
 // This may or may not be a "good" feature, but it's an old feature
-TEST_P(WriteControllerTest, CreditAccumulation) {
-  WriteController controller(GetParam(), 10 MBPS);
+TEST_F(WriteControllerTest, CreditAccumulation) {
+  WriteController controller(false, 10 MBPS);
 
   std::array<std::unique_ptr<WriteControllerToken>, 10> tokens;
 

@@ -496,18 +496,18 @@ class ColumnFamilyData {
   void TEST_ResetWriteControllerToken() { write_controller_token_.reset(); }
 
  private:
-  std::unique_ptr<WriteControllerToken> DynamicSetupDelay(
-      WriteController* write_controller, uint64_t compaction_needed_bytes,
-      const MutableCFOptions& mutable_cf_options,
-      WriteStallCause& write_stall_cause);
+  void UpdateCFRate(void* client_id, uint64_t write_rate);
+  void ResetCFRate(void* client_id);
+
+  void DynamicSetupDelay(uint64_t max_write_rate,
+                         uint64_t compaction_needed_bytes,
+                         const MutableCFOptions& mutable_cf_options,
+                         WriteStallCause& write_stall_cause);
 
   double CalculateWriteDelayDividerAndMaybeUpdateWriteStallCause(
       uint64_t compaction_needed_bytes,
       const MutableCFOptions& mutable_cf_options,
       WriteStallCause& write_stall_cause);
-
-  // returns the min rate to set
-  uint64_t UpdateCFRate(uint32_t id, uint64_t write_rate);
 
  public:
   void set_initialized() { initialized_.store(true); }
@@ -550,6 +550,13 @@ class ColumnFamilyData {
 
   ThreadLocalPtr* TEST_GetLocalSV() { return local_sv_.get(); }
   WriteBufferManager* write_buffer_mgr() { return write_buffer_manager_; }
+
+  WriteController* write_controller_ptr() { return write_controller_.get(); }
+
+  const WriteController* write_controller_ptr() const {
+    return write_controller_.get();
+  }
+
   std::shared_ptr<CacheReservationManager>
   GetFileMetadataCacheReservationManager() {
     return file_metadata_cache_res_mgr_;
@@ -589,6 +596,7 @@ class ColumnFamilyData {
   ColumnFamilyData(uint32_t id, const std::string& name,
                    Version* dummy_versions, Cache* table_cache,
                    WriteBufferManager* write_buffer_manager,
+                   std::shared_ptr<WriteController> write_controller,
                    const ColumnFamilyOptions& options,
                    const ImmutableDBOptions& db_options,
                    const FileOptions* file_options,
@@ -624,6 +632,7 @@ class ColumnFamilyData {
   std::unique_ptr<InternalStats> internal_stats_;
 
   WriteBufferManager* write_buffer_manager_;
+  std::shared_ptr<WriteController> write_controller_;
 
   MemTable* mem_;
   MemTableList imm_;
@@ -771,19 +780,15 @@ class ColumnFamilySet {
 
   WriteBufferManager* write_buffer_manager() { return write_buffer_manager_; }
 
-  const std::shared_ptr<WriteController>& write_controller() const {
+  std::shared_ptr<WriteController> write_controller() const {
     return write_controller_;
   }
 
-  uint64_t UpdateCFRate(uint32_t id, uint64_t write_rate);
-
-  bool IsInRateMap(uint32_t id) { return cf_id_to_write_rate_.count(id); }
-
-  // try and remove the cf id from WriteController::cf_id_to_write_rate_.
-  // if successful and it was the min rate, set the current minimum value.
-  void DeleteSelfFromMapAndMaybeUpdateDelayRate(uint32_t id);
-
   WriteController* write_controller_ptr() { return write_controller_.get(); }
+
+  const WriteController* write_controller_ptr() const {
+    return write_controller_.get();
+  }
 
  private:
   friend class ColumnFamilyData;
@@ -829,8 +834,6 @@ class ColumnFamilySet {
   std::shared_ptr<IOTracer> io_tracer_;
   const std::string& db_id_;
   std::string db_session_id_;
-
-  std::unordered_map<uint32_t, uint64_t> cf_id_to_write_rate_;
 };
 
 // A wrapper for ColumnFamilySet that supports releasing DB mutex during each

@@ -341,12 +341,12 @@ TEST_P(DBTestSharedWriteBufferAcrossCFs, SharedWriteBufferAcrossCFs) {
   if (use_old_interface_) {
     options.db_write_buffer_size = 120000;  // this is the real limit
   } else if (!cost_cache_) {
-    options.write_buffer_manager.reset(
-        new WriteBufferManager(114285, {}, WriteBufferManager::kDfltAllowStall,
-                               false /* initiate_flushes */));
+    options.write_buffer_manager.reset(new WriteBufferManager(
+        114285, {}, WriteBufferManager::kDfltAllowDelaysAndStalls,
+        false /* initiate_flushes */));
   } else {
     options.write_buffer_manager.reset(new WriteBufferManager(
-        114285, cache, WriteBufferManager::kDfltAllowStall,
+        114285, cache, WriteBufferManager::kDfltAllowDelaysAndStalls,
         false /* initiate_flushes */));
   }
   options.write_buffer_size = 500000;  // this is never hit
@@ -527,7 +527,7 @@ TEST_F(DBTest2, SharedWriteBufferLimitAcrossDB) {
   // Use a write buffer total size so that the soft limit is about
   // 105000.
   options.write_buffer_manager.reset(new WriteBufferManager(
-      120000, {} /* cache */, WriteBufferManager::kDfltAllowStall,
+      120000, {} /* cache */, WriteBufferManager::kDfltAllowDelaysAndStalls,
       false /* initiate_flushes */));
   CreateAndReopenWithCF({"cf1", "cf2"}, options);
 
@@ -1954,7 +1954,7 @@ TEST_F(DBTest2, CompactionStall) {
   DestroyAndReopen(options);
   // make sure all background compaction jobs can be scheduled
   auto stop_token =
-      dbfull()->TEST_write_controler()->GetCompactionPressureToken();
+      dbfull()->write_controller_ptr()->GetCompactionPressureToken();
 
   Random rnd(301);
 

@@ -2538,8 +2538,10 @@ void StressTest::PrintEnv() const {
           FLAGS_db_write_buffer_size);
   fprintf(stdout, "Cost To Cache (WBM)       : %s\n",
           FLAGS_cost_write_buffer_to_cache ? "true" : "false");
-  fprintf(stdout, "Allow WBM Stalls          : %s\n",
-          FLAGS_allow_wbm_stalls ? "true" : "false");
+  fprintf(stdout, "Allow WBM Delays and Stalls: %s\n",
+          FLAGS_allow_wbm_delays_and_stalls ? "true" : "false");
+  fprintf(stdout, "WBM start delay percent   : %d\n",
+          FLAGS_start_delay_percent);
   fprintf(stdout, "Initiate WBM Flushes      : %s\n",
           FLAGS_initiate_wbm_flushes ? "true" : "false");
   fprintf(stdout, "Write-buffer-size         : %d\n", FLAGS_write_buffer_size);
@@ -3290,12 +3292,14 @@ void InitializeOptionsFromFlags(
   }
   if (FLAGS_cost_write_buffer_to_cache) {
     options.write_buffer_manager.reset(new WriteBufferManager(
-        FLAGS_db_write_buffer_size, cache, FLAGS_allow_wbm_stalls,
+        FLAGS_db_write_buffer_size, cache, FLAGS_allow_wbm_delays_and_stalls,
         FLAGS_initiate_wbm_flushes, flush_initiation_options));
   } else {
     options.write_buffer_manager.reset(new WriteBufferManager(
-        FLAGS_db_write_buffer_size, {} /* cache */, FLAGS_allow_wbm_stalls,
-        FLAGS_initiate_wbm_flushes, flush_initiation_options));
+        FLAGS_db_write_buffer_size, {} /* cache */,
+        FLAGS_allow_wbm_delays_and_stalls, FLAGS_initiate_wbm_flushes,
+        flush_initiation_options,
+        static_cast<uint16_t>(FLAGS_start_delay_percent)));
   }
 
   options.write_buffer_size = FLAGS_write_buffer_size;

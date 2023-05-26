@@ -923,11 +923,17 @@ class DBImpl : public DB {
     return num_running_compactions_;
   }
 
-  const std::shared_ptr<WriteController>& write_controller() const {
+  std::shared_ptr<WriteController> write_controller() const {
     return write_controller_;
   }
 
   WriteController* write_controller_ptr() { return write_controller_.get(); }
+
+  const WriteController* write_controller_ptr() const {
+    return write_controller_.get();
+  }
+
+  WriteBufferManager* write_buffer_manager() { return write_buffer_manager_; }
 
   // hollow transactions shell used for recovery.
   // these will then be passed to TransactionDB so that
@@ -1185,10 +1191,6 @@ class DBImpl : public DB {
                                         MutableCFOptions* mutable_cf_options);
 
   Cache* TEST_table_cache() { return table_cache_.get(); }
-
-  const std::shared_ptr<WriteController>& TEST_write_controler() {
-    return write_controller_;
-  }
 
   uint64_t TEST_FindMinLogContainingOutstandingPrep();
   uint64_t TEST_FindMinPrepLogReferencedByMemTable();

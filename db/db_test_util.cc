@@ -133,11 +133,11 @@ void DBTestBase::RecalculateWriteStallConditions(
 }
 
 bool DBTestBase::IsDbWriteStopped(DBImpl* dbimpl) {
-  return dbimpl->TEST_write_controler()->IsStopped();
+  return dbimpl->write_controller_ptr()->IsStopped();
 }
 
 bool DBTestBase::IsDbWriteDelayed(DBImpl* dbimpl) {
-  return dbimpl->TEST_write_controler()->NeedsDelay();
+  return dbimpl->write_controller_ptr()->NeedsDelay();
 }
 
 bool DBTestBase::ShouldSkipOptions(int option_config, int skip_mask) {

@@ -711,8 +711,13 @@ class CompactionJobTestBase : public testing::Test {
 
     {
       // When the state from WriteController is Delayed.
-      std::unique_ptr<WriteControllerToken> delay_token =
-          write_controller->GetDelayToken(1000000);
+      if (write_controller->is_dynamic_delay()) {
+        write_controller->HandleNewDelayReq(this, 1000000);
+      } else {
+        std::unique_ptr<WriteControllerToken> delay_token =
+            write_controller->GetDelayToken(1000000);
+      }
+
       ASSERT_EQ(compaction_job.GetRateLimiterPriority(), Env::IO_USER);
     }
 
@@ -2403,8 +2408,12 @@ TEST_F(CompactionJobIOPriorityTest, WriteControllerStateDelayed) {
   auto files = cfd->current()->storage_info()->LevelFiles(input_level);
   ASSERT_EQ(2U, files.size());
   {
-    std::unique_ptr<WriteControllerToken> delay_token =
-        write_controller_->GetDelayToken(1000000);
+    if (write_controller_->is_dynamic_delay()) {
+      write_controller_->HandleNewDelayReq(this, 1000000);
+    } else {
+      std::unique_ptr<WriteControllerToken> delay_token =
+          write_controller_->GetDelayToken(1000000);
+    }
     RunCompaction({files}, {input_level}, {expected_results}, {},
                   kMaxSequenceNumber, 1, false, {kInvalidBlobFileNumber}, false,
                   Env::IO_USER, Env::IO_USER);

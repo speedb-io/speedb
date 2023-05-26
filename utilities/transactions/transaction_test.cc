@@ -6780,7 +6780,7 @@ TEST_P(TransactionTest, UnlockWALStallCleared) {
     if (external_stall) {
       // Also make sure UnlockWAL can return despite another stall being in
       // effect.
-      token = dbimpl->TEST_write_controler()->GetStopToken();
+      token = dbimpl->write_controller_ptr()->GetStopToken();
     }
 
     SyncPoint::GetInstance()->DisableProcessing();

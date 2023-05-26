@@ -366,7 +366,7 @@ void CompactionJob::AcquireSubcompactionResources(
           mutable_db_options_copy_.max_background_compactions,
           mutable_db_options_copy_.max_background_jobs,
           versions_->GetColumnFamilySet()
-              ->write_controller()
+              ->write_controller_ptr()
               ->NeedSpeedupCompaction())
           .max_compactions;
   InstrumentedMutexLock l(db_mutex_);
@@ -2135,7 +2135,7 @@ std::string CompactionJob::GetTableFileName(uint64_t file_number) {
 Env::IOPriority CompactionJob::GetRateLimiterPriority() {
   if (versions_ && versions_->GetColumnFamilySet() &&
       versions_->GetColumnFamilySet()->write_controller()) {
-    WriteController* write_controller =
+    const WriteController* write_controller =
         versions_->GetColumnFamilySet()->write_controller_ptr();
     if (write_controller->NeedsDelay() || write_controller->IsStopped()) {
       return Env::IO_USER;

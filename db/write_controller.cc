@@ -9,9 +9,9 @@
 #include <atomic>
 #include <cassert>
 #include <chrono>
-#include <mutex>
 #include <ratio>
 
+#include "db/error_handler.h"
 #include "rocksdb/system_clock.h"
 #include "test_util/sync_point.h"
 
@@ -24,13 +24,13 @@ std::unique_ptr<WriteControllerToken> WriteController::GetStopToken() {
 
 std::unique_ptr<WriteControllerToken> WriteController::GetDelayToken(
     uint64_t write_rate) {
-  {
-    std::lock_guard<std::mutex> lock(metrics_mu_);
-    if (0 == total_delayed_++) {
-      // Starting delay, so reset counters.
-      next_refill_time_ = 0;
-      credit_in_bytes_ = 0;
-    }
+  // this is now only accessed when use_dynamic_delay = false so no need to
+  // protect
+  assert(is_dynamic_delay() == false);
+  if (0 == total_delayed_++) {
+    // Starting delay, so reset counters.
+    next_refill_time_ = 0;
+    credit_in_bytes_ = 0;
   }
   // NOTE: for simplicity, any current credit_in_bytes_ or "debt" in
   // next_refill_time_ will be based on an old rate. This rate will apply
@@ -41,35 +41,25 @@ std::unique_ptr<WriteControllerToken> WriteController::GetDelayToken(
 
 uint64_t WriteController::TEST_GetMapMinRate() { return GetMapMinRate(); }
 
-void WriteController::AddToDbRateMap(CfIdToRateMap* cf_map) {
-  std::lock_guard<std::mutex> lock(map_mu_);
-  db_id_to_write_rate_map_.insert(cf_map);
-}
-
-void WriteController::RemoveFromDbRateMap(CfIdToRateMap* cf_map) {
-  std::lock_guard<std::mutex> lock(map_mu_);
-  db_id_to_write_rate_map_.erase(cf_map);
-}
-
-// REQUIRES: write_controller map mutex held.
 uint64_t WriteController::GetMapMinRate() {
-  uint64_t min_rate = max_delayed_write_rate();
-  for (auto cf_id_to_write_rate_ : db_id_to_write_rate_map_) {
-    for (const auto& key_val : *cf_id_to_write_rate_) {
-      if (key_val.second < min_rate) {
-        min_rate = key_val.second;
-      }
-    }
+  assert(is_dynamic_delay());
+  if (!id_to_write_rate_map_.empty()) {
+    auto min_elem_iter = std::min_element(
+        id_to_write_rate_map_.begin(), id_to_write_rate_map_.end(),
+        [](const auto& a, const auto& b) { return a.second < b.second; });
+    return std::min(min_elem_iter->second, max_delayed_write_rate());
+  } else {
+    return max_delayed_write_rate();
   }
-  return min_rate;
 }
 
-bool WriteController::IsMinRate(uint32_t id, CfIdToRateMap* cf_map) {
-  if (!cf_map->count(id)) {
+bool WriteController::IsMinRate(void* client_id) {
+  assert(is_dynamic_delay());
+  if (!IsInRateMap(client_id)) {
     return false;
   }
   uint64_t min_rate = delayed_write_rate();
-  auto cf_rate = (*cf_map)[id];
+  auto cf_rate = id_to_write_rate_map_[client_id];
   // the cf is already in the map so it shouldnt be possible for it to have a
   // lower rate than the delayed_write_rate_ unless set_max_delayed_write_rate
   // has been used which also sets delayed_write_rate_
@@ -77,33 +67,68 @@ bool WriteController::IsMinRate(uint32_t id, CfIdToRateMap* cf_map) {
   return cf_rate <= min_rate;
 }
 
-void WriteController::DeleteSelfFromMapAndMaybeUpdateDelayRate(
-    uint32_t id, CfIdToRateMap* cf_map) {
-  std::lock_guard<std::mutex> lock(map_mu_);
-  bool was_min = IsMinRate(id, cf_map);
-  cf_map->erase(id);
-  if (was_min) {
-    set_delayed_write_rate(GetMapMinRate());
-  }
+bool WriteController::IsInRateMap(void* client_id) {
+  return id_to_write_rate_map_.count(client_id);
 }
 
-// the usual case is to set the write_rate of this cf only if its lower than the
-// current min (delayed_write_rate_) but theres also the case where this cf was
-// the min rate (was_min) and now its write_rate is higher than the
-// delayed_write_rate_ so we need to find a new min from all cfs
-// (GetMapMinRate())
-uint64_t WriteController::InsertToMapAndGetMinRate(uint32_t id,
-                                                   CfIdToRateMap* cf_map,
-                                                   uint64_t cf_write_rate) {
+// The usual case is to set the write_rate of this client (cf, write buffer
+// manager) only if its lower than the current min (delayed_write_rate_) but
+// theres also the case where this client was the min rate (was_min) and now
+// its write_rate is higher than the delayed_write_rate_ so we need to find a
+// new min from all clients via GetMapMinRate()
+void WriteController::HandleNewDelayReq(void* client_id,
+                                        uint64_t cf_write_rate) {
+  assert(is_dynamic_delay());
   std::lock_guard<std::mutex> lock(map_mu_);
-  bool was_min = IsMinRate(id, cf_map);
-  cf_map->insert_or_assign(id, cf_write_rate);
-  if (cf_write_rate <= delayed_write_rate()) {
-    return cf_write_rate;
+  bool was_min = IsMinRate(client_id);
+  bool inserted =
+      id_to_write_rate_map_.insert_or_assign(client_id, cf_write_rate).second;
+  if (inserted) {
+    total_delayed_++;
+  }
+  uint64_t min_rate = delayed_write_rate();
+  if (cf_write_rate <= min_rate) {
+    min_rate = cf_write_rate;
   } else if (was_min) {
-    return GetMapMinRate();
-  } else {
-    return delayed_write_rate();
+    min_rate = GetMapMinRate();
+  }
+  set_delayed_write_rate(min_rate);
+}
+
+// Checks if the client is in the id_to_write_rate_map_ , if it is:
+// 1. remove it
+// 2. decrement total_delayed_
+// 3. in case this client had min rate, also set up a new min from the map.
+// 4. if total_delayed_ == 0, reset next_refill_time_ and credit_in_bytes_
+void WriteController::HandleRemoveDelayReq(void* client_id) {
+  assert(is_dynamic_delay());
+  {
+    std::lock_guard<std::mutex> lock(map_mu_);
+    if (!IsInRateMap(client_id)) {
+      return;
+    }
+    bool was_min = RemoveDelayReq(client_id);
+    if (was_min) {
+      set_delayed_write_rate(GetMapMinRate());
+    }
+  }
+  MaybeResetCounters();
+}
+
+bool WriteController::RemoveDelayReq(void* client_id) {
+  bool was_min = IsMinRate(client_id);
+  [[maybe_unused]] bool erased = id_to_write_rate_map_.erase(client_id);
+  assert(erased);
+  total_delayed_--;
+  return was_min;
+}
+
+void WriteController::MaybeResetCounters() {
+  std::lock_guard<std::mutex> lock(metrics_mu_);
+  if (total_delayed_ == 0) {
+    // reset counters.
+    next_refill_time_ = 0;
+    credit_in_bytes_ = 0;
   }
 }
 

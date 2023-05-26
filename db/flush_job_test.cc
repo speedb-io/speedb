@@ -596,8 +596,12 @@ TEST_F(FlushJobTest, GetRateLimiterPriorityForWrite) {
 
   {
     // When the state from WriteController is Delayed.
-    std::unique_ptr<WriteControllerToken> delay_token =
-        write_controller->GetDelayToken(1000000);
+    if (write_controller->is_dynamic_delay()) {
+      write_controller->HandleNewDelayReq(this, 1000000);
+    } else {
+      std::unique_ptr<WriteControllerToken> delay_token =
+          write_controller->GetDelayToken(1000000);
+    }
     ASSERT_EQ(flush_job.GetRateLimiterPriorityForWrite(), Env::IO_USER);
   }
 

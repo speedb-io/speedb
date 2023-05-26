@@ -1888,14 +1888,14 @@ Status DBImpl::DelayWrite(uint64_t num_bytes, WriteThread& write_thread,
       } else {
         TEST_SYNC_POINT("DBImpl::DelayWrite:NonmemWait");
       }
-      mutex_.Unlock();
-      auto continue_wait = [this]() -> bool {
-        return (this->error_handler_.GetBGError().ok() &&
-                !(this->shutting_down_.load(std::memory_order_relaxed)));
-      };
-      write_controller_->WaitOnCV(continue_wait);
-
-      mutex_.Lock();
+      {
+        InstrumentedMutexUnlock unlock_guard(&mutex_);
+        auto continue_wait = [this]() -> bool {
+          return (this->error_handler_.GetBGError().ok() &&
+                  !(this->shutting_down_.load(std::memory_order_relaxed)));
+        };
+        write_controller_->WaitOnCV(continue_wait);
+      }
       TEST_SYNC_POINT_CALLBACK("DBImpl::DelayWrite:AfterWait", &mutex_);
       write_thread.EndWriteStall();
     }

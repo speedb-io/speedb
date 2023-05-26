@@ -101,6 +101,8 @@ DBOptions SanitizeOptions(const std::string& dbname, const DBOptions& src,
         result.use_dynamic_delay, result.delayed_write_rate));
   } else if (result.use_dynamic_delay == false) {
     result.use_dynamic_delay = true;
+    result.write_controller.reset(new WriteController(
+        result.use_dynamic_delay, result.delayed_write_rate));
     ROCKS_LOG_WARN(
         result.info_log,
         "Global Write Controller is only possible with use_dynamic_delay");

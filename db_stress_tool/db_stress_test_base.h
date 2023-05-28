@@ -31,12 +31,13 @@ class StressTest {
 
   bool BuildOptionsTable();
 
-  void InitDb(SharedState*);
+  virtual void InitDb(SharedState*);
   // The initialization work is split into two parts to avoid a circular
   // dependency with `SharedState`.
   virtual void FinishInitDb(SharedState*);
   void TrackExpectedState(SharedState* shared);
-  void OperateDb(ThreadState* thread);
+
+  virtual void OperateDb(ThreadState* thread);
   virtual void VerifyDb(ThreadState* thread) const = 0;
   virtual void ContinuouslyVerifyDb(ThreadState* /*thread*/) const = 0;
   void PrintStatistics();

@@ -358,6 +358,8 @@ int db_stress_tool(int argc, char** argv) {
   std::unique_ptr<ROCKSDB_NAMESPACE::StressTest> stress;
   if (FLAGS_test_cf_consistency) {
     stress.reset(CreateCfConsistencyStressTest());
+  } else if (FLAGS_test_stall_stress) {
+    stress.reset(CreateStallStressTest());
   } else if (FLAGS_test_batches_snapshots) {
     stress.reset(CreateBatchedOpsStressTest());
   } else if (FLAGS_test_multi_ops_txns) {

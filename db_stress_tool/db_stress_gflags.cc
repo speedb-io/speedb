@@ -105,6 +105,11 @@ DEFINE_bool(test_multi_ops_txns, false,
             "transactions on a simple relational table with primary and "
             "secondary index.");
 
+DEFINE_bool(test_stall_stress, false, "runs stall stress testing");
+
+DEFINE_int32(num_dbs, 2,
+             "Number of dbs to open when test_stall_stress is true.");
+
 DEFINE_int32(threads, 32, "Number of concurrent threads to run.");
 
 DEFINE_int32(ttl, -1,

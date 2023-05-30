@@ -1854,7 +1854,7 @@ DEFINE_int64(multiread_stride, 0,
              "Stride length for the keys in a MultiGet batch");
 DEFINE_bool(multiread_batched, false, "Use the new MultiGet API");
 
-DEFINE_string(memtablerep, "speedb.HashSpdRepFactory", "");
+DEFINE_string(memtablerep, "skip_list", "");
 DEFINE_int64(hash_bucket_count, 1000000, "hash bucket count");
 DEFINE_bool(use_seek_parralel_threshold, true,
             "if use seek parralel threshold .");

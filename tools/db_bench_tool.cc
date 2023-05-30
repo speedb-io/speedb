@@ -1590,7 +1590,7 @@ DEFINE_double(experimental_mempurge_threshold,
               ROCKSDB_NAMESPACE::Options().experimental_mempurge_threshold,
               "Maximum useful payload ratio estimate that triggers a mempurge "
               "(memtable garbage collection).");
-DEFINE_bool(use_spdb_writes, true, "Use optimized Speedb write flow");
+DEFINE_bool(use_spdb_writes, false, "Use optimized Speedb write flow");
 
 DEFINE_bool(inplace_update_support,
             ROCKSDB_NAMESPACE::Options().inplace_update_support,
@@ -1854,7 +1854,7 @@ DEFINE_int64(multiread_stride, 0,
              "Stride length for the keys in a MultiGet batch");
 DEFINE_bool(multiread_batched, false, "Use the new MultiGet API");
 
-DEFINE_string(memtablerep, "skip_list", "");
+DEFINE_string(memtablerep, "speedb.HashSpdRepFactory", "");
 DEFINE_int64(hash_bucket_count, 1000000, "hash bucket count");
 DEFINE_bool(use_seek_parralel_threshold, true,
             "if use seek parralel threshold .");

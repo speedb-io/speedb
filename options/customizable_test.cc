@@ -36,6 +36,7 @@
 #include "rocksdb/utilities/options_type.h"
 #include "table/block_based/filter_policy_internal.h"
 #include "table/block_based/flush_block_policy.h"
+#include "table/block_based/table_pinning_policy.h"
 #include "table/mock_table.h"
 #include "test_util/mock_time_env.h"
 #include "test_util/testharness.h"
@@ -1392,6 +1393,22 @@ class MockFilterPolicy : public FilterPolicy {
   }
 };
 
+class MockTablePinningPolicy : public TablePinningPolicy {
+ public:
+  static const char* kClassName() { return "Mock"; }
+  const char* Name() const override { return kClassName(); }
+  bool MayPin(const TablePinningOptions&, uint8_t, size_t) const override {
+    return false;
+  }
+  bool PinData(const TablePinningOptions&, uint8_t, size_t,
+               std::unique_ptr<PinnedEntry>*) override {
+    return false;
+  }
+  void UnPinData(std::unique_ptr<PinnedEntry>&) override {}
+  size_t GetUsage() const override { return 0; }
+  std::string ToString() const override { return ""; }
+};
+
 static int RegisterLocalObjects(ObjectLibrary& library,
                                 const std::string& /*arg*/) {
   size_t num_types;
@@ -1506,12 +1523,18 @@ static int RegisterLocalObjects(ObjectLibrary& library,
         guard->reset(new MockTablePropertiesCollectorFactory());
         return guard->get();
       });
-
   library.AddFactory<const FilterPolicy>(
       MockFilterPolicy::kClassName(),
       [](const std::string& /*uri*/, std::unique_ptr<const FilterPolicy>* guard,
          std::string* /* errmsg */) {
         guard->reset(new MockFilterPolicy());
+        return guard->get();
+      });
+  library.AddFactory<TablePinningPolicy>(
+      MockTablePinningPolicy::kClassName(),
+      [](const std::string& /*uri*/, std::unique_ptr<TablePinningPolicy>* guard,
+         std::string* /* errmsg */) {
+        guard->reset(new MockTablePinningPolicy());
         return guard->get();
       });
 
@@ -2105,6 +2128,13 @@ TEST_F(LoadCustomizableTest, LoadFlushBlockPolicyFactoryTest) {
     ASSERT_NE(bbto->flush_block_policy_factory.get(), nullptr);
     ASSERT_STREQ(bbto->flush_block_policy_factory->Name(),
                  TestFlushBlockPolicyFactory::kClassName());
+  }
+}
+
+TEST_F(LoadCustomizableTest, LoadTablePiningPolicyTest) {
+  ASSERT_OK(TestSharedBuiltins<TablePinningPolicy>("Mock", ""));
+  if (RegisterTests("Test")) {
+    ExpectCreateShared<TablePinningPolicy>("Mock");
   }
 }
 

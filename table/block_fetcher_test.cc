@@ -16,6 +16,7 @@
 #include "table/block_based/block_based_table_builder.h"
 #include "table/block_based/block_based_table_factory.h"
 #include "table/block_based/block_based_table_reader.h"
+#include "table/block_based/table_pinning_policy.h"
 #include "table/format.h"
 #include "test_util/testharness.h"
 #include "utilities/memory_allocators.h"
@@ -338,9 +339,9 @@ class BlockFetcherTest : public testing::Test {
     std::unique_ptr<BlockBasedTable::IndexReader> index_reader;
     ReadOptions ro;
     ASSERT_OK(BinarySearchIndexReader::Create(
-        table.get(), ro, nullptr /* prefetch_buffer */, false /* use_cache */,
-        false /* prefetch */, false /* pin */, nullptr /* lookup_context */,
-        &index_reader));
+        table.get(), ro, TablePinningOptions(), nullptr /* prefetch_buffer */,
+        false /* use_cache */, false /* prefetch */, false /* pin */,
+        nullptr /* lookup_context */, &index_reader));
 
     std::unique_ptr<InternalIteratorBase<IndexValue>> iter(
         index_reader->NewIterator(

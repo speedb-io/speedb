@@ -39,6 +39,7 @@ struct TableReaderOptions {
       const InternalKeyComparator& _internal_comparator,
       bool _skip_filters = false, bool _immortal = false,
       bool _force_direct_prefetch = false, int _level = -1,
+      bool _is_bottommost = false,
       BlockCacheTracer* const _block_cache_tracer = nullptr,
       size_t _max_file_size_for_l0_meta_pin = 0,
       const std::string& _cur_db_session_id = "", uint64_t _cur_file_num = 0,
@@ -51,6 +52,7 @@ struct TableReaderOptions {
         immortal(_immortal),
         force_direct_prefetch(_force_direct_prefetch),
         level(_level),
+        is_bottommost(_is_bottommost),
         largest_seqno(_largest_seqno),
         block_cache_tracer(_block_cache_tracer),
         max_file_size_for_l0_meta_pin(_max_file_size_for_l0_meta_pin),
@@ -73,6 +75,8 @@ struct TableReaderOptions {
   // What level this table/file is on, -1 for "not set, don't know." Used
   // for level-specific statistics.
   int level;
+  // Whether or not this is the bottom most level
+  bool is_bottommost;
   // largest seqno in the table (or 0 means unknown???)
   SequenceNumber largest_seqno;
   BlockCacheTracer* const block_cache_tracer;

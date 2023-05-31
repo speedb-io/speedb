@@ -17,6 +17,7 @@
 #include "rocksdb/filter_policy.h"
 #include "table/block_based/block.h"
 #include "table/block_based/block_based_table_reader.h"
+#include "table/block_based/table_pinning_policy.h"
 #include "util/coding.h"
 
 namespace ROCKSDB_NAMESPACE {
@@ -187,18 +188,22 @@ Slice PartitionedFilterBlockBuilder::Finish(
 
 PartitionedFilterBlockReader::PartitionedFilterBlockReader(
     const BlockBasedTable* t,
-    CachableEntry<Block_kFilterPartitionIndex>&& filter_block)
-    : FilterBlockReaderCommon(t, std::move(filter_block)) {}
+    CachableEntry<Block_kFilterPartitionIndex>&& filter_block,
+    std::unique_ptr<PinnedEntry>&& pinned)
+    : FilterBlockReaderCommon(t, std::move(filter_block), std::move(pinned)) {}
 
 std::unique_ptr<FilterBlockReader> PartitionedFilterBlockReader::Create(
     const BlockBasedTable* table, const ReadOptions& ro,
-    FilePrefetchBuffer* prefetch_buffer, bool use_cache, bool prefetch,
-    bool pin, BlockCacheLookupContext* lookup_context) {
+    const TablePinningOptions& tpo, FilePrefetchBuffer* prefetch_buffer,
+    bool use_cache, bool prefetch, bool pin,
+    BlockCacheLookupContext* lookup_context) {
   assert(table);
   assert(table->get_rep());
   assert(!pin || prefetch);
 
   CachableEntry<Block_kFilterPartitionIndex> filter_block;
+  std::unique_ptr<PinnedEntry> pinned;
+
   if (prefetch || !use_cache) {
     const Status s = ReadFilterBlock(table, prefetch_buffer, ro, use_cache,
                                      nullptr /* get_context */, lookup_context,
@@ -208,13 +213,18 @@ std::unique_ptr<FilterBlockReader> PartitionedFilterBlockReader::Create(
       return std::unique_ptr<FilterBlockReader>();
     }
 
-    if (use_cache && !pin) {
+    if (pin) {
+      table->PinData(tpo, TablePinningPolicy::kTopLevel,
+                     filter_block.GetValue()->ApproximateMemoryUsage(),
+                     &pinned);
+    }
+    if (use_cache && !pinned) {
       filter_block.Reset();
     }
   }
 
-  return std::unique_ptr<FilterBlockReader>(
-      new PartitionedFilterBlockReader(table, std::move(filter_block)));
+  return std::unique_ptr<FilterBlockReader>(new PartitionedFilterBlockReader(
+      table, std::move(filter_block), std::move(pinned)));
 }
 
 bool PartitionedFilterBlockReader::KeyMayMatch(

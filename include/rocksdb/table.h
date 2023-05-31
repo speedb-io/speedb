@@ -40,6 +40,7 @@ struct TableReaderOptions;
 struct TableBuilderOptions;
 class TableBuilder;
 class TableFactory;
+class TablePinningPolicy;
 class TableReader;
 class WritableFileWriter;
 struct ConfigOptions;
@@ -655,6 +656,9 @@ struct BlockBasedTableOptions {
   //
   // Default: 2
   uint64_t num_file_reads_for_auto_readahead = 2;
+
+  // EXPERIMENTAL
+  std::shared_ptr<TablePinningPolicy> pinning_policy;
 };
 
 // Table Properties that are specific to block-based table properties.

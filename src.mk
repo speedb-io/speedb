@@ -192,6 +192,7 @@ LIB_SOURCES =                                                   \
   table/block_based/partitioned_index_iterator.cc               \
   table/block_based/partitioned_index_reader.cc                 \
   table/block_based/reader_common.cc                            \
+  table/block_based/table_pinning_policy.cc                     \
   table/block_based/uncompression_dict_reader.cc                \
   table/block_fetcher.cc                                        \
   table/cuckoo/cuckoo_table_builder.cc                          \

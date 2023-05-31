@@ -1145,9 +1145,9 @@ bool BlockBasedTable::PinData(const TablePinningOptions& tpo, uint8_t type,
   return rep_->table_options.pinning_policy->PinData(tpo, type, size, pinned);
 }
 
-void BlockBasedTable::UnPinData(std::unique_ptr<PinnedEntry>& pinned) const {
+void BlockBasedTable::UnPinData(std::unique_ptr<PinnedEntry>&& pinned) const {
   if (pinned) {
-    rep_->table_options.pinning_policy->UnPinData(pinned);
+    rep_->table_options.pinning_policy->UnPinData(std::move(pinned));
   }
 }
 

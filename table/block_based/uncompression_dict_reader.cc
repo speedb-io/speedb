@@ -53,7 +53,7 @@ Status UncompressionDictReader::Create(
 }
 
 UncompressionDictReader::~UncompressionDictReader() {
-  table_->UnPinData(pinned_);
+  table_->UnPinData(std::move(pinned_));
 }
 
 Status UncompressionDictReader::ReadUncompressionDictionary(

@@ -131,7 +131,7 @@ bool RecordingPinningPolicy::PinData(const TablePinningOptions& tpo,
   }
 }
 
-void RecordingPinningPolicy::UnPinData(std::unique_ptr<PinnedEntry>& pinned) {
+void RecordingPinningPolicy::UnPinData(std::unique_ptr<PinnedEntry>&& pinned) {
   RecordPinned(pinned->level, pinned->type, pinned->size, false);
   usage_ -= pinned->size;
   pinned.reset();

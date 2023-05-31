@@ -24,14 +24,23 @@ class RecordingPinningPolicy : public TablePinningPolicy {
               size_t size) const override;
   bool PinData(const TablePinningOptions& tpo, uint8_t type, size_t size,
                std::unique_ptr<PinnedEntry>* pinned) override;
-  void UnPinData(std::unique_ptr<PinnedEntry>& pinned) override;
+  void UnPinData(std::unique_ptr<PinnedEntry>&& pinned) override;
   std::string ToString() const override;
+
+  // Returns the total pinned memory usage
   size_t GetUsage() const override;
+
+  // Returns the pinned memory usage for the input level
   size_t GetUsageByLevel(int level) const;
+
+  // Returns the pinned memory usage for the input type
   size_t GetUsageByType(uint8_t type) const;
 
  protected:
+  // Updates the statistics with the new pinned information.
   void RecordPinned(int level, uint8_t type, size_t size, bool pinned);
+
+  // Checks whether the data can be pinned.
   virtual bool CheckPin(const TablePinningOptions& tpo, uint8_t type,
                         size_t size, size_t limit) const = 0;
 

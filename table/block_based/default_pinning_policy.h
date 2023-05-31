@@ -12,8 +12,9 @@
 #include "table/block_based/recording_pinning_policy.h"
 
 namespace ROCKSDB_NAMESPACE {
+
+// The original RocksDB pinning policy
 class DefaultPinningPolicy : public RecordingPinningPolicy {
- public:
  public:
   DefaultPinningPolicy();
   DefaultPinningPolicy(const BlockBasedTableOptions& bbto);

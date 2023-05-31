@@ -79,10 +79,12 @@ class TablePinningPolicy : public Customizable {
                        size_t size, std::unique_ptr<PinnedEntry>* pinned) = 0;
 
   // Releases and clears the pinned entry.
-  virtual void UnPinData(std::unique_ptr<PinnedEntry>& pinned) = 0;
+  virtual void UnPinData(std::unique_ptr<PinnedEntry>&& pinned) = 0;
 
   // Returns the amount of data currently pinned.
   virtual size_t GetUsage() const = 0;
+
+  // Returns the info (e.g. statistics) associated with this policy.
   virtual std::string ToString() const = 0;
 };
 
@@ -101,8 +103,8 @@ class TablePinningPolicyWrapper : public TablePinningPolicy {
     return target_->PinData(tpo, type, size, pinned);
   }
 
-  void UnPinData(std::unique_ptr<PinnedEntry>& pinned) override {
-    target_->UnPinData(pinned);
+  void UnPinData(std::unique_ptr<PinnedEntry>&& pinned) override {
+    target_->UnPinData(std::move(pinned));
   }
 
   size_t GetUsage() const override { return target_->GetUsage(); }

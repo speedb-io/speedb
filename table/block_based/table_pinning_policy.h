@@ -13,12 +13,13 @@
 #include "rocksdb/status.h"
 
 namespace ROCKSDB_NAMESPACE {
+
 struct BlockBasedTableOptions;
 struct ConfigOptions;
 
 // Struct that contains information about the table being evaluated for pinning
 struct TablePinningOptions {
-  TablePinningOptions() {}
+  TablePinningOptions() = default;
 
   TablePinningOptions(int _level, bool _is_bottom, size_t _file_size,
                       size_t _max_file_size_for_l0_meta_pin)
@@ -82,7 +83,7 @@ class TablePinningPolicy : public Customizable {
   virtual void UnPinData(std::unique_ptr<PinnedEntry>&& pinned) = 0;
 
   // Returns the amount of data currently pinned.
-  virtual size_t GetUsage() const = 0;
+  virtual size_t GetPinnedUsage() const = 0;
 
   // Returns the info (e.g. statistics) associated with this policy.
   virtual std::string ToString() const = 0;
@@ -107,7 +108,7 @@ class TablePinningPolicyWrapper : public TablePinningPolicy {
     target_->UnPinData(std::move(pinned));
   }
 
-  size_t GetUsage() const override { return target_->GetUsage(); }
+  size_t GetPinnedUsage() const override { return target_->GetPinnedUsage(); }
 
  protected:
   std::shared_ptr<TablePinningPolicy> target_;

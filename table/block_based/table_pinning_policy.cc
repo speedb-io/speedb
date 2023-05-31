@@ -168,14 +168,14 @@ std::string RecordingPinningPolicy::ToString() const {
       .append("\n");
   return result;
 }
-size_t RecordingPinningPolicy::GetUsage() const { return usage_; }
+size_t RecordingPinningPolicy::GetPinnedUsage() const { return usage_; }
 
-size_t RecordingPinningPolicy::GetUsageByLevel(int level) const {
+size_t RecordingPinningPolicy::GetPinnedUsageByLevel(int level) const {
   if (level > kNumLevels) level = kNumLevels;
   return usage_by_level_[level];
 }
 
-size_t RecordingPinningPolicy::GetUsageByType(uint8_t type) const {
+size_t RecordingPinningPolicy::GetPinnedUsageByType(uint8_t type) const {
   if (type >= kNumTypes) type = kNumTypes - 1;
   return usage_by_type_[type];
 }

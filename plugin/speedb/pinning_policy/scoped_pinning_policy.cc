@@ -26,12 +26,14 @@ static std::unordered_map<std::string, OptionTypeInfo>
         {"capacity",
          {offsetof(struct ScopedPinningOptions, capacity), OptionType::kSizeT,
           OptionVerificationType::kNormal, OptionTypeFlags::kNone}},
-        {"bottom_limit",
-         {offsetof(struct ScopedPinningOptions, bottom_limit), OptionType::kInt,
-          OptionVerificationType::kNormal, OptionTypeFlags::kNone}},
-        {"mid_limit",
-         {offsetof(struct ScopedPinningOptions, mid_limit), OptionType::kInt,
-          OptionVerificationType::kNormal, OptionTypeFlags::kNone}},
+        {"bottom_percent",
+         {offsetof(struct ScopedPinningOptions, bottom_percent),
+          OptionType::kUInt32T, OptionVerificationType::kNormal,
+          OptionTypeFlags::kNone}},
+        {"mid_percent",
+         {offsetof(struct ScopedPinningOptions, mid_percent),
+          OptionType::kUInt32T, OptionVerificationType::kNormal,
+          OptionTypeFlags::kNone}},
 };
 
 ScopedPinningPolicy::ScopedPinningPolicy() {
@@ -49,20 +51,17 @@ std::string ScopedPinningPolicy::GetId() const {
 
 bool ScopedPinningPolicy::CheckPin(const TablePinningOptions& tpo,
                                    uint8_t /* type */, size_t size,
-                                   size_t limit) const {
-  if (tpo.is_bottom && options_.bottom_limit >= 0) {
-    if (limit + size > (options_.capacity * options_.bottom_limit / 100)) {
-      printf(
-          "MJR: Rejecting pinned bottom size=%d/%d level=%d capacity=%d/%d\n",
-          (int)size, (int)limit, tpo.level, (int)options_.capacity,
-          (int)(options_.capacity * options_.bottom_limit / 100));
+                                   size_t usage) const {
+  auto proposed = usage + size;
+  if (tpo.is_bottom && options_.bottom_percent >= 0) {
+    if (proposed > (options_.capacity * options_.bottom_percent / 100)) {
       return false;
     }
-  } else if (tpo.level > 0 && options_.mid_limit >= 0) {
-    if (limit + size > (options_.capacity * options_.mid_limit / 100)) {
+  } else if (tpo.level > 0 && options_.mid_percent >= 0) {
+    if (proposed > (options_.capacity * options_.mid_percent / 100)) {
       return false;
     }
-  } else if (limit + size > options_.capacity) {
+  } else if (proposed > options_.capacity) {
     return false;
   }
 

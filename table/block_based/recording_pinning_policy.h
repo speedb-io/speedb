@@ -28,13 +28,13 @@ class RecordingPinningPolicy : public TablePinningPolicy {
   std::string ToString() const override;
 
   // Returns the total pinned memory usage
-  size_t GetUsage() const override;
+  size_t GetPinnedUsage() const override;
 
   // Returns the pinned memory usage for the input level
-  size_t GetUsageByLevel(int level) const;
+  size_t GetPinnedUsageByLevel(int level) const;
 
   // Returns the pinned memory usage for the input type
-  size_t GetUsageByType(uint8_t type) const;
+  size_t GetPinnedUsageByType(uint8_t type) const;
 
  protected:
   // Updates the statistics with the new pinned information.

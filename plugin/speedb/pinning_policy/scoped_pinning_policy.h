@@ -25,9 +25,9 @@ struct ScopedPinningOptions {
   size_t capacity = 1024 * 1024 * 1024;  // 1GB
 
   // Percent of capacity at which not to pin bottom-most data
-  int bottom_limit = 10;
+  uint32_t bottom_percent = 10;
   // Percent of capacity at which not to pin non-L0 data
-  int mid_limit = 80;
+  uint32_t mid_percent = 80;
 };
 
 // A table policy that limits the size of the data to be pinned

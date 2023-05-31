@@ -1405,7 +1405,7 @@ class MockTablePinningPolicy : public TablePinningPolicy {
     return false;
   }
   void UnPinData(std::unique_ptr<PinnedEntry>&&) override {}
-  size_t GetUsage() const override { return 0; }
+  size_t GetPinnedUsage() const override { return 0; }
   std::string ToString() const override { return ""; }
 };
 

@@ -42,6 +42,7 @@ class ScopedPinningPolicyTest : public testing::Test {
                std::vector<std::unique_ptr<PinnedEntry>>& entries) {
     std::unique_ptr<PinnedEntry> p;
     if (pinning_policy_->PinData(tpo, type, size, &p)) {
+      ASSERT_NE(p.get(), nullptr);
       entries.emplace_back(std::move(p));
       return true;
     } else {
@@ -63,17 +64,17 @@ TEST_F(ScopedPinningPolicyTest, GetOptions) {
   auto opts = policy->GetOptions<ScopedPinningOptions>();
   ASSERT_NE(opts, nullptr);
   ASSERT_EQ(opts->capacity, ScopedPinningOptions().capacity);
-  ASSERT_EQ(opts->bottom_limit, ScopedPinningOptions().bottom_limit);
-  ASSERT_EQ(opts->mid_limit, ScopedPinningOptions().mid_limit);
+  ASSERT_EQ(opts->bottom_percent, ScopedPinningOptions().bottom_percent);
+  ASSERT_EQ(opts->mid_percent, ScopedPinningOptions().mid_percent);
   ASSERT_TRUE(policy->IsInstanceOf(ScopedPinningPolicy::kClassName()));
 
   ASSERT_OK(TablePinningPolicy::CreateFromString(
-      cfg, id + "; capacity=2048; bottom_limit=22; mid_limit=33", &policy));
+      cfg, id + "; capacity=2048; bottom_percent=22; mid_percent=33", &policy));
   opts = policy->GetOptions<ScopedPinningOptions>();
   ASSERT_NE(opts, nullptr);
   ASSERT_EQ(opts->capacity, 2048);
-  ASSERT_EQ(opts->bottom_limit, 22);
-  ASSERT_EQ(opts->mid_limit, 33);
+  ASSERT_EQ(opts->bottom_percent, 22);
+  ASSERT_EQ(opts->mid_percent, 33);
   ASSERT_TRUE(policy->IsInstanceOf(ScopedPinningPolicy::kClassName()));
 }
 
@@ -84,12 +85,12 @@ TEST_F(ScopedPinningPolicyTest, GetManaged) {
 
   std::string id = std::string("id=") + ScopedPinningPolicy::kClassName();
   ASSERT_OK(TablePinningPolicy::CreateFromString(
-      cfg, id + "; capacity=2048; bottom_limit=22; mid_limit=33", &policy));
+      cfg, id + "; capacity=2048; bottom_percent=22; mid_percent=33", &policy));
   auto opts = policy->GetOptions<ScopedPinningOptions>();
   ASSERT_NE(opts, nullptr);
   ASSERT_EQ(opts->capacity, 2048);
-  ASSERT_EQ(opts->bottom_limit, 22);
-  ASSERT_EQ(opts->mid_limit, 33);
+  ASSERT_EQ(opts->bottom_percent, 22);
+  ASSERT_EQ(opts->mid_percent, 33);
   ASSERT_TRUE(policy->IsInstanceOf(ScopedPinningPolicy::kClassName()));
   std::shared_ptr<TablePinningPolicy> copy;
   ASSERT_OK(TablePinningPolicy::CreateFromString(cfg, policy->GetId(), &copy));
@@ -98,14 +99,14 @@ TEST_F(ScopedPinningPolicyTest, GetManaged) {
   ASSERT_OK(TablePinningPolicy::CreateFromString(
       cfg,
       "id= " + policy->GetId() +
-          "; capacity=4096; bottom_limit=11; mid_limit=44",
+          "; capacity=4096; bottom_percent=11; mid_percent=44",
       &copy));
   ASSERT_EQ(copy, policy);
   opts = policy->GetOptions<ScopedPinningOptions>();
   ASSERT_NE(opts, nullptr);
   ASSERT_EQ(opts->capacity, 2048);
-  ASSERT_EQ(opts->bottom_limit, 22);
-  ASSERT_EQ(opts->mid_limit, 33);
+  ASSERT_EQ(opts->bottom_percent, 22);
+  ASSERT_EQ(opts->mid_percent, 33);
 }
 
 TEST_F(ScopedPinningPolicyTest, TestLimits) {
@@ -113,9 +114,8 @@ TEST_F(ScopedPinningPolicyTest, TestLimits) {
   auto opts = policy->GetOptions<ScopedPinningOptions>();
   ASSERT_NE(opts, nullptr);
   auto capacity = opts->capacity;
-  size_t bottom = capacity * opts->bottom_limit / 100;
-  size_t mid = capacity * opts->mid_limit / 100;
-  // size_t used = 0;
+  size_t bottom = capacity * opts->bottom_percent / 100;
+  size_t mid = capacity * opts->mid_percent / 100;
 
   TablePinningOptions l0(0, false, 0, 0);  // Level 0
   TablePinningOptions lm(1, false, 0, 0);  // Mid level
@@ -172,19 +172,20 @@ TEST_F(ScopedPinningPolicyTest, TestLimits) {
 
   ASSERT_TRUE(
       PinData(lb, TablePinningPolicy::kTopLevel, bottom - 3, pinned_entries));
-  ASSERT_EQ(policy->GetUsage(), bottom - 1);
-  ASSERT_EQ(policy->GetUsageByLevel(0), 2);
-  ASSERT_EQ(policy->GetUsageByLevel(lb.level), bottom - 3);
-  ASSERT_EQ(policy->GetUsageByType(TablePinningPolicy::kIndex), 2);
-  ASSERT_EQ(policy->GetUsageByType(TablePinningPolicy::kTopLevel), bottom - 3);
+  ASSERT_EQ(policy->GetPinnedUsage(), bottom - 1);
+  ASSERT_EQ(policy->GetPinnedUsageByLevel(0), 2);
+  ASSERT_EQ(policy->GetPinnedUsageByLevel(lb.level), bottom - 3);
+  ASSERT_EQ(policy->GetPinnedUsageByType(TablePinningPolicy::kIndex), 2);
+  ASSERT_EQ(policy->GetPinnedUsageByType(TablePinningPolicy::kTopLevel),
+            bottom - 3);
 
   policy->UnPinData(pinned_entries.back());
   pinned_entries.pop_back();
-  ASSERT_EQ(policy->GetUsage(), 2);
-  ASSERT_EQ(policy->GetUsageByLevel(0), 2);
-  ASSERT_EQ(policy->GetUsageByLevel(lb.level), 0);
-  ASSERT_EQ(policy->GetUsageByType(TablePinningPolicy::kIndex), 2);
-  ASSERT_EQ(policy->GetUsageByType(TablePinningPolicy::kTopLevel), 0);
+  ASSERT_EQ(policy->GetPinnedUsage(), 2);
+  ASSERT_EQ(policy->GetPinnedUsageByLevel(0), 2);
+  ASSERT_EQ(policy->GetPinnedUsageByLevel(lb.level), 0);
+  ASSERT_EQ(policy->GetPinnedUsageByType(TablePinningPolicy::kIndex), 2);
+  ASSERT_EQ(policy->GetPinnedUsageByType(TablePinningPolicy::kTopLevel), 0);
 }
 }  // namespace ROCKSDB_NAMESPACE
 

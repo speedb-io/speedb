@@ -2134,7 +2134,7 @@ TEST_F(DISABLED_SpdbDBBloomFilterTest, PrefixScan) {
 
 // TODO: The filter builder is created always with OFFM = false, both for us and
 // rocksdb. Is that how it's supposed to be?
-TEST_F(DISABLED_SpdbDBBloomFilterTest, DISABLED_OptimizeFiltersForHits) {
+TEST_F(DISABLED_SpdbDBBloomFilterTest, OptimizeFiltersForHits) {
   Options options = CurrentOptions();
   options.write_buffer_size = 64 * 1024;
   options.arena_block_size = 4 * 1024;

@@ -15,7 +15,7 @@
 // multiple threads without any external synchronization.
 
 #pragma once
-
+ 
 #include <stdint.h>
 
 #include <cstdarg>

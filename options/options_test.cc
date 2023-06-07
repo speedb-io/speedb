@@ -5034,11 +5034,11 @@ TEST_F(SharedOptionsSpeeDBTest, EnableSpeeDBFeaturesDB) {
               so->getDelayedWriteRate());
 
   ASSERT_TRUE(db1->GetOptions().db_write_buffer_size ==
-              std::max<size_t>(so->getTotalRamSizeBytes() / 4, 1 << 30ul));
+              std::max<size_t>(so->getTotalRamSizeBytes() / 4, 1 << 29ul));
   ASSERT_TRUE(db2->GetOptions().db_write_buffer_size ==
-              std::max<size_t>(so->getTotalRamSizeBytes() / 4, 1 << 30ul));
+              std::max<size_t>(so->getTotalRamSizeBytes() / 4, 1 << 29ul));
   ASSERT_TRUE(db3->GetOptions().db_write_buffer_size ==
-              std::max<size_t>(so->getTotalRamSizeBytes() / 4, 1 << 30ul));
+              std::max<size_t>(so->getTotalRamSizeBytes() / 4, 1 << 29ul));
 
   ASSERT_TRUE(db1->GetOptions().write_buffer_manager ==
               so->write_buffer_manager);

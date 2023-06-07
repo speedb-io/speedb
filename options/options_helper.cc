@@ -116,6 +116,7 @@ DBOptions BuildDBOptions(const ImmutableDBOptions& immutable_db_options,
   options.db_write_buffer_size = immutable_db_options.db_write_buffer_size;
   options.write_buffer_manager = immutable_db_options.write_buffer_manager;
   options.write_controller = immutable_db_options.write_controller;
+  options.shared_options = immutable_db_options.shared_options;
   options.access_hint_on_compaction_start =
       immutable_db_options.access_hint_on_compaction_start;
   options.compaction_readahead_size =

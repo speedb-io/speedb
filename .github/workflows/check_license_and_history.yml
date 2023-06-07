@@ -1,13 +1,14 @@
 name: test check lic
 
-on:
+on:  # this workflow is planned to be called by the ci_pipeline and it will compare the PR files with the main
   workflow_call:
-  workflow_dispatch:
-  pull_request_review:
-    types: [submitted]
+  #workflow_dispatch:
+  #pull_request_review:
+  #  types: [submitted]
 
 jobs:
   changedfiles:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     outputs:
       output1: ${{ steps.changes.outputs.diff_list }}
@@ -20,8 +21,6 @@ jobs:
         id: changes       
         run: |
           git diff --name-only --diff-filter=ACMRT ${{ github.event.pull_request.base.sha }} ${{ github.sha }} 
-          echo "Next "
-          diff_list=$(git diff --name-only --diff-filter=ACMRT ${{ github.event.pull_request.base.sha }} ${{ github.sha }}) 
           echo "diff_list<<EOF" >> $GITHUB_OUTPUT
           git diff --name-only --diff-filter=ACMRT ${{ github.event.pull_request.base.sha }} ${{ github.sha }} >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
@@ -30,6 +29,7 @@ jobs:
         run: |
           echo "New files in this PR ${{ steps.changes.outputs.diff_list }}"
   lint:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     needs: changedfiles
     env: 
@@ -46,13 +46,19 @@ jobs:
           done
           exit $exit_code
       - name: Check HISTORY
-        run: |  
+      run: |  
+        set +e
+        git diff --name-only --diff-filter=A ${{ github.event.pull_request.base.sha }} ${{ github.sha }}|grep -v "\.github" |grep -q [a-z,A-Z]
+        if [ $? -eq "0" ]; then
+          #echo "New files were added, we need to make sure the history.md file was updated" 
           history_not_in=1
-          for file in $(echo $OUTPUT1)
-          
-          do         
-            if "$file" == HISTORY.md; then history_not_in=0
-            fi
-          done
-
-          exit $history_not_in      
+          git diff --name-only --diff-filter=M ${{ github.event.pull_request.base.sha }} ${{ github.sha }}|grep -v "\.github" |grep -q "HISTORY.md"
+          if [ $? -ne "0" ]; then
+            echo "New files were added in this PR but the HISTORY.md file was not updated"
+            else 
+            history_not_in=0
+          fi
+          exit $history_not_in 
+        fi
+        echo "No files were added"
+        exit 0

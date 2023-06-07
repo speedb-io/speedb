@@ -560,17 +560,17 @@ void SharedOptionsSpeeDB::initializeSharedOptionsForSpeeDB() {
 DBOptions* DBOptions::EnableSpeedbFeaturesDB(
     std::shared_ptr<SharedOptionsSpeeDB>* _shared_options) {
   if (shared_options != nullptr) {
-      // shared config is already defined case
-      return nullptr;
+    // shared config is already defined case
+    return nullptr;
   }
   shared_options = *_shared_options;
   env = shared_options->env;
   IncreaseParallelism((*_shared_options)->getTotalThreads());
   if ((*_shared_options)->getDelayedWriteRate() != 0) {
-      delayed_write_rate = (*_shared_options)->getDelayedWriteRate();
+    delayed_write_rate = (*_shared_options)->getDelayedWriteRate();
   }
   db_write_buffer_size = std::max<size_t>(
-      (*_shared_options)->getTotalRamSizeBytes() / 4, 1 << 30ul);
+      (*_shared_options)->getTotalRamSizeBytes() / 4, 1 << 29ul);
   bytes_per_sync = 1ul << 20;
   use_dynamic_delay = true;
   write_buffer_manager = shared_options->write_buffer_manager;

@@ -567,7 +567,7 @@ DBOptions* DBOptions::EnableSpeedbFeaturesDB(
   env = shared_options->env;
   IncreaseParallelism((*_shared_options)->getTotalThreads());
   if ((*_shared_options)->getDelayedWriteRate() != 0) {
-      delayed_write_rate = (*_shared_options)->getDelayedWriteRate();
+    delayed_write_rate = (*_shared_options)->getDelayedWriteRate();
   }
   db_write_buffer_size = std::max<size_t>(
       (*_shared_options)->getTotalRamSizeBytes() / 4, 1 << 29ul);

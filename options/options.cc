@@ -12,6 +12,7 @@
 #include <cinttypes>
 #include <limits>
 
+#include "db/write_controller.h"
 #include "logging/logging.h"
 #include "monitoring/statistics.h"
 #include "options/db_options.h"
@@ -19,6 +20,7 @@
 #include "rocksdb/cache.h"
 #include "rocksdb/compaction_filter.h"
 #include "rocksdb/comparator.h"
+#include "rocksdb/convenience.h"
 #include "rocksdb/env.h"
 #include "rocksdb/filter_policy.h"
 #include "rocksdb/memtablerep.h"
@@ -30,12 +32,9 @@
 #include "rocksdb/table.h"
 #include "rocksdb/table_properties.h"
 #include "rocksdb/wal_filter.h"
-#include "rocksdb/convenience.h"
 #include "rocksdb/write_buffer_manager.h"
 #include "table/block_based/block_based_table_factory.h"
 #include "util/compression.h"
-#include "db/write_controller.h"
-
 
 namespace ROCKSDB_NAMESPACE {
 
@@ -534,44 +533,44 @@ Options* Options::OldDefaults(int rocksdb_major_version,
   return this;
 }
 
-
-
-Options* Options::EnableSpeedbFeatures(std::shared_ptr<SharedOptionsSpeeDB> *shared_options){
+Options* Options::EnableSpeedbFeatures(
+    std::shared_ptr<SharedOptionsSpeeDB>* shared_options) {
   EnableSpeedbFeaturesDB(shared_options);
   EnableSpeedbFeaturesCF(this);
   return this;
 }
 
-SharedOptionsSpeeDB::SharedOptionsSpeeDB(size_t total_ram_size_bytes, int total_threads,
-					   size_t delayed_write_rate = 256 * 1024 * 1024){
+SharedOptionsSpeeDB::SharedOptionsSpeeDB(
+    size_t total_ram_size_bytes, int total_threads,
+    size_t delayed_write_rate = 256 * 1024 * 1024) {
   _total_threads = total_threads;
   _total_ram_size_bytes = total_ram_size_bytes;
   _delayed_write_rate = delayed_write_rate;
   initializeSharedOptionsForSpeeDB();
-} 
+}
 
-void SharedOptionsSpeeDB::initializeSharedOptionsForSpeeDB(){
-  _write_buffer_size = std::max<size_t> (_total_ram_size_bytes / 4, 1<<30ul);
+void SharedOptionsSpeeDB::initializeSharedOptionsForSpeeDB() {
+  _write_buffer_size = std::max<size_t>(_total_ram_size_bytes / 4, 1 << 30ul);
   cache = NewLRUCache(_total_ram_size_bytes);
   write_controller.reset(new WriteController(true, _delayed_write_rate));
   write_buffer_manager.reset(new WriteBufferManager(
-  _write_buffer_size, cache /*,  shared_write_controler */));
+      _write_buffer_size, cache /*,  shared_write_controler */));
 }
 
-
-
-DBOptions* DBOptions::EnableSpeedbFeaturesDB(std::shared_ptr<SharedOptionsSpeeDB> *_shared_options) {
-  if(shared_options != nullptr){
-    //shared config is already defined case
-    return nullptr;
+DBOptions* DBOptions::EnableSpeedbFeaturesDB(
+    std::shared_ptr<SharedOptionsSpeeDB>* _shared_options) {
+  if (shared_options != nullptr) {
+      // shared config is already defined case
+      return nullptr;
   }
   shared_options = *_shared_options;
   env = shared_options->env;
   IncreaseParallelism((*_shared_options)->getTotalThreads());
-  if((*_shared_options)->getDelayedWriteRate() != 0){
-    delayed_write_rate = (*_shared_options)->getDelayedWriteRate();
+  if ((*_shared_options)->getDelayedWriteRate() != 0) {
+      delayed_write_rate = (*_shared_options)->getDelayedWriteRate();
   }
-  db_write_buffer_size = std::max<size_t> ((*_shared_options)->getTotalRamSizeBytes() / 4, 1<<30ul);
+  db_write_buffer_size = std::max<size_t>(
+      (*_shared_options)->getTotalRamSizeBytes() / 4, 1 << 30ul);
   bytes_per_sync = 1ul << 20;
   use_dynamic_delay = true;
   write_buffer_manager = shared_options->write_buffer_manager;
@@ -601,33 +600,37 @@ ColumnFamilyOptions* ColumnFamilyOptions::EnableSpeedbFeaturesCF(
     const Options* options) {
   // error must call enable_speedb_feature on the db first
   assert(options->shared_options->cache);
-  // to disable flush due to write buffer full 
-  auto db_wbf_size = options->shared_options->write_buffer_manager->buffer_size();
-  write_buffer_size = std::min<size_t> (db_wbf_size/4, 64ul<<20);
+  // to disable flush due to write buffer full
+  auto db_wbf_size =
+      options->shared_options->write_buffer_manager->buffer_size();
+  write_buffer_size = std::min<size_t>(db_wbf_size / 4, 64ul << 20);
   max_write_buffer_number = int(db_wbf_size / write_buffer_size) + 2;
-  min_write_buffer_number_to_merge = max_write_buffer_number -1;
-  // set the pinning option for indexes and filters 
+  min_write_buffer_number_to_merge = max_write_buffer_number - 1;
+  // set the pinning option for indexes and filters
   {
     ConfigOptions config_options;
     config_options.ignore_unknown_options = false;
     config_options.ignore_unsupported_options = false;
     BlockBasedTableOptions block_based_table_options;
-    Status s = FilterPolicy::CreateFromString(config_options, "speedb.PairedBloomFilter:23.2", &block_based_table_options.filter_policy);
+    Status s = FilterPolicy::CreateFromString(
+        config_options, "speedb.PairedBloomFilter:23.2",
+        &block_based_table_options.filter_policy);
     assert(s.ok());
     block_based_table_options.cache_index_and_filter_blocks = true;
     block_based_table_options.block_cache = options->shared_options->cache;
-    auto &cache_usage_options = block_based_table_options.cache_usage_options;
+    auto& cache_usage_options = block_based_table_options.cache_usage_options;
     CacheEntryRoleOptions role_options;
-    block_based_table_options.metadata_cache_options.unpartitioned_pinning = PinningTier::kAll;
-    block_based_table_options.metadata_cache_options.partition_pinning = PinningTier::kAll;
+    block_based_table_options.metadata_cache_options.unpartitioned_pinning =
+        PinningTier::kAll;
+    block_based_table_options.metadata_cache_options.partition_pinning =
+        PinningTier::kAll;
     role_options.charged = CacheEntryRoleOptions::Decision::kEnabled;
-    cache_usage_options.options_overrides.insert(					 
+    cache_usage_options.options_overrides.insert(
         {CacheEntryRole::kFilterConstruction, role_options});
     cache_usage_options.options_overrides.insert(
         {CacheEntryRole::kBlockBasedTableReader, role_options});
     cache_usage_options.options_overrides.insert(
-        {CacheEntryRole::kCompressionDictionaryBuildingBuffer,
-         role_options});
+        {CacheEntryRole::kCompressionDictionaryBuildingBuffer, role_options});
     cache_usage_options.options_overrides.insert(
         {CacheEntryRole::kFileMetadata, role_options});
     table_factory.reset(NewBlockBasedTableFactory(block_based_table_options));

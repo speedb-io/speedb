@@ -4975,16 +4975,16 @@ TEST_F(SharedOptionsSpeeDBTest, SharedOptionsSpeeDBTest) {
   size_t total_ram_size_bytes = 512 * 1024 * 1024;
   size_t delayed_write_rate = 256 * 1024 * 1024;
   int total_threads = 8;
-  std::shared_ptr<SharedOptionsSpeeDB> so = std::shared_ptr<SharedOptionsSpeeDB>(
-    new SharedOptionsSpeeDB(total_ram_size_bytes, total_threads,
-     delayed_write_rate)); 
-  
+  std::shared_ptr<SharedOptionsSpeeDB> so =
+      std::shared_ptr<SharedOptionsSpeeDB>(new SharedOptionsSpeeDB(
+          total_ram_size_bytes, total_threads, delayed_write_rate));
+
   so->initializeSharedOptionsForSpeeDB();
 
-  ASSERT_TRUE(so->write_buffer_manager->buffer_size() == std::max<size_t> (total_ram_size_bytes / 4, 1<<30ul)); 
+  ASSERT_TRUE(so->write_buffer_manager->buffer_size() ==
+              std::max<size_t>(total_ram_size_bytes / 4, 1 << 30ul));
   ASSERT_TRUE(so->cache->GetCapacity() == total_ram_size_bytes);
 }
-
 
 TEST_F(SharedOptionsSpeeDBTest, EnableSpeeDBFeaturesDB) {
   DB *db1, *db2, *db3;
@@ -4992,9 +4992,9 @@ TEST_F(SharedOptionsSpeeDBTest, EnableSpeeDBFeaturesDB) {
   size_t total_ram_size_bytes = 512 * 1024 * 1024;
   size_t delayed_write_rate = 256 * 1024 * 1024;
   int total_threads = 8;
-  std::shared_ptr<SharedOptionsSpeeDB> so = std::shared_ptr<SharedOptionsSpeeDB>(
-    new SharedOptionsSpeeDB(total_ram_size_bytes, total_threads,
-     delayed_write_rate)); 
+  std::shared_ptr<SharedOptionsSpeeDB> so =
+      std::shared_ptr<SharedOptionsSpeeDB>(new SharedOptionsSpeeDB(
+          total_ram_size_bytes, total_threads, delayed_write_rate));
   // create the DB if it's not already present
   op1.create_if_missing = true;
   op2.create_if_missing = true;
@@ -5002,11 +5002,11 @@ TEST_F(SharedOptionsSpeeDBTest, EnableSpeeDBFeaturesDB) {
   op1.EnableSpeedbFeatures(&so);
   op2.EnableSpeedbFeatures(&so);
   op3.EnableSpeedbFeatures(&so);
-  
+
   ASSERT_TRUE(op1.shared_options == so);
   ASSERT_TRUE(op2.shared_options == so);
   ASSERT_TRUE(op3.shared_options == so);
-  
+
   ASSERT_OK(DB::Open(op1, "db1", &db1));
   ASSERT_OK(DB::Open(op2, "db2", &db2));
   ASSERT_OK(DB::Open(op3, "db3", &db3));
@@ -5014,27 +5014,38 @@ TEST_F(SharedOptionsSpeeDBTest, EnableSpeeDBFeaturesDB) {
   ASSERT_TRUE(db1->GetOptions().shared_options == so);
   ASSERT_TRUE(db2->GetOptions().shared_options == so);
   ASSERT_TRUE(db3->GetOptions().shared_options == so);
-  
+
   ASSERT_TRUE(db1->GetOptions().env == so->env);
   ASSERT_TRUE(db2->GetOptions().env == so->env);
   ASSERT_TRUE(db3->GetOptions().env == so->env);
 
-  ASSERT_TRUE(db1->GetOptions().max_background_jobs == (int)so->getTotalThreads());
-  ASSERT_TRUE(db2->GetOptions().max_background_jobs == (int)so->getTotalThreads());
-  ASSERT_TRUE(db3->GetOptions().max_background_jobs == (int)so->getTotalThreads());
+  ASSERT_TRUE(db1->GetOptions().max_background_jobs ==
+              (int)so->getTotalThreads());
+  ASSERT_TRUE(db2->GetOptions().max_background_jobs ==
+              (int)so->getTotalThreads());
+  ASSERT_TRUE(db3->GetOptions().max_background_jobs ==
+              (int)so->getTotalThreads());
 
-  ASSERT_TRUE(db1->GetOptions().delayed_write_rate == so->getDelayedWriteRate());
-  ASSERT_TRUE(db2->GetOptions().delayed_write_rate == so->getDelayedWriteRate());
-  ASSERT_TRUE(db3->GetOptions().delayed_write_rate == so->getDelayedWriteRate());
+  ASSERT_TRUE(db1->GetOptions().delayed_write_rate ==
+              so->getDelayedWriteRate());
+  ASSERT_TRUE(db2->GetOptions().delayed_write_rate ==
+              so->getDelayedWriteRate());
+  ASSERT_TRUE(db3->GetOptions().delayed_write_rate ==
+              so->getDelayedWriteRate());
 
+  ASSERT_TRUE(db1->GetOptions().db_write_buffer_size ==
+              std::max<size_t>(so->getTotalRamSizeBytes() / 4, 1 << 30ul));
+  ASSERT_TRUE(db2->GetOptions().db_write_buffer_size ==
+              std::max<size_t>(so->getTotalRamSizeBytes() / 4, 1 << 30ul));
+  ASSERT_TRUE(db3->GetOptions().db_write_buffer_size ==
+              std::max<size_t>(so->getTotalRamSizeBytes() / 4, 1 << 30ul));
 
-  ASSERT_TRUE(db1->GetOptions().db_write_buffer_size == std::max<size_t> (so->getTotalRamSizeBytes() / 4, 1<<30ul));
-  ASSERT_TRUE(db2->GetOptions().db_write_buffer_size == std::max<size_t> (so->getTotalRamSizeBytes() / 4, 1<<30ul));
-  ASSERT_TRUE(db3->GetOptions().db_write_buffer_size == std::max<size_t> (so->getTotalRamSizeBytes() / 4, 1<<30ul));
-
-  ASSERT_TRUE(db1->GetOptions().write_buffer_manager == so->write_buffer_manager);
-  ASSERT_TRUE(db2->GetOptions().write_buffer_manager == so->write_buffer_manager);
-  ASSERT_TRUE(db3->GetOptions().write_buffer_manager == so->write_buffer_manager);
+  ASSERT_TRUE(db1->GetOptions().write_buffer_manager ==
+              so->write_buffer_manager);
+  ASSERT_TRUE(db2->GetOptions().write_buffer_manager ==
+              so->write_buffer_manager);
+  ASSERT_TRUE(db3->GetOptions().write_buffer_manager ==
+              so->write_buffer_manager);
 
   delete db1;
   delete db2;
@@ -5042,7 +5053,7 @@ TEST_F(SharedOptionsSpeeDBTest, EnableSpeeDBFeaturesDB) {
 }
 
 TEST_F(SharedOptionsSpeeDBTest, EnableSpeeDBFeaturesCF) {
-  DB *db1;
+  DB* db1;
   Options op1;
   ColumnFamilyHandle* cf;
   ColumnFamilyOptions cfo;
@@ -5050,11 +5061,11 @@ TEST_F(SharedOptionsSpeeDBTest, EnableSpeeDBFeaturesCF) {
   size_t total_ram_size_bytes = 512 * 1024 * 1024;
   size_t delayed_write_rate = 256 * 1024 * 1024;
   int total_threads = 8;
-  
-  std::shared_ptr<SharedOptionsSpeeDB> so = std::shared_ptr<SharedOptionsSpeeDB>(
-    new SharedOptionsSpeeDB(total_ram_size_bytes, total_threads,
-     delayed_write_rate)); 
-  
+
+  std::shared_ptr<SharedOptionsSpeeDB> so =
+      std::shared_ptr<SharedOptionsSpeeDB>(new SharedOptionsSpeeDB(
+          total_ram_size_bytes, total_threads, delayed_write_rate));
+
   // create the DB if it's not already present
   op1.create_if_missing = true;
   op1.EnableSpeedbFeatures(&so);

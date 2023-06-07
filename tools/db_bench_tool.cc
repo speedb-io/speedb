@@ -5142,17 +5142,16 @@ class Benchmark {
     if (FLAGS_use_spdb_features) {
       size_t cache_size = FLAGS_cache_size;
       if (cache_size == 0) {
-	cache_size = 4ul<<30;
+        cache_size = 4ul << 30;
       }
       int total_threads = options.max_background_jobs;
       if (total_threads <= 0) {
-	total_threads = 16;
+        total_threads = 16;
       }
-	
+
       db_options.EnableSpeedbFeatures(cache_size, total_threads);
       cf_options.EnableSpeedbFeatures(&db_options);
     }
-
 
     // Open with column families if necessary.
     if (FLAGS_num_column_families > 1) {
@@ -5165,8 +5164,8 @@ class Benchmark {
       }
       std::vector<ColumnFamilyDescriptor> column_families;
       for (size_t i = 0; i < num_hot; i++) {
-        column_families.push_back(ColumnFamilyDescriptor(
-             ColumnFamilyName(i), cf_options));
+        column_families.push_back(
+            ColumnFamilyDescriptor(ColumnFamilyName(i), cf_options));
       }
       std::vector<int> cfh_idx_to_prob;
       if (!FLAGS_column_family_distribution.empty()) {

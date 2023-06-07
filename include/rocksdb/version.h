@@ -15,7 +15,6 @@
 #define ROCKSDB_MINOR 1
 #define ROCKSDB_PATCH 1
 
-
 #define SPEEDB_MAJOR 2
 #define SPEEDB_MINOR 3
 #define SPEEDB_PATCH 0

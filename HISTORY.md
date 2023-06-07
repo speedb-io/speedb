@@ -29,6 +29,7 @@ Once the WBM reached its capacity, writes will be stopped using the old ShouldSt
 * WriteController: fix for stop while shutting down (#499)
 Also switch to waiting a sec on the CV each time. This is required since a bg error doesn't signal the CV in the WriteController.
 * fix UnlockWALStallCleared test in utilities/transactions/transaction_test.cc (#514)
+* Always assume optimize_filters_for_memory=false when creating a paired bloom filter (#488)
 
 ### Miscellaneous
 * disable failing unit tests and paired bloom filter stress testing

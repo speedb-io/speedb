@@ -457,11 +457,11 @@ void SpdbVectorContainer::SortThread() {
       (*sort_iter_anchor)->Sort(comparator_);
     }
 
-    if (spdb_vectors_.size() > kMergedVectorsMax) {
+    /*if (spdb_vectors_.size() > kMergedVectorsMax) {
       if (TryMergeVectors(last)) {
         sort_iter_anchor = spdb_vectors_.begin();
       }
-    }
+    }*/
   }
 }
 

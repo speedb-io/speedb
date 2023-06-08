@@ -401,7 +401,7 @@ void SpdbVectorContainer::Merge(std::list<SpdbVectorPtr>::iterator& begin,
   }
 }
 
-bool SpdbVectorContainer::TryMergeVectors(
+/*bool SpdbVectorContainer::TryMergeVectors(
     std::list<SpdbVectorPtr>::iterator last) {
   std::list<SpdbVectorPtr>::iterator start = spdb_vectors_.begin();
   const size_t merge_threshold = switch_spdb_vector_limit_ * 75 / 100;
@@ -434,7 +434,7 @@ bool SpdbVectorContainer::TryMergeVectors(
   }
   return false;
 }
-
+*/
 void SpdbVectorContainer::SortThread() {
   std::unique_lock<std::mutex> lck(sort_thread_mutex_);
   std::list<SpdbVectorPtr>::iterator sort_iter_anchor = spdb_vectors_.begin();

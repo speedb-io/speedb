@@ -11,7 +11,7 @@ env:
 
 jobs:
   test:
-    runs-on: [self-hosted, ubuntu, asrunner]
+    runs-on: [self-hosted, ubuntu, tst1]
     container:
       image: ubuntu:18.04
       volumes:

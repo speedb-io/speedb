@@ -379,7 +379,7 @@ void SpdbVectorContainer::SeekIter(const IterAnchors& iter_anchor,
   }
 }
 
-void SpdbVectorContainer::Merge(std::list<SpdbVectorPtr>::iterator& begin,
+/*void SpdbVectorContainer::Merge(std::list<SpdbVectorPtr>::iterator& begin,
                                 std::list<SpdbVectorPtr>::iterator& end,
                                 size_t total_merge_vector_elements) {
   SpdbVectorIterator iterator(this, comparator_, begin, end);
@@ -401,7 +401,7 @@ void SpdbVectorContainer::Merge(std::list<SpdbVectorPtr>::iterator& begin,
   }
 }
 
-/*bool SpdbVectorContainer::TryMergeVectors(
+bool SpdbVectorContainer::TryMergeVectors(
     std::list<SpdbVectorPtr>::iterator last) {
   std::list<SpdbVectorPtr>::iterator start = spdb_vectors_.begin();
   const size_t merge_threshold = switch_spdb_vector_limit_ * 75 / 100;

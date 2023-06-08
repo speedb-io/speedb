@@ -561,7 +561,7 @@ DBOptions* DBOptions::EnableSpeedbFeaturesDB(
   env = shared_options.env;
   IncreaseParallelism(shared_options.getTotalThreads());
   if (shared_options.getDelayedWriteRate() != 0) {
-      delayed_write_rate = shared_options.getDelayedWriteRate();
+    delayed_write_rate = shared_options.getDelayedWriteRate();
   }
   db_write_buffer_size =
       std::max<size_t>(shared_options.getTotalRamSizeBytes() / 4, 1 << 29ul);
@@ -637,9 +637,8 @@ ColumnFamilyOptions* ColumnFamilyOptions::EnableSpeedbFeaturesCF(
 
     auto s = MemTableRepFactory::CreateFromString(
         config_options, memtablerep + memtable_opt, &unique);
-    if (s.ok()) {
-      memtable_factory.reset(unique.release());
-    }
+    assert(s.ok());
+    memtable_factory.reset(unique.release());
   }
   return this;
 }

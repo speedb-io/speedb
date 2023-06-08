@@ -2172,6 +2172,12 @@ struct SharedOptions {
 };
 
 // SharedOptions for SpeeDB, includes initialization for SpeeDB features
+// if you choose to use it you should not change:
+// total_ram_size_bytes, max_background_jobs, delayed_write_rate,
+// write_buffer_size cache, write_controller,
+// write_buffer_manager,bytes_per_sync, use_dynamic_delay table_factory and
+// memtable_factory we will initialize and configure those. use example can be
+// find in  enable_speedb_features_example.cc
 struct SpeedbSharedOptions : public SharedOptions {
  public:
   SpeedbSharedOptions(size_t total_ram_size_bytes, size_t total_threads,

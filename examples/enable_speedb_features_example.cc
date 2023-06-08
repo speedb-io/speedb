@@ -21,7 +21,15 @@
 #include "rocksdb/options.h"
 #include "rocksdb/slice.h"
 
-using namespace ROCKSDB_NAMESPACE;
+using ROCKSDB_NAMESPACE::DB;
+using ROCKSDB_NAMESPACE::Options;
+using ROCKSDB_NAMESPACE::PinnableSlice;
+using ROCKSDB_NAMESPACE::ReadOptions;
+using ROCKSDB_NAMESPACE::SharedOptions;
+using ROCKSDB_NAMESPACE::SpeedbSharedOptions;
+using ROCKSDB_NAMESPACE::Status;
+using ROCKSDB_NAMESPACE::WriteBatch;
+using ROCKSDB_NAMESPACE::WriteOptions;
 
 #if defined(OS_WIN)
 std::string kDBPath = "C:\\Windows\\TEMP\\enable_speedb_features_example";
@@ -53,12 +61,12 @@ int main() {
   // customize each options file except SpeedbSharedOptiopns members
   // as listed in the definition of SpeedbSharedOptiopns in options.h
   op1.create_if_missing = true;
-  op1.compression = kNoCompression;
+  op1.compression = rocksdb::kNoCompression;
   //...
   op1.EnableSpeedbFeatures(so1);
 
   op2.create_if_missing = true;
-  op2.compression = kZlibCompression;
+  op2.compression = rocksdb::kZlibCompression;
   //...
   op2.EnableSpeedbFeatures(so1);
 
@@ -85,12 +93,12 @@ int main() {
 
   // again customize each options file except SpeedbSharedOptiopns members
   op3.create_if_missing = true;
-  op3.compaction_style = kCompactionStyleUniversal;
+  op3.compaction_style = rocksdb::kCompactionStyleUniversal;
   //...
   op3.EnableSpeedbFeatures(so2);
 
   op4.create_if_missing = true;
-  op4.compaction_style = kCompactionStyleLevel;
+  op4.compaction_style = rocksdb::kCompactionStyleLevel;
   //...
   op4.EnableSpeedbFeatures(so2);
 
@@ -109,8 +117,8 @@ int main() {
   std::cout << "DBs group 2 was created" << std::endl;
 
   // creation of column family
-  ColumnFamilyOptions cfo3(op3);
-  ColumnFamilyHandle *cf;
+  rocksdb::ColumnFamilyOptions cfo3(op3);
+  rocksdb::ColumnFamilyHandle *cf;
   // coustomize it except SpeedbSharedOptiopns members
 
   // call EnableSpeedbFeaturesCF and supply for it the same SpeedbSharedOptions

@@ -35,7 +35,6 @@
 
 namespace ROCKSDB_NAMESPACE {
 namespace {
-constexpr size_t kMergedVectorsMax = 8;
 struct SpdbKeyHandle {
   SpdbKeyHandle* GetNextBucketItem() {
     return next_.load(std::memory_order_acquire);
@@ -323,9 +322,6 @@ bool SpdbVectorContainer::IsEmpty() const { return num_elements_.load() == 0; }
 // copy the list of vectors to the iter_anchors
 bool SpdbVectorContainer::InitIterator(IterAnchors& iter_anchor) {
   bool immutable = immutable_.load();
-  if (!immutable) {
-    spdb_vectors_merge_rwlock_.ReadLock();
-  }
 
   auto last_iter = curr_vector_.load()->GetVectorListIter();
   bool notify_sort_thread = false;
@@ -346,7 +342,6 @@ bool SpdbVectorContainer::InitIterator(IterAnchors& iter_anchor) {
   ++last_iter;
   InitIterator(iter_anchor, spdb_vectors_.begin(), last_iter);
   if (!immutable) {
-    spdb_vectors_merge_rwlock_.ReadUnlock();
     if (notify_sort_thread) {
       sort_thread_cv_.notify_one();
     }
@@ -379,62 +374,6 @@ void SpdbVectorContainer::SeekIter(const IterAnchors& iter_anchor,
   }
 }
 
-void SpdbVectorContainer::Merge(std::list<SpdbVectorPtr>::iterator& begin,
-                                std::list<SpdbVectorPtr>::iterator& end,
-                                size_t total_merge_vector_elements) {
-  SpdbVectorIterator iterator(this, comparator_, begin, end);
-  if (total_merge_vector_elements > 0) {
-    SpdbVector::Vec merged;
-    merged.reserve(total_merge_vector_elements);
-
-    for (iterator.SeekToFirst(); iterator.Valid(); iterator.Next()) {
-      merged.emplace_back(iterator.key());
-    }
-
-    SpdbVectorPtr new_vector(
-        new SpdbVector(std::move(merged), total_merge_vector_elements));
-
-    // now replace
-    WriteLock wl(&spdb_vectors_merge_rwlock_);
-    spdb_vectors_.insert(begin, std::move(new_vector));
-    spdb_vectors_.erase(begin, end);
-  }
-}
-
-bool SpdbVectorContainer::TryMergeVectors(
-    std::list<SpdbVectorPtr>::iterator last) {
-  std::list<SpdbVectorPtr>::iterator start = spdb_vectors_.begin();
-  const size_t merge_threshold = switch_spdb_vector_limit_ * 75 / 100;
-
-  size_t merge_vectors_count = 0;
-  size_t total_merge_vector_elements = 0;
-
-  for (auto s = start; s != last; ++s) {
-    if ((*s)->Size() > merge_threshold) {
-      if (merge_vectors_count > 1) {
-        last = s;
-        break;
-      }
-
-      merge_vectors_count = 0;
-      total_merge_vector_elements = 0;
-      start = std::next(s);
-    } else {
-      ++merge_vectors_count;
-      total_merge_vector_elements += (*s)->Size();
-      if (merge_vectors_count == kMergedVectorsMax) {
-        last = std::next(s);
-        break;
-      }
-    }
-  }
-  if (merge_vectors_count > 1) {
-    Merge(start, last, total_merge_vector_elements);
-    return true;
-  }
-  return false;
-}
-
 void SpdbVectorContainer::SortThread() {
   std::unique_lock<std::mutex> lck(sort_thread_mutex_);
   std::list<SpdbVectorPtr>::iterator sort_iter_anchor = spdb_vectors_.begin();
@@ -455,12 +394,6 @@ void SpdbVectorContainer::SortThread() {
 
     for (; sort_iter_anchor != last; ++sort_iter_anchor) {
       (*sort_iter_anchor)->Sort(comparator_);
-    }
-
-    if (spdb_vectors_.size() > kMergedVectorsMax) {
-      if (TryMergeVectors(last)) {
-        sort_iter_anchor = spdb_vectors_.begin();
-      }
     }
   }
 }

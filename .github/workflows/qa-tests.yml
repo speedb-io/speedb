@@ -14,9 +14,9 @@ jobs:
     runs-on: tst1
     container:
       image: ubuntu:18.04
-      volumes:
-        - /var/tmp:/var/tmp # Needed for env_test's IoctlFriendlyTmpdir
-        - /tmp:/tmp # Needed for running tests on non-overlayfs (can't use /dev/shm because there's not enough RAM on the runner)
+      #volumes:
+      #  - /var/tmp:/var/tmp # Needed for env_test's IoctlFriendlyTmpdir
+      #  - /tmp:/tmp # Needed for running tests on non-overlayfs (can't use /dev/shm because there's not enough RAM on the runner)
     strategy:
       matrix:
         include:

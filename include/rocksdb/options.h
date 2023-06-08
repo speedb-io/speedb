@@ -61,7 +61,7 @@ class WriteController;
 struct Options;
 struct DbPath;
 struct SharedOptions;
-struct SharedOptionsSpeeDB;
+struct SpeedbSharedOptions;
 
 using FileTypeSet = SmallEnumSet<FileType, FileType::kBlobFile>;
 
@@ -106,8 +106,11 @@ struct ColumnFamilyOptions : public AdvancedColumnFamilyOptions {
   ColumnFamilyOptions* OptimizeUniversalStyleCompaction(
       uint64_t memtable_memory_budget = 512 * 1024 * 1024);
 
-  // use it to enable speedb features to some default manner
-  ColumnFamilyOptions* EnableSpeedbFeaturesCF(const Options* options);
+  // Default values for some parameters in ColumnFamilyOptions are not
+  // optimized for SpeeDB features, As a starting point for configuring
+  // SpeeDB Features, use this function.
+  ColumnFamilyOptions* EnableSpeedbFeaturesCF(
+      SpeedbSharedOptions& shared_options);
   // -------------------
   // Parameters that affect behavior
 
@@ -476,8 +479,7 @@ struct DBOptions {
   // enable the spdb features
   // please note that a call to enable speedb options in the level of cf should
   // follow
-  DBOptions* EnableSpeedbFeaturesDB(
-      std::shared_ptr<SharedOptionsSpeeDB>* shared_options);
+  DBOptions* EnableSpeedbFeaturesDB(SpeedbSharedOptions& shared_options);
 
   // #endif  // ROCKSDB_LITE
 
@@ -934,9 +936,6 @@ struct DBOptions {
   //
   // Default: null
   std::shared_ptr<WriteController> write_controller = nullptr;
-
-  // If set and initialized will define the shared recources.
-  std::shared_ptr<SharedOptions> shared_options = nullptr;
 
   // Specify the file access pattern once a compaction is started.
   // It will be applied to all input files of a compaction.
@@ -1486,8 +1485,7 @@ struct Options : public DBOptions, public ColumnFamilyOptions {
   // spend lots of memory for memtables.
   Options* OptimizeForSmallDb();
   // Use this to configure SpeeDB featurs to a default manner .
-  Options* EnableSpeedbFeatures(
-      std::shared_ptr<SharedOptionsSpeeDB>* shared_options);
+  Options* EnableSpeedbFeatures(SpeedbSharedOptions& shared_options);
 
   // Disable some checks that should not be necessary in the absence of
   // software logic errors or CPU+memory hardware errors. This can improve
@@ -1916,50 +1914,6 @@ enum class BlobGarbageCollectionPolicy {
   kUseDefault,
 };
 
-// use this struct to arrange multiple db shared options
-struct SharedOptions {
- public:
-  SharedOptions() {}
-
-  std::shared_ptr<Cache> cache = nullptr;
-  std::shared_ptr<WriteController> write_controller = nullptr;
-  std::shared_ptr<WriteBufferManager> write_buffer_manager = nullptr;
-  Env* env = Env::Default();
-  std::shared_ptr<RateLimiter> rate_limiter = nullptr;
-  std::shared_ptr<SstFileManager> sst_file_manager = nullptr;
-  std::shared_ptr<Logger> info_log = nullptr;
-  std::vector<std::shared_ptr<EventListener>> listeners;
-  std::shared_ptr<FileChecksumGenFactory> file_checksum_gen_factory = nullptr;
-};
-
-// SharedOptions for SpeeDB, includes initialization for SpeeDB features
-struct SharedOptionsSpeeDB : public SharedOptions {
- public:
-  SharedOptionsSpeeDB(size_t total_ram_size_bytes, int total_threads,
-                      size_t _delayed_write_rate);
-  int getTotalThreads() { return _total_threads; }
-  size_t getTotalRamSizeBytes() { return _total_ram_size_bytes; }
-  size_t getDelayedWriteRate() { return _delayed_write_rate; }
-  void setTotalThreads(int total_threads) {
-    _total_threads = total_threads;
-    initializeSharedOptionsForSpeeDB();
-  }
-  void setTotalRamSizeBytes(size_t total_ram_size_bytes) {
-    _total_ram_size_bytes = total_ram_size_bytes;
-    initializeSharedOptionsForSpeeDB();
-  }
-  void setDelayedWriteRate(size_t delayed_write_rate) {
-    _delayed_write_rate = delayed_write_rate;
-    initializeSharedOptionsForSpeeDB();
-  }
-  void initializeSharedOptionsForSpeeDB();
-
- private:
-  int _total_threads = 0;
-  size_t _total_ram_size_bytes = 0;
-  size_t _delayed_write_rate = 0;
-  size_t _write_buffer_size;
-};
 // CompactRangeOptions is used by CompactRange() call.
 struct CompactRangeOptions {
   // If true, no other compaction will run at the same time as this
@@ -2198,6 +2152,40 @@ struct LiveFilesStorageInfoOptions {
   // number (and DB is not read-only).
   // Default: always force a flush without checking sizes.
   uint64_t wal_size_for_flush = 0;
+};
+
+// use this struct to arrange multiple db shared options as a group
+// this struct includes all the shared_ptrs from DBOptions.
+struct SharedOptions {
+ public:
+  SharedOptions() {}
+
+  std::shared_ptr<Cache> cache = nullptr;
+  std::shared_ptr<WriteController> write_controller = nullptr;
+  std::shared_ptr<WriteBufferManager> write_buffer_manager = nullptr;
+  Env* env = Env::Default();
+  std::shared_ptr<RateLimiter> rate_limiter = nullptr;
+  std::shared_ptr<SstFileManager> sst_file_manager = nullptr;
+  std::shared_ptr<Logger> info_log = nullptr;
+  std::vector<std::shared_ptr<EventListener>> listeners;
+  std::shared_ptr<FileChecksumGenFactory> file_checksum_gen_factory = nullptr;
+};
+
+// SharedOptions for SpeeDB, includes initialization for SpeeDB features
+struct SpeedbSharedOptions : public SharedOptions {
+ public:
+  SpeedbSharedOptions(size_t total_ram_size_bytes, size_t total_threads,
+                      size_t delayed_write_rate);
+  size_t getTotalThreads() { return total_threads_; }
+  size_t getTotalRamSizeBytes() { return total_ram_size_bytes_; }
+  size_t getDelayedWriteRate() { return delayed_write_rate_; }
+  void initializeSharedOptionsForSpeeDB();
+
+ private:
+  size_t total_threads_ = 0;
+  size_t total_ram_size_bytes_ = 0;
+  size_t delayed_write_rate_ = 0;
+  size_t write_buffer_size_;
 };
 
 }  // namespace ROCKSDB_NAMESPACE

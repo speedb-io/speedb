@@ -15,8 +15,7 @@ ifneq ($(USE_RTTI), 1)
 	CXXFLAGS += -fno-rtti
 endif
 
-CFLAGS += -Wstrict-prototypes -g
-CXXFLAGS += -g
+CFLAGS += -Wstrict-prototypes
 .PHONY: clean static_lib
 
 all: simple_example column_families_example compaction_filter_example compact_files_example c_simple_example optimistic_transaction_example \

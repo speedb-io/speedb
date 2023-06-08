@@ -533,47 +533,41 @@ Options* Options::OldDefaults(int rocksdb_major_version,
   return this;
 }
 
-Options* Options::EnableSpeedbFeatures(
-    std::shared_ptr<SharedOptionsSpeeDB>* shared_options) {
+Options* Options::EnableSpeedbFeatures(SpeedbSharedOptions& shared_options) {
   EnableSpeedbFeaturesDB(shared_options);
-  EnableSpeedbFeaturesCF(this);
+  EnableSpeedbFeaturesCF(shared_options);
   return this;
 }
 
-SharedOptionsSpeeDB::SharedOptionsSpeeDB(
-    size_t total_ram_size_bytes, int total_threads,
+SpeedbSharedOptions::SpeedbSharedOptions(
+    size_t total_ram_size_bytes, size_t total_threads,
     size_t delayed_write_rate = 256 * 1024 * 1024) {
-  _total_threads = total_threads;
-  _total_ram_size_bytes = total_ram_size_bytes;
-  _delayed_write_rate = delayed_write_rate;
+  total_threads_ = total_threads;
+  total_ram_size_bytes_ = total_ram_size_bytes;
+  delayed_write_rate_ = delayed_write_rate;
   initializeSharedOptionsForSpeeDB();
 }
 
-void SharedOptionsSpeeDB::initializeSharedOptionsForSpeeDB() {
-  _write_buffer_size = std::max<size_t>(_total_ram_size_bytes / 4, 1 << 30ul);
-  cache = NewLRUCache(_total_ram_size_bytes);
-  write_controller.reset(new WriteController(true, _delayed_write_rate));
+void SpeedbSharedOptions::initializeSharedOptionsForSpeeDB() {
+  write_buffer_size_ = std::max<size_t>(total_ram_size_bytes_ / 4, 1 << 30ul);
+  cache = NewLRUCache(total_ram_size_bytes_);
+  write_controller.reset(new WriteController(true, delayed_write_rate_));
   write_buffer_manager.reset(new WriteBufferManager(
-      _write_buffer_size, cache /*,  shared_write_controler */));
+      write_buffer_size_, cache /*,  shared_write_controler */));
 }
 
 DBOptions* DBOptions::EnableSpeedbFeaturesDB(
-    std::shared_ptr<SharedOptionsSpeeDB>* _shared_options) {
-  if (shared_options != nullptr) {
-    // shared config is already defined case
-    return nullptr;
+    SpeedbSharedOptions& shared_options) {
+  env = shared_options.env;
+  IncreaseParallelism(shared_options.getTotalThreads());
+  if (shared_options.getDelayedWriteRate() != 0) {
+      delayed_write_rate = shared_options.getDelayedWriteRate();
   }
-  shared_options = *_shared_options;
-  env = shared_options->env;
-  IncreaseParallelism((*_shared_options)->getTotalThreads());
-  if ((*_shared_options)->getDelayedWriteRate() != 0) {
-    delayed_write_rate = (*_shared_options)->getDelayedWriteRate();
-  }
-  db_write_buffer_size = std::max<size_t>(
-      (*_shared_options)->getTotalRamSizeBytes() / 4, 1 << 29ul);
+  db_write_buffer_size =
+      std::max<size_t>(shared_options.getTotalRamSizeBytes() / 4, 1 << 29ul);
   bytes_per_sync = 1ul << 20;
   use_dynamic_delay = true;
-  write_buffer_manager = shared_options->write_buffer_manager;
+  write_buffer_manager = shared_options.write_buffer_manager;
   return this;
 }
 
@@ -597,12 +591,9 @@ DBOptions* DBOptions::OldDefaults(int rocksdb_major_version,
 }
 
 ColumnFamilyOptions* ColumnFamilyOptions::EnableSpeedbFeaturesCF(
-    const Options* options) {
-  // error must call enable_speedb_feature on the db first
-  assert(options->shared_options->cache);
+    SpeedbSharedOptions& shared_options) {
   // to disable flush due to write buffer full
-  auto db_wbf_size =
-      options->shared_options->write_buffer_manager->buffer_size();
+  auto db_wbf_size = shared_options.write_buffer_manager->buffer_size();
   write_buffer_size = std::min<size_t>(db_wbf_size / 4, 64ul << 20);
   max_write_buffer_number = int(db_wbf_size / write_buffer_size) + 2;
   min_write_buffer_number_to_merge = max_write_buffer_number - 1;
@@ -617,7 +608,7 @@ ColumnFamilyOptions* ColumnFamilyOptions::EnableSpeedbFeaturesCF(
         &block_based_table_options.filter_policy);
     assert(s.ok());
     block_based_table_options.cache_index_and_filter_blocks = true;
-    block_based_table_options.block_cache = options->shared_options->cache;
+    block_based_table_options.block_cache = shared_options.cache;
     auto& cache_usage_options = block_based_table_options.cache_usage_options;
     CacheEntryRoleOptions role_options;
     block_based_table_options.metadata_cache_options.unpartitioned_pinning =

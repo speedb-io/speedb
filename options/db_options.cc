@@ -733,7 +733,6 @@ ImmutableDBOptions::ImmutableDBOptions(const DBOptions& options)
       db_write_buffer_size(options.db_write_buffer_size),
       write_buffer_manager(options.write_buffer_manager),
       write_controller(options.write_controller),
-      shared_options(options.shared_options),
       access_hint_on_compaction_start(options.access_hint_on_compaction_start),
       random_access_max_buffer_size(options.random_access_max_buffer_size),
       use_adaptive_mutex(options.use_adaptive_mutex),

@@ -5035,6 +5035,27 @@ TEST_F(SpeedbSharedOptionsTest, EnableSpeeDBFeaturesDB) {
   delete db1;
   delete db2;
   delete db3;
+  for (auto dbname_ : {"db1", "db2", "db3"}) {
+    std::vector<std::string> filenames;
+    ASSERT_OK(op1.env->GetChildren(dbname_, &filenames));
+    // In Windows, LOCK file cannot be deleted because it is locked by
+    // optins_test After closing optins_test, the LOCK file is unlocked and can
+    // be deleted Delete archival files.
+    bool deleteDir = true;
+    for (size_t i = 0; i < filenames.size(); ++i) {
+      std::string file_path = dbname_;
+      file_path += "/";
+      file_path += filenames[i];
+      Status s = op1.env->DeleteFile(file_path);
+      if (!s.ok()) {
+        deleteDir = false;
+      }
+    }
+    ASSERT_TRUE(deleteDir);
+    if (deleteDir) {
+      ASSERT_OK(op1.env->DeleteDir(dbname_));
+    }
+  }
 }
 
 TEST_F(SpeedbSharedOptionsTest, EnableSpeeDBFeaturesCF) {
@@ -5054,12 +5075,42 @@ TEST_F(SpeedbSharedOptionsTest, EnableSpeeDBFeaturesCF) {
   op1.create_if_missing = true;
   op1.EnableSpeedbFeatures(so);
   ASSERT_OK(DB::Open(op1, "db1", &db1));
-
   cfo.EnableSpeedbFeaturesCF(so);
   ASSERT_OK(db1->CreateColumnFamily(cfo, "new_cf", &cf));
+
+  auto write_buffer_size =
+      std::min<size_t>(so.write_buffer_manager->buffer_size() / 4, 64ul << 20);
+  ASSERT_TRUE(int(so.write_buffer_manager->buffer_size() / write_buffer_size) +
+                  2 ==
+              cfo.max_write_buffer_number);
+  const auto* sanitized_table_options =
+      op1.table_factory->GetOptions<BlockBasedTableOptions>();
+  ASSERT_TRUE(sanitized_table_options->block_cache == so.cache);
+
   ASSERT_OK(db1->DropColumnFamily(cf));
   ASSERT_OK(db1->DestroyColumnFamilyHandle(cf));
   delete db1;
+  for (auto dbname_ : {"db1"}) {
+    std::vector<std::string> filenames;
+    ASSERT_OK(op1.env->GetChildren(dbname_, &filenames));
+    // In Windows, LOCK file cannot be deleted because it is locked by
+    // optins_test After closing optins_test, the LOCK file is unlocked and can
+    // be deleted Delete archival files.
+    bool deleteDir = true;
+    for (size_t i = 0; i < filenames.size(); ++i) {
+      std::string file_path = dbname_;
+      file_path += "/";
+      file_path += filenames[i];
+      Status s = op1.env->DeleteFile(file_path);
+      if (!s.ok()) {
+        deleteDir = false;
+      }
+    }
+    ASSERT_TRUE(deleteDir);
+    if (deleteDir) {
+      ASSERT_OK(op1.env->DeleteDir(dbname_));
+    }
+  }
 }
 
 }  // namespace ROCKSDB_NAMESPACE

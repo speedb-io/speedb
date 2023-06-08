@@ -598,8 +598,8 @@ ColumnFamilyOptions* ColumnFamilyOptions::EnableSpeedbFeaturesCF(
   max_write_buffer_number = int(db_wbf_size / write_buffer_size) + 2;
   min_write_buffer_number_to_merge = max_write_buffer_number - 1;
   // set the pinning option for indexes and filters
+  ConfigOptions config_options;
   {
-    ConfigOptions config_options;
     config_options.ignore_unknown_options = false;
     config_options.ignore_unsupported_options = false;
     BlockBasedTableOptions block_based_table_options;
@@ -633,7 +633,7 @@ ColumnFamilyOptions* ColumnFamilyOptions::EnableSpeedbFeaturesCF(
     std::string memtable_opt;
     memtable_opt = ":" + std::to_string(0);
     std::unique_ptr<MemTableRepFactory> unique;
-    ConfigOptions config_options;
+    config_options;
 
     auto s = MemTableRepFactory::CreateFromString(
         config_options, memtablerep + memtable_opt, &unique);

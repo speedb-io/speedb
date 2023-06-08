@@ -1,7 +1,16 @@
-// Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
-//  This source code is licensed under both the GPLv2 (found in the
-//  COPYING file in the root directory) and Apache 2.0 License
-//  (found in the LICENSE.Apache file in the root directory).
+// Copyright (C) 2022 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 #include <cstdio>
 #include <iostream>
@@ -12,7 +21,7 @@
 #include "rocksdb/options.h"
 #include "rocksdb/slice.h"
 
-using namespace rocksdb;
+using namespace ROCKSDB_NAMESPACE;
 
 #if defined(OS_WIN)
 std::string kDBPath = "C:\\Windows\\TEMP\\enable_speedb_features_example";
@@ -42,6 +51,7 @@ int main() {
                           delayed_write_rate);
 
   // customize each options file except SpeedbSharedOptiopns members
+  // as listed in the definition of SpeedbSharedOptiopns in options.h
   op1.create_if_missing = true;
   op1.compression = kNoCompression;
   //...
@@ -52,7 +62,7 @@ int main() {
   //...
   op2.EnableSpeedbFeatures(so1);
 
-  // open DBs that will share the recoureces in the shared options
+  // open the databases that sharing the recoureces from shared_options opbject
   Status s = DB::Open(op1, kDBPath1, &db1);
   if (!s.ok()) {
     std::cerr << s.ToString() << std::endl;
@@ -99,23 +109,32 @@ int main() {
   std::cout << "DBs group 2 was created" << std::endl;
 
   // creation of column family
-  ColumnFamilyOptions cf3(op3);
+  ColumnFamilyOptions cfo3(op3);
   ColumnFamilyHandle *cf;
   // coustomize it except SpeedbSharedOptiopns members
 
   // call EnableSpeedbFeaturesCF and supply for it the same SpeedbSharedOptions
-  // object as the DB
-  cf3.EnableSpeedbFeaturesCF(so2);
+  // object as the DB, so2 this time.
+  cfo3.EnableSpeedbFeaturesCF(so2);
   // create the cf
-  db3->CreateColumnFamily(cf3, "new_cf", &cf);
+  db3->CreateColumnFamily(cfo3, "new_cf", &cf);
+  std::cout << "new_cf was created in db3" << std::endl;
 
-  db1->DropColumnFamily(cf);
-  db1->DestroyColumnFamilyHandle(cf);
+  db3->DropColumnFamily(cf);
+  if (!s.ok()) {
+    std::cerr << s.ToString() << std::endl;
+    return 1;
+  }
+  db3->DestroyColumnFamilyHandle(cf);
+  if (!s.ok()) {
+    std::cerr << s.ToString() << std::endl;
+    return 1;
+  }
+  std::cout << "new_cf was destroyed" << std::endl;
 
   delete db1;
   delete db2;
   delete db3;
   delete db4;
-
   return 0;
 }

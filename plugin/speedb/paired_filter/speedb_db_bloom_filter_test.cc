@@ -2718,6 +2718,176 @@ TEST_F(SpdbDBBloomFilterTest, DynamicBloomFilterOptions) {
   ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_USEFUL), 3);
 }
 
+TEST_F(SpdbDBBloomFilterTest, RibbonToPairedFilter) {
+  ReadOptions ropts;
+  Options options;
+  options.env = CurrentOptions().env;
+  options.create_if_missing = true;
+  options.disable_auto_compactions = true;
+  options.statistics = CreateDBStatistics();
+  // Enable prefix bloom for SST files
+  BlockBasedTableOptions table_options;
+  table_options.cache_index_and_filter_blocks = true;
+  table_options.filter_policy = BloomLikeFilterPolicy::Create(RibbonFilterPolicy::kClassName(), 20);
+  options.table_factory.reset(NewBlockBasedTableFactory(table_options));
+  DestroyAndReopen(options);
+
+  std::string value;
+  std::string key = "key_";
+  constexpr int kNumKeys = 100;
+  for (int i = 0; i < kNumKeys; i++) {
+    ASSERT_OK(Put(key + std::to_string(i), "value"));
+    ASSERT_TRUE(db_->KeyMayExist(ropts, key + std::to_string(i), &value));
+  }
+  //ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_CHECKED), kNumKeys);
+  //ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_USEFUL), kNumKeys);
+  dbfull()->Flush(FlushOptions());
+  Reopen(options);
+  int count = 0;
+  for (int i = 0; i < 2*kNumKeys; i++) {
+    bool mjr = db_->KeyMayExist(ropts, key + std::to_string(i), &value);
+    if (mjr) count++;
+  }
+  printf("MJR: Ribbon MayExist=%d useful=%d\n", count, (int) TestGetTickerCount(options, BLOOM_FILTER_USEFUL));
+  // ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_USEFUL), kNumKeys);
+
+  table_options.filter_policy = BloomLikeFilterPolicy::Create(BloomFilterPolicy::kClassName(), 20);
+  options.table_factory.reset(NewBlockBasedTableFactory(table_options));
+  Reopen(options);
+  count = 0;
+  for (int i = 0; i < 2*kNumKeys; i++) {
+    bool mjr = db_->KeyMayExist(ropts, key + std::to_string(i), &value);
+    if (mjr) count++;
+  }
+  printf("MJR: Bloom MayExist=%d useful=%d\n", count, (int) TestGetTickerCount(options, BLOOM_FILTER_USEFUL));
+  // ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_USEFUL), kNumKeys);
+
+  table_options.filter_policy = Create(20, kSpdbPairedBloom);
+  options.table_factory.reset(NewBlockBasedTableFactory(table_options));
+  Reopen(options);
+  count = 0;
+  for (int i = 0; i < 2*kNumKeys; i++) {
+    bool mjr = db_->KeyMayExist(ropts, key + std::to_string(i), &value);
+    if (mjr) count++;
+  }
+  printf("MJR: Paired MayExist=%d useful=%d\n", count, (int) TestGetTickerCount(options, BLOOM_FILTER_USEFUL));
+  
+}
+  
+TEST_F(SpdbDBBloomFilterTest, BloomToPairedFilter) {
+  ReadOptions ropts;
+  Options options;
+  options.env = CurrentOptions().env;
+  options.create_if_missing = true;
+  options.disable_auto_compactions = true;
+  options.statistics = CreateDBStatistics();
+  // Enable prefix bloom for SST files
+  BlockBasedTableOptions table_options;
+  table_options.cache_index_and_filter_blocks = true;
+  table_options.filter_policy = BloomLikeFilterPolicy::Create(BloomFilterPolicy::kClassName(), 20);
+  options.table_factory.reset(NewBlockBasedTableFactory(table_options));
+  DestroyAndReopen(options);
+
+  std::string value;
+  std::string key = "key_";
+  constexpr int kNumKeys = 100;
+  for (int i = 0; i < kNumKeys; i++) {
+    ASSERT_OK(Put(key + std::to_string(i), "value"));
+    ASSERT_TRUE(db_->KeyMayExist(ropts, key + std::to_string(i), &value));
+  }
+  //ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_CHECKED), kNumKeys);
+  //ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_USEFUL), kNumKeys);
+  dbfull()->Flush(FlushOptions());
+  Reopen(options);
+  int count = 0;
+  for (int i = 0; i < 2*kNumKeys; i++) {
+    bool mjr = db_->KeyMayExist(ropts, key + std::to_string(i), &value);
+    if (mjr) count++;
+  }
+  printf("MJR: Bloom MayExist=%d useful=%d\n", count, (int) TestGetTickerCount(options, BLOOM_FILTER_USEFUL));
+  // ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_USEFUL), kNumKeys);
+
+  table_options.filter_policy = BloomLikeFilterPolicy::Create(RibbonFilterPolicy::kClassName(), 20);
+  options.table_factory.reset(NewBlockBasedTableFactory(table_options));
+  Reopen(options);
+  count = 0;
+  for (int i = 0; i < 2*kNumKeys; i++) {
+    bool mjr = db_->KeyMayExist(ropts, key + std::to_string(i), &value);
+    if (mjr) count++;
+  }
+  printf("MJR: Ribbon MayExist=%d useful=%d\n", count, (int) TestGetTickerCount(options, BLOOM_FILTER_USEFUL));
+  // ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_USEFUL), kNumKeys);
+
+  table_options.filter_policy = Create(20, kSpdbPairedBloom);
+  options.table_factory.reset(NewBlockBasedTableFactory(table_options));
+  Reopen(options);
+  count = 0;
+  for (int i = 0; i < 2*kNumKeys; i++) {
+    bool mjr = db_->KeyMayExist(ropts, key + std::to_string(i), &value);
+    if (mjr) count++;
+  }
+  printf("MJR: Paired MayExist=%d useful=%d\n", count, (int) TestGetTickerCount(options, BLOOM_FILTER_USEFUL));
+  
+}
+  
+TEST_F(SpdbDBBloomFilterTest, PairedFilterToBloom) {
+  ReadOptions ropts;
+  Options options;
+  options.env = CurrentOptions().env;
+  options.create_if_missing = true;
+  options.disable_auto_compactions = true;
+  options.statistics = CreateDBStatistics();
+  // Enable prefix bloom for SST files
+  BlockBasedTableOptions table_options;
+  table_options.cache_index_and_filter_blocks = true;
+  table_options.filter_policy = Create(20, kSpdbPairedBloom);
+  options.table_factory.reset(NewBlockBasedTableFactory(table_options));
+  DestroyAndReopen(options);
+
+  std::string value;
+  std::string key = "key_";
+  constexpr int kNumKeys = 100;
+  for (int i = 0; i < kNumKeys; i++) {
+    ASSERT_OK(Put(key + std::to_string(i), "value"));
+    ASSERT_TRUE(db_->KeyMayExist(ropts, key + std::to_string(i), &value));
+  }
+  //ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_CHECKED), kNumKeys);
+  //ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_USEFUL), kNumKeys);
+  dbfull()->Flush(FlushOptions());
+  Reopen(options);
+  int count = 0;
+  for (int i = 0; i < 2*kNumKeys; i++) {
+    bool mjr = db_->KeyMayExist(ropts, key + std::to_string(i), &value);
+    if (mjr) count++;
+  }
+  printf("MJR: Paired MayExist=%d useful=%d\n", count, (int) TestGetTickerCount(options, BLOOM_FILTER_USEFUL));
+  //  ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_CHECKED), kNumKeys);
+  // ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_USEFUL), kNumKeys);
+
+  table_options.filter_policy = BloomLikeFilterPolicy::Create(BloomFilterPolicy::kClassName(), 20);
+  options.table_factory.reset(NewBlockBasedTableFactory(table_options));
+  Reopen(options);
+  count = 0;
+  for (int i = 0; i < 2*kNumKeys; i++) {
+    bool mjr = db_->KeyMayExist(ropts, key + std::to_string(i), &value);
+    if (mjr) count++;
+  }
+  printf("MJR: Bloom MayExist=%d useful=%d\n", count, (int) TestGetTickerCount(options, BLOOM_FILTER_USEFUL));
+
+  table_options.filter_policy = BloomLikeFilterPolicy::Create(RibbonFilterPolicy::kClassName(), 20);
+  options.table_factory.reset(NewBlockBasedTableFactory(table_options));
+  Reopen(options);
+  count = 0;
+  for (int i = 0; i < 2*kNumKeys; i++) {
+    bool mjr = db_->KeyMayExist(ropts, key + std::to_string(i), &value);
+    if (mjr) count++;
+  }
+  printf("MJR: Ribbon MayExist=%d useful=%d\n", count, (int) TestGetTickerCount(options, BLOOM_FILTER_USEFUL));
+
+  //  ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_CHECKED), kNumKeys);
+  // ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_USEFUL), kNumKeys);
+  
+}
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {

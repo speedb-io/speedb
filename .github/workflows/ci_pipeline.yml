@@ -105,3 +105,7 @@ jobs:
     if: ${{ github.event.review.state == 'approved' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/release') }}
     needs: [Build]
     uses: ./.github/workflows/test_fuzz.yml
+
+  Check-Licence-And-History:
+    if: ${{  github.event_name == 'pull_request' }}
+    uses: ./.github/workflows/check_license_and_history.yml

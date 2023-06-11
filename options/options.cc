@@ -568,11 +568,11 @@ SpeedbSharedOptions::SpeedbSharedOptions(
 
 void SpeedbSharedOptions::increaseWriteBufferSize(size_t increase_by) {
   if (write_buffer_manager->buffer_size() == 1 && increase_by > 1) {
-      write_buffer_manager->SetBufferSize(increase_by);
+    write_buffer_manager->SetBufferSize(increase_by);
   } else if (total_ram_size_bytes_ / 4 >
              write_buffer_manager->buffer_size() + increase_by) {
-      write_buffer_manager->SetBufferSize(write_buffer_manager->buffer_size() +
-                                          increase_by);
+    write_buffer_manager->SetBufferSize(write_buffer_manager->buffer_size() +
+                                        increase_by);
   }
 }
 

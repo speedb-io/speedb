@@ -541,7 +541,9 @@ DEFINE_int64(db_write_buffer_size,
 DEFINE_bool(cost_write_buffer_to_cache, false,
             "The usage of memtable is costed to the block cache");
 
-DEFINE_bool(allow_wbm_stalls, false, "Enable WBM write stalls and delays");
+DEFINE_bool(allow_wbm_delays_and_stalls,
+            ROCKSDB_NAMESPACE::WriteBufferManager::kDfltAllowDelaysAndStalls,
+            "Enable WBM write stalls and delays");
 
 DEFINE_bool(initiate_wbm_flushes,
             ROCKSDB_NAMESPACE::WriteBufferManager::kDfltInitiateFlushes,
@@ -556,6 +558,12 @@ DEFINE_uint32(max_num_parallel_flushes,
               "In case FLAGGS_initiate_wbm_flushes is true, this flag will "
               "overwrite the default "
               "max number of parallel flushes.");
+
+DEFINE_uint32(
+    start_delay_percent,
+    ROCKSDB_NAMESPACE::WriteBufferManager::kDfltStartDelayPercentThreshold,
+    "The percent threshold of the buffer size after which WBM will "
+    "initiate delays.");
 
 DEFINE_int64(arena_block_size, ROCKSDB_NAMESPACE::Options().arena_block_size,
              "The size, in bytes, of one block in arena memory allocation.");
@@ -1582,7 +1590,7 @@ DEFINE_double(experimental_mempurge_threshold,
               ROCKSDB_NAMESPACE::Options().experimental_mempurge_threshold,
               "Maximum useful payload ratio estimate that triggers a mempurge "
               "(memtable garbage collection).");
-DEFINE_bool(use_spdb_writes, true, "Use optimized Speedb write flow");
+DEFINE_bool(use_spdb_writes, false, "Use optimized Speedb write flow");
 
 DEFINE_bool(inplace_update_support,
             ROCKSDB_NAMESPACE::Options().inplace_update_support,
@@ -4924,12 +4932,15 @@ class Benchmark {
     }
     if (FLAGS_cost_write_buffer_to_cache) {
       options.write_buffer_manager.reset(new WriteBufferManager(
-          FLAGS_db_write_buffer_size, cache_, FLAGS_allow_wbm_stalls,
-          FLAGS_initiate_wbm_flushes, flush_initiation_options));
+          FLAGS_db_write_buffer_size, cache_, FLAGS_allow_wbm_delays_and_stalls,
+          FLAGS_initiate_wbm_flushes, flush_initiation_options,
+          static_cast<uint16_t>(FLAGS_start_delay_percent)));
     } else {
       options.write_buffer_manager.reset(new WriteBufferManager(
-          FLAGS_db_write_buffer_size, {} /* cache */, FLAGS_allow_wbm_stalls,
-          FLAGS_initiate_wbm_flushes, flush_initiation_options));
+          FLAGS_db_write_buffer_size, {} /* cache */,
+          FLAGS_allow_wbm_delays_and_stalls, FLAGS_initiate_wbm_flushes,
+          flush_initiation_options,
+          static_cast<uint16_t>(FLAGS_start_delay_percent)));
     }
 
     if (FLAGS_use_dynamic_delay && FLAGS_num_multi_db > 1) {

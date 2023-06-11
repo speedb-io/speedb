@@ -133,11 +133,11 @@ void DBTestBase::RecalculateWriteStallConditions(
 }
 
 bool DBTestBase::IsDbWriteStopped(DBImpl* dbimpl) {
-  return dbimpl->TEST_write_controler()->IsStopped();
+  return dbimpl->write_controller_ptr()->IsStopped();
 }
 
 bool DBTestBase::IsDbWriteDelayed(DBImpl* dbimpl) {
-  return dbimpl->TEST_write_controler()->NeedsDelay();
+  return dbimpl->write_controller_ptr()->NeedsDelay();
 }
 
 bool DBTestBase::ShouldSkipOptions(int option_config, int skip_mask) {
@@ -1697,6 +1697,13 @@ void VerifySstUniqueIds(const TablePropertiesCollection& props) {
     std::string id;
     ASSERT_OK(GetUniqueIdFromTableProperties(*pair.second, &id));
     ASSERT_TRUE(seen.insert(id).second);
+  }
+}
+
+void DBTestBase::ResetWriteControllerTokens(DBImpl* db) {
+  auto versions = db->GetVersionSet();
+  for (auto* cfd : versions->GetRefedColumnFamilySet()) {
+    cfd->TEST_ResetWriteControllerToken();
   }
 }
 

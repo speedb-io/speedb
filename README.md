@@ -14,17 +14,17 @@
 </div>
 
 # Speedb
-A first-of-its-kind, community-led storage engine designed to support modern data sets. 
-It focuses on high performance, optimized for modern storage hardware and scale, on-premise and in the cloud. We strive to simplify the usability of complex data engines as well as stabilize and improve performance.
+[Website](https://www.speedb.io) • [Docs](https://docs.speedb.io/) • [Community Discord](https://discord.com/invite/5fVUUtM2cG) • [Videos](https://www.youtube.com/watch?v=jM987hjxRxI&list=UULF6cdtbCAzRnWtluhMsmjGKw&index=2)
 
-We are building an open source community where RocksDB and Speedb users and developers can interact, improve, share knowledge, and learn best practices. 
-You are welcome to join our community, contribute, and participate in the development of the next generation storage engine.
-We welcome any questions or comments you may have. 
-Please use issues to submit them, and pull requests to make contributions.
+A first-of-its-kind, community-led key-value storage engine, designed to support modern data sets. 
 
-This project is maintained by Speedb and is based on Rocksdb, developed by Facebook.
+Speedb is a 100% RocksDB compatible, drop-in library, focused on high performance, optimized for modern storage hardware and scale, on-premise and in the cloud. 
+We strive to simplify the usability of complex data engines as well as stabilize and improve performance for any use case.
 
-**Join us to build the next generation data engine!**
+We are building an open source community where RocksDB and Speedb users and developers can interact, improve, share knowledge, and learn best practices. You are welcome to join our community, contribute, and participate in the development of the next generation storage engine. We welcome any questions or comments you may have. Please use issues to submit them, and pull requests to make contributions.
+
+
+**Join us to build the next generation key-value storage engine!**
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset=".github/new-bee-mascot-dark.gif" width="80px" >
@@ -32,27 +32,36 @@ This project is maintained by Speedb and is based on Rocksdb, developed by Faceb
 </picture>
 
 
-## Benchmarks
-Below is a graph comparing Speedb's paired bloom filter with the default bloom filter. 
+## 📊 Example Benchmark
 
-<img width="769" alt="Screen Shot 2022-10-31 at 15 15 42" src="https://user-images.githubusercontent.com/107058910/199016617-4ecbe279-b281-4a8c-b630-87a509bc09da.png">
+Below is a graph comparing Speedb and RocksDB running a massive random write workload.
 
-This test simulates a large number of non-existing keys, with the disk as the bottleneck. The test was running with 1 billion objects, value size of 256 bytes and 4 threads on a system with 8 CPU cores. 
+The test was running on a database with 80 million objects, while the value size is 1KB and 50 threads. 
 
-According to the graph, random reads produce significant improvements of up to 140% in this type of workload.
+The graph below shows how Speedb can handle massive write workloads while maintaining consistent performance over time and without stalling, thanks to its improved delayed write mechanism.
 
-
-Another test using the same bits per key, memory consumption was reduced by 23%, while performance remained unchanged.
-The results are presented in the graph below.
-The test was running with 1 billion objects, value size of 256 bytes and 4 threads on a system with 16 CPU cores.
-
-![Blueberry performance results  (4)](https://user-images.githubusercontent.com/107058910/205052811-888de6c3-2db5-46c0-9108-607206bf31f7.jpg)
+![random-writes-delayed-writes](https://github.com/speedb-io/speedb/assets/107058910/dca2785a-d43f-494d-ad34-815ade50ca7a)
 
 
+You can read more about the new delayed write mechanism and other features and enhancements in the Speedb [documentation](https://docs.speedb.io/enhancements/dynamic-delayed-writes).
 
-You can read more about our new paired bloom filter algorithm in the [documentation](https://docs.speedb.dev/documentation/speedb-features/paired-bloom-filter).
+## 💬 Why use Speedb?
+* Improved read and write performance with Speedb by enabling features like the new [sorted hash memtable](https://docs.speedb.io/speedb-features/sorted-hash-memtable) 
+* Stabilized performance with the improved [delayed write mechanism](https://docs.speedb.io/enhancements/dynamic-delayed-writes) 
+* Reduced memory consumption when using features like the [Speedb paired bloom filter](https://docs.speedb.io/speedb-features/paired-bloom-filter)
+* Easy to maintain - with Speedb you can [change mutable options](https://docs.speedb.io/speedb-features/live-configuration-changes) during runtime 
+* Easy to manage multiple databases
 
-## Usage
+And many more!
+
+## 🛣️ Roadmap
+
+The [product roadmap](https://github.com/orgs/speedb-io/projects/4/views/1) provides a snapshot of the features we are currently developing, what we are planning for the future, and the items that have already been delivered.
+
+We have added a column with items that are awaiting community feedback. We invite you to participate in our polls inside, share your thoughts about topics that are important to you, and let us know if there is anything else you would like to see on the list.
+
+
+## 👷‍♀️ Usage
 * If speedb is in your default library path:
 
 
@@ -73,7 +82,7 @@ Usage of the library in your code is the same regardless of whether you statical
 The public interface is in [include](include/rocksdb). Callers should not include or rely on the details of any other header files in this package. Those internal APIs may be changed without warning.
 
 
-## Build dependencies
+## ⛓️ Build dependencies
 
 Please refer to the file [INSTALL.md](INSTALL.md) for a list of all the
 dependencies and how to install them across different platforms.
@@ -120,22 +129,18 @@ In there you can also find a readme with the commands we are using to get you st
 
 
 
-## Documentation
+## 📚 Documentation
 
 You can find a detailed description of all Speedb features [here](https://speedb.gitbook.io/documentation/).
 
 [Speedb's documentation repository](https://github.com/speedb-io/documentation) allows you to enhance, add content and fix issues. 
 
-## 🛣️ Roadmap
 
-The [product roadmap](https://github.com/orgs/speedb-io/projects/4/views/1) provides a snapshot of the features we are currently developing, what we are planning for the future, and the items that have already been delivered.
-
-We have added a column with items that are awaiting community feedback. We invite you to participate in our polls inside, share your thoughts about topics that are important to you, and let us know if there is anything else you would like to see on the list.
 
 ## ❔ Questions 
 
 - For live discussion with the community you can use our official [Discord channel](https://discord.gg/5fVUUtM2cG). 
-- For technical questions and discussions you can use our official [Discourse forum](https://forum.speedb.dev). 
+
 
 
 ## 🌎 Join us 
@@ -144,7 +149,7 @@ Speedb is committed to a welcoming and inclusive environment where everyone can
 contribute.
 
 
-## Contributing code
+## 🫴 Contributing code
 
 See the [contributing guide](CONTRIBUTING.md).
 

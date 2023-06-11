@@ -140,9 +140,13 @@ DEFINE_uint64(db_write_buffer_size,
 DEFINE_bool(cost_write_buffer_to_cache, false,
             "The usage of memtable is costed to the block cache");
 
-DEFINE_bool(allow_wbm_delays_and_stalls,
-            ROCKSDB_NAMESPACE::WriteBufferManager::kDfltAllowDelaysAndStalls,
-            "Enable WBM write stalls and delays");
+DEFINE_bool(allow_wbm_stalls,
+            ROCKSDB_NAMESPACE::WriteBufferManager::kDfltAllowStall,
+            "Enable WBM write stalls");
+
+DEFINE_bool(allow_wbm_delays,
+            ROCKSDB_NAMESPACE::WriteBufferManager::kDfltAllowDelays,
+            "Enable WBM write delays");
 
 DEFINE_uint32(
     start_delay_percent,

@@ -46,7 +46,7 @@ class StallInterface {
 
 class WriteBufferManager final {
  public:
-  // Delay Mechanism (allow_delays_and_stalls == true) definitions
+  // Delay Mechanism (allow_delays == true) definitions
   static constexpr uint16_t kDfltStartDelayPercentThreshold = 70U;
   static constexpr uint64_t kNoDelayedWriteFactor = 0U;
   static constexpr uint64_t kMaxDelayedWriteFactor = 100U;
@@ -72,7 +72,8 @@ class WriteBufferManager final {
     size_t max_num_parallel_flushes = kDfltMaxNumParallelFlushes;
   };
 
-  static constexpr bool kDfltAllowDelaysAndStalls = true;
+  static constexpr bool kDfltAllowStall = true;
+  static constexpr bool kDfltAllowDelays = true;
   static constexpr bool kDfltInitiateFlushes = true;
 
  public:
@@ -84,15 +85,9 @@ class WriteBufferManager final {
   // cost the memory allocated to the cache. It can be used even if _buffer_size
   // = 0.
   //
-  // allow_delays_and_stalls: if set true, will enable delays and stall as
-  // described below:
-  //  Delays: delay writes when memory_usage() exceeds the
-  //    start_delay_percent percent threshold of the buffer size.
-  //    The WBM calculates a delay factor that is increasing as memory_usage()
-  //    increases. Whenever the state changes, the WBM will notify registered
-  //    Write Controllers about the applicable delay factor.
-  //  Stalls: stalling of writes when memory_usage() exceeds buffer_size. It
-  //    will wait for flush to complete and memory usage to drop down.
+  // allow_stall: if set true, it will enable stalling of writes when
+  // memory_usage() exceeds buffer_size. It will wait for flush to complete and
+  // memory usage to drop down.
   //
   // initiate_flushes: if set true, the WBM will proactively request registered
   // DB-s to flush. The mechanism is based on initiating an increasing number of
@@ -100,13 +95,20 @@ class WriteBufferManager final {
   // call ShouldFlush() and the WBM will indicate if current memory usage merits
   // a flush. Currently the ShouldFlush() mechanism is used only in the
   // write-path of a DB.
+  //
+  // allow_delays: delay writes when memory_usage() exceeds the
+  //    start_delay_percent percent threshold of the buffer size.
+  //    The WBM calculates a delay factor that is increasing as memory_usage()
+  //    increases. Whenever the state changes, the WBM will notify registered
+  //    WriteControllers about the applicable delay factor.
   explicit WriteBufferManager(
       size_t _buffer_size, std::shared_ptr<Cache> cache = {},
-      bool allow_delays_and_stalls = kDfltAllowDelaysAndStalls,
+      bool allow_stall = kDfltAllowStall,
       bool initiate_flushes = kDfltInitiateFlushes,
       const FlushInitiationOptions& flush_initiation_options =
           FlushInitiationOptions(),
-      uint16_t start_delay_percent = kDfltStartDelayPercentThreshold);
+      uint16_t start_delay_percent = kDfltStartDelayPercentThreshold,
+      bool allow_delays = kDfltAllowDelays);
 
   // No copying allowed
   WriteBufferManager(const WriteBufferManager&) = delete;
@@ -201,12 +203,11 @@ class WriteBufferManager final {
   // We stall the writes untill memory_usage drops below buffer_size. When the
   // function returns true, all writer threads (including one checking this
   // condition) across all DBs will be stalled. Stall is allowed only if user
-  // pass allow_delays_and_stalls = true during WriteBufferManager instance
-  // creation.
+  // pass allow_stall = true during WriteBufferManager instance creation.
   //
   // Should only be called by RocksDB internally .
   bool ShouldStall() const {
-    if (!allow_delays_and_stalls_ || !enabled()) {
+    if (!allow_stall_ || !enabled()) {
       return false;
     }
 
@@ -354,8 +355,9 @@ class WriteBufferManager final {
   std::list<StallInterface*> queue_;
   // Protects the queue_ and stall_active_.
   std::mutex mu_;
-  bool allow_delays_and_stalls_ = kDfltAllowDelaysAndStalls;
+  bool allow_stall_ = kDfltAllowStall;
   uint16_t start_delay_percent_ = kDfltStartDelayPercentThreshold;
+  bool allow_delays_ = kDfltAllowDelays;
 
   // Value should only be changed by BeginWriteStall() and MaybeEndWriteStall()
   // while holding mu_, but it can be read without a lock.

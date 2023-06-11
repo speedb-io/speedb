@@ -811,6 +811,9 @@ std::string BlockBasedTableFactory::GetPrintableOptions() const {
   snprintf(buffer, kBufferSize, "  partition_filters: %d\n",
            table_options_.partition_filters);
   ret.append(buffer);
+  snprintf(buffer, kBufferSize, "  optimize_filters_for_memory: %d\n",
+           table_options_.optimize_filters_for_memory);
+  ret.append(buffer);
   snprintf(buffer, kBufferSize, "  use_delta_encoding: %d\n",
            table_options_.use_delta_encoding);
   ret.append(buffer);

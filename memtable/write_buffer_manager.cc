@@ -35,8 +35,8 @@ auto WriteBufferManager::FlushInitiationOptions::Sanitize() const
 WriteBufferManager::WriteBufferManager(
     size_t _buffer_size, std::shared_ptr<Cache> cache, bool allow_stall,
     bool initiate_flushes,
-    const FlushInitiationOptions& flush_initiation_options,
-    uint16_t start_delay_percent, bool allow_delays)
+    const FlushInitiationOptions& flush_initiation_options, bool allow_delays,
+    uint16_t start_delay_percent)
     : buffer_size_(_buffer_size),
       mutable_limit_(buffer_size_ * 7 / 8),
       memory_used_(0),
@@ -312,11 +312,11 @@ std::string WriteBufferManager::GetPrintableOptions() const {
   ret.append(buffer);
 
   snprintf(buffer, kBufferSize, "%*s: %d\n", field_width,
-           "wbm.initiate_flushes", IsInitiatingFlushes());
+           "wbm.start_delay_percent", start_delay_percent_);
   ret.append(buffer);
 
   snprintf(buffer, kBufferSize, "%*s: %d\n", field_width,
-           "wbm.start_delay_percent", start_delay_percent_);
+           "wbm.initiate_flushes", IsInitiatingFlushes());
   ret.append(buffer);
 
   return ret;
@@ -430,8 +430,8 @@ void WriteBufferManager::UpdateControllerDelayState() {
   if (usage_state == UsageState::kDelay) {
     WBMSetupDelay(delay_factor);
   } else if (usage_state == UsageState::kStop && !allow_stall_) {
-    // setting write rate to kMinWriteRate
-    WBMSetupDelay(kMaxDelayedWriteFactor);
+    // setting write rate to the last step of delay speed.
+    WBMSetupDelay(kMaxDelayedWriteFactor - 1);
   } else {
     // check if this WMB has an active delay request.
     // if yes, remove it and maybe set a different rate.

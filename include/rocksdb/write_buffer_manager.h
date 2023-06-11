@@ -107,8 +107,8 @@ class WriteBufferManager final {
       bool initiate_flushes = kDfltInitiateFlushes,
       const FlushInitiationOptions& flush_initiation_options =
           FlushInitiationOptions(),
-      uint16_t start_delay_percent = kDfltStartDelayPercentThreshold,
-      bool allow_delays = kDfltAllowDelays);
+      bool allow_delays = kDfltAllowDelays,
+      uint16_t start_delay_percent = kDfltStartDelayPercentThreshold);
 
   // No copying allowed
   WriteBufferManager(const WriteBufferManager&) = delete;

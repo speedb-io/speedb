@@ -3112,14 +3112,14 @@ void InitializeOptionsFromFlags(
     options.write_buffer_manager.reset(new WriteBufferManager(
         FLAGS_db_write_buffer_size, cache, FLAGS_allow_wbm_stalls,
         FLAGS_initiate_wbm_flushes, flush_initiation_options,
-        static_cast<uint16_t>(FLAGS_start_delay_percent),
-        FLAGS_allow_wbm_delays));
+        FLAGS_allow_wbm_delays,
+        static_cast<uint16_t>(FLAGS_start_delay_percent)));
   } else {
     options.write_buffer_manager.reset(new WriteBufferManager(
         FLAGS_db_write_buffer_size, {} /* cache */, FLAGS_allow_wbm_stalls,
         FLAGS_initiate_wbm_flushes, flush_initiation_options,
-        static_cast<uint16_t>(FLAGS_start_delay_percent),
-        FLAGS_allow_wbm_delays));
+        FLAGS_allow_wbm_delays,
+        static_cast<uint16_t>(FLAGS_start_delay_percent)));
   }
 
   options.write_buffer_size = FLAGS_write_buffer_size;

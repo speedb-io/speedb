@@ -545,8 +545,8 @@ SpeedbSharedOptions::SpeedbSharedOptions(
   total_threads_ = total_threads;
   total_ram_size_bytes_ = total_ram_size_bytes;
   delayed_write_rate_ = delayed_write_rate;
-  
-  int write_buffer_size_ = std::max<size_t>(total_ram_size_bytes_ / 4, 512*1024*1024ul);
+
+  int initial_write_buffer_size_ = 1;
   int num_shard_bits = -1;
   bool strict_capacity_limit = false;
   double high_pri_pool_ratio = (0.5);
@@ -559,14 +559,18 @@ SpeedbSharedOptions::SpeedbSharedOptions(
     use_adaptive_mutex, metadata_charge_policy, low_pri_pool_ratio);
   int64_t low_pri_rate_bytes_per_sec = 1048576LL;
   write_controller.reset(new WriteController(true /*dynamic_delay*/, delayed_write_rate_, low_pri_rate_bytes_per_sec));
-  write_buffer_manager.reset(new WriteBufferManager(
-      write_buffer_size_, cache));
+  write_buffer_manager.reset(
+      new WriteBufferManager(initial_write_buffer_size_, cache));
 }
 
 void SpeedbSharedOptions::increaseWriteBufferSize(size_t increase_by)
 {
-  if (total_ram_size_bytes_ / 4 > (write_buffer_manager->buffer_size() +  increase_by)){
-    write_buffer_manager->SetBufferSize(write_buffer_manager->buffer_size() + increase_by);
+  if (write_buffer_manager->buffer_size() == 1 && increase_by > 1) {
+      write_buffer_manager->SetBufferSize(increase_by);
+  } else if (total_ram_size_bytes_ / 4 >
+             write_buffer_manager->buffer_size() + increase_by) {
+      write_buffer_manager->SetBufferSize(write_buffer_manager->buffer_size() +
+                                          increase_by);
   }
 }
 
@@ -604,7 +608,7 @@ DBOptions* DBOptions::OldDefaults(int rocksdb_major_version,
 ColumnFamilyOptions* ColumnFamilyOptions::EnableSpeedbFeaturesCF(
     SpeedbSharedOptions& shared_options) {
   // to disable flush due to write buffer full
-  shared_options.increaseWriteBufferSize(512 * 1024 * 1024);
+  shared_options.increaseWriteBufferSize(512 * 1024 * 1024ul);
   auto db_wbf_size = shared_options.write_buffer_manager->buffer_size();
   write_buffer_size = std::min<size_t>(db_wbf_size / 4, 64ul << 20);
   max_write_buffer_number = 32;

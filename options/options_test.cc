@@ -4972,22 +4972,21 @@ INSTANTIATE_TEST_CASE_P(OptionsSanityCheckTest, OptionsSanityCheckTest,
 class SpeedbSharedOptionsTest : public testing::Test {};
 
 TEST_F(SpeedbSharedOptionsTest, SpeedbSharedOptionsTest) {
-  size_t total_ram_size_bytes = 512 * 1024 * 1024;
-  size_t delayed_write_rate = 256 * 1024 * 1024;
+  size_t total_ram_size_bytes = 100 * 1024 * 1024 * 1024ul;
+  size_t delayed_write_rate = 256 * 1024 * 1024ul;
   int total_threads = 8;
   SpeedbSharedOptions so(total_ram_size_bytes, total_threads,
                          delayed_write_rate);
 
-  ASSERT_TRUE(so.write_buffer_manager->buffer_size() ==
-              std::max<size_t>(total_ram_size_bytes / 4, 1 << 30ul));
+  ASSERT_TRUE(so.write_buffer_manager->buffer_size() == 1);
   ASSERT_TRUE(so.cache->GetCapacity() == total_ram_size_bytes);
 }
 
 TEST_F(SpeedbSharedOptionsTest, EnableSpeeDBFeaturesDB) {
   DB *db1, *db2, *db3;
   Options op1, op2, op3;
-  size_t total_ram_size_bytes = 512 * 1024 * 1024;
-  size_t delayed_write_rate = 256 * 1024 * 1024;
+  size_t total_ram_size_bytes = 100 * 1024 * 1024 * 1024ul;
+  size_t delayed_write_rate = 256 * 1024 * 1024ul;
   int total_threads = 8;
   SpeedbSharedOptions so(total_ram_size_bytes, total_threads,
                          delayed_write_rate);
@@ -4995,9 +4994,16 @@ TEST_F(SpeedbSharedOptionsTest, EnableSpeeDBFeaturesDB) {
   op1.create_if_missing = true;
   op2.create_if_missing = true;
   op3.create_if_missing = true;
+
   op1.EnableSpeedbFeatures(so);
+  ASSERT_TRUE(op1.write_buffer_manager->buffer_size() ==
+              1 * 512 * 1024 * 1024ul);
   op2.EnableSpeedbFeatures(so);
+  ASSERT_TRUE(op2.write_buffer_manager->buffer_size() ==
+              2 * 512 * 1024 * 1024ul);
   op3.EnableSpeedbFeatures(so);
+  ASSERT_TRUE(op3.write_buffer_manager->buffer_size() ==
+              3 * 512 * 1024 * 1024ul);
 
   ASSERT_OK(DB::Open(op1, "db1", &db1));
   ASSERT_OK(DB::Open(op2, "db2", &db2));
@@ -5018,12 +5024,6 @@ TEST_F(SpeedbSharedOptionsTest, EnableSpeeDBFeaturesDB) {
   ASSERT_TRUE(db2->GetOptions().delayed_write_rate == so.getDelayedWriteRate());
   ASSERT_TRUE(db3->GetOptions().delayed_write_rate == so.getDelayedWriteRate());
 
-  ASSERT_TRUE(db1->GetOptions().db_write_buffer_size ==
-              std::max<size_t>(so.getTotalRamSizeBytes() / 4, 1 << 29ul));
-  ASSERT_TRUE(db2->GetOptions().db_write_buffer_size ==
-              std::max<size_t>(so.getTotalRamSizeBytes() / 4, 1 << 29ul));
-  ASSERT_TRUE(db3->GetOptions().db_write_buffer_size ==
-              std::max<size_t>(so.getTotalRamSizeBytes() / 4, 1 << 29ul));
 
   ASSERT_TRUE(db1->GetOptions().write_buffer_manager ==
               so.write_buffer_manager);
@@ -5031,6 +5031,13 @@ TEST_F(SpeedbSharedOptionsTest, EnableSpeeDBFeaturesDB) {
               so.write_buffer_manager);
   ASSERT_TRUE(db3->GetOptions().write_buffer_manager ==
               so.write_buffer_manager);
+
+  ASSERT_TRUE(db1->GetOptions().write_buffer_manager->buffer_size() ==
+              3 * 512 * 1024 * 1024ul);
+  ASSERT_TRUE(db2->GetOptions().write_buffer_manager->buffer_size() ==
+              3 * 512 * 1024 * 1024ul);
+  ASSERT_TRUE(db3->GetOptions().write_buffer_manager->buffer_size() ==
+              3 * 512 * 1024 * 1024ul);
 
   delete db1;
   delete db2;
@@ -5064,7 +5071,7 @@ TEST_F(SpeedbSharedOptionsTest, EnableSpeeDBFeaturesCF) {
   ColumnFamilyHandle* cf;
   ColumnFamilyOptions cfo;
 
-  size_t total_ram_size_bytes = 512 * 1024 * 1024;
+  size_t total_ram_size_bytes = 100 * 1024 * 1024 * 1024ul;
   size_t delayed_write_rate = 256 * 1024 * 1024;
   int total_threads = 8;
 
@@ -5075,14 +5082,15 @@ TEST_F(SpeedbSharedOptionsTest, EnableSpeeDBFeaturesCF) {
   op1.create_if_missing = true;
   op1.EnableSpeedbFeatures(so);
   ASSERT_OK(DB::Open(op1, "db1", &db1));
+  ASSERT_TRUE(db1->GetOptions().write_buffer_manager->buffer_size() ==
+              1 * 512 * 1024 * 1024ul);
   cfo.EnableSpeedbFeaturesCF(so);
   ASSERT_OK(db1->CreateColumnFamily(cfo, "new_cf", &cf));
+  ASSERT_TRUE(db1->GetOptions().write_buffer_manager->buffer_size() ==
+              2 * 512 * 1024 * 1024ul);
 
   auto write_buffer_size =
       std::min<size_t>(so.write_buffer_manager->buffer_size() / 4, 64ul << 20);
-  ASSERT_TRUE(int(so.write_buffer_manager->buffer_size() / write_buffer_size) +
-                  2 ==
-              cfo.max_write_buffer_number);
   const auto* sanitized_table_options =
       op1.table_factory->GetOptions<BlockBasedTableOptions>();
   ASSERT_TRUE(sanitized_table_options->block_cache == so.cache);

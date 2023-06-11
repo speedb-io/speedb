@@ -46,19 +46,19 @@ jobs:
           done
           exit $exit_code
       - name: Check HISTORY
-      run: |  
-        set +e
-        git diff --name-only --diff-filter=A ${{ github.event.pull_request.base.sha }} ${{ github.sha }}|grep -v "\.github" |grep -q [a-z,A-Z]
-        if [ $? -eq "0" ]; then
+        run: |  
+          set +e
+          git diff --name-only --diff-filter=A ${{ github.event.pull_request.base.sha }} ${{ github.sha }}|grep -v "\.github" |grep -q [a-z,A-Z]
+          if [ $? -eq "0" ]; then
           #echo "New files were added, we need to make sure the history.md file was updated" 
-          history_not_in=1
-          git diff --name-only --diff-filter=M ${{ github.event.pull_request.base.sha }} ${{ github.sha }}|grep -v "\.github" |grep -q "HISTORY.md"
-          if [ $? -ne "0" ]; then
-            echo "New files were added in this PR but the HISTORY.md file was not updated"
-            else 
-            history_not_in=0
+            history_not_in=1
+            git diff --name-only --diff-filter=M ${{ github.event.pull_request.base.sha }} ${{ github.sha }}|grep -v "\.github" |grep -q "HISTORY.md"
+            if [ $? -ne "0" ]; then
+              echo "New files were added in this PR but the HISTORY.md file was not updated"
+              else 
+              history_not_in=0
+            fi
+            exit $history_not_in 
           fi
-          exit $history_not_in 
-        fi
-        echo "No files were added"
-        exit 0
+          echo "No files were added"
+          exit 0

@@ -108,7 +108,14 @@ struct ColumnFamilyOptions : public AdvancedColumnFamilyOptions {
 
   // Default values for some parameters in ColumnFamilyOptions are not
   // optimized for SpeeDB features, As a starting point for configuring
-  // SpeeDB Features, use this function.
+  // SpeeDB Features.
+// if you choose to use it you should not change:
+// total_ram_size_bytes, max_background_jobs, delayed_write_rate,
+// write_buffer_size cache, write_controller,
+// write_buffer_manager,bytes_per_sync, use_dynamic_delay table_factory and
+// memtable_factory we will initialize and configure those. use example can be
+// find in  enable_speedb_features_example.cc
+// 
   ColumnFamilyOptions* EnableSpeedbFeaturesCF(
       SpeedbSharedOptions& shared_options);
   // -------------------
@@ -476,9 +483,15 @@ struct DBOptions {
   // bottlenecked by RocksDB.
   DBOptions* IncreaseParallelism(int total_threads = 16);
 
-  // enable the spdb features
-  // please note that a call to enable speedb options in the level of cf should
-  // follow
+// Enable SpeeDB features function for DBOptions
+// 
+// if you choose to use it you should not change:
+// total_ram_size_bytes, max_background_jobs, delayed_write_rate,
+// write_buffer_size cache, write_controller,
+// write_buffer_manager,bytes_per_sync, use_dynamic_delay table_factory and
+// memtable_factory we will initialize and configure those. use example can be
+// find in  enable_speedb_features_example.cc
+// 
   DBOptions* EnableSpeedbFeaturesDB(SpeedbSharedOptions& shared_options);
 
   // #endif  // ROCKSDB_LITE
@@ -1068,7 +1081,7 @@ struct DBOptions {
   // Dynamically changeable through SetDBOptions() API.
   uint64_t delayed_write_rate = 0;
 
-  // Use Speedb's dynamic delay -
+  // Use SpeeDB's dynamic delay -
   // https://github.com/speedb-io/speedb/issues/276. Setting this to true,
   // enables a different kind of calculation (instead of SetupDelay) for the
   // delayed_write_rate whenever a call to RecalculateWriteStallConditions is
@@ -1485,6 +1498,9 @@ struct Options : public DBOptions, public ColumnFamilyOptions {
   // spend lots of memory for memtables.
   Options* OptimizeForSmallDb();
   // Use this to configure SpeeDB featurs to a default manner .
+  // more details can be found in documentation:
+  // 
+  // use example can be found in enable_speedb_features_example.cc 
   Options* EnableSpeedbFeatures(SpeedbSharedOptions& shared_options);
 
   // Disable some checks that should not be necessary in the absence of
@@ -2185,13 +2201,13 @@ struct SpeedbSharedOptions : public SharedOptions {
   size_t getTotalThreads() { return total_threads_; }
   size_t getTotalRamSizeBytes() { return total_ram_size_bytes_; }
   size_t getDelayedWriteRate() { return delayed_write_rate_; }
+  void increaseWriteBufferSize(size_t write_buffer_size_addition);
   void initializeSharedOptionsForSpeeDB();
 
  private:
   size_t total_threads_ = 0;
   size_t total_ram_size_bytes_ = 0;
   size_t delayed_write_rate_ = 0;
-  size_t write_buffer_size_;
 };
 
 }  // namespace ROCKSDB_NAMESPACE

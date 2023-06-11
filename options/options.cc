@@ -540,34 +540,45 @@ Options* Options::EnableSpeedbFeatures(SpeedbSharedOptions& shared_options) {
 }
 
 SpeedbSharedOptions::SpeedbSharedOptions(
-    size_t total_ram_size_bytes, size_t total_threads,
-    size_t delayed_write_rate = 256 * 1024 * 1024) {
+  size_t total_ram_size_bytes, size_t total_threads,
+  size_t delayed_write_rate = 256 * 1024 * 1024) {
   total_threads_ = total_threads;
   total_ram_size_bytes_ = total_ram_size_bytes;
   delayed_write_rate_ = delayed_write_rate;
-  initializeSharedOptionsForSpeeDB();
+  
+  int write_buffer_size_ = std::max<size_t>(total_ram_size_bytes_ / 4, 512*1024*1024ul);
+  int num_shard_bits = -1;
+  bool strict_capacity_limit = false;
+  double high_pri_pool_ratio = (0.5);
+  std::__1::shared_ptr<rocksdb::MemoryAllocator> memory_allocator = nullptr;
+  bool use_adaptive_mutex = rocksdb::kDefaultToAdaptiveMutex;
+  rocksdb::CacheMetadataChargePolicy metadata_charge_policy = rocksdb::kFullChargeCacheMetadata;
+  double low_pri_pool_ratio = (0.0);
+  cache = NewLRUCache(total_ram_size_bytes_, num_shard_bits,
+   strict_capacity_limit, high_pri_pool_ratio, memory_allocator,
+    use_adaptive_mutex, metadata_charge_policy, low_pri_pool_ratio);
+  int64_t low_pri_rate_bytes_per_sec = 1048576LL;
+  write_controller.reset(new WriteController(true /*dynamic_delay*/, delayed_write_rate_, low_pri_rate_bytes_per_sec));
+  write_buffer_manager.reset(new WriteBufferManager(
+      write_buffer_size_, cache));
 }
 
-void SpeedbSharedOptions::initializeSharedOptionsForSpeeDB() {
-  write_buffer_size_ = std::max<size_t>(total_ram_size_bytes_ / 4, 1 << 30ul);
-  cache = NewLRUCache(total_ram_size_bytes_);
-  write_controller.reset(new WriteController(true, delayed_write_rate_));
-  write_buffer_manager.reset(new WriteBufferManager(
-      write_buffer_size_, cache /*,  shared_write_controler */));
+void SpeedbSharedOptions::increaseWriteBufferSize(size_t increase_by)
+{
+  if (total_ram_size_bytes_ / 4 > (write_buffer_manager->buffer_size() +  increase_by)){
+    write_buffer_manager->SetBufferSize(write_buffer_manager->buffer_size() + increase_by);
+  }
 }
 
 DBOptions* DBOptions::EnableSpeedbFeaturesDB(
     SpeedbSharedOptions& shared_options) {
   env = shared_options.env;
   IncreaseParallelism(shared_options.getTotalThreads());
-  if (shared_options.getDelayedWriteRate() != 0) {
-    delayed_write_rate = shared_options.getDelayedWriteRate();
-  }
-  db_write_buffer_size =
-      std::max<size_t>(shared_options.getTotalRamSizeBytes() / 4, 1 << 29ul);
+  delayed_write_rate = shared_options.getDelayedWriteRate();
   bytes_per_sync = 1ul << 20;
   use_dynamic_delay = true;
   write_buffer_manager = shared_options.write_buffer_manager;
+  write_controller = shared_options.write_controller;
   return this;
 }
 
@@ -593,21 +604,24 @@ DBOptions* DBOptions::OldDefaults(int rocksdb_major_version,
 ColumnFamilyOptions* ColumnFamilyOptions::EnableSpeedbFeaturesCF(
     SpeedbSharedOptions& shared_options) {
   // to disable flush due to write buffer full
+  shared_options.increaseWriteBufferSize(512 * 1024 * 1024);
   auto db_wbf_size = shared_options.write_buffer_manager->buffer_size();
   write_buffer_size = std::min<size_t>(db_wbf_size / 4, 64ul << 20);
-  max_write_buffer_number = int(db_wbf_size / write_buffer_size) + 2;
+  max_write_buffer_number = 32;
   min_write_buffer_number_to_merge = max_write_buffer_number - 1;
   // set the pinning option for indexes and filters
-  ConfigOptions config_options;
   {
+    ConfigOptions config_options;
     config_options.ignore_unknown_options = false;
     config_options.ignore_unsupported_options = false;
     BlockBasedTableOptions block_based_table_options;
     Status s = FilterPolicy::CreateFromString(
-        config_options, "speedb.PairedBloomFilter:23.2",
+        config_options, "speedb.PairedBloomFilter:10",
         &block_based_table_options.filter_policy);
     assert(s.ok());
     block_based_table_options.cache_index_and_filter_blocks = true;
+    block_based_table_options.cache_index_and_filter_blocks_with_high_priority = true;
+    block_based_table_options.pin_l0_filter_and_index_blocks_in_cache = false;
     block_based_table_options.block_cache = shared_options.cache;
     auto& cache_usage_options = block_based_table_options.cache_usage_options;
     CacheEntryRoleOptions role_options;
@@ -632,13 +646,12 @@ ColumnFamilyOptions* ColumnFamilyOptions::EnableSpeedbFeaturesCF(
     std::string memtablerep = "speedb.HashSpdRepFactory";
     std::string memtable_opt;
     memtable_opt = ":" + std::to_string(0);
-    std::unique_ptr<MemTableRepFactory> unique;
-    config_options;
+    std::unique_ptr<MemTableRepFactory> mem_factory_ptr;
 
     auto s = MemTableRepFactory::CreateFromString(
-        config_options, memtablerep + memtable_opt, &unique);
+        ConfigOptions(), memtablerep + memtable_opt, &mem_factory_ptr);
     assert(s.ok());
-    memtable_factory.reset(unique.release());
+    memtable_factory.reset(mem_factory_ptr.release());
   }
   return this;
 }

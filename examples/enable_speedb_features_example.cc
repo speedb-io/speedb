@@ -45,7 +45,6 @@ int main() {
   DB *db2 = nullptr;
   DB *db3 = nullptr;
   DB *db4 = nullptr;
-  DB *db5 = nullptr;
   Options op1;
   Options op2;
   Options op3;
@@ -70,7 +69,7 @@ int main() {
   //...
   op2.EnableSpeedbFeatures(so1);
 
-  // open the databases that sharing the recoureces from shared_options opbject
+  // open the databases
   Status s = DB::Open(op1, kDBPath1, &db1);
   if (!s.ok()) {
     std::cerr << s.ToString() << std::endl;
@@ -91,7 +90,7 @@ int main() {
   SpeedbSharedOptions so2(total_ram_size_bytes, total_threads,
                           delayed_write_rate);
 
-  // again customize each options file except SpeedbSharedOptiopns members
+  // again customize each options object except SpeedbSharedOptiopns members
   op3.create_if_missing = true;
   op3.compaction_style = rocksdb::kCompactionStyleUniversal;
   //...
@@ -102,7 +101,7 @@ int main() {
   //...
   op4.EnableSpeedbFeatures(so2);
 
-  // open DBs that will share the recoureces in the shared options
+  // open the databases
   s = DB::Open(op3, kDBPath3, &db3);
   if (!s.ok()) {
     std::cerr << s.ToString() << std::endl;
@@ -125,10 +124,14 @@ int main() {
   // object as the DB, so2 this time.
   cfo3.EnableSpeedbFeaturesCF(so2);
   // create the cf
-  db3->CreateColumnFamily(cfo3, "new_cf", &cf);
+  s = db3->CreateColumnFamily(cfo3, "new_cf", &cf);
+  if (!s.ok()) {
+    std::cerr << s.ToString() << std::endl;
+    return 1;
+  }
   std::cout << "new_cf was created in db3" << std::endl;
 
-  db3->DropColumnFamily(cf);
+  s = db3->DropColumnFamily(cf);
   if (!s.ok()) {
     std::cerr << s.ToString() << std::endl;
     return 1;

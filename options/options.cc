@@ -540,8 +540,8 @@ Options* Options::EnableSpeedbFeatures(SpeedbSharedOptions& shared_options) {
 }
 
 SpeedbSharedOptions::SpeedbSharedOptions(
-  size_t total_ram_size_bytes, size_t total_threads,
-  size_t delayed_write_rate = 256 * 1024 * 1024) {
+    size_t total_ram_size_bytes, size_t total_threads,
+    size_t delayed_write_rate = 256 * 1024 * 1024) {
   total_threads_ = total_threads;
   total_ram_size_bytes_ = total_ram_size_bytes;
   delayed_write_rate_ = delayed_write_rate;
@@ -552,19 +552,21 @@ SpeedbSharedOptions::SpeedbSharedOptions(
   double high_pri_pool_ratio = (0.5);
   std::__1::shared_ptr<rocksdb::MemoryAllocator> memory_allocator = nullptr;
   bool use_adaptive_mutex = rocksdb::kDefaultToAdaptiveMutex;
-  rocksdb::CacheMetadataChargePolicy metadata_charge_policy = rocksdb::kFullChargeCacheMetadata;
+  rocksdb::CacheMetadataChargePolicy metadata_charge_policy =
+      rocksdb::kFullChargeCacheMetadata;
   double low_pri_pool_ratio = (0.0);
-  cache = NewLRUCache(total_ram_size_bytes_, num_shard_bits,
-   strict_capacity_limit, high_pri_pool_ratio, memory_allocator,
-    use_adaptive_mutex, metadata_charge_policy, low_pri_pool_ratio);
+  cache =
+      NewLRUCache(total_ram_size_bytes_, num_shard_bits, strict_capacity_limit,
+                  high_pri_pool_ratio, memory_allocator, use_adaptive_mutex,
+                  metadata_charge_policy, low_pri_pool_ratio);
   int64_t low_pri_rate_bytes_per_sec = 1048576LL;
-  write_controller.reset(new WriteController(true /*dynamic_delay*/, delayed_write_rate_, low_pri_rate_bytes_per_sec));
+  write_controller.reset(new WriteController(
+      true /*dynamic_delay*/, delayed_write_rate_, low_pri_rate_bytes_per_sec));
   write_buffer_manager.reset(
       new WriteBufferManager(initial_write_buffer_size_, cache));
 }
 
-void SpeedbSharedOptions::increaseWriteBufferSize(size_t increase_by)
-{
+void SpeedbSharedOptions::increaseWriteBufferSize(size_t increase_by) {
   if (write_buffer_manager->buffer_size() == 1 && increase_by > 1) {
       write_buffer_manager->SetBufferSize(increase_by);
   } else if (total_ram_size_bytes_ / 4 >
@@ -624,7 +626,8 @@ ColumnFamilyOptions* ColumnFamilyOptions::EnableSpeedbFeaturesCF(
         &block_based_table_options.filter_policy);
     assert(s.ok());
     block_based_table_options.cache_index_and_filter_blocks = true;
-    block_based_table_options.cache_index_and_filter_blocks_with_high_priority = true;
+    block_based_table_options.cache_index_and_filter_blocks_with_high_priority =
+        true;
     block_based_table_options.pin_l0_filter_and_index_blocks_in_cache = false;
     block_based_table_options.block_cache = shared_options.cache;
     auto& cache_usage_options = block_based_table_options.cache_usage_options;

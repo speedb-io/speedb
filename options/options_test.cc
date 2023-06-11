@@ -5024,7 +5024,6 @@ TEST_F(SpeedbSharedOptionsTest, EnableSpeeDBFeaturesDB) {
   ASSERT_TRUE(db2->GetOptions().delayed_write_rate == so.getDelayedWriteRate());
   ASSERT_TRUE(db3->GetOptions().delayed_write_rate == so.getDelayedWriteRate());
 
-
   ASSERT_TRUE(db1->GetOptions().write_buffer_manager ==
               so.write_buffer_manager);
   ASSERT_TRUE(db2->GetOptions().write_buffer_manager ==

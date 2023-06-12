@@ -31,6 +31,7 @@ Also switch to waiting a sec on the CV each time. This is required since a bg er
 * fix UnlockWALStallCleared test in utilities/transactions/transaction_test.cc (#514)
 * Always assume optimize_filters_for_memory=false when creating a paired bloom filter (#488)
 * spdb memtable use after free bug (#501)
+* db_bench: Create a WBM once for all db-s regardless of their use in different groups (#550)
 
 ### Miscellaneous
 * disable failing unit tests and paired bloom filter stress testing

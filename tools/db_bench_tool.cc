@@ -3707,9 +3707,15 @@ class Benchmark {
     std::unique_ptr<ExpiredTimeFilter> filter;
     while (std::getline(benchmark_stream, name, ',')) {
       if (open_options_.write_buffer_manager) {
-        fprintf(stderr, "\nBEFORE Benchmark (%s): %lu OF %lu\n\n", name.c_str(),
-                open_options_.write_buffer_manager->memory_usage(),
-                open_options_.write_buffer_manager->buffer_size());
+        fprintf(stderr,
+                "\nWBM's Usage Info [BEFORE Benchmark (%s)]: %s OF %s\n\n",
+                name.c_str(),
+                BytesToHumanString(
+                    open_options_.write_buffer_manager->memory_usage())
+                    .c_str(),
+                BytesToHumanString(
+                    open_options_.write_buffer_manager->buffer_size())
+                    .c_str());
       }
 
       // Sanitize parameters
@@ -4171,9 +4177,15 @@ class Benchmark {
       }
 
       if (open_options_.write_buffer_manager) {
-        fprintf(stderr, "\nAFTER Benchmark (%s): %lu OF %lu\n", name.c_str(),
-                open_options_.write_buffer_manager->memory_usage(),
-                open_options_.write_buffer_manager->buffer_size());
+        fprintf(stderr,
+                "\nWBM's Usage Info [AFTER Benchmark (%s)]: %s OF %s\n\n",
+                name.c_str(),
+                BytesToHumanString(
+                    open_options_.write_buffer_manager->memory_usage())
+                    .c_str(),
+                BytesToHumanString(
+                    open_options_.write_buffer_manager->buffer_size())
+                    .c_str());
       }
     }
 
@@ -4991,17 +5003,20 @@ class Benchmark {
       flush_initiation_options.max_num_parallel_flushes =
           FLAGS_max_num_parallel_flushes;
     }
-    if (FLAGS_cost_write_buffer_to_cache) {
-      options.write_buffer_manager.reset(new WriteBufferManager(
-          FLAGS_db_write_buffer_size, cache_, FLAGS_allow_wbm_delays_and_stalls,
-          FLAGS_initiate_wbm_flushes, flush_initiation_options,
-          static_cast<uint16_t>(FLAGS_start_delay_percent)));
-    } else {
-      options.write_buffer_manager.reset(new WriteBufferManager(
-          FLAGS_db_write_buffer_size, {} /* cache */,
-          FLAGS_allow_wbm_delays_and_stalls, FLAGS_initiate_wbm_flushes,
-          flush_initiation_options,
-          static_cast<uint16_t>(FLAGS_start_delay_percent)));
+    if (options.write_buffer_manager == nullptr) {
+      if (FLAGS_cost_write_buffer_to_cache) {
+        options.write_buffer_manager.reset(new WriteBufferManager(
+            FLAGS_db_write_buffer_size, cache_,
+            FLAGS_allow_wbm_delays_and_stalls, FLAGS_initiate_wbm_flushes,
+            flush_initiation_options,
+            static_cast<uint16_t>(FLAGS_start_delay_percent)));
+      } else {
+        options.write_buffer_manager.reset(new WriteBufferManager(
+            FLAGS_db_write_buffer_size, {} /* cache */,
+            FLAGS_allow_wbm_delays_and_stalls, FLAGS_initiate_wbm_flushes,
+            flush_initiation_options,
+            static_cast<uint16_t>(FLAGS_start_delay_percent)));
+      }
     }
 
     if (FLAGS_use_dynamic_delay && FLAGS_num_multi_db > 1) {

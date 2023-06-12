@@ -528,7 +528,7 @@ void WriteBufferManager::UpdateUsageState(size_t new_memory_used,
                                           ssize_t memory_changed_size,
                                           size_t quota) {
   assert(enabled());
-  if (allow_delays_ == false || controllers_to_refcount_map_.empty()) {
+  if (allow_delays_ == false) {
     return;
   }
 

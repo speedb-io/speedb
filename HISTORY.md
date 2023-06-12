@@ -9,7 +9,7 @@ Before this PR, setting allow_stall in the WBM's constructor meant that writes a
 the users write speed before that threshold is reached in order to gain stability.
 To use this feature, pass allow_delays = true to the ctor of WBM and the db needs to be opened with options.use_dynamic_delay = true. The WBM will setup delay requests starting from (start_delay_percent * _buffer_size) / 100 (default value is 70) (start_delay_percent is another WBM ctor parameter).
 Changes to the WBM's memory are tracked in WriteBufferManager::ReserveMem and FreeMem.
-Once the WBM reached its capacity, if allow_stall == true, writes will be stopped using the old ShouldStall() and WBMStallWrites(). If allow_stall == false and the WBM reached the capacity then writes will be delayed at a rate of WriteController::kMinWriteRate (#423)
+Once the WBM reached its capacity, if allow_stall == true, writes will be stopped using the old ShouldStall() and WBMStallWrites(). If allow_stall == false and the WBM reached the capacity then writes will be delayed at the maximum rate calculated by the delay which is max_delayed_write_rate_ * (1 / kMaxDelayedWriteFactor) (#423)
 
 * Prevent flush entry followed delete operations
 currently during memtable flush ,  if key has a match key in the

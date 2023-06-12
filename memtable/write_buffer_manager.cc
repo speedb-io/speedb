@@ -33,8 +33,8 @@ auto WriteBufferManager::FlushInitiationOptions::Sanitize() const
 }
 
 WriteBufferManager::WriteBufferManager(
-    size_t _buffer_size, std::shared_ptr<Cache> cache,
-    bool allow_delays_and_stalls, bool initiate_flushes,
+    size_t _buffer_size, std::shared_ptr<Cache> cache, bool allow_stall,
+    bool initiate_flushes,
     const FlushInitiationOptions& flush_initiation_options,
     uint16_t start_delay_percent)
     : buffer_size_(_buffer_size),
@@ -43,7 +43,7 @@ WriteBufferManager::WriteBufferManager(
       memory_inactive_(0),
       memory_being_freed_(0U),
       cache_res_mgr_(nullptr),
-      allow_stall_(allow_delays_and_stalls),
+      allow_stall_(allow_stall),
       start_delay_percent_(start_delay_percent),
       stall_active_(false),
       initiate_flushes_(initiate_flushes),
@@ -303,11 +303,11 @@ std::string WriteBufferManager::GetPrintableOptions() const {
   ret.append(buffer);
 
   snprintf(buffer, kBufferSize, "%*s: %d\n", field_width,
-           "wbm.initiate_flushes", IsInitiatingFlushes());
+           "wbm.start_delay_percent", start_delay_percent_);
   ret.append(buffer);
 
   snprintf(buffer, kBufferSize, "%*s: %d\n", field_width,
-           "wbm.start_delay_percent", start_delay_percent_);
+           "wbm.initiate_flushes", IsInitiatingFlushes());
   ret.append(buffer);
 
   return ret;

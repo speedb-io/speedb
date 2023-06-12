@@ -72,7 +72,7 @@ class WriteBufferManager final {
     size_t max_num_parallel_flushes = kDfltMaxNumParallelFlushes;
   };
 
-  static constexpr bool kDfltAllowDelaysAndStalls = true;
+  static constexpr bool kDfltAllowStall = false;
   static constexpr bool kDfltInitiateFlushes = true;
 
  public:
@@ -84,7 +84,7 @@ class WriteBufferManager final {
   // cost the memory allocated to the cache. It can be used even if _buffer_size
   // = 0.
   //
-  // allow_delays_and_stalls: if set true, will enable delays and stall as
+  // allow_stall: if set true, will enable delays and stall as
   // described below:
   //  Delays: delay writes when memory_usage() exceeds the
   //    start_delay_percent percent threshold of the buffer size.
@@ -102,7 +102,7 @@ class WriteBufferManager final {
   // write-path of a DB.
   explicit WriteBufferManager(
       size_t _buffer_size, std::shared_ptr<Cache> cache = {},
-      bool allow_delays_and_stalls = kDfltAllowDelaysAndStalls,
+      bool allow_stall = kDfltAllowStall,
       bool initiate_flushes = kDfltInitiateFlushes,
       const FlushInitiationOptions& flush_initiation_options =
           FlushInitiationOptions(),
@@ -208,8 +208,7 @@ class WriteBufferManager final {
   // We stall the writes untill memory_usage drops below buffer_size. When the
   // function returns true, all writer threads (including one checking this
   // condition) across all DBs will be stalled. Stall is allowed only if user
-  // pass allow_delays_and_stalls = true during WriteBufferManager instance
-  // creation.
+  // pass allow_stall = true during WriteBufferManager instance creation.
   //
   // Should only be called by RocksDB internally .
   bool ShouldStall() const {

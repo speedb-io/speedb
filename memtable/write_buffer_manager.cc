@@ -33,8 +33,8 @@ auto WriteBufferManager::FlushInitiationOptions::Sanitize() const
 }
 
 WriteBufferManager::WriteBufferManager(
-    size_t _buffer_size, std::shared_ptr<Cache> cache,
-    bool allow_delays_and_stalls, bool initiate_flushes,
+    size_t _buffer_size, std::shared_ptr<Cache> cache, bool allow_stall,
+    bool initiate_flushes,
     const FlushInitiationOptions& flush_initiation_options,
     uint16_t start_delay_percent)
     : buffer_size_(_buffer_size),
@@ -43,7 +43,7 @@ WriteBufferManager::WriteBufferManager(
       memory_inactive_(0),
       memory_being_freed_(0U),
       cache_res_mgr_(nullptr),
-      allow_delays_and_stalls_(allow_delays_and_stalls),
+      allow_stall_(allow_stall),
       start_delay_percent_(start_delay_percent),
       stall_active_(false),
       initiate_flushes_(initiate_flushes),
@@ -210,7 +210,7 @@ size_t WriteBufferManager::FreeMemWithCache(size_t mem) {
 
 void WriteBufferManager::BeginWriteStall(StallInterface* wbm_stall) {
   assert(wbm_stall != nullptr);
-  assert(allow_delays_and_stalls_);
+  assert(allow_stall_);
 
   // Allocate outside of the lock.
   std::list<StallInterface*> new_node = {wbm_stall};
@@ -235,7 +235,7 @@ void WriteBufferManager::BeginWriteStall(StallInterface* wbm_stall) {
 void WriteBufferManager::MaybeEndWriteStall() {
   // Cannot early-exit on !enabled() because SetBufferSize(0) needs to unblock
   // the writers.
-  if (!allow_delays_and_stalls_) {
+  if (!allow_stall_) {
     return;
   }
 
@@ -267,7 +267,7 @@ void WriteBufferManager::RemoveDBFromQueue(StallInterface* wbm_stall) {
   // Deallocate the removed nodes outside of the lock.
   std::list<StallInterface*> cleanup;
 
-  if (enabled() && allow_delays_and_stalls_) {
+  if (enabled() && allow_stall_) {
     std::unique_lock<std::mutex> lock(mu_);
     for (auto it = queue_.begin(); it != queue_.end();) {
       auto next = std::next(it);
@@ -302,16 +302,16 @@ std::string WriteBufferManager::GetPrintableOptions() const {
   snprintf(buffer, kBufferSize, "%*s: %p\n", field_width, "wbm.cache", cache);
   ret.append(buffer);
 
-  snprintf(buffer, kBufferSize, "%*s: %d\n", field_width,
-           "wbm.allow_delays_and_stalls", allow_delays_and_stalls_);
-  ret.append(buffer);
-
-  snprintf(buffer, kBufferSize, "%*s: %d\n", field_width,
-           "wbm.initiate_flushes", IsInitiatingFlushes());
+  snprintf(buffer, kBufferSize, "%*s: %d\n", field_width, "wbm.allow_stall",
+           allow_stall_);
   ret.append(buffer);
 
   snprintf(buffer, kBufferSize, "%*s: %d\n", field_width,
            "wbm.start_delay_percent", start_delay_percent_);
+  ret.append(buffer);
+
+  snprintf(buffer, kBufferSize, "%*s: %d\n", field_width,
+           "wbm.initiate_flushes", IsInitiatingFlushes());
   ret.append(buffer);
 
   return ret;
@@ -520,8 +520,7 @@ void WriteBufferManager::UpdateUsageState(size_t new_memory_used,
                                           ssize_t memory_changed_size,
                                           size_t quota) {
   assert(enabled());
-  if (allow_delays_and_stalls_ == false ||
-      controllers_to_refcount_map_.empty()) {
+  if (allow_stall_ == false) {
     return;
   }
 

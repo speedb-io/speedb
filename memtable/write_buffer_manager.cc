@@ -424,9 +424,6 @@ void WriteBufferManager::UpdateControllerDelayState() {
 
   if (usage_state == UsageState::kDelay) {
     WBMSetupDelay(delay_factor);
-  } else if (usage_state == UsageState::kStop && !allow_stall_) {
-    // setting write rate to the last step of delay speed.
-    WBMSetupDelay(kMaxDelayedWriteFactor - 1);
   } else {
     // check if this WMB has an active delay request.
     // if yes, remove it and maybe set a different rate.

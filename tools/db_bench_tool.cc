@@ -4945,15 +4945,13 @@ class Benchmark {
     if (options.write_buffer_manager == nullptr) {
       if (FLAGS_cost_write_buffer_to_cache) {
         options.write_buffer_manager.reset(new WriteBufferManager(
-            FLAGS_db_write_buffer_size, cache_,
-            FLAGS_allow_wbm_stalls, FLAGS_initiate_wbm_flushes,
-            flush_initiation_options,
+            FLAGS_db_write_buffer_size, cache_, FLAGS_allow_wbm_stalls,
+            FLAGS_initiate_wbm_flushes, flush_initiation_options,
             static_cast<uint16_t>(FLAGS_start_delay_percent)));
       } else {
         options.write_buffer_manager.reset(new WriteBufferManager(
-            FLAGS_db_write_buffer_size, {} /* cache */,
-            FLAGS_allow_wbm_stalls, FLAGS_initiate_wbm_flushes,
-            flush_initiation_options,
+            FLAGS_db_write_buffer_size, {} /* cache */, FLAGS_allow_wbm_stalls,
+            FLAGS_initiate_wbm_flushes, flush_initiation_options,
             static_cast<uint16_t>(FLAGS_start_delay_percent)));
       }
     }

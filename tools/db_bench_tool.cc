@@ -543,11 +543,7 @@ DEFINE_bool(cost_write_buffer_to_cache, false,
 
 DEFINE_bool(allow_wbm_stalls,
             ROCKSDB_NAMESPACE::WriteBufferManager::kDfltAllowStall,
-            "Enable WBM write stalls");
-
-DEFINE_bool(allow_wbm_delays,
-            ROCKSDB_NAMESPACE::WriteBufferManager::kDfltAllowDelays,
-            "Enable WBM write delays");
+            "Enable WBM write stalls and delays");
 
 DEFINE_bool(initiate_wbm_flushes,
             ROCKSDB_NAMESPACE::WriteBufferManager::kDfltInitiateFlushes,

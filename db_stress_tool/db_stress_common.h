@@ -105,7 +105,6 @@ DECLARE_bool(progress_reports);
 DECLARE_uint64(db_write_buffer_size);
 DECLARE_bool(cost_write_buffer_to_cache);
 DECLARE_bool(allow_wbm_stalls);
-DECLARE_bool(allow_wbm_delays);
 DECLARE_uint32(start_delay_percent);
 DECLARE_bool(initiate_wbm_flushes);
 DECLARE_uint32(max_num_parallel_flushes);

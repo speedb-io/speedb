@@ -37,6 +37,7 @@ This feature keeps only the delete record and reduce SST size for later compacti
 Also switch to waiting a sec on the CV each time. This is required since a bg error doesn't signal the CV in the WriteController.
 * fix UnlockWALStallCleared test in utilities/transactions/transaction_test.cc (#514)
 * Always assume optimize_filters_for_memory=false when creating a paired bloom filter (#488)
+* spdb memtable use after free bug (#501)
 
 ### Miscellaneous
 * disable failing unit tests and paired bloom filter stress testing

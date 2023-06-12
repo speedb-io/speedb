@@ -53,11 +53,11 @@ bool ScopedPinningPolicy::CheckPin(const TablePinningOptions& tpo,
                                    uint8_t /* type */, size_t size,
                                    size_t usage) const {
   auto proposed = usage + size;
-  if (tpo.is_bottom && options_.bottom_percent >= 0) {
+  if (tpo.is_bottom && options_.bottom_percent > 0) {
     if (proposed > (options_.capacity * options_.bottom_percent / 100)) {
       return false;
     }
-  } else if (tpo.level > 0 && options_.mid_percent >= 0) {
+  } else if (tpo.level > 0 && options_.mid_percent > 0) {
     if (proposed > (options_.capacity * options_.mid_percent / 100)) {
       return false;
     }

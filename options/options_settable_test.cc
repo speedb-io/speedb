@@ -370,7 +370,8 @@ TEST_F(OptionsSettableTest, DBOptionsAllFieldsSettable) {
                              "enforce_single_del_contracts=false;"
                              "refresh_options_sec=0;"
                              "refresh_options_file=Options.new;"
-                             "use_dynamic_delay=true",
+                             "use_dynamic_delay=true;"
+                             "use_clean_delete_during_flush=false;",
                              new_options));
 
   ASSERT_EQ(unset_bytes_base, NumUnsetBytes(new_options_ptr, sizeof(DBOptions),

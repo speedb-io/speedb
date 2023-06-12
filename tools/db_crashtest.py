@@ -226,6 +226,7 @@ default_params = {
     "use_dynamic_delay": lambda: random.choice([0, 1, 1, 1]),
     "allow_wbm_delays_and_stalls": lambda: random.randint(0, 1),
     "start_delay_percent": lambda: random.randint(0, 99),
+    "use_clean_delete_during_flush": lambda: random.randint(0, 1),
 }
 
 _TEST_DIR_ENV_VAR = "TEST_TMPDIR"

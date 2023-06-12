@@ -88,7 +88,7 @@ MemTable::MemTable(const InternalKeyComparator& cmp,
       table_(ioptions.memtable_factory->CreateMemTableRep(
           comparator_, &arena_, mutable_cf_options.prefix_extractor.get(),
           ioptions.logger, column_family_id)),
-      range_del_table_(SkipListFactory().CreateMemTableRep(
+      del_table_(SkipListFactory().CreateMemTableRep(
           comparator_, &arena_, nullptr /* transform */, ioptions.logger,
           column_family_id)),
       is_range_del_table_empty_(true),
@@ -153,7 +153,7 @@ MemTable::~MemTable() {
 size_t MemTable::ApproximateMemoryUsage() {
   autovector<size_t> usages = {
       arena_.ApproximateMemoryUsage(), table_->ApproximateMemoryUsage(),
-      range_del_table_->ApproximateMemoryUsage(),
+      del_table_->ApproximateMemoryUsage(),
       ROCKSDB_NAMESPACE::ApproximateMemoryUsage(insert_hints_)};
   size_t total_usage = 0;
   for (size_t usage : usages) {
@@ -182,7 +182,7 @@ bool MemTable::ShouldFlushNow() {
   // If arena still have room for new block allocation, we can safely say it
   // shouldn't flush.
   auto allocated_memory = table_->ApproximateMemoryUsage() +
-                          range_del_table_->ApproximateMemoryUsage() +
+                          del_table_->ApproximateMemoryUsage() +
                           arena_.MemoryAllocatedBytes();
 
   approximate_memory_usage_.store(allocated_memory, std::memory_order_relaxed);
@@ -376,7 +376,7 @@ class MemTableIterator : public InternalIterator {
         status_(Status::OK()),
         logger_(mem.moptions_.info_log) {
     if (use_range_del_table) {
-      iter_ = mem.range_del_table_->GetIterator(arena);
+      iter_ = mem.del_table_->GetIterator(arena);
     } else if (prefix_extractor_ != nullptr && !read_options.total_order_seek &&
                !read_options.auto_prefix_mode) {
       // Auto prefix mode is not implemented in memtable yet.
@@ -621,7 +621,7 @@ port::RWMutex* MemTable::GetLock(const Slice& key) {
 MemTable::MemTableStats MemTable::ApproximateStats(const Slice& start_ikey,
                                                    const Slice& end_ikey) {
   uint64_t entry_count = table_->ApproximateNumEntries(start_ikey, end_ikey);
-  entry_count += range_del_table_->ApproximateNumEntries(start_ikey, end_ikey);
+  entry_count += del_table_->ApproximateNumEntries(start_ikey, end_ikey);
   if (entry_count == 0) {
     return {0, 0};
   }
@@ -732,7 +732,7 @@ Status MemTable::Add(SequenceNumber s, ValueType type,
                                val_size + moptions_.protection_bytes_per_key;
   char* buf = nullptr;
   std::unique_ptr<MemTableRep>& table =
-      type == kTypeRangeDeletion ? range_del_table_ : table_;
+      type == kTypeRangeDeletion ? del_table_ : table_;
   KeyHandle handle = table->Allocate(encoded_len, &buf);
 
   char* p = EncodeVarint32(buf, internal_key_size);

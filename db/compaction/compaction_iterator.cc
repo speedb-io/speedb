@@ -36,7 +36,7 @@ CompactionIterator::CompactionIterator(
     const std::shared_ptr<Logger> info_log,
     const std::string* full_history_ts_low,
     const SequenceNumber preserve_time_min_seqno,
-    const SequenceNumber preclude_last_level_min_seqno)
+    const SequenceNumber preclude_last_level_min_seqno, bool use_skip_delete)
     : CompactionIterator(
           input, cmp, merge_helper, last_sequence, snapshots,
           earliest_write_conflict_snapshot, job_snapshot, snapshot_checker, env,
@@ -46,7 +46,8 @@ CompactionIterator::CompactionIterator(
           std::unique_ptr<CompactionProxy>(
               compaction ? new RealCompaction(compaction) : nullptr),
           compaction_filter, shutting_down, info_log, full_history_ts_low,
-          preserve_time_min_seqno, preclude_last_level_min_seqno) {}
+          preserve_time_min_seqno, preclude_last_level_min_seqno,
+          use_skip_delete) {}
 
 CompactionIterator::CompactionIterator(
     InternalIterator* input, const Comparator* cmp, MergeHelper* merge_helper,
@@ -64,7 +65,7 @@ CompactionIterator::CompactionIterator(
     const std::shared_ptr<Logger> info_log,
     const std::string* full_history_ts_low,
     const SequenceNumber preserve_time_min_seqno,
-    const SequenceNumber preclude_last_level_min_seqno)
+    const SequenceNumber preclude_last_level_min_seqno, bool use_skip_delete)
     : input_(input, cmp,
              !compaction || compaction->DoesInputReferenceBlobFiles()),
       cmp_(cmp),
@@ -109,7 +110,8 @@ CompactionIterator::CompactionIterator(
       cmp_with_history_ts_low_(0),
       level_(compaction_ == nullptr ? 0 : compaction_->level()),
       preserve_time_min_seqno_(preserve_time_min_seqno),
-      preclude_last_level_min_seqno_(preclude_last_level_min_seqno) {
+      preclude_last_level_min_seqno_(preclude_last_level_min_seqno),
+      use_skip_delete_(use_skip_delete) {
   assert(snapshots_ != nullptr);
   assert(preserve_time_min_seqno_ <= preclude_last_level_min_seqno_);
 
@@ -455,6 +457,58 @@ bool CompactionIterator::InvokeFilterIfNeeded(bool* need_skip,
   return true;
 }
 
+bool CompactionIterator::CanBeSkipped() {
+  if (!use_skip_delete_) {
+    return false;
+  }
+  key_ = input_.key();
+  value_ = input_.value();
+
+  // If there are no snapshots, then this kv affect visibility at tip.
+  // Otherwise, search though all existing snapshots to find the earliest
+  // snapshot that is affected by this kv.
+
+  current_user_key_sequence_ = ikey_.sequence;
+  SequenceNumber last_snapshot = current_user_key_snapshot_;
+  SequenceNumber prev_snapshot = 0;  // 0 means no previous snapshot
+  current_user_key_snapshot_ =
+      visible_at_tip_
+          ? earliest_snapshot_
+          : findEarliestVisibleSnapshot(ikey_.sequence, &prev_snapshot);
+
+  const bool is_timestamp_eligible_for_gc =
+      (timestamp_size_ == 0 ||
+       (full_history_ts_low_ && cmp_with_history_ts_low_ < 0));
+
+  if (prev_snapshot == 0 ||
+      DefinitelyNotInSnapshot(ikey_.sequence, prev_snapshot)) {
+    if (!is_timestamp_eligible_for_gc) {
+      // We cannot drop  as timestamp is enabled, and
+      // timestamp of this key is greater than or equal to
+      // *full_history_ts_low_. .
+      return false;
+    } else if (DefinitelyInSnapshot(ikey_.sequence,
+                                    earliest_write_conflict_snapshot_) ||
+               (earliest_snapshot_ < earliest_write_conflict_snapshot_ &&
+                DefinitelyInSnapshot(ikey_.sequence, earliest_snapshot_))) {
+      // Found a matching value, we can drop the value.
+      // It is safe to drop  record since we've already
+      // outputted a key in this snapshot, or there is no earlier
+      // snapshot
+      ++iter_stats_.num_record_drop_hidden;
+      ++iter_stats_.num_record_drop_obsolete;
+      return true;
+    }
+  }
+
+  if (last_snapshot == current_user_key_snapshot_ ||
+      (last_snapshot > 0 && last_snapshot < current_user_key_snapshot_)) {
+    ++iter_stats_.num_record_drop_hidden;
+    return true;
+  }
+  return false;
+}
+
 void CompactionIterator::NextFromInput() {
   at_next_ = false;
   validity_info_.Invalidate();
@@ -693,6 +747,10 @@ void CompactionIterator::NextFromInput() {
       // we can choose how to handle such a combinations of operations.  We will
       // try to compact out as much as we can in these cases.
       // We will report counts on these anomalous cases.
+      //
+      // Optomization 4:
+      // Skip followed value key by a delete entry. note that the delete entry
+      // remains...
       //
       // Note: If timestamp is enabled, then record will be eligible for
       // deletion, only if, along with above conditions (Rule 1 and Rule 2)

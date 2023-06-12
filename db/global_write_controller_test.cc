@@ -43,10 +43,8 @@ class GlobalWriteControllerTest : public DBTestBase {
     if (add_wbm) {
       options.write_buffer_manager.reset(new WriteBufferManager(
           buffer_size, {}, true /*allow_stall*/, false /*initiate_flushes*/,
-          WriteBufferManager::FlushInitiationOptions(), true /*allow_delays*/,
-          WriteBufferManager::
-              kDfltStartDelayPercentThreshold /*start_delay_percent*/
-          ));
+          WriteBufferManager::FlushInitiationOptions(),
+          WriteBufferManager::kDfltStartDelayPercentThreshold));
     }
 
     for (int i = 0; i < num_dbs; i++) {

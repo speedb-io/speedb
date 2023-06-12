@@ -46,7 +46,7 @@ class StallInterface {
 
 class WriteBufferManager final {
  public:
-  // Delay Mechanism (allow_delays == true) definitions
+  // Delay Mechanism (allow_stall == true) definitions
   static constexpr uint16_t kDfltStartDelayPercentThreshold = 70U;
   static constexpr uint64_t kNoDelayedWriteFactor = 0U;
   static constexpr uint64_t kMaxDelayedWriteFactor = 100U;
@@ -72,8 +72,7 @@ class WriteBufferManager final {
     size_t max_num_parallel_flushes = kDfltMaxNumParallelFlushes;
   };
 
-  static constexpr bool kDfltAllowStall = true;
-  static constexpr bool kDfltAllowDelays = true;
+  static constexpr bool kDfltAllowStall = false;
   static constexpr bool kDfltInitiateFlushes = true;
 
  public:
@@ -85,9 +84,15 @@ class WriteBufferManager final {
   // cost the memory allocated to the cache. It can be used even if _buffer_size
   // = 0.
   //
-  // allow_stall: if set true, it will enable stalling of writes when
-  // memory_usage() exceeds buffer_size. It will wait for flush to complete and
-  // memory usage to drop down.
+  // allow_stall: if set true, will enable delays and stall as
+  // described below:
+  //  Delays: delay writes when memory_usage() exceeds the
+  //    start_delay_percent percent threshold of the buffer size.
+  //    The WBM calculates a delay factor that is increasing as memory_usage()
+  //    increases. Whenever the state changes, the WBM will notify registered
+  //    Write Controllers about the applicable delay factor.
+  //  Stalls: stalling of writes when memory_usage() exceeds buffer_size. It
+  //    will wait for flush to complete and memory usage to drop down.
   //
   // initiate_flushes: if set true, the WBM will proactively request registered
   // DB-s to flush. The mechanism is based on initiating an increasing number of
@@ -95,19 +100,12 @@ class WriteBufferManager final {
   // call ShouldFlush() and the WBM will indicate if current memory usage merits
   // a flush. Currently the ShouldFlush() mechanism is used only in the
   // write-path of a DB.
-  //
-  // allow_delays: delay writes when memory_usage() exceeds the
-  //    start_delay_percent percent threshold of the buffer size.
-  //    The WBM calculates a delay factor that is increasing as memory_usage()
-  //    increases. Whenever the state changes, the WBM will notify registered
-  //    WriteControllers about the applicable delay factor.
   explicit WriteBufferManager(
       size_t _buffer_size, std::shared_ptr<Cache> cache = {},
       bool allow_stall = kDfltAllowStall,
       bool initiate_flushes = kDfltInitiateFlushes,
       const FlushInitiationOptions& flush_initiation_options =
           FlushInitiationOptions(),
-      bool allow_delays = kDfltAllowDelays,
       uint16_t start_delay_percent = kDfltStartDelayPercentThreshold);
 
   // No copying allowed
@@ -357,7 +355,6 @@ class WriteBufferManager final {
   std::mutex mu_;
   bool allow_stall_ = kDfltAllowStall;
   uint16_t start_delay_percent_ = kDfltStartDelayPercentThreshold;
-  bool allow_delays_ = kDfltAllowDelays;
 
   // Value should only be changed by BeginWriteStall() and MaybeEndWriteStall()
   // while holding mu_, but it can be read without a lock.

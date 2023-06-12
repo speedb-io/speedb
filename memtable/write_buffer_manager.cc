@@ -35,7 +35,7 @@ auto WriteBufferManager::FlushInitiationOptions::Sanitize() const
 WriteBufferManager::WriteBufferManager(
     size_t _buffer_size, std::shared_ptr<Cache> cache, bool allow_stall,
     bool initiate_flushes,
-    const FlushInitiationOptions& flush_initiation_options, bool allow_delays,
+    const FlushInitiationOptions& flush_initiation_options,
     uint16_t start_delay_percent)
     : buffer_size_(_buffer_size),
       mutable_limit_(buffer_size_ * 7 / 8),
@@ -45,7 +45,6 @@ WriteBufferManager::WriteBufferManager(
       cache_res_mgr_(nullptr),
       allow_stall_(allow_stall),
       start_delay_percent_(start_delay_percent),
-      allow_delays_(allow_delays),
       stall_active_(false),
       initiate_flushes_(initiate_flushes),
       flush_initiation_options_(flush_initiation_options.Sanitize()),
@@ -307,10 +306,6 @@ std::string WriteBufferManager::GetPrintableOptions() const {
            allow_stall_);
   ret.append(buffer);
 
-  snprintf(buffer, kBufferSize, "%*s: %d\n", field_width, "wbm.allow_delays",
-           allow_delays_);
-  ret.append(buffer);
-
   snprintf(buffer, kBufferSize, "%*s: %d\n", field_width,
            "wbm.start_delay_percent", start_delay_percent_);
   ret.append(buffer);
@@ -528,7 +523,7 @@ void WriteBufferManager::UpdateUsageState(size_t new_memory_used,
                                           ssize_t memory_changed_size,
                                           size_t quota) {
   assert(enabled());
-  if (allow_delays_ == false) {
+  if (allow_stall_ == false) {
     return;
   }
 

@@ -243,7 +243,7 @@ default_params = {
     # "filter_uri": lambda: random.choice(["speedb.PairedBloomFilter", ""]),
     "memtablerep": lambda: random.choice(["skip_list", "speedb.HashSpdRepFactory"]),
     "use_dynamic_delay": lambda: random.choice([0, 1, 1, 1]),
-    "allow_wbm_delays_and_stalls": lambda: random.randint(0, 1),
+    "allow_wbm_stalls": lambda: random.randint(0, 1),
     "start_delay_percent": lambda: random.randint(0, 99),
 }
 

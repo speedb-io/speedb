@@ -542,8 +542,8 @@ DEFINE_int64(db_write_buffer_size,
 DEFINE_bool(cost_write_buffer_to_cache, false,
             "The usage of memtable is costed to the block cache");
 
-DEFINE_bool(allow_wbm_delays_and_stalls,
-            ROCKSDB_NAMESPACE::WriteBufferManager::kDfltAllowDelaysAndStalls,
+DEFINE_bool(allow_wbm_stalls,
+            ROCKSDB_NAMESPACE::WriteBufferManager::kDfltAllowStall,
             "Enable WBM write stalls and delays");
 
 DEFINE_bool(initiate_wbm_flushes,
@@ -5006,15 +5006,13 @@ class Benchmark {
     if (options.write_buffer_manager == nullptr) {
       if (FLAGS_cost_write_buffer_to_cache) {
         options.write_buffer_manager.reset(new WriteBufferManager(
-            FLAGS_db_write_buffer_size, cache_,
-            FLAGS_allow_wbm_delays_and_stalls, FLAGS_initiate_wbm_flushes,
-            flush_initiation_options,
+            FLAGS_db_write_buffer_size, cache_, FLAGS_allow_wbm_stalls,
+            FLAGS_initiate_wbm_flushes, flush_initiation_options,
             static_cast<uint16_t>(FLAGS_start_delay_percent)));
       } else {
         options.write_buffer_manager.reset(new WriteBufferManager(
-            FLAGS_db_write_buffer_size, {} /* cache */,
-            FLAGS_allow_wbm_delays_and_stalls, FLAGS_initiate_wbm_flushes,
-            flush_initiation_options,
+            FLAGS_db_write_buffer_size, {} /* cache */, FLAGS_allow_wbm_stalls,
+            FLAGS_initiate_wbm_flushes, flush_initiation_options,
             static_cast<uint16_t>(FLAGS_start_delay_percent)));
       }
     }

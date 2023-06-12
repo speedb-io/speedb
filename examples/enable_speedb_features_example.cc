@@ -21,15 +21,7 @@
 #include "rocksdb/options.h"
 #include "rocksdb/slice.h"
 
-using ROCKSDB_NAMESPACE::DB;
-using ROCKSDB_NAMESPACE::Options;
-using ROCKSDB_NAMESPACE::PinnableSlice;
-using ROCKSDB_NAMESPACE::ReadOptions;
-using ROCKSDB_NAMESPACE::SharedOptions;
-using ROCKSDB_NAMESPACE::SpeedbSharedOptions;
-using ROCKSDB_NAMESPACE::Status;
-using ROCKSDB_NAMESPACE::WriteBatch;
-using ROCKSDB_NAMESPACE::WriteOptions;
+using namespace ROCKSDB_NAMESPACE;
 
 #if defined(OS_WIN)
 std::string kDBPath = "C:\\Windows\\TEMP\\enable_speedb_features_example";

@@ -1406,9 +1406,6 @@ DEFINE_uint64(
     "num_file_reads_for_auto_readahead indicates after how many sequential "
     "reads into that file internal auto prefetching should be start.");
 
-// DEFINE_bool(use_spdb_features, true,
-//             "When true use enable all the spdb features");
-
 static enum ROCKSDB_NAMESPACE::CompressionType StringToCompressionType(
     const char* ctype) {
   assert(ctype);
@@ -5137,26 +5134,6 @@ class Benchmark {
               DBWithColumnFamilies* db) {
     uint64_t open_start = FLAGS_report_open_timing ? FLAGS_env->NowNanos() : 0;
     Status s;
-    ColumnFamilyOptions cf_options(options);
-    DBOptions db_options(options);
-    // if (FLAGS_use_spdb_features) {
-    //   size_t total_ram_size_bytes = FLAGS_cache_size;
-    //   if (total_ram_size_bytes == 0) {
-    //     total_ram_size_bytes = 4ul << 30;
-    //   }
-    //   size_t total_threads = options.max_background_jobs;
-    //   if (total_threads <= 0) {
-    //     total_threads = 16;
-    //   }
-    //   size_t delayed_write_rate = options.delayed_write_rate;
-    //   if (delayed_write_rate <= 0) {
-    //     total_threads = 256ul << 30;
-    //   }
-    //   SpeedbSharedOptions so(total_ram_size_bytes, total_threads);
-    //   db_options.EnableSpeedbFeaturesDB(so);
-    //   cf_options.EnableSpeedbFeaturesCF(so);
-    // }
-
     // Open with column families if necessary.
     if (FLAGS_num_column_families > 1) {
       size_t num_hot = FLAGS_num_column_families;

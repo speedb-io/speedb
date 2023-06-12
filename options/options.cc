@@ -539,9 +539,9 @@ Options* Options::EnableSpeedbFeatures(SpeedbSharedOptions& shared_options) {
   return this;
 }
 
-SpeedbSharedOptions::SpeedbSharedOptions(
-    size_t total_ram_size_bytes, size_t total_threads,
-    size_t delayed_write_rate = 256 * 1024 * 1024) {
+SpeedbSharedOptions::SpeedbSharedOptions(size_t total_ram_size_bytes,
+                                         size_t total_threads,
+                                         size_t delayed_write_rate) {
   total_threads_ = total_threads;
   total_ram_size_bytes_ = total_ram_size_bytes;
   delayed_write_rate_ = delayed_write_rate;
@@ -550,7 +550,7 @@ SpeedbSharedOptions::SpeedbSharedOptions(
   int num_shard_bits = -1;
   bool strict_capacity_limit = false;
   double high_pri_pool_ratio = (0.5);
-  std::__1::shared_ptr<rocksdb::MemoryAllocator> memory_allocator = nullptr;
+  std::shared_ptr<rocksdb::MemoryAllocator> memory_allocator = nullptr;
   bool use_adaptive_mutex = rocksdb::kDefaultToAdaptiveMutex;
   rocksdb::CacheMetadataChargePolicy metadata_charge_policy =
       rocksdb::kFullChargeCacheMetadata;
@@ -562,11 +562,17 @@ SpeedbSharedOptions::SpeedbSharedOptions(
   int64_t low_pri_rate_bytes_per_sec = 1048576LL;
   write_controller.reset(new WriteController(
       true /*dynamic_delay*/, delayed_write_rate_, low_pri_rate_bytes_per_sec));
+  bool allow_delays_and_stalls = true;
+  bool initiate_flushes = true;
+  const rocksdb::WriteBufferManager::FlushInitiationOptions&
+      flush_initiation_options =
+          rocksdb::WriteBufferManager::FlushInitiationOptions();
+  uint16_t start_delay_percent = (uint16_t)70U;
   write_buffer_manager.reset(
       new WriteBufferManager(initial_write_buffer_size_, cache));
 }
 
-void SpeedbSharedOptions::increaseWriteBufferSize(size_t increase_by) {
+void SpeedbSharedOptions::IncreaseWriteBufferSize(size_t increase_by) {
   if (write_buffer_manager->buffer_size() == 1 && increase_by > 1) {
     write_buffer_manager->SetBufferSize(increase_by);
   } else if (total_ram_size_bytes_ / 4 >
@@ -579,8 +585,8 @@ void SpeedbSharedOptions::increaseWriteBufferSize(size_t increase_by) {
 DBOptions* DBOptions::EnableSpeedbFeaturesDB(
     SpeedbSharedOptions& shared_options) {
   env = shared_options.env;
-  IncreaseParallelism(shared_options.getTotalThreads());
-  delayed_write_rate = shared_options.getDelayedWriteRate();
+  IncreaseParallelism((int)shared_options.GetTotalThreads());
+  delayed_write_rate = shared_options.GetDelayedWriteRate();
   bytes_per_sync = 1ul << 20;
   use_dynamic_delay = true;
   write_buffer_manager = shared_options.write_buffer_manager;
@@ -610,7 +616,7 @@ DBOptions* DBOptions::OldDefaults(int rocksdb_major_version,
 ColumnFamilyOptions* ColumnFamilyOptions::EnableSpeedbFeaturesCF(
     SpeedbSharedOptions& shared_options) {
   // to disable flush due to write buffer full
-  shared_options.increaseWriteBufferSize(512 * 1024 * 1024ul);
+  shared_options.IncreaseWriteBufferSize(512 * 1024 * 1024ul);
   auto db_wbf_size = shared_options.write_buffer_manager->buffer_size();
   write_buffer_size = std::min<size_t>(db_wbf_size / 4, 64ul << 20);
   max_write_buffer_number = 32;
@@ -629,13 +635,13 @@ ColumnFamilyOptions* ColumnFamilyOptions::EnableSpeedbFeaturesCF(
     block_based_table_options.cache_index_and_filter_blocks_with_high_priority =
         true;
     block_based_table_options.pin_l0_filter_and_index_blocks_in_cache = false;
-    block_based_table_options.block_cache = shared_options.cache;
-    auto& cache_usage_options = block_based_table_options.cache_usage_options;
-    CacheEntryRoleOptions role_options;
     block_based_table_options.metadata_cache_options.unpartitioned_pinning =
         PinningTier::kAll;
     block_based_table_options.metadata_cache_options.partition_pinning =
         PinningTier::kAll;
+    block_based_table_options.block_cache = shared_options.cache;
+    auto& cache_usage_options = block_based_table_options.cache_usage_options;
+    CacheEntryRoleOptions role_options;
     role_options.charged = CacheEntryRoleOptions::Decision::kEnabled;
     cache_usage_options.options_overrides.insert(
         {CacheEntryRole::kFilterConstruction, role_options});

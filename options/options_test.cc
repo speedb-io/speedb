@@ -14,6 +14,7 @@
 
 #include "cache/lru_cache.h"
 #include "cache/sharded_cache.h"
+#include "db/write_controller.h"
 #include "options/options_helper.h"
 #include "options/options_parser.h"
 #include "port/port.h"
@@ -4974,15 +4975,22 @@ class SpeedbSharedOptionsTest : public testing::Test {};
 TEST_F(SpeedbSharedOptionsTest, SpeedbSharedOptionsTest) {
   size_t total_ram_size_bytes = 100 * 1024 * 1024 * 1024ul;
   size_t delayed_write_rate = 256 * 1024 * 1024ul;
-  int total_threads = 8;
+  size_t total_threads = 8;
   SpeedbSharedOptions so(total_ram_size_bytes, total_threads,
                          delayed_write_rate);
 
+  ASSERT_TRUE(so.GetTotalThreads() == total_threads);
+  ASSERT_TRUE(so.GetDelayedWriteRate() == delayed_write_rate);
+  ASSERT_TRUE(so.GetTotalRamSizeBytes() == total_ram_size_bytes);
+
   ASSERT_TRUE(so.write_buffer_manager->buffer_size() == 1);
   ASSERT_TRUE(so.cache->GetCapacity() == total_ram_size_bytes);
+  ASSERT_TRUE(so.write_buffer_manager->IsInitiatingFlushes() == true);
+  ASSERT_TRUE(so.write_controller->max_delayed_write_rate() ==
+              delayed_write_rate);
 }
 
-TEST_F(SpeedbSharedOptionsTest, EnableSpeeDBFeaturesDB) {
+TEST_F(SpeedbSharedOptionsTest, EnableSpeedbFeaturesDB) {
   DB *db1, *db2, *db3;
   Options op1, op2, op3;
   size_t total_ram_size_bytes = 100 * 1024 * 1024 * 1024ul;
@@ -5014,15 +5022,15 @@ TEST_F(SpeedbSharedOptionsTest, EnableSpeeDBFeaturesDB) {
   ASSERT_TRUE(db3->GetOptions().env == so.env);
 
   ASSERT_TRUE(db1->GetOptions().max_background_jobs ==
-              (int)so.getTotalThreads());
+              (int)so.GetTotalThreads());
   ASSERT_TRUE(db2->GetOptions().max_background_jobs ==
-              (int)so.getTotalThreads());
+              (int)so.GetTotalThreads());
   ASSERT_TRUE(db3->GetOptions().max_background_jobs ==
-              (int)so.getTotalThreads());
+              (int)so.GetTotalThreads());
 
-  ASSERT_TRUE(db1->GetOptions().delayed_write_rate == so.getDelayedWriteRate());
-  ASSERT_TRUE(db2->GetOptions().delayed_write_rate == so.getDelayedWriteRate());
-  ASSERT_TRUE(db3->GetOptions().delayed_write_rate == so.getDelayedWriteRate());
+  ASSERT_TRUE(db1->GetOptions().delayed_write_rate == so.GetDelayedWriteRate());
+  ASSERT_TRUE(db2->GetOptions().delayed_write_rate == so.GetDelayedWriteRate());
+  ASSERT_TRUE(db3->GetOptions().delayed_write_rate == so.GetDelayedWriteRate());
 
   ASSERT_TRUE(db1->GetOptions().write_buffer_manager ==
               so.write_buffer_manager);
@@ -5039,32 +5047,18 @@ TEST_F(SpeedbSharedOptionsTest, EnableSpeeDBFeaturesDB) {
               3 * 512 * 1024 * 1024ul);
 
   delete db1;
+  db1 = nullptr;
   delete db2;
+  db2 = nullptr;
   delete db3;
-  for (auto dbname_ : {"db1", "db2", "db3"}) {
-    std::vector<std::string> filenames;
-    ASSERT_OK(op1.env->GetChildren(dbname_, &filenames));
-    // In Windows, LOCK file cannot be deleted because it is locked by
-    // optins_test After closing optins_test, the LOCK file is unlocked and can
-    // be deleted Delete archival files.
-    bool deleteDir = true;
-    for (size_t i = 0; i < filenames.size(); ++i) {
-      std::string file_path = dbname_;
-      file_path += "/";
-      file_path += filenames[i];
-      Status s = op1.env->DeleteFile(file_path);
-      if (!s.ok()) {
-        deleteDir = false;
-      }
-    }
-    ASSERT_TRUE(deleteDir);
-    if (deleteDir) {
-      ASSERT_OK(op1.env->DeleteDir(dbname_));
-    }
-  }
+  db3 = nullptr;
+
+  ASSERT_OK(DestroyDB("db1", op1));
+  ASSERT_OK(DestroyDB("db2", op2));
+  ASSERT_OK(DestroyDB("db3", op3));
 }
 
-TEST_F(SpeedbSharedOptionsTest, EnableSpeeDBFeaturesCF) {
+TEST_F(SpeedbSharedOptionsTest, EnableSpeedbFeaturesCF) {
   DB* db1;
   Options op1;
   ColumnFamilyHandle* cf;
@@ -5088,8 +5082,6 @@ TEST_F(SpeedbSharedOptionsTest, EnableSpeeDBFeaturesCF) {
   ASSERT_TRUE(db1->GetOptions().write_buffer_manager->buffer_size() ==
               2 * 512 * 1024 * 1024ul);
 
-  auto write_buffer_size =
-      std::min<size_t>(so.write_buffer_manager->buffer_size() / 4, 64ul << 20);
   const auto* sanitized_table_options =
       op1.table_factory->GetOptions<BlockBasedTableOptions>();
   ASSERT_TRUE(sanitized_table_options->block_cache == so.cache);
@@ -5097,27 +5089,8 @@ TEST_F(SpeedbSharedOptionsTest, EnableSpeeDBFeaturesCF) {
   ASSERT_OK(db1->DropColumnFamily(cf));
   ASSERT_OK(db1->DestroyColumnFamilyHandle(cf));
   delete db1;
-  for (auto dbname_ : {"db1"}) {
-    std::vector<std::string> filenames;
-    ASSERT_OK(op1.env->GetChildren(dbname_, &filenames));
-    // In Windows, LOCK file cannot be deleted because it is locked by
-    // optins_test After closing optins_test, the LOCK file is unlocked and can
-    // be deleted Delete archival files.
-    bool deleteDir = true;
-    for (size_t i = 0; i < filenames.size(); ++i) {
-      std::string file_path = dbname_;
-      file_path += "/";
-      file_path += filenames[i];
-      Status s = op1.env->DeleteFile(file_path);
-      if (!s.ok()) {
-        deleteDir = false;
-      }
-    }
-    ASSERT_TRUE(deleteDir);
-    if (deleteDir) {
-      ASSERT_OK(op1.env->DeleteDir(dbname_));
-    }
-  }
+  db1 = nullptr;
+  ASSERT_OK(DestroyDB("db1", op1));
 }
 
 }  // namespace ROCKSDB_NAMESPACE

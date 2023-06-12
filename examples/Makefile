@@ -16,6 +16,7 @@ ifneq ($(USE_RTTI), 1)
 endif
 
 CFLAGS += -Wstrict-prototypes
+
 .PHONY: clean static_lib
 
 all: simple_example column_families_example compaction_filter_example compact_files_example c_simple_example optimistic_transaction_example \
@@ -57,7 +58,6 @@ speedb_is_awesome_example: static_lib speedb_is_awesome_example.cc
 
 enable_speedb_features_example: static_lib enable_speedb_features_example.cc
 	$(CXX) $(CXXFLAGS) $@.cc -o$@ ../$(LIBNAME).a -I../include -O2 -std=c++17 $(PLATFORM_LDFLAGS) $(PLATFORM_CXXFLAGS) $(EXEC_LDFLAGS)
-
 speedb_with_ttl_example: static_lib speedb_with_ttl_example.cc
 	$(CXX) $(CXXFLAGS) $@.cc -o$@ ../$(LIBNAME).a -I../include -O2 -std=c++17 $(PLATFORM_LDFLAGS) $(PLATFORM_CXXFLAGS) $(EXEC_LDFLAGS)
 

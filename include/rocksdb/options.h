@@ -1191,6 +1191,10 @@ struct DBOptions {
   // Default: nullptr (disabled)
   std::shared_ptr<Cache> row_cache = nullptr;
 
+  // If true during flush we skip any entry that has a followed delete
+  // entry (#411)
+  bool use_clean_delete_during_flush = false;
+
   // A filter object supplied to be invoked while processing write-ahead-logs
   // (WALs) during recovery. The filter provides a way to inspect log
   // records, ignoring a particular record or skipping replay.

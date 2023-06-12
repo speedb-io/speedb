@@ -7,9 +7,16 @@ Based on RocksDB 8.1.1
 * Delay writes gradually based on memory usage of the WriteBufferManager (WBM).
 Before this PR, setting allow_stall in the WBM's constructor meant that writes are completely stopped when the WBM's memory usage exceeds its quota. The goal here is to gradually decrease
 the users write speed before that threshold is reached in order to gain stability.
-To use this feature, pass allow_delays_and_stalls = true to the ctor of WBM (renamed from allow_stall) and the db needs to be opened with options.use_dynamic_delay = true. The WBM will
-setup delay requests starting from (start_delay_percent * _buffer_size) / 100 (default value is 70) (start_delay_percent is another WBM ctor parameter). Changes to the WBM's memory are tracked in WriteBufferManager::ReserveMem and FreeMem.
-Once the WBM reached its capacity, writes will be stopped using the old ShouldStall() and WBMStallWrites(). (#423)
+To use this feature, pass allow_stall = true to the ctor of WBM and the db needs to be opened with options.use_dynamic_delay = true. The WBM will setup delay requests starting from (start_delay_percent * _buffer_size) / 100 (default value is 70) (start_delay_percent is another WBM ctor parameter).
+Changes to the WBM's memory are tracked in WriteBufferManager::ReserveMem and FreeMem.
+Once the WBM reached its capacity, if allow_stall == true, writes will be stopped using the old ShouldStall() and WBMStallWrites(). (#423)
+
+* Prevent flush entry followed delete operations
+currently during memtable flush ,  if key has a match key in the
+delete range table and this record has no snapshot related to it,
+we still write it with its value to SST file.
+This feature keeps only the delete record and reduce SST size for later compaction.
+(#411)
 
 ### Enhancements
 * CI: add a workflow for building and publishing jar to maven central (#507)
@@ -29,6 +36,9 @@ Once the WBM reached its capacity, writes will be stopped using the old ShouldSt
 * WriteController: fix for stop while shutting down (#499)
 Also switch to waiting a sec on the CV each time. This is required since a bg error doesn't signal the CV in the WriteController.
 * fix UnlockWALStallCleared test in utilities/transactions/transaction_test.cc (#514)
+* Always assume optimize_filters_for_memory=false when creating a paired bloom filter (#488)
+* spdb memtable use after free bug (#501)
+* db_bench: Create a WBM once for all db-s regardless of their use in different groups (#550)
 
 ### Miscellaneous
 * disable failing unit tests and paired bloom filter stress testing

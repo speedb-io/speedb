@@ -42,8 +42,9 @@ class GlobalWriteControllerTest : public DBTestBase {
         options.use_dynamic_delay, options.delayed_write_rate));
     if (add_wbm) {
       options.write_buffer_manager.reset(new WriteBufferManager(
-          buffer_size, {}, true /*allow_delays_and_stalls*/,
-          false /*initiate_flushes*/));
+          buffer_size, {}, true /*allow_stall*/, false /*initiate_flushes*/,
+          WriteBufferManager::FlushInitiationOptions(),
+          WriteBufferManager::kDfltStartDelayPercentThreshold));
     }
 
     for (int i = 0; i < num_dbs; i++) {

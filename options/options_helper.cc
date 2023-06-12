@@ -180,6 +180,8 @@ DBOptions BuildDBOptions(const ImmutableDBOptions& immutable_db_options,
       immutable_db_options.enforce_single_del_contracts;
   options.refresh_options_sec = mutable_db_options.refresh_options_sec;
   options.refresh_options_file = mutable_db_options.refresh_options_file;
+  options.use_clean_delete_during_flush =
+      immutable_db_options.use_clean_delete_during_flush;
   return options;
 }
 

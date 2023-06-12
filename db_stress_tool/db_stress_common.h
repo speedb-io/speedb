@@ -104,7 +104,7 @@ DECLARE_bool(verbose);
 DECLARE_bool(progress_reports);
 DECLARE_uint64(db_write_buffer_size);
 DECLARE_bool(cost_write_buffer_to_cache);
-DECLARE_bool(allow_wbm_delays_and_stalls);
+DECLARE_bool(allow_wbm_stalls);
 DECLARE_uint32(start_delay_percent);
 DECLARE_bool(initiate_wbm_flushes);
 DECLARE_uint32(max_num_parallel_flushes);
@@ -263,6 +263,7 @@ DECLARE_int32(continuous_verification_interval);
 DECLARE_int32(get_property_one_in);
 DECLARE_string(file_checksum_impl);
 DECLARE_bool(use_dynamic_delay);
+DECLARE_bool(use_clean_delete_during_flush);
 
 // Options for StackableDB-based BlobDB
 DECLARE_bool(use_blob_db);

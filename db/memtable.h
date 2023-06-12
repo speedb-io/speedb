@@ -150,8 +150,7 @@ class MemTable {
   // used by MemTableListVersion::MemoryAllocatedBytesExcludingLast
   size_t MemoryAllocatedBytes() const {
     return table_->ApproximateMemoryUsage() +
-           range_del_table_->ApproximateMemoryUsage() +
-           arena_.MemoryAllocatedBytes();
+           del_table_->ApproximateMemoryUsage() + arena_.MemoryAllocatedBytes();
   }
 
   // Returns a vector of unique random memtable entries of size 'sample_size'.
@@ -564,7 +563,7 @@ class MemTable {
   AllocTracker mem_tracker_;
   ConcurrentArena arena_;
   std::unique_ptr<MemTableRep> table_;
-  std::unique_ptr<MemTableRep> range_del_table_;
+  std::unique_ptr<MemTableRep> del_table_;
   std::atomic_bool is_range_del_table_empty_;
 
   // Total data size of all data inserted
@@ -628,7 +627,7 @@ class MemTable {
   // writes with sequence number smaller than seq are flushed.
   SequenceNumber atomic_flush_seqno_;
 
-  // keep track of memory usage in table_, arena_, and range_del_table_.
+  // keep track of memory usage in table_, arena_, and del_table_.
   // Gets refreshed inside `ApproximateMemoryUsage()` or `ShouldFlushNow`
   std::atomic<uint64_t> approximate_memory_usage_;
 

@@ -545,29 +545,12 @@ SpeedbSharedOptions::SpeedbSharedOptions(size_t total_ram_size_bytes,
   total_threads_ = total_threads;
   total_ram_size_bytes_ = total_ram_size_bytes;
   delayed_write_rate_ = delayed_write_rate;
-
+  // initial_write_buffer_size_ is initialized to 1 to avoid from empty memory
+  // which might cause some problems
   int initial_write_buffer_size_ = 1;
-  int num_shard_bits = -1;
-  bool strict_capacity_limit = false;
-  double high_pri_pool_ratio = (0.5);
-  std::shared_ptr<rocksdb::MemoryAllocator> memory_allocator = nullptr;
-  bool use_adaptive_mutex = rocksdb::kDefaultToAdaptiveMutex;
-  rocksdb::CacheMetadataChargePolicy metadata_charge_policy =
-      rocksdb::kFullChargeCacheMetadata;
-  double low_pri_pool_ratio = (0.0);
-  cache =
-      NewLRUCache(total_ram_size_bytes_, num_shard_bits, strict_capacity_limit,
-                  high_pri_pool_ratio, memory_allocator, use_adaptive_mutex,
-                  metadata_charge_policy, low_pri_pool_ratio);
-  int64_t low_pri_rate_bytes_per_sec = 1048576LL;
-  write_controller.reset(new WriteController(
-      true /*dynamic_delay*/, delayed_write_rate_, low_pri_rate_bytes_per_sec));
-  bool allow_delays_and_stalls = true;
-  bool initiate_flushes = true;
-  const rocksdb::WriteBufferManager::FlushInitiationOptions&
-      flush_initiation_options =
-          rocksdb::WriteBufferManager::FlushInitiationOptions();
-  uint16_t start_delay_percent = (uint16_t)70U;
+  cache = NewLRUCache(total_ram_size_bytes_);
+  write_controller.reset(
+      new WriteController(true /*dynamic_delay*/, delayed_write_rate_));
   write_buffer_manager.reset(
       new WriteBufferManager(initial_write_buffer_size_, cache));
 }
@@ -616,8 +599,11 @@ DBOptions* DBOptions::OldDefaults(int rocksdb_major_version,
 ColumnFamilyOptions* ColumnFamilyOptions::EnableSpeedbFeaturesCF(
     SpeedbSharedOptions& shared_options) {
   // to disable flush due to write buffer full
+  // each new column family will ask the write buffer manager to increase the
+  // write buffer size by 512 * 1024 * 1024ul
   shared_options.IncreaseWriteBufferSize(512 * 1024 * 1024ul);
   auto db_wbf_size = shared_options.write_buffer_manager->buffer_size();
+  // cf write_buffer_size
   write_buffer_size = std::min<size_t>(db_wbf_size / 4, 64ul << 20);
   max_write_buffer_number = 32;
   min_write_buffer_number_to_merge = max_write_buffer_number - 1;

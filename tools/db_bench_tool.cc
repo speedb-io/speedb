@@ -5145,8 +5145,8 @@ class Benchmark {
       }
       std::vector<ColumnFamilyDescriptor> column_families;
       for (size_t i = 0; i < num_hot; i++) {
-        column_families.push_back(
-            ColumnFamilyDescriptor(ColumnFamilyName(i), cf_options));
+        column_families.push_back(ColumnFamilyDescriptor(
+            ColumnFamilyName(i), ColumnFamilyOptions(options)));
       }
       std::vector<int> cfh_idx_to_prob;
       if (!FLAGS_column_family_distribution.empty()) {

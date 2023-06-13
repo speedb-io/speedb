@@ -4988,9 +4988,14 @@ TEST_F(SpeedbSharedOptionsTest, SpeedbSharedOptionsTest) {
   ASSERT_TRUE(so.write_buffer_manager->IsInitiatingFlushes() == true);
   ASSERT_TRUE(so.write_controller->max_delayed_write_rate() ==
               delayed_write_rate);
+  ASSERT_TRUE(so.write_controller->is_dynamic_delay());
+  ASSERT_TRUE(so.rate_limiter == nullptr);
+  ASSERT_TRUE(so.sst_file_manager == nullptr);
+  ASSERT_TRUE(so.info_log == nullptr);
+  ASSERT_TRUE(so.file_checksum_gen_factory == nullptr);
 }
 
-TEST_F(SpeedbSharedOptionsTest, EnableSpeedbFeaturesDB) {
+TEST_F(SpeedbSharedOptionsTest, EnableSpeedbFeatures) {
   DB *db1, *db2, *db3;
   Options op1, op2, op3;
   size_t total_ram_size_bytes = 100 * 1024 * 1024 * 1024ul;
@@ -5058,6 +5063,42 @@ TEST_F(SpeedbSharedOptionsTest, EnableSpeedbFeaturesDB) {
   ASSERT_OK(DestroyDB("db3", op3));
 }
 
+TEST_F(SpeedbSharedOptionsTest, EnableSpeedbFeaturesDB) {
+  DB* db1;
+  Options op1;
+  size_t total_ram_size_bytes = 100 * 1024 * 1024 * 1024ul;
+  size_t delayed_write_rate = 256 * 1024 * 1024ul;
+  int total_threads = 8;
+  SpeedbSharedOptions so(total_ram_size_bytes, total_threads,
+                         delayed_write_rate);
+  // create the DB if it's not already present
+  op1.create_if_missing = true;
+
+  op1.EnableSpeedbFeatures(so);
+  ASSERT_TRUE(op1.write_buffer_manager->buffer_size() ==
+              1 * 512 * 1024 * 1024ul);
+
+  ASSERT_OK(DB::Open(op1, "db1", &db1));
+
+  ASSERT_TRUE(db1->GetOptions().env == so.env);
+
+  ASSERT_TRUE(db1->GetOptions().max_background_jobs ==
+              (int)so.GetTotalThreads());
+
+  ASSERT_TRUE(db1->GetOptions().delayed_write_rate == so.GetDelayedWriteRate());
+
+  ASSERT_TRUE(db1->GetOptions().write_buffer_manager ==
+              so.write_buffer_manager);
+
+  ASSERT_TRUE(db1->GetOptions().write_buffer_manager->buffer_size() ==
+              1 * 512 * 1024 * 1024ul);
+
+  delete db1;
+  db1 = nullptr;
+
+  ASSERT_OK(DestroyDB("db1", op1));
+}
+
 TEST_F(SpeedbSharedOptionsTest, EnableSpeedbFeaturesCF) {
   DB* db1;
   Options op1;
@@ -5081,16 +5122,50 @@ TEST_F(SpeedbSharedOptionsTest, EnableSpeedbFeaturesCF) {
   ASSERT_OK(db1->CreateColumnFamily(cfo, "new_cf", &cf));
   ASSERT_TRUE(db1->GetOptions().write_buffer_manager->buffer_size() ==
               2 * 512 * 1024 * 1024ul);
-
+  ASSERT_TRUE(db1->GetOptions().write_buffer_size ==
+              std::min<size_t>(
+                  db1->GetOptions().write_buffer_manager->buffer_size() / 4,
+                  64ul << 20));
+  ASSERT_TRUE(db1->GetOptions().max_write_buffer_number == 32);
+  ASSERT_TRUE(db1->GetOptions().min_write_buffer_number_to_merge ==
+              db1->GetOptions().max_write_buffer_number - 1);
+  ASSERT_TRUE(db1->GetOptions().env == so.env);
   const auto* sanitized_table_options =
       op1.table_factory->GetOptions<BlockBasedTableOptions>();
   ASSERT_TRUE(sanitized_table_options->block_cache == so.cache);
 
-  ASSERT_OK(db1->DropColumnFamily(cf));
+  const auto sanitized_options_overrides =
+      sanitized_table_options->cache_usage_options.options_overrides;
+  EXPECT_EQ(sanitized_options_overrides.size(), kNumCacheEntryRoles);
+  for (auto options_overrides_iter = sanitized_options_overrides.cbegin();
+       options_overrides_iter != sanitized_options_overrides.cend();
+       ++options_overrides_iter) {
+    CacheEntryRoleOptions role_options = options_overrides_iter->second;
+    CacheEntryRoleOptions default_options =
+        sanitized_table_options->cache_usage_options.options;
+    if (options_overrides_iter->first == CacheEntryRole::kFilterConstruction) {
+      ASSERT_TRUE(role_options.charged ==
+                  CacheEntryRoleOptions::Decision::kEnabled);
+    } else if (options_overrides_iter->first ==
+               CacheEntryRole::kBlockBasedTableReader) {
+      ASSERT_TRUE(role_options.charged ==
+                  CacheEntryRoleOptions::Decision::kEnabled);
+    } else if (options_overrides_iter->first ==
+               CacheEntryRole::kCompressionDictionaryBuildingBuffer) {
+      ASSERT_TRUE(role_options.charged ==
+                  CacheEntryRoleOptions::Decision::kEnabled);
+    } else if (options_overrides_iter->first == CacheEntryRole::kFileMetadata) {
+      ASSERT_TRUE(role_options.charged ==
+                  CacheEntryRoleOptions::Decision::kEnabled);
+    } else {
+      EXPECT_TRUE(role_options == default_options);
+    }
+  }
+
   ASSERT_OK(db1->DestroyColumnFamilyHandle(cf));
   delete db1;
   db1 = nullptr;
-  ASSERT_OK(DestroyDB("db1", op1));
+  ASSERT_OK(DestroyDB("db1", op1, {{"new_cf", cfo}}));
 }
 
 }  // namespace ROCKSDB_NAMESPACE

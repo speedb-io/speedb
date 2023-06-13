@@ -109,16 +109,11 @@ struct ColumnFamilyOptions : public AdvancedColumnFamilyOptions {
   // Default values for some parameters in ColumnFamilyOptions are not
   // optimized for Speedb features, As a starting point for configuring
   // Speedb Features.
-  // if you choose to use it you should not change:
-  // total_ram_size_bytes, max_background_jobs, delayed_write_rate,
-  // write_buffer_size cache, write_controller,
-  // write_buffer_manager,bytes_per_sync, use_dynamic_delay table_factory and
-  // memtable_factory we will initialize and configure those.
+  // please avoid changing:
+  // write_buffer_size, cache, write_controller, write_buffer_manager,
+  // table_factory, memtable_factory.
   // the function might overide any of those.
   // use example can be found in  enable_speedb_features_example.cc
-  // each new column family will ask the write buffer manager to increase the
-  // write buffer size by 512 * 1024 * 1024ul using
-  // SpeedbSharedOptions::IncreaseWriteBufferSize(size_t increase_by) default
   // bucket count is initialized to 0; max_write_buffer_number is initialized to
   // 32
   ColumnFamilyOptions* EnableSpeedbFeaturesCF(
@@ -490,10 +485,9 @@ struct DBOptions {
 
   // Enable Speedb features function for DBOptions
   //
-  // if you choose to use it you should not change:
-  // total_ram_size_bytes, max_background_jobs, delayed_write_rate,
-  // write_buffer_size cache, write_controller,
-  // write_buffer_manager,bytes_per_sync, use_dynamic_delay table_factory and
+  // please avoid changing:
+  // write_buffer_size cache, write_controller, delayed_write_rate
+  // bytes_per_sync, write_buffer_manager, use_dynamic_delay table_factory and
   // memtable_factory we will initialize and configure those.
   // the function might overide any of those.
   // use example can be fuond in  enable_speedb_features_example.cc
@@ -2199,12 +2193,7 @@ struct SharedOptions {
 };
 
 // SharedOptions for Speedb, includes initialization for Speedb features
-// if you choose to use it you should not change:
-// total_ram_size_bytes, max_background_jobs, delayed_write_rate,
-// write_buffer_size cache, write_controller,
-// write_buffer_manager,bytes_per_sync, use_dynamic_delay table_factory and
-// memtable_factory we will initialize and configure those. use example can be
-// find in  enable_speedb_features_example.cc
+// use example can be found in  enable_speedb_features_example.cc
 class SpeedbSharedOptions : public SharedOptions {
  public:
   SpeedbSharedOptions(size_t total_ram_size_bytes, size_t total_threads,

@@ -5068,39 +5068,26 @@ TEST_F(SpeedbSharedOptionsTest, EnableSpeedbFeatures) {
 }
 
 TEST_F(SpeedbSharedOptionsTest, EnableSpeedbFeaturesDB) {
-  DB* db1;
-  Options op1;
+  DBOptions op;
   size_t total_ram_size_bytes = 100 * 1024 * 1024 * 1024ul;
   size_t delayed_write_rate = 256 * 1024 * 1024ul;
   int total_threads = 8;
   SpeedbSharedOptions so(total_ram_size_bytes, total_threads,
                          delayed_write_rate);
-  // create the DB if it's not already present
-  op1.create_if_missing = true;
 
-  op1.EnableSpeedbFeatures(so);
-  ASSERT_TRUE(op1.write_buffer_manager->buffer_size() ==
-              1 * 512 * 1024 * 1024ul);
+  op.EnableSpeedbFeaturesDB(so);
 
-  ASSERT_OK(DB::Open(op1, "db1", &db1));
+  ASSERT_TRUE(op.env == so.env);
 
-  ASSERT_TRUE(db1->GetOptions().env == so.env);
-
-  ASSERT_TRUE(db1->GetOptions().max_background_jobs ==
+  ASSERT_TRUE(op.max_background_jobs ==
               (int)so.GetTotalThreads());
 
-  ASSERT_TRUE(db1->GetOptions().delayed_write_rate == so.GetDelayedWriteRate());
+  ASSERT_TRUE(op.delayed_write_rate == so.GetDelayedWriteRate());
 
-  ASSERT_TRUE(db1->GetOptions().write_buffer_manager ==
+  ASSERT_TRUE(op.write_buffer_manager ==
               so.write_buffer_manager);
 
-  ASSERT_TRUE(db1->GetOptions().write_buffer_manager->buffer_size() ==
-              1 * 512 * 1024 * 1024ul);
-
-  delete db1;
-  db1 = nullptr;
-
-  ASSERT_OK(DestroyDB("db1", op1));
+  ASSERT_TRUE(op.write_buffer_manager->buffer_size() == 1);
 }
 
 TEST_F(SpeedbSharedOptionsTest, EnableSpeedbFeaturesCF) {

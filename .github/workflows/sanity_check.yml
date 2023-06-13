@@ -13,7 +13,7 @@ jobs:
     steps:
     
     - name: pre
-      run: apt update && apt install -y sudo git make clang build-essential clang-format
+      run: apt update && apt install -y sudo git make clang build-essential clang-format wget
     
     - name: Checkout feature branch
       uses: actions/checkout@v2
@@ -42,7 +42,8 @@ jobs:
       run: pip install argparse
 
     - name: Download clang-format-diff.py
-      run: wget https://raw.githubusercontent.com/llvm/llvm-project/release/12.x/clang/tools/clang-format/clang-format-diff.py
+      run: |
+        wget https://raw.githubusercontent.com/llvm/llvm-project/release/12.x/clang/tools/clang-format/clang-format-diff.py
 
     - name: Check format
       run: VERBOSE_CHECK=1 make check-format

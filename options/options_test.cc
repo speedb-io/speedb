@@ -5079,13 +5079,11 @@ TEST_F(SpeedbSharedOptionsTest, EnableSpeedbFeaturesDB) {
 
   ASSERT_TRUE(op.env == so.env);
 
-  ASSERT_TRUE(op.max_background_jobs ==
-              (int)so.GetTotalThreads());
+  ASSERT_TRUE(op.max_background_jobs == (int)so.GetTotalThreads());
 
   ASSERT_TRUE(op.delayed_write_rate == so.GetDelayedWriteRate());
 
-  ASSERT_TRUE(op.write_buffer_manager ==
-              so.write_buffer_manager);
+  ASSERT_TRUE(op.write_buffer_manager == so.write_buffer_manager);
 
   ASSERT_TRUE(op.write_buffer_manager->buffer_size() == 1);
 }

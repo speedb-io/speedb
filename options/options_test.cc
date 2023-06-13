@@ -5051,6 +5051,10 @@ TEST_F(SpeedbSharedOptionsTest, EnableSpeedbFeatures) {
   ASSERT_TRUE(db3->GetOptions().write_buffer_manager->buffer_size() ==
               3 * 512 * 1024 * 1024ul);
 
+  const auto* sanitized_table_options =
+      op1.table_factory->GetOptions<BlockBasedTableOptions>();
+  ASSERT_TRUE(sanitized_table_options->block_cache == so.cache);
+
   delete db1;
   db1 = nullptr;
   delete db2;

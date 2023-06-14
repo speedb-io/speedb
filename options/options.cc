@@ -533,13 +533,13 @@ Options* Options::OldDefaults(int rocksdb_major_version,
   return this;
 }
 
-Options* Options::EnableSpeedbFeatures(SpeedbSharedOptions& shared_options) {
+Options* Options::EnableSpeedbFeatures(SharedOptions& shared_options) {
   EnableSpeedbFeaturesDB(shared_options);
   EnableSpeedbFeaturesCF(shared_options);
   return this;
 }
 
-SpeedbSharedOptions::SpeedbSharedOptions(size_t total_ram_size_bytes,
+SharedOptions::SharedOptions(size_t total_ram_size_bytes,
                                          size_t total_threads,
                                          size_t delayed_write_rate) {
   total_threads_ = total_threads;
@@ -555,7 +555,7 @@ SpeedbSharedOptions::SpeedbSharedOptions(size_t total_ram_size_bytes,
       new WriteBufferManager(initial_write_buffer_size_, cache));
 }
 
-void SpeedbSharedOptions::IncreaseWriteBufferSize(size_t increase_by) {
+void SharedOptions::IncreaseWriteBufferSize(size_t increase_by) {
   if (write_buffer_manager->buffer_size() == 1 && increase_by > 1) {
       write_buffer_manager->SetBufferSize(increase_by);
   } else if (total_ram_size_bytes_ / 4 >
@@ -566,7 +566,7 @@ void SpeedbSharedOptions::IncreaseWriteBufferSize(size_t increase_by) {
 }
 
 DBOptions* DBOptions::EnableSpeedbFeaturesDB(
-    SpeedbSharedOptions& shared_options) {
+    SharedOptions& shared_options) {
   env = shared_options.env;
   IncreaseParallelism((int)shared_options.GetTotalThreads());
   delayed_write_rate = shared_options.GetDelayedWriteRate();
@@ -597,7 +597,7 @@ DBOptions* DBOptions::OldDefaults(int rocksdb_major_version,
 }
 
 ColumnFamilyOptions* ColumnFamilyOptions::EnableSpeedbFeaturesCF(
-    SpeedbSharedOptions& shared_options) {
+    SharedOptions& shared_options) {
   // to disable flush due to write buffer full
   // each new column family will ask the write buffer manager to increase the
   // write buffer size by 512 * 1024 * 1024ul

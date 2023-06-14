@@ -57,11 +57,10 @@ class WalFilter;
 class WriteBufferManager;
 class WriteController;
 class FileSystem;
-class SpeedbSharedOptions;
+class SharedOptions;
 
 struct Options;
 struct DbPath;
-struct SharedOptions;
 
 using FileTypeSet = SmallEnumSet<FileType, FileType::kBlobFile>;
 
@@ -112,12 +111,12 @@ struct ColumnFamilyOptions : public AdvancedColumnFamilyOptions {
   // please avoid changing:
   // write_buffer_size, cache, write_controller, write_buffer_manager,
   // table_factory, memtable_factory.
-  // the function might overide any of those.
+  // the function might override any of those.
   // use example can be found in  enable_speedb_features_example.cc
   // bucket count is initialized to 0; max_write_buffer_number is initialized to
   // 32
   ColumnFamilyOptions* EnableSpeedbFeaturesCF(
-      SpeedbSharedOptions& shared_options);
+      SharedOptions& shared_options);
   // -------------------
   // Parameters that affect behavior
 
@@ -491,7 +490,7 @@ struct DBOptions {
   // memtable_factory we will initialize and configure those.
   // the function might overide any of those.
   // use example can be fuond in  enable_speedb_features_example.cc
-  DBOptions* EnableSpeedbFeaturesDB(SpeedbSharedOptions& shared_options);
+  DBOptions* EnableSpeedbFeaturesDB(SharedOptions& shared_options);
 
   // #endif  // ROCKSDB_LITE
 
@@ -1506,7 +1505,7 @@ struct Options : public DBOptions, public ColumnFamilyOptions {
   // memtable_factory we will initialize and configure those.
   // the function might overide any of those.
   // use example can be found in  enable_speedb_features_example.cc
-  Options* EnableSpeedbFeatures(SpeedbSharedOptions& shared_options);
+  Options* EnableSpeedbFeatures(SharedOptions& shared_options);
 
   // Disable some checks that should not be necessary in the absence of
   // software logic errors or CPU+memory hardware errors. This can improve
@@ -2175,11 +2174,22 @@ struct LiveFilesStorageInfoOptions {
   uint64_t wal_size_for_flush = 0;
 };
 
-// use this struct to arrange multiple db shared options as a group
-// this struct includes all the shared_ptrs from DBOptions.
-struct SharedOptions {
+// use this class to arrange multiple db shared options as a group
+// this class includes all the shared_ptrs from DBOptions.
+// it is also includes initialization for Speedb features
+// more info and use example can be found in  enable_speedb_features_example.cc
+class SharedOptions {
  public:
-  SharedOptions() {}
+  SharedOptions();
+  SharedOptions(size_t total_ram_size_bytes, size_t total_threads,
+                      size_t delayed_write_rate = 256 * 1024 * 1024ul);
+  size_t GetTotalThreads() { return total_threads_; }
+  size_t GetTotalRamSizeBytes() { return total_ram_size_bytes_; }
+  size_t GetDelayedWriteRate() { return delayed_write_rate_; }
+  // this function will increase write buffer manager by increased_by amount
+  // as long as the result is not bigger than the maximum size of
+  // total_ram_size_ /4
+  void IncreaseWriteBufferSize(size_t increase_by);
 
   std::shared_ptr<Cache> cache = nullptr;
   std::shared_ptr<WriteController> write_controller = nullptr;
@@ -2190,22 +2200,7 @@ struct SharedOptions {
   std::shared_ptr<Logger> info_log = nullptr;
   std::vector<std::shared_ptr<EventListener>> listeners;
   std::shared_ptr<FileChecksumGenFactory> file_checksum_gen_factory = nullptr;
-};
-
-// SharedOptions for Speedb, includes initialization for Speedb features
-// use example can be found in  enable_speedb_features_example.cc
-class SpeedbSharedOptions : public SharedOptions {
- public:
-  SpeedbSharedOptions(size_t total_ram_size_bytes, size_t total_threads,
-                      size_t delayed_write_rate = 256 * 1024 * 1024ul);
-  size_t GetTotalThreads() { return total_threads_; }
-  size_t GetTotalRamSizeBytes() { return total_ram_size_bytes_; }
-  size_t GetDelayedWriteRate() { return delayed_write_rate_; }
-  // this function will increase write buffer manager by increased_by amount
-  // as long as the result is not bigger than the maximum size of
-  // total_ram_size_ /4
-  void IncreaseWriteBufferSize(size_t increase_by);
-
+ 
  private:
   size_t total_threads_ = 0;
   size_t total_ram_size_bytes_ = 0;

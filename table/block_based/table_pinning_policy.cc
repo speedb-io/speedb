@@ -100,7 +100,7 @@ RecordingPinningPolicy::RecordingPinningPolicy()
       attempts_counter_(0),
       pinned_counter_(0),
       active_counter_(0),
-      usage_by_level_(kNumLevels),
+      usage_by_level_(kNumLevels + 1),
       usage_by_type_(kNumTypes) {
   for (int l = 0; l <= kNumLevels; l++) {
     usage_by_level_[l].store(0);

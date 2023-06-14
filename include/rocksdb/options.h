@@ -115,8 +115,7 @@ struct ColumnFamilyOptions : public AdvancedColumnFamilyOptions {
   // use example can be found in  enable_speedb_features_example.cc
   // bucket count is initialized to 0; max_write_buffer_number is initialized to
   // 32
-  ColumnFamilyOptions* EnableSpeedbFeaturesCF(
-      SharedOptions& shared_options);
+  ColumnFamilyOptions* EnableSpeedbFeaturesCF(SharedOptions& shared_options);
   // -------------------
   // Parameters that affect behavior
 
@@ -2182,7 +2181,7 @@ class SharedOptions {
  public:
   SharedOptions();
   SharedOptions(size_t total_ram_size_bytes, size_t total_threads,
-                      size_t delayed_write_rate = 256 * 1024 * 1024ul);
+                size_t delayed_write_rate = 256 * 1024 * 1024ul);
   size_t GetTotalThreads() { return total_threads_; }
   size_t GetTotalRamSizeBytes() { return total_ram_size_bytes_; }
   size_t GetDelayedWriteRate() { return delayed_write_rate_; }
@@ -2200,7 +2199,7 @@ class SharedOptions {
   std::shared_ptr<Logger> info_log = nullptr;
   std::vector<std::shared_ptr<EventListener>> listeners;
   std::shared_ptr<FileChecksumGenFactory> file_checksum_gen_factory = nullptr;
- 
+
  private:
   size_t total_threads_ = 0;
   size_t total_ram_size_bytes_ = 0;

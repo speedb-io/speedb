@@ -539,9 +539,8 @@ Options* Options::EnableSpeedbFeatures(SharedOptions& shared_options) {
   return this;
 }
 
-SharedOptions::SharedOptions(size_t total_ram_size_bytes,
-                                         size_t total_threads,
-                                         size_t delayed_write_rate) {
+SharedOptions::SharedOptions(size_t total_ram_size_bytes, size_t total_threads,
+                             size_t delayed_write_rate) {
   total_threads_ = total_threads;
   total_ram_size_bytes_ = total_ram_size_bytes;
   delayed_write_rate_ = delayed_write_rate;
@@ -565,8 +564,7 @@ void SharedOptions::IncreaseWriteBufferSize(size_t increase_by) {
   }
 }
 
-DBOptions* DBOptions::EnableSpeedbFeaturesDB(
-    SharedOptions& shared_options) {
+DBOptions* DBOptions::EnableSpeedbFeaturesDB(SharedOptions& shared_options) {
   env = shared_options.env;
   IncreaseParallelism((int)shared_options.GetTotalThreads());
   delayed_write_rate = shared_options.GetDelayedWriteRate();

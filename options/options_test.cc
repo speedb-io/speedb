@@ -4976,8 +4976,7 @@ TEST_F(SharedOptionsTest, SharedOptionsTest) {
   size_t total_ram_size_bytes = 100 * 1024 * 1024 * 1024ul;
   size_t delayed_write_rate = 256 * 1024 * 1024ul;
   size_t total_threads = 8;
-  SharedOptions so(total_ram_size_bytes, total_threads,
-                         delayed_write_rate);
+  SharedOptions so(total_ram_size_bytes, total_threads, delayed_write_rate);
 
   ASSERT_TRUE(so.GetTotalThreads() == total_threads);
   ASSERT_TRUE(so.GetDelayedWriteRate() == delayed_write_rate);
@@ -5001,8 +5000,7 @@ TEST_F(SharedOptionsTest, EnableSpeedbFeatures) {
   size_t total_ram_size_bytes = 100 * 1024 * 1024 * 1024ul;
   size_t delayed_write_rate = 256 * 1024 * 1024ul;
   int total_threads = 8;
-  SharedOptions so(total_ram_size_bytes, total_threads,
-                         delayed_write_rate);
+  SharedOptions so(total_ram_size_bytes, total_threads, delayed_write_rate);
   // create the DB if it's not already present
   op1.create_if_missing = true;
   op2.create_if_missing = true;
@@ -5026,30 +5024,24 @@ TEST_F(SharedOptionsTest, EnableSpeedbFeatures) {
   ASSERT_EQ(db2->GetOptions().env, so.env);
   ASSERT_EQ(db3->GetOptions().env, so.env);
 
-  ASSERT_EQ(db1->GetOptions().max_background_jobs,
-              (int)so.GetTotalThreads());
-  ASSERT_EQ(db2->GetOptions().max_background_jobs,
-              (int)so.GetTotalThreads());
-  ASSERT_EQ(db3->GetOptions().max_background_jobs,
-              (int)so.GetTotalThreads());
+  ASSERT_EQ(db1->GetOptions().max_background_jobs, (int)so.GetTotalThreads());
+  ASSERT_EQ(db2->GetOptions().max_background_jobs, (int)so.GetTotalThreads());
+  ASSERT_EQ(db3->GetOptions().max_background_jobs, (int)so.GetTotalThreads());
 
   ASSERT_EQ(db1->GetOptions().delayed_write_rate, so.GetDelayedWriteRate());
   ASSERT_EQ(db2->GetOptions().delayed_write_rate, so.GetDelayedWriteRate());
   ASSERT_EQ(db3->GetOptions().delayed_write_rate, so.GetDelayedWriteRate());
 
-  ASSERT_EQ(db1->GetOptions().write_buffer_manager,
-              so.write_buffer_manager);
-  ASSERT_EQ(db2->GetOptions().write_buffer_manager,
-              so.write_buffer_manager);
-  ASSERT_EQ(db3->GetOptions().write_buffer_manager,
-              so.write_buffer_manager);
+  ASSERT_EQ(db1->GetOptions().write_buffer_manager, so.write_buffer_manager);
+  ASSERT_EQ(db2->GetOptions().write_buffer_manager, so.write_buffer_manager);
+  ASSERT_EQ(db3->GetOptions().write_buffer_manager, so.write_buffer_manager);
 
   ASSERT_EQ(db1->GetOptions().write_buffer_manager->buffer_size(),
-              3 * 512 * 1024 * 1024ul);
+            3 * 512 * 1024 * 1024ul);
   ASSERT_EQ(db2->GetOptions().write_buffer_manager->buffer_size(),
-              3 * 512 * 1024 * 1024ul);
+            3 * 512 * 1024 * 1024ul);
   ASSERT_EQ(db3->GetOptions().write_buffer_manager->buffer_size(),
-              3 * 512 * 1024 * 1024ul);
+            3 * 512 * 1024 * 1024ul);
 
   const auto* sanitized_table_options =
       op1.table_factory->GetOptions<BlockBasedTableOptions>();
@@ -5072,8 +5064,7 @@ TEST_F(SharedOptionsTest, EnableSpeedbFeaturesDB) {
   size_t total_ram_size_bytes = 100 * 1024 * 1024 * 1024ul;
   size_t delayed_write_rate = 256 * 1024 * 1024ul;
   int total_threads = 8;
-  SharedOptions so(total_ram_size_bytes, total_threads,
-                         delayed_write_rate);
+  SharedOptions so(total_ram_size_bytes, total_threads, delayed_write_rate);
 
   op.EnableSpeedbFeaturesDB(so);
 
@@ -5098,26 +5089,25 @@ TEST_F(SharedOptionsTest, EnableSpeedbFeaturesCF) {
   size_t delayed_write_rate = 256 * 1024 * 1024;
   int total_threads = 8;
 
-  SharedOptions so(total_ram_size_bytes, total_threads,
-                         delayed_write_rate);
+  SharedOptions so(total_ram_size_bytes, total_threads, delayed_write_rate);
 
   // create the DB if it's not already present
   op1.create_if_missing = true;
   op1.EnableSpeedbFeatures(so);
   ASSERT_OK(DB::Open(op1, "db1", &db1));
   ASSERT_EQ(db1->GetOptions().write_buffer_manager->buffer_size(),
-              1 * 512 * 1024 * 1024ul);
+            1 * 512 * 1024 * 1024ul);
   cfo.EnableSpeedbFeaturesCF(so);
   ASSERT_OK(db1->CreateColumnFamily(cfo, "new_cf", &cf));
   ASSERT_EQ(db1->GetOptions().write_buffer_manager->buffer_size(),
-              2 * 512 * 1024 * 1024ul);
+            2 * 512 * 1024 * 1024ul);
   ASSERT_EQ(db1->GetOptions().write_buffer_size,
-              std::min<size_t>(
-                  db1->GetOptions().write_buffer_manager->buffer_size() / 4,
-                  64ul << 20));
+            std::min<size_t>(
+                db1->GetOptions().write_buffer_manager->buffer_size() / 4,
+                64ul << 20));
   ASSERT_EQ(db1->GetOptions().max_write_buffer_number, 32);
   ASSERT_EQ(db1->GetOptions().min_write_buffer_number_to_merge,
-              db1->GetOptions().max_write_buffer_number - 1);
+            db1->GetOptions().max_write_buffer_number - 1);
   ASSERT_EQ(db1->GetOptions().env, so.env);
   const auto* sanitized_table_options =
       op1.table_factory->GetOptions<BlockBasedTableOptions>();
@@ -5134,18 +5124,18 @@ TEST_F(SharedOptionsTest, EnableSpeedbFeaturesCF) {
         sanitized_table_options->cache_usage_options.options;
     if (options_overrides_iter->first == CacheEntryRole::kFilterConstruction) {
       ASSERT_EQ(role_options.charged,
-                  CacheEntryRoleOptions::Decision::kEnabled);
+                CacheEntryRoleOptions::Decision::kEnabled);
     } else if (options_overrides_iter->first ==
                CacheEntryRole::kBlockBasedTableReader) {
       ASSERT_EQ(role_options.charged,
-                  CacheEntryRoleOptions::Decision::kEnabled);
+                CacheEntryRoleOptions::Decision::kEnabled);
     } else if (options_overrides_iter->first ==
                CacheEntryRole::kCompressionDictionaryBuildingBuffer) {
       ASSERT_EQ(role_options.charged,
-                  CacheEntryRoleOptions::Decision::kEnabled);
+                CacheEntryRoleOptions::Decision::kEnabled);
     } else if (options_overrides_iter->first == CacheEntryRole::kFileMetadata) {
       ASSERT_EQ(role_options.charged,
-                  CacheEntryRoleOptions::Decision::kEnabled);
+                CacheEntryRoleOptions::Decision::kEnabled);
     } else {
       EXPECT_TRUE(role_options == default_options);
     }

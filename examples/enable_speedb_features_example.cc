@@ -49,8 +49,7 @@ int main() {
   size_t total_threads = 8;
 
   // define SharedOptions object for each databases group
-  SharedOptions so1(total_ram_size_bytes, total_threads,
-                          delayed_write_rate);
+  SharedOptions so1(total_ram_size_bytes, total_threads, delayed_write_rate);
 
   // customize each options file except SpeedbSharedOptiopns members
   // as listed in the definition of SpeedbSharedOptiopns in options.h
@@ -82,8 +81,7 @@ int main() {
   total_ram_size_bytes = 1024 * 1024 * 1024;
   delayed_write_rate = 128 * 1024 * 1024;
   total_threads = 4;
-  SharedOptions so2(total_ram_size_bytes, total_threads,
-                          delayed_write_rate);
+  SharedOptions so2(total_ram_size_bytes, total_threads, delayed_write_rate);
 
   // again customize each options object except SharedOptiopns members
   op3.create_if_missing = true;

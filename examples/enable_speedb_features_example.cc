@@ -24,7 +24,10 @@
 using namespace ROCKSDB_NAMESPACE;
 
 #if defined(OS_WIN)
-std::string kDBPath = "C:\\Windows\\TEMP\\enable_speedb_features_example";
+std::string kDBPath1 = "C:\\Windows\\TEMP\\enable_speedb_features_example1";
+std::string kDBPath2 = "C:\\Windows\\TEMP\\enable_speedb_features_example2";
+std::string kDBPath3 = "C:\\Windows\\TEMP\\enable_speedb_features_example3";
+std::string kDBPath4 = "C:\\Windows\\TEMP\\enable_speedb_features_example4";
 #else
 std::string kDBPath1 = "/tmp/enable_speedb_features_example1";
 std::string kDBPath2 = "/tmp/enable_speedb_features_example2";
@@ -45,8 +48,8 @@ int main() {
   size_t delayed_write_rate = 256 * 1024 * 1024;
   size_t total_threads = 8;
 
-  // define SpeedbSharedOptions object for each databases group
-  SpeedbSharedOptions so1(total_ram_size_bytes, total_threads,
+  // define SharedOptions object for each databases group
+  SharedOptions so1(total_ram_size_bytes, total_threads,
                           delayed_write_rate);
 
   // customize each options file except SpeedbSharedOptiopns members
@@ -79,10 +82,10 @@ int main() {
   total_ram_size_bytes = 1024 * 1024 * 1024;
   delayed_write_rate = 128 * 1024 * 1024;
   total_threads = 4;
-  SpeedbSharedOptions so2(total_ram_size_bytes, total_threads,
+  SharedOptions so2(total_ram_size_bytes, total_threads,
                           delayed_write_rate);
 
-  // again customize each options object except SpeedbSharedOptiopns members
+  // again customize each options object except SharedOptiopns members
   op3.create_if_missing = true;
   op3.compaction_style = rocksdb::kCompactionStyleUniversal;
   //...
@@ -112,7 +115,7 @@ int main() {
   rocksdb::ColumnFamilyHandle *cf;
   // coustomize it except SpeedbSharedOptiopns members
 
-  // call EnableSpeedbFeaturesCF and supply for it the same SpeedbSharedOptions
+  // call EnableSpeedbFeaturesCF and supply for it the same SharedOptions
   // object as the DB, so2 this time.
   cfo3.EnableSpeedbFeaturesCF(so2);
   // create the cf
@@ -135,9 +138,13 @@ int main() {
   }
   std::cout << "new_cf was destroyed" << std::endl;
 
-  delete db1;
-  delete db2;
-  delete db3;
-  delete db4;
+  s = db1->Close();
+  assert(s.ok());
+  s = db2->Close();
+  assert(s.ok());
+  s = db3->Close();
+  assert(s.ok());
+  s = db4->Close();
+  assert(s.ok());
   return 0;
 }

@@ -193,7 +193,7 @@ Based on RocksDB 7.2.2
 
 ## Miscellaneous
 * LOG: Print write_buffer_manager size to LOG
-* LOG: change log header to SpeeDB
+* LOG: change log header to Speedb
 * LOG & db_bench: metadata_cache_options - print to LOG and support its configuration in db_bench
 * db_impl: use unique_ptr in DBImpl::Open for nicer memory management
 * Explicitly compare the SuperVersion pointer in column_family

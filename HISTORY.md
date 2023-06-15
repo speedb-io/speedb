@@ -1,6 +1,8 @@
 # Speedb Change Log 
 
 ## Unreleased
+
+## Fig v2.5.0 (06/14/2023)
 Based on RocksDB 8.1.1
 
 ### New Features

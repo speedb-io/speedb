@@ -42,6 +42,12 @@ jobs:
     with:
       verSion: ${{ needs.pre_build.outputs.out1 }}     
   
+  Mac_ARM_Bld:
+    needs: pre_build
+    uses: ./.github/workflows/ci_macos_ARM.yml
+    with:
+      verSion: ${{ needs.pre_build.outputs.out1 }}  
+      
   Windows_Bld:
     needs: pre_build
     uses: ./.github/workflows/ci_windows.yml
@@ -77,6 +83,7 @@ jobs:
         export JAVA_HOME="$(jrunscript -e 'java.lang.System.out.println(java.lang.System.getProperty("java.home"));')"
         export LIB_JAVA_VERSION=11.0.17
         export the_version=${{ steps.find_version.outputs.verSion }}
+        make DEBUG_LEVEL=0 -j 16 rocksdbjava
         cd java
         mkdir src/main/resources
         echo "aws s3 --profile nd7 cp --recursive s3://spdb-builder/jar_test/v$VERSION/ java/src/main/resources/"

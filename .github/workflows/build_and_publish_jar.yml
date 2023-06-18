@@ -90,7 +90,7 @@ jobs:
         echo "waiting 3 minutes for you to upload your files"
         sleep 180
         aws s3 --profile nd7 cp --recursive s3://spdb-builder/jar_test/v$VERSION/ src/main/resources/
-        ls -l java/src/main/resources/
+        ls -l src/main/resources/
         cp ../../../../../templ/pom.xml .
         mvn versions:set -DnewVersion=$VERSION-SNAPSHOT
         mvn deploy -X -e -DskipTests

@@ -308,11 +308,11 @@ class WriteBufferManager final {
     return ParseCodedUsageState(GetCodedUsageState());
   }
 
-  void UpdateUsageState(size_t new_memory_used, ssize_t mem_changed_size,
+  void UpdateUsageState(size_t new_memory_used, int64_t mem_changed_size,
                         size_t quota);
 
   uint64_t CalcNewCodedUsageState(size_t new_memory_used,
-                                  ssize_t memory_changed_size, size_t quota,
+                                  int64_t memory_changed_size, size_t quota,
                                   uint64_t old_coded_usage_state);
 
   uint64_t GetCodedUsageState() const {

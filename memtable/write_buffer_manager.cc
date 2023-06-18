@@ -98,7 +98,7 @@ void WriteBufferManager::ReserveMem(size_t mem) {
     new_memory_used = old_memory_used + mem;
   }
   if (is_enabled) {
-    UpdateUsageState(new_memory_used, mem, buffer_size());
+    UpdateUsageState(new_memory_used, static_cast<int64_t>(mem), buffer_size());
     // Checking outside the locks is not reliable, but avoids locking
     // unnecessarily which is expensive
     if (UNLIKELY(ShouldInitiateAnotherFlushMemOnly(new_memory_used))) {
@@ -172,7 +172,8 @@ void WriteBufferManager::FreeMem(size_t mem) {
     assert(curr_memory_inactive >= mem);
     assert(curr_memory_being_freed >= mem);
 
-    UpdateUsageState(new_memory_used, -mem, buffer_size());
+    UpdateUsageState(new_memory_used, static_cast<int64_t>(-mem),
+                     buffer_size());
   }
 
   // Check if stall is active and can be ended.
@@ -431,15 +432,14 @@ void WriteBufferManager::UpdateControllerDelayState() {
 }
 
 uint64_t WriteBufferManager::CalcNewCodedUsageState(
-    size_t new_memory_used, ssize_t memory_changed_size, size_t quota,
+    size_t new_memory_used, int64_t memory_changed_size, size_t quota,
     uint64_t old_coded_usage_state) {
   auto [old_usage_state, old_delay_factor] =
       ParseCodedUsageState(old_coded_usage_state);
 
   auto new_usage_state = old_usage_state;
   auto new_delay_factor = old_delay_factor;
-  size_t usage_start_delay_threshold =
-      (static_cast<double>(start_delay_percent_) / 100) * quota;
+  size_t usage_start_delay_threshold = (start_delay_percent_ / 100.0) * quota;
   auto step_size =
       (quota - usage_start_delay_threshold) / kMaxDelayedWriteFactor;
 
@@ -513,7 +513,7 @@ auto WriteBufferManager::ParseCodedUsageState(uint64_t coded_usage_state)
 }
 
 void WriteBufferManager::UpdateUsageState(size_t new_memory_used,
-                                          ssize_t memory_changed_size,
+                                          int64_t memory_changed_size,
                                           size_t quota) {
   assert(enabled());
   if (allow_stall_.load(std::memory_order_relaxed) == false ||
@@ -540,7 +540,7 @@ void WriteBufferManager::UpdateUsageState(size_t new_memory_used,
       if (done == false) {
         // Retry. However,
         new_memory_used = memory_usage();
-        memory_changed_size = 0U;
+        memory_changed_size = 0;
       } else {
         // WBM state has changed. need to update the WCs.
         UpdateControllerDelayState();

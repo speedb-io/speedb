@@ -301,7 +301,7 @@ void SpdbWriteImpl::SwitchAndWriteBatchGroup(WritesBatchList* batch_group) {
       io_s = db_->SpdbWriteToWAL(wal_batch, 1, to_be_cached_state,
                                  batch_group->need_sync_, &offset, &size);
     } else {
-      uint64_t progress_batch_seq;
+      uint64_t progress_batch_seq = 0;
       size_t wal_writes = 0;
       WriteBatch* merged_batch = &tmp_batch_;
       for (const WriteBatch* batch : batch_group->wal_writes_) {

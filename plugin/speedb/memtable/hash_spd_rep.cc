@@ -543,32 +543,36 @@ MemTableRep::Iterator* HashSpdRep::GetIterator(Arena* arena) {
   }
 }
 
-static std::unordered_map<std::string, OptionTypeInfo> hash_spd_factory_info = {
-
-    {"hash_bucket_count",
-     {0, OptionType::kSizeT, OptionVerificationType::kNormal,
-      OptionTypeFlags::kDontSerialize /*Since it is part of the ID*/}},
-    {"use_seek_parralel_threshold",
-     {0, OptionType::kBoolean, OptionVerificationType::kNormal,
-      OptionTypeFlags::kDontSerialize /*Since it is part of the ID*/}},
+static std::unordered_map<std::string, OptionTypeInfo> hash_spdb_factory_info =
+    {
+        {"hash_bucket_count",
+         {offsetof(struct HashSpdbRepOptions, hash_bucket_count),
+          OptionType::kSizeT, OptionVerificationType::kNormal,
+          OptionTypeFlags::kNone}},
+        {"use_seek_parralel_threshold",
+         {offsetof(struct HashSpdbRepOptions, use_seek_parralel_threshold),
+          OptionType::kBoolean, OptionVerificationType::kNormal,
+          OptionTypeFlags::kNone}},
 };
 }  // namespace
 
 // HashSpdRepFactory
 
-HashSpdRepFactory::HashSpdRepFactory(size_t hash_bucket_count)
-    : bucket_count_(hash_bucket_count), use_seek_parralel_threshold_(false) {
+HashSpdRepFactory::HashSpdRepFactory(size_t hash_bucket_count) {
+  options_.hash_bucket_count = hash_bucket_count;
+  options_.use_seek_parralel_threshold = false;
+
   if (hash_bucket_count == 0) {
-    use_seek_parralel_threshold_ = true;
-    bucket_count_ = 1000000;
+    options_.use_seek_parralel_threshold = true;
+    options_.hash_bucket_count = 1000000;
   }
-  RegisterOptions("", &bucket_count_, &hash_spd_factory_info);
+  RegisterOptions(&options_, &hash_spdb_factory_info);
   Init();
 }
 
 MemTableRep* HashSpdRepFactory::PreCreateMemTableRep() {
-  MemTableRep* hash_spd =
-      new HashSpdRep(nullptr, bucket_count_, use_seek_parralel_threshold_);
+  MemTableRep* hash_spd = new HashSpdRep(nullptr, options_.hash_bucket_count,
+                                         options_.use_seek_parralel_threshold);
   return hash_spd;
 }
 
@@ -582,8 +586,8 @@ void HashSpdRepFactory::PostCreateMemTableRep(
 MemTableRep* HashSpdRepFactory::CreateMemTableRep(
     const MemTableRep::KeyComparator& compare, Allocator* allocator,
     const SliceTransform* /*transform*/, Logger* /*logger*/) {
-  return new HashSpdRep(compare, allocator, bucket_count_,
-                        use_seek_parralel_threshold_);
+  return new HashSpdRep(compare, allocator, options_.hash_bucket_count,
+                        options_.use_seek_parralel_threshold);
 }
 
 }  // namespace ROCKSDB_NAMESPACE

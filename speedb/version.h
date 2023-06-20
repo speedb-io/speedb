@@ -15,8 +15,8 @@
 #include <string>
 #pragma once
 
-#define SPEEDB_MAJOR 0
-#define SPEEDB_MINOR 1
+#define SPEEDB_MAJOR 2
+#define SPEEDB_MINOR 5
 #define SPEEDB_PATCH 0
 
 namespace ROCKSDB_NAMESPACE {

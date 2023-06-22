@@ -3966,6 +3966,7 @@ class Benchmark {
       } else if (name == "stats") {
         PrintStats("rocksdb.stats");
       } else if (name == "table-readers-mem") {
+        fprintf(stdout, "table-readers-mem");
         PrintStats("rocksdb.estimate-table-readers-mem");
       } else if (name == "resetstats") {
         ResetStats();

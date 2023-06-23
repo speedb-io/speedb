@@ -15,6 +15,7 @@
 #include <atomic>
 #include <vector>
 
+#include "rocksdb/table_pinning_policy.h"
 #include "table/block_based/recording_pinning_policy.h"
 
 namespace ROCKSDB_NAMESPACE {

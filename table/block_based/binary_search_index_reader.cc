@@ -8,7 +8,7 @@
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 #include "table/block_based/binary_search_index_reader.h"
 
-#include "table/block_based/table_pinning_policy.h"
+#include "rocksdb/table_pinning_policy.h"
 
 namespace ROCKSDB_NAMESPACE {
 Status BinarySearchIndexReader::Create(

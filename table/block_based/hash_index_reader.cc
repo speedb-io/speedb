@@ -8,7 +8,7 @@
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 #include "table/block_based/hash_index_reader.h"
 
-#include "table/block_based/table_pinning_policy.h"
+#include "rocksdb/table_pinning_policy.h"
 #include "table/block_fetcher.h"
 #include "table/meta_blocks.h"
 

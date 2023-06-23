@@ -8,8 +8,8 @@
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 #include "table/block_based/index_reader_common.h"
 
+#include "rocksdb/table_pinning_policy.h"
 #include "table/block_based/block_cache.h"
-#include "table/block_based/table_pinning_policy.h"
 
 namespace ROCKSDB_NAMESPACE {
 BlockBasedTable::IndexReaderCommon::~IndexReaderCommon() {

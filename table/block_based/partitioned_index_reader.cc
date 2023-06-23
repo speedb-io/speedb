@@ -10,9 +10,9 @@
 
 #include "block_cache.h"
 #include "file/random_access_file_reader.h"
+#include "rocksdb/table_pinning_policy.h"
 #include "table/block_based/block_based_table_reader.h"
 #include "table/block_based/partitioned_index_iterator.h"
-#include "table/block_based/table_pinning_policy.h"
 
 namespace ROCKSDB_NAMESPACE {
 Status PartitionIndexReader::Create(

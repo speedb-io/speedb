@@ -8,8 +8,8 @@
 
 #include "logging/logging.h"
 #include "monitoring/perf_context_imp.h"
+#include "rocksdb/table_pinning_policy.h"
 #include "table/block_based/block_based_table_reader.h"
-#include "table/block_based/table_pinning_policy.h"
 #include "util/compression.h"
 
 namespace ROCKSDB_NAMESPACE {

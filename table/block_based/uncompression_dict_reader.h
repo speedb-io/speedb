@@ -8,8 +8,8 @@
 
 #include <cassert>
 
+#include "rocksdb/table_pinning_policy.h"
 #include "table/block_based/cachable_entry.h"
-#include "table/block_based/table_pinning_policy.h"
 #include "table/format.h"
 
 namespace ROCKSDB_NAMESPACE {
@@ -18,9 +18,7 @@ class BlockBasedTable;
 struct BlockCacheLookupContext;
 class FilePrefetchBuffer;
 class GetContext;
-struct PinnedEntry;
 struct ReadOptions;
-struct TablePinningOptions;
 struct UncompressionDict;
 
 // Provides access to the uncompression dictionary regardless of whether

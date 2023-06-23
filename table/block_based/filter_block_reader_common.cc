@@ -8,9 +8,9 @@
 
 #include "block_cache.h"
 #include "monitoring/perf_context_imp.h"
+#include "rocksdb/table_pinning_policy.h"
 #include "table/block_based/block_based_table_reader.h"
 #include "table/block_based/parsed_full_filter_block.h"
-#include "table/block_based/table_pinning_policy.h"
 
 namespace ROCKSDB_NAMESPACE {
 template <typename TBlocklike>

@@ -12,7 +12,7 @@
 #include <atomic>
 #include <vector>
 
-#include "table/block_based/table_pinning_policy.h"
+#include "rocksdb/table_pinning_policy.h"
 
 namespace ROCKSDB_NAMESPACE {
 // An abstract table pinning policy that records the pinned operations

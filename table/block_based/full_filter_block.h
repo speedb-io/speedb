@@ -18,7 +18,6 @@
 #include "table/block_based/filter_block_reader_common.h"
 #include "table/block_based/filter_policy_internal.h"
 #include "table/block_based/parsed_full_filter_block.h"
-#include "table/block_based/table_pinning_policy.h"
 #include "util/hash.h"
 
 namespace ROCKSDB_NAMESPACE {
@@ -26,6 +25,7 @@ namespace ROCKSDB_NAMESPACE {
 class FilterPolicy;
 class FilterBitsBuilder;
 class FilterBitsReader;
+struct PinnedEntry;
 struct TablePinningOptions;
 
 // A FullFilterBlockBuilder is used to construct a full filter for a

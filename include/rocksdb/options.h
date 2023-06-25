@@ -111,7 +111,8 @@ struct ColumnFamilyOptions : public AdvancedColumnFamilyOptions {
   // please avoid changing:
   // write_buffer_size, cache, write_controller, write_buffer_manager,
   // table_factory, memtable_factory.
-  // the function might override any of those.
+  // the function might override any of those major options, some more options
+  // might be overridden please read the code.
   // use example can be found in  enable_speedb_features_example.cc
   // bucket count is initialized to 0; max_write_buffer_number is initialized to
   // 32
@@ -487,7 +488,8 @@ struct DBOptions {
   // write_buffer_size cache, write_controller, delayed_write_rate
   // bytes_per_sync, write_buffer_manager, use_dynamic_delay table_factory and
   // memtable_factory we will initialize and configure those.
-  // the function might overide any of those.
+  // the function might override any of those major options, some more options
+  // might be overridden please read the code.
   // use example can be fuond in  enable_speedb_features_example.cc
   DBOptions* EnableSpeedbFeaturesDB(SharedOptions& shared_options);
 

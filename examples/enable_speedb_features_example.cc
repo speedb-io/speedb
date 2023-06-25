@@ -144,5 +144,11 @@ int main() {
   assert(s.ok());
   s = db4->Close();
   assert(s.ok());
+
+  delete db1;
+  delete db2;
+  delete db3;
+  delete db4;
+
   return 0;
 }

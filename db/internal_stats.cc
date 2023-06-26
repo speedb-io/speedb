@@ -729,7 +729,8 @@ uint64_t InternalStats::CacheEntryRoleStats::GetLastDurationMicros() const {
 std::string InternalStats::CacheEntryRoleStats::ToString(
     SystemClock* clock) const {
   std::ostringstream str;
-  str << "Block cache " << cache_id
+  str << "\n"
+      << "Block cache " << cache_id
       << " capacity: " << BytesToHumanString(cache_capacity)
       << " seed: " << hash_seed << " usage: " << BytesToHumanString(cache_usage)
       << " table_size: " << table_size << " occupancy: " << occupancy

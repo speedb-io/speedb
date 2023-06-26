@@ -5101,10 +5101,10 @@ TEST_F(SharedOptionsTest, EnableSpeedbFeaturesCF) {
   ASSERT_OK(db->CreateColumnFamily(cfo, "new_cf", &cf));
   ASSERT_EQ(db->GetOptions().write_buffer_manager->buffer_size(),
             2 * 512 * 1024 * 1024ul);
-  ASSERT_EQ(db->GetOptions().write_buffer_size,
-            std::min<size_t>(
-                db->GetOptions().write_buffer_manager->buffer_size() / 4,
-                64ul << 20));
+  ASSERT_EQ(
+      db->GetOptions().write_buffer_size,
+      std::min<size_t>(db->GetOptions().write_buffer_manager->buffer_size() / 4,
+                       64ul << 20));
   ASSERT_EQ(db->GetOptions().max_write_buffer_number, 32);
   ASSERT_EQ(db->GetOptions().min_write_buffer_number_to_merge,
             db->GetOptions().max_write_buffer_number - 1);

@@ -299,6 +299,8 @@ DEFINE_string(
     "\twaitforcompaction - pause until compaction is (probably) done\n"
     "\tflush - flush the memtable\n"
     "\tstats       -- Print DB stats\n"
+    "\ttable-readers-mem    -- Print table readers memory. excluding memory "
+    "used in block cache\n"
     "\tresetstats  -- Reset DB stats\n"
     "\tlevelstats  -- Print the number of files and bytes per level\n"
     "\tmemstats  -- Print memtable stats\n"
@@ -4021,6 +4023,9 @@ class Benchmark {
         CacheReportProblems();
       } else if (name == "stats") {
         PrintStats("rocksdb.stats");
+      } else if (name == "table-readers-mem") {
+        fprintf(stdout, "table-readers-mem");
+        PrintStats("rocksdb.estimate-table-readers-mem");
       } else if (name == "resetstats") {
         ResetStats();
       } else if (name == "verify") {

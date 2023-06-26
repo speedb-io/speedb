@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Enhancements
+* db_bench: add estimate-table-readers-mem benchmark which prints these stats.
+
 ## Fig v2.5.0 (06/14/2023)
 Based on RocksDB 8.1.1
 

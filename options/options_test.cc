@@ -5080,8 +5080,8 @@ TEST_F(SharedOptionsTest, EnableSpeedbFeaturesDB) {
 }
 
 TEST_F(SharedOptionsTest, EnableSpeedbFeaturesCF) {
-  DB* db1;
-  Options op1;
+  DB* db;
+  Options op;
   ColumnFamilyHandle* cf;
   ColumnFamilyOptions cfo;
 
@@ -5092,25 +5092,25 @@ TEST_F(SharedOptionsTest, EnableSpeedbFeaturesCF) {
   SharedOptions so(total_ram_size_bytes, total_threads, delayed_write_rate);
 
   // create the DB if it's not already present
-  op1.create_if_missing = true;
-  op1.EnableSpeedbFeatures(so);
-  ASSERT_OK(DB::Open(op1, "db1", &db1));
-  ASSERT_EQ(db1->GetOptions().write_buffer_manager->buffer_size(),
+  op.create_if_missing = true;
+  op.EnableSpeedbFeatures(so);
+  ASSERT_OK(DB::Open(op, "db", &db));
+  ASSERT_EQ(db->GetOptions().write_buffer_manager->buffer_size(),
             1 * 512 * 1024 * 1024ul);
   cfo.EnableSpeedbFeaturesCF(so);
-  ASSERT_OK(db1->CreateColumnFamily(cfo, "new_cf", &cf));
-  ASSERT_EQ(db1->GetOptions().write_buffer_manager->buffer_size(),
+  ASSERT_OK(db->CreateColumnFamily(cfo, "new_cf", &cf));
+  ASSERT_EQ(db->GetOptions().write_buffer_manager->buffer_size(),
             2 * 512 * 1024 * 1024ul);
-  ASSERT_EQ(db1->GetOptions().write_buffer_size,
+  ASSERT_EQ(db->GetOptions().write_buffer_size,
             std::min<size_t>(
-                db1->GetOptions().write_buffer_manager->buffer_size() / 4,
+                db->GetOptions().write_buffer_manager->buffer_size() / 4,
                 64ul << 20));
-  ASSERT_EQ(db1->GetOptions().max_write_buffer_number, 32);
-  ASSERT_EQ(db1->GetOptions().min_write_buffer_number_to_merge,
-            db1->GetOptions().max_write_buffer_number - 1);
-  ASSERT_EQ(db1->GetOptions().env, so.env);
+  ASSERT_EQ(db->GetOptions().max_write_buffer_number, 32);
+  ASSERT_EQ(db->GetOptions().min_write_buffer_number_to_merge,
+            db->GetOptions().max_write_buffer_number - 1);
+  ASSERT_EQ(db->GetOptions().env, so.env);
   const auto* sanitized_table_options =
-      op1.table_factory->GetOptions<BlockBasedTableOptions>();
+      op.table_factory->GetOptions<BlockBasedTableOptions>();
   ASSERT_EQ(sanitized_table_options->block_cache, so.cache);
 
   const auto sanitized_options_overrides =
@@ -5141,10 +5141,10 @@ TEST_F(SharedOptionsTest, EnableSpeedbFeaturesCF) {
     }
   }
 
-  ASSERT_OK(db1->DestroyColumnFamilyHandle(cf));
-  delete db1;
-  db1 = nullptr;
-  ASSERT_OK(DestroyDB("db1", op1, {{"new_cf", cfo}}));
+  ASSERT_OK(db->DestroyColumnFamilyHandle(cf));
+  delete db;
+  db = nullptr;
+  ASSERT_OK(DestroyDB("db", op, {{"new_cf", cfo}}));
 }
 
 }  // namespace ROCKSDB_NAMESPACE

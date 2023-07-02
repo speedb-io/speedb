@@ -1,6 +1,11 @@
 # Speedb Change Log 
 
 ## Unreleased
+
+### Enhancements
+* db_bench: add estimate-table-readers-mem benchmark which prints these stats.
+
+## Fig v2.5.0 (06/14/2023)
 Based on RocksDB 8.1.1
 
 ### New Features
@@ -39,6 +44,7 @@ Also switch to waiting a sec on the CV each time. This is required since a bg er
 * Always assume optimize_filters_for_memory=false when creating a paired bloom filter (#488)
 * spdb memtable use after free bug (#501)
 * db_bench: Create a WBM once for all db-s regardless of their use in different groups (#550)
+* Tompstone unit test faiure (#560)
 
 ### Miscellaneous
 * disable failing unit tests and paired bloom filter stress testing
@@ -198,7 +204,7 @@ Based on RocksDB 7.2.2
 
 ## Miscellaneous
 * LOG: Print write_buffer_manager size to LOG
-* LOG: change log header to SpeeDB
+* LOG: change log header to Speedb
 * LOG & db_bench: metadata_cache_options - print to LOG and support its configuration in db_bench
 * db_impl: use unique_ptr in DBImpl::Open for nicer memory management
 * Explicitly compare the SuperVersion pointer in column_family

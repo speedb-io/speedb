@@ -210,12 +210,6 @@ Status BuildTable(
     range_del_it->SeekToFirst();
     Slice last_tombstone_start_user_key{};
     c_iter.SeekToFirst();
-    RangeTombstone tombstone;
-    std::pair<InternalKey, Slice> kv;
-    if (range_del_it->Valid()) {
-      tombstone = range_del_it->Tombstone();
-      kv = tombstone.Serialize();
-    }
 
     for (; c_iter.Valid(); c_iter.Next()) {
       const Slice& key = c_iter.key();
@@ -230,6 +224,8 @@ Status BuildTable(
           ikey.type == kTypeValue) {
         bool was_skipped = false;
         while (range_del_it->Valid()) {
+          auto tombstone = range_del_it->Tombstone();
+          auto kv = tombstone.Serialize();
           if (icmp.Compare(kv.first, internal_key) > 0) {
             // the record smaller than the current range delete iter proceed as
             // usual
@@ -258,18 +254,14 @@ Status BuildTable(
                 SizeApproximationOptions approx_opts;
                 approx_opts.files_size_error_margin = 0.1;
                 meta->compensated_range_deletion_size +=
-                    versions->ApproximateSize(
-                        approx_opts, version, kv.first.Encode(),
-                        tombstone_end.Encode(), 0 /* start_level */,
-                        -1 /* end_level */, TableReaderCaller::kFlush);
+                    versions->ApproximateSize(approx_opts, version,
+                                              kv.first.Encode(),
+                                              tombstone_end.Encode(), 0, -1,
+                                              TableReaderCaller::kFlush);
               }
               last_tombstone_start_user_key = range_del_it->start_key();
             }
             range_del_it->Next();
-            if (range_del_it->Valid()) {
-              tombstone = range_del_it->Tombstone();
-              kv = tombstone.Serialize();
-            }
           }
         }
         if (was_skipped) {
@@ -302,8 +294,8 @@ Status BuildTable(
 
     if (s.ok()) {
       for (; range_del_it->Valid(); range_del_it->Next()) {
-        tombstone = range_del_it->Tombstone();
-        kv = tombstone.Serialize();
+        auto tombstone = range_del_it->Tombstone();
+        auto kv = tombstone.Serialize();
         builder->Add(kv.first.Encode(), kv.second);
         InternalKey tombstone_end = tombstone.SerializeEndKey();
         meta->UpdateBoundariesForRange(kv.first, tombstone_end, tombstone.seq_,

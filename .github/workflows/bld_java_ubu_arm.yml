@@ -4,7 +4,7 @@
 # The Mac OS server must have all the tools and software required for Speedb building to be installed
 
 
-name: Build on Mac 
+name: Build on Ubuntu Arm 
 
 on:
   workflow_call:
@@ -16,18 +16,16 @@ on:
 
 jobs:
   build-and-deploy:
-    runs-on: macOSi86 # a test self hosted runner on a vm with MacOS
+    runs-on: ubuArm64 # a test self hosted runner on a vm with MacOS
     steps:
     - name: 'Checkout GitHub Action'
       uses: actions/checkout@v3
 
     - name: 'build'
       run: |
-        export JAVA_HOME=/usr/local/opt/openjdk@11
-        export CPPFLAGS="-I/usr/local/opt/openjdk@11/include"
-        export CXXFLAGS="-I/usr/local/opt/openjdk@11/include"
-        ROCKSDB_DISABLE_JEMALLOC=1 PORTABLE=1 DEBUG_LEVEL=0 make -j 4 rocksdbjavastatic
+        export JAVA_HOME=$(jrunscript -e 'java.lang.System.out.println(java.lang.System.getProperty("java.home"));')
+        PORTABLE=1 DEBUG_LEVEL=0 make -j $(nproc) rocksdbjavastatic
     
     - name: 'upload artifacts'    #This step executed only when this workflow is called by another and a version is provided
       if: inputs.verSion != ' '
-      run: aws s3 cp java/target/libspeedbjni-osx-x86_64.jnilib s3://spdb-builder/jar_test/v${{ inputs.verSion }}/libspeedbjni-osx-x86_64.jnilib
+      run: aws s3 cp java/target/libspeedbjni-linux-aarch64.so s3://spdb-builder/jar_test/v${{ inputs.verSion }}/libspeedbjni-linux-aarch64.so

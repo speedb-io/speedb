@@ -1,8 +1,5 @@
-# This workflow will build Speedb on a Mac OS server
+# This workflow will build Speedb library on Mac i86 and ARM, Ubuntu i86 and Arm, Windows i86. Then build a jar and publish to Maven central 
 #
-# This workflow assumes the self hosted runner on a Windows machine is ready.
-# The Mac OS server must have all the tools and software required for Speedb building to be installed
-
 
 name: build all and publish jar
 
@@ -42,6 +39,18 @@ jobs:
     with:
       verSion: ${{ needs.pre_build.outputs.out1 }}     
   
+  Mac_ARM_Bld:
+    needs: pre_build
+    uses: ./.github/workflows/ci_macos_ARM.yml
+    with:
+      verSion: ${{ needs.pre_build.outputs.out1 }}  
+      
+  Ubu_ARM_Bld:
+    needs: pre_build
+    uses: ./.github/workflows/bld_java_ubu_arm.yml
+    with:
+      verSion: ${{ needs.pre_build.outputs.out1 }}  
+
   Windows_Bld:
     needs: pre_build
     uses: ./.github/workflows/ci_windows.yml
@@ -53,7 +62,7 @@ jobs:
       AWS_BUCKET: ${{ secrets.AWS_BUCKET }}
  
   Build_and_upload:
-    needs: [pre_build, Mac_i86_Bld, Windows_Bld]
+    needs: [pre_build, Mac_i86_Bld, Windows_Bld, Ubu_ARM_Bld]
     runs-on: ubu4mvn 
     env:
       VERSION_FILE: speedb/version.h
@@ -76,11 +85,15 @@ jobs:
       run: |
         export JAVA_HOME="$(jrunscript -e 'java.lang.System.out.println(java.lang.System.getProperty("java.home"));')"
         export LIB_JAVA_VERSION=11.0.17
-        export the_version=${{steps.find_version.outputs.verSion}}
+        export the_version=${{ steps.find_version.outputs.verSion }}
+        make DEBUG_LEVEL=0 -j 16 rocksdbjava
         cd java
         mkdir src/main/resources
-        aws s3 --profile nd7 cp --recursive s3://spdb-builder/jar_test/v$VERSION/ java/src/main/resources/
-        ls -l java/src/main/resources/
+        cp target/libspeedbjni-linux64.so src/main/resources
+        echo "aws s3 --profile nd7 cp --recursive s3://spdb-builder/jar_test/v$VERSION/ java/src/main/resources/"
+        sleep 180
+        aws s3 --profile nd7 cp --recursive s3://spdb-builder/jar_test/v$VERSION/ src/main/resources/
+        ls -l src/main/resources/
         cp ../../../../../templ/pom.xml .
         mvn versions:set -DnewVersion=$VERSION-SNAPSHOT
         mvn deploy -X -e -DskipTests

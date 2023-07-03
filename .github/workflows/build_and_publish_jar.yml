@@ -91,7 +91,6 @@ jobs:
         mkdir src/main/resources
         cp target/libspeedbjni-linux64.so src/main/resources
         echo "aws s3 --profile nd7 cp --recursive s3://spdb-builder/jar_test/v$VERSION/ java/src/main/resources/"
-        echo "waiting 3 minutes for you to upload your files"
         sleep 180
         aws s3 --profile nd7 cp --recursive s3://spdb-builder/jar_test/v$VERSION/ src/main/resources/
         ls -l src/main/resources/

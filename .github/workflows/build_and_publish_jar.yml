@@ -86,7 +86,7 @@ jobs:
         export JAVA_HOME="$(jrunscript -e 'java.lang.System.out.println(java.lang.System.getProperty("java.home"));')"
         export LIB_JAVA_VERSION=11.0.17
         export the_version=${{ steps.find_version.outputs.verSion }}
-        make DEBUG_LEVEL=0 -j 16 rocksdbjava
+        PORTABLE=1 DEBUG_LEVEL=0 make -j $(nproc) rocksdbjavastatic
         cd java
         mkdir src/main/resources
         cp target/libspeedbjni-linux64.so src/main/resources

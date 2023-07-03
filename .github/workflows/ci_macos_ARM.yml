@@ -1,0 +1,37 @@
+# This workflow will build Speedb on a Mac OS server
+#
+# This workflow assumes the self hosted runner on a Mac machine is ready.
+# The Mac OS server must have all the tools and software required for Speedb building to be installed
+
+
+name: ARM - Build on Mac
+
+on:
+  workflow_call:
+    inputs:
+      verSion:
+        required: true
+        type: string
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest # will be changed to a MAC when it will be available
+    steps:
+    - name: 'Checkout GitHub Action'
+      uses: actions/checkout@v3
+
+    - name: 'build'
+      run: |
+        echo "the built library java/target/libspeedbjni-osx-x86_64.jnilib needs to be uploaded to the folloing location"
+        echo "java/target/libspeedbjni-osx-arm64.jnilib s3://spdb-builder/jar_test/v${{ inputs.verSion }}/libspeedbjni-osx-arm64.jnilib"
+        
+        # export JAVA_HOME=/usr/local/opt/openjdk@11
+        # export CPPFLAGS="-I/usr/local/opt/openjdk@11/include"
+        # export CXXFLAGS="-I/usr/local/opt/openjdk@11/include"
+        # ROCKSDB_DISABLE_JEMALLOC=1 PORTABLE=1 DEBUG_LEVEL=0 make -j 4 rocksdbjavastatic
+    
+    - name: 'upload artifacts'    #This step executed only when this workflow is called by another and a version is provided
+      if: inputs.verSion != ' '
+      run: echo "nothing to do here until the real environment is ready"
+      #run: aws s3 cp java/target/libspeedbjni-osx-x86_64.jnilib s3://spdb-builder/jar_test/v${{ inputs.verSion }}/libspeedbjni-osx-x86_64.jnilib

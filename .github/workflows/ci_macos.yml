@@ -26,7 +26,7 @@ jobs:
         export JAVA_HOME=/usr/local/opt/openjdk@11
         export CPPFLAGS="-I/usr/local/opt/openjdk@11/include"
         export CXXFLAGS="-I/usr/local/opt/openjdk@11/include"
-        DEBUG_LEVEL=0 make -j 4 rocksdbjavastatic
+        ROCKSDB_DISABLE_JEMALLOC=1 PORTABLE=1 DEBUG_LEVEL=0 make -j 4 rocksdbjavastatic
     
     - name: 'upload artifacts'    #This step executed only when this workflow is called by another and a version is provided
       if: inputs.verSion != ' '

@@ -40,6 +40,7 @@ Also switch to waiting a sec on the CV each time. This is required since a bg er
 * spdb memtable use after free bug (#501)
 * db_bench: Create a WBM once for all db-s regardless of their use in different groups (#550)
 * Tompstone unit test faiure (#560)
+* build: Remove unused variables in unit tests (#581)
 
 ### Miscellaneous
 * disable failing unit tests and paired bloom filter stress testing

@@ -254,9 +254,7 @@ TEST_P(PrefetchTest, Basic) {
   // count the keys
   {
     auto iter = std::unique_ptr<Iterator>(db_->NewIterator(ReadOptions()));
-    int num_keys = 0;
     for (iter->SeekToFirst(); iter->Valid(); iter->Next()) {
-      num_keys++;
     }
     (void)num_keys;
   }
@@ -2434,7 +2432,6 @@ TEST_P(PrefetchTest, MultipleSeekWithPosixFS) {
     ASSERT_OK(s);
   }
 
-  int total_keys = 0;
   // Write the keys.
   {
     WriteBatch batch;
@@ -2442,7 +2439,6 @@ TEST_P(PrefetchTest, MultipleSeekWithPosixFS) {
     for (int j = 0; j < 5; j++) {
       for (int i = j * kNumKeys; i < (j + 1) * kNumKeys; i++) {
         ASSERT_OK(batch.Put(BuildKey(i), rnd.RandomString(1000)));
-        total_keys++;
       }
       ASSERT_OK(db_->Write(WriteOptions(), &batch));
       ASSERT_OK(Flush());

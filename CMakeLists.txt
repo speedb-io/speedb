@@ -1407,6 +1407,7 @@ if(WITH_TESTS)
         db/compaction/compaction_service_test.cc
         db/compaction/tiered_compaction_test.cc
         db/comparator_db_test.cc
+        db/configuration_validation_test.cc
         db/corruption_test.cc
         db/cuckoo_table_db_test.cc
         db/db_readonly_with_timestamp_test.cc

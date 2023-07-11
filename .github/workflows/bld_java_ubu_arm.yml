@@ -30,4 +30,7 @@ jobs:
     
     - name: 'upload artifacts'    #This step executed only when this workflow is called by another and a version is provided
       if: inputs.verSion != ' '
-      run: aws s3 cp java/target/libspeedbjni-linux-aarch64.so s3://spdb-builder/jar_test/v${{ inputs.verSion }}/libspeedbjni-linux-aarch64.so
+      #run: aws s3 cp java/target/libspeedbjni-linux-aarch64.so s3://spdb-builder/jar_test/v${{ inputs.verSion }}/libspeedbjni-linux-aarch64.so
+      run: |
+        aws s3 cp ~/spdb_lib/libspeedbjni-linux-aarch64.so s3://spdb-builder/jar_test/v${{ inputs.verSion }}/libspeedbjni-linux-aarch64.so
+        mv ~/spdb_lib/libspeedbjni-linux-aarch64.so{,_$(date '+%d_%m_%Y__%H_%M_%S')} date '+%d_%m_%Y__%H_%M_%S'

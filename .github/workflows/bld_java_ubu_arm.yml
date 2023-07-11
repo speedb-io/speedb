@@ -25,6 +25,7 @@ jobs:
       run: |
         export SPDB_LIB_DIR=~/spdb_lib &&  mkdir -p $SPDB_LIB_DIR
         docker run --rm -v $(readlink -f ${SPDB_LIB_DIR}):/out -i speedb-centos-builder ${{ github.ref_name }}
+        mv ~/spdb_lib/libspeedbjni-linux-aarch64.so{,_$(date '+%d_%m_%Y__%H_%M_%S')}
     
     - name: 'upload artifacts'    #This step executed only when this workflow is called by another and a version is provided
       if: inputs.verSion != ' '

@@ -85,7 +85,7 @@ jobs:
       run: |
         # export JAVA_HOME="$(jrunscript -e 'java.lang.System.out.println(java.lang.System.getProperty("java.home"));')"
         # export LIB_JAVA_VERSION=11.0.17
-        # export the_version=${{ steps.find_version.outputs.verSion }}
+        #export the_version=${{ steps.find_version.outputs.verSion }}
         # PORTABLE=1 DEBUG_LEVEL=0 make -j $(nproc) rocksdbjavastatic
         export SPDB_LIB_DIR=~/spdb_lib &&  mkdir -p $SPDB_LIB_DIR
         docker run --rm -v $(readlink -f ${SPDB_LIB_DIR}):/out -i speedb-centos-builder ${{ github.ref_name }}

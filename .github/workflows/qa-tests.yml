@@ -11,14 +11,15 @@ env:
 
 jobs:
   test:
-    runs-on: tst1
+    runs-on: ${{ matrix.runner }}
     container:
       image: ubuntu:18.04
-      #volumes:
-      #  - /var/tmp:/var/tmp # Needed for env_test's IoctlFriendlyTmpdir
-      #  - /tmp:/tmp # Needed for running tests on non-overlayfs (can't use /dev/shm because there's not enough RAM on the runner)
+      volumes:
+        - /var/tmp:/var/tmp # Needed for env_test's IoctlFriendlyTmpdir
+        - /tmp:/tmp # Needed for running tests on non-overlayfs (can't use /dev/shm because there's not enough RAM on the runner)
     strategy:
       matrix:
+        runner: [arm, x86]
         include:
           - name: Unit tests
             short_test: TMPD="$(mktemp -d /tmp/speedb.XXXX)" make -j$(nproc) check

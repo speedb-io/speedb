@@ -60,7 +60,7 @@ jobs:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       AWS_BUCKET: ${{ secrets.AWS_BUCKET }}
- 
+   
   Build_and_upload:
     needs: [pre_build, Mac_i86_Bld, Windows_Bld, Ubu_ARM_Bld]
     runs-on: ubu4mvn 
@@ -86,12 +86,10 @@ jobs:
         export JAVA_HOME="$(jrunscript -e 'java.lang.System.out.println(java.lang.System.getProperty("java.home"));')"
         export LIB_JAVA_VERSION=11.0.17
         export the_version=${{ steps.find_version.outputs.verSion }}
-        # PORTABLE=1 DEBUG_LEVEL=0 make -j $(nproc) rocksdbjavastatic
         export SPDB_LIB_DIR=~/spdb_lib &&  mkdir -p $SPDB_LIB_DIR
         docker run --rm -v $(readlink -f ${SPDB_LIB_DIR}):/out -i speedb-centos-builder ${{ github.ref_name }}
         cd java
         mkdir src/main/resources
-        #cp target/libspeedbjni-linux64.so src/main/resources
         cp $SPDB_LIB_DIR/libspeedbjni-linux64.so src/main/resources
         mv $SPDB_LIB_DIR/libspeedbjni-linux64.so{,_$(date '+%d_%m_%Y__%H_%M_%S')}
         echo "aws s3 --profile nd7 cp --recursive s3://spdb-builder/jar_test/v$VERSION/ java/src/main/resources/"

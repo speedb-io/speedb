@@ -23,9 +23,11 @@ jobs:
 
     - name: 'build'
       run: |
-        export JAVA_HOME=$(jrunscript -e 'java.lang.System.out.println(java.lang.System.getProperty("java.home"));')
-        PORTABLE=1 DEBUG_LEVEL=0 make -j $(nproc) rocksdbjavastatic
+        export SPDB_LIB_DIR=~/spdb_lib &&  mkdir -p $SPDB_LIB_DIR
+        docker run --rm -v $(readlink -f ${SPDB_LIB_DIR}):/out -i speedb-centos-builder ${{ github.ref_name }}
     
     - name: 'upload artifacts'    #This step executed only when this workflow is called by another and a version is provided
       if: inputs.verSion != ' '
-      run: aws s3 cp java/target/libspeedbjni-linux-aarch64.so s3://spdb-builder/jar_test/v${{ inputs.verSion }}/libspeedbjni-linux-aarch64.so
+      run: |
+        aws s3 cp ~/spdb_lib/libspeedbjni-linux-aarch64.so s3://spdb-builder/jar_test/v${{ inputs.verSion }}/libspeedbjni-linux-aarch64.so
+        mv ~/spdb_lib/libspeedbjni-linux-aarch64.so{,_$(date '+%d_%m_%Y__%H_%M_%S')}

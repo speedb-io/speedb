@@ -242,6 +242,7 @@ DECLARE_bool(compression_use_zstd_dict_trainer);
 DECLARE_string(checksum_type);
 DECLARE_string(env_uri);
 DECLARE_string(fs_uri);
+DECLARE_string(pinning_policy);
 DECLARE_uint64(ops_per_thread);
 DECLARE_uint64(log2_keys_per_lock);
 DECLARE_uint64(max_manifest_file_size);

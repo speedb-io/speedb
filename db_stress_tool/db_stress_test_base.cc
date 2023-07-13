@@ -21,6 +21,7 @@
 #include "rocksdb/filter_policy.h"
 #include "rocksdb/secondary_cache.h"
 #include "rocksdb/sst_file_manager.h"
+#include "rocksdb/table_pinning_policy.h"
 #include "rocksdb/types.h"
 #include "rocksdb/utilities/object_registry.h"
 #include "rocksdb/utilities/write_batch_with_index.h"
@@ -506,6 +507,12 @@ std::string StressTest::DebugString(const Slice& value,
 void StressTest::PrintStatistics() {
   if (dbstats) {
     fprintf(stdout, "STATISTICS:\n%s\n", dbstats->ToString().c_str());
+    const auto bbto =
+        options_.table_factory->GetOptions<BlockBasedTableOptions>();
+    if (bbto != nullptr && bbto->pinning_policy) {
+      fprintf(stdout, "PINNING STATISTICS:\n%s\n",
+              bbto->pinning_policy->ToString().c_str());
+    }
   }
   if (dbstats_secondaries) {
     fprintf(stdout, "Secondary instances STATISTICS:\n%s\n",
@@ -3098,6 +3105,19 @@ void InitializeOptionsFromFlags(
   block_based_options.max_auto_readahead_size = FLAGS_max_auto_readahead_size;
   block_based_options.num_file_reads_for_auto_readahead =
       FLAGS_num_file_reads_for_auto_readahead;
+  if (!FLAGS_pinning_policy.empty()) {
+    ConfigOptions config_options;
+    config_options.ignore_unknown_options = false;
+    config_options.ignore_unsupported_options = false;
+    Status s = TablePinningPolicy::CreateFromString(
+        config_options, FLAGS_pinning_policy,
+        &block_based_options.pinning_policy);
+    if (!s.ok()) {
+      fprintf(stderr, "Failed to create PinningPolicy: %s\n",
+              s.ToString().c_str());
+      exit(1);
+    }
+  }
   options.table_factory.reset(NewBlockBasedTableFactory(block_based_options));
 
   // Write-Buffer-Manager

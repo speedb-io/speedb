@@ -6,7 +6,7 @@ on:
 
 jobs:
   Fuzz:
-    runs-on: arm-tst1 #[self-hosted, ubuntu, asrunner]
+    runs-on: x86 #[self-hosted, ubuntu, asrunner]
     container:
       image: ubuntu:18.04
     strategy:

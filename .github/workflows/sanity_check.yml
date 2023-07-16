@@ -6,7 +6,7 @@ permissions:
 jobs:
   check:
     name: Check TARGETS file and code format
-    runs-on: tst1
+    runs-on: x86
     container:
       image: ubuntu:focal
     steps:

@@ -25,7 +25,7 @@ namespace ROCKSDB_NAMESPACE {
 struct HashSpdbRepOptions {
   static const char* kName() { return "HashSpdbRepOptions"; }
   size_t hash_bucket_count;
-  bool use_seek_parralel_threshold;
+  bool use_seek_parallel_threshold;
 };
 
 class HashSpdRepFactory : public MemTableRepFactory {

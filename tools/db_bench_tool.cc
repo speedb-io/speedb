@@ -1857,9 +1857,11 @@ DEFINE_int64(multiread_stride, 0,
 DEFINE_bool(multiread_batched, false, "Use the new MultiGet API");
 
 DEFINE_string(memtablerep, "speedb.HashSpdRepFactory", "");
+
 DEFINE_int64(hash_bucket_count, 1000000, "hash bucket count");
-DEFINE_bool(use_seek_parralel_threshold, true,
-            "if use seek parralel threshold .");
+DEFINE_bool(use_seek_parallel_threshold, true,
+            "if use seek parallel threshold .");
+
 DEFINE_bool(use_plain_table, false,
             "if use plain table instead of block-based table format");
 DEFINE_bool(use_cuckoo_table, false, "if use cuckoo table format");

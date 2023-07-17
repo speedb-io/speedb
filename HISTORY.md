@@ -7,6 +7,7 @@
 
 ### Bug Fixes
 * unit tests: fix GlobalWriteControllerTest.GlobalAndWBMSetupDelay by waiting for the memtable memory release.
+* spdb memtable: use_seek_parallel_threshold option parameter mishandled (#570)
 
 ## Fig v2.5.0 (06/14/2023)
 Based on RocksDB 8.1.1
@@ -49,7 +50,6 @@ Also switch to waiting a sec on the CV each time. This is required since a bg er
 * db_bench: Create a WBM once for all db-s regardless of their use in different groups (#550)
 * Tompstone unit test faiure (#560)
 * build: Remove unused variables in unit tests (#581)
-* Spdb memtable use seek parralel threshold option parameter mishandled (#570)
 
 ### Miscellaneous
 * disable failing unit tests and paired bloom filter stress testing

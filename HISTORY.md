@@ -7,6 +7,7 @@
 
 ### Bug Fixes
 * unit tests: fix GlobalWriteControllerTest.GlobalAndWBMSetupDelay by waiting for the memtable memory release.
+* spdb memtable: use_seek_parallel_threshold option parameter mishandled (#570)
 
 ## Fig v2.5.0 (06/14/2023)
 Based on RocksDB 8.1.1

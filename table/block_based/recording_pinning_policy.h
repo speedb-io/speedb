@@ -48,8 +48,8 @@ class RecordingPinningPolicy : public TablePinningPolicy {
   mutable std::atomic<size_t> attempts_counter_;
   std::atomic<size_t> pinned_counter_;
   std::atomic<size_t> active_counter_;
-  std::vector<std::atomic_size_t> usage_by_level_;
-  std::vector<std::atomic_size_t> usage_by_type_;
+  std::vector<std::atomic<uint64_t>> usage_by_level_;
+  std::vector<std::atomic<uint64_t>> usage_by_type_;
 };
 
 }  // namespace ROCKSDB_NAMESPACE

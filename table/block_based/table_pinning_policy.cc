@@ -42,7 +42,9 @@ class DefaultPinningPolicy : public RecordingPinningPolicy {
  protected:
   bool CheckPin(const TablePinningOptions& tpo, uint8_t type, size_t /*size*/,
                 size_t /*limit*/) const override {
-    if (type == kTopLevel) {
+    if (tpo.level < 0) {
+      return false;
+    } else if (type == kTopLevel) {
       return IsPinned(tpo, cache_options_.top_level_index_pinning,
                       pin_top_level_index_and_filter_ ? PinningTier::kAll
                                                       : PinningTier::kNone);
@@ -139,7 +141,7 @@ void RecordingPinningPolicy::UnPinData(std::unique_ptr<PinnedEntry>&& pinned) {
 
 void RecordingPinningPolicy::RecordPinned(int level, uint8_t type, size_t size,
                                           bool pinned) {
-  if (level > kNumLevels) level = kNumLevels;
+  if (level < 0 || level > kNumLevels) level = kNumLevels;
   if (type >= kNumTypes) type = kNumTypes - 1;
   if (pinned) {
     usage_by_level_[level] += size;

@@ -1901,6 +1901,8 @@ Status DBImpl::DelayWrite(uint64_t num_bytes, WriteThread& write_thread,
 // REQUIRES: mutex_ is held
 // REQUIRES: this thread is currently at the front of the writer queue
 void DBImpl::WriteBufferManagerStallWrites() {
+  ROCKS_LOG_WARN(immutable_db_options_.info_log,
+                 "Write-Buffer-Manager Stalls Writes");
   mutex_.AssertHeld();
   // First block future writer threads who want to add themselves to the queue
   // of WriteThread.
@@ -1914,6 +1916,9 @@ void DBImpl::WriteBufferManagerStallWrites() {
   // and block this thread by calling WBMStallInterface::Block().
   write_buffer_manager_->BeginWriteStall(wbm_stall_.get());
   wbm_stall_->Block();
+
+  ROCKS_LOG_WARN(immutable_db_options_.info_log,
+                 "Write-Buffer-Manager Stall Writes END");
 
   mutex_.Lock();
   // Stall has ended. Signal writer threads so that they can add

@@ -567,7 +567,7 @@ HashSpdRepFactory::HashSpdRepFactory(size_t hash_bucket_count) {
     options_.hash_bucket_count = 1000000;
   }
   RegisterOptions(&options_, &hash_spdb_factory_info);
-  Init();
+  //Init();
 }
 
 MemTableRep* HashSpdRepFactory::PreCreateMemTableRep() {

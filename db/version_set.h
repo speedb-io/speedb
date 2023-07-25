@@ -45,8 +45,8 @@
 #include "db/table_cache.h"
 #include "db/version_builder.h"
 #include "db/version_edit.h"
-#include "db/write_controller.h"
 #include "env/file_system_tracer.h"
+#include "rocksdb/write_controller.h"
 #if USE_COROUTINES
 #include "folly/experimental/coro/BlockingWait.h"
 #include "folly/experimental/coro/Collect.h"

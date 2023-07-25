@@ -13,8 +13,8 @@
 // limitations under the License.
 
 #include "db/db_test_util.h"
-#include "db/write_controller.h"
 #include "rocksdb/write_buffer_manager.h"
+#include "rocksdb/write_controller.h"
 
 namespace ROCKSDB_NAMESPACE {
 

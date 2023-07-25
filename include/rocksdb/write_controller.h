@@ -68,10 +68,13 @@ class WriteController {
   bool NeedSpeedupCompaction() const {
     return IsStopped() || NeedsDelay() || total_compaction_pressure_.load() > 0;
   }
+
+  // Should only be called by Speedb internally!
   // return how many microseconds the caller needs to sleep after the call
   // num_bytes: how many number of bytes to put into the DB.
   // Prerequisite: DB mutex held.
   uint64_t GetDelay(SystemClock* clock, uint64_t num_bytes);
+
   void set_delayed_write_rate(uint64_t write_rate) {
     std::lock_guard<std::mutex> lock(metrics_mu_);
     // avoid divide 0
@@ -117,6 +120,7 @@ class WriteController {
 
   uint64_t TEST_GetMapMinRate();
 
+  // Below 2 functions should only be called by Speedb internally!
   void WaitOnCV(std::function<bool()> continue_wait);
   void NotifyCV();
 

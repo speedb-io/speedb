@@ -8,6 +8,7 @@
 ### Bug Fixes
 * unit tests: fix GlobalWriteControllerTest.GlobalAndWBMSetupDelay by waiting for the memtable memory release.
 * spdb memtable: use_seek_parallel_threshold option parameter mishandled (#570)
+* build: Plug memtable global switch memtable stuck fix.  (#606)
 * build: Windows compilation fix (#568).
 * Logger: fix Block cache stats trace by spacing it from the last trace (#578).
 * WriteController: move the class to public interface which should have been done under #346.

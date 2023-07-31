@@ -693,8 +693,8 @@ static std::unordered_map<std::string, OptionTypeInfo> cs_result_type_info = {
         const auto status_obj = static_cast<const Status*>(addr);
         StatusSerializationAdapter adapter(*status_obj);
         std::string result;
-        Status s = OptionTypeInfo::SerializeType(opts, status_adapter_type_info,
-                                                 &adapter, &result);
+        Status s = OptionTypeInfo::TypeToString(
+            opts, "", status_adapter_type_info, &adapter, &result);
         *value = "{" + result + "}";
         return s;
       },
@@ -770,7 +770,13 @@ Status CompactionServiceInput::Write(std::string* output) {
   output->append(buf, sizeof(BinaryFormatVersion));
   ConfigOptions cf;
   cf.invoke_prepare_options = false;
-  return OptionTypeInfo::SerializeType(cf, cs_input_type_info, this, output);
+  std::unordered_map<std::string, std::string> options;
+  Status s =
+      OptionTypeInfo::SerializeType(cf, cs_input_type_info, this, &options);
+  if (s.ok()) {
+    output->append(cf.ToString("", options) + cf.delimiter);
+  }
+  return s;
 }
 
 Status CompactionServiceResult::Read(const std::string& data_str,
@@ -799,7 +805,13 @@ Status CompactionServiceResult::Write(std::string* output) {
   output->append(buf, sizeof(BinaryFormatVersion));
   ConfigOptions cf;
   cf.invoke_prepare_options = false;
-  return OptionTypeInfo::SerializeType(cf, cs_result_type_info, this, output);
+  std::unordered_map<std::string, std::string> options;
+  Status s =
+      OptionTypeInfo::SerializeType(cf, cs_result_type_info, this, &options);
+  if (s.ok()) {
+    output->append(cf.ToString("", options) + cf.delimiter);
+  }
+  return s;
 }
 
 #ifndef NDEBUG

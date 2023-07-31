@@ -57,6 +57,8 @@ class Customizable : public Configurable {
  public:
   ~Customizable() override {}
 
+  constexpr static const char* kTargetPropName() { return "target"; }
+
   // Returns the name of this class of Customizable
   virtual const char* Name() const = 0;
 
@@ -222,8 +224,9 @@ class Customizable : public Configurable {
   virtual const char* NickName() const { return ""; }
   //  Given a name (e.g. rocksdb.my.type.opt), returns the short name (opt)
   std::string GetOptionName(const std::string& long_name) const override;
-  std::string SerializeOptions(const ConfigOptions& options,
-                               const std::string& prefix) const override;
+  Status SerializeOptions(
+      const ConfigOptions& config_options,
+      std::unordered_map<std::string, std::string>* options) const override;
 };
 
 }  // namespace ROCKSDB_NAMESPACE

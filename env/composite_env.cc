@@ -391,7 +391,7 @@ Status CompositeEnv::NewDirectory(const std::string& name,
 
 namespace {
 static std::unordered_map<std::string, OptionTypeInfo> env_wrapper_type_info = {
-    {"target",
+    {Customizable::kTargetPropName(),
      OptionTypeInfo(0, OptionType::kUnknown, OptionVerificationType::kByName,
                     OptionTypeFlags::kDontSerialize)
          .SetParseFunc([](const ConfigOptions& opts,
@@ -482,14 +482,13 @@ Status CompositeEnvWrapper::PrepareOptions(const ConfigOptions& options) {
   return Env::PrepareOptions(options);
 }
 
-std::string CompositeEnvWrapper::SerializeOptions(
-    const ConfigOptions& config_options, const std::string& header) const {
-  auto options = CompositeEnv::SerializeOptions(config_options, header);
+Status CompositeEnvWrapper::SerializeOptions(
+    const ConfigOptions& config_options,
+    std::unordered_map<std::string, std::string>* options) const {
   if (target_.env != nullptr && target_.env != Env::Default()) {
-    options.append("target=");
-    options.append(target_.env->ToString(config_options));
+    options->insert({kTargetPropName(), target_.env->ToString(config_options)});
   }
-  return options;
+  return CompositeEnv::SerializeOptions(config_options, options);
 }
 
 EnvWrapper::EnvWrapper(Env* t) : target_(t) {
@@ -511,24 +510,14 @@ Status EnvWrapper::PrepareOptions(const ConfigOptions& options) {
   return Env::PrepareOptions(options);
 }
 
-std::string EnvWrapper::SerializeOptions(const ConfigOptions& config_options,
-                                         const std::string& header) const {
-  auto parent = Env::SerializeOptions(config_options, "");
-  if (config_options.IsShallow() || target_.env == nullptr ||
-      target_.env == Env::Default()) {
-    return parent;
-  } else {
-    std::string result = header;
-    if (!StartsWith(parent, OptionTypeInfo::kIdPropName())) {
-      result.append(OptionTypeInfo::kIdPropName()).append("=");
-    }
-    result.append(parent);
-    if (!EndsWith(result, config_options.delimiter)) {
-      result.append(config_options.delimiter);
-    }
-    result.append("target=").append(target_.env->ToString(config_options));
-    return result;
+Status EnvWrapper::SerializeOptions(
+    const ConfigOptions& config_options,
+    std::unordered_map<std::string, std::string>* options) const {
+  if (!config_options.IsShallow() && target_.env != nullptr &&
+      target_.env != Env::Default()) {
+    options->insert({kTargetPropName(), target_.env->ToString(config_options)});
   }
+  return Env::SerializeOptions(config_options, options);
 }
 
 }  // namespace ROCKSDB_NAMESPACE

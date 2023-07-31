@@ -103,6 +103,13 @@ struct ConfigOptions {
   bool IsCheckEnabled(SanityLevel level) const {
     return (level > SanityLevel::kSanityLevelNone && level <= sanity_level);
   }
+  // Converts the map of options to a single string representation
+  std::string ToString(
+      const std::string& prefix,
+      const std::unordered_map<std::string, std::string>& options) const;
+  // Converts the vector options to a single string representation
+  std::string ToString(char separator,
+                       const std::vector<std::string>& elems) const;
 };
 
 

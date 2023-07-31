@@ -343,8 +343,9 @@ class Configurable {
                                std::string* bad_name) const;
   // Internal method to serialize options (ToString)
   // Classes may override this value to change its behavior.
-  virtual std::string SerializeOptions(const ConfigOptions& config_options,
-                                       const std::string& header) const;
+  virtual Status SerializeOptions(
+      const ConfigOptions& config_options,
+      std::unordered_map<std::string, std::string>* options) const;
 
   //  Given a name (e.g. rocksdb.my.type.opt), returns the short name (opt)
   virtual std::string GetOptionName(const std::string& long_name) const;

@@ -46,27 +46,18 @@ Status Customizable::GetOption(const ConfigOptions& config_options,
   }
 }
 
-std::string Customizable::SerializeOptions(const ConfigOptions& config_options,
-                                           const std::string& prefix) const {
-  std::string result;
-  std::string parent;
-  std::string id = GetId();
-  if (!config_options.IsShallow() && !id.empty()) {
-    parent = Configurable::SerializeOptions(config_options, "");
-  }
-  if (parent.empty()) {
-    result = id;
-  } else {
-    result.append(prefix);
-    result.append(OptionTypeInfo::kIdPropName());
-    result.append("=");
-    result.append(id);
-    result.append(config_options.delimiter);
-    result.append(parent);
-  }
-  return result;
-}
+Status Customizable::SerializeOptions(
+    const ConfigOptions& config_options,
+    std::unordered_map<std::string, std::string>* options) const {
+  Status s;
+  auto id = GetId();
+  options->insert({OptionTypeInfo::kIdPropName(), id});
 
+  if (!config_options.IsShallow() && !id.empty()) {
+    s = Configurable::SerializeOptions(config_options, options);
+  }
+  return s;
+}
 
 bool Customizable::AreEquivalent(const ConfigOptions& config_options,
                                  const Configurable* other,

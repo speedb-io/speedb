@@ -456,29 +456,34 @@ Status ConfigurableHelper::ConfigureOption(
 
 Status Configurable::GetOptionString(const ConfigOptions& config_options,
                                      std::string* result) const {
+  std::unordered_map<std::string, std::string> options;
   assert(result);
   result->clear();
-  return ConfigurableHelper::SerializeOptions(config_options, *this, "",
-                                              result);
+  Status s =
+      ConfigurableHelper::SerializeOptions(config_options, *this, &options);
+  if (s.ok()) {
+    *result = config_options.ToString("", options);
+  }
+  return s;
 }
 
 std::string Configurable::ToString(const ConfigOptions& config_options,
                                    const std::string& prefix) const {
-  std::string result = SerializeOptions(config_options, prefix);
-  if (result.empty() || result.find('=') == std::string::npos) {
-    return result;
+  std::unordered_map<std::string, std::string> options;
+  Status status = SerializeOptions(config_options, &options);
+  Status s = SerializeOptions(config_options, &options);
+  assert(s.ok());
+  if (s.ok()) {
+    return config_options.ToString(prefix, options);
   } else {
-    return "{" + result + "}";
+    return "";
   }
 }
 
-std::string Configurable::SerializeOptions(const ConfigOptions& config_options,
-                                           const std::string& header) const {
-  std::string result;
-  Status s = ConfigurableHelper::SerializeOptions(config_options, *this, header,
-                                                  &result);
-  assert(s.ok());
-  return result;
+Status Configurable::SerializeOptions(
+    const ConfigOptions& config_options,
+    std::unordered_map<std::string, std::string>* options) const {
+  return ConfigurableHelper::SerializeOptions(config_options, *this, options);
 }
 
 Status Configurable::GetOption(const ConfigOptions& config_options,
@@ -517,45 +522,16 @@ Status ConfigurableHelper::GetOption(const ConfigOptions& config_options,
   return Status::NotFound("Cannot find option: ", short_name);
 }
 
-Status ConfigurableHelper::SerializeOptions(const ConfigOptions& config_options,
-                                            const Configurable& configurable,
-                                            const std::string& prefix,
-                                            std::string* result) {
-  assert(result);
+Status ConfigurableHelper::SerializeOptions(
+    const ConfigOptions& config_options, const Configurable& configurable,
+    std::unordered_map<std::string, std::string>* options) {
+  assert(options);
   for (auto const& opt_iter : configurable.options_) {
     if (opt_iter.type_map != nullptr) {
-      for (const auto& map_iter : *(opt_iter.type_map)) {
-        const auto& opt_name = map_iter.first;
-        const auto& opt_info = map_iter.second;
-        if (opt_info.ShouldSerialize()) {
-          std::string value;
-          Status s;
-          if (!config_options.mutable_options_only) {
-            s = opt_info.Serialize(config_options, prefix + opt_name,
-                                   opt_iter.opt_ptr, &value);
-          } else if (opt_info.IsMutable()) {
-            ConfigOptions copy = config_options;
-            copy.mutable_options_only = false;
-            s = opt_info.Serialize(copy, prefix + opt_name, opt_iter.opt_ptr,
-                                   &value);
-          } else if (opt_info.IsConfigurable()) {
-            // If it is a Configurable and we are either printing all of the
-            // details or not printing only the name, this option should be
-            // included in the list
-            if (config_options.IsDetailed() ||
-                !opt_info.IsEnabled(OptionTypeFlags::kStringNameOnly)) {
-              s = opt_info.Serialize(config_options, prefix + opt_name,
-                                     opt_iter.opt_ptr, &value);
-            }
-          }
-          if (!s.ok()) {
-            return s;
-          } else if (!value.empty()) {
-            // <prefix><opt_name>=<value><delimiter>
-            result->append(prefix + opt_name + "=" + value +
-                           config_options.delimiter);
-          }
-        }
+      Status s = OptionTypeInfo::SerializeType(
+          config_options, *(opt_iter.type_map), opt_iter.opt_ptr, options);
+      if (!s.ok()) {
+        return s;
       }
     }
   }

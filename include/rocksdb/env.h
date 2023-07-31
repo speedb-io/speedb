@@ -1643,8 +1643,9 @@ class EnvWrapper : public Env {
     target_.env->SanitizeEnvOptions(env_opts);
   }
   Status PrepareOptions(const ConfigOptions& options) override;
-  std::string SerializeOptions(const ConfigOptions& config_options,
-                               const std::string& header) const override;
+  Status SerializeOptions(
+      const ConfigOptions& config_options,
+      std::unordered_map<std::string, std::string>* options) const override;
 
  private:
   Target target_;

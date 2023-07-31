@@ -6,7 +6,7 @@ permissions:
 jobs:
   check:
     name: Check TARGETS file and code format
-    runs-on: ubuntu:20.04
+    runs-on: ubuntu-20.04
     #runs-on: [self-hosted, ubuntu, asrunner]
     container:
       image: ubuntu:focal

@@ -13,7 +13,7 @@ jobs:
     steps:
     
     - name: pre
-      run: sudo apt update && apt install -y sudo git make clang build-essential clang-format wget
+      run: sudo apt update && sudo apt install -y git make clang build-essential clang-format wget
     
     - name: Checkout feature branch
       uses: actions/checkout@v2

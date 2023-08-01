@@ -1130,29 +1130,13 @@ Status OptionTypeInfo::SerializeType(
     const std::unordered_map<std::string, OptionTypeInfo>& type_map,
     const void* opt_addr,
     std::unordered_map<std::string, std::string>* options) {
-  Status status;
   for (const auto& iter : type_map) {
     std::string single;
     const auto& opt_name = iter.first;
     const auto& opt_info = iter.second;
     if (opt_info.ShouldSerialize()) {
-      if (!config_options.mutable_options_only) {
-        status =
-            opt_info.Serialize(config_options, opt_name, opt_addr, &single);
-      } else if (opt_info.IsMutable()) {
-        ConfigOptions copy = config_options;
-        copy.mutable_options_only = false;
-        status = opt_info.Serialize(copy, opt_name, opt_addr, &single);
-      } else if (opt_info.IsConfigurable()) {
-        // If it is a Configurable and we are either printing all of the
-        // details or not printing only the name, this option should be
-        // included in the list
-        if (config_options.IsDetailed() ||
-            !opt_info.IsEnabled(OptionTypeFlags::kStringNameOnly)) {
-          status =
-              opt_info.Serialize(config_options, opt_name, opt_addr, &single);
-        }
-      }
+      Status status = ConfigurableHelper::SerializeOption(
+          config_options, opt_name, opt_info, opt_addr, &single);
       if (!status.ok()) {
         return status;
       } else if (!single.empty()) {
@@ -1160,7 +1144,7 @@ Status OptionTypeInfo::SerializeType(
       }
     }
   }
-  return status;
+  return Status::OK();
 }
 
 Status OptionTypeInfo::SerializeStruct(

@@ -301,13 +301,15 @@ class FullTypedCacheInterface
   inline Status InsertFull(
       const Slice& key, TValuePtr value, size_t charge,
       TypedHandle** handle = nullptr, Priority priority = Priority::LOW,
-      CacheTier lowest_used_cache_tier = CacheTier::kNonVolatileBlockTier) {
+      CacheTier lowest_used_cache_tier = CacheTier::kNonVolatileBlockTier,
+      Cache::ItemOwnerId item_owner_id = Cache::kUnknownItemOwnerId) {
     auto untyped_handle = reinterpret_cast<Handle**>(handle);
     auto helper = lowest_used_cache_tier == CacheTier::kNonVolatileBlockTier
                       ? GetFullHelper()
                       : GetBasicHelper();
-    return this->cache_->Insert(key, UpCastValue(value), helper, charge,
-                                untyped_handle, priority);
+    return this->cache_->InsertWithOwnerId(key, UpCastValue(value), helper,
+                                           charge, item_owner_id,
+                                           untyped_handle, priority);
   }
 
   // Like SecondaryCache::InsertSaved, with SecondaryCache compatibility

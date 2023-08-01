@@ -20,6 +20,7 @@
 #include "db/table_properties_collector.h"
 #include "file/writable_file_writer.h"
 #include "options/cf_options.h"
+#include "rocksdb/cache.h"
 #include "rocksdb/options.h"
 #include "rocksdb/table_properties.h"
 #include "table/unique_id_impl.h"
@@ -90,6 +91,8 @@ struct TableReaderOptions {
 
   // Known unique_id or {}, kNullUniqueId64x2 means unknown
   UniqueId64x2 unique_id;
+
+  Cache::ItemOwnerId cache_owner_id = Cache::kUnknownItemOwnerId;
 };
 
 struct TableBuilderOptions {

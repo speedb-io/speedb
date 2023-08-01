@@ -174,11 +174,19 @@ class ShardedCache : public ShardedCacheBase {
   Status Insert(const Slice& key, ObjectPtr obj, const CacheItemHelper* helper,
                 size_t charge, Handle** handle = nullptr,
                 Priority priority = Priority::LOW) override {
+    return InsertWithOwnerId(key, obj, helper, charge, kUnknownItemOwnerId,
+                             handle, priority);
+  }
+
+  Status InsertWithOwnerId(const Slice& key, ObjectPtr obj,
+                           const CacheItemHelper* helper, size_t charge,
+                           ItemOwnerId item_owner_id, Handle** handle = nullptr,
+                           Priority priority = Priority::LOW) override {
     assert(helper);
     HashVal hash = CacheShard::ComputeHash(key);
     auto h_out = reinterpret_cast<HandleImpl**>(handle);
-    return GetShard(hash).Insert(key, hash, obj, helper, charge, h_out,
-                                 priority);
+    return GetShard(hash).InsertWithOwnerId(key, hash, obj, helper, charge,
+                                            item_owner_id, h_out, priority);
   }
 
   Handle* CreateStandalone(const Slice& key, ObjectPtr obj,
@@ -235,6 +243,22 @@ class ShardedCache : public ShardedCacheBase {
       const std::function<void(const Slice& key, ObjectPtr value, size_t charge,
                                const CacheItemHelper* helper)>& callback,
       const ApplyToAllEntriesOptions& opts) override {
+    auto callback_with_owner_id =
+        [&callback](const Slice& key, ObjectPtr obj, size_t charge,
+                    const CacheItemHelper* helper,
+                    Cache::ItemOwnerId /* item_owner_id */) {
+          callback(key, obj, charge, helper);
+        };
+
+    ApplyToAllEntriesWithOwnerId(callback_with_owner_id, opts);
+  }
+
+  void ApplyToAllEntriesWithOwnerId(
+      const std::function<void(const Slice& key, ObjectPtr obj, size_t charge,
+                               const CacheItemHelper* helper,
+                               Cache::ItemOwnerId item_owner_id)>&
+          callback_with_owner_id,
+      const ApplyToAllEntriesOptions& opts) override {
     uint32_t num_shards = GetNumShards();
     // Iterate over part of each shard, rotating between shards, to
     // minimize impact on latency of concurrent operations.
@@ -248,7 +272,8 @@ class ShardedCache : public ShardedCacheBase {
       remaining_work = false;
       for (uint32_t i = 0; i < num_shards; i++) {
         if (states[i] != SIZE_MAX) {
-          shards_[i].ApplyToSomeEntries(callback, aepl, &states[i]);
+          shards_[i].ApplyToSomeEntriesWithOwnerId(callback_with_owner_id, aepl,
+                                                   &states[i]);
           remaining_work |= states[i] != SIZE_MAX;
         }
       }

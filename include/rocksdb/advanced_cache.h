@@ -9,7 +9,10 @@
 
 #include <cstdint>
 #include <functional>
+#include <limits>
+#include <list>
 #include <memory>
+#include <mutex>
 #include <string>
 
 #include "rocksdb/cache.h"
@@ -64,6 +67,16 @@ class Cache {
   // cache_index_and_filter_blocks_with_high_priority is
   // not set. The "bottom" priority level is for BlobDB's blob values.
   enum class Priority { HIGH, LOW, BOTTOM };
+
+  // An (optional) opaque id of an owner of an item in the cache.
+  // This id allows per-owner accounting of the total charge of its
+  // entities in the cache.
+  using ItemOwnerId = uint16_t;
+
+  static constexpr ItemOwnerId kUnknownItemOwnerId = 0U;
+  static constexpr ItemOwnerId kMinItemOnwerId = 1U;
+  static constexpr ItemOwnerId kMaxItemOnwerId =
+      std::numeric_limits<ItemOwnerId>::max();
 
   // A set of callbacks to allow objects in the primary block cache to be
   // be persisted in a secondary cache. The purpose of the secondary cache
@@ -249,6 +262,17 @@ class Cache {
                         Handle** handle = nullptr,
                         Priority priority = Priority::LOW) = 0;
 
+  // Same as Insert() but includes the inserted item's owner id
+  // Implemented to avoid having all derived classes to implement it.
+  // Only classes that support per-item accounting will override this method.
+  virtual Status InsertWithOwnerId(const Slice& key, ObjectPtr obj,
+                                   const CacheItemHelper* helper, size_t charge,
+                                   ItemOwnerId /* item_owner_id */,
+                                   Handle** handle = nullptr,
+                                   Priority priority = Priority::LOW) {
+    return Insert(key, obj, helper, charge, handle, priority);
+  }
+
   // Similar to Insert, but used for creating cache entries that cannot
   // be found with Lookup, such as for memory charging purposes. The
   // key is needed for cache sharding purposes.
@@ -389,6 +413,23 @@ class Cache {
                                const CacheItemHelper* helper)>& callback,
       const ApplyToAllEntriesOptions& opts) = 0;
 
+  // Same as ApplyToAllEntries() but passes the item's owner id in the callback.
+  virtual void ApplyToAllEntriesWithOwnerId(
+      const std::function<void(const Slice& key, ObjectPtr obj, size_t charge,
+                               const CacheItemHelper* helper,
+                               Cache::ItemOwnerId item_owner_id)>&
+          callback_with_owner_id,
+      const ApplyToAllEntriesOptions& opts) {
+    auto callback = [&callback_with_owner_id](const Slice& key, ObjectPtr obj,
+                                              size_t charge,
+                                              const CacheItemHelper* helper) {
+      callback_with_owner_id(key, obj, charge, helper,
+                             Cache::kUnknownItemOwnerId);
+    };
+
+    return ApplyToAllEntries(callback, opts);
+  }
+
   // Remove all entries.
   // Prerequisite: no entry is referenced.
   virtual void EraseUnRefEntries() = 0;
@@ -517,9 +558,39 @@ class Cache {
   // or destruction, guaranteed before or after any thread-shared operations.
   void SetEvictionCallback(EvictionCallback&& fn);
 
+  // Allocates the next unique owner id for items in this cache.
+  // The method is thread-safe
+  ItemOwnerId GetNextItemOwnerId();
+
+  // Frees the specified item owner id.
+  // On return, will set the owner id to kUnknownItemOwnerId
+  // The method is thread-safe
+  void DiscardItemOwnerId(ItemOwnerId*);
+
  protected:
   std::shared_ptr<MemoryAllocator> memory_allocator_;
   EvictionCallback eviction_callback_;
+
+ public:
+  // Public so it is accessible from the unit tests (Just a constant)
+  static constexpr size_t kMaxFreeItemOwnersIdListSize = 10000U;
+
+ private:
+  // The items owner id allocator class
+  // The public methods of this class are thread-safe
+  class ItemOwnerIdAllocator {
+   public:
+    ItemOwnerId Allocate();
+    void Free(ItemOwnerId* id);
+
+   private:
+    ItemOwnerId next_item_owner_id_ = kMinItemOnwerId;
+    bool has_wrapped_around_ = false;
+    std::mutex free_ids_mutex_;
+    std::list<ItemOwnerId> free_ids_;
+  };
+
+  ItemOwnerIdAllocator owner_id_allocator_;
 };
 
 // A wrapper around Cache that can easily be extended with instrumentation,

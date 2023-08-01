@@ -88,6 +88,16 @@ struct BlockCacheEntryStatsMapKeys {
   static std::string UsedPercent(CacheEntryRole);
 };
 
+// For use with `GetMapProperty()` for property
+// `DB::Properties::kBlockCacheCfStats` and
+// 'DB::Properties::kFastBlockCacheCfStats' On success, the map will be
+// populated with all keys that can be obtained from these functions.
+struct BlockCacheCfStatsMapKeys {
+  static const std::string& CfName();
+  static const std::string& CacheId();
+  static std::string UsedBytes(CacheEntryRole);
+};
+
 extern const bool kDefaultToAdaptiveMutex;
 
 enum CacheMetadataChargePolicy {

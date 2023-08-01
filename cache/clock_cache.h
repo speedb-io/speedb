@@ -614,6 +614,12 @@ class ALIGN_AS(CACHE_LINE_SIZE) ClockCacheShard final : public CacheShardBase {
                 Cache::ObjectPtr value, const Cache::CacheItemHelper* helper,
                 size_t charge, HandleImpl** handle, Cache::Priority priority);
 
+  Status InsertWithOwnerId(const Slice& key, const UniqueId64x2& hashed_key,
+                           Cache::ObjectPtr value,
+                           const Cache::CacheItemHelper* helper, size_t charge,
+                           Cache::ItemOwnerId /* item_owner_id */,
+                           HandleImpl** handle, Cache::Priority priority);
+
   HandleImpl* CreateStandalone(const Slice& key, const UniqueId64x2& hashed_key,
                                Cache::ObjectPtr obj,
                                const Cache::CacheItemHelper* helper,
@@ -643,10 +649,11 @@ class ALIGN_AS(CACHE_LINE_SIZE) ClockCacheShard final : public CacheShardBase {
 
   size_t GetTableAddressCount() const;
 
-  void ApplyToSomeEntries(
-      const std::function<void(const Slice& key, Cache::ObjectPtr obj,
+  void ApplyToSomeEntriesWithOwnerId(
+      const std::function<void(const Slice& key, Cache::ObjectPtr value,
                                size_t charge,
-                               const Cache::CacheItemHelper* helper)>& callback,
+                               const Cache::CacheItemHelper* helper,
+                               Cache::ItemOwnerId item_owner_id)>& callback,
       size_t average_entries_per_lock, size_t* state);
 
   void EraseUnRefEntries();

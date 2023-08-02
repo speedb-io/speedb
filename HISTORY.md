@@ -1,7 +1,11 @@
 # Speedb Change Log 
 
 ## Unreleased
+
+### New Features
+* Snapshot optimization - The most important information inside a snapshot is its Sequence number, which allows the compaction to know if the key-value should be deleted or not. The sequence number is being changed when modification happens in the db. This feature allows the db to take a snapshot without acquiring db mutex when the last snapshot has the same sequence number as a new one. In transactional db with mostly read operations, it should improve performance when used with multithreaded environment and as well other scenarios of taking large amount of snapshots with mostly read operations.
 * Add a TablePinningPolicy to the BlockBasedTableOptions.  This class controls when blocks should be pinned in memory for a block based table.  The default behavior uses the MetadataCacheOptions to control pinning and behaves identical to the previous releases. 
+
 ### Enhancements
 * db_bench: add estimate-table-readers-mem benchmark which prints these stats.
 

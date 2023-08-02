@@ -12,17 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-speedb_SOURCES = 																			\
-		   speedb_registry.cc															\
-		   memtable/hash_spd_rep.cc	        							\
- 			 paired_filter/speedb_paired_bloom.cc						\
- 			 paired_filter/speedb_paired_bloom_internal.cc	\
+speedb_SOURCES = \
+     speedb_registry.cc                            \
+     memtable/hash_spd_rep.cc                      \
+     paired_filter/speedb_paired_bloom.cc          \
+     paired_filter/speedb_paired_bloom_internal.cc \
+     pinning_policy/scoped_pinning_policy.cc       \
 
 
 speedb_FUNC = register_SpeedbPlugins
 
-speedb_HEADERS = 																  								\
-										paired_filter/speedb_paired_bloom.h						\
+speedb_HEADERS = \
+     paired_filter/speedb_paired_bloom.h           \
+     pinning_policy/scoped_pinning_policy.h        \
+
+speedb_TESTS =   \
+     speedb_customizable_test.cc                   \
+     paired_filter/speedb_db_bloom_filter_test.cc  \
+     pinning_policy/scoped_pinning_policy_test.cc  \
 
 speedb_TESTS = 																										\
      speedb_customizable_test.cc																	\

@@ -14,7 +14,8 @@
 set(speedb_SOURCES
       speedb_registry.cc
       memtable/hash_spd_rep.cc
- 		  paired_filter/speedb_paired_bloom.cc
-      paired_filter/speedb_paired_bloom_internal.cc)
+      paired_filter/speedb_paired_bloom.cc
+      paired_filter/speedb_paired_bloom_internal.cc
+      pinning_policy/scoped_pinning_policy.cc)
 
 set(speedb_FUNC register_SpeedbPlugins)

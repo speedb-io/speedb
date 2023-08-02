@@ -8,10 +8,15 @@
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 
 #pragma once
+#include <mutex>
 #include <vector>
 
 #include "db/dbformat.h"
+#ifdef SPEEDB_SNAP_OPTIMIZATION
+#include "folly/concurrency/AtomicSharedPtr.h"
+#endif
 #include "rocksdb/db.h"
+#include "rocksdb/types.h"
 #include "util/autovector.h"
 
 namespace ROCKSDB_NAMESPACE {
@@ -22,17 +27,39 @@ class SnapshotList;
 // Each SnapshotImpl corresponds to a particular sequence number.
 class SnapshotImpl : public Snapshot {
  public:
+  int64_t unix_time_;
+  uint64_t timestamp_;
+  // Will this snapshot be used by a Transaction to do write-conflict checking?
+  bool is_write_conflict_boundary_;
+
+  SnapshotImpl() {}
+
+  SnapshotImpl(SnapshotImpl* s) {
+    number_ = s->number_;
+    unix_time_ = s->unix_time_;
+    is_write_conflict_boundary_ = s->is_write_conflict_boundary_;
+    timestamp_ = s->timestamp_;
+  }
+
+#ifdef SPEEDB_SNAP_OPTIMIZATION
+  std::atomic_uint64_t refcount = {1};
+  std::shared_ptr<SnapshotImpl> cached_snapshot = nullptr;
+
+  struct Deleter {
+    inline void operator()(SnapshotImpl* snap) const;
+  };
+  // Will this snapshot be used by a Transaction to do write-conflict checking?
+#endif
   SequenceNumber number_;  // const after creation
   // It indicates the smallest uncommitted data at the time the snapshot was
   // taken. This is currently used by WritePrepared transactions to limit the
   // scope of queries to IsInSnapshot.
   SequenceNumber min_uncommitted_ = kMinUnCommittedSeq;
 
-  SequenceNumber GetSequenceNumber() const override { return number_; }
-
   int64_t GetUnixTime() const override { return unix_time_; }
 
   uint64_t GetTimestamp() const override { return timestamp_; }
+  SequenceNumber GetSequenceNumber() const override { return number_; }
 
  private:
   friend class SnapshotList;
@@ -41,19 +68,19 @@ class SnapshotImpl : public Snapshot {
   SnapshotImpl* prev_;
   SnapshotImpl* next_;
 
-  SnapshotList* list_;  // just for sanity checks
-
-  int64_t unix_time_;
-
-  uint64_t timestamp_;
-
-  // Will this snapshot be used by a Transaction to do write-conflict checking?
-  bool is_write_conflict_boundary_;
+  SnapshotList* list_;
 };
 
 class SnapshotList {
  public:
-  SnapshotList() {
+  mutable std::mutex lock_;
+  SystemClock* clock_;
+#ifdef SPEEDB_SNAP_OPTIMIZATION
+  bool deleteitem_ = false;
+  folly::atomic_shared_ptr<SnapshotImpl> last_snapshot_;
+#endif
+  SnapshotList(SystemClock* clock) {
+    clock_ = clock;
     list_.prev_ = &list_;
     list_.next_ = &list_;
     list_.number_ = 0xFFFFFFFFL;  // placeholder marker, for debugging
@@ -63,6 +90,29 @@ class SnapshotList {
     list_.timestamp_ = 0;
     list_.is_write_conflict_boundary_ = false;
     count_ = 0;
+#ifdef SPEEDB_SNAP_OPTIMIZATION
+    last_snapshot_ = nullptr;
+#endif
+  }
+  SnapshotImpl* RefSnapshot([[maybe_unused]] bool is_write_conflict_boundary,
+                            [[maybe_unused]] SequenceNumber last_seq) {
+#ifdef SPEEDB_SNAP_OPTIMIZATION
+    std::shared_ptr<SnapshotImpl> shared_snap = last_snapshot_;
+    if (shared_snap && shared_snap->GetSequenceNumber() == last_seq &&
+        shared_snap->is_write_conflict_boundary_ ==
+            is_write_conflict_boundary) {
+      SnapshotImpl* snapshot = new SnapshotImpl;
+      clock_->GetCurrentTime(&snapshot->unix_time_)
+          .PermitUncheckedError();  // Ignore error
+      snapshot->cached_snapshot = shared_snap;
+      logical_count_.fetch_add(1);
+      shared_snap->refcount.fetch_add(1);
+      snapshot->number_ = shared_snap->GetSequenceNumber();
+      snapshot->is_write_conflict_boundary_ = is_write_conflict_boundary;
+      return snapshot;
+    }
+#endif
+    return nullptr;
   }
 
   // No copy-construct.
@@ -81,11 +131,48 @@ class SnapshotList {
     return list_.prev_;
   }
 
-  SnapshotImpl* New(SnapshotImpl* s, SequenceNumber seq, uint64_t unix_time,
-                    bool is_write_conflict_boundary,
+#ifdef SPEEDB_SNAP_OPTIMIZATION
+  SnapshotImpl* NewSnapRef(SnapshotImpl* s) {
+    // user snapshot is a reference to the snapshot inside the SnapshotList
+    // Unfortunatly right now the snapshot api cannot return shared_ptr to the
+    // user so a deep copy should be created
+    // s is the original snapshot that is being stored in the SnapshotList
+    SnapshotImpl* user_snapshot = new SnapshotImpl(s);
+    auto new_last_snapshot =
+        std::shared_ptr<SnapshotImpl>(s, SnapshotImpl::Deleter{});
+    // may call Deleter
+    last_snapshot_ = new_last_snapshot;
+    user_snapshot->cached_snapshot = last_snapshot_;
+    return user_snapshot;
+  }
+#endif
+  bool UnRefSnapshot([[maybe_unused]] const SnapshotImpl* snapshot) {
+#ifdef SPEEDB_SNAP_OPTIMIZATION
+    SnapshotImpl* snap = const_cast<SnapshotImpl*>(snapshot);
+    logical_count_.fetch_sub(1);
+    size_t cnt = snap->cached_snapshot->refcount.fetch_sub(1);
+    if (cnt < 2) {
+      last_snapshot_.compare_exchange_weak(snap->cached_snapshot, nullptr);
+    }
+    delete snap;
+    if (!deleteitem_) {
+      // item has not been deleted from SnapshotList
+      return true;
+    }
+#endif
+    return false;
+  }
+
+  SnapshotImpl* New(SequenceNumber seq, bool is_write_conflict_boundary,
                     uint64_t ts = std::numeric_limits<uint64_t>::max()) {
+    SnapshotImpl* s = new SnapshotImpl;
+#ifdef SPEEDB_SNAP_OPTIMIZATION
+    std::unique_lock<std::mutex> l(lock_);
+    logical_count_.fetch_add(1);
+#endif
+    clock_->GetCurrentTime(&s->unix_time_)
+        .PermitUncheckedError();  // Ignore error
     s->number_ = seq;
-    s->unix_time_ = unix_time;
     s->timestamp_ = ts;
     s->is_write_conflict_boundary_ = is_write_conflict_boundary;
     s->list_ = this;
@@ -94,15 +181,25 @@ class SnapshotList {
     s->prev_->next_ = s;
     s->next_->prev_ = s;
     count_++;
+#ifdef SPEEDB_SNAP_OPTIMIZATION
+    l.unlock();
+    return NewSnapRef(s);
+#endif
     return s;
   }
 
   // Do not responsible to free the object.
   void Delete(const SnapshotImpl* s) {
+#ifdef SPEEDB_SNAP_OPTIMIZATION
+    std::unique_lock<std::mutex> l(lock_);
+    deleteitem_ = false;
+#else
     assert(s->list_ == this);
+    count_--;
     s->prev_->next_ = s->next_;
     s->next_->prev_ = s->prev_;
-    count_--;
+    delete s;
+#endif
   }
 
   // retrieve all snapshot numbers up until max_seq. They are sorted in
@@ -118,6 +215,9 @@ class SnapshotList {
   void GetAll(std::vector<SequenceNumber>* snap_vector,
               SequenceNumber* oldest_write_conflict_snapshot = nullptr,
               const SequenceNumber& max_seq = kMaxSequenceNumber) const {
+#ifdef SPEEDB_SNAP_OPTIMIZATION
+    std::scoped_lock<std::mutex> l(lock_);
+#endif
     std::vector<SequenceNumber>& ret = *snap_vector;
     // So far we have no use case that would pass a non-empty vector
     assert(ret.size() == 0);
@@ -176,12 +276,17 @@ class SnapshotList {
     }
   }
 
+  // How many snapshots in the SnapshotList
   uint64_t count() const { return count_; }
+  // How many snapshots in the system included those that created refcount
+  uint64_t logical_count() const { return logical_count_; }
+
+  std::atomic_uint64_t logical_count_ = {0};
+  uint64_t count_;
 
  private:
   // Dummy head of doubly-linked list of snapshots
   SnapshotImpl list_;
-  uint64_t count_;
 };
 
 // All operations on TimestampedSnapshotList must be protected by db mutex.
@@ -235,5 +340,16 @@ class TimestampedSnapshotList {
  private:
   std::map<uint64_t, std::shared_ptr<const SnapshotImpl>> snapshots_;
 };
-
+#ifdef SPEEDB_SNAP_OPTIMIZATION
+inline void SnapshotImpl::Deleter::operator()(SnapshotImpl* snap) const {
+  if (snap->cached_snapshot == nullptr) {
+    std::scoped_lock<std::mutex> l(snap->list_->lock_);
+    snap->list_->count_--;
+    snap->prev_->next_ = snap->next_;
+    snap->next_->prev_ = snap->prev_;
+    snap->list_->deleteitem_ = true;
+  }
+  delete snap;
+}
+#endif
 }  // namespace ROCKSDB_NAMESPACE

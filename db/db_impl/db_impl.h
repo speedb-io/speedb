@@ -349,6 +349,11 @@ class DBImpl : public DB {
       std::vector<Iterator*>* iterators) override;
 
   virtual const Snapshot* GetSnapshot() override;
+  // Will unref a snapshot copy
+  // Returns true if the snapshot has not been deleted from SnapshotList
+  bool UnRefSnapshot(const SnapshotImpl* snapshot, bool& is_cached_snapshot);
+  // true if the snapshot provided has been referenced, otherwise false
+  bool RefSnapshot(bool is_write_conflict_boundary, SnapshotImpl* snapshot);
   virtual void ReleaseSnapshot(const Snapshot* snapshot) override;
   // Create a timestamped snapshot. This snapshot can be shared by multiple
   // readers. If any of them uses it for write conflict checking, then

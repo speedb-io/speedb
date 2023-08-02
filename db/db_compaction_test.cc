@@ -9100,9 +9100,13 @@ TEST_F(DBCompactionTest, DisableMultiManualCompaction) {
   MoveFilesToLevel(1);
 
   // Block compaction queue
-  test::SleepingBackgroundTask sleeping_task_low;
-  env_->Schedule(&test::SleepingBackgroundTask::DoSleepTask, &sleeping_task_low,
-                 Env::Priority::LOW);
+  std::vector<test::SleepingBackgroundTask> sleeping_task_low(
+      std::max(1, env_->GetBackgroundThreads(Env::Priority::LOW)));
+
+  for (auto& sleeping_task : sleeping_task_low) {
+    env_->Schedule(&test::SleepingBackgroundTask::DoSleepTask, &sleeping_task,
+                   Env::Priority::LOW);
+  }
 
   port::Thread compact_thread1([&]() {
     CompactRangeOptions cro;
@@ -9133,8 +9137,11 @@ TEST_F(DBCompactionTest, DisableMultiManualCompaction) {
   compact_thread1.join();
   compact_thread2.join();
 
-  sleeping_task_low.WakeUp();
-  sleeping_task_low.WaitUntilDone();
+  for (auto& sleeping_task : sleeping_task_low) {
+    sleeping_task.WakeUp();
+    sleeping_task.WaitUntilDone();
+  }
+
   ASSERT_OK(dbfull()->TEST_WaitForCompact());
 }
 

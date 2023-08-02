@@ -9,7 +9,9 @@
 
 #include "block_cache.h"
 #include "index_builder.h"
+#include "port/stack_trace.h"
 #include "rocksdb/filter_policy.h"
+#include "rocksdb/table_pinning_policy.h"
 #include "table/block_based/block_based_table_reader.h"
 #include "table/block_based/filter_policy_internal.h"
 #include "table/format.h"
@@ -37,7 +39,8 @@ class MyPartitionedFilterBlockReader : public PartitionedFilterBlockReader {
   MyPartitionedFilterBlockReader(BlockBasedTable* t,
                                  CachableEntry<Block>&& filter_block)
       : PartitionedFilterBlockReader(
-            t, std::move(filter_block.As<Block_kFilterPartitionIndex>())) {
+            t, std::move(filter_block.As<Block_kFilterPartitionIndex>()),
+            std::unique_ptr<PinnedEntry>()) {
     for (const auto& pair : blooms) {
       const uint64_t offset = pair.first;
       const std::string& bloom = pair.second;

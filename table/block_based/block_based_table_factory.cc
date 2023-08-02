@@ -26,6 +26,9 @@
 #include "rocksdb/flush_block_policy.h"
 #include "rocksdb/rocksdb_namespace.h"
 #include "rocksdb/table.h"
+#include "rocksdb/table_pinning_policy.h"
+#include "rocksdb/utilities/customizable_util.h"
+#include "rocksdb/utilities/object_registry.h"
 #include "rocksdb/utilities/options_type.h"
 #include "table/block_based/block_based_table_builder.h"
 #include "table/block_based/block_based_table_reader.h"
@@ -441,6 +444,10 @@ void BlockBasedTableFactory::InitializeOptions() {
     table_options_.flush_block_policy_factory.reset(
         new FlushBlockBySizePolicyFactory());
   }
+  if (table_options_.pinning_policy == nullptr) {
+    table_options_.pinning_policy.reset(
+        NewDefaultPinningPolicy(table_options_));
+  }
   if (table_options_.no_block_cache) {
     table_options_.block_cache.reset();
   } else if (table_options_.block_cache == nullptr) {
@@ -573,7 +580,8 @@ Status BlockBasedTableFactory::NewTableReader(
       table_reader, table_reader_options.tail_size, table_reader_cache_res_mgr_,
       table_reader_options.prefix_extractor, prefetch_index_and_filter_in_cache,
       table_reader_options.skip_filters, table_reader_options.level,
-      table_reader_options.immortal, table_reader_options.largest_seqno,
+      table_reader_options.is_bottommost, table_reader_options.immortal,
+      table_reader_options.largest_seqno,
       table_reader_options.force_direct_prefetch, &tail_prefetch_stats_,
       table_reader_options.block_cache_tracer,
       table_reader_options.max_file_size_for_l0_meta_pin,

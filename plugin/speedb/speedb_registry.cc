@@ -16,6 +16,7 @@
 
 #include "paired_filter/speedb_paired_bloom.h"
 #include "plugin/speedb/memtable/hash_spd_rep.h"
+#include "plugin/speedb/pinning_policy/scoped_pinning_policy.h"
 #include "rocksdb/utilities/object_registry.h"
 #include "util/string_util.h"
 
@@ -53,6 +54,14 @@ int register_SpeedbPlugins(ObjectLibrary& library, const std::string&) {
       [](const std::string& uri, std::unique_ptr<const FilterPolicy>* guard,
          std::string* /* errmsg */) {
         guard->reset(NewSpdbPairedBloomFilterWithBits(uri));
+        return guard->get();
+      });
+  library.AddFactory<TablePinningPolicy>(
+      ObjectLibrary::PatternEntry::AsIndividualId(
+          ScopedPinningPolicy::kClassName()),
+      [](const std::string& /*uri*/, std::unique_ptr<TablePinningPolicy>* guard,
+         std::string* /* errmsg */) {
+        guard->reset(new ScopedPinningPolicy());
         return guard->get();
       });
 

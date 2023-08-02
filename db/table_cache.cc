@@ -134,12 +134,12 @@ Status TableCache::GetTableReader(
       file_temperature = ioptions_.default_temperature;
     }
     StopWatch sw(ioptions_.clock, ioptions_.stats, TABLE_OPEN_IO_MICROS);
+    bool is_bottom = (level == ioptions_.num_levels - 1);
     std::unique_ptr<RandomAccessFileReader> file_reader(
         new RandomAccessFileReader(std::move(file), fname, ioptions_.clock,
                                    io_tracer_, ioptions_.stats, SST_READ_MICROS,
                                    file_read_hist, ioptions_.rate_limiter.get(),
-                                   ioptions_.listeners, file_temperature,
-                                   level == ioptions_.num_levels - 1));
+                                   ioptions_.listeners, file_temperature, is_bottom));
     UniqueId64x2 expected_unique_id;
     if (ioptions_.verify_sst_unique_id_in_manifest) {
       expected_unique_id = file_meta.unique_id;
@@ -151,7 +151,7 @@ Status TableCache::GetTableReader(
         TableReaderOptions(
             ioptions_, prefix_extractor, file_options, internal_comparator,
             block_protection_bytes_per_key, skip_filters, immortal_tables_,
-            false /* force_direct_prefetch */, level, block_cache_tracer_,
+            false /* force_direct_prefetch */, level, is_bottom, block_cache_tracer_,
             max_file_size_for_l0_meta_pin, db_session_id_,
             file_meta.fd.GetNumber(), expected_unique_id,
             file_meta.fd.largest_seqno, file_meta.tail_size,

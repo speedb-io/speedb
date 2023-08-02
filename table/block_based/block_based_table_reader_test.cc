@@ -135,7 +135,7 @@ class BlockBasedTableReaderBaseTest : public testing::Test {
         ioptions, moptions.prefix_extractor, EnvOptions(), comparator,
         0 /* block_protection_bytes_per_key */, false /* _skip_filters */,
         false /* _immortal */, false /* _force_direct_prefetch */,
-        -1 /* _level */, nullptr /* _block_cache_tracer */,
+        -1 /* _level */, false /* bottommost */, nullptr /* _block_cache_tracer */,
         0 /* _max_file_size_for_l0_meta_pin */, "" /* _cur_db_session_id */,
         0 /* _cur_file_num */, {} /* _unique_id */, 0 /* _largest_seqno */,
         0 /* _tail_size */, user_defined_timestamps_persisted);

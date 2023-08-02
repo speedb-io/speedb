@@ -8,6 +8,7 @@
 
 #include <cassert>
 
+#include "rocksdb/table_pinning_policy.h"
 #include "table/block_based/cachable_entry.h"
 #include "table/format.h"
 
@@ -27,10 +28,11 @@ class UncompressionDictReader {
  public:
   static Status Create(
       const BlockBasedTable* table, const ReadOptions& ro,
-      FilePrefetchBuffer* prefetch_buffer, bool use_cache, bool prefetch,
-      bool pin, BlockCacheLookupContext* lookup_context,
+      const TablePinningOptions& tpo, FilePrefetchBuffer* prefetch_buffer,
+      bool use_cache, bool prefetch, bool pin,
+      BlockCacheLookupContext* lookup_context,
       std::unique_ptr<UncompressionDictReader>* uncompression_dict_reader);
-
+  ~UncompressionDictReader();
   Status GetOrReadUncompressionDictionary(
       FilePrefetchBuffer* prefetch_buffer, const ReadOptions& ro, bool no_io,
       bool verify_checksums, GetContext* get_context,
@@ -41,8 +43,11 @@ class UncompressionDictReader {
 
  private:
   UncompressionDictReader(const BlockBasedTable* t,
-                          CachableEntry<UncompressionDict>&& uncompression_dict)
-      : table_(t), uncompression_dict_(std::move(uncompression_dict)) {
+                          CachableEntry<UncompressionDict>&& uncompression_dict,
+                          std::unique_ptr<PinnedEntry>&& pinned)
+      : table_(t),
+        uncompression_dict_(std::move(uncompression_dict)),
+        pinned_(std::move(pinned)) {
     assert(table_);
   }
 
@@ -56,6 +61,7 @@ class UncompressionDictReader {
 
   const BlockBasedTable* table_;
   CachableEntry<UncompressionDict> uncompression_dict_;
+  std::unique_ptr<PinnedEntry> pinned_;
 };
 
 }  // namespace ROCKSDB_NAMESPACE

@@ -35,7 +35,6 @@
 
 namespace ROCKSDB_NAMESPACE {
 namespace {
-constexpr size_t kMergedVectorsMax = 8;
 struct SpdbKeyHandle {
   SpdbKeyHandle* GetNextBucketItem() {
     return next_.load(std::memory_order_acquire);
@@ -323,9 +322,6 @@ bool SpdbVectorContainer::IsEmpty() const { return num_elements_.load() == 0; }
 // copy the list of vectors to the iter_anchors
 bool SpdbVectorContainer::InitIterator(IterAnchors& iter_anchor) {
   bool immutable = immutable_.load();
-  if (!immutable) {
-    spdb_vectors_merge_rwlock_.ReadLock();
-  }
 
   auto last_iter = curr_vector_.load()->GetVectorListIter();
   bool notify_sort_thread = false;
@@ -346,7 +342,6 @@ bool SpdbVectorContainer::InitIterator(IterAnchors& iter_anchor) {
   ++last_iter;
   InitIterator(iter_anchor, spdb_vectors_.begin(), last_iter);
   if (!immutable) {
-    spdb_vectors_merge_rwlock_.ReadUnlock();
     if (notify_sort_thread) {
       sort_thread_cv_.notify_one();
     }
@@ -379,62 +374,6 @@ void SpdbVectorContainer::SeekIter(const IterAnchors& iter_anchor,
   }
 }
 
-void SpdbVectorContainer::Merge(std::list<SpdbVectorPtr>::iterator& begin,
-                                std::list<SpdbVectorPtr>::iterator& end,
-                                size_t total_merge_vector_elements) {
-  SpdbVectorIterator iterator(this, comparator_, begin, end);
-  if (total_merge_vector_elements > 0) {
-    SpdbVector::Vec merged;
-    merged.reserve(total_merge_vector_elements);
-
-    for (iterator.SeekToFirst(); iterator.Valid(); iterator.Next()) {
-      merged.emplace_back(iterator.key());
-    }
-
-    SpdbVectorPtr new_vector(
-        new SpdbVector(std::move(merged), total_merge_vector_elements));
-
-    // now replace
-    WriteLock wl(&spdb_vectors_merge_rwlock_);
-    spdb_vectors_.insert(begin, std::move(new_vector));
-    spdb_vectors_.erase(begin, end);
-  }
-}
-
-bool SpdbVectorContainer::TryMergeVectors(
-    std::list<SpdbVectorPtr>::iterator last) {
-  std::list<SpdbVectorPtr>::iterator start = spdb_vectors_.begin();
-  const size_t merge_threshold = switch_spdb_vector_limit_ * 75 / 100;
-
-  size_t merge_vectors_count = 0;
-  size_t total_merge_vector_elements = 0;
-
-  for (auto s = start; s != last; ++s) {
-    if ((*s)->Size() > merge_threshold) {
-      if (merge_vectors_count > 1) {
-        last = s;
-        break;
-      }
-
-      merge_vectors_count = 0;
-      total_merge_vector_elements = 0;
-      start = std::next(s);
-    } else {
-      ++merge_vectors_count;
-      total_merge_vector_elements += (*s)->Size();
-      if (merge_vectors_count == kMergedVectorsMax) {
-        last = std::next(s);
-        break;
-      }
-    }
-  }
-  if (merge_vectors_count > 1) {
-    Merge(start, last, total_merge_vector_elements);
-    return true;
-  }
-  return false;
-}
-
 void SpdbVectorContainer::SortThread() {
   std::unique_lock<std::mutex> lck(sort_thread_mutex_);
   std::list<SpdbVectorPtr>::iterator sort_iter_anchor = spdb_vectors_.begin();
@@ -456,22 +395,16 @@ void SpdbVectorContainer::SortThread() {
     for (; sort_iter_anchor != last; ++sort_iter_anchor) {
       (*sort_iter_anchor)->Sort(comparator_);
     }
-
-    if (spdb_vectors_.size() > kMergedVectorsMax) {
-      if (TryMergeVectors(last)) {
-        sort_iter_anchor = spdb_vectors_.begin();
-      }
-    }
   }
 }
 
 class HashSpdRep : public MemTableRep {
  public:
   HashSpdRep(const MemTableRep::KeyComparator& compare, Allocator* allocator,
-             size_t bucket_size, bool use_seek_parralel_threshold = false);
+             size_t bucket_size, bool use_seek_parallel_threshold = false);
 
   HashSpdRep(Allocator* allocator, size_t bucket_size,
-             bool use_seek_parralel_threshold = false);
+             bool use_seek_parallel_threshold = false);
   void PostCreate(const MemTableRep::KeyComparator& compare,
                   Allocator* allocator);
 
@@ -512,22 +445,22 @@ class HashSpdRep : public MemTableRep {
 
  private:
   SpdbHashTable spdb_hash_table_;
-  bool use_seek_parralel_threshold_ = false;
+  bool use_seek_parallel_threshold_ = false;
   std::shared_ptr<SpdbVectorContainer> spdb_vectors_cont_ = nullptr;
 };
 
 HashSpdRep::HashSpdRep(const MemTableRep::KeyComparator& compare,
                        Allocator* allocator, size_t bucket_size,
-                       bool use_seek_parralel_threshold)
-    : HashSpdRep(allocator, bucket_size, use_seek_parralel_threshold) {
+                       bool use_seek_parallel_threshold)
+    : HashSpdRep(allocator, bucket_size, use_seek_parallel_threshold) {
   spdb_vectors_cont_ = std::make_shared<SpdbVectorContainer>(compare);
 }
 
 HashSpdRep::HashSpdRep(Allocator* allocator, size_t bucket_size,
-                       bool use_seek_parralel_threshold)
+                       bool use_seek_parallel_threshold)
     : MemTableRep(allocator),
       spdb_hash_table_(bucket_size),
-      use_seek_parralel_threshold_(use_seek_parralel_threshold) {}
+      use_seek_parallel_threshold_(use_seek_parallel_threshold) {}
 
 void HashSpdRep::PostCreate(const MemTableRep::KeyComparator& compare,
                             Allocator* allocator) {
@@ -592,7 +525,7 @@ void HashSpdRep::Get(const LookupKey& k, void* callback_args,
 MemTableRep::Iterator* HashSpdRep::GetIterator(Arena* arena) {
   const bool empty_iter =
       spdb_vectors_cont_->IsEmpty() ||
-      (use_seek_parralel_threshold_ && !spdb_vectors_cont_->IsReadOnly());
+      (use_seek_parallel_threshold_ && !spdb_vectors_cont_->IsReadOnly());
   if (arena != nullptr) {
     void* mem;
     if (empty_iter) {
@@ -610,32 +543,35 @@ MemTableRep::Iterator* HashSpdRep::GetIterator(Arena* arena) {
   }
 }
 
-static std::unordered_map<std::string, OptionTypeInfo> hash_spd_factory_info = {
-
-    {"hash_bucket_count",
-     {0, OptionType::kSizeT, OptionVerificationType::kNormal,
-      OptionTypeFlags::kDontSerialize /*Since it is part of the ID*/}},
-    {"use_seek_parralel_threshold",
-     {0, OptionType::kBoolean, OptionVerificationType::kNormal,
-      OptionTypeFlags::kDontSerialize /*Since it is part of the ID*/}},
+static std::unordered_map<std::string, OptionTypeInfo> hash_spdb_factory_info =
+    {
+        {"hash_bucket_count",
+         {offsetof(struct HashSpdbRepOptions, hash_bucket_count),
+          OptionType::kSizeT, OptionVerificationType::kNormal,
+          OptionTypeFlags::kNone}},
+        {"use_seek_parallel_threshold",
+         {offsetof(struct HashSpdbRepOptions, use_seek_parallel_threshold),
+          OptionType::kBoolean, OptionVerificationType::kNormal,
+          OptionTypeFlags::kNone}},
 };
 }  // namespace
 
 // HashSpdRepFactory
 
-HashSpdRepFactory::HashSpdRepFactory(size_t hash_bucket_count)
-    : bucket_count_(hash_bucket_count), use_seek_parralel_threshold_(false) {
+HashSpdRepFactory::HashSpdRepFactory(size_t hash_bucket_count) {
+  options_.hash_bucket_count = hash_bucket_count;
+  options_.use_seek_parallel_threshold = false;
+
   if (hash_bucket_count == 0) {
-    use_seek_parralel_threshold_ = true;
-    bucket_count_ = 1000000;
+    options_.use_seek_parallel_threshold = true;
+    options_.hash_bucket_count = 1000000;
   }
-  RegisterOptions("", &bucket_count_, &hash_spd_factory_info);
-  Init();
+  RegisterOptions(&options_, &hash_spdb_factory_info);
 }
 
 MemTableRep* HashSpdRepFactory::PreCreateMemTableRep() {
-  MemTableRep* hash_spd =
-      new HashSpdRep(nullptr, bucket_count_, use_seek_parralel_threshold_);
+  MemTableRep* hash_spd = new HashSpdRep(nullptr, options_.hash_bucket_count,
+                                         options_.use_seek_parallel_threshold);
   return hash_spd;
 }
 
@@ -649,8 +585,8 @@ void HashSpdRepFactory::PostCreateMemTableRep(
 MemTableRep* HashSpdRepFactory::CreateMemTableRep(
     const MemTableRep::KeyComparator& compare, Allocator* allocator,
     const SliceTransform* /*transform*/, Logger* /*logger*/) {
-  return new HashSpdRep(compare, allocator, bucket_count_,
-                        use_seek_parralel_threshold_);
+  return new HashSpdRep(compare, allocator, options_.hash_bucket_count,
+                        options_.use_seek_parallel_threshold);
 }
 
 }  // namespace ROCKSDB_NAMESPACE

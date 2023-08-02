@@ -341,12 +341,12 @@ TEST_P(DBTestSharedWriteBufferAcrossCFs, SharedWriteBufferAcrossCFs) {
   if (use_old_interface_) {
     options.db_write_buffer_size = 120000;  // this is the real limit
   } else if (!cost_cache_) {
-    options.write_buffer_manager.reset(new WriteBufferManager(
-        114285, {}, WriteBufferManager::kDfltAllowDelaysAndStalls,
-        false /* initiate_flushes */));
+    options.write_buffer_manager.reset(
+        new WriteBufferManager(114285, {}, WriteBufferManager::kDfltAllowStall,
+                               false /* initiate_flushes */));
   } else {
     options.write_buffer_manager.reset(new WriteBufferManager(
-        114285, cache, WriteBufferManager::kDfltAllowDelaysAndStalls,
+        114285, cache, WriteBufferManager::kDfltAllowStall,
         false /* initiate_flushes */));
   }
   options.write_buffer_size = 500000;  // this is never hit
@@ -527,7 +527,7 @@ TEST_F(DBTest2, SharedWriteBufferLimitAcrossDB) {
   // Use a write buffer total size so that the soft limit is about
   // 105000.
   options.write_buffer_manager.reset(new WriteBufferManager(
-      120000, {} /* cache */, WriteBufferManager::kDfltAllowDelaysAndStalls,
+      120000, {} /* cache */, WriteBufferManager::kDfltAllowStall,
       false /* initiate_flushes */));
   CreateAndReopenWithCF({"cf1", "cf2"}, options);
 
@@ -2047,6 +2047,46 @@ TEST_F(DBTest2, DuplicateSnapshot) {
     db_->ReleaseSnapshot(s);
   }
 }
+
+#ifdef SPEEDB_SNAP_OPTIMIZATION
+// This test should run only if there is snapshot optimization enabled
+TEST_F(DBTest2, RefSnapshot) {
+  Options options;
+  options = CurrentOptions(options);
+  std::vector<const Snapshot*> snapshots;
+  DBImpl* dbi = static_cast_with_check<DBImpl>(db_);
+  SequenceNumber oldest_ww_snap, first_ww_snap;
+
+  ASSERT_OK(Put("k", "v"));  // inc seq
+  snapshots.push_back(db_->GetSnapshot());
+  snapshots.push_back(db_->GetSnapshot());
+  ASSERT_OK(Put("k", "v"));  // inc seq
+  snapshots.push_back(db_->GetSnapshot());
+  snapshots.push_back(dbi->GetSnapshotForWriteConflictBoundary());
+  first_ww_snap = snapshots.back()->GetSequenceNumber();
+  ASSERT_OK(Put("k", "v"));  // inc seq
+  snapshots.push_back(dbi->GetSnapshotForWriteConflictBoundary());
+  snapshots.push_back(db_->GetSnapshot());
+  ASSERT_OK(Put("k", "v"));  // inc seq
+  snapshots.push_back(db_->GetSnapshot());
+  snapshots.push_back(db_->GetSnapshot());  // this should create a reference
+
+  {
+    InstrumentedMutexLock l(dbi->mutex());
+    auto seqs = dbi->snapshots().GetAll(&oldest_ww_snap);
+    ASSERT_EQ(seqs.size(), 4);  // duplicates are not counted
+    ASSERT_EQ(oldest_ww_snap, first_ww_snap);
+    ASSERT_EQ(dbi->snapshots().count(),
+              6);  // how many snapshots stored in SnapshotList
+    ASSERT_EQ(dbi->snapshots().logical_count(),
+              8);  // how many snapshots in the system
+  }
+
+  for (auto s : snapshots) {
+    db_->ReleaseSnapshot(s);
+  }
+}
+#endif
 
 class PinL0IndexAndFilterBlocksTest
     : public DBTestBase,

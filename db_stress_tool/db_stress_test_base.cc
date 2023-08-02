@@ -21,6 +21,7 @@
 #include "rocksdb/filter_policy.h"
 #include "rocksdb/secondary_cache.h"
 #include "rocksdb/sst_file_manager.h"
+#include "rocksdb/table_pinning_policy.h"
 #include "rocksdb/types.h"
 #include "rocksdb/utilities/object_registry.h"
 #include "rocksdb/utilities/write_batch_with_index.h"
@@ -506,6 +507,12 @@ std::string StressTest::DebugString(const Slice& value,
 void StressTest::PrintStatistics() {
   if (dbstats) {
     fprintf(stdout, "STATISTICS:\n%s\n", dbstats->ToString().c_str());
+    const auto bbto =
+        options_.table_factory->GetOptions<BlockBasedTableOptions>();
+    if (bbto != nullptr && bbto->pinning_policy) {
+      fprintf(stdout, "PINNING STATISTICS:\n%s\n",
+              bbto->pinning_policy->ToString().c_str());
+    }
   }
   if (dbstats_secondaries) {
     fprintf(stdout, "Secondary instances STATISTICS:\n%s\n",
@@ -2400,8 +2407,8 @@ void StressTest::PrintEnv() const {
           FLAGS_db_write_buffer_size);
   fprintf(stdout, "Cost To Cache (WBM)       : %s\n",
           FLAGS_cost_write_buffer_to_cache ? "true" : "false");
-  fprintf(stdout, "Allow WBM Delays and Stalls: %s\n",
-          FLAGS_allow_wbm_delays_and_stalls ? "true" : "false");
+  fprintf(stdout, "Allow WBM Stalls and Delays: %s\n",
+          FLAGS_allow_wbm_stalls ? "true" : "false");
   fprintf(stdout, "WBM start delay percent   : %d\n",
           FLAGS_start_delay_percent);
   fprintf(stdout, "Initiate WBM Flushes      : %s\n",
@@ -3098,6 +3105,19 @@ void InitializeOptionsFromFlags(
   block_based_options.max_auto_readahead_size = FLAGS_max_auto_readahead_size;
   block_based_options.num_file_reads_for_auto_readahead =
       FLAGS_num_file_reads_for_auto_readahead;
+  if (!FLAGS_pinning_policy.empty()) {
+    ConfigOptions config_options;
+    config_options.ignore_unknown_options = false;
+    config_options.ignore_unsupported_options = false;
+    Status s = TablePinningPolicy::CreateFromString(
+        config_options, FLAGS_pinning_policy,
+        &block_based_options.pinning_policy);
+    if (!s.ok()) {
+      fprintf(stderr, "Failed to create PinningPolicy: %s\n",
+              s.ToString().c_str());
+      exit(1);
+    }
+  }
   options.table_factory.reset(NewBlockBasedTableFactory(block_based_options));
 
   // Write-Buffer-Manager
@@ -3108,13 +3128,13 @@ void InitializeOptionsFromFlags(
   }
   if (FLAGS_cost_write_buffer_to_cache) {
     options.write_buffer_manager.reset(new WriteBufferManager(
-        FLAGS_db_write_buffer_size, cache, FLAGS_allow_wbm_delays_and_stalls,
-        FLAGS_initiate_wbm_flushes, flush_initiation_options));
+        FLAGS_db_write_buffer_size, cache, FLAGS_allow_wbm_stalls,
+        FLAGS_initiate_wbm_flushes, flush_initiation_options,
+        static_cast<uint16_t>(FLAGS_start_delay_percent)));
   } else {
     options.write_buffer_manager.reset(new WriteBufferManager(
-        FLAGS_db_write_buffer_size, {} /* cache */,
-        FLAGS_allow_wbm_delays_and_stalls, FLAGS_initiate_wbm_flushes,
-        flush_initiation_options,
+        FLAGS_db_write_buffer_size, {} /* cache */, FLAGS_allow_wbm_stalls,
+        FLAGS_initiate_wbm_flushes, flush_initiation_options,
         static_cast<uint16_t>(FLAGS_start_delay_percent)));
   }
 
@@ -3224,6 +3244,7 @@ void InitializeOptionsFromFlags(
   options.refresh_options_file = FLAGS_refresh_options_file;
 
   options.use_dynamic_delay = FLAGS_use_dynamic_delay;
+  options.use_clean_delete_during_flush = FLAGS_use_clean_delete_during_flush;
 
   // Integrated BlobDB
   options.enable_blob_files = FLAGS_enable_blob_files;

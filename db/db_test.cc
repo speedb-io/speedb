@@ -3484,10 +3484,8 @@ static bool CompareIterators(int step, DB* model, DB* db,
   options.snapshot = db_snap;
   Iterator* dbiter = db->NewIterator(options);
   bool ok = true;
-  int count = 0;
   for (miter->SeekToFirst(), dbiter->SeekToFirst();
        ok && miter->Valid() && dbiter->Valid(); miter->Next(), dbiter->Next()) {
-    count++;
     if (miter->key().compare(dbiter->key()) != 0) {
       fprintf(stderr, "step %d: Key mismatch: '%s' vs. '%s'\n", step,
               EscapeString(miter->key()).c_str(),
@@ -5099,7 +5097,7 @@ TEST_F(DBTest, FlushOnDestroy) {
   CancelAllBackgroundWork(db_);
 }
 
-// stuck since allow_delays_and_stalls is now true which leads to ShouldStall()
+// stuck since allow_stall is now true which leads to ShouldStall()
 // to return true, but together with ShouldFlush() returning false since
 // initiate_flushes_ is true, there are no flushes. caused and will be fixed
 // with - https://github.com/speedb-io/speedb/issues/424

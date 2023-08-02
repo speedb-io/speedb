@@ -64,6 +64,7 @@
 #include "rocksdb/slice_transform.h"
 #include "rocksdb/stats_history.h"
 #include "rocksdb/table.h"
+#include "rocksdb/table_pinning_policy.h"
 #include "rocksdb/utilities/backup_engine.h"
 #include "rocksdb/utilities/db_ttl.h"
 #include "rocksdb/utilities/object_registry.h"
@@ -298,6 +299,8 @@ DEFINE_string(
     "\twaitforcompaction - pause until compaction is (probably) done\n"
     "\tflush - flush the memtable\n"
     "\tstats       -- Print DB stats\n"
+    "\ttable-readers-mem    -- Print table readers memory. excluding memory "
+    "used in block cache\n"
     "\tresetstats  -- Reset DB stats\n"
     "\tlevelstats  -- Print the number of files and bytes per level\n"
     "\tmemstats  -- Print memtable stats\n"
@@ -541,8 +544,8 @@ DEFINE_int64(db_write_buffer_size,
 DEFINE_bool(cost_write_buffer_to_cache, false,
             "The usage of memtable is costed to the block cache");
 
-DEFINE_bool(allow_wbm_delays_and_stalls,
-            ROCKSDB_NAMESPACE::WriteBufferManager::kDfltAllowDelaysAndStalls,
+DEFINE_bool(allow_wbm_stalls,
+            ROCKSDB_NAMESPACE::WriteBufferManager::kDfltAllowStall,
             "Enable WBM write stalls and delays");
 
 DEFINE_bool(initiate_wbm_flushes,
@@ -798,6 +801,8 @@ DEFINE_bool(
     "Pin unpartitioned index/filter blocks in block cache."
     " Note `cache_index_and_filter_blocks` must be true for this option to have"
     " any effect.");
+
+DEFINE_string(pinning_policy, "", "URI for registry TablePinningPolicy");
 
 DEFINE_int32(block_size,
              static_cast<int32_t>(
@@ -1855,9 +1860,11 @@ DEFINE_int64(multiread_stride, 0,
 DEFINE_bool(multiread_batched, false, "Use the new MultiGet API");
 
 DEFINE_string(memtablerep, "speedb.HashSpdRepFactory", "");
+
 DEFINE_int64(hash_bucket_count, 1000000, "hash bucket count");
-DEFINE_bool(use_seek_parralel_threshold, true,
-            "if use seek parralel threshold .");
+DEFINE_bool(use_seek_parallel_threshold, true,
+            "if use seek parallel threshold .");
+
 DEFINE_bool(use_plain_table, false,
             "if use plain table instead of block-based table format");
 DEFINE_bool(use_cuckoo_table, false, "if use cuckoo table format");
@@ -3652,9 +3659,15 @@ class Benchmark {
     std::unique_ptr<ExpiredTimeFilter> filter;
     while (std::getline(benchmark_stream, name, ',')) {
       if (open_options_.write_buffer_manager) {
-        fprintf(stderr, "\nBEFORE Benchmark (%s): %lu OF %lu\n\n", name.c_str(),
-                open_options_.write_buffer_manager->memory_usage(),
-                open_options_.write_buffer_manager->buffer_size());
+        fprintf(stderr,
+                "\nWBM's Usage Info [BEFORE Benchmark (%s)]: %s OF %s\n\n",
+                name.c_str(),
+                BytesToHumanString(
+                    open_options_.write_buffer_manager->memory_usage())
+                    .c_str(),
+                BytesToHumanString(
+                    open_options_.write_buffer_manager->buffer_size())
+                    .c_str());
       }
 
       // Sanitize parameters
@@ -3957,6 +3970,9 @@ class Benchmark {
         PrintStats("rocksdb.block-cache-entry-stats");
       } else if (name == "stats") {
         PrintStats("rocksdb.stats");
+      } else if (name == "table-readers-mem") {
+        fprintf(stdout, "table-readers-mem");
+        PrintStats("rocksdb.estimate-table-readers-mem");
       } else if (name == "resetstats") {
         ResetStats();
       } else if (name == "verify") {
@@ -4113,9 +4129,15 @@ class Benchmark {
       }
 
       if (open_options_.write_buffer_manager) {
-        fprintf(stderr, "\nAFTER Benchmark (%s): %lu OF %lu\n", name.c_str(),
-                open_options_.write_buffer_manager->memory_usage(),
-                open_options_.write_buffer_manager->buffer_size());
+        fprintf(stderr,
+                "\nWBM's Usage Info [AFTER Benchmark (%s)]: %s OF %s\n\n",
+                name.c_str(),
+                BytesToHumanString(
+                    open_options_.write_buffer_manager->memory_usage())
+                    .c_str(),
+                BytesToHumanString(
+                    open_options_.write_buffer_manager->buffer_size())
+                    .c_str());
       }
     }
 
@@ -4143,6 +4165,12 @@ class Benchmark {
 
     if (dbstats) {
       fprintf(stdout, "STATISTICS:\n%s\n", dbstats->ToString().c_str());
+      const auto bbto =
+          open_options_.table_factory->GetOptions<BlockBasedTableOptions>();
+      if (bbto != nullptr && bbto->pinning_policy) {
+        fprintf(stdout, "PINNING STATISTICS:\n%s\n",
+                bbto->pinning_policy->ToString().c_str());
+      }
     }
     if (FLAGS_simcache_size >= 0) {
       fprintf(
@@ -4793,6 +4821,15 @@ class Benchmark {
       } else {
         fprintf(stdout, "Integrated BlobDB: blob cache disabled\n");
       }
+      if (!FLAGS_pinning_policy.empty()) {
+        s = TablePinningPolicy::CreateFromString(
+            config_options, FLAGS_pinning_policy,
+            &block_based_options.pinning_policy);
+        if (!s.ok()) {
+          ErrorExit("Could not create pinning policy: %s",
+                    s.ToString().c_str());
+        }
+      }
 
       options.table_factory.reset(
           NewBlockBasedTableFactory(block_based_options));
@@ -4930,17 +4967,18 @@ class Benchmark {
       flush_initiation_options.max_num_parallel_flushes =
           FLAGS_max_num_parallel_flushes;
     }
-    if (FLAGS_cost_write_buffer_to_cache) {
-      options.write_buffer_manager.reset(new WriteBufferManager(
-          FLAGS_db_write_buffer_size, cache_, FLAGS_allow_wbm_delays_and_stalls,
-          FLAGS_initiate_wbm_flushes, flush_initiation_options,
-          static_cast<uint16_t>(FLAGS_start_delay_percent)));
-    } else {
-      options.write_buffer_manager.reset(new WriteBufferManager(
-          FLAGS_db_write_buffer_size, {} /* cache */,
-          FLAGS_allow_wbm_delays_and_stalls, FLAGS_initiate_wbm_flushes,
-          flush_initiation_options,
-          static_cast<uint16_t>(FLAGS_start_delay_percent)));
+    if (options.write_buffer_manager == nullptr) {
+      if (FLAGS_cost_write_buffer_to_cache) {
+        options.write_buffer_manager.reset(new WriteBufferManager(
+            FLAGS_db_write_buffer_size, cache_, FLAGS_allow_wbm_stalls,
+            FLAGS_initiate_wbm_flushes, flush_initiation_options,
+            static_cast<uint16_t>(FLAGS_start_delay_percent)));
+      } else {
+        options.write_buffer_manager.reset(new WriteBufferManager(
+            FLAGS_db_write_buffer_size, {} /* cache */, FLAGS_allow_wbm_stalls,
+            FLAGS_initiate_wbm_flushes, flush_initiation_options,
+            static_cast<uint16_t>(FLAGS_start_delay_percent)));
+      }
     }
 
     if (FLAGS_use_dynamic_delay && FLAGS_num_multi_db > 1) {

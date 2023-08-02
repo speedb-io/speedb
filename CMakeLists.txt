@@ -427,6 +427,16 @@ if(WITH_TBB)
   list(APPEND THIRDPARTY_LIBS TBB::TBB)
 endif()
 
+option(WITH_SNAP_OPTIMIZATION "Optimize Snapshot performance for read mostly workload" OFF)
+if(WITH_SNAP_OPTIMIZATION)
+	find_package(folly REQUIRED)
+	add_definitions(-DSPEEDB_SNAP_OPTIMIZATION)
+  list(APPEND THIRDPARTY_LIBS folly)
+  message(STATUS "Enabling RTTI in all builds - part of folly requirements")
+  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DROCKSDB_USE_RTTI")
+  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -DROCKSDB_USE_RTTI")
+endif()
+
 # Stall notifications eat some performance from inserts
 option(DISABLE_STALL_NOTIF "Build with stall notifications" OFF)
 if(DISABLE_STALL_NOTIF)
@@ -446,6 +456,7 @@ endif()
 
 
 # RTTI is by default AUTO which enables it in debug and disables it in release.
+if(NOT WITH_SNAP_OPTIMIZATION)
 set(USE_RTTI AUTO CACHE STRING "Enable RTTI in builds")
 set_property(CACHE USE_RTTI PROPERTY STRINGS AUTO ON OFF)
 if(USE_RTTI STREQUAL "AUTO")
@@ -470,6 +481,7 @@ else()
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-rtti")
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fno-rtti")
   endif()
+endif()
 endif()
 
 # Used to run CI build and tests so we can run faster
@@ -857,6 +869,7 @@ set(SOURCES
         table/block_based/partitioned_index_iterator.cc
         table/block_based/partitioned_index_reader.cc
         table/block_based/reader_common.cc
+        table/block_based/table_pinning_policy.cc
         table/block_based/uncompression_dict_reader.cc
         table/block_fetcher.cc
         table/cuckoo/cuckoo_table_builder.cc

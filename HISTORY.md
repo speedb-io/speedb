@@ -1,15 +1,40 @@
 # Speedb Change Log 
 
 ## Unreleased
+
+### New Features
+* Snapshot optimization - The most important information inside a snapshot is its Sequence number, which allows the compaction to know if the key-value should be deleted or not. The sequence number is being changed when modification happens in the db. This feature allows the db to take a snapshot without acquiring db mutex when the last snapshot has the same sequence number as a new one. In transactional db with mostly read operations, it should improve performance when used with multithreaded environment and as well other scenarios of taking large amount of snapshots with mostly read operations.
+* Add a TablePinningPolicy to the BlockBasedTableOptions.  This class controls when blocks should be pinned in memory for a block based table.  The default behavior uses the MetadataCacheOptions to control pinning and behaves identical to the previous releases. 
+
+### Enhancements
+* db_bench: add estimate-table-readers-mem benchmark which prints these stats.
+
+### Bug Fixes
+* unit tests: fix GlobalWriteControllerTest.GlobalAndWBMSetupDelay by waiting for the memtable memory release.
+* spdb memtable: use_seek_parallel_threshold option parameter mishandled (#570)
+* build: Plug memtable global switch memtable stuck fix.  (#606)
+* build: Windows compilation fix (#568).
+* Logger: fix Block cache stats trace by spacing it from the last trace (#578).
+* WriteController: move the class to public interface which should have been done under #346.
+* unit tests: fix DBCompactionTest.DisableMultiManualCompaction by blocking all bg compaction threads which increased by default to 8 in #194. 
+
+## Fig v2.5.0 (06/14/2023)
 Based on RocksDB 8.1.1
 
 ### New Features
 * Delay writes gradually based on memory usage of the WriteBufferManager (WBM).
 Before this PR, setting allow_stall in the WBM's constructor meant that writes are completely stopped when the WBM's memory usage exceeds its quota. The goal here is to gradually decrease
 the users write speed before that threshold is reached in order to gain stability.
-To use this feature, pass allow_delays_and_stalls = true to the ctor of WBM (renamed from allow_stall) and the db needs to be opened with options.use_dynamic_delay = true. The WBM will
-setup delay requests starting from (start_delay_percent * _buffer_size) / 100 (default value is 70) (start_delay_percent is another WBM ctor parameter). Changes to the WBM's memory are tracked in WriteBufferManager::ReserveMem and FreeMem.
-Once the WBM reached its capacity, writes will be stopped using the old ShouldStall() and WBMStallWrites(). (#423)
+To use this feature, pass allow_stall = true to the ctor of WBM and the db needs to be opened with options.use_dynamic_delay = true. The WBM will setup delay requests starting from (start_delay_percent * _buffer_size) / 100 (default value is 70) (start_delay_percent is another WBM ctor parameter).
+Changes to the WBM's memory are tracked in WriteBufferManager::ReserveMem and FreeMem.
+Once the WBM reached its capacity, if allow_stall == true, writes will be stopped using the old ShouldStall() and WBMStallWrites(). (#423)
+
+* Prevent flush entry followed delete operations
+currently during memtable flush ,  if key has a match key in the
+delete range table and this record has no snapshot related to it,
+we still write it with its value to SST file.
+This feature keeps only the delete record and reduce SST size for later compaction.
+(#411)
 
 ### Enhancements
 * CI: add a workflow for building and publishing jar to maven central (#507)
@@ -30,6 +55,10 @@ Once the WBM reached its capacity, writes will be stopped using the old ShouldSt
 Also switch to waiting a sec on the CV each time. This is required since a bg error doesn't signal the CV in the WriteController.
 * fix UnlockWALStallCleared test in utilities/transactions/transaction_test.cc (#514)
 * Always assume optimize_filters_for_memory=false when creating a paired bloom filter (#488)
+* spdb memtable use after free bug (#501)
+* db_bench: Create a WBM once for all db-s regardless of their use in different groups (#550)
+* Tompstone unit test faiure (#560)
+* build: Remove unused variables in unit tests (#581)
 
 ### Miscellaneous
 * disable failing unit tests and paired bloom filter stress testing
@@ -189,7 +218,7 @@ Based on RocksDB 7.2.2
 
 ## Miscellaneous
 * LOG: Print write_buffer_manager size to LOG
-* LOG: change log header to SpeeDB
+* LOG: change log header to Speedb
 * LOG & db_bench: metadata_cache_options - print to LOG and support its configuration in db_bench
 * db_impl: use unique_ptr in DBImpl::Open for nicer memory management
 * Explicitly compare the SuperVersion pointer in column_family

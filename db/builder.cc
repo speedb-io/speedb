@@ -203,16 +203,71 @@ Status BuildTable(
         ioptions.enforce_single_del_contracts,
         /*manual_compaction_canceled=*/kManualCompactionCanceledFalse,
         /*compaction=*/nullptr, compaction_filter.get(),
-        /*shutting_down=*/nullptr, db_options.info_log, full_history_ts_low);
-
+        /*shutting_down=*/nullptr, db_options.info_log, full_history_ts_low,
+        ioptions.use_clean_delete_during_flush);
+    const InternalKeyComparator& icmp = tboptions.internal_comparator;
+    auto range_del_it = range_del_agg->NewIterator();
+    range_del_it->SeekToFirst();
+    Slice last_tombstone_start_user_key{};
     c_iter.SeekToFirst();
+
     for (; c_iter.Valid(); c_iter.Next()) {
       const Slice& key = c_iter.key();
       const Slice& value = c_iter.value();
       const ParsedInternalKey& ikey = c_iter.ikey();
+      auto internal_key = InternalKey(key, ikey.sequence, ikey.type);
       // Generate a rolling 64-bit hash of the key and values
       // Note :
       // Here "key" integrates 'sequence_number'+'kType'+'user key'.
+      if (ioptions.use_clean_delete_during_flush &&
+          tboptions.reason == TableFileCreationReason::kFlush &&
+          ikey.type == kTypeValue) {
+        bool was_skipped = false;
+        while (range_del_it->Valid()) {
+          auto tombstone = range_del_it->Tombstone();
+          auto kv = tombstone.Serialize();
+          if (icmp.Compare(kv.first, internal_key) > 0) {
+            // the record smaller than the current range delete iter proceed as
+            // usual
+            break;
+          }
+          if ((icmp.Compare(kv.first, internal_key) <= 0) &&
+              (icmp.Compare(internal_key, tombstone.SerializeEndKey()) <= 0)) {
+            // the key is in delete range... check if we can skip it...
+            if (c_iter.CanBeSkipped()) {
+              was_skipped = true;
+            }
+            break;
+          } else {
+            // the record is above the current range delete iter. need progress
+            // range delete iter and check again. first update the current range
+            // delete iter for boundaries
+            builder->Add(kv.first.Encode(), kv.second);
+            InternalKey tombstone_end = tombstone.SerializeEndKey();
+            meta->UpdateBoundariesForRange(kv.first, tombstone_end,
+                                           tombstone.seq_, icmp);
+            if (version) {
+              if (last_tombstone_start_user_key.empty() ||
+                  ucmp->CompareWithoutTimestamp(last_tombstone_start_user_key,
+                                                range_del_it->start_key()) <
+                      0) {
+                SizeApproximationOptions approx_opts;
+                approx_opts.files_size_error_margin = 0.1;
+                meta->compensated_range_deletion_size +=
+                    versions->ApproximateSize(approx_opts, version,
+                                              kv.first.Encode(),
+                                              tombstone_end.Encode(), 0, -1,
+                                              TableReaderCaller::kFlush);
+              }
+              last_tombstone_start_user_key = range_del_it->start_key();
+            }
+            range_del_it->Next();
+          }
+        }
+        if (was_skipped) {
+          continue;
+        }
+      }
       s = output_validator.Add(key, value);
       if (!s.ok()) {
         break;
@@ -238,16 +293,13 @@ Status BuildTable(
     }
 
     if (s.ok()) {
-      auto range_del_it = range_del_agg->NewIterator();
-      Slice last_tombstone_start_user_key{};
-      for (range_del_it->SeekToFirst(); range_del_it->Valid();
-           range_del_it->Next()) {
+      for (; range_del_it->Valid(); range_del_it->Next()) {
         auto tombstone = range_del_it->Tombstone();
         auto kv = tombstone.Serialize();
         builder->Add(kv.first.Encode(), kv.second);
         InternalKey tombstone_end = tombstone.SerializeEndKey();
         meta->UpdateBoundariesForRange(kv.first, tombstone_end, tombstone.seq_,
-                                       tboptions.internal_comparator);
+                                       icmp);
         if (version) {
           if (last_tombstone_start_user_key.empty() ||
               ucmp->CompareWithoutTimestamp(last_tombstone_start_user_key,

@@ -205,7 +205,8 @@ class CompactionIterator {
       const std::shared_ptr<Logger> info_log = nullptr,
       const std::string* full_history_ts_low = nullptr,
       const SequenceNumber preserve_time_min_seqno = kMaxSequenceNumber,
-      const SequenceNumber preclude_last_level_min_seqno = kMaxSequenceNumber);
+      const SequenceNumber preclude_last_level_min_seqno = kMaxSequenceNumber,
+      bool use_skip_delete = false);
 
   // Constructor with custom CompactionProxy, used for tests.
   CompactionIterator(
@@ -224,7 +225,8 @@ class CompactionIterator {
       const std::shared_ptr<Logger> info_log = nullptr,
       const std::string* full_history_ts_low = nullptr,
       const SequenceNumber preserve_time_min_seqno = kMaxSequenceNumber,
-      const SequenceNumber preclude_last_level_min_seqno = kMaxSequenceNumber);
+      const SequenceNumber preclude_last_level_min_seqno = kMaxSequenceNumber,
+      bool use_skip_delete = false);
 
   ~CompactionIterator();
 
@@ -260,6 +262,7 @@ class CompactionIterator {
     return output_to_penultimate_level_;
   }
   Status InputStatus() const { return input_.status(); }
+  bool CanBeSkipped();
 
   bool IsDeleteRangeSentinelKey() const { return is_range_del_; }
 
@@ -491,6 +494,7 @@ class CompactionIterator {
   // min seqno to preclude the data from the last level, if the key seqno larger
   // than this, it will be output to penultimate level
   const SequenceNumber preclude_last_level_min_seqno_ = kMaxSequenceNumber;
+  bool use_skip_delete_;
 
   void AdvanceInputIter() { input_.Next(); }
 

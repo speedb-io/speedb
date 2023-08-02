@@ -33,8 +33,8 @@ auto WriteBufferManager::FlushInitiationOptions::Sanitize() const
 }
 
 WriteBufferManager::WriteBufferManager(
-    size_t _buffer_size, std::shared_ptr<Cache> cache,
-    bool allow_delays_and_stalls, bool initiate_flushes,
+    size_t _buffer_size, std::shared_ptr<Cache> cache, bool allow_stall,
+    bool initiate_flushes,
     const FlushInitiationOptions& flush_initiation_options,
     uint16_t start_delay_percent)
     : buffer_size_(_buffer_size),
@@ -43,7 +43,7 @@ WriteBufferManager::WriteBufferManager(
       memory_inactive_(0),
       memory_being_freed_(0U),
       cache_res_mgr_(nullptr),
-      allow_delays_and_stalls_(allow_delays_and_stalls),
+      allow_stall_(allow_stall),
       start_delay_percent_(start_delay_percent),
       stall_active_(false),
       initiate_flushes_(initiate_flushes),
@@ -98,7 +98,7 @@ void WriteBufferManager::ReserveMem(size_t mem) {
     new_memory_used = old_memory_used + mem;
   }
   if (is_enabled) {
-    UpdateUsageState(new_memory_used, mem, buffer_size());
+    UpdateUsageState(new_memory_used, static_cast<int64_t>(mem), buffer_size());
     // Checking outside the locks is not reliable, but avoids locking
     // unnecessarily which is expensive
     if (UNLIKELY(ShouldInitiateAnotherFlushMemOnly(new_memory_used))) {
@@ -172,7 +172,8 @@ void WriteBufferManager::FreeMem(size_t mem) {
     assert(curr_memory_inactive >= mem);
     assert(curr_memory_being_freed >= mem);
 
-    UpdateUsageState(new_memory_used, -mem, buffer_size());
+    UpdateUsageState(new_memory_used, static_cast<int64_t>(-mem),
+                     buffer_size());
   }
 
   // Check if stall is active and can be ended.
@@ -210,7 +211,7 @@ size_t WriteBufferManager::FreeMemWithCache(size_t mem) {
 
 void WriteBufferManager::BeginWriteStall(StallInterface* wbm_stall) {
   assert(wbm_stall != nullptr);
-  assert(allow_delays_and_stalls_);
+  assert(allow_stall_);
 
   // Allocate outside of the lock.
   std::list<StallInterface*> new_node = {wbm_stall};
@@ -235,7 +236,7 @@ void WriteBufferManager::BeginWriteStall(StallInterface* wbm_stall) {
 void WriteBufferManager::MaybeEndWriteStall() {
   // Cannot early-exit on !enabled() because SetBufferSize(0) needs to unblock
   // the writers.
-  if (!allow_delays_and_stalls_) {
+  if (!allow_stall_) {
     return;
   }
 
@@ -267,7 +268,7 @@ void WriteBufferManager::RemoveDBFromQueue(StallInterface* wbm_stall) {
   // Deallocate the removed nodes outside of the lock.
   std::list<StallInterface*> cleanup;
 
-  if (enabled() && allow_delays_and_stalls_) {
+  if (enabled() && allow_stall_) {
     std::unique_lock<std::mutex> lock(mu_);
     for (auto it = queue_.begin(); it != queue_.end();) {
       auto next = std::next(it);
@@ -302,16 +303,16 @@ std::string WriteBufferManager::GetPrintableOptions() const {
   snprintf(buffer, kBufferSize, "%*s: %p\n", field_width, "wbm.cache", cache);
   ret.append(buffer);
 
-  snprintf(buffer, kBufferSize, "%*s: %d\n", field_width,
-           "wbm.allow_delays_and_stalls", allow_delays_and_stalls_);
-  ret.append(buffer);
-
-  snprintf(buffer, kBufferSize, "%*s: %d\n", field_width,
-           "wbm.initiate_flushes", IsInitiatingFlushes());
+  snprintf(buffer, kBufferSize, "%*s: %d\n", field_width, "wbm.allow_stall",
+           allow_stall_);
   ret.append(buffer);
 
   snprintf(buffer, kBufferSize, "%*s: %d\n", field_width,
            "wbm.start_delay_percent", start_delay_percent_);
+  ret.append(buffer);
+
+  snprintf(buffer, kBufferSize, "%*s: %d\n", field_width,
+           "wbm.initiate_flushes", IsInitiatingFlushes());
   ret.append(buffer);
 
   return ret;
@@ -435,15 +436,14 @@ void WriteBufferManager::UpdateControllerDelayState() {
 }
 
 uint64_t WriteBufferManager::CalcNewCodedUsageState(
-    size_t new_memory_used, ssize_t memory_changed_size, size_t quota,
+    size_t new_memory_used, int64_t memory_changed_size, size_t quota,
     uint64_t old_coded_usage_state) {
   auto [old_usage_state, old_delay_factor] =
       ParseCodedUsageState(old_coded_usage_state);
 
   auto new_usage_state = old_usage_state;
   auto new_delay_factor = old_delay_factor;
-  size_t usage_start_delay_threshold =
-      (static_cast<double>(start_delay_percent_) / 100) * quota;
+  size_t usage_start_delay_threshold = (start_delay_percent_ / 100.0) * quota;
   auto step_size =
       (quota - usage_start_delay_threshold) / kMaxDelayedWriteFactor;
 
@@ -517,11 +517,10 @@ auto WriteBufferManager::ParseCodedUsageState(uint64_t coded_usage_state)
 }
 
 void WriteBufferManager::UpdateUsageState(size_t new_memory_used,
-                                          ssize_t memory_changed_size,
+                                          int64_t memory_changed_size,
                                           size_t quota) {
   assert(enabled());
-  if (allow_delays_and_stalls_ == false ||
-      controllers_to_refcount_map_.empty()) {
+  if (allow_stall_ == false) {
     return;
   }
 
@@ -544,7 +543,7 @@ void WriteBufferManager::UpdateUsageState(size_t new_memory_used,
       if (done == false) {
         // Retry. However,
         new_memory_used = memory_usage();
-        memory_changed_size = 0U;
+        memory_changed_size = 0;
       } else {
         // WBM state has changed. need to update the WCs.
         UpdateControllerDelayState();

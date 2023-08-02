@@ -140,8 +140,8 @@ DEFINE_uint64(db_write_buffer_size,
 DEFINE_bool(cost_write_buffer_to_cache, false,
             "The usage of memtable is costed to the block cache");
 
-DEFINE_bool(allow_wbm_delays_and_stalls,
-            ROCKSDB_NAMESPACE::WriteBufferManager::kDfltAllowDelaysAndStalls,
+DEFINE_bool(allow_wbm_stalls,
+            ROCKSDB_NAMESPACE::WriteBufferManager::kDfltAllowStall,
             "Enable WBM write stalls and delays");
 
 DEFINE_uint32(
@@ -876,6 +876,8 @@ DEFINE_string(fs_uri, "",
               " with --env_uri."
               " Creates a default environment with the specified filesystem.");
 
+DEFINE_string(pinning_policy, "", "URI for registry TablePinningPolicy");
+
 DEFINE_uint64(ops_per_thread, 1200000, "Number of operations per thread.");
 static const bool FLAGS_ops_per_thread_dummy __attribute__((__unused__)) =
     RegisterFlagValidator(&FLAGS_ops_per_thread, &ValidateUint32Range);
@@ -1113,6 +1115,10 @@ DEFINE_uint64(stats_dump_period_sec,
 
 DEFINE_bool(use_dynamic_delay, ROCKSDB_NAMESPACE::Options().use_dynamic_delay,
             "Use dynamic delay");
+
+DEFINE_bool(use_clean_delete_during_flush,
+            ROCKSDB_NAMESPACE::Options().use_clean_delete_during_flush,
+            "Use clean delete during flush");
 
 DEFINE_bool(use_io_uring, false, "Enable the use of IO uring on Posix");
 extern "C" bool RocksDbIOUringEnable() { return FLAGS_use_io_uring; }

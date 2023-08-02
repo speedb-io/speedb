@@ -13,8 +13,8 @@
 // limitations under the License.
 
 #include "db/db_test_util.h"
-#include "db/write_controller.h"
 #include "rocksdb/write_buffer_manager.h"
+#include "rocksdb/write_controller.h"
 
 namespace ROCKSDB_NAMESPACE {
 
@@ -42,8 +42,9 @@ class GlobalWriteControllerTest : public DBTestBase {
         options.use_dynamic_delay, options.delayed_write_rate));
     if (add_wbm) {
       options.write_buffer_manager.reset(new WriteBufferManager(
-          buffer_size, {}, true /*allow_delays_and_stalls*/,
-          false /*initiate_flushes*/));
+          buffer_size, {}, true /*allow_stall*/, false /*initiate_flushes*/,
+          WriteBufferManager::FlushInitiationOptions(),
+          WriteBufferManager::kDfltStartDelayPercentThreshold));
     }
 
     for (int i = 0; i < num_dbs; i++) {
@@ -359,6 +360,12 @@ TEST_F(GlobalWriteControllerTest, GlobalAndWBMSetupDelay) {
   OpenDBsAndSetUp(num_dbs, options, true);
   WriteOptions wo;
 
+  SyncPoint::GetInstance()->DisableProcessing();
+  SyncPoint::GetInstance()->LoadDependency(
+      {{"DBImpl::BackgroundCallFlush:ContextCleanedUp",
+        "GlobalAndWBMSetupDelay:WaitForMemFree"}});
+  SyncPoint::GetInstance()->EnableProcessing();
+
   // verify that theres no delay
   for (int i = 0; i < num_dbs; i++) {
     ASSERT_FALSE(IsDbWriteDelayed(dbimpls_[i]));
@@ -387,6 +394,15 @@ TEST_F(GlobalWriteControllerTest, GlobalAndWBMSetupDelay) {
 
   // clear the memory usage
   ASSERT_OK(dbs_[0]->Flush(FlushOptions()));
+
+  // The Flush waits for imm()->NumNotFlushed() == 0 which happens in
+  // MemTableListVersion::Remove inside FlushJob::Run. However, the WBM memory
+  // is only freed after FlushJob::Run() ends in job_context.Clean() under
+  // DBImpl::BackgroundCallFlush right after PurgeObsoleteFiles. So the Flush
+  // call can return before the memory is actually freed thats why we need wait
+  // until the memory is actually freed in job_context.Clean().
+  TEST_SYNC_POINT("GlobalAndWBMSetupDelay:WaitForMemFree");
+
   // there should only be 2k per memtable left
   ASSERT_TRUE(options.write_buffer_manager->memory_usage() < 5_kb);
 

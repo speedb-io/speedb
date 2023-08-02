@@ -46,7 +46,7 @@ class StallInterface {
 
 class WriteBufferManager final {
  public:
-  // Delay Mechanism (allow_delays_and_stalls == true) definitions
+  // Delay Mechanism (allow_stall == true) definitions
   static constexpr uint16_t kDfltStartDelayPercentThreshold = 70U;
   static constexpr uint64_t kNoDelayedWriteFactor = 0U;
   static constexpr uint64_t kMaxDelayedWriteFactor = 100U;
@@ -72,7 +72,7 @@ class WriteBufferManager final {
     size_t max_num_parallel_flushes = kDfltMaxNumParallelFlushes;
   };
 
-  static constexpr bool kDfltAllowDelaysAndStalls = true;
+  static constexpr bool kDfltAllowStall = false;
   static constexpr bool kDfltInitiateFlushes = true;
 
  public:
@@ -84,7 +84,7 @@ class WriteBufferManager final {
   // cost the memory allocated to the cache. It can be used even if _buffer_size
   // = 0.
   //
-  // allow_delays_and_stalls: if set true, will enable delays and stall as
+  // allow_stall: if set true, will enable delays and stall as
   // described below:
   //  Delays: delay writes when memory_usage() exceeds the
   //    start_delay_percent percent threshold of the buffer size.
@@ -102,7 +102,7 @@ class WriteBufferManager final {
   // write-path of a DB.
   explicit WriteBufferManager(
       size_t _buffer_size, std::shared_ptr<Cache> cache = {},
-      bool allow_delays_and_stalls = kDfltAllowDelaysAndStalls,
+      bool allow_stall = kDfltAllowStall,
       bool initiate_flushes = kDfltInitiateFlushes,
       const FlushInitiationOptions& flush_initiation_options =
           FlushInitiationOptions(),
@@ -201,12 +201,11 @@ class WriteBufferManager final {
   // We stall the writes untill memory_usage drops below buffer_size. When the
   // function returns true, all writer threads (including one checking this
   // condition) across all DBs will be stalled. Stall is allowed only if user
-  // pass allow_delays_and_stalls = true during WriteBufferManager instance
-  // creation.
+  // pass allow_stall = true during WriteBufferManager instance creation.
   //
   // Should only be called by RocksDB internally .
   bool ShouldStall() const {
-    if (!allow_delays_and_stalls_ || !enabled()) {
+    if (!allow_stall_ || !enabled()) {
       return false;
     }
 
@@ -302,11 +301,11 @@ class WriteBufferManager final {
     return ParseCodedUsageState(GetCodedUsageState());
   }
 
-  void UpdateUsageState(size_t new_memory_used, ssize_t mem_changed_size,
+  void UpdateUsageState(size_t new_memory_used, int64_t mem_changed_size,
                         size_t quota);
 
   uint64_t CalcNewCodedUsageState(size_t new_memory_used,
-                                  ssize_t memory_changed_size, size_t quota,
+                                  int64_t memory_changed_size, size_t quota,
                                   uint64_t old_coded_usage_state);
 
   uint64_t GetCodedUsageState() const {
@@ -354,7 +353,7 @@ class WriteBufferManager final {
   std::list<StallInterface*> queue_;
   // Protects the queue_ and stall_active_.
   std::mutex mu_;
-  bool allow_delays_and_stalls_ = kDfltAllowDelaysAndStalls;
+  bool allow_stall_ = kDfltAllowStall;
   uint16_t start_delay_percent_ = kDfltStartDelayPercentThreshold;
 
   // Value should only be changed by BeginWriteStall() and MaybeEndWriteStall()

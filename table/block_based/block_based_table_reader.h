@@ -51,6 +51,8 @@ struct BlockBasedTableOptions;
 struct EnvOptions;
 struct ReadOptions;
 class GetContext;
+struct PinnedEntry;
+struct TablePinningOptions;
 
 using KVPairBlock = std::vector<std::pair<std::string, std::string>>;
 
@@ -103,7 +105,7 @@ class BlockBasedTable : public TableReader {
           nullptr,
       const std::shared_ptr<const SliceTransform>& prefix_extractor = nullptr,
       bool prefetch_index_and_filter_in_cache = true, bool skip_filters = false,
-      int level = -1, const bool immortal_table = false,
+      int level = -1, bool is_bottom = false, const bool immortal_table = false,
       const SequenceNumber largest_seqno = 0,
       bool force_direct_prefetch = false,
       TailPrefetchStats* tail_prefetch_stats = nullptr,
@@ -272,6 +274,10 @@ class BlockBasedTable : public TableReader {
   Rep* get_rep() { return rep_; }
   const Rep* get_rep() const { return rep_; }
 
+  TablePinningPolicy* GetPinningPolicy() const;
+  bool PinData(const TablePinningOptions& tpo, uint8_t type, size_t size,
+               std::unique_ptr<PinnedEntry>* pinned) const;
+  void UnPinData(std::unique_ptr<PinnedEntry>&& pinned) const;
   // input_iter: if it is not null, update this one and return it as Iterator
   template <typename TBlockIter>
   TBlockIter* NewDataBlockIterator(const ReadOptions& ro,
@@ -418,9 +424,10 @@ class BlockBasedTable : public TableReader {
   // need to access extra meta blocks for index construction. This parameter
   // helps avoid re-reading meta index block if caller already created one.
   Status CreateIndexReader(const ReadOptions& ro,
+                           const TablePinningOptions& tpo,
                            FilePrefetchBuffer* prefetch_buffer,
                            InternalIterator* preloaded_meta_index_iter,
-                           bool use_cache, bool prefetch, bool pin,
+                           bool use_cache, bool prefetch,
                            BlockCacheLookupContext* lookup_context,
                            std::unique_ptr<IndexReader>* index_reader);
 
@@ -461,7 +468,7 @@ class BlockBasedTable : public TableReader {
       const ReadOptions& ro, FilePrefetchBuffer* prefetch_buffer,
       InternalIterator* meta_iter, BlockBasedTable* new_table,
       bool prefetch_all, const BlockBasedTableOptions& table_options,
-      const int level, size_t file_size, size_t max_file_size_for_l0_meta_pin,
+      const TablePinningOptions& pinning_options,
       BlockCacheLookupContext* lookup_context);
 
   static BlockType GetBlockTypeForMetaBlockByName(const Slice& meta_block_name);
@@ -472,9 +479,9 @@ class BlockBasedTable : public TableReader {
 
   // Create the filter from the filter block.
   std::unique_ptr<FilterBlockReader> CreateFilterBlockReader(
-      const ReadOptions& ro, FilePrefetchBuffer* prefetch_buffer,
-      bool use_cache, bool prefetch, bool pin,
-      BlockCacheLookupContext* lookup_context);
+      const ReadOptions& ro, const TablePinningOptions& tpo,
+      FilePrefetchBuffer* prefetch_buffer, bool use_cache, bool prefetch,
+      bool pin, BlockCacheLookupContext* lookup_context);
 
   // Size of all data blocks, maybe approximate
   uint64_t GetApproximateDataSize();

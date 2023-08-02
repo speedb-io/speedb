@@ -64,6 +64,7 @@
 #include "rocksdb/slice_transform.h"
 #include "rocksdb/stats_history.h"
 #include "rocksdb/table.h"
+#include "rocksdb/table_pinning_policy.h"
 #include "rocksdb/utilities/backup_engine.h"
 #include "rocksdb/utilities/db_ttl.h"
 #include "rocksdb/utilities/object_registry.h"
@@ -800,6 +801,8 @@ DEFINE_bool(
     "Pin unpartitioned index/filter blocks in block cache."
     " Note `cache_index_and_filter_blocks` must be true for this option to have"
     " any effect.");
+
+DEFINE_string(pinning_policy, "", "URI for registry TablePinningPolicy");
 
 DEFINE_int32(block_size,
              static_cast<int32_t>(
@@ -4162,6 +4165,12 @@ class Benchmark {
 
     if (dbstats) {
       fprintf(stdout, "STATISTICS:\n%s\n", dbstats->ToString().c_str());
+      const auto bbto =
+          open_options_.table_factory->GetOptions<BlockBasedTableOptions>();
+      if (bbto != nullptr && bbto->pinning_policy) {
+        fprintf(stdout, "PINNING STATISTICS:\n%s\n",
+                bbto->pinning_policy->ToString().c_str());
+      }
     }
     if (FLAGS_simcache_size >= 0) {
       fprintf(
@@ -4811,6 +4820,15 @@ class Benchmark {
                 FLAGS_prepopulate_blob_cache);
       } else {
         fprintf(stdout, "Integrated BlobDB: blob cache disabled\n");
+      }
+      if (!FLAGS_pinning_policy.empty()) {
+        s = TablePinningPolicy::CreateFromString(
+            config_options, FLAGS_pinning_policy,
+            &block_based_options.pinning_policy);
+        if (!s.ok()) {
+          ErrorExit("Could not create pinning policy: %s",
+                    s.ToString().c_str());
+        }
       }
 
       options.table_factory.reset(

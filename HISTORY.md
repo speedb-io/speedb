@@ -1,7 +1,7 @@
 # Speedb Change Log 
 
 ## Unreleased
-
+* Add a TablePinningPolicy to the BlockBasedTableOptions.  This class controls when blocks should be pinned in memory for a block based table.  The default behavior uses the MetadataCacheOptions to control pinning and behaves identical to the previous releases. 
 ### Enhancements
 * db_bench: add estimate-table-readers-mem benchmark which prints these stats.
 

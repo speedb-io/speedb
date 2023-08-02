@@ -105,12 +105,13 @@ class PartitionedFilterBlockReader
  public:
   PartitionedFilterBlockReader(
       const BlockBasedTable* t,
-      CachableEntry<Block_kFilterPartitionIndex>&& filter_block);
-
+      CachableEntry<Block_kFilterPartitionIndex>&& filter_block,
+      std::unique_ptr<PinnedEntry>&& pinned);
   static std::unique_ptr<FilterBlockReader> Create(
       const BlockBasedTable* table, const ReadOptions& ro,
-      FilePrefetchBuffer* prefetch_buffer, bool use_cache, bool prefetch,
-      bool pin, BlockCacheLookupContext* lookup_context);
+      const TablePinningOptions& tpo, FilePrefetchBuffer* prefetch_buffer,
+      bool use_cache, bool prefetch, bool pin,
+      BlockCacheLookupContext* lookup_context);
 
   bool KeyMayMatch(const Slice& key, const bool no_io,
                    const Slice* const const_ikey_ptr, GetContext* get_context,

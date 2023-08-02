@@ -12,6 +12,8 @@
 #include "table/block_based/reader_common.h"
 
 namespace ROCKSDB_NAMESPACE {
+struct PinnedEntry;
+
 // Encapsulates common functionality for the various index reader
 // implementations. Provides access to the index block regardless of whether
 // it is owned by the reader or stored in the cache, or whether it is pinned
@@ -19,10 +21,15 @@ namespace ROCKSDB_NAMESPACE {
 class BlockBasedTable::IndexReaderCommon : public BlockBasedTable::IndexReader {
  public:
   IndexReaderCommon(const BlockBasedTable* t,
-                    CachableEntry<Block>&& index_block)
-      : table_(t), index_block_(std::move(index_block)) {
+                    CachableEntry<Block>&& index_block,
+                    std::unique_ptr<PinnedEntry>&& pinned)
+      : table_(t),
+        index_block_(std::move(index_block)),
+        pinned_(std::move(pinned)) {
     assert(table_ != nullptr);
   }
+
+  ~IndexReaderCommon() override;
 
  protected:
   static Status ReadIndexBlock(const BlockBasedTable* table,
@@ -80,6 +87,7 @@ class BlockBasedTable::IndexReaderCommon : public BlockBasedTable::IndexReader {
  private:
   const BlockBasedTable* table_;
   CachableEntry<Block> index_block_;
+  std::unique_ptr<PinnedEntry> pinned_;
 };
 
 }  // namespace ROCKSDB_NAMESPACE

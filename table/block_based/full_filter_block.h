@@ -15,6 +15,7 @@
 #include "rocksdb/options.h"
 #include "rocksdb/slice.h"
 #include "rocksdb/slice_transform.h"
+#include "rocksdb/table_pinning_policy.h"
 #include "table/block_based/filter_block_reader_common.h"
 #include "table/block_based/filter_policy_internal.h"
 #include "table/block_based/parsed_full_filter_block.h"
@@ -25,6 +26,8 @@ namespace ROCKSDB_NAMESPACE {
 class FilterPolicy;
 class FilterBitsBuilder;
 class FilterBitsReader;
+struct PinnedEntry;
+struct TablePinningOptions;
 
 // A FullFilterBlockBuilder is used to construct a full filter for a
 // particular Table.  It generates a single string which is stored as
@@ -97,13 +100,16 @@ class FullFilterBlockBuilder : public FilterBlockBuilder {
 class FullFilterBlockReader
     : public FilterBlockReaderCommon<ParsedFullFilterBlock> {
  public:
-  FullFilterBlockReader(const BlockBasedTable* t,
-                        CachableEntry<ParsedFullFilterBlock>&& filter_block);
+  FullFilterBlockReader(
+      const BlockBasedTable* t,
+      CachableEntry<ParsedFullFilterBlock>&& filter_block,
+      std::unique_ptr<PinnedEntry>&& pinned = std::unique_ptr<PinnedEntry>());
 
   static std::unique_ptr<FilterBlockReader> Create(
       const BlockBasedTable* table, const ReadOptions& ro,
-      FilePrefetchBuffer* prefetch_buffer, bool use_cache, bool prefetch,
-      bool pin, BlockCacheLookupContext* lookup_context);
+      const TablePinningOptions& tpo, FilePrefetchBuffer* prefetch_buffer,
+      bool use_cache, bool prefetch, bool pin,
+      BlockCacheLookupContext* lookup_context);
 
   bool KeyMayMatch(const Slice& key, const bool no_io,
                    const Slice* const const_ikey_ptr, GetContext* get_context,

@@ -12,6 +12,7 @@
 * build: Windows compilation fix (#568).
 * Logger: fix Block cache stats trace by spacing it from the last trace (#578).
 * WriteController: move the class to public interface which should have been done under #346.
+* unit tests: fix DBCompactionTest.DisableMultiManualCompaction by blocking all bg compaction threads which increased by default to 8 in #194. 
 
 ## Fig v2.5.0 (06/14/2023)
 Based on RocksDB 8.1.1

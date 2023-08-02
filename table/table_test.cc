@@ -447,7 +447,7 @@ class TableConstructor : public Constructor {
                            *last_internal_comparator_,
                            0 /* block_protection_bytes_per_key */,
                            /*skip_filters*/ false,
-                           /*immortal*/ false, false, level_,
+                           /*immortal*/ false, false, level_, false,
                            &block_cache_tracer_, moptions.write_buffer_size, "",
                            file_num_, kNullUniqueId64x2, largest_seqno_),
         std::move(file_reader_), TEST_GetSink()->contents().size(),

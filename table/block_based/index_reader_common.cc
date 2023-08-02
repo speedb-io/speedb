@@ -8,9 +8,14 @@
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 #include "table/block_based/index_reader_common.h"
 
-#include "block_cache.h"
+#include "rocksdb/table_pinning_policy.h"
+#include "table/block_based/block_cache.h"
 
 namespace ROCKSDB_NAMESPACE {
+BlockBasedTable::IndexReaderCommon::~IndexReaderCommon() {
+  table_->UnPinData(std::move(pinned_));
+}
+
 Status BlockBasedTable::IndexReaderCommon::ReadIndexBlock(
     const BlockBasedTable* table, FilePrefetchBuffer* prefetch_buffer,
     const ReadOptions& read_options, bool use_cache, GetContext* get_context,

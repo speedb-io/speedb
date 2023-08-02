@@ -8,19 +8,21 @@
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 #include "table/block_based/binary_search_index_reader.h"
 
+#include "rocksdb/table_pinning_policy.h"
+
 namespace ROCKSDB_NAMESPACE {
 Status BinarySearchIndexReader::Create(
     const BlockBasedTable* table, const ReadOptions& ro,
-    FilePrefetchBuffer* prefetch_buffer, bool use_cache, bool prefetch,
-    bool pin, BlockCacheLookupContext* lookup_context,
+    const TablePinningOptions& tpo, FilePrefetchBuffer* prefetch_buffer,
+    bool use_cache, bool prefetch, bool pin,
+    BlockCacheLookupContext* lookup_context,
     std::unique_ptr<IndexReader>* index_reader) {
   assert(table != nullptr);
-  assert(table->get_rep());
-  assert(!pin || prefetch);
   assert(index_reader != nullptr);
 
+  std::unique_ptr<PinnedEntry> pinned;
   CachableEntry<Block> index_block;
-  if (prefetch || !use_cache) {
+  if (prefetch || pin || !use_cache) {
     const Status s =
         ReadIndexBlock(table, prefetch_buffer, ro, use_cache,
                        /*get_context=*/nullptr, lookup_context, &index_block);
@@ -28,13 +30,17 @@ Status BinarySearchIndexReader::Create(
       return s;
     }
 
-    if (use_cache && !pin) {
+    if (pin) {
+      table->PinData(tpo, TablePinningPolicy::kIndex,
+                     index_block.GetValue()->ApproximateMemoryUsage(), &pinned);
+    }
+    if (use_cache && !pinned) {
       index_block.Reset();
     }
   }
 
-  index_reader->reset(
-      new BinarySearchIndexReader(table, std::move(index_block)));
+  index_reader->reset(new BinarySearchIndexReader(table, std::move(index_block),
+                                                  std::move(pinned)));
 
   return Status::OK();
 }

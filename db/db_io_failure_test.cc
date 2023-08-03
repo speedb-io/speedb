@@ -20,7 +20,7 @@ class DBIOFailureTest : public DBTestBase {
 };
 
 // Check that number of files does not grow when writes are dropped
-TEST_F(DBIOFailureTest, DISABLED_DropWrites) {
+TEST_F(DBIOFailureTest, DropWrites) {
   do {
     Options options = CurrentOptions();
     options.env = env_;
@@ -30,7 +30,7 @@ TEST_F(DBIOFailureTest, DISABLED_DropWrites) {
     ASSERT_OK(Put("foo", "v1"));
     ASSERT_EQ("v1", Get("foo"));
     Compact("a", "z");
-    const size_t num_files = CountFiles();
+    const auto num_files = GetSstFileCount(dbname_);
     // Force out-of-space errors
     env_->drop_writes_.store(true, std::memory_order_release);
     env_->sleep_counter_.Reset();
@@ -59,7 +59,7 @@ TEST_F(DBIOFailureTest, DISABLED_DropWrites) {
     ASSERT_EQ("5", property_value);
 
     env_->drop_writes_.store(false, std::memory_order_release);
-    const size_t count = CountFiles();
+    const auto count = GetSstFileCount(dbname_);
     ASSERT_LT(count, num_files + 3);
 
     // Check that compaction attempts slept after errors

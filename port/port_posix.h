@@ -13,7 +13,7 @@
 
 #include <thread>
 
-#include "rocksdb/options.h"
+#include "rocksdb/port_defs.h"
 #include "rocksdb/rocksdb_namespace.h"
 
 // size_t printf formatting named in the manner of C99 standard formatting
@@ -25,45 +25,48 @@
 
 #undef PLATFORM_IS_LITTLE_ENDIAN
 #if defined(OS_MACOSX)
-  #include <machine/endian.h>
-  #if defined(__DARWIN_LITTLE_ENDIAN) && defined(__DARWIN_BYTE_ORDER)
-    #define PLATFORM_IS_LITTLE_ENDIAN \
-        (__DARWIN_BYTE_ORDER == __DARWIN_LITTLE_ENDIAN)
-  #endif
+#include <machine/endian.h>
+#if defined(__DARWIN_LITTLE_ENDIAN) && defined(__DARWIN_BYTE_ORDER)
+#define PLATFORM_IS_LITTLE_ENDIAN \
+  (__DARWIN_BYTE_ORDER == __DARWIN_LITTLE_ENDIAN)
+#endif
 #elif defined(OS_SOLARIS)
-  #include <sys/isa_defs.h>
-  #ifdef _LITTLE_ENDIAN
-    #define PLATFORM_IS_LITTLE_ENDIAN true
-  #else
-    #define PLATFORM_IS_LITTLE_ENDIAN false
-  #endif
-  #include <alloca.h>
+#include <sys/isa_defs.h>
+#ifdef _LITTLE_ENDIAN
+#define PLATFORM_IS_LITTLE_ENDIAN true
+#else
+#define PLATFORM_IS_LITTLE_ENDIAN false
+#endif
+#include <alloca.h>
 #elif defined(OS_AIX)
-  #include <sys/types.h>
-  #include <arpa/nameser_compat.h>
-  #define PLATFORM_IS_LITTLE_ENDIAN (BYTE_ORDER == LITTLE_ENDIAN)
-  #include <alloca.h>
+#include <arpa/nameser_compat.h>
+#include <sys/types.h>
+#define PLATFORM_IS_LITTLE_ENDIAN (BYTE_ORDER == LITTLE_ENDIAN)
+#include <alloca.h>
 #elif defined(OS_FREEBSD) || defined(OS_OPENBSD) || defined(OS_NETBSD) || \
     defined(OS_DRAGONFLYBSD) || defined(OS_ANDROID)
-  #include <sys/endian.h>
-  #include <sys/types.h>
-  #define PLATFORM_IS_LITTLE_ENDIAN (_BYTE_ORDER == _LITTLE_ENDIAN)
+#include <sys/endian.h>
+#include <sys/types.h>
+#define PLATFORM_IS_LITTLE_ENDIAN (_BYTE_ORDER == _LITTLE_ENDIAN)
 #else
-  #include <endian.h>
+#include <endian.h>
 #endif
 #include <pthread.h>
-
 #include <stdint.h>
 #include <string.h>
+
+#include <atomic>
+#include <condition_variable>
 #include <limits>
+#include <mutex>
 #include <string>
 
 #ifndef PLATFORM_IS_LITTLE_ENDIAN
 #define PLATFORM_IS_LITTLE_ENDIAN (__BYTE_ORDER == __LITTLE_ENDIAN)
 #endif
 
-#if defined(OS_MACOSX) || defined(OS_SOLARIS) || defined(OS_FREEBSD) ||\
-    defined(OS_NETBSD) || defined(OS_OPENBSD) || defined(OS_DRAGONFLYBSD) ||\
+#if defined(OS_MACOSX) || defined(OS_SOLARIS) || defined(OS_FREEBSD) ||      \
+    defined(OS_NETBSD) || defined(OS_OPENBSD) || defined(OS_DRAGONFLYBSD) || \
     defined(OS_ANDROID) || defined(CYGWIN) || defined(OS_AIX)
 // Use fread/fwrite/fflush on platforms without _unlocked variants
 #define fread_unlocked fread
@@ -71,8 +74,8 @@
 #define fflush_unlocked fflush
 #endif
 
-#if defined(OS_MACOSX) || defined(OS_FREEBSD) ||\
-    defined(OS_OPENBSD) || defined(OS_DRAGONFLYBSD)
+#if defined(OS_MACOSX) || defined(OS_FREEBSD) || defined(OS_OPENBSD) || \
+    defined(OS_DRAGONFLYBSD)
 // Use fsync() on platforms without fdatasync()
 #define fdatasync fsync
 #endif
@@ -139,10 +142,23 @@ class RWMutex {
   void WriteLock();
   void ReadUnlock();
   void WriteUnlock();
-  void AssertHeld() { }
+  void AssertHeld() {}
 
  protected:
   pthread_rwlock_t mu_; // the underlying platform mutex
+};
+
+// RWLock with write preference
+class RWMutexWr : public RWMutex {
+ public:
+  RWMutexWr();
+  void ReadLock();
+  void WriteLock();
+
+ private:
+  std::atomic<int> m_wr_pending;
+  std::mutex wr_pending_mutex_;
+  std::condition_variable wr_pending_cv_;
 };
 
 // RWLock with write preference
@@ -167,6 +183,7 @@ class CondVar {
   bool TimedWait(uint64_t abs_time_us);
   void Signal();
   void SignalAll();
+
  private:
   pthread_cond_t cv_;
   Mutex* mu_;
@@ -181,6 +198,8 @@ static inline void AsmVolatilePause() {
   asm volatile("isb");
 #elif defined(__powerpc64__)
   asm volatile("or 27,27,27");
+#elif defined(__loongarch64)
+  asm volatile("dbar 0");
 #endif
   // it's okay for other platforms to be no-ops
 }
@@ -218,9 +237,9 @@ extern void InitOnce(OnceType* once, void (*initializer)());
 static_assert((CACHE_LINE_SIZE & (CACHE_LINE_SIZE - 1)) == 0,
               "Cache line size must be a power of 2 number of bytes");
 
-extern void *cacheline_aligned_alloc(size_t size);
+extern void* cacheline_aligned_alloc(size_t size);
 
-extern void cacheline_aligned_free(void *memblock);
+extern void cacheline_aligned_free(void* memblock);
 
 #if defined(__aarch64__)
 //  __builtin_prefetch(..., 1) turns into a prefetch into prfm pldl3keep. On

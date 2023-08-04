@@ -101,49 +101,4 @@ std::string BlockCacheEntryStatsMapKeys::UsedPercent(CacheEntryRole role) {
   return GetPrefixedCacheEntryRoleName(kPrefix, role);
 }
 
-const std::string& BlockCacheCfStatsMapKeys::CfName() {
-  static const std::string kCfName = "cf_name";
-  return kCfName;
-}
-
-const std::string& BlockCacheCfStatsMapKeys::CacheId() {
-  static const std::string kCacheId = "id";
-  return kCacheId;
-}
-
-std::string BlockCacheCfStatsMapKeys::UsedBytes(CacheEntryRole role) {
-  const static std::string kPrefix = "bytes.";
-  return GetPrefixedCacheEntryRoleName(kPrefix, role);
-}
-
-namespace {
-
-struct Registry {
-  std::mutex mutex;
-  UnorderedMap<Cache::DeleterFn, CacheEntryRole> role_map;
-  void Register(Cache::DeleterFn fn, CacheEntryRole role) {
-    std::lock_guard<std::mutex> lock(mutex);
-    role_map[fn] = role;
-  }
-  UnorderedMap<Cache::DeleterFn, CacheEntryRole> Copy() {
-    std::lock_guard<std::mutex> lock(mutex);
-    return role_map;
-  }
-};
-
-Registry& GetRegistry() {
-  STATIC_AVOID_DESTRUCTION(Registry, registry);
-  return registry;
-}
-
-}  // namespace
-
-void RegisterCacheDeleterRole(Cache::DeleterFn fn, CacheEntryRole role) {
-  GetRegistry().Register(fn, role);
-}
-
-UnorderedMap<Cache::DeleterFn, CacheEntryRole> CopyCacheDeleterRoleMap() {
-  return GetRegistry().Copy();
-}
-
 }  // namespace ROCKSDB_NAMESPACE

@@ -29,7 +29,7 @@ int64_t MaybeCurrentTime(Env* env) {
   env->GetCurrentTime(&time).PermitUncheckedError();
   return time;
 }
-}  // namespace
+}  // anonymous namespace
 
 // Special Env used to delay background operations
 
@@ -70,7 +70,6 @@ DBTestBase::DBTestBase(const std::string path, bool env_do_fsync)
   if (getenv("MEM_ENV")) {
     mem_env_ = MockEnv::Create(base_env, base_env->GetSystemClock());
   }
-#ifndef ROCKSDB_LITE
   if (getenv("ENCRYPTED_ENV")) {
     std::shared_ptr<EncryptionProvider> provider;
     std::string provider_id = getenv("ENCRYPTED_ENV");
@@ -82,7 +81,6 @@ DBTestBase::DBTestBase(const std::string path, bool env_do_fsync)
                                                    &provider));
     encrypted_env_ = NewEncryptedEnv(mem_env_ ? mem_env_ : base_env, provider);
   }
-#endif  // !ROCKSDB_LITE
   env_ = new SpecialEnv(encrypted_env_ ? encrypted_env_
                                        : (mem_env_ ? mem_env_ : base_env));
   env_->SetBackgroundThreads(1, Env::LOW);
@@ -135,63 +133,46 @@ void DBTestBase::RecalculateWriteStallConditions(
 }
 
 bool DBTestBase::IsDbWriteStopped(DBImpl* dbimpl) {
-  return dbimpl->TEST_write_controler()->IsStopped();
+  return dbimpl->write_controller_ptr()->IsStopped();
 }
 
 bool DBTestBase::IsDbWriteDelayed(DBImpl* dbimpl) {
-  return dbimpl->TEST_write_controler()->NeedsDelay();
+  return dbimpl->write_controller_ptr()->NeedsDelay();
 }
 
 bool DBTestBase::ShouldSkipOptions(int option_config, int skip_mask) {
-#ifdef ROCKSDB_LITE
-    // These options are not supported in ROCKSDB_LITE
-    if (option_config == kHashSkipList ||
-        option_config == kPlainTableFirstBytePrefix ||
-        option_config == kPlainTableCappedPrefix ||
-        option_config == kPlainTableCappedPrefixNonMmap ||
-        option_config == kPlainTableAllBytesPrefix ||
-        option_config == kVectorRep || option_config == kHashLinkList ||
-        option_config == kUniversalCompaction ||
-        option_config == kUniversalCompactionMultiLevel ||
-        option_config == kUniversalSubcompactions ||
-        option_config == kFIFOCompaction ||
-        option_config == kConcurrentSkipList) {
-      return true;
-    }
-#endif
-
-    if ((skip_mask & kSkipUniversalCompaction) &&
-        (option_config == kUniversalCompaction ||
-         option_config == kUniversalCompactionMultiLevel ||
-         option_config == kUniversalSubcompactions)) {
-      return true;
-    }
-    if ((skip_mask & kSkipMergePut) && option_config == kMergePut) {
-      return true;
-    }
-    if ((skip_mask & kSkipNoSeekToLast) &&
-        (option_config == kHashLinkList || option_config == kHashSkipList)) {
-      return true;
-    }
-    if ((skip_mask & kSkipPlainTable) &&
-        (option_config == kPlainTableAllBytesPrefix ||
-         option_config == kPlainTableFirstBytePrefix ||
-         option_config == kPlainTableCappedPrefix ||
-         option_config == kPlainTableCappedPrefixNonMmap)) {
-      return true;
-    }
-    if ((skip_mask & kSkipHashIndex) &&
-        (option_config == kBlockBasedTableWithPrefixHashIndex ||
-         option_config == kBlockBasedTableWithWholeKeyHashIndex)) {
-      return true;
-    }
-    if ((skip_mask & kSkipFIFOCompaction) && option_config == kFIFOCompaction) {
-      return true;
-    }
-    if ((skip_mask & kSkipMmapReads) && option_config == kWalDirAndMmapReads) {
-      return true;
-    }
-    return false;
+  if ((skip_mask & kSkipUniversalCompaction) &&
+      (option_config == kUniversalCompaction ||
+       option_config == kUniversalCompactionMultiLevel ||
+       option_config == kUniversalSubcompactions)) {
+    return true;
+  }
+  if ((skip_mask & kSkipMergePut) && option_config == kMergePut) {
+    return true;
+  }
+  if ((skip_mask & kSkipNoSeekToLast) &&
+      (option_config == kHashLinkList || option_config == kHashSkipList)) {
+    return true;
+  }
+  if ((skip_mask & kSkipPlainTable) &&
+      (option_config == kPlainTableAllBytesPrefix ||
+       option_config == kPlainTableFirstBytePrefix ||
+       option_config == kPlainTableCappedPrefix ||
+       option_config == kPlainTableCappedPrefixNonMmap)) {
+    return true;
+  }
+  if ((skip_mask & kSkipHashIndex) &&
+      (option_config == kBlockBasedTableWithPrefixHashIndex ||
+       option_config == kBlockBasedTableWithWholeKeyHashIndex)) {
+    return true;
+  }
+  if ((skip_mask & kSkipFIFOCompaction) && option_config == kFIFOCompaction) {
+    return true;
+  }
+  if ((skip_mask & kSkipMmapReads) && option_config == kWalDirAndMmapReads) {
+    return true;
+  }
+  return false;
 }
 
 // Switch to a fresh database with the next option configuration to
@@ -396,7 +377,6 @@ Options DBTestBase::GetOptions(
 
   bool can_allow_mmap = IsMemoryMappedAccessSupported();
   switch (option_config) {
-#ifndef ROCKSDB_LITE
     case kHashSkipList:
       options.prefix_extractor.reset(NewFixedPrefixTransform(1));
       options.memtable_factory.reset(NewHashSkipListRepFactory(16));
@@ -443,14 +423,13 @@ Options DBTestBase::GetOptions(
       options.allow_concurrent_memtable_write = false;
       options.unordered_write = false;
       break;
-      case kDirectIO: {
-        options.use_direct_reads = true;
-        options.use_direct_io_for_flush_and_compaction = true;
-        options.compaction_readahead_size = 2 * 1024 * 1024;
-        SetupSyncPointsToMockDirectIO();
-        break;
-      }
-#endif  // ROCKSDB_LITE
+    case kDirectIO: {
+      options.use_direct_reads = true;
+      options.use_direct_io_for_flush_and_compaction = true;
+      options.compaction_readahead_size = 2 * 1024 * 1024;
+      SetupSyncPointsToMockDirectIO();
+      break;
+    }
     case kMergePut:
       options.merge_operator = MergeOperators::CreatePutOperator();
       break;
@@ -499,15 +478,13 @@ Options DBTestBase::GetOptions(
       options.compaction_style = kCompactionStyleUniversal;
       options.num_levels = 8;
       break;
-    case kCompressedBlockCache:
-      options.allow_mmap_writes = can_allow_mmap;
-      table_options.block_cache_compressed = NewLRUCache(8 * 1024 * 1024);
-      break;
     case kInfiniteMaxOpenFiles:
       options.max_open_files = -1;
       break;
-    case kXXH3Checksum: {
-      table_options.checksum = kXXH3;
+    case kCRC32cChecksum: {
+      // Old default was CRC32c, but XXH3 (new default) is faster on common
+      // hardware
+      table_options.checksum = kCRC32c;
       // Thrown in here for basic coverage:
       options.DisableExtraChecks();
       break;
@@ -723,7 +700,6 @@ void DBTestBase::Destroy(const Options& options, bool delete_cf_paths) {
   if (delete_cf_paths) {
     for (size_t i = 0; i < handles_.size(); ++i) {
       ColumnFamilyDescriptor cfdescriptor;
-      // GetDescriptor is not implemented for ROCKSDB_LITE
       handles_[i]->GetDescriptor(&cfdescriptor).PermitUncheckedError();
       column_families.push_back(cfdescriptor);
     }
@@ -982,6 +958,25 @@ std::string DBTestBase::Contents(int cf) {
   return result;
 }
 
+void DBTestBase::CheckAllEntriesWithFifoReopen(
+    const std::string& expected_value, const Slice& user_key, int cf,
+    const std::vector<std::string>& cfs, const Options& options) {
+  ASSERT_EQ(AllEntriesFor(user_key, cf), expected_value);
+
+  std::vector<std::string> cfs_plus_default = cfs;
+  cfs_plus_default.insert(cfs_plus_default.begin(), kDefaultColumnFamilyName);
+
+  Options fifo_options(options);
+  fifo_options.compaction_style = kCompactionStyleFIFO;
+  fifo_options.max_open_files = -1;
+  fifo_options.disable_auto_compactions = true;
+  ASSERT_OK(TryReopenWithColumnFamilies(cfs_plus_default, fifo_options));
+  ASSERT_EQ(AllEntriesFor(user_key, cf), expected_value);
+
+  ASSERT_OK(TryReopenWithColumnFamilies(cfs_plus_default, options));
+  ASSERT_EQ(AllEntriesFor(user_key, cf), expected_value);
+}
+
 std::string DBTestBase::AllEntriesFor(const Slice& user_key, int cf) {
   Arena arena;
   auto options = CurrentOptions();
@@ -1044,7 +1039,6 @@ std::string DBTestBase::AllEntriesFor(const Slice& user_key, int cf) {
   return result;
 }
 
-#ifndef ROCKSDB_LITE
 int DBTestBase::NumSortedRuns(int cf) {
   ColumnFamilyMetaData cf_meta;
   if (cf == 0) {
@@ -1163,7 +1157,6 @@ std::string DBTestBase::FilesPerLevel(int cf) {
   return result;
 }
 
-#endif  // !ROCKSDB_LITE
 
 std::vector<uint64_t> DBTestBase::GetBlobFileNumbers() {
   VersionSet* const versions = dbfull()->GetVersionSet();
@@ -1281,7 +1274,6 @@ void DBTestBase::MoveFilesToLevel(int level, int cf) {
   }
 }
 
-#ifndef ROCKSDB_LITE
 void DBTestBase::DumpFileCounts(const char* label) {
   fprintf(stderr, "---\n%s:\n", label);
   fprintf(stderr, "maxoverlap: %" PRIu64 "\n",
@@ -1293,7 +1285,6 @@ void DBTestBase::DumpFileCounts(const char* label) {
     }
   }
 }
-#endif  // !ROCKSDB_LITE
 
 std::string DBTestBase::DumpSSTableList() {
   std::string property;
@@ -1305,12 +1296,14 @@ void DBTestBase::GetSstFiles(Env* env, std::string path,
                              std::vector<std::string>* files) {
   EXPECT_OK(env->GetChildren(path, files));
 
-  files->erase(
-      std::remove_if(files->begin(), files->end(), [](std::string name) {
-        uint64_t number;
-        FileType type;
-        return !(ParseFileName(name, &number, &type) && type == kTableFile);
-      }), files->end());
+  files->erase(std::remove_if(files->begin(), files->end(),
+                              [](std::string name) {
+                                uint64_t number;
+                                FileType type;
+                                return !(ParseFileName(name, &number, &type) &&
+                                         type == kTableFile);
+                              }),
+               files->end());
 }
 
 int DBTestBase::GetSstFileCount(std::string path) {
@@ -1583,8 +1576,8 @@ void DBTestBase::VerifyDBFromMap(std::map<std::string, std::string> true_data,
       iter_cnt++;
       total_reads++;
     }
-    ASSERT_EQ(data_iter, true_data.end()) << iter_cnt << " / "
-                                          << true_data.size();
+    ASSERT_EQ(data_iter, true_data.end())
+        << iter_cnt << " / " << true_data.size();
     delete iter;
 
     // Verify Iterator::Prev()
@@ -1607,8 +1600,8 @@ void DBTestBase::VerifyDBFromMap(std::map<std::string, std::string> true_data,
       iter_cnt++;
       total_reads++;
     }
-    ASSERT_EQ(data_rev, true_data.rend()) << iter_cnt << " / "
-                                          << true_data.size();
+    ASSERT_EQ(data_rev, true_data.rend())
+        << iter_cnt << " / " << true_data.size();
 
     // Verify Iterator::Seek()
     for (auto kv : true_data) {
@@ -1621,7 +1614,6 @@ void DBTestBase::VerifyDBFromMap(std::map<std::string, std::string> true_data,
   }
 
   if (tailing_iter) {
-#ifndef ROCKSDB_LITE
     // Tailing iterator
     int iter_cnt = 0;
     ReadOptions ro;
@@ -1638,8 +1630,8 @@ void DBTestBase::VerifyDBFromMap(std::map<std::string, std::string> true_data,
       iter_cnt++;
       total_reads++;
     }
-    ASSERT_EQ(data_iter, true_data.end()) << iter_cnt << " / "
-                                          << true_data.size();
+    ASSERT_EQ(data_iter, true_data.end())
+        << iter_cnt << " / " << true_data.size();
 
     // Verify ForwardIterator::Seek()
     for (auto kv : true_data) {
@@ -1650,7 +1642,6 @@ void DBTestBase::VerifyDBFromMap(std::map<std::string, std::string> true_data,
     }
 
     delete iter;
-#endif  // ROCKSDB_LITE
   }
 
   if (total_reads_res) {
@@ -1678,7 +1669,6 @@ void DBTestBase::VerifyDBInternal(
   iter->~InternalIterator();
 }
 
-#ifndef ROCKSDB_LITE
 
 uint64_t DBTestBase::GetNumberOfSstFilesForColumnFamily(
     DB* db, std::string column_family_name) {
@@ -1699,7 +1689,6 @@ uint64_t DBTestBase::GetSstSizeHelper(Temperature temperature) {
       &prop));
   return static_cast<uint64_t>(std::atoi(prop.c_str()));
 }
-#endif  // ROCKSDB_LITE
 
 void VerifySstUniqueIds(const TablePropertiesCollection& props) {
   ASSERT_FALSE(props.empty());  // suspicious test if empty
@@ -1708,6 +1697,13 @@ void VerifySstUniqueIds(const TablePropertiesCollection& props) {
     std::string id;
     ASSERT_OK(GetUniqueIdFromTableProperties(*pair.second, &id));
     ASSERT_TRUE(seen.insert(id).second);
+  }
+}
+
+void DBTestBase::ResetWriteControllerTokens(DBImpl* db) {
+  auto versions = db->GetVersionSet();
+  for (auto* cfd : versions->GetRefedColumnFamilySet()) {
+    cfd->TEST_ResetWriteControllerToken();
   }
 }
 
@@ -1722,13 +1718,13 @@ TargetCacheChargeTrackingCache<R>::TargetCacheChargeTrackingCache(
       cache_charge_increments_sum_(0) {}
 
 template <CacheEntryRole R>
-Status TargetCacheChargeTrackingCache<R>::Insert(
-    const Slice& key, void* value, size_t charge,
-    void (*deleter)(const Slice& key, void* value), Handle** handle,
-    Priority priority, Cache::ItemOwnerId item_owner_id) {
-  Status s = target_->Insert(key, value, charge, deleter, handle, priority,
-                             item_owner_id);
-  if (deleter == kNoopDeleter) {
+Status TargetCacheChargeTrackingCache<R>::Insert(const Slice& key,
+                                                 ObjectPtr value,
+                                                 const CacheItemHelper* helper,
+                                                 size_t charge, Handle** handle,
+                                                 Priority priority) {
+  Status s = target_->Insert(key, value, helper, charge, handle, priority);
+  if (helper == kCrmHelper) {
     if (last_peak_tracked_) {
       cache_charge_peak_ = 0;
       cache_charge_increment_ = 0;
@@ -1747,8 +1743,8 @@ Status TargetCacheChargeTrackingCache<R>::Insert(
 template <CacheEntryRole R>
 bool TargetCacheChargeTrackingCache<R>::Release(Handle* handle,
                                                 bool erase_if_last_ref) {
-  auto deleter = GetDeleter(handle);
-  if (deleter == kNoopDeleter) {
+  auto helper = GetCacheItemHelper(handle);
+  if (helper == kCrmHelper) {
     if (!last_peak_tracked_) {
       cache_charge_peaks_.push_back(cache_charge_peak_);
       cache_charge_increments_sum_ += cache_charge_increment_;
@@ -1761,8 +1757,8 @@ bool TargetCacheChargeTrackingCache<R>::Release(Handle* handle,
 }
 
 template <CacheEntryRole R>
-const Cache::DeleterFn TargetCacheChargeTrackingCache<R>::kNoopDeleter =
-    CacheReservationManagerImpl<R>::TEST_GetNoopDeleterForRole();
+const Cache::CacheItemHelper* TargetCacheChargeTrackingCache<R>::kCrmHelper =
+    CacheReservationManagerImpl<R>::TEST_GetCacheItemHelperForRole();
 
 template class TargetCacheChargeTrackingCache<
     CacheEntryRole::kFilterConstruction>;

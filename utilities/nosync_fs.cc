@@ -11,7 +11,7 @@ namespace ROCKSDB_NAMESPACE {
 namespace {
 static std::unordered_map<std::string, OptionTypeInfo> no_sync_fs_option_info =
     {
-#ifndef ROCKSDB_LITE
+
         {"sync",
          {offsetof(struct NoSyncOptions, do_sync), OptionType::kBoolean,
           OptionVerificationType::kNormal, OptionTypeFlags::kCompareNever}},
@@ -24,7 +24,7 @@ static std::unordered_map<std::string, OptionTypeInfo> no_sync_fs_option_info =
         {"dir_sync",
          {offsetof(struct NoSyncOptions, do_dsync), OptionType::kBoolean,
           OptionVerificationType::kNormal, OptionTypeFlags::kCompareNever}},
-#endif  // ROCKSDB_LITE
+
 };
 }  // namespace
 

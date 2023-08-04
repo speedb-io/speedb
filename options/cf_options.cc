@@ -16,6 +16,7 @@
 #include "options/options_helper.h"
 #include "options/options_parser.h"
 #include "port/port.h"
+#include "rocksdb/advanced_cache.h"
 #include "rocksdb/compaction_filter.h"
 #include "rocksdb/concurrent_task_limiter.h"
 #include "rocksdb/configurable.h"
@@ -36,7 +37,6 @@
 
 namespace ROCKSDB_NAMESPACE {
 
-#ifndef ROCKSDB_LITE
 static Status ParseCompressionOptions(const std::string& value,
                                       const std::string& name,
                                       CompressionOptions& compression_opts) {
@@ -269,6 +269,11 @@ static std::unordered_map<std::string, OptionTypeInfo>
         {"max_compaction_bytes",
          {offsetof(struct MutableCFOptions, max_compaction_bytes),
           OptionType::kUInt64T, OptionVerificationType::kNormal,
+          OptionTypeFlags::kMutable}},
+        {"ignore_max_compaction_bytes_for_input",
+         {offsetof(struct MutableCFOptions,
+                   ignore_max_compaction_bytes_for_input),
+          OptionType::kBoolean, OptionVerificationType::kNormal,
           OptionTypeFlags::kMutable}},
         {"expanded_compaction_factor",
          {0, OptionType::kInt, OptionVerificationType::kDeprecated,
@@ -550,6 +555,11 @@ static std::unordered_map<std::string, OptionTypeInfo>
                    level_compaction_dynamic_level_bytes),
           OptionType::kBoolean, OptionVerificationType::kNormal,
           OptionTypeFlags::kNone}},
+        {"level_compaction_dynamic_file_size",
+         {offsetof(struct ImmutableCFOptions,
+                   level_compaction_dynamic_file_size),
+          OptionType::kBoolean, OptionVerificationType::kNormal,
+          OptionTypeFlags::kNone}},
         {"optimize_filters_for_hits",
          {offsetof(struct ImmutableCFOptions, optimize_filters_for_hits),
           OptionType::kBoolean, OptionVerificationType::kNormal,
@@ -560,6 +570,10 @@ static std::unordered_map<std::string, OptionTypeInfo>
           OptionTypeFlags::kNone}},
         {"preclude_last_level_data_seconds",
          {offsetof(struct ImmutableCFOptions, preclude_last_level_data_seconds),
+          OptionType::kUInt64T, OptionVerificationType::kNormal,
+          OptionTypeFlags::kNone}},
+        {"preserve_internal_time_seconds",
+         {offsetof(struct ImmutableCFOptions, preserve_internal_time_seconds),
           OptionType::kUInt64T, OptionVerificationType::kNormal,
           OptionTypeFlags::kNone}},
         // Need to keep this around to be able to read old OPTIONS files.
@@ -865,7 +879,6 @@ std::unique_ptr<Configurable> CFOptionsAsConfigurable(
   std::unique_ptr<Configurable> ptr(new ConfigurableCFOptions(opts, opt_map));
   return ptr;
 }
-#endif  // ROCKSDB_LITE
 
 ImmutableCFOptions::ImmutableCFOptions() : ImmutableCFOptions(Options()) {}
 
@@ -892,11 +905,14 @@ ImmutableCFOptions::ImmutableCFOptions(const ColumnFamilyOptions& cf_options)
       bloom_locality(cf_options.bloom_locality),
       level_compaction_dynamic_level_bytes(
           cf_options.level_compaction_dynamic_level_bytes),
+      level_compaction_dynamic_file_size(
+          cf_options.level_compaction_dynamic_file_size),
       num_levels(cf_options.num_levels),
       optimize_filters_for_hits(cf_options.optimize_filters_for_hits),
       force_consistency_checks(cf_options.force_consistency_checks),
       preclude_last_level_data_seconds(
           cf_options.preclude_last_level_data_seconds),
+      preserve_internal_time_seconds(cf_options.preserve_internal_time_seconds),
       memtable_insert_with_hint_prefix_extractor(
           cf_options.memtable_insert_with_hint_prefix_extractor),
       cf_paths(cf_options.cf_paths),
@@ -1022,6 +1038,8 @@ void MutableCFOptions::Dump(Logger* log) const {
                  level0_stop_writes_trigger);
   ROCKS_LOG_INFO(log, "                     max_compaction_bytes: %" PRIu64,
                  max_compaction_bytes);
+  ROCKS_LOG_INFO(log, "    ignore_max_compaction_bytes_for_input: %s",
+                 ignore_max_compaction_bytes_for_input ? "true" : "false");
   ROCKS_LOG_INFO(log, "                    target_file_size_base: %" PRIu64,
                  target_file_size_base);
   ROCKS_LOG_INFO(log, "              target_file_size_multiplier: %d",
@@ -1119,7 +1137,6 @@ void MutableCFOptions::Dump(Logger* log) const {
 MutableCFOptions::MutableCFOptions(const Options& options)
     : MutableCFOptions(ColumnFamilyOptions(options)) {}
 
-#ifndef ROCKSDB_LITE
 Status GetMutableOptionsFromStrings(
     const MutableCFOptions& base_options,
     const std::unordered_map<std::string, std::string>& options_map,
@@ -1143,5 +1160,4 @@ Status GetStringFromMutableCFOptions(const ConfigOptions& config_options,
   return OptionTypeInfo::SerializeType(
       config_options, cf_mutable_options_type_info, &mutable_opts, opt_string);
 }
-#endif  // ROCKSDB_LITE
 }  // namespace ROCKSDB_NAMESPACE

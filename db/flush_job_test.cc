@@ -166,15 +166,15 @@ TEST_F(FlushJobTest, Empty) {
   auto cfd = versions_->GetColumnFamilySet()->GetDefault();
   EventLogger event_logger(db_options_.info_log.get());
   SnapshotChecker* snapshot_checker = nullptr;  // not relavant
-  FlushJob flush_job(dbname_, versions_->GetColumnFamilySet()->GetDefault(),
-                     db_options_, *cfd->GetLatestMutableCFOptions(),
-                     std::numeric_limits<uint64_t>::max() /* memtable_id */,
-                     env_options_, versions_.get(), &mutex_, &shutting_down_,
-                     {}, kMaxSequenceNumber, snapshot_checker, &job_context,
-                     nullptr, nullptr, nullptr, kNoCompression, nullptr,
-                     &event_logger, false, true /* sync_output_directory */,
-                     true /* write_manifest */, Env::Priority::USER,
-                     nullptr /*IOTracer*/, empty_seqno_to_time_mapping_);
+  FlushJob flush_job(
+      dbname_, versions_->GetColumnFamilySet()->GetDefault(), db_options_,
+      *cfd->GetLatestMutableCFOptions(),
+      std::numeric_limits<uint64_t>::max() /* memtable_id */, env_options_,
+      versions_.get(), &mutex_, &shutting_down_, {}, kMaxSequenceNumber,
+      snapshot_checker, &job_context, FlushReason::kTest, nullptr, nullptr,
+      nullptr, kNoCompression, nullptr, &event_logger, false,
+      true /* sync_output_directory */, true /* write_manifest */,
+      Env::Priority::USER, nullptr /*IOTracer*/, empty_seqno_to_time_mapping_);
   {
     InstrumentedMutexLock l(&mutex_);
     flush_job.PickMemTable();
@@ -216,8 +216,8 @@ TEST_F(FlushJobTest, NonEmpty) {
   // Note: the first two blob references will not be considered when resolving
   // the oldest blob file referenced (the first one is inlined TTL, while the
   // second one is TTL and thus points to a TTL blob file).
-  constexpr std::array<uint64_t, 6> blob_file_numbers{{
-      kInvalidBlobFileNumber, 5, 103, 17, 102, 101}};
+  constexpr std::array<uint64_t, 6> blob_file_numbers{
+      {kInvalidBlobFileNumber, 5, 103, 17, 102, 101}};
   for (size_t i = 0; i < blob_file_numbers.size(); ++i) {
     std::string key(std::to_string(i + 10001));
     std::string blob_index;
@@ -257,9 +257,9 @@ TEST_F(FlushJobTest, NonEmpty) {
       *cfd->GetLatestMutableCFOptions(),
       std::numeric_limits<uint64_t>::max() /* memtable_id */, env_options_,
       versions_.get(), &mutex_, &shutting_down_, {}, kMaxSequenceNumber,
-      snapshot_checker, &job_context, nullptr, nullptr, nullptr, kNoCompression,
-      db_options_.statistics.get(), &event_logger, true,
-      true /* sync_output_directory */, true /* write_manifest */,
+      snapshot_checker, &job_context, FlushReason::kTest, nullptr, nullptr,
+      nullptr, kNoCompression, db_options_.statistics.get(), &event_logger,
+      true, true /* sync_output_directory */, true /* write_manifest */,
       Env::Priority::USER, nullptr /*IOTracer*/, empty_seqno_to_time_mapping_);
 
   HistogramData hist;
@@ -320,9 +320,9 @@ TEST_F(FlushJobTest, FlushMemTablesSingleColumnFamily) {
       dbname_, versions_->GetColumnFamilySet()->GetDefault(), db_options_,
       *cfd->GetLatestMutableCFOptions(), flush_memtable_id, env_options_,
       versions_.get(), &mutex_, &shutting_down_, {}, kMaxSequenceNumber,
-      snapshot_checker, &job_context, nullptr, nullptr, nullptr, kNoCompression,
-      db_options_.statistics.get(), &event_logger, true,
-      true /* sync_output_directory */, true /* write_manifest */,
+      snapshot_checker, &job_context, FlushReason::kTest, nullptr, nullptr,
+      nullptr, kNoCompression, db_options_.statistics.get(), &event_logger,
+      true, true /* sync_output_directory */, true /* write_manifest */,
       Env::Priority::USER, nullptr /*IOTracer*/, empty_seqno_to_time_mapping_);
   HistogramData hist;
   FileMetaData file_meta;
@@ -393,8 +393,8 @@ TEST_F(FlushJobTest, FlushMemtablesMultipleColumnFamilies) {
         dbname_, cfd, db_options_, *cfd->GetLatestMutableCFOptions(),
         memtable_ids[k], env_options_, versions_.get(), &mutex_,
         &shutting_down_, snapshot_seqs, kMaxSequenceNumber, snapshot_checker,
-        &job_context, nullptr, nullptr, nullptr, kNoCompression,
-        db_options_.statistics.get(), &event_logger, true,
+        &job_context, FlushReason::kTest, nullptr, nullptr, nullptr,
+        kNoCompression, db_options_.statistics.get(), &event_logger, true,
         false /* sync_output_directory */, false /* write_manifest */,
         Env::Priority::USER, nullptr /*IOTracer*/,
         empty_seqno_to_time_mapping_));
@@ -429,11 +429,9 @@ TEST_F(FlushJobTest, FlushMemtablesMultipleColumnFamilies) {
   }
   autovector<std::list<std::unique_ptr<FlushJobInfo>>*>
       committed_flush_jobs_info;
-#ifndef ROCKSDB_LITE
   for (auto& job : flush_jobs) {
     committed_flush_jobs_info.push_back(job->GetCommittedFlushJobsInfo());
   }
-#endif  //! ROCKSDB_LITE
 
   Status s = InstallMemtableAtomicFlushResults(
       nullptr /* imm_lists */, all_cfds, mutable_cf_options_list, mems_list,
@@ -522,9 +520,9 @@ TEST_F(FlushJobTest, Snapshots) {
       *cfd->GetLatestMutableCFOptions(),
       std::numeric_limits<uint64_t>::max() /* memtable_id */, env_options_,
       versions_.get(), &mutex_, &shutting_down_, snapshots, kMaxSequenceNumber,
-      snapshot_checker, &job_context, nullptr, nullptr, nullptr, kNoCompression,
-      db_options_.statistics.get(), &event_logger, true,
-      true /* sync_output_directory */, true /* write_manifest */,
+      snapshot_checker, &job_context, FlushReason::kTest, nullptr, nullptr,
+      nullptr, kNoCompression, db_options_.statistics.get(), &event_logger,
+      true, true /* sync_output_directory */, true /* write_manifest */,
       Env::Priority::USER, nullptr /*IOTracer*/, empty_seqno_to_time_mapping_);
   mutex_.Lock();
   flush_job.PickMemTable();
@@ -578,9 +576,9 @@ TEST_F(FlushJobTest, GetRateLimiterPriorityForWrite) {
       dbname_, versions_->GetColumnFamilySet()->GetDefault(), db_options_,
       *cfd->GetLatestMutableCFOptions(), flush_memtable_id, env_options_,
       versions_.get(), &mutex_, &shutting_down_, {}, kMaxSequenceNumber,
-      snapshot_checker, &job_context, nullptr, nullptr, nullptr, kNoCompression,
-      db_options_.statistics.get(), &event_logger, true,
-      true /* sync_output_directory */, true /* write_manifest */,
+      snapshot_checker, &job_context, FlushReason::kTest, nullptr, nullptr,
+      nullptr, kNoCompression, db_options_.statistics.get(), &event_logger,
+      true, true /* sync_output_directory */, true /* write_manifest */,
       Env::Priority::USER, nullptr /*IOTracer*/, empty_seqno_to_time_mapping_);
 
   // When the state from WriteController is normal.
@@ -591,8 +589,12 @@ TEST_F(FlushJobTest, GetRateLimiterPriorityForWrite) {
 
   {
     // When the state from WriteController is Delayed.
-    std::unique_ptr<WriteControllerToken> delay_token =
-        write_controller->GetDelayToken(1000000);
+    if (write_controller->is_dynamic_delay()) {
+      write_controller->HandleNewDelayReq(this, 1000000);
+    } else {
+      std::unique_ptr<WriteControllerToken> delay_token =
+          write_controller->GetDelayToken(1000000);
+    }
     ASSERT_EQ(flush_job.GetRateLimiterPriorityForWrite(), Env::IO_USER);
   }
 
@@ -658,9 +660,9 @@ TEST_F(FlushJobTimestampTest, AllKeysExpired) {
       dbname_, cfd, db_options_, *cfd->GetLatestMutableCFOptions(),
       std::numeric_limits<uint64_t>::max() /* memtable_id */, env_options_,
       versions_.get(), &mutex_, &shutting_down_, snapshots, kMaxSequenceNumber,
-      snapshot_checker, &job_context, nullptr, nullptr, nullptr, kNoCompression,
-      db_options_.statistics.get(), &event_logger, true,
-      true /* sync_output_directory */, true /* write_manifest */,
+      snapshot_checker, &job_context, FlushReason::kTest, nullptr, nullptr,
+      nullptr, kNoCompression, db_options_.statistics.get(), &event_logger,
+      true, true /* sync_output_directory */, true /* write_manifest */,
       Env::Priority::USER, nullptr /*IOTracer*/, empty_seqno_to_time_mapping_,
       /*db_id=*/"",
       /*db_session_id=*/"", full_history_ts_low);
@@ -711,9 +713,9 @@ TEST_F(FlushJobTimestampTest, NoKeyExpired) {
       dbname_, cfd, db_options_, *cfd->GetLatestMutableCFOptions(),
       std::numeric_limits<uint64_t>::max() /* memtable_id */, env_options_,
       versions_.get(), &mutex_, &shutting_down_, snapshots, kMaxSequenceNumber,
-      snapshot_checker, &job_context, nullptr, nullptr, nullptr, kNoCompression,
-      db_options_.statistics.get(), &event_logger, true,
-      true /* sync_output_directory */, true /* write_manifest */,
+      snapshot_checker, &job_context, FlushReason::kTest, nullptr, nullptr,
+      nullptr, kNoCompression, db_options_.statistics.get(), &event_logger,
+      true, true /* sync_output_directory */, true /* write_manifest */,
       Env::Priority::USER, nullptr /*IOTracer*/, empty_seqno_to_time_mapping_,
       /*db_id=*/"",
       /*db_session_id=*/"", full_history_ts_low);
@@ -741,6 +743,7 @@ TEST_F(FlushJobTimestampTest, NoKeyExpired) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+  ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

@@ -16,12 +16,12 @@
 
 #include "paired_filter/speedb_paired_bloom.h"
 #include "plugin/speedb/memtable/hash_spd_rep.h"
+#include "plugin/speedb/pinning_policy/scoped_pinning_policy.h"
 #include "rocksdb/utilities/object_registry.h"
 #include "util/string_util.h"
 
 namespace ROCKSDB_NAMESPACE {
 
-#ifndef ROCKSDB_LITE
 // Similar to the NewBuiltinFilterPolicyWithBits template for RocksDB built-in
 // filters
 SpdbPairedBloomFilterPolicy* NewSpdbPairedBloomFilterWithBits(
@@ -56,10 +56,17 @@ int register_SpeedbPlugins(ObjectLibrary& library, const std::string&) {
         guard->reset(NewSpdbPairedBloomFilterWithBits(uri));
         return guard->get();
       });
+  library.AddFactory<TablePinningPolicy>(
+      ObjectLibrary::PatternEntry::AsIndividualId(
+          ScopedPinningPolicy::kClassName()),
+      [](const std::string& /*uri*/, std::unique_ptr<TablePinningPolicy>* guard,
+         std::string* /* errmsg */) {
+        guard->reset(new ScopedPinningPolicy());
+        return guard->get();
+      });
 
   size_t num_types;
   return static_cast<int>(library.GetFactoryCount(&num_types));
 }
-#endif  // ROCKSDB_LITE
 
 }  // namespace ROCKSDB_NAMESPACE

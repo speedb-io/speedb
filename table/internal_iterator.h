@@ -204,7 +204,6 @@ class InternalIteratorBase : public Cleanable {
     }
   }
 
-  bool is_mutable_;
   bool is_empty_;
 };
 

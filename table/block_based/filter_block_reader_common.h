@@ -8,7 +8,6 @@
 
 #include <cassert>
 
-#include "block_type.h"
 #include "table/block_based/cachable_entry.h"
 #include "table/block_based/filter_block.h"
 
@@ -16,6 +15,7 @@ namespace ROCKSDB_NAMESPACE {
 
 class BlockBasedTable;
 class FilePrefetchBuffer;
+struct PinnedEntry;
 
 // Encapsulates common functionality for the various filter block reader
 // implementations. Provides access to the filter block regardless of whether
@@ -25,8 +25,11 @@ template <typename TBlocklike>
 class FilterBlockReaderCommon : public FilterBlockReader {
  public:
   FilterBlockReaderCommon(const BlockBasedTable* t,
-                          CachableEntry<TBlocklike>&& filter_block)
-      : table_(t), filter_block_(std::move(filter_block)) {
+                          CachableEntry<TBlocklike>&& filter_block,
+                          std::unique_ptr<PinnedEntry>&& pinned)
+      : table_(t),
+        filter_block_(std::move(filter_block)),
+        pinned_(std::move(pinned)) {
     assert(table_);
     const SliceTransform* const prefix_extractor = table_prefix_extractor();
     if (prefix_extractor) {
@@ -34,7 +37,7 @@ class FilterBlockReaderCommon : public FilterBlockReader {
           prefix_extractor->FullLengthEnabled(&prefix_extractor_full_length_);
     }
   }
-
+  ~FilterBlockReaderCommon() override;
   bool RangeMayExist(const Slice* iterate_upper_bound, const Slice& user_key,
                      const SliceTransform* prefix_extractor,
                      const Comparator* comparator,
@@ -49,8 +52,7 @@ class FilterBlockReaderCommon : public FilterBlockReader {
                                 const ReadOptions& read_options, bool use_cache,
                                 GetContext* get_context,
                                 BlockCacheLookupContext* lookup_context,
-                                CachableEntry<TBlocklike>* filter_block,
-                                BlockType block_type);
+                                CachableEntry<TBlocklike>* filter_block);
 
   const BlockBasedTable* table() const { return table_; }
   const SliceTransform* table_prefix_extractor() const;
@@ -60,7 +62,6 @@ class FilterBlockReaderCommon : public FilterBlockReader {
   Status GetOrReadFilterBlock(bool no_io, GetContext* get_context,
                               BlockCacheLookupContext* lookup_context,
                               CachableEntry<TBlocklike>* filter_block,
-                              BlockType block_type,
                               Env::IOPriority rate_limiter_priority) const;
 
   size_t ApproximateFilterBlockMemoryUsage() const;
@@ -72,6 +73,7 @@ class FilterBlockReaderCommon : public FilterBlockReader {
  private:
   const BlockBasedTable* table_;
   CachableEntry<TBlocklike> filter_block_;
+  std::unique_ptr<PinnedEntry> pinned_;
   size_t prefix_extractor_full_length_ = 0;
   bool full_length_enabled_ = false;
 };

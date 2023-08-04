@@ -4,9 +4,9 @@
 //  (found in the LICENSE.Apache file in the root directory).
 
 #pragma once
-#ifndef ROCKSDB_LITE
 #include <string>
 #include <vector>
+
 #include "db/db_impl/db_impl.h"
 
 namespace ROCKSDB_NAMESPACE {
@@ -132,12 +132,10 @@ class CompactedDBImpl : public DBImpl {
   // Share with DBImplReadOnly?
 
  protected:
-#ifndef ROCKSDB_LITE
   Status FlushForGetLiveFiles() override {
     // No-op for read-only DB
     return Status::OK();
   }
-#endif  // !ROCKSDB_LITE
 
  private:
   friend class DB;
@@ -150,4 +148,3 @@ class CompactedDBImpl : public DBImpl {
   LevelFilesBrief files_;
 };
 }  // namespace ROCKSDB_NAMESPACE
-#endif  // ROCKSDB_LITE

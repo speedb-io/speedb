@@ -8,15 +8,18 @@
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 #include "table/block_based/partitioned_index_reader.h"
 
+#include "block_cache.h"
 #include "file/random_access_file_reader.h"
+#include "rocksdb/table_pinning_policy.h"
 #include "table/block_based/block_based_table_reader.h"
 #include "table/block_based/partitioned_index_iterator.h"
 
 namespace ROCKSDB_NAMESPACE {
 Status PartitionIndexReader::Create(
     const BlockBasedTable* table, const ReadOptions& ro,
-    FilePrefetchBuffer* prefetch_buffer, bool use_cache, bool prefetch,
-    bool pin, BlockCacheLookupContext* lookup_context,
+    const TablePinningOptions& tpo, FilePrefetchBuffer* prefetch_buffer,
+    bool use_cache, bool prefetch, bool pin,
+    BlockCacheLookupContext* lookup_context,
     std::unique_ptr<IndexReader>* index_reader) {
   assert(table != nullptr);
   assert(table->get_rep());
@@ -24,6 +27,7 @@ Status PartitionIndexReader::Create(
   assert(index_reader != nullptr);
 
   CachableEntry<Block> index_block;
+  std::unique_ptr<PinnedEntry> pinned;
   if (prefetch || !use_cache) {
     const Status s =
         ReadIndexBlock(table, prefetch_buffer, ro, use_cache,
@@ -32,12 +36,18 @@ Status PartitionIndexReader::Create(
       return s;
     }
 
-    if (use_cache && !pin) {
+    if (pin) {
+      pin = table->PinData(tpo, TablePinningPolicy::kTopLevel,
+                           index_block.GetValue()->ApproximateMemoryUsage(),
+                           &pinned);
+    }
+    if (use_cache && !pinned) {
       index_block.Reset();
     }
   }
 
-  index_reader->reset(new PartitionIndexReader(table, std::move(index_block)));
+  index_reader->reset(new PartitionIndexReader(table, std::move(index_block),
+                                               std::move(pinned)));
 
   return Status::OK();
 }
@@ -112,6 +122,11 @@ InternalIteratorBase<IndexValue>* PartitionIndexReader::NewIterator(
 }
 Status PartitionIndexReader::CacheDependencies(const ReadOptions& ro,
                                                bool pin) {
+  if (!partition_map_.empty()) {
+    // The dependencies are already cached since `partition_map_` is filled in
+    // an all-or-nothing manner.
+    return Status::OK();
+  }
   // Before read partitions, prefetch them to avoid lots of IOs
   BlockCacheLookupContext lookup_context{TableReaderCaller::kPrefetch};
   const BlockBasedTable::Rep* rep = table()->rep_;
@@ -186,7 +201,7 @@ Status PartitionIndexReader::CacheDependencies(const ReadOptions& ro,
     // filter blocks
     Status s = table()->MaybeReadBlockAndLoadToCache(
         prefetch_buffer.get(), ro, handle, UncompressionDict::GetEmptyDict(),
-        /*wait=*/true, /*for_compaction=*/false, &block, BlockType::kIndex,
+        /*for_compaction=*/false, &block.As<Block_kIndex>(),
         /*get_context=*/nullptr, &lookup_context, /*contents=*/nullptr,
         /*async_read=*/false);
 

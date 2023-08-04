@@ -7,40 +7,87 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 //
-// A Cache is an interface that maps keys to values.  It has internal
-// synchronization and may be safely accessed concurrently from
-// multiple threads.  It may automatically evict entries to make room
-// for new entries.  Values have a specified charge against the cache
-// capacity.  For example, a cache where the values are variable
-// length strings, may use the length of the string as the charge for
-// the string.
-//
-// A builtin cache implementation with a least-recently-used eviction
-// policy is provided.  Clients may use their own implementations if
-// they want something more sophisticated (like scan-resistance, a
-// custom eviction policy, variable cache sizing, etc.)
+// Various APIs for configuring, creating, and monitoring read caches.
 
 #pragma once
 
 #include <atomic>
 #include <cstdint>
-#include <functional>
-#include <limits>
-#include <list>
-#include <mutex>
+#include <memory>
 #include <string>
 
 #include "rocksdb/compression_type.h"
+#include "rocksdb/data_structure.h"
 #include "rocksdb/memory_allocator.h"
-#include "rocksdb/slice.h"
-#include "rocksdb/statistics.h"
-#include "rocksdb/status.h"
 
 namespace ROCKSDB_NAMESPACE {
 
-class Cache;
+class Cache;  // defined in advanced_cache.h
 struct ConfigOptions;
 class SecondaryCache;
+
+// Classifications of block cache entries.
+//
+// Developer notes: Adding a new enum to this class requires corresponding
+// updates to `kCacheEntryRoleToCamelString` and
+// `kCacheEntryRoleToHyphenString`. Do not add to this enum after `kMisc` since
+// `kNumCacheEntryRoles` assumes `kMisc` comes last.
+enum class CacheEntryRole {
+  // Block-based table data block
+  kDataBlock,
+  // Block-based table filter block (full or partitioned)
+  kFilterBlock,
+  // Block-based table metadata block for partitioned filter
+  kFilterMetaBlock,
+  // OBSOLETE / DEPRECATED: old/removed block-based filter
+  kDeprecatedFilterBlock,
+  // Block-based table index block
+  kIndexBlock,
+  // Other kinds of block-based table block
+  kOtherBlock,
+  // WriteBufferManager's charge to account for its memtable usage
+  kWriteBuffer,
+  // Compression dictionary building buffer's charge to account for
+  // its memory usage
+  kCompressionDictionaryBuildingBuffer,
+  // Filter's charge to account for
+  // (new) bloom and ribbon filter construction's memory usage
+  kFilterConstruction,
+  // BlockBasedTableReader's charge to account for its memory usage
+  kBlockBasedTableReader,
+  // FileMetadata's charge to account for its memory usage
+  kFileMetadata,
+  // Blob value (when using the same cache as block cache and blob cache)
+  kBlobValue,
+  // Blob cache's charge to account for its memory usage (when using a
+  // separate block cache and blob cache)
+  kBlobCache,
+  // Default bucket, for miscellaneous cache entries. Do not use for
+  // entries that could potentially add up to large usage.
+  kMisc,
+};
+constexpr uint32_t kNumCacheEntryRoles =
+    static_cast<uint32_t>(CacheEntryRole::kMisc) + 1;
+
+// Obtain a hyphen-separated, lowercase name of a `CacheEntryRole`.
+const std::string& GetCacheEntryRoleName(CacheEntryRole);
+
+// A fast bit set for CacheEntryRoles
+using CacheEntryRoleSet = SmallEnumSet<CacheEntryRole, CacheEntryRole::kMisc>;
+
+// For use with `GetMapProperty()` for property
+// `DB::Properties::kBlockCacheEntryStats`. On success, the map will
+// be populated with all keys that can be obtained from these functions.
+struct BlockCacheEntryStatsMapKeys {
+  static const std::string& CacheId();
+  static const std::string& CacheCapacityBytes();
+  static const std::string& LastCollectionDurationSeconds();
+  static const std::string& LastCollectionAgeSeconds();
+
+  static std::string EntryCount(CacheEntryRole);
+  static std::string UsedBytes(CacheEntryRole);
+  static std::string UsedPercent(CacheEntryRole);
+};
 
 extern const bool kDefaultToAdaptiveMutex;
 
@@ -89,6 +136,9 @@ struct ShardedCacheOptions {
   CacheMetadataChargePolicy metadata_charge_policy =
       kDefaultCacheMetadataChargePolicy;
 
+  // A SecondaryCache instance to use the non-volatile tier.
+  std::shared_ptr<SecondaryCache> secondary_cache;
+
   ShardedCacheOptions() {}
   ShardedCacheOptions(
       size_t _capacity, int _num_shard_bits, bool _strict_capacity_limit,
@@ -103,27 +153,31 @@ struct ShardedCacheOptions {
 };
 
 struct LRUCacheOptions : public ShardedCacheOptions {
-  // Percentage of cache reserved for high priority entries.
-  // If greater than zero, the LRU list will be split into a high-pri
-  // list and a low-pri list. High-pri entries will be inserted to the
-  // tail of high-pri list, while low-pri entries will be first inserted to
-  // the low-pri list (the midpoint). This is referred to as
-  // midpoint insertion strategy to make entries that never get hit in cache
-  // age out faster.
+  // Ratio of cache reserved for high-priority and low-priority entries,
+  // respectively. (See Cache::Priority below more information on the levels.)
+  // Valid values are between 0 and 1 (inclusive), and the sum of the two
+  // values cannot exceed 1.
   //
-  // See also
-  // BlockBasedTableOptions::cache_index_and_filter_blocks_with_high_priority.
+  // If high_pri_pool_ratio is greater than zero, a dedicated high-priority LRU
+  // list is maintained by the cache. Similarly, if low_pri_pool_ratio is
+  // greater than zero, a dedicated low-priority LRU list is maintained.
+  // There is also a bottom-priority LRU list, which is always enabled and not
+  // explicitly configurable. Entries are spilled over to the next available
+  // lower-priority pool if a certain pool's capacity is exceeded.
+  //
+  // Entries with cache hits are inserted into the highest priority LRU list
+  // available regardless of the entry's priority. Entries without hits
+  // are inserted into highest priority LRU list available whose priority
+  // does not exceed the entry's priority. (For example, high-priority items
+  // with no hits are placed in the high-priority pool if available;
+  // otherwise, they are placed in the low-priority pool if available;
+  // otherwise, they are placed in the bottom-priority pool.) This results
+  // in lower-priority entries without hits getting evicted from the cache
+  // sooner.
+  //
+  // Default values: high_pri_pool_ratio = 0.5 (which is referred to as
+  // "midpoint insertion"), low_pri_pool_ratio = 0
   double high_pri_pool_ratio = 0.5;
-
-  // Percentage of cache reserved for low priority entries.
-  // If greater than zero, the LRU list will be split into a high-pri list, a
-  // low-pri list and a bottom-pri list. High-pri entries will be inserted to
-  // the tail of high-pri list, while low-pri entries will be first inserted to
-  // the low-pri list (the midpoint) and bottom-pri entries will be first
-  // inserted to the bottom-pri list.
-  //
-  //
-  // See also high_pri_pool_ratio.
   double low_pri_pool_ratio = 0.0;
 
   // Whether to use adaptive mutexes for cache shards. Note that adaptive
@@ -131,9 +185,6 @@ struct LRUCacheOptions : public ShardedCacheOptions {
   // effect. The default value is true if RocksDB is compiled with
   // -DROCKSDB_DEFAULT_TO_ADAPTIVE_MUTEX, false otherwise.
   bool use_adaptive_mutex = kDefaultToAdaptiveMutex;
-
-  // A SecondaryCache instance to use a the non-volatile tier.
-  std::shared_ptr<SecondaryCache> secondary_cache;
 
   LRUCacheOptions() {}
   LRUCacheOptions(size_t _capacity, int _num_shard_bits,
@@ -189,6 +240,10 @@ struct CompressedSecondaryCacheOptions : LRUCacheOptions {
   // into chunks so that they may better fit jemalloc bins.
   bool enable_custom_split_merge = false;
 
+  // Kinds of entries that should not be compressed, but can be stored.
+  // (Filter blocks are essentially non-compressible but others usually are.)
+  CacheEntryRoleSet do_not_compress_roles = {CacheEntryRole::kFilterBlock};
+
   CompressedSecondaryCacheOptions() {}
   CompressedSecondaryCacheOptions(
       size_t _capacity, int _num_shard_bits, bool _strict_capacity_limit,
@@ -199,14 +254,17 @@ struct CompressedSecondaryCacheOptions : LRUCacheOptions {
           kDefaultCacheMetadataChargePolicy,
       CompressionType _compression_type = CompressionType::kLZ4Compression,
       uint32_t _compress_format_version = 2,
-      bool _enable_custom_split_merge = false)
+      bool _enable_custom_split_merge = false,
+      const CacheEntryRoleSet& _do_not_compress_roles =
+          {CacheEntryRole::kFilterBlock})
       : LRUCacheOptions(_capacity, _num_shard_bits, _strict_capacity_limit,
                         _high_pri_pool_ratio, std::move(_memory_allocator),
                         _use_adaptive_mutex, _metadata_charge_policy,
                         _low_pri_pool_ratio),
         compression_type(_compression_type),
         compress_format_version(_compress_format_version),
-        enable_custom_split_merge(_enable_custom_split_merge) {}
+        enable_custom_split_merge(_enable_custom_split_merge),
+        do_not_compress_roles(_do_not_compress_roles) {}
 };
 
 // EXPERIMENTAL
@@ -221,16 +279,28 @@ extern std::shared_ptr<SecondaryCache> NewCompressedSecondaryCache(
         kDefaultCacheMetadataChargePolicy,
     CompressionType compression_type = CompressionType::kLZ4Compression,
     uint32_t compress_format_version = 2,
-    bool enable_custom_split_merge = false);
+    bool enable_custom_split_merge = false,
+    const CacheEntryRoleSet& _do_not_compress_roles = {
+        CacheEntryRole::kFilterBlock});
 
 extern std::shared_ptr<SecondaryCache> NewCompressedSecondaryCache(
     const CompressedSecondaryCacheOptions& opts);
 
-// HyperClockCache - EXPERIMENTAL
-//
-// A lock-free Cache alternative for RocksDB block cache that offers much
-// improved CPU efficiency under high parallel load or high contention, with
-// some caveats.
+// HyperClockCache - A lock-free Cache alternative for RocksDB block cache
+// that offers much improved CPU efficiency vs. LRUCache under high parallel
+// load or high contention, with some caveats:
+// * Not a general Cache implementation: can only be used for
+// BlockBasedTableOptions::block_cache, which RocksDB uses in a way that is
+// compatible with HyperClockCache.
+// * Requires an extra tuning parameter: see estimated_entry_charge below.
+// Similarly, substantially changing the capacity with SetCapacity could
+// harm efficiency.
+// * SecondaryCache is not yet supported.
+// * Cache priorities are less aggressively enforced, which could cause
+// cache dilution from long range scans (unless they use fill_cache=false).
+// * Can be worse for small caches, because if almost all of a cache shard is
+// pinned (more likely with non-partitioned filters), then CLOCK eviction
+// becomes very CPU intensive.
 //
 // See internal cache/clock_cache.h for full description.
 struct HyperClockCacheOptions : public ShardedCacheOptions {
@@ -290,478 +360,5 @@ extern std::shared_ptr<Cache> NewClockCache(
     bool strict_capacity_limit = false,
     CacheMetadataChargePolicy metadata_charge_policy =
         kDefaultCacheMetadataChargePolicy);
-
-class Cache {
- public:
-  // Depending on implementation, cache entries with high priority could be less
-  // likely to get evicted than low priority entries.
-  //
-  // The BOTTOM priority is mainly used for blob caching. Blobs are typically
-  // lower-value targets for caching than data blocks, since 1) with BlobDB,
-  // data blocks containing blob references conceptually form an index structure
-  // which has to be consulted before we can read the blob value, and 2) cached
-  // blobs represent only a single key-value, while cached data blocks generally
-  // contain multiple KVs. Since we would like to make it possible to use the
-  // same backing cache for the block cache and the blob cache, it would make
-  // sense to add a new, bottom cache priority level for blobs so data blocks
-  // are prioritized over them.
-  enum class Priority { HIGH, LOW, BOTTOM };
-
-  using ItemOwnerId = uint16_t;
-  static constexpr ItemOwnerId kUnknownItemId = 0U;
-  static constexpr ItemOwnerId kMinOwnerItemId = 1U;
-  static constexpr ItemOwnerId kMaxOwnerItemId =
-      std::numeric_limits<ItemOwnerId>::max();
-
-  // A set of callbacks to allow objects in the primary block cache to be
-  // be persisted in a secondary cache. The purpose of the secondary cache
-  // is to support other ways of caching the object, such as persistent or
-  // compressed data, that may require the object to be parsed and transformed
-  // in some way. Since the primary cache holds C++ objects and the secondary
-  // cache may only hold flat data that doesn't need relocation, these
-  // callbacks need to be provided by the user of the block
-  // cache to do the conversion.
-  // The CacheItemHelper is passed to Insert() and Lookup(). It has pointers
-  // to callback functions for size, saving and deletion of the
-  // object. The callbacks are defined in C-style in order to make them
-  // stateless and not add to the cache metadata size.
-  // Saving multiple std::function objects will take up 32 bytes per
-  // function, even if its not bound to an object and does no capture.
-  //
-  // All the callbacks are C-style function pointers in order to simplify
-  // lifecycle management. Objects in the cache can outlive the parent DB,
-  // so anything required for these operations should be contained in the
-  // object itself.
-  //
-  // The SizeCallback takes a void* pointer to the object and returns the size
-  // of the persistable data. It can be used by the secondary cache to allocate
-  // memory if needed.
-  //
-  // RocksDB callbacks are NOT exception-safe. A callback completing with an
-  // exception can lead to undefined behavior in RocksDB, including data loss,
-  // unreported corruption, deadlocks, and more.
-  using SizeCallback = size_t (*)(void* obj);
-
-  // The SaveToCallback takes a void* object pointer and saves the persistable
-  // data into a buffer. The secondary cache may decide to not store it in a
-  // contiguous buffer, in which case this callback will be called multiple
-  // times with increasing offset
-  using SaveToCallback = Status (*)(void* from_obj, size_t from_offset,
-                                    size_t length, void* out);
-
-  // A function pointer type for custom destruction of an entry's
-  // value. The Cache is responsible for copying and reclaiming space
-  // for the key, but values are managed by the caller.
-  using DeleterFn = void (*)(const Slice& key, void* value);
-
-  // A struct with pointers to helper functions for spilling items from the
-  // cache into the secondary cache. May be extended in the future. An
-  // instance of this struct is expected to outlive the cache.
-  struct CacheItemHelper {
-    SizeCallback size_cb;
-    SaveToCallback saveto_cb;
-    DeleterFn del_cb;
-
-    CacheItemHelper() : size_cb(nullptr), saveto_cb(nullptr), del_cb(nullptr) {}
-    CacheItemHelper(SizeCallback _size_cb, SaveToCallback _saveto_cb,
-                    DeleterFn _del_cb)
-        : size_cb(_size_cb), saveto_cb(_saveto_cb), del_cb(_del_cb) {}
-  };
-
-  // The CreateCallback is passed by the block cache user to Lookup(). It
-  // takes in a buffer from the NVM cache and constructs an object using
-  // it. The callback doesn't have ownership of the buffer and should
-  // copy the contents into its own buffer.
-  using CreateCallback = std::function<Status(const void* buf, size_t size,
-                                              void** out_obj, size_t* charge)>;
-
-  Cache(std::shared_ptr<MemoryAllocator> allocator = nullptr)
-      : memory_allocator_(std::move(allocator)) {}
-  // No copying allowed
-  Cache(const Cache&) = delete;
-  Cache& operator=(const Cache&) = delete;
-
-  // Creates a new Cache based on the input value string and returns the result.
-  // Currently, this method can be used to create LRUCaches only
-  // @param config_options
-  // @param value  The value might be:
-  //   - an old-style cache ("1M") -- equivalent to NewLRUCache(1024*102(
-  //   - Name-value option pairs -- "capacity=1M; num_shard_bits=4;
-  //     For the LRUCache, the values are defined in LRUCacheOptions.
-  // @param result The new Cache object
-  // @return OK if the cache was successfully created
-  // @return NotFound if an invalid name was specified in the value
-  // @return InvalidArgument if either the options were not valid
-  static Status CreateFromString(const ConfigOptions& config_options,
-                                 const std::string& value,
-                                 std::shared_ptr<Cache>* result);
-
-  // Destroys all existing entries by calling the "deleter"
-  // function that was passed via the Insert() function.
-  //
-  // @See Insert
-  virtual ~Cache() {}
-
-  // Opaque handle to an entry stored in the cache.
-  struct Handle {};
-
-  // The type of the Cache
-  virtual const char* Name() const = 0;
-
-  // Insert a mapping from key->value into the volatile cache only
-  // and assign it with the specified charge against the total cache capacity.
-  // If strict_capacity_limit is true and cache reaches its full capacity,
-  // return Status::MemoryLimit.
-  //
-  // If handle is not nullptr, returns a handle that corresponds to the
-  // mapping. The caller must call this->Release(handle) when the returned
-  // mapping is no longer needed. In case of error caller is responsible to
-  // cleanup the value (i.e. calling "deleter").
-  //
-  // If handle is nullptr, it is as if Release is called immediately after
-  // insert. In case of error value will be cleanup.
-  //
-  // When the inserted entry is no longer needed, the key and
-  // value will be passed to "deleter" which must delete the value.
-  // (The Cache is responsible for copying and reclaiming space for
-  // the key.)
-  static constexpr Priority kDefaultPriority = Priority::LOW;
-  virtual Status Insert(const Slice& key, void* value, size_t charge,
-                        DeleterFn deleter, Handle** handle = nullptr,
-                        Priority priority = kDefaultPriority,
-                        Cache::ItemOwnerId item_owner_id = kUnknownItemId) = 0;
-
-  // If the cache has no mapping for "key", returns nullptr.
-  //
-  // Else return a handle that corresponds to the mapping.  The caller
-  // must call this->Release(handle) when the returned mapping is no
-  // longer needed.
-  // If stats is not nullptr, relative tickers could be used inside the
-  // function.
-  virtual Handle* Lookup(const Slice& key, Statistics* stats = nullptr) = 0;
-
-  // Increments the reference count for the handle if it refers to an entry in
-  // the cache. Returns true if refcount was incremented; otherwise, returns
-  // false.
-  // REQUIRES: handle must have been returned by a method on *this.
-  virtual bool Ref(Handle* handle) = 0;
-
-  /**
-   * Release a mapping returned by a previous Lookup(). A released entry might
-   * still remain in cache in case it is later looked up by others. If
-   * erase_if_last_ref is set then it also erases it from the cache if there is
-   * no other reference to  it. Erasing it should call the deleter function that
-   * was provided when the entry was inserted.
-   *
-   * Returns true if the entry was also erased.
-   */
-  // REQUIRES: handle must not have been released yet.
-  // REQUIRES: handle must have been returned by a method on *this.
-  virtual bool Release(Handle* handle, bool erase_if_last_ref = false) = 0;
-
-  // Return the value encapsulated in a handle returned by a
-  // successful Lookup().
-  // REQUIRES: handle must not have been released yet.
-  // REQUIRES: handle must have been returned by a method on *this.
-  virtual void* Value(Handle* handle) = 0;
-
-  // If the cache contains the entry for the key, erase it.  Note that the
-  // underlying entry will be kept around until all existing handles
-  // to it have been released.
-  virtual void Erase(const Slice& key) = 0;
-  // Return a new numeric id.  May be used by multiple clients who are
-  // sharding the same cache to partition the key space.  Typically the
-  // client will allocate a new id at startup and prepend the id to
-  // its cache keys.
-  virtual uint64_t NewId() = 0;
-
-  // sets the maximum configured capacity of the cache. When the new
-  // capacity is less than the old capacity and the existing usage is
-  // greater than new capacity, the implementation will do its best job to
-  // purge the released entries from the cache in order to lower the usage
-  virtual void SetCapacity(size_t capacity) = 0;
-
-  // Set whether to return error on insertion when cache reaches its full
-  // capacity.
-  virtual void SetStrictCapacityLimit(bool strict_capacity_limit) = 0;
-
-  // Get the flag whether to return error on insertion when cache reaches its
-  // full capacity.
-  virtual bool HasStrictCapacityLimit() const = 0;
-
-  // Returns the maximum configured capacity of the cache
-  virtual size_t GetCapacity() const = 0;
-
-  // Returns the memory size for the entries residing in the cache.
-  virtual size_t GetUsage() const = 0;
-
-  // Returns the number of entries currently tracked in the table. SIZE_MAX
-  // means "not supported." This is used for inspecting the load factor, along
-  // with GetTableAddressCount().
-  virtual size_t GetOccupancyCount() const { return SIZE_MAX; }
-
-  // Returns the number of ways the hash function is divided for addressing
-  // entries. Zero means "not supported." This is used for inspecting the load
-  // factor, along with GetOccupancyCount().
-  virtual size_t GetTableAddressCount() const { return 0; }
-
-  // Returns the memory size for a specific entry in the cache.
-  virtual size_t GetUsage(Handle* handle) const = 0;
-
-  // Returns the memory size for the entries in use by the system
-  virtual size_t GetPinnedUsage() const = 0;
-
-  // Returns the charge for the specific entry in the cache.
-  virtual size_t GetCharge(Handle* handle) const = 0;
-
-  // Returns the deleter for the specified entry. This might seem useless
-  // as the Cache itself is responsible for calling the deleter, but
-  // the deleter can essentially verify that a cache entry is of an
-  // expected type from an expected code source.
-  virtual DeleterFn GetDeleter(Handle* handle) const = 0;
-
-  // Call this on shutdown if you want to speed it up. Cache will disown
-  // any underlying data and will not free it on delete. This call will leak
-  // memory - call this only if you're shutting down the process.
-  // Any attempts of using cache after this call will fail terribly.
-  // Always delete the DB object before calling this method!
-  virtual void DisownData() {
-    // default implementation is noop
-  }
-
-  struct ApplyToAllEntriesOptions {
-    // If the Cache uses locks, setting `average_entries_per_lock` to
-    // a higher value suggests iterating over more entries each time a lock
-    // is acquired, likely reducing the time for ApplyToAllEntries but
-    // increasing latency for concurrent users of the Cache. Setting
-    // `average_entries_per_lock` to a smaller value could be helpful if
-    // callback is relatively expensive, such as using large data structures.
-    size_t average_entries_per_lock = 256;
-  };
-
-  // Apply a callback to all entries in the cache. The Cache must ensure
-  // thread safety but does not guarantee that a consistent snapshot of all
-  // entries is iterated over if other threads are operating on the Cache
-  // also.
-  virtual void ApplyToAllEntries(
-      const std::function<void(const Slice& key, void* value, size_t charge,
-                               DeleterFn deleter,
-                               Cache::ItemOwnerId item_owner_id)>& callback,
-      const ApplyToAllEntriesOptions& opts) = 0;
-
-  // DEPRECATED version of above. (Default implementation uses above.)
-  virtual void ApplyToAllCacheEntries(void (*callback)(void* value,
-                                                       size_t charge),
-                                      bool /*thread_safe*/) {
-    ApplyToAllEntries(
-        [callback](const Slice&, void* value, size_t charge, DeleterFn,
-                   uint64_t) { callback(value, charge); },
-        {});
-  }
-
-  // Remove all entries.
-  // Prerequisite: no entry is referenced.
-  virtual void EraseUnRefEntries() = 0;
-
-  virtual std::string GetPrintableOptions() const { return ""; }
-
-  MemoryAllocator* memory_allocator() const { return memory_allocator_.get(); }
-
-  // EXPERIMENTAL
-  // The following APIs are experimental and might change in the future.
-  // The Insert and Lookup APIs below are intended to allow cached objects
-  // to be demoted/promoted between the primary block cache and a secondary
-  // cache. The secondary cache could be a non-volatile cache, and will
-  // likely store the object in a different representation. They rely on a
-  // per object CacheItemHelper to do the conversions.
-  // The secondary cache may persist across process and system restarts,
-  // and may even be moved between hosts. Therefore, the cache key must
-  // be repeatable across restarts/reboots, and globally unique if
-  // multiple DBs share the same cache and the set of DBs can change
-  // over time.
-
-  // Insert a mapping from key->value into the cache and assign it
-  // the specified charge against the total cache capacity.
-  // If strict_capacity_limit is true and cache reaches its full capacity,
-  // return Status::MemoryLimit.
-  //
-  // The helper argument is saved by the cache and will be used when the
-  // inserted object is evicted or promoted to the secondary cache. It,
-  // therefore, must outlive the cache.
-  //
-  // If handle is not nullptr, returns a handle that corresponds to the
-  // mapping. The caller must call this->Release(handle) when the returned
-  // mapping is no longer needed. In case of error caller is responsible to
-  // cleanup the value (i.e. calling "deleter").
-  //
-  // If handle is nullptr, it is as if Release is called immediately after
-  // insert. In case of error value will be cleanup.
-  //
-  // Regardless of whether the item was inserted into the cache,
-  // it will attempt to insert it into the secondary cache if one is
-  // configured, and the helper supports it.
-  // The cache implementation must support a secondary cache, otherwise
-  // the item is only inserted into the primary cache. It may
-  // defer the insertion to the secondary cache as it sees fit.
-  //
-  // When the inserted entry is no longer needed, the key and
-  // value will be passed to "deleter".
-  virtual Status Insert(const Slice& key, void* value,
-                        const CacheItemHelper* helper, size_t charge,
-                        Handle** handle = nullptr,
-                        Priority priority = Priority::LOW,
-                        Cache::ItemOwnerId item_owner_id = kUnknownItemId) {
-    if (!helper) {
-      return Status::InvalidArgument();
-    }
-    return Insert(key, value, charge, helper->del_cb, handle, priority,
-                  item_owner_id);
-  }
-
-  // Lookup the key in the primary and secondary caches (if one is configured).
-  // The create_cb callback function object will be used to contruct the
-  // cached object.
-  // If none of the caches have the mapping for the key, returns nullptr.
-  // Else, returns a handle that corresponds to the mapping.
-  //
-  // This call may promote the object from the secondary cache (if one is
-  // configured, and has the given key) to the primary cache.
-  //
-  // The helper argument should be provided if the caller wants the lookup
-  // to include the secondary cache (if one is configured) and the object,
-  // if it exists, to be promoted to the primary cache. The helper may be
-  // saved and used later when the object is evicted. Therefore, it must
-  // outlive the cache.
-  //
-  // The handle returned may not be ready. The caller should call IsReady()
-  // to check if the item value is ready, and call Wait() or WaitAll() if
-  // its not ready. The caller should then call Value() to check if the
-  // item was successfully retrieved. If unsuccessful (perhaps due to an
-  // IO error), Value() will return nullptr.
-  virtual Handle* Lookup(const Slice& key, const CacheItemHelper* /*helper_cb*/,
-                         const CreateCallback& /*create_cb*/,
-                         Priority /*priority*/, bool /*wait*/,
-                         Statistics* stats = nullptr) {
-    return Lookup(key, stats);
-  }
-
-  // Release a mapping returned by a previous Lookup(). The "useful"
-  // parameter specifies whether the data was actually used or not,
-  // which may be used by the cache implementation to decide whether
-  // to consider it as a hit for retention purposes.
-  virtual bool Release(Handle* handle, bool /*useful*/,
-                       bool erase_if_last_ref) {
-    return Release(handle, erase_if_last_ref);
-  }
-
-  // Determines if the handle returned by Lookup() has a valid value yet. The
-  // call is not thread safe and should be called only by someone holding a
-  // reference to the handle.
-  virtual bool IsReady(Handle* /*handle*/) { return true; }
-
-  // If the handle returned by Lookup() is not ready yet, wait till it
-  // becomes ready.
-  // Note: A ready handle doesn't necessarily mean it has a valid value. The
-  // user should call Value() and check for nullptr.
-  virtual void Wait(Handle* /*handle*/) {}
-
-  // Wait for a vector of handles to become ready. As with Wait(), the user
-  // should check the Value() of each handle for nullptr. This call is not
-  // thread safe and should only be called by the caller holding a reference
-  // to each of the handles.
-  virtual void WaitAll(std::vector<Handle*>& /*handles*/) {}
-
-  ItemOwnerId GetNextItemOwnerId();
-  // On return will set the owner id to kUnknownItemId
-  void DiscardItemOwnerId(ItemOwnerId*);
-
-  static constexpr size_t kMaxFreeItemOwnersIdListSize = 10000U;
-
- private:
-  std::shared_ptr<MemoryAllocator> memory_allocator_;
-
-  class ItemOwnerIdAllocator {
-   public:
-    ItemOwnerId Allocate();
-    void Free(ItemOwnerId* id);
-
-   private:
-    ItemOwnerId next_item_owner_id_ = kMinOwnerItemId;
-    bool has_wrapped_around_ = false;
-    std::mutex free_ids_mutex_;
-    std::list<ItemOwnerId> free_ids_;
-  };
-
-  ItemOwnerIdAllocator owner_id_allocator_;
-};
-
-// Classifications of block cache entries.
-//
-// Developer notes: Adding a new enum to this class requires corresponding
-// updates to `kCacheEntryRoleToCamelString` and
-// `kCacheEntryRoleToHyphenString`. Do not add to this enum after `kMisc` since
-// `kNumCacheEntryRoles` assumes `kMisc` comes last.
-enum class CacheEntryRole {
-  // Block-based table data block
-  kDataBlock,
-  // Block-based table filter block (full or partitioned)
-  kFilterBlock,
-  // Block-based table metadata block for partitioned filter
-  kFilterMetaBlock,
-  // OBSOLETE / DEPRECATED: old/removed block-based filter
-  kDeprecatedFilterBlock,
-  // Block-based table index block
-  kIndexBlock,
-  // Other kinds of block-based table block
-  kOtherBlock,
-  // WriteBufferManager's charge to account for its memtable usage
-  kWriteBuffer,
-  // Compression dictionary building buffer's charge to account for
-  // its memory usage
-  kCompressionDictionaryBuildingBuffer,
-  // Filter's charge to account for
-  // (new) bloom and ribbon filter construction's memory usage
-  kFilterConstruction,
-  // BlockBasedTableReader's charge to account for its memory usage
-  kBlockBasedTableReader,
-  // FileMetadata's charge to account for its memory usage
-  kFileMetadata,
-  // Blob value (when using the same cache as block cache and blob cache)
-  kBlobValue,
-  // Blob cache's charge to account for its memory usage (when using a
-  // separate block cache and blob cache)
-  kBlobCache,
-  // Default bucket, for miscellaneous cache entries. Do not use for
-  // entries that could potentially add up to large usage.
-  kMisc,
-};
-constexpr uint32_t kNumCacheEntryRoles =
-    static_cast<uint32_t>(CacheEntryRole::kMisc) + 1;
-
-// Obtain a hyphen-separated, lowercase name of a `CacheEntryRole`.
-const std::string& GetCacheEntryRoleName(CacheEntryRole);
-
-// For use with `GetMapProperty()` for property
-// `DB::Properties::kBlockCacheEntryStats`. On success, the map will
-// be populated with all keys that can be obtained from these functions.
-struct BlockCacheEntryStatsMapKeys {
-  static const std::string& CacheId();
-  static const std::string& CacheCapacityBytes();
-  static const std::string& LastCollectionDurationSeconds();
-  static const std::string& LastCollectionAgeSeconds();
-
-  static std::string EntryCount(CacheEntryRole);
-  static std::string UsedBytes(CacheEntryRole);
-  static std::string UsedPercent(CacheEntryRole);
-};
-
-// For use with `GetMapProperty()` for property
-// `DB::Properties::kBlockCacheCfStats`. On success, the map will
-// be populated with all keys that can be obtained from these functions.
-struct BlockCacheCfStatsMapKeys {
-  static const std::string& CfName();
-  static const std::string& CacheId();
-  static std::string UsedBytes(CacheEntryRole);
-};
 
 }  // namespace ROCKSDB_NAMESPACE

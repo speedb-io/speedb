@@ -19,7 +19,6 @@ class DBIOFailureTest : public DBTestBase {
   DBIOFailureTest() : DBTestBase("db_io_failure_test", /*env_do_fsync=*/true) {}
 };
 
-#ifndef ROCKSDB_LITE
 // Check that number of files does not grow when writes are dropped
 TEST_F(DBIOFailureTest, DropWrites) {
   do {
@@ -31,7 +30,7 @@ TEST_F(DBIOFailureTest, DropWrites) {
     ASSERT_OK(Put("foo", "v1"));
     ASSERT_EQ("v1", Get("foo"));
     Compact("a", "z");
-    const size_t num_files = CountFiles();
+    const auto num_files = GetSstFileCount(dbname_);
     // Force out-of-space errors
     env_->drop_writes_.store(true, std::memory_order_release);
     env_->sleep_counter_.Reset();
@@ -60,7 +59,7 @@ TEST_F(DBIOFailureTest, DropWrites) {
     ASSERT_EQ("5", property_value);
 
     env_->drop_writes_.store(false, std::memory_order_release);
-    const size_t count = CountFiles();
+    const auto count = GetSstFileCount(dbname_);
     ASSERT_LT(count, num_files + 3);
 
     // Check that compaction attempts slept after errors
@@ -123,7 +122,6 @@ TEST_F(DBIOFailureTest, NoSpaceCompactRange) {
     env_->no_space_.store(false, std::memory_order_release);
   } while (ChangeCompactOptions());
 }
-#endif  // ROCKSDB_LITE
 
 TEST_F(DBIOFailureTest, NonWritableFileSystem) {
   do {
@@ -147,7 +145,6 @@ TEST_F(DBIOFailureTest, NonWritableFileSystem) {
   } while (ChangeCompactOptions());
 }
 
-#ifndef ROCKSDB_LITE
 TEST_F(DBIOFailureTest, ManifestWriteError) {
   // Test for the following problem:
   // (a) Compaction produces file F
@@ -582,7 +579,6 @@ TEST_F(DBIOFailureTest, CompactionSstSyncError) {
   ASSERT_EQ("bar3", Get(1, "foo"));
 }
 #endif  // !(defined NDEBUG) || !defined(OS_WIN)
-#endif  // ROCKSDB_LITE
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {

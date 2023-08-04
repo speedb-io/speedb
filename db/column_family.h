@@ -19,13 +19,13 @@
 #include "db/table_cache.h"
 #include "db/table_properties_collector.h"
 #include "db/write_batch_internal.h"
-#include "db/write_controller.h"
 #include "options/cf_options.h"
 #include "rocksdb/cache.h"
 #include "rocksdb/compaction_job_stats.h"
 #include "rocksdb/db.h"
 #include "rocksdb/env.h"
 #include "rocksdb/options.h"
+#include "rocksdb/write_controller.h"
 #include "trace_replay/block_cache_tracer.h"
 #include "util/hash_containers.h"
 #include "util/thread_local.h"
@@ -164,8 +164,8 @@ extern const double kIncSlowdownRatio;
 class ColumnFamilyHandleImpl : public ColumnFamilyHandle {
  public:
   // create while holding the mutex
-  ColumnFamilyHandleImpl(
-      ColumnFamilyData* cfd, DBImpl* db, InstrumentedMutex* mutex);
+  ColumnFamilyHandleImpl(ColumnFamilyData* cfd, DBImpl* db,
+                         InstrumentedMutex* mutex);
   // destroy without mutex
   virtual ~ColumnFamilyHandleImpl();
   virtual ColumnFamilyData* cfd() const { return cfd_; }
@@ -190,7 +190,8 @@ class ColumnFamilyHandleImpl : public ColumnFamilyHandle {
 class ColumnFamilyHandleInternal : public ColumnFamilyHandleImpl {
  public:
   ColumnFamilyHandleInternal()
-      : ColumnFamilyHandleImpl(nullptr, nullptr, nullptr), internal_cfd_(nullptr) {}
+      : ColumnFamilyHandleImpl(nullptr, nullptr, nullptr),
+        internal_cfd_(nullptr) {}
 
   void SetCFD(ColumnFamilyData* _cfd) { internal_cfd_ = _cfd; }
   virtual ColumnFamilyData* cfd() const override { return internal_cfd_; }
@@ -310,10 +311,6 @@ class ColumnFamilyData {
   void SetLogNumber(uint64_t log_number) { log_number_ = log_number; }
   uint64_t GetLogNumber() const { return log_number_; }
 
-  void SetFlushReason(FlushReason flush_reason) {
-    flush_reason_ = flush_reason;
-  }
-  FlushReason GetFlushReason() const { return flush_reason_; }
   // thread-safe
   const FileOptions* soptions() const;
   const ImmutableOptions* ioptions() const { return &ioptions_; }
@@ -339,12 +336,10 @@ class ColumnFamilyData {
   // Validate CF options against DB options
   static Status ValidateOptions(const DBOptions& db_options,
                                 const ColumnFamilyOptions& cf_options);
-#ifndef ROCKSDB_LITE
   // REQUIRES: DB mutex held
   Status SetOptions(
       const DBOptions& db_options,
       const std::unordered_map<std::string, std::string>& options_map);
-#endif  // ROCKSDB_LITE
 
   InternalStats* internal_stats() { return internal_stats_.get(); }
 
@@ -358,7 +353,7 @@ class ColumnFamilyData {
   Version* current() { return current_; }
   Version* dummy_versions() { return dummy_versions_; }
   void SetCurrent(Version* _current);
-  uint64_t GetNumLiveVersions() const;  // REQUIRE: DB mutex held
+  uint64_t GetNumLiveVersions() const;    // REQUIRE: DB mutex held
   uint64_t GetTotalSstFilesSize() const;  // REQUIRE: DB mutex held
   uint64_t GetLiveSstFilesSize() const;   // REQUIRE: DB mutex held
   uint64_t GetTotalBlobFileSize() const;  // REQUIRE: DB mutex held
@@ -475,12 +470,6 @@ class ColumnFamilyData {
   bool queued_for_flush() { return queued_for_flush_; }
   bool queued_for_compaction() { return queued_for_compaction_; }
 
-  enum class WriteStallCause {
-    kNone,
-    kMemtableLimit,
-    kL0FileCountLimit,
-    kPendingCompactionBytes,
-  };
   static std::pair<WriteStallCondition, WriteStallCause>
   GetWriteStallConditionAndCause(
       int num_unflushed_memtables, int num_l0_files,
@@ -499,19 +488,21 @@ class ColumnFamilyData {
       const MutableCFOptions& mutable_cf_options,
       WriteStallCause& write_stall_cause);
 
+  void TEST_ResetWriteControllerToken() { write_controller_token_.reset(); }
+
  private:
-  std::unique_ptr<WriteControllerToken> DynamicSetupDelay(
-      WriteController* write_controller, uint64_t compaction_needed_bytes,
-      const MutableCFOptions& mutable_cf_options,
-      WriteStallCause& write_stall_cause);
+  void UpdateCFRate(void* client_id, uint64_t write_rate);
+  void ResetCFRate(void* client_id);
+
+  void DynamicSetupDelay(uint64_t max_write_rate,
+                         uint64_t compaction_needed_bytes,
+                         const MutableCFOptions& mutable_cf_options,
+                         WriteStallCause& write_stall_cause);
 
   double CalculateWriteDelayDividerAndMaybeUpdateWriteStallCause(
       uint64_t compaction_needed_bytes,
       const MutableCFOptions& mutable_cf_options,
       WriteStallCause& write_stall_cause);
-
-  // returns the min rate to set
-  uint64_t UpdateCFRate(uint32_t id, uint64_t write_rate);
 
  public:
   void set_initialized() { initialized_.store(true); }
@@ -548,6 +539,13 @@ class ColumnFamilyData {
 
   ThreadLocalPtr* TEST_GetLocalSV() { return local_sv_.get(); }
   WriteBufferManager* write_buffer_mgr() { return write_buffer_manager_; }
+
+  WriteController* write_controller_ptr() { return write_controller_.get(); }
+
+  const WriteController* write_controller_ptr() const {
+    return write_controller_.get();
+  }
+
   std::shared_ptr<CacheReservationManager>
   GetFileMetadataCacheReservationManager() {
     return file_metadata_cache_res_mgr_;
@@ -566,13 +564,30 @@ class ColumnFamilyData {
   static constexpr uint64_t kLaggingFlushesThreshold = 10U;
   void SetNumTimedQueuedForFlush(uint64_t num) { num_queued_for_flush_ = num; }
 
-  Cache::ItemOwnerId GetCacheOwnerId() const { return cache_owner_id_; }
+  // Allocate and return a new epoch number
+  uint64_t NewEpochNumber() { return next_epoch_number_.fetch_add(1); }
+
+  // Get the next epoch number to be assigned
+  uint64_t GetNextEpochNumber() const { return next_epoch_number_.load(); }
+
+  // Set the next epoch number to be assigned
+  void SetNextEpochNumber(uint64_t next_epoch_number) {
+    next_epoch_number_.store(next_epoch_number);
+  }
+
+  // Reset the next epoch number to be assigned
+  void ResetNextEpochNumber() { next_epoch_number_.store(1); }
+
+  // Recover the next epoch number of this CF and epoch number
+  // of its files (if missing)
+  void RecoverEpochNumbers();
 
  private:
   friend class ColumnFamilySet;
   ColumnFamilyData(uint32_t id, const std::string& name,
                    Version* dummy_versions, Cache* table_cache,
                    WriteBufferManager* write_buffer_manager,
+                   std::shared_ptr<WriteController> write_controller,
                    const ColumnFamilyOptions& options,
                    const ImmutableDBOptions& db_options,
                    const FileOptions* file_options,
@@ -588,7 +603,7 @@ class ColumnFamilyData {
   Version* dummy_versions_;  // Head of circular doubly-linked list of versions.
   Version* current_;         // == dummy_versions->prev_
 
-  std::atomic<int> refs_;      // outstanding references to ColumnFamilyData
+  std::atomic<int> refs_;  // outstanding references to ColumnFamilyData
   std::atomic<bool> initialized_;
   std::atomic<bool> dropped_;  // true if client dropped it
 
@@ -608,6 +623,7 @@ class ColumnFamilyData {
   std::unique_ptr<InternalStats> internal_stats_;
 
   WriteBufferManager* write_buffer_manager_;
+  std::shared_ptr<WriteController> write_controller_;
 
   MemTable* mem_;
   MemTableList imm_;
@@ -632,8 +648,6 @@ class ColumnFamilyData {
   // Column Family. All earlier log files must be ignored and not
   // recovered from
   uint64_t log_number_;
-
-  std::atomic<FlushReason> flush_reason_;
 
   // An object that keeps all the compaction stats
   // and picks the next compaction
@@ -669,11 +683,12 @@ class ColumnFamilyData {
   // a Version associated with this CFD
   std::shared_ptr<CacheReservationManager> file_metadata_cache_res_mgr_;
   bool mempurge_used_;
+
   // Used in the WBM's flush initiation heuristics.
   // See DBImpl::InitiateMemoryManagerFlushRequest() for more details
   uint64_t num_queued_for_flush_ = 0U;
 
-  Cache::ItemOwnerId cache_owner_id_ = Cache::kUnknownItemId;
+  std::atomic<uint64_t> next_epoch_number_;
 };
 
 // ColumnFamilySet has interesting thread-safety requirements
@@ -697,8 +712,7 @@ class ColumnFamilySet {
   // ColumnFamilySet supports iteration
   class iterator {
    public:
-    explicit iterator(ColumnFamilyData* cfd)
-        : current_(cfd) {}
+    explicit iterator(ColumnFamilyData* cfd) : current_(cfd) {}
     // NOTE: minimum operators for for-loop iteration
     iterator& operator++() {
       current_ = current_->next_;
@@ -747,19 +761,15 @@ class ColumnFamilySet {
 
   WriteBufferManager* write_buffer_manager() { return write_buffer_manager_; }
 
-  const std::shared_ptr<WriteController>& write_controller() const {
+  std::shared_ptr<WriteController> write_controller() const {
     return write_controller_;
   }
 
-  uint64_t UpdateCFRate(uint32_t id, uint64_t write_rate);
-
-  bool IsInRateMap(uint32_t id) { return cf_id_to_write_rate_.count(id); }
-
-  // try and remove the cf id from WriteController::cf_id_to_write_rate_.
-  // if successful and it was the min rate, set the current minimum value.
-  void DeleteSelfFromMapAndMaybeUpdateDelayRate(uint32_t id);
-
   WriteController* write_controller_ptr() { return write_controller_.get(); }
+
+  const WriteController* write_controller_ptr() const {
+    return write_controller_.get();
+  }
 
  private:
   friend class ColumnFamilyData;

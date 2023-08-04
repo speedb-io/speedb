@@ -3,7 +3,6 @@
 //  COPYING file in the root directory) and Apache 2.0 License
 //  (found in the LICENSE.Apache file in the root directory).
 
-#ifndef ROCKSDB_LITE
 
 #include <mutex>
 #include <string>
@@ -348,16 +347,13 @@ TEST_F(CompactFilesTest, CompactionFilterWithGetSv) {
       return true;
     }
 
-    void SetDB(DB* db) {
-      db_ = db;
-    }
+    void SetDB(DB* db) { db_ = db; }
 
     const char* Name() const override { return "FilterWithGet"; }
 
    private:
     DB* db_;
   };
-
 
   std::shared_ptr<FilterWithGet> cf(new FilterWithGet());
 
@@ -385,7 +381,6 @@ TEST_F(CompactFilesTest, CompactionFilterWithGetSv) {
         db->CompactFiles(ROCKSDB_NAMESPACE::CompactionOptions(), {fname}, 0));
   }
 
-
   delete db;
 }
 
@@ -400,10 +395,9 @@ TEST_F(CompactFilesTest, SentinelCompressionType) {
   }
   // Check that passing `CompressionType::kDisableCompressionOption` to
   // `CompactFiles` causes it to use the column family compression options.
-  for (auto compaction_style :
-       {CompactionStyle::kCompactionStyleLevel,
-        CompactionStyle::kCompactionStyleUniversal,
-        CompactionStyle::kCompactionStyleNone}) {
+  for (auto compaction_style : {CompactionStyle::kCompactionStyleLevel,
+                                CompactionStyle::kCompactionStyleUniversal,
+                                CompactionStyle::kCompactionStyleNone}) {
     ASSERT_OK(DestroyDB(db_name_, Options()));
     Options options;
     options.compaction_style = compaction_style;
@@ -490,17 +484,8 @@ TEST_F(CompactFilesTest, GetCompactionJobInfo) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+  ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }
 
-#else
-#include <stdio.h>
-
-int main(int /*argc*/, char** /*argv*/) {
-  fprintf(stderr,
-          "SKIPPED as DBImpl::CompactFiles is not supported in ROCKSDB_LITE\n");
-  return 0;
-}
-
-#endif  // !ROCKSDB_LITE

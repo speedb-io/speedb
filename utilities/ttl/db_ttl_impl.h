@@ -5,7 +5,6 @@
 
 #pragma once
 
-#ifndef ROCKSDB_LITE
 #include <deque>
 #include <string>
 #include <vector>
@@ -107,7 +106,7 @@ class DBWithTTLImpl : public DBWithTTL {
 
   void SetTtl(int32_t ttl) override { SetTtl(DefaultColumnFamily(), ttl); }
 
-  void SetTtl(ColumnFamilyHandle *h, int32_t ttl) override;
+  void SetTtl(ColumnFamilyHandle* h, int32_t ttl) override;
 
  private:
   // remember whether the Close completes or not
@@ -115,7 +114,6 @@ class DBWithTTLImpl : public DBWithTTL {
 };
 
 class TtlIterator : public Iterator {
-
  public:
   explicit TtlIterator(Iterator* iter, int32_t ttl, bool skip_expired_data,
                        int64_t creation_time)
@@ -225,9 +223,7 @@ class TtlCompactionFilterFactory : public CompactionFilterFactory {
 
   std::unique_ptr<CompactionFilter> CreateCompactionFilter(
       const CompactionFilter::Context& context) override;
-  void SetTtl(int32_t ttl) {
-    ttl_ = ttl;
-  }
+  void SetTtl(int32_t ttl) { ttl_ = ttl; }
   int32_t GetTtl() { return ttl_; }
 
   const char* Name() const override { return kClassName(); }
@@ -246,7 +242,6 @@ class TtlCompactionFilterFactory : public CompactionFilterFactory {
 };
 
 class TtlMergeOperator : public MergeOperator {
-
  public:
   explicit TtlMergeOperator(const std::shared_ptr<MergeOperator>& merge_op,
                             SystemClock* clock);
@@ -283,4 +278,3 @@ int RegisterTtlObjects(ObjectLibrary& library, const std::string& /*arg*/);
 }  // extern "C"
 
 }  // namespace ROCKSDB_NAMESPACE
-#endif  // ROCKSDB_LITE

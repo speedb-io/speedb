@@ -3,9 +3,9 @@
 //  COPYING file in the root directory) and Apache 2.0 License
 //  (found in the LICENSE.Apache file in the root directory).
 #pragma once
-#ifndef ROCKSDB_LITE
 #include <string>
 #include <vector>
+
 #include "rocksdb/db.h"
 #include "rocksdb/options.h"
 
@@ -27,7 +27,7 @@ struct LDBOptions {
   // Default: Slice::ToString()
   std::shared_ptr<SliceFormatter> key_formatter;
 
-  std::string print_help_header = "beezcli - Speedb Tool";
+  std::string print_help_header = "ldb - Speedb Tool";
 };
 
 class LDBTool {
@@ -40,4 +40,3 @@ class LDBTool {
 
 }  // namespace ROCKSDB_NAMESPACE
 
-#endif  // ROCKSDB_LITE

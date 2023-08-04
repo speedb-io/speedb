@@ -12,6 +12,7 @@
 #include "port/malloc.h"
 #include "port/port.h"
 #include "rocksdb/filter_policy.h"
+#include "rocksdb/table_pinning_policy.h"
 #include "table/block_based/block_based_table_reader.h"
 #include "util/coding.h"
 
@@ -120,8 +121,9 @@ Slice FullFilterBlockBuilder::Finish(
 
 FullFilterBlockReader::FullFilterBlockReader(
     const BlockBasedTable* t,
-    CachableEntry<ParsedFullFilterBlock>&& filter_block)
-    : FilterBlockReaderCommon(t, std::move(filter_block)) {}
+    CachableEntry<ParsedFullFilterBlock>&& filter_block,
+    std::unique_ptr<PinnedEntry>&& pinned)
+    : FilterBlockReaderCommon(t, std::move(filter_block), std::move(pinned)) {}
 
 bool FullFilterBlockReader::KeyMayMatch(const Slice& key, const bool no_io,
                                         const Slice* const /*const_ikey_ptr*/,
@@ -137,29 +139,36 @@ bool FullFilterBlockReader::KeyMayMatch(const Slice& key, const bool no_io,
 
 std::unique_ptr<FilterBlockReader> FullFilterBlockReader::Create(
     const BlockBasedTable* table, const ReadOptions& ro,
-    FilePrefetchBuffer* prefetch_buffer, bool use_cache, bool prefetch,
-    bool pin, BlockCacheLookupContext* lookup_context) {
+    const TablePinningOptions& tpo, FilePrefetchBuffer* prefetch_buffer,
+    bool use_cache, bool prefetch, bool pin,
+    BlockCacheLookupContext* lookup_context) {
   assert(table);
   assert(table->get_rep());
   assert(!pin || prefetch);
 
   CachableEntry<ParsedFullFilterBlock> filter_block;
+  std::unique_ptr<PinnedEntry> pinned;
   if (prefetch || !use_cache) {
     const Status s = ReadFilterBlock(table, prefetch_buffer, ro, use_cache,
                                      nullptr /* get_context */, lookup_context,
-                                     &filter_block, BlockType::kFilter);
+                                     &filter_block);
     if (!s.ok()) {
       IGNORE_STATUS_IF_ERROR(s);
       return std::unique_ptr<FilterBlockReader>();
     }
+    if (pin) {
+      table->PinData(tpo, TablePinningPolicy::kFilter,
+                     filter_block.GetValue()->ApproximateMemoryUsage(),
+                     &pinned);
+    }
 
-    if (use_cache && !pin) {
+    if (use_cache && !pinned) {
       filter_block.Reset();
     }
   }
 
-  return std::unique_ptr<FilterBlockReader>(
-      new FullFilterBlockReader(table, std::move(filter_block)));
+  return std::unique_ptr<FilterBlockReader>(new FullFilterBlockReader(
+      table, std::move(filter_block), std::move(pinned)));
 }
 
 bool FullFilterBlockReader::PrefixMayMatch(
@@ -177,9 +186,8 @@ bool FullFilterBlockReader::MayMatch(
     Env::IOPriority rate_limiter_priority) const {
   CachableEntry<ParsedFullFilterBlock> filter_block;
 
-  const Status s =
-      GetOrReadFilterBlock(no_io, get_context, lookup_context, &filter_block,
-                           BlockType::kFilter, rate_limiter_priority);
+  const Status s = GetOrReadFilterBlock(no_io, get_context, lookup_context,
+                                        &filter_block, rate_limiter_priority);
   if (!s.ok()) {
     IGNORE_STATUS_IF_ERROR(s);
     return true;
@@ -228,9 +236,9 @@ void FullFilterBlockReader::MayMatch(
     Env::IOPriority rate_limiter_priority) const {
   CachableEntry<ParsedFullFilterBlock> filter_block;
 
-  const Status s = GetOrReadFilterBlock(
-      no_io, range->begin()->get_context, lookup_context, &filter_block,
-      BlockType::kFilter, rate_limiter_priority);
+  const Status s =
+      GetOrReadFilterBlock(no_io, range->begin()->get_context, lookup_context,
+                           &filter_block, rate_limiter_priority);
   if (!s.ok()) {
     IGNORE_STATUS_IF_ERROR(s);
     return;

@@ -6,6 +6,7 @@
 #pragma once
 
 #include <stdint.h>
+
 #include <map>
 #include <string>
 
@@ -68,7 +69,7 @@ struct PerfContext {
   uint64_t block_read_count;           // total number of block reads (with IO)
   uint64_t block_read_byte;            // total number of bytes from block reads
   uint64_t block_read_time;            // total nanos spent on block reads
-  uint64_t block_cache_index_hit_count;   // total number of index block hits
+  uint64_t block_cache_index_hit_count;  // total number of index block hits
   // total number of standalone handles lookup from secondary cache
   uint64_t block_cache_standalone_handle_count;
   // total number of real handles lookup from secondary cache that are inserted
@@ -134,9 +135,14 @@ struct PerfContext {
   // than the snapshot that iterator is using.
   //
   uint64_t internal_recent_skipped_count;
-  // How many values were fed into merge operator by iterators.
+  // How many merge operands were fed into the merge operator by iterators.
+  // Note: base values are not included in the count.
   //
   uint64_t internal_merge_count;
+  // How many merge operands were fed into the merge operator by point lookups.
+  // Note: base values are not included in the count.
+  //
+  uint64_t internal_merge_point_lookup_count;
   // Number of times we reseeked inside a merging iterator, specifically to skip
   // after or before a range of keys covered by a range deletion in a newer LSM
   // component.

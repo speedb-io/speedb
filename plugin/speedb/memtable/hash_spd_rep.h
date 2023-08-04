@@ -14,7 +14,6 @@
 
 #pragma once
 
-#ifndef ROCKSDB_LITE
 #include <condition_variable>  // std::condition_variable
 #include <mutex>
 #include <thread>
@@ -23,9 +22,15 @@
 
 namespace ROCKSDB_NAMESPACE {
 
+struct HashSpdbRepOptions {
+  static const char* kName() { return "HashSpdbRepOptions"; }
+  size_t hash_bucket_count;
+  bool use_seek_parallel_threshold;
+};
+
 class HashSpdRepFactory : public MemTableRepFactory {
  public:
-  explicit HashSpdRepFactory(size_t bucket_count = 1000000);
+  explicit HashSpdRepFactory(size_t hash_bucket_count = 1000000);
 
   using MemTableRepFactory::CreateMemTableRep;
   MemTableRep* CreateMemTableRep(const MemTableRep::KeyComparator& compare,
@@ -45,10 +50,7 @@ class HashSpdRepFactory : public MemTableRepFactory {
   const char* Name() const override { return kClassName(); }
 
  private:
-  size_t bucket_count_;
-  bool use_seek_parralel_threshold_ = false;
+  HashSpdbRepOptions options_;
 };
 
 }  // namespace ROCKSDB_NAMESPACE
-
-#endif  // ROCKSDB_LITE

@@ -7,6 +7,7 @@
 
 #include <utility>
 
+#include "block_cache.h"
 #include "block_type.h"
 #include "file/random_access_file_reader.h"
 #include "logging/logging.h"
@@ -14,6 +15,7 @@
 #include "port/malloc.h"
 #include "port/port.h"
 #include "rocksdb/filter_policy.h"
+#include "rocksdb/table_pinning_policy.h"
 #include "table/block_based/block.h"
 #include "table/block_based/block_based_table_reader.h"
 #include "util/coding.h"
@@ -185,34 +187,44 @@ Slice PartitionedFilterBlockBuilder::Finish(
 }
 
 PartitionedFilterBlockReader::PartitionedFilterBlockReader(
-    const BlockBasedTable* t, CachableEntry<Block>&& filter_block)
-    : FilterBlockReaderCommon(t, std::move(filter_block)) {}
+    const BlockBasedTable* t,
+    CachableEntry<Block_kFilterPartitionIndex>&& filter_block,
+    std::unique_ptr<PinnedEntry>&& pinned)
+    : FilterBlockReaderCommon(t, std::move(filter_block), std::move(pinned)) {}
 
 std::unique_ptr<FilterBlockReader> PartitionedFilterBlockReader::Create(
     const BlockBasedTable* table, const ReadOptions& ro,
-    FilePrefetchBuffer* prefetch_buffer, bool use_cache, bool prefetch,
-    bool pin, BlockCacheLookupContext* lookup_context) {
+    const TablePinningOptions& tpo, FilePrefetchBuffer* prefetch_buffer,
+    bool use_cache, bool prefetch, bool pin,
+    BlockCacheLookupContext* lookup_context) {
   assert(table);
   assert(table->get_rep());
   assert(!pin || prefetch);
 
-  CachableEntry<Block> filter_block;
+  CachableEntry<Block_kFilterPartitionIndex> filter_block;
+  std::unique_ptr<PinnedEntry> pinned;
+
   if (prefetch || !use_cache) {
-    const Status s = ReadFilterBlock(
-        table, prefetch_buffer, ro, use_cache, nullptr /* get_context */,
-        lookup_context, &filter_block, BlockType::kFilterPartitionIndex);
+    const Status s = ReadFilterBlock(table, prefetch_buffer, ro, use_cache,
+                                     nullptr /* get_context */, lookup_context,
+                                     &filter_block);
     if (!s.ok()) {
       IGNORE_STATUS_IF_ERROR(s);
       return std::unique_ptr<FilterBlockReader>();
     }
 
-    if (use_cache && !pin) {
+    if (pin) {
+      table->PinData(tpo, TablePinningPolicy::kTopLevel,
+                     filter_block.GetValue()->ApproximateMemoryUsage(),
+                     &pinned);
+    }
+    if (use_cache && !pinned) {
       filter_block.Reset();
     }
   }
 
-  return std::unique_ptr<FilterBlockReader>(
-      new PartitionedFilterBlockReader(table, std::move(filter_block)));
+  return std::unique_ptr<FilterBlockReader>(new PartitionedFilterBlockReader(
+      table, std::move(filter_block), std::move(pinned)));
 }
 
 bool PartitionedFilterBlockReader::KeyMayMatch(
@@ -260,7 +272,8 @@ void PartitionedFilterBlockReader::PrefixesMayMatch(
 }
 
 BlockHandle PartitionedFilterBlockReader::GetFilterPartitionHandle(
-    const CachableEntry<Block>& filter_block, const Slice& entry) const {
+    const CachableEntry<Block_kFilterPartitionIndex>& filter_block,
+    const Slice& entry) const {
   IndexBlockIter iter;
   const InternalKeyComparator* const comparator = internal_comparator();
   Statistics* kNullStats = nullptr;
@@ -313,9 +326,9 @@ Status PartitionedFilterBlockReader::GetFilterPartitionBlock(
   const Status s =
       table()->RetrieveBlock(prefetch_buffer, read_options, fltr_blk_handle,
                              UncompressionDict::GetEmptyDict(), filter_block,
-                             BlockType::kFilter, get_context, lookup_context,
+                             get_context, lookup_context,
                              /* for_compaction */ false, /* use_cache */ true,
-                             /* wait_for_cache */ true, /* async_read */ false);
+                             /* async_read */ false);
 
   return s;
 }
@@ -325,10 +338,9 @@ bool PartitionedFilterBlockReader::MayMatch(
     GetContext* get_context, BlockCacheLookupContext* lookup_context,
     Env::IOPriority rate_limiter_priority,
     FilterFunction filter_function) const {
-  CachableEntry<Block> filter_block;
-  Status s = GetOrReadFilterBlock(
-      no_io, get_context, lookup_context, &filter_block,
-      BlockType::kFilterPartitionIndex, rate_limiter_priority);
+  CachableEntry<Block_kFilterPartitionIndex> filter_block;
+  Status s = GetOrReadFilterBlock(no_io, get_context, lookup_context,
+                                  &filter_block, rate_limiter_priority);
   if (UNLIKELY(!s.ok())) {
     IGNORE_STATUS_IF_ERROR(s);
     return true;
@@ -364,10 +376,10 @@ void PartitionedFilterBlockReader::MayMatch(
     BlockCacheLookupContext* lookup_context,
     Env::IOPriority rate_limiter_priority,
     FilterManyFunction filter_function) const {
-  CachableEntry<Block> filter_block;
-  Status s = GetOrReadFilterBlock(
-      no_io, range->begin()->get_context, lookup_context, &filter_block,
-      BlockType::kFilterPartitionIndex, rate_limiter_priority);
+  CachableEntry<Block_kFilterPartitionIndex> filter_block;
+  Status s =
+      GetOrReadFilterBlock(no_io, range->begin()->get_context, lookup_context,
+                           &filter_block, rate_limiter_priority);
   if (UNLIKELY(!s.ok())) {
     IGNORE_STATUS_IF_ERROR(s);
     return;  // Any/all may match
@@ -455,11 +467,10 @@ Status PartitionedFilterBlockReader::CacheDependencies(const ReadOptions& ro,
 
   BlockCacheLookupContext lookup_context{TableReaderCaller::kPrefetch};
 
-  CachableEntry<Block> filter_block;
+  CachableEntry<Block_kFilterPartitionIndex> filter_block;
 
   Status s = GetOrReadFilterBlock(false /* no_io */, nullptr /* get_context */,
                                   &lookup_context, &filter_block,
-                                  BlockType::kFilterPartitionIndex,
                                   ro.rate_limiter_priority);
   if (!s.ok()) {
     ROCKS_LOG_ERROR(rep->ioptions.logger,
@@ -517,9 +528,8 @@ Status PartitionedFilterBlockReader::CacheDependencies(const ReadOptions& ro,
     // filter blocks
     s = table()->MaybeReadBlockAndLoadToCache(
         prefetch_buffer.get(), ro, handle, UncompressionDict::GetEmptyDict(),
-        /* wait */ true, /* for_compaction */ false, &block, BlockType::kFilter,
-        nullptr /* get_context */, &lookup_context, nullptr /* contents */,
-        false);
+        /* for_compaction */ false, &block, nullptr /* get_context */,
+        &lookup_context, nullptr /* contents */, false);
     if (!s.ok()) {
       return s;
     }

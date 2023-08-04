@@ -5,10 +5,10 @@
 
 #pragma once
 
-#ifndef ROCKSDB_LITE
 
 #include <string>
 #include <vector>
+
 #include "db/db_impl/db_impl.h"
 
 namespace ROCKSDB_NAMESPACE {
@@ -145,12 +145,10 @@ class DBImplReadOnly : public DBImpl {
   // FIXME: some missing overrides for more "write" functions
 
  protected:
-#ifndef ROCKSDB_LITE
   Status FlushForGetLiveFiles() override {
     // No-op for read-only DB
     return Status::OK();
   }
-#endif  // !ROCKSDB_LITE
 
  private:
   // A "helper" function for DB::OpenForReadOnly without column families
@@ -166,4 +164,3 @@ class DBImplReadOnly : public DBImpl {
 };
 }  // namespace ROCKSDB_NAMESPACE
 
-#endif  // !ROCKSDB_LITE

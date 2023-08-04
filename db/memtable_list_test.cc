@@ -4,15 +4,17 @@
 //  (found in the LICENSE.Apache file in the root directory).
 
 #include "db/memtable_list.h"
+
 #include <algorithm>
 #include <string>
 #include <vector>
+
 #include "db/merge_context.h"
 #include "db/version_set.h"
-#include "db/write_controller.h"
 #include "rocksdb/db.h"
 #include "rocksdb/status.h"
 #include "rocksdb/write_buffer_manager.h"
+#include "rocksdb/write_controller.h"
 #include "test_util/testharness.h"
 #include "test_util/testutil.h"
 #include "util/string_util.h"
@@ -65,11 +67,9 @@ class MemTableListTest : public testing::Test {
   ~MemTableListTest() override {
     if (db) {
       std::vector<ColumnFamilyDescriptor> cf_descs(handles.size());
-#ifndef ROCKSDB_LITE
       for (int i = 0; i != static_cast<int>(handles.size()); ++i) {
         EXPECT_OK(handles[i]->GetDescriptor(&cf_descs[i]));
       }
-#endif  // !ROCKSDB_LITE
       for (auto h : handles) {
         if (h) {
           EXPECT_OK(db->DestroyColumnFamilyHandle(h));
@@ -1184,6 +1184,7 @@ TEST_F(MemTableListTest, AtomicFlusTest) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+  ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

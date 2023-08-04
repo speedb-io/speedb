@@ -12,7 +12,6 @@
 
 namespace ROCKSDB_NAMESPACE {
 
-#ifndef ROCKSDB_LITE
 class PeriodicTaskSchedulerTest : public DBTestBase {
  public:
   PeriodicTaskSchedulerTest()
@@ -66,7 +65,7 @@ TEST_F(PeriodicTaskSchedulerTest, Basic) {
   ASSERT_EQ(kPeriodSec, dbfull()->GetDBOptions().stats_persist_period_sec);
 
   ASSERT_GT(kPeriodSec, 1u);
-  dbfull()->TEST_WaitForPeridicTaskRun([&] {
+  dbfull()->TEST_WaitForPeriodicTaskRun([&] {
     mock_clock_->MockSleepForSeconds(static_cast<int>(kPeriodSec) - 1);
   });
 
@@ -78,14 +77,14 @@ TEST_F(PeriodicTaskSchedulerTest, Basic) {
   ASSERT_EQ(1, pst_st_counter);
   ASSERT_EQ(1, flush_info_log_counter);
 
-  dbfull()->TEST_WaitForPeridicTaskRun(
+  dbfull()->TEST_WaitForPeriodicTaskRun(
       [&] { mock_clock_->MockSleepForSeconds(static_cast<int>(kPeriodSec)); });
 
   ASSERT_EQ(2, dump_st_counter);
   ASSERT_EQ(2, pst_st_counter);
   ASSERT_EQ(2, flush_info_log_counter);
 
-  dbfull()->TEST_WaitForPeridicTaskRun(
+  dbfull()->TEST_WaitForPeriodicTaskRun(
       [&] { mock_clock_->MockSleepForSeconds(static_cast<int>(kPeriodSec)); });
 
   ASSERT_EQ(3, dump_st_counter);
@@ -99,7 +98,7 @@ TEST_F(PeriodicTaskSchedulerTest, Basic) {
   ASSERT_EQ(0u, dbfull()->GetDBOptions().stats_persist_period_sec);
 
   // Info log flush should still run.
-  dbfull()->TEST_WaitForPeridicTaskRun(
+  dbfull()->TEST_WaitForPeriodicTaskRun(
       [&] { mock_clock_->MockSleepForSeconds(static_cast<int>(kPeriodSec)); });
   ASSERT_EQ(3, dump_st_counter);
   ASSERT_EQ(3, pst_st_counter);
@@ -114,7 +113,7 @@ TEST_F(PeriodicTaskSchedulerTest, Basic) {
 
   ASSERT_EQ(2, scheduler.TEST_GetValidTaskNum());
 
-  dbfull()->TEST_WaitForPeridicTaskRun(
+  dbfull()->TEST_WaitForPeriodicTaskRun(
       [&] { mock_clock_->MockSleepForSeconds(static_cast<int>(kPeriodSec)); });
   ASSERT_EQ(4, dump_st_counter);
   ASSERT_EQ(3, pst_st_counter);
@@ -156,19 +155,19 @@ TEST_F(PeriodicTaskSchedulerTest, MultiInstances) {
   ASSERT_EQ(kInstanceNum * 3, scheduler.TEST_GetValidTaskNum());
 
   int expected_run = kInstanceNum;
-  dbi->TEST_WaitForPeridicTaskRun(
+  dbi->TEST_WaitForPeriodicTaskRun(
       [&] { mock_clock_->MockSleepForSeconds(kPeriodSec - 1); });
   ASSERT_EQ(expected_run, dump_st_counter);
   ASSERT_EQ(expected_run, pst_st_counter);
 
   expected_run += kInstanceNum;
-  dbi->TEST_WaitForPeridicTaskRun(
+  dbi->TEST_WaitForPeriodicTaskRun(
       [&] { mock_clock_->MockSleepForSeconds(kPeriodSec); });
   ASSERT_EQ(expected_run, dump_st_counter);
   ASSERT_EQ(expected_run, pst_st_counter);
 
   expected_run += kInstanceNum;
-  dbi->TEST_WaitForPeridicTaskRun(
+  dbi->TEST_WaitForPeriodicTaskRun(
       [&] { mock_clock_->MockSleepForSeconds(kPeriodSec); });
   ASSERT_EQ(expected_run, dump_st_counter);
   ASSERT_EQ(expected_run, pst_st_counter);
@@ -180,9 +179,9 @@ TEST_F(PeriodicTaskSchedulerTest, MultiInstances) {
 
   expected_run += (kInstanceNum - half) * 2;
 
-  dbi->TEST_WaitForPeridicTaskRun(
+  dbi->TEST_WaitForPeriodicTaskRun(
       [&] { mock_clock_->MockSleepForSeconds(kPeriodSec); });
-  dbi->TEST_WaitForPeridicTaskRun(
+  dbi->TEST_WaitForPeriodicTaskRun(
       [&] { mock_clock_->MockSleepForSeconds(kPeriodSec); });
   ASSERT_EQ(expected_run, dump_st_counter);
   ASSERT_EQ(expected_run, pst_st_counter);
@@ -222,10 +221,10 @@ TEST_F(PeriodicTaskSchedulerTest, MultiEnv) {
   Close();
 }
 
-#endif  // !ROCKSDB_LITE
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+  ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
 
   return RUN_ALL_TESTS();

@@ -3,7 +3,6 @@
 //  COPYING file in the root directory) and Apache 2.0 License
 //  (found in the LICENSE.Apache file in the root directory).
 
-#ifndef ROCKSDB_LITE
 
 #include "utilities/transactions/write_prepared_txn.h"
 
@@ -115,8 +114,8 @@ Status WritePreparedTxn::PrepareInternal() {
   // For each duplicate key we account for a new sub-batch
   prepare_batch_cnt_ = GetWriteBatch()->SubBatchCnt();
   // Having AddPrepared in the PreReleaseCallback allows in-order addition of
-  // prepared entries to PreparedHeap and hence enables an optimization. Refer to
-  // SmallestUnCommittedSeq for more details.
+  // prepared entries to PreparedHeap and hence enables an optimization. Refer
+  // to SmallestUnCommittedSeq for more details.
   AddPreparedCallback add_prepared_callback(
       wpt_db_, db_impl_, prepare_batch_cnt_,
       db_impl_->immutable_db_options().two_write_queues, kFirstPrepareBatch);
@@ -509,4 +508,3 @@ Status WritePreparedTxn::RebuildFromWriteBatch(WriteBatch* src_batch) {
 
 }  // namespace ROCKSDB_NAMESPACE
 
-#endif  // ROCKSDB_LITE

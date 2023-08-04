@@ -87,6 +87,8 @@ DECLARE_string(options_file);
 DECLARE_int64(active_width);
 DECLARE_bool(test_batches_snapshots);
 DECLARE_bool(atomic_flush);
+DECLARE_int32(manual_wal_flush_one_in);
+DECLARE_int32(lock_wal_one_in);
 DECLARE_bool(test_cf_consistency);
 DECLARE_bool(test_multi_ops_txns);
 DECLARE_int32(threads);
@@ -101,7 +103,9 @@ DECLARE_bool(destroy_db_initially);
 DECLARE_bool(verbose);
 DECLARE_bool(progress_reports);
 DECLARE_uint64(db_write_buffer_size);
+DECLARE_bool(cost_write_buffer_to_cache);
 DECLARE_bool(allow_wbm_stalls);
+DECLARE_uint32(start_delay_percent);
 DECLARE_bool(initiate_wbm_flushes);
 DECLARE_uint32(max_num_parallel_flushes);
 DECLARE_int32(write_buffer_size);
@@ -154,6 +158,7 @@ DECLARE_string(cache_type);
 DECLARE_uint64(subcompactions);
 DECLARE_uint64(periodic_compaction_seconds);
 DECLARE_uint64(compaction_ttl);
+DECLARE_bool(fifo_allow_compaction);
 DECLARE_bool(allow_concurrent_memtable_write);
 DECLARE_double(experimental_mempurge_threshold);
 DECLARE_bool(use_spdb_writes);
@@ -217,6 +222,7 @@ DECLARE_bool(compare_full_db_state_snapshot);
 DECLARE_uint64(snapshot_hold_ops);
 DECLARE_bool(long_running_snapshots);
 DECLARE_bool(use_multiget);
+DECLARE_bool(use_get_entity);
 DECLARE_int32(readpercent);
 DECLARE_int32(prefixpercent);
 DECLARE_int32(writepercent);
@@ -236,6 +242,7 @@ DECLARE_bool(compression_use_zstd_dict_trainer);
 DECLARE_string(checksum_type);
 DECLARE_string(env_uri);
 DECLARE_string(fs_uri);
+DECLARE_string(pinning_policy);
 DECLARE_uint64(ops_per_thread);
 DECLARE_uint64(log2_keys_per_lock);
 DECLARE_uint64(max_manifest_file_size);
@@ -243,6 +250,7 @@ DECLARE_bool(in_place_update);
 DECLARE_string(memtablerep);
 DECLARE_int32(prefix_size);
 DECLARE_bool(use_merge);
+DECLARE_uint32(use_put_entity_one_in);
 DECLARE_bool(use_full_merge_v1);
 DECLARE_int32(sync_wal_one_in);
 DECLARE_bool(avoid_unnecessary_blocking_io);
@@ -255,11 +263,9 @@ DECLARE_int32(verify_db_one_in);
 DECLARE_int32(continuous_verification_interval);
 DECLARE_int32(get_property_one_in);
 DECLARE_string(file_checksum_impl);
-DECLARE_int32(data_block_index_type);
-DECLARE_double(data_block_hash_table_util_ratio);
 DECLARE_bool(use_dynamic_delay);
+DECLARE_bool(use_clean_delete_during_flush);
 
-#ifndef ROCKSDB_LITE
 // Options for StackableDB-based BlobDB
 DECLARE_bool(use_blob_db);
 DECLARE_uint64(blob_db_min_blob_size);
@@ -267,7 +273,6 @@ DECLARE_uint64(blob_db_bytes_per_sync);
 DECLARE_uint64(blob_db_file_size);
 DECLARE_bool(blob_db_enable_gc);
 DECLARE_double(blob_db_gc_cutoff);
-#endif  // !ROCKSDB_LITE
 
 // Options for integrated BlobDB
 DECLARE_bool(allow_setting_blob_options_dynamically);
@@ -304,13 +309,11 @@ DECLARE_int32(secondary_cache_fault_one_in);
 DECLARE_int32(prepopulate_block_cache);
 
 DECLARE_bool(two_write_queues);
-#ifndef ROCKSDB_LITE
 DECLARE_bool(use_only_the_last_commit_time_batch_for_recovery);
 DECLARE_uint64(wp_snapshot_cache_bits);
 DECLARE_uint64(wp_commit_cache_bits);
 DECLARE_int32(refresh_options_sec);
 DECLARE_string(refresh_options_file);
-#endif  // !ROCKSDB_LITE
 
 DECLARE_bool(adaptive_readahead);
 DECLARE_bool(async_io);
@@ -324,6 +327,7 @@ DECLARE_bool(allow_data_in_errors);
 // Tiered storage
 DECLARE_bool(enable_tiered_storage);  // set last_level_temperature
 DECLARE_int64(preclude_last_level_data_seconds);
+DECLARE_int64(preserve_internal_time_seconds);
 
 DECLARE_int32(verify_iterator_with_expected_state_one_in);
 DECLARE_bool(preserve_unverified_changes);
@@ -332,6 +336,7 @@ DECLARE_uint64(readahead_size);
 DECLARE_uint64(initial_auto_readahead_size);
 DECLARE_uint64(max_auto_readahead_size);
 DECLARE_uint64(num_file_reads_for_auto_readahead);
+DECLARE_bool(use_io_uring);
 
 constexpr long KB = 1024;
 constexpr int kRandomValueMaxFactor = 3;
@@ -499,8 +504,8 @@ extern inline std::string Key(int64_t val) {
     if (offset < weight) {
       // Use the bottom 3 bits of offset as the number of trailing 'x's in the
       // key. If the next key is going to be of the next level, then skip the
-      // trailer as it would break ordering. If the key length is already at max,
-      // skip the trailer.
+      // trailer as it would break ordering. If the key length is already at
+      // max, skip the trailer.
       if (offset < weight - 1 && level < levels - 1) {
         size_t trailer_len = offset & 0x7;
         key.append(trailer_len, 'x');
@@ -588,6 +593,24 @@ extern inline std::string StringToHex(const std::string& str) {
   return result;
 }
 
+inline std::string WideColumnsToHex(const WideColumns& columns) {
+  if (columns.empty()) {
+    return std::string();
+  }
+
+  std::ostringstream oss;
+
+  oss << std::hex;
+
+  auto it = columns.begin();
+  oss << *it;
+  for (++it; it != columns.end(); ++it) {
+    oss << ' ' << *it;
+  }
+
+  return oss.str();
+}
+
 // Unified output format for double parameters
 extern inline std::string FormatDoubleParam(double param) {
   return std::to_string(param);
@@ -614,6 +637,12 @@ extern std::vector<int64_t> GenerateNKeys(ThreadState* thread, int num_keys,
 
 extern size_t GenerateValue(uint32_t rand, char* v, size_t max_sz);
 extern uint32_t GetValueBase(Slice s);
+
+extern WideColumns GenerateWideColumns(uint32_t value_base, const Slice& slice);
+extern WideColumns GenerateExpectedWideColumns(uint32_t value_base,
+                                               const Slice& slice);
+extern bool VerifyWideColumns(const Slice& value, const WideColumns& columns);
+extern bool VerifyWideColumns(const WideColumns& columns);
 
 extern StressTest* CreateCfConsistencyStressTest();
 extern StressTest* CreateBatchedOpsStressTest();

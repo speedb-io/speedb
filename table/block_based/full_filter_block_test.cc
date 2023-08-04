@@ -84,7 +84,6 @@ class TestFilterBitsReader : public FilterBitsReader {
   uint32_t len_;
 };
 
-
 class TestHashFilter : public FilterPolicy {
  public:
   const char* Name() const override { return "TestHashFilter"; }
@@ -338,6 +337,7 @@ TEST_F(FullFilterBlockTest, SingleChunk) {
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+  ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

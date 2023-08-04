@@ -1,12 +1,188 @@
 # Speedb Change Log 
 
-## Blueberry 2.1.0 (10/26/2022)
-## New Features
+## Unreleased
+
+### New Features
+* Snapshot optimization - The most important information inside a snapshot is its Sequence number, which allows the compaction to know if the key-value should be deleted or not. The sequence number is being changed when modification happens in the db. This feature allows the db to take a snapshot without acquiring db mutex when the last snapshot has the same sequence number as a new one. In transactional db with mostly read operations, it should improve performance when used with multithreaded environment and as well other scenarios of taking large amount of snapshots with mostly read operations.
+* Add a TablePinningPolicy to the BlockBasedTableOptions.  This class controls when blocks should be pinned in memory for a block based table.  The default behavior uses the MetadataCacheOptions to control pinning and behaves identical to the previous releases. 
+
+### Enhancements
+* db_bench: add estimate-table-readers-mem benchmark which prints these stats.
+
+### Bug Fixes
+* unit tests: fix GlobalWriteControllerTest.GlobalAndWBMSetupDelay by waiting for the memtable memory release.
+* spdb memtable: use_seek_parallel_threshold option parameter mishandled (#570)
+* build: Plug memtable global switch memtable stuck fix.  (#606)
+* build: Windows compilation fix (#568).
+* Logger: fix Block cache stats trace by spacing it from the last trace (#578).
+* WriteController: move the class to public interface which should have been done under #346.
+* unit tests: fix DBCompactionTest.DisableMultiManualCompaction by blocking all bg compaction threads which increased by default to 8 in #194. 
+
+## Fig v2.5.0 (06/14/2023)
+Based on RocksDB 8.1.1
+
+### New Features
+* Delay writes gradually based on memory usage of the WriteBufferManager (WBM).
+Before this PR, setting allow_stall in the WBM's constructor meant that writes are completely stopped when the WBM's memory usage exceeds its quota. The goal here is to gradually decrease
+the users write speed before that threshold is reached in order to gain stability.
+To use this feature, pass allow_stall = true to the ctor of WBM and the db needs to be opened with options.use_dynamic_delay = true. The WBM will setup delay requests starting from (start_delay_percent * _buffer_size) / 100 (default value is 70) (start_delay_percent is another WBM ctor parameter).
+Changes to the WBM's memory are tracked in WriteBufferManager::ReserveMem and FreeMem.
+Once the WBM reached its capacity, if allow_stall == true, writes will be stopped using the old ShouldStall() and WBMStallWrites(). (#423)
+
+* Prevent flush entry followed delete operations
+currently during memtable flush ,  if key has a match key in the
+delete range table and this record has no snapshot related to it,
+we still write it with its value to SST file.
+This feature keeps only the delete record and reduce SST size for later compaction.
+(#411)
+
+### Enhancements
+* CI: add a workflow for building and publishing jar to maven central (#507)
+* LOG: Compaction job traces - report cf name and job id (#511)
+* db_stress: Add cost_write_buffer_to_cache flag (#513)
+* LOG: Display cf names in rolled logs with their options (#419)
+* Log Improvement: Report the name of cf-s whose options are skipped in the log (#520)
+
+### Bug Fixes
+* CI: fix sanity check to use clang-format 10
+* CI: run sanity only once on PRs
+* Makefile: Remove pycache artifacts after running gtest-parallel (#495)
+* AVX512: fix disabling other optimizations (#489)
+* stress test: fix decoding error (#498)
+* db_bench and stress: fix WBM initiation (#510)
+* Sanitize max_num_parallel_flushes in WBM if 0 (#460)
+* WriteController: fix for stop while shutting down (#499)
+Also switch to waiting a sec on the CV each time. This is required since a bg error doesn't signal the CV in the WriteController.
+* fix UnlockWALStallCleared test in utilities/transactions/transaction_test.cc (#514)
+* Always assume optimize_filters_for_memory=false when creating a paired bloom filter (#488)
+* spdb memtable use after free bug (#501)
+* db_bench: Create a WBM once for all db-s regardless of their use in different groups (#550)
+* Tompstone unit test faiure (#560)
+* build: Remove unused variables in unit tests (#581)
+
+### Miscellaneous
+* disable failing unit tests and paired bloom filter stress testing
+* version: update Speedb patch version to 2.4.1 (#503)
+
+## Speedb v2.4.1 ( 04/19/2023)
+### Enhancements
+* Add the ability to create any Filter Policy in java (including ribbon filter and the Speedb paired bloom filter) by @mrambacher in #387
+
+### Bug Fixes
+* Write Flow: Reduce debug log size. Note: the write flow is still experimental in this release (#461) by @ayulas in #472
+
+## Ephedra v2.4.0 (04/05/2023)
+### New Features
+* New beezcli: Interactive CLI that offers data access and admin commands by @ofriedma in #427
+* Global delayed write rate: manage the delayed write rate across multiple CFs/databases by @Yuval-Ariel in #392
+* New write flow: Major improvement of writing while reading. Note: This feature is experimental and it consumes slightly more memory in this release by @ayulas in #445
+
+### Enhancements
+* Skip expired object while using DBWithTtl by @ofriedma in #403
+
+### Bug Fixes
+* Dynamic delay writes: fix pending bytes rate calculation by @Yuval-Ariel in #451
+* Global delay write: check again credits under mutex by @Yuval-Ariel in #438
+
+### Miscellaneous
+* Add back accidental revert in DropRandomUnsyncedData by @mrambacher in #402
+* Add speedb licenses to code by @ofriedma in #409
+* Enforce writing licenses inside a source file by @ofriedma in #410
+* Makefile: Use speedb libs in build_size target by @AmnonHanuhov in #399
+* Replace uint with unsinged int (Windows Build Failure) (#420) by @udi-speedb in #421
+* crashtest: dont reroll skip_list or HashSpdRepFactory by @Yuval-Ariel in #452
+* Options: Forward declare WriteBufferManager by @AmnonHanuhov in #433
+
+## Dragon Fruit v2.3.0 (02/15/2023)
+Based on RocksDB 7.7.8
+
+### New Features
+* New Live configuration changes: support changing immutable options on the fly by @mrambacher in #294
+
+### Enhancements
+* Improved performance while using the sorted-hash memtable (#298) by @ayulas in #299
+* Added prints and query option of Index size per CF - LRU Cache Only (#338) by @udi-speedb in #368
+* Add F_BARRIERFSYNC for Sync operations on MacOS (addresses the issue raised in rocksdb#11035) by @mrambacher in #319
+* Paired-Bloom-Filter: Balancing rounding to batches between the bottom-most level and other levels by @noamhaham in #371
+* db_bench: recreate only specified DBs in a group of benchmarks by @andy-byers in #370
+* Use a NoSyncFileSystem to skip Sync/FSync to reduce test times ( based on RocksDB PR 9545) by @mrambacher in #380
+
+### Bug Fixes
+* Delayed Writes: fix L0 calc bug by @Yuval-Ariel in #311
+* util: Fixed compilation failure on Fedora 35 with gcc 11.2.1 and gflag 2.2.2  by @AmnonHanuhov in #396
+* Fixed compilation failure on windows  by @ayulas in #384
+* Fixed compilation issues on Mac by @mrambacher in #393
+* Use the Test Name for the dbname when running unit tests by @mrambacher in #353
+
+### Miscellaneous
+* Added Speedb is awesome example to the getting started section by @RoyBenMoshe in #382
+* unit tests: fix CompactionServiceTest.RemoteEventListener (#314) by @Yuval-Ariel in #354
+* Artifacts check tool - readme file was updated by @RoyBenMoshe in #293
+* Don't use AVX512 with asan by @Yuval-Ariel in #398
+
+
+## Speedb v2.2.1 (01/30/2023)
+Based on RocksDB 7.7.8
+
+### Bug Fixes
+* Delayed Writes: fixed L0 calculation bug by @Yuval-Ariel in #311
+
+### Miscellaneous
+* Added WBM's cache info to the log (#312) by @udi-speedb in #313
+* db_bench: set db_bench defaults to Speedb (#61) by @Yuval-Ariel in #322
+* build: remove the dependency on GNU Parallel for running unit tests by @AmnonHanuhov in #243
+
+## Coconut v2.2.0 (12/22/2022)
+Based on RocksDB 7.7.3
+
+### New Features
+* Proactive flushes for better resources utilization by @udi-speedb #185
+* Dynamic delayed write mechanism for consistent performance by @Yuval-Ariel in #281
+
+### Enhancements 
+* Paired block bloom: Removed the bits-per-key limitation for better results by @udi-speedb in #163
+* Allow running multiple benchmark, each with its own configuration by @udi-speedb in #250
+* db_bench: Support '--groups' in addition to '-groups' (#283) by @udi-speedb in #295
+* db_stress enhancement: Support control over WBM's allow_stall by @udi-speedb in #289
+* Shorten latency while switch generic memtable by @ayulas in #297
+
+### Bug Fixes
+* db_bench: bug fix inserted in #200 (#263) by @Yuval-Ariel in #265
+* db_bench: ErrorExit from static func bug (#277) by @Yuval-Ariel in #278
+* Proactive Flushes: compilation warnings fix (#304) by @Yuval-Ariel in #307
+
+### Miscellaneous
+Added info to the log file for artifact testing by @RoyBenMoshe in #286
+Disable LoadCustomizableTest.LoadMemTableRepFactoryTest (#303) by @ayulas in #305
+
+## Speedb v2.1.1 (11/15/2022)
+### Bug Fixes
+* Shorten latency while switch memtable (#14)
+* Fixed a crash that occurred when using the hash memtable. (#98)
+* memtable_list: avoid rolling back memtable flush on CF drop (#144)
+* crashtest: fix 0 value of data_block_hash_table_util_ratio (#214)
+* deletefile_test: fix breakage caused by the compaction threads change (#218)
+* cmake: clean up on successful runs and randomise test scheduling (#202)
+* build: add a version build-tag for non-release builds (#156)
+* build: support ccache and sccache in the Makefile build (#170)
+* docs: fix instructions for building Speedb in README.md and INSTALL.md
+* readme typo fix by @azmisaquib (#223)
+* build_version: apply the build tag to the Speedb version string (#231)
+* build: correctly handle merge commits when calculating a build tag (#207)
+* db_test2: fix BackgroundPurgeTest (#236)
+* Update HISTORY.md (#239)
+* db_bench: Fix a bug when destructing a Benchmark with multiple db-s (#234)
+* db_bench: add benchmark - seektodeletedranges (#201)
+
+
+## Blueberry v2.1.0 (10/26/2022) 
+Based on RocksDB 7.2.2
+### New Features
 * Added new Paired bloom filter that reduces false positive rate with the same performance and memory. In some configurations, the memory consumption is even reduced by up to 30%.
 Note: Paired bloom filter is recommended to use when the number of bits per key is larger than 10. (#54)
 * Added Plugin Tests to builds (#143)
 
-## Enhancements
+### Enhancements
 * The default value for the number of compaction threads has changed to 8 (#194)
 * An infrastructure addition for a future feature: added API to retrieve the amount of immutable memory that can be freed. (#113)
 * cmake: allow running the tests in parallel like in the Makefile (#103)
@@ -16,7 +192,7 @@ Note: Paired bloom filter is recommended to use when the number of bits per key 
 * Added db_bench option to change the parameter: avoid_unnecessary_blocking_io (#184)
 * Allow construction of Filter Policy from uri to the tools (#83)
 
-## Miscellaneous
+### Miscellaneous
 * Remove the GPL as an alternative license (#119)
 * Fix shell tab-completions in makefile (#148)
 * Added Speedb change-log to the HISTORY.md file (#189)
@@ -24,12 +200,13 @@ Note: Paired bloom filter is recommended to use when the number of bits per key 
 * Change the name of the output artifacts to Speedb (#66)
 
 
-## Apricot 2.0.0 (08/04/2022)
-## New Features
+## Apricot v2.0.0 (08/04/2022)
+Based on RocksDB 7.2.2 
+### New Features
 * Added a new hash based memtable that supports concurrent reads and writes
 * Added ability to create MemTableFactory from URI/string to tools
 
-## Bug Fixes
+### Bug Fixes
 * Avoid comparing Status using == as it compares only status codes. The comparison breaks when comparing against status::NoSpace() since it has a status code of `Code::kIOError` and only a subcode of `SubCode::kNoSpace`
 * Fixed snapshots leak in optimistic_transaction_example: whenever the example is run under ASan, snapshots are acquired but not released, resulting in a memory leak error.
 * ldb: fix get to print the entire value
@@ -41,7 +218,7 @@ Note: Paired bloom filter is recommended to use when the number of bits per key 
 
 ## Miscellaneous
 * LOG: Print write_buffer_manager size to LOG
-* LOG: change log header to SpeeDB
+* LOG: change log header to Speedb
 * LOG & db_bench: metadata_cache_options - print to LOG and support its configuration in db_bench
 * db_impl: use unique_ptr in DBImpl::Open for nicer memory management
 * Explicitly compare the SuperVersion pointer in column_family
@@ -52,44 +229,160 @@ Note: Paired bloom filter is recommended to use when the number of bits per key 
 
 
 # Rocksdb Change Log
-## 7.7.8 (11/27/2022)
+## 8.1.1 (04/06/2023)
 ### Bug Fixes
-* Fix failed memtable flush retry bug that could cause wrongly ordered updates, which would surface to writers as `Status::Corruption` in case of `force_consistency_checks=true` (default). It affects use cases that enable both parallel flush (`max_background_flushes > 1` or `max_background_jobs >= 8`) and non-default memtable count (`max_write_buffer_number > 2`).
-* Tiered Storage: fixed excessive keys written to penultimate level in non-debug builds.
+* In the DB::VerifyFileChecksums API, ensure that file system reads of SST files are equal to the readahead_size in ReadOptions, if specified. Previously, each read was 2x the readahead_size.
+
+## 8.1.0 (03/18/2023)
+### Behavior changes
+* Compaction output file cutting logic now considers range tombstone start keys. For example, SST partitioner now may receive ParitionRequest for range tombstone start keys.
+* If the async_io ReadOption is specified for MultiGet or NewIterator on a platform that doesn't support IO uring, the option is ignored and synchronous IO is used.
+
+### Bug Fixes
+* Fixed an issue for backward iteration when user defined timestamp is enabled in combination with BlobDB.
+* Fixed a couple of cases where a Merge operand encountered during iteration wasn't reflected in the `internal_merge_count` PerfContext counter.
+* Fixed a bug in CreateColumnFamilyWithImport()/ExportColumnFamily() which did not support range tombstones (#11252).
+* Fixed a bug where an excluded column family from an atomic flush contains unflushed data that should've been included in this atomic flush (i.e, data of seqno less than the max seqno of this atomic flush), leading to potential data loss in this excluded column family when `WriteOptions::disableWAL == true` (#11148).
+
+### New Features
+* Add statistics rocksdb.secondary.cache.filter.hits, rocksdb.secondary.cache.index.hits, and rocksdb.secondary.cache.filter.hits
+* Added a new PerfContext counter `internal_merge_point_lookup_count` which tracks the number of Merge operands applied while serving point lookup queries.
+* Add new statistics rocksdb.table.open.prefetch.tail.read.bytes, rocksdb.table.open.prefetch.tail.{miss|hit}
+* Add support for SecondaryCache with HyperClockCache (`HyperClockCacheOptions` inherits `secondary_cache` option from `ShardedCacheOptions`)
+* Add new db properties `rocksdb.cf-write-stall-stats`, `rocksdb.db-write-stall-stats`and APIs to examine them in a structured way. In particular, users of `GetMapProperty()` with property `kCFWriteStallStats`/`kDBWriteStallStats` can now use the functions in `WriteStallStatsMapKeys` to find stats in the map.
+
+### Public API Changes
+* Changed various functions and features in `Cache` that are mostly relevant to custom implementations or wrappers. Especially, asychronous lookup functionality is moved from `Lookup()` to a new `StartAsyncLookup()` function.
+
+## 8.0.0 (02/19/2023)
+### Behavior changes
+* `ReadOptions::verify_checksums=false` disables checksum verification for more reads of non-`CacheEntryRole::kDataBlock` blocks.
+* In case of scan with async_io enabled, if posix doesn't support IOUring, Status::NotSupported error will be returned to the users. Initially that error was swallowed and reads were switched to synchronous reads.
+
+### Bug Fixes
+* Fixed a data race on `ColumnFamilyData::flush_reason` caused by concurrent flushes.
+* Fixed an issue in `Get` and `MultiGet` when user-defined timestamps is enabled in combination with BlobDB.
+* Fixed some atypical behaviors for `LockWAL()` such as allowing concurrent/recursive use and not expecting `UnlockWAL()` after non-OK result. See API comments.
+* Fixed a feature interaction bug where for blobs `GetEntity` would expose the blob reference instead of the blob value.
+* Fixed `DisableManualCompaction()` and `CompactRangeOptions::canceled` to cancel compactions even when they are waiting on conflicting compactions to finish
+* Fixed a bug in which a successful `GetMergeOperands()` could transiently return `Status::MergeInProgress()`
+* Return the correct error (Status::NotSupported()) to MultiGet caller when ReadOptions::async_io flag is true and IO uring is not enabled. Previously, Status::Corruption() was being returned when the actual failure was lack of async IO support.
+* Fixed a bug in DB open/recovery from a compressed WAL that was caused due to incorrect handling of certain record fragments with the same offset within a WAL block.
+
+### Feature Removal
+* Remove RocksDB Lite.
+* The feature block_cache_compressed is removed. Statistics related to it are removed too.
+* Remove deprecated Env::LoadEnv(). Use Env::CreateFromString() instead.
+* Remove deprecated FileSystem::Load(). Use FileSystem::CreateFromString() instead.
+* Removed the deprecated version of these utility functions and the corresponding Java bindings: `LoadOptionsFromFile`, `LoadLatestOptions`, `CheckOptionsCompatibility`.
+* Remove the FactoryFunc from the LoadObject method from the Customizable helper methods.
+
+### Public API Changes
+* Moved rarely-needed Cache class definition to new advanced_cache.h, and added a CacheWrapper class to advanced_cache.h. Minor changes to SimCache API definitions.
+* Completely removed the following deprecated/obsolete statistics: the tickers `BLOCK_CACHE_INDEX_BYTES_EVICT`, `BLOCK_CACHE_FILTER_BYTES_EVICT`, `BLOOM_FILTER_MICROS`, `NO_FILE_CLOSES`, `STALL_L0_SLOWDOWN_MICROS`, `STALL_MEMTABLE_COMPACTION_MICROS`, `STALL_L0_NUM_FILES_MICROS`, `RATE_LIMIT_DELAY_MILLIS`, `NO_ITERATORS`, `NUMBER_FILTERED_DELETES`, `WRITE_TIMEDOUT`, `BLOB_DB_GC_NUM_KEYS_OVERWRITTEN`, `BLOB_DB_GC_NUM_KEYS_EXPIRED`, `BLOB_DB_GC_BYTES_OVERWRITTEN`, `BLOB_DB_GC_BYTES_EXPIRED`, `BLOCK_CACHE_COMPRESSION_DICT_BYTES_EVICT` as well as the histograms `STALL_L0_SLOWDOWN_COUNT`, `STALL_MEMTABLE_COMPACTION_COUNT`, `STALL_L0_NUM_FILES_COUNT`, `HARD_RATE_LIMIT_DELAY_COUNT`, `SOFT_RATE_LIMIT_DELAY_COUNT`, `BLOB_DB_GC_MICROS`, and `NUM_DATA_BLOCKS_READ_PER_LEVEL`. Note that as a result, the C++ enum values of the still supported statistics have changed. Developers are advised to not rely on the actual numeric values.
+* Deprecated IngestExternalFileOptions::write_global_seqno and change default to false. This option only needs to be set to true to generate a DB compatible with RocksDB versions before 5.16.0.
+* Remove deprecated APIs `GetColumnFamilyOptionsFrom{Map|String}(const ColumnFamilyOptions&, ..)`, `GetDBOptionsFrom{Map|String}(const DBOptions&, ..)`, `GetBlockBasedTableOptionsFrom{Map|String}(const BlockBasedTableOptions& table_options, ..)` and ` GetPlainTableOptionsFrom{Map|String}(const PlainTableOptions& table_options,..)`.
+* Added a subcode of `Status::Corruption`, `Status::SubCode::kMergeOperatorFailed`, for users to identify corruption failures originating in the merge operator, as opposed to RocksDB's internally identified data corruptions
+
+### Build Changes
+* The `make` build now builds a shared library by default instead of a static library. Use `LIB_MODE=static` to override.
+
+### New Features
+* Compaction filters are now supported for wide-column entities by means of the `FilterV3` API. See the comment of the API for more details.
+* Added `do_not_compress_roles` to `CompressedSecondaryCacheOptions` to disable compression on certain kinds of block. Filter blocks are now not compressed by CompressedSecondaryCache by default.
+* Added a new `MultiGetEntity` API that enables batched wide-column point lookups. See the API comments for more details.
+
+## 7.10.0 (01/23/2023)
+### Behavior changes
+* Make best-efforts recovery verify SST unique ID before Version construction (#10962)
+* Introduce `epoch_number` and sort L0 files by `epoch_number` instead of `largest_seqno`. `epoch_number` represents the order of a file being flushed or ingested/imported. Compaction output file will be assigned with the minimum `epoch_number` among input files'. For L0, larger `epoch_number` indicates newer L0 file.
+
+### Bug Fixes
 * Fixed a regression in iterator where range tombstones after `iterate_upper_bound` is processed.
+* Fixed a memory leak in MultiGet with async_io read option, caused by IO errors during table file open
+* Fixed a bug that multi-level FIFO compaction deletes one file in non-L0 even when `CompactionOptionsFIFO::max_table_files_size` is no exceeded since #10348 or 7.8.0.
+* Fixed a bug caused by `DB::SyncWAL()` affecting `track_and_verify_wals_in_manifest`. Without the fix, application may see "open error: Corruption: Missing WAL with log number" while trying to open the db. The corruption is a false alarm but prevents DB open (#10892).
+* Fixed a BackupEngine bug in which RestoreDBFromLatestBackup would fail if the latest backup was deleted and there is another valid backup available.
+* Fix L0 file misorder corruption caused by ingesting files of overlapping seqnos with memtable entries' through introducing `epoch_number`. Before the fix, `force_consistency_checks=true` may catch the corruption before it's exposed to readers, in which case writes returning `Status::Corruption` would be expected. Also replace the previous incomplete fix (#5958) to the same corruption with this new and more complete fix.
+* Fixed a bug in LockWAL() leading to re-locking mutex (#11020).
+* Fixed a heap use after free bug in async scan prefetching when the scan thread and another thread try to read and load the same seek block into cache.
+* Fixed a heap use after free in async scan prefetching if dictionary compression is enabled, in which case sync read of the compression dictionary gets mixed with async prefetching
+* Fixed a data race bug of `CompactRange()` under `change_level=true` acts on overlapping range with an ongoing file ingestion for level compaction. This will either result in overlapping file ranges corruption at a certain level caught by `force_consistency_checks=true` or protentially two same keys both with seqno 0 in two different levels (i.e, new data ends up in lower/older level). The latter will be caught by assertion in debug build but go silently and result in read returning wrong result in release build. This fix is general so it also replaced previous fixes to a similar problem for `CompactFiles()` (#4665), general `CompactRange()` and auto compaction (commit 5c64fb6 and 87dfc1d).
+* Fixed a bug in compaction output cutting where small output files were produced due to TTL file cutting states were not being updated (#11075).
 
-## 7.7.7 (11/15/2022)
-### Bug Fixes
-* Fixed a regression in scan for async_io. During seek, valid buffers were getting cleared causing a regression.
+### New Features
+* When an SstPartitionerFactory is configured, CompactRange() now automatically selects for compaction any files overlapping a partition boundary that is in the compaction range, even if no actual entries are in the requested compaction range. With this feature, manual compaction can be used to (re-)establish SST partition points when SstPartitioner changes, without a full compaction.
+* Add BackupEngine feature to exclude files from backup that are known to be backed up elsewhere, using `CreateBackupOptions::exclude_files_callback`. To restore the DB, the excluded files must be provided in alternative backup directories using `RestoreOptions::alternate_dirs`.
 
-## 7.7.6 (11/03/2022)
-### Bug Fixes
-* Fix memory corruption error in scans if async_io is enabled. Memory corruption happened if there is IOError while reading the data leading to empty buffer and other buffer already in progress of async read goes again for reading.
+### Public API Changes
+* Substantial changes have been made to the Cache class to support internal development goals. Direct use of Cache class members is discouraged and further breaking modifications are expected in the future. SecondaryCache has some related changes and implementations will need to be updated. (Unlike Cache, SecondaryCache is still intended to support user implementations, and disruptive changes will be avoided.) (#10975)
+* Add `MergeOperationOutput::op_failure_scope` for merge operator users to control the blast radius of merge operator failures. Existing merge operator users do not need to make any change to preserve the old behavior
 
-## 7.7.5 (10/28/2022)
-### Bug Fixes
+### Performance Improvements
+* Updated xxHash source code, which should improve kXXH3 checksum speed, at least on ARM (#11098).
+* Improved CPU efficiency of DB reads, from block cache access improvements (#10975).
+
+## 7.9.0 (11/21/2022)
+### Performance Improvements
 * Fixed an iterator performance regression for delete range users when scanning through a consecutive sequence of range tombstones (#10877).
 
-## 7.7.4 (10/28/2022)
 ### Bug Fixes
-* Fixed a case of calling malloc_usable_size on result of operator new[].
+* Fix memory corruption error in scans if async_io is enabled. Memory corruption happened if there is IOError while reading the data leading to empty buffer and other buffer already in progress of async read goes again for reading.
+* Fix failed memtable flush retry bug that could cause wrongly ordered updates, which would surface to writers as `Status::Corruption` in case of `force_consistency_checks=true` (default). It affects use cases that enable both parallel flush (`max_background_flushes > 1` or `max_background_jobs >= 8`) and non-default memtable count (`max_write_buffer_number > 2`).
+* Fixed an issue where the `READ_NUM_MERGE_OPERANDS` ticker was not updated when the base key-value or tombstone was read from an SST file.
+* Fixed a memory safety bug when using a SecondaryCache with `block_cache_compressed`. `block_cache_compressed` no longer attempts to use SecondaryCache features.
+* Fixed a regression in scan for async_io. During seek, valid buffers were getting cleared causing a regression.
+* Tiered Storage: fixed excessive keys written to penultimate level in non-debug builds.
 
-## 7.7.3 (10/11/2022)
-### Bug Fixes
-* Fixed a memory safety bug in experimental HyperClockCache (#10768)
+### New Features
+* Add basic support for user-defined timestamp to Merge (#10819).
+* Add stats for ReadAsync time spent and async read errors.
+* Basic support for the wide-column data model is now available. Wide-column entities can be stored using the `PutEntity` API, and retrieved using `GetEntity` and the new `columns` API of iterator. For compatibility, the classic APIs `Get` and `MultiGet`, as well as iterator's `value` API return the value of the anonymous default column of wide-column entities; also, `GetEntity` and iterator's `columns` return any plain key-values in the form of an entity which only has the anonymous default column. `Merge` (and `GetMergeOperands`) currently also apply to the default column; any other columns of entities are unaffected by `Merge` operations. Note that some features like compaction filters, transactions, user-defined timestamps, and the SST file writer do not yet support wide-column entities; also, there is currently no `MultiGet`-like API to retrieve multiple entities at once. We plan to gradually close the above gaps and also implement new features like column-level operations (e.g. updating or querying only certain columns of an entity).
+* Marked HyperClockCache as a production-ready alternative to LRUCache for the block cache. HyperClockCache greatly improves hot-path CPU efficiency under high parallel load or high contention, with some documented caveats and limitations. As much as 4.5x higher ops/sec vs. LRUCache has been seen in db_bench under high parallel load.
+* Add periodic diagnostics to info_log (LOG file) for HyperClockCache block cache if performance is degraded by bad `estimated_entry_charge` option.
 
-## 7.7.2 (10/05/2022)
+### Public API Changes
+* Marked `block_cache_compressed` as a deprecated feature. Use SecondaryCache instead.
+* Added a `SecondaryCache::InsertSaved()` API, with default implementation depending on `Insert()`. Some implementations might need to add a custom implementation of `InsertSaved()`. (Details in API comments.)
+
+## 7.8.0 (10/22/2022)
+### New Features
+* `DeleteRange()` now supports user-defined timestamp.
+* Provide support for async_io with tailing iterators when ReadOptions.tailing is enabled during scans.
+* Tiered Storage: allow data moving up from the last level to the penultimate level if the input level is penultimate level or above.
+* Added `DB::Properties::kFastBlockCacheEntryStats`, which is similar to `DB::Properties::kBlockCacheEntryStats`, except returns cached (stale) values in more cases to reduce overhead.
+* FIFO compaction now supports migrating from a multi-level DB via DB::Open(). During the migration phase, FIFO compaction picker will:
+* picks the sst file with the smallest starting key in the bottom-most non-empty level.
+* Note that during the migration phase, the file purge order will only be an approximation of "FIFO" as files in lower-level might sometime contain newer keys than files in upper-level.
+* Added an option `ignore_max_compaction_bytes_for_input` to ignore max_compaction_bytes limit when adding files to be compacted from input level. This should help reduce write amplification. The option is enabled by default.
+* Tiered Storage: allow data moving up from the last level even if it's a last level only compaction, as long as the penultimate level is empty.
+* Add a new option IOOptions.do_not_recurse that can be used by underlying file systems to skip recursing through sub directories and list only files in GetChildren API.
+* Add option `preserve_internal_time_seconds` to preserve the time information for the latest data. Which can be used to determine the age of data when `preclude_last_level_data_seconds` is enabled. The time information is attached with SST in table property `rocksdb.seqno.time.map` which can be parsed by tool ldb or sst_dump.
+
 ### Bug Fixes
+* Fix a bug in io_uring_prep_cancel in AbortIO API for posix which expects sqe->addr to match with read request submitted and wrong paramter was being passed.
+* Fixed a regression in iterator performance when the entire DB is a single memtable introduced in #10449. The fix is in #10705 and #10716.
+* Fixed an optimistic transaction validation bug caused by DBImpl::GetLatestSequenceForKey() returning non-latest seq for merge (#10724).
+* Fixed a bug in iterator refresh which could segfault for DeleteRange users (#10739).
+* Fixed a bug causing manual flush with `flush_opts.wait=false` to stall when database has stopped all writes (#10001).
 * Fixed a bug in iterator refresh that was not freeing up SuperVersion, which could cause excessive resource pinniung (#10770).
 * Fixed a bug where RocksDB could be doing compaction endlessly when allow_ingest_behind is true and the bottommost level is not filled (#10767).
+* Fixed a memory safety bug in experimental HyperClockCache (#10768)
+* Fixed some cases where `ldb update_manifest` and `ldb unsafe_remove_sst_file` are not usable because they were requiring the DB files to match the existing manifest state (before updating the manifest to match a desired state).
+
+### Performance Improvements
+* Try to align the compaction output file boundaries to the next level ones, which can reduce more than 10% compaction load for the default level compaction. The feature is enabled by default, to disable, set `AdvancedColumnFamilyOptions.level_compaction_dynamic_file_size` to false. As a side effect, it can create SSTs larger than the target_file_size (capped at 2x target_file_size) or smaller files.
+* Improve RoundRobin TTL compaction, which is going to be the same as normal RoundRobin compaction to move the compaction cursor.
+* Fix a small CPU regression caused by a change that UserComparatorWrapper was made Customizable, because Customizable itself has small CPU overhead for initialization.
 
 ### Behavior Changes
 * Sanitize min_write_buffer_number_to_merge to 1 if atomic flush is enabled to prevent unexpected data loss when WAL is disabled in a multi-column-family setting (#10773).
+* With periodic stat dumper waits up every options.stats_dump_period_sec seconds, it won't dump stats for a CF if it has no change in the period, unless 7 periods have been skipped.
+* Only periodic stats dumper triggered by options.stats_dump_period_sec will update stats interval. Ones triggered by DB::GetProperty() will not update stats interval and will report based on an interval since the last time stats dump period.
 
-## 7.7.1 (09/26/2022)
-### Bug Fixes
-* Fixed an optimistic transaction validation bug caused by DBImpl::GetLatestSequenceForKey() returning non-latest seq for merge (#10724).
-* Fixed a bug in iterator refresh which could segfault for DeleteRange users (#10739).
+### Public API changes
+* Make kXXH3 checksum the new default, because it is faster on common hardware, especially with kCRC32c affected by a performance bug in some versions of clang (https://github.com/facebook/rocksdb/issues/9891). DBs written with this new setting can be read by RocksDB 6.27 and newer.
+* Refactor the classes, APIs and data structures for block cache tracing to allow a user provided trace writer to be used. Introduced an abstract BlockCacheTraceWriter class that takes a structured BlockCacheTraceRecord. The BlockCacheTraceWriter implementation can then format and log the record in whatever way it sees fit. The default BlockCacheTraceWriterImpl does file tracing using a user provided TraceWriter. More details in rocksdb/includb/block_cache_trace_writer.h.
 
 ## 7.7.0 (09/18/2022)
 ### Bug Fixes

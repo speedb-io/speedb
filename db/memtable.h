@@ -88,7 +88,7 @@ class MemTable {
  public:
   struct KeyComparator : public MemTableRep::KeyComparator {
     const InternalKeyComparator comparator;
-    explicit KeyComparator(const InternalKeyComparator& c) : comparator(c) { }
+    explicit KeyComparator(const InternalKeyComparator& c) : comparator(c) {}
     virtual int operator()(const char* prefix_len_key1,
                            const char* prefix_len_key2) const override;
     virtual int operator()(const char* prefix_len_key,
@@ -150,8 +150,7 @@ class MemTable {
   // used by MemTableListVersion::MemoryAllocatedBytesExcludingLast
   size_t MemoryAllocatedBytes() const {
     return table_->ApproximateMemoryUsage() +
-           range_del_table_->ApproximateMemoryUsage() +
-           arena_.MemoryAllocatedBytes();
+           del_table_->ApproximateMemoryUsage() + arena_.MemoryAllocatedBytes();
   }
 
   // Returns a vector of unique random memtable entries of size 'sample_size'.
@@ -448,9 +447,7 @@ class MemTable {
   // persisted.
   // REQUIRES: external synchronization to prevent simultaneous
   // operations on the same MemTable.
-  void MarkFlushed() {
-    table_->MarkFlushed();
-  }
+  void MarkFlushed() { table_->MarkFlushed(); }
 
   // return true if the current MemTableRep supports merge operator.
   bool IsMergeOperatorSupported() const {
@@ -519,7 +516,6 @@ class MemTable {
     flush_in_progress_ = in_progress;
   }
 
-#ifndef ROCKSDB_LITE
   void SetFlushJobInfo(std::unique_ptr<FlushJobInfo>&& info) {
     flush_job_info_ = std::move(info);
   }
@@ -527,7 +523,6 @@ class MemTable {
   std::unique_ptr<FlushJobInfo> ReleaseFlushJobInfo() {
     return std::move(flush_job_info_);
   }
-#endif  // !ROCKSDB_LITE
 
   // Returns a heuristic flush decision
   bool ShouldFlushNow();
@@ -568,7 +563,7 @@ class MemTable {
   AllocTracker mem_tracker_;
   ConcurrentArena arena_;
   std::unique_ptr<MemTableRep> table_;
-  std::unique_ptr<MemTableRep> range_del_table_;
+  std::unique_ptr<MemTableRep> del_table_;
   std::atomic_bool is_range_del_table_empty_;
 
   // Total data size of all data inserted
@@ -632,14 +627,12 @@ class MemTable {
   // writes with sequence number smaller than seq are flushed.
   SequenceNumber atomic_flush_seqno_;
 
-  // keep track of memory usage in table_, arena_, and range_del_table_.
+  // keep track of memory usage in table_, arena_, and del_table_.
   // Gets refreshed inside `ApproximateMemoryUsage()` or `ShouldFlushNow`
   std::atomic<uint64_t> approximate_memory_usage_;
 
-#ifndef ROCKSDB_LITE
   // Flush job info of the current memtable.
   std::unique_ptr<FlushJobInfo> flush_job_info_;
-#endif  // !ROCKSDB_LITE
 
   // Updates flush_state_ using ShouldFlushNow()
   void UpdateFlushState();
@@ -657,6 +650,8 @@ class MemTable {
   // Always returns non-null and assumes certain pre-checks (e.g.,
   // is_range_del_table_empty_) are done. This is only valid during the lifetime
   // of the underlying memtable.
+  // read_seq and read_options.timestamp will be used as the upper bound
+  // for range tombstones.
   FragmentedRangeTombstoneIterator* NewRangeTombstoneIteratorInternal(
       const ReadOptions& read_options, SequenceNumber read_seq,
       bool immutable_memtable);

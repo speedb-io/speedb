@@ -5,6 +5,7 @@
 //
 
 #include <sstream>
+
 #include "monitoring/perf_context_imp.h"
 
 namespace ROCKSDB_NAMESPACE {
@@ -17,9 +18,7 @@ PerfContext perf_context;
 thread_local PerfContext perf_context;
 #endif
 
-PerfContext* get_perf_context() {
-  return &perf_context;
-}
+PerfContext* get_perf_context() { return &perf_context; }
 
 PerfContext::~PerfContext() {
 #if !defined(NPERF_CONTEXT) && !defined(OS_SOLARIS)
@@ -70,6 +69,7 @@ PerfContext::PerfContext(const PerfContext& other) {
   internal_delete_skipped_count = other.internal_delete_skipped_count;
   internal_recent_skipped_count = other.internal_recent_skipped_count;
   internal_merge_count = other.internal_merge_count;
+  internal_merge_point_lookup_count = other.internal_merge_point_lookup_count;
   internal_range_del_reseek_count = other.internal_range_del_reseek_count;
   write_wal_time = other.write_wal_time;
   get_snapshot_time = other.get_snapshot_time;
@@ -189,6 +189,7 @@ PerfContext::PerfContext(PerfContext&& other) noexcept {
   internal_delete_skipped_count = other.internal_delete_skipped_count;
   internal_recent_skipped_count = other.internal_recent_skipped_count;
   internal_merge_count = other.internal_merge_count;
+  internal_merge_point_lookup_count = other.internal_merge_point_lookup_count;
   internal_range_del_reseek_count = other.internal_range_del_reseek_count;
   write_wal_time = other.write_wal_time;
   get_snapshot_time = other.get_snapshot_time;
@@ -310,6 +311,7 @@ PerfContext& PerfContext::operator=(const PerfContext& other) {
   internal_delete_skipped_count = other.internal_delete_skipped_count;
   internal_recent_skipped_count = other.internal_recent_skipped_count;
   internal_merge_count = other.internal_merge_count;
+  internal_merge_point_lookup_count = other.internal_merge_point_lookup_count;
   internal_range_del_reseek_count = other.internal_range_del_reseek_count;
   write_wal_time = other.write_wal_time;
   get_snapshot_time = other.get_snapshot_time;
@@ -423,6 +425,7 @@ void PerfContext::Reset() {
   internal_delete_skipped_count = 0;
   internal_recent_skipped_count = 0;
   internal_merge_count = 0;
+  internal_merge_point_lookup_count = 0;
   internal_range_del_reseek_count = 0;
   write_wal_time = 0;
 
@@ -499,15 +502,14 @@ void PerfContext::Reset() {
     ss << #counter << " = " << counter << ", ";  \
   }
 
-#define PERF_CONTEXT_BY_LEVEL_OUTPUT_ONE_COUNTER(counter)         \
-  if (per_level_perf_context_enabled && \
-      level_to_perf_context) {                                    \
-    ss << #counter << " = ";                                      \
-    for (auto& kv : *level_to_perf_context) {                     \
-      if (!exclude_zero_counters || (kv.second.counter > 0)) {    \
-        ss << kv.second.counter << "@level" << kv.first << ", ";  \
-      }                                                           \
-    }                                                             \
+#define PERF_CONTEXT_BY_LEVEL_OUTPUT_ONE_COUNTER(counter)        \
+  if (per_level_perf_context_enabled && level_to_perf_context) { \
+    ss << #counter << " = ";                                     \
+    for (auto& kv : *level_to_perf_context) {                    \
+      if (!exclude_zero_counters || (kv.second.counter > 0)) {   \
+        ss << kv.second.counter << "@level" << kv.first << ", "; \
+      }                                                          \
+    }                                                            \
   }
 
 void PerfContextByLevel::Reset() {
@@ -558,6 +560,7 @@ std::string PerfContext::ToString(bool exclude_zero_counters) const {
   PERF_CONTEXT_OUTPUT(internal_delete_skipped_count);
   PERF_CONTEXT_OUTPUT(internal_recent_skipped_count);
   PERF_CONTEXT_OUTPUT(internal_merge_count);
+  PERF_CONTEXT_OUTPUT(internal_merge_point_lookup_count);
   PERF_CONTEXT_OUTPUT(internal_range_del_reseek_count);
   PERF_CONTEXT_OUTPUT(write_wal_time);
   PERF_CONTEXT_OUTPUT(get_snapshot_time);
@@ -638,11 +641,11 @@ void PerfContext::EnablePerLevelPerfContext() {
   per_level_perf_context_enabled = true;
 }
 
-void PerfContext::DisablePerLevelPerfContext(){
+void PerfContext::DisablePerLevelPerfContext() {
   per_level_perf_context_enabled = false;
 }
 
-void PerfContext::ClearPerLevelPerfContext(){
+void PerfContext::ClearPerLevelPerfContext() {
   if (level_to_perf_context != nullptr) {
     level_to_perf_context->clear();
     delete level_to_perf_context;

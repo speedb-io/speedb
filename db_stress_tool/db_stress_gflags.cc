@@ -84,6 +84,17 @@ DEFINE_bool(test_batches_snapshots, false,
 DEFINE_bool(atomic_flush, false,
             "If set, enables atomic flush in the options.\n");
 
+DEFINE_int32(
+    manual_wal_flush_one_in, 0,
+    "If non-zero, then `FlushWAL(bool sync)`, where `bool sync` is randomly "
+    "decided, will be explictly called in db stress once for every N ops "
+    "on average. Setting `manual_wal_flush_one_in` to be greater than 0 "
+    "implies `Options::manual_wal_flush = true` is set.");
+
+DEFINE_int32(lock_wal_one_in, 1000000,
+             "If non-zero, then `LockWAL()` + `UnlockWAL()` will be called in "
+             "db_stress once for every N ops on average.");
+
 DEFINE_bool(test_cf_consistency, false,
             "If set, runs the stress test dedicated to verifying writes to "
             "multiple column families are consistent. Setting this implies "
@@ -126,9 +137,21 @@ DEFINE_uint64(db_write_buffer_size,
               ROCKSDB_NAMESPACE::Options().db_write_buffer_size,
               "Number of bytes to buffer in all memtables before compacting");
 
-DEFINE_bool(allow_wbm_stalls, false, "Enable WBM write stalls and delays");
+DEFINE_bool(cost_write_buffer_to_cache, false,
+            "The usage of memtable is costed to the block cache");
 
-DEFINE_bool(initiate_wbm_flushes, false,
+DEFINE_bool(allow_wbm_stalls,
+            ROCKSDB_NAMESPACE::WriteBufferManager::kDfltAllowStall,
+            "Enable WBM write stalls and delays");
+
+DEFINE_uint32(
+    start_delay_percent,
+    ROCKSDB_NAMESPACE::WriteBufferManager::kDfltStartDelayPercentThreshold,
+    "The percent threshold of the buffer size after which WBM will initiate "
+    "delays.");
+
+DEFINE_bool(initiate_wbm_flushes,
+            ROCKSDB_NAMESPACE::WriteBufferManager::kDfltInitiateFlushes,
             "WBM will proactively initiate flushes (Speedb)."
             "If false, WBM-related flushes will be initiated using the "
             "ShouldFlush() service "
@@ -385,6 +408,10 @@ DEFINE_uint64(periodic_compaction_seconds, 1000,
 DEFINE_uint64(compaction_ttl, 1000,
               "Files older than TTL will be compacted to the next level.");
 
+DEFINE_bool(fifo_allow_compaction, false,
+            "If true, set `Options::compaction_options_fifo.allow_compaction = "
+            "true`. It only take effect when FIFO compaction is used.");
+
 DEFINE_bool(use_spdb_writes, false, "Use optimized Speedb write flow");
 
 DEFINE_bool(allow_concurrent_memtable_write, false,
@@ -397,7 +424,6 @@ DEFINE_double(experimental_mempurge_threshold, 0.0,
 DEFINE_bool(enable_write_thread_adaptive_yield, true,
             "Use a yielding spin loop for brief writer thread waits.");
 
-#ifndef ROCKSDB_LITE
 // Options for StackableDB-based BlobDB
 DEFINE_bool(use_blob_db, false, "[Stacked BlobDB] Use BlobDB.");
 
@@ -425,7 +451,6 @@ DEFINE_double(
     blob_db_gc_cutoff,
     ROCKSDB_NAMESPACE::blob_db::BlobDBOptions().garbage_collection_cutoff,
     "[Stacked BlobDB] Cutoff ratio for BlobDB garbage collection.");
-#endif  // !ROCKSDB_LITE
 
 // Options for integrated BlobDB
 DEFINE_bool(allow_setting_blob_options_dynamically, false,
@@ -506,6 +531,10 @@ DEFINE_bool(enable_tiered_storage, false, "Set last_level_temperature");
 DEFINE_int64(preclude_last_level_data_seconds, 0,
              "Preclude data from the last level. Used with tiered storage "
              "feature to preclude new data from comacting to the last level.");
+
+DEFINE_int64(
+    preserve_internal_time_seconds, 0,
+    "Preserve internal time information which is attached to each SST.");
 
 static const bool FLAGS_subcompactions_dummy __attribute__((__unused__)) =
     RegisterFlagValidator(&FLAGS_subcompactions, &ValidateUint32Range);
@@ -754,6 +783,8 @@ DEFINE_bool(long_running_snapshots, false,
 DEFINE_bool(use_multiget, false,
             "If set, use the batched MultiGet API for reads");
 
+DEFINE_bool(use_get_entity, false, "If set, use the GetEntity API for reads");
+
 static bool ValidateInt32Percent(const char* flagname, int32_t value) {
   if (value < 0 || value > 100) {
     fprintf(stderr, "Invalid value for --%s: %d, 0<= pct <=100 \n", flagname,
@@ -850,6 +881,8 @@ DEFINE_string(fs_uri, "",
               " with --env_uri."
               " Creates a default environment with the specified filesystem.");
 
+DEFINE_string(pinning_policy, "", "URI for registry TablePinningPolicy");
+
 DEFINE_uint64(ops_per_thread, 1200000, "Number of operations per thread.");
 static const bool FLAGS_ops_per_thread_dummy __attribute__((__unused__)) =
     RegisterFlagValidator(&FLAGS_ops_per_thread, &ValidateUint32Range);
@@ -881,6 +914,10 @@ static const bool FLAGS_prefix_size_dummy __attribute__((__unused__)) =
 DEFINE_bool(use_merge, false,
             "On true, replaces all writes with a Merge "
             "that behaves like a Put");
+
+DEFINE_uint32(use_put_entity_one_in, 0,
+              "If greater than zero, PutEntity will be used once per every N "
+              "write ops on average.");
 
 DEFINE_bool(use_full_merge_v1, false,
             "On true, use a merge operator that implement the deprecated "
@@ -988,13 +1025,11 @@ DEFINE_int32(open_metadata_write_fault_one_in, 0,
              "On non-zero, enables fault injection on file metadata write "
              "during DB reopen.");
 
-#ifndef ROCKSDB_LITE
 DEFINE_string(secondary_cache_uri, "",
               "Full URI for creating a customized secondary cache object");
 DEFINE_int32(secondary_cache_fault_one_in, 0,
              "On non-zero, enables fault injection in secondary cache inserts"
              " and lookups");
-#endif  // ROCKSDB_LITE
 DEFINE_int32(open_write_fault_one_in, 0,
              "On non-zero, enables fault injection on file writes "
              "during DB reopen.");
@@ -1013,7 +1048,6 @@ DEFINE_int32(prepopulate_block_cache,
 
 DEFINE_bool(two_write_queues, false,
             "Set to true to enable two write queues. Default: false");
-#ifndef ROCKSDB_LITE
 
 DEFINE_bool(use_only_the_last_commit_time_batch_for_recovery, false,
             "If true, the commit-time write batch will not be immediately "
@@ -1032,8 +1066,6 @@ DEFINE_int32(
     "Frequency (in secs) to look for a new options file (off by default)");
 DEFINE_string(refresh_options_file, "",
               "File in which to look for new options");
-
-#endif  // !ROCKSDB_LITE
 
 DEFINE_bool(adaptive_readahead, false,
             "Carry forward internal auto readahead size from one file to next "
@@ -1088,5 +1120,12 @@ DEFINE_uint64(stats_dump_period_sec,
 
 DEFINE_bool(use_dynamic_delay, ROCKSDB_NAMESPACE::Options().use_dynamic_delay,
             "Use dynamic delay");
+
+DEFINE_bool(use_clean_delete_during_flush,
+            ROCKSDB_NAMESPACE::Options().use_clean_delete_during_flush,
+            "Use clean delete during flush");
+
+DEFINE_bool(use_io_uring, false, "Enable the use of IO uring on Posix");
+extern "C" bool RocksDbIOUringEnable() { return FLAGS_use_io_uring; }
 
 #endif  // GFLAGS

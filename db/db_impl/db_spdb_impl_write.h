@@ -1,4 +1,4 @@
-// Copyright 2022 SpeeDB Ltd.
+// Copyright 2022 Speedb Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 #include <array>
 #include <atomic>
 #include <condition_variable>
+#include <list>
 #include <mutex>
 #include <thread>
 #include <vector>
@@ -27,6 +28,7 @@
 namespace ROCKSDB_NAMESPACE {
 
 class DBImpl;
+struct WriteOptions;
 
 struct WritesBatchList {
   std::list<WriteBatch*> wal_writes_;

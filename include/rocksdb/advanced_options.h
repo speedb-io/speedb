@@ -27,14 +27,11 @@ enum CompactionStyle : char {
   // level based compaction style
   kCompactionStyleLevel = 0x0,
   // Universal compaction style
-  // Not supported in ROCKSDB_LITE.
   kCompactionStyleUniversal = 0x1,
   // FIFO compaction style
-  // Not supported in ROCKSDB_LITE
   kCompactionStyleFIFO = 0x2,
   // Disable background compaction. Compaction jobs are submitted
   // via CompactFiles().
-  // Not supported in ROCKSDB_LITE
   kCompactionStyleNone = 0x3,
 };
 
@@ -240,10 +237,10 @@ enum class CacheTier : uint8_t {
   kNonVolatileBlockTier = 0x01,
 };
 
-enum UpdateStatus {    // Return status For inplace update callback
-  UPDATE_FAILED   = 0, // Nothing to update
-  UPDATED_INPLACE = 1, // Value updated inplace
-  UPDATED         = 2, // No inplace update. Merged value set
+enum UpdateStatus {     // Return status For inplace update callback
+  UPDATE_FAILED = 0,    // Nothing to update
+  UPDATED_INPLACE = 1,  // Value updated inplace
+  UPDATED = 2,          // No inplace update. Merged value set
 };
 
 enum class PrepopulateBlobCache : uint8_t {
@@ -651,6 +648,15 @@ struct AdvancedColumnFamilyOptions {
   // Default: false
   bool level_compaction_dynamic_level_bytes = false;
 
+  // Allows RocksDB to generate files that are not exactly the target_file_size
+  // only for the non-bottommost files. Which can reduce the write-amplification
+  // from compaction. The file size could be from 0 to 2x target_file_size.
+  // Once enabled, non-bottommost compaction will try to cut the files align
+  // with the next level file boundaries (grandparent level).
+  //
+  // Default: true
+  bool level_compaction_dynamic_file_size = true;
+
   // Default: 10.
   //
   // Dynamically changeable through SetOptions() API
@@ -674,6 +680,17 @@ struct AdvancedColumnFamilyOptions {
   //
   // Dynamically changeable through SetOptions() API
   uint64_t max_compaction_bytes = 0;
+
+  // When setting up compaction input files, we ignore the
+  // `max_compaction_bytes` limit when pulling in input files that are entirely
+  // within output key range.
+  //
+  // Default: true
+  //
+  // Dynamically changeable through SetOptions() API
+  // We could remove this knob and always ignore the limit once it is proven
+  // safe.
+  bool ignore_max_compaction_bytes_for_input = true;
 
   // All writes will be slowed down to at least delayed_write_rate if estimated
   // bytes needed to be compaction exceed this threshold.
@@ -733,7 +750,7 @@ struct AdvancedColumnFamilyOptions {
   // Related options that were originally here but now moved include:
   //   no_block_cache
   //   block_cache
-  //   block_cache_compressed
+  //   block_cache_compressed (removed)
   //   block_size
   //   block_size_deviation
   //   block_restart_interval
@@ -846,7 +863,9 @@ struct AdvancedColumnFamilyOptions {
   // age is based on the file's last modified time (given by the underlying
   // Env).
   //
-  // Supported in Level and FIFO compaction.
+  // Supported in all compaction styles.
+  // In Universal compaction, rocksdb will try to do a full compaction when
+  // possible, see more in UniversalCompactionBuilder::PickPeriodicCompaction().
   // In FIFO compaction, this option has the same meaning as TTL and whichever
   // stricter will be used.
   // Pre-req: max_open_file == -1.
@@ -902,7 +921,32 @@ struct AdvancedColumnFamilyOptions {
   //  size constrained, the size amp is going to be only for non-last levels.
   //
   // Default: 0 (disable the feature)
+  //
+  // Not dynamically changeable, change it requires db restart.
   uint64_t preclude_last_level_data_seconds = 0;
+
+  // EXPERIMENTAL
+  // If this option is set, it will preserve the internal time information about
+  // the data until it's older than the specified time here.
+  // Internally the time information is a map between sequence number and time,
+  // which is the same as `preclude_last_level_data_seconds`. But it won't
+  // preclude the data from the last level and the data in the last level won't
+  // have the sequence number zeroed out.
+  // Internally, rocksdb would sample the sequence number to time pair and store
+  // that in SST property "rocksdb.seqno.time.map". The information is currently
+  // only used for tiered storage compaction (option
+  // `preclude_last_level_data_seconds`).
+  //
+  // Note: if both `preclude_last_level_data_seconds` and this option is set, it
+  //  will preserve the max time of the 2 options and compaction still preclude
+  //  the data based on `preclude_last_level_data_seconds`.
+  //  The higher the preserve_time is, the less the sampling frequency will be (
+  //  which means less accuracy of the time estimation).
+  //
+  // Default: 0 (disable the feature)
+  //
+  // Not dynamically changeable, change it requires db restart.
+  uint64_t preserve_internal_time_seconds = 0;
 
   // When set, large values (blobs) are written to separate blob files, and
   // only pointers to them are stored in SST files. This can reduce write
@@ -1006,21 +1050,21 @@ struct AdvancedColumnFamilyOptions {
   // Dynamically changeable through the SetOptions() API
   int blob_file_starting_level = 0;
 
-  // This feature is WORK IN PROGRESS
-  // If non-NULL use the specified cache for blobs.
-  // If NULL, rocksdb will not use a blob cache.
+  // The Cache object to use for blobs. Using a dedicated object for blobs and
+  // using the same object for the block and blob caches are both supported. In
+  // the latter case, note that blobs are less valuable from a caching
+  // perspective than SST blocks, and some cache implementations have
+  // configuration options that can be used to prioritize items accordingly (see
+  // Cache::Priority and LRUCacheOptions::{high,low}_pri_pool_ratio).
   //
   // Default: nullptr (disabled)
   std::shared_ptr<Cache> blob_cache = nullptr;
 
-  // If enabled, prepopulate warm/hot blobs which are already in memory into
-  // blob cache at the time of flush. On a flush, the blob that is in memory (in
-  // memtables) get flushed to the device. If using Direct IO, additional IO is
-  // incurred to read this blob back into memory again, which is avoided by
-  // enabling this option. This further helps if the workload exhibits high
-  // temporal locality, where most of the reads go to recently written data.
-  // This also helps in case of the remote file system since it involves network
-  // traffic and higher latencies.
+  // Enable/disable prepopulating the blob cache. When set to kFlushOnly, BlobDB
+  // will insert newly written blobs into the blob cache during flush. This can
+  // improve performance when reading back these blobs would otherwise be
+  // expensive (e.g. when using direct I/O or remote storage), or when the
+  // workload has a high temporal locality.
   //
   // Default: disabled
   //

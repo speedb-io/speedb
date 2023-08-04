@@ -43,7 +43,7 @@ const std::string kStandard128Ribbon =
     test::Standard128RibbonFilterPolicy::kClassName();
 const std::string kAutoBloom = BloomFilterPolicy::kClassName();
 const std::string kAutoRibbon = RibbonFilterPolicy::kClassName();
-}  // namespace
+}  // anonymous namespace
 
 // DB tests related to bloom filter.
 
@@ -245,14 +245,12 @@ TEST_F(DBBloomFilterTest, GetFilterByPrefixBloomCustomPrefixExtractor) {
         (*(get_perf_context()->level_to_perf_context))[0].bloom_filter_useful);
 
     // No bloom on extractor changed
-#ifndef ROCKSDB_LITE
     ASSERT_OK(db_->SetOptions({{"prefix_extractor", "capped:10"}}));
     ASSERT_EQ("NOT_FOUND", Get("foobarbar"));
     ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_USEFUL), 3);
     ASSERT_EQ(
         3,
         (*(get_perf_context()->level_to_perf_context))[0].bloom_filter_useful);
-#endif  // ROCKSDB_LITE
 
     // No bloom on extractor changed, after re-open
     options.prefix_extractor.reset(NewCappedPrefixTransform(10));
@@ -317,14 +315,12 @@ TEST_F(DBBloomFilterTest, GetFilterByPrefixBloom) {
         (*(get_perf_context()->level_to_perf_context))[0].bloom_filter_useful);
 
     // No bloom on extractor changed
-#ifndef ROCKSDB_LITE
     ASSERT_OK(db_->SetOptions({{"prefix_extractor", "capped:10"}}));
     ASSERT_EQ("NOT_FOUND", Get("foobarbar"));
     ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_USEFUL), 3);
     ASSERT_EQ(
         3,
         (*(get_perf_context()->level_to_perf_context))[0].bloom_filter_useful);
-#endif  // ROCKSDB_LITE
 
     get_perf_context()->Reset();
   }
@@ -564,7 +560,6 @@ TEST_P(DBBloomFilterTestWithParam, BloomFilter) {
       ASSERT_LE(reads, 3 * N / 100);
     }
 
-#ifndef ROCKSDB_LITE
     // Sanity check some table properties
     std::map<std::string, std::string> props;
     ASSERT_TRUE(db_->GetMapProperty(
@@ -583,7 +578,6 @@ TEST_P(DBBloomFilterTestWithParam, BloomFilter) {
 
     uint64_t num_filter_entries = ParseUint64(props["num_filter_entries"]);
     EXPECT_EQ(num_filter_entries, nkeys);
-#endif  // ROCKSDB_LITE
 
     env_->delay_sstable_sync_.store(false, std::memory_order_release);
     Close();
@@ -622,7 +616,7 @@ class AlwaysTrueFilterPolicy : public ReadOnlyBuiltinFilterPolicy {
   bool skip_;
 };
 
-}  // namespace
+}  // anonymous namespace
 
 TEST_P(DBBloomFilterTestWithParam, SkipFilterOnEssentiallyZeroBpk) {
   constexpr int maxKey = 10;
@@ -649,10 +643,8 @@ TEST_P(DBBloomFilterTestWithParam, SkipFilterOnEssentiallyZeroBpk) {
     PutFn();
     GetFn();
   };
-#ifndef ROCKSDB_LITE
   std::map<std::string, std::string> props;
   const auto& kAggTableProps = DB::Properties::kAggregatedTableProperties;
-#endif  // ROCKSDB_LITE
 
   Options options = CurrentOptions();
   options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
@@ -675,11 +667,9 @@ TEST_P(DBBloomFilterTestWithParam, SkipFilterOnEssentiallyZeroBpk) {
   EXPECT_EQ(TestGetTickerCount(options, BLOOM_FILTER_FULL_POSITIVE), 0);
   EXPECT_EQ(TestGetTickerCount(options, BLOOM_FILTER_FULL_TRUE_POSITIVE), 0);
 
-#ifndef ROCKSDB_LITE
   props.clear();
   ASSERT_TRUE(db_->GetMapProperty(kAggTableProps, &props));
   EXPECT_EQ(props["filter_size"], "0");
-#endif  // ROCKSDB_LITE
 
   // Test 2: use custom API to skip filters -> no filter constructed
   // or read.
@@ -693,11 +683,9 @@ TEST_P(DBBloomFilterTestWithParam, SkipFilterOnEssentiallyZeroBpk) {
   EXPECT_EQ(TestGetTickerCount(options, BLOOM_FILTER_FULL_POSITIVE), 0);
   EXPECT_EQ(TestGetTickerCount(options, BLOOM_FILTER_FULL_TRUE_POSITIVE), 0);
 
-#ifndef ROCKSDB_LITE
   props.clear();
   ASSERT_TRUE(db_->GetMapProperty(kAggTableProps, &props));
   EXPECT_EQ(props["filter_size"], "0");
-#endif  // ROCKSDB_LITE
 
   // Control test: using an actual filter with 100% FP rate -> the filter
   // is constructed and checked on read.
@@ -713,11 +701,9 @@ TEST_P(DBBloomFilterTestWithParam, SkipFilterOnEssentiallyZeroBpk) {
   EXPECT_EQ(
       TestGetAndResetTickerCount(options, BLOOM_FILTER_FULL_TRUE_POSITIVE),
       maxKey);
-#ifndef ROCKSDB_LITE
   props.clear();
   ASSERT_TRUE(db_->GetMapProperty(kAggTableProps, &props));
   EXPECT_NE(props["filter_size"], "0");
-#endif  // ROCKSDB_LITE
 
   // Test 3 (options test): Able to read existing filters with longstanding
   // generated options file entry `filter_policy=rocksdb.BuiltinBloomFilter`
@@ -743,11 +729,9 @@ TEST_P(DBBloomFilterTestWithParam, SkipFilterOnEssentiallyZeroBpk) {
   EXPECT_EQ(TestGetTickerCount(options, BLOOM_FILTER_FULL_POSITIVE), 0);
   EXPECT_EQ(TestGetTickerCount(options, BLOOM_FILTER_FULL_TRUE_POSITIVE), 0);
 
-#ifndef ROCKSDB_LITE
   props.clear();
   ASSERT_TRUE(db_->GetMapProperty(kAggTableProps, &props));
   EXPECT_EQ(props["filter_size"], "0");
-#endif  // ROCKSDB_LITE
 }
 
 #if !defined(ROCKSDB_VALGRIND_RUN) || defined(ROCKSDB_FULL_VALGRIND_RUN)
@@ -840,7 +824,7 @@ std::vector<CompatibilityConfig> kCompatibilityConfigs = {
      BlockBasedTableOptions().format_version},
     {kCompatibilityRibbonPolicy, true, BlockBasedTableOptions().format_version},
 };
-}  // namespace
+}  // anonymous namespace
 
 TEST_F(DBBloomFilterTest, BloomFilterCompatibility) {
   Options options = CurrentOptions();
@@ -1229,7 +1213,7 @@ TEST_P(ChargeFilterConstructionTestWithParam, Basic) {
      *
      *  The test is designed in a way such that the reservation for (p1 - b')
      *  will trigger at least another dummy entry insertion
-     *  (or equivelantly to saying, creating another peak).
+     *  (or equivalently to saying, creating another peak).
      *
      * kStandard128Ribbon + FullFilter +
      * detect_filter_construct_corruption
@@ -1503,7 +1487,6 @@ TEST_P(DBFilterConstructionCorruptionTestWithParam, DetectCorruption) {
 }
 
 // RocksDB lite does not support dynamic options
-#ifndef ROCKSDB_LITE
 TEST_P(DBFilterConstructionCorruptionTestWithParam,
        DynamicallyTurnOnAndOffDetectConstructCorruption) {
   Options options = CurrentOptions();
@@ -1587,7 +1570,6 @@ TEST_P(DBFilterConstructionCorruptionTestWithParam,
       db_->GetOptions().table_factory->GetOptions<BlockBasedTableOptions>();
   EXPECT_FALSE(updated_table_options->detect_filter_construct_corruption);
 }
-#endif  // ROCKSDB_LITE
 
 namespace {
 // NOTE: This class is referenced by HISTORY.md as a model for a wrapper
@@ -1678,7 +1660,7 @@ class TestingContextCustomFilterPolicy
  private:
   mutable std::string test_report_;
 };
-}  // namespace
+}  // anonymous namespace
 
 TEST_F(DBBloomFilterTest, ContextCustomFilterPolicy) {
   auto policy = std::make_shared<TestingContextCustomFilterPolicy>(15, 8, 5);
@@ -1706,7 +1688,7 @@ TEST_F(DBBloomFilterTest, ContextCustomFilterPolicy) {
     ASSERT_OK(Put(1, Key(maxKey + 55555), Key(maxKey + 55555)));
     Flush(1);
     EXPECT_EQ(policy->DumpTestReport(),
-              fifo ? "cf=abe,s=kCompactionStyleFIFO,n=1,l=0,b=0,r=kFlush\n"
+              fifo ? "cf=abe,s=kCompactionStyleFIFO,n=7,l=0,b=0,r=kFlush\n"
                    : "cf=bob,s=kCompactionStyleLevel,n=7,l=0,b=0,r=kFlush\n");
 
     for (int i = maxKey / 2; i < maxKey; i++) {
@@ -1714,7 +1696,7 @@ TEST_F(DBBloomFilterTest, ContextCustomFilterPolicy) {
     }
     Flush(1);
     EXPECT_EQ(policy->DumpTestReport(),
-              fifo ? "cf=abe,s=kCompactionStyleFIFO,n=1,l=0,b=0,r=kFlush\n"
+              fifo ? "cf=abe,s=kCompactionStyleFIFO,n=7,l=0,b=0,r=kFlush\n"
                    : "cf=bob,s=kCompactionStyleLevel,n=7,l=0,b=0,r=kFlush\n");
 
     // Check that they can be found
@@ -1738,7 +1720,7 @@ TEST_F(DBBloomFilterTest, ContextCustomFilterPolicy) {
       EXPECT_LE(useful_count, maxKey * 2 * (fifo ? 0.9995 : 0.98));
     }
 
-    if (!fifo) {  // FIFO only has L0
+    if (!fifo) {  // FIFO doesn't fully support CompactRange
       // Full compaction
       ASSERT_OK(db_->CompactRange(CompactRangeOptions(), handles_[1], nullptr,
                                   nullptr));
@@ -1756,7 +1738,6 @@ TEST_F(DBBloomFilterTest, ContextCustomFilterPolicy) {
         EXPECT_LE(useful_count, maxKey * 0.91);
       }
     } else {
-#ifndef ROCKSDB_LITE
       // Also try external SST file
       {
         std::string file_path = dbname_ + "/external.sst";
@@ -1768,7 +1749,6 @@ TEST_F(DBBloomFilterTest, ContextCustomFilterPolicy) {
       // Note: kCompactionStyleLevel is default, ignored if num_levels == -1
       EXPECT_EQ(policy->DumpTestReport(),
                 "cf=abe,s=kCompactionStyleLevel,n=-1,l=-1,b=0,r=kMisc\n");
-#endif
     }
 
     // Destroy
@@ -2036,9 +2016,7 @@ TEST_P(DBBloomFilterTestVaryPrefixAndFormatVer, PartitionedMultiGet) {
     ASSERT_OK(Put(UKey(i), UKey(i)));
   }
   ASSERT_OK(Flush());
-#ifndef ROCKSDB_LITE
   ASSERT_EQ(TotalTableFiles(), 1);
-#endif
 
   constexpr uint32_t Q = 29;
   // MultiGet In
@@ -2186,16 +2164,13 @@ INSTANTIATE_TEST_CASE_P(DBBloomFilterTestVaryPrefixAndFormatVer,
                             std::make_tuple(false, 2),
                             std::make_tuple(false, 3),
                             std::make_tuple(false, 4),
-                            std::make_tuple(false, 5),
-                            std::make_tuple(true, 2),
-                            std::make_tuple(true, 3),
-                            std::make_tuple(true, 4),
+                            std::make_tuple(false, 5), std::make_tuple(true, 2),
+                            std::make_tuple(true, 3), std::make_tuple(true, 4),
                             std::make_tuple(true, 5)));
 
-#ifndef ROCKSDB_LITE
 namespace {
 static const std::string kPlainTable = "test_PlainTableBloom";
-}  // namespace
+}  // anonymous namespace
 
 class BloomStatsTestWithParam
     : public DBBloomFilterTest,
@@ -2408,7 +2383,7 @@ void PrefixScanInit(DBBloomFilterTest* dbtest) {
     dbtest->Flush();
   }
 }
-}  // namespace
+}  // anonymous namespace
 
 TEST_F(DBBloomFilterTest, PrefixScan) {
   while (ChangeFilterOptions()) {
@@ -2496,7 +2471,7 @@ TEST_F(DBBloomFilterTest, OptimizeFiltersForHits) {
   for (int i = 0; i < numkeys; i += 2) {
     keys.push_back(i);
   }
-  RandomShuffle(std::begin(keys), std::end(keys));
+  RandomShuffle(std::begin(keys), std::end(keys), /*seed*/ 42);
   int num_inserted = 0;
   for (int key : keys) {
     ASSERT_OK(Put(1, Key(key), "val"));
@@ -2620,8 +2595,7 @@ TEST_F(DBBloomFilterTest, OptimizeFiltersForHits) {
       BottommostLevelCompaction::kSkip;
   compact_options.change_level = true;
   compact_options.target_level = 7;
-  ASSERT_TRUE(db_->CompactRange(compact_options, handles_[1], nullptr, nullptr)
-                  .IsNotSupported());
+  ASSERT_OK(db_->CompactRange(compact_options, handles_[1], nullptr, nullptr));
 
   ASSERT_EQ(trivial_move, 1);
   ASSERT_EQ(non_trivial_move, 0);
@@ -3169,7 +3143,7 @@ std::pair<uint64_t, uint64_t> CheckedAndUseful(uint64_t checked,
                                                uint64_t useful) {
   return {checked, useful};
 }
-}  // namespace
+}  // anonymous namespace
 
 // This uses a prefix_extractor + comparator combination that violates
 // one of the old obsolete, unnecessary axioms of prefix extraction:
@@ -3377,7 +3351,7 @@ class NonIdempotentFixed4Transform : public SliceTransform {
 
   bool InDomain(const Slice& src) const override { return src.size() >= 5; }
 };
-}  // namespace
+}  // anonymous namespace
 
 // This uses a prefix_extractor + comparator combination that violates
 // two of the old obsolete, unnecessary axioms of prefix extraction:
@@ -3489,7 +3463,6 @@ TEST_F(DBBloomFilterTest, WeirdPrefixExtractorWithFilter3) {
   }
 }
 
-#endif  // ROCKSDB_LITE
 
 }  // namespace ROCKSDB_NAMESPACE
 

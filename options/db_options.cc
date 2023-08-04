@@ -12,6 +12,7 @@
 #include "options/options_helper.h"
 #include "options/options_parser.h"
 #include "port/port.h"
+#include "rocksdb/advanced_cache.h"
 #include "rocksdb/configurable.h"
 #include "rocksdb/env.h"
 #include "rocksdb/file_system.h"
@@ -26,7 +27,6 @@
 #include "util/string_util.h"
 
 namespace ROCKSDB_NAMESPACE {
-#ifndef ROCKSDB_LITE
 static std::unordered_map<std::string, WALRecoveryMode>
     wal_recovery_mode_string_map = {
         {"kTolerateCorruptedTailRecords",
@@ -575,6 +575,10 @@ static std::unordered_map<std::string, OptionTypeInfo>
          {offsetof(struct ImmutableDBOptions, use_dynamic_delay),
           OptionType::kBoolean, OptionVerificationType::kNormal,
           OptionTypeFlags::kNone}},
+        {"use_clean_delete_during_flush",
+         {offsetof(struct ImmutableDBOptions, use_clean_delete_during_flush),
+          OptionType::kBoolean, OptionVerificationType::kNormal,
+          OptionTypeFlags::kNone}},
 };
 
 const std::string OptionsHelper::kDBOptionsName = "DBOptions";
@@ -687,7 +691,6 @@ std::unique_ptr<Configurable> DBOptionsAsConfigurable(
   std::unique_ptr<Configurable> ptr(new DBOptionsConfigurable(opts, opt_map));
   return ptr;
 }
-#endif  // ROCKSDB_LITE
 
 ImmutableDBOptions::ImmutableDBOptions() : ImmutableDBOptions(Options()) {}
 
@@ -753,9 +756,7 @@ ImmutableDBOptions::ImmutableDBOptions(const DBOptions& options)
       wal_recovery_mode(options.wal_recovery_mode),
       allow_2pc(options.allow_2pc),
       row_cache(options.row_cache),
-#ifndef ROCKSDB_LITE
       wal_filter(options.wal_filter),
-#endif  // ROCKSDB_LITE
       fail_if_options_file_error(options.fail_if_options_file_error),
       dump_malloc_stats(options.dump_malloc_stats),
       avoid_flush_during_recovery(options.avoid_flush_during_recovery),
@@ -778,7 +779,8 @@ ImmutableDBOptions::ImmutableDBOptions(const DBOptions& options)
       lowest_used_cache_tier(options.lowest_used_cache_tier),
       compaction_service(options.compaction_service),
       use_dynamic_delay(options.use_dynamic_delay),
-      enforce_single_del_contracts(options.enforce_single_del_contracts) {
+      enforce_single_del_contracts(options.enforce_single_del_contracts),
+      use_clean_delete_during_flush(options.use_clean_delete_during_flush) {
   fs = env->GetFileSystem();
   clock = env->GetSystemClock().get();
   logger = info_log.get();
@@ -917,10 +919,8 @@ void ImmutableDBOptions::Dump(Logger* log) const {
     ROCKS_LOG_HEADER(log,
                      "                              Options.row_cache: None");
   }
-#ifndef ROCKSDB_LITE
   ROCKS_LOG_HEADER(log, "                             Options.wal_filter: %s",
                    wal_filter ? wal_filter->Name() : "None");
-#endif  // ROCKDB_LITE
 
   ROCKS_LOG_HEADER(log, "            Options.avoid_flush_during_recovery: %d",
                    avoid_flush_during_recovery);
@@ -959,6 +959,8 @@ void ImmutableDBOptions::Dump(Logger* log) const {
                    db_host_id.c_str());
   ROCKS_LOG_HEADER(log, "            Options.enforce_single_del_contracts: %s",
                    enforce_single_del_contracts ? "true" : "false");
+  ROCKS_LOG_HEADER(log, "            Options.use_clean_delete_during_flush: %s",
+                   use_clean_delete_during_flush ? "true" : "false");
 }
 
 bool ImmutableDBOptions::IsWalDirSameAsDBPath() const {
@@ -1089,7 +1091,6 @@ void MutableDBOptions::Dump(Logger* log) const {
                           max_background_flushes);
 }
 
-#ifndef ROCKSDB_LITE
 Status GetMutableDBOptionsFromStrings(
     const MutableDBOptions& base_options,
     const std::unordered_map<std::string, std::string>& options_map,
@@ -1120,5 +1121,4 @@ Status GetStringFromMutableDBOptions(const ConfigOptions& config_options,
   return OptionTypeInfo::SerializeType(
       config_options, db_mutable_options_type_info, &mutable_opts, opt_string);
 }
-#endif  // ROCKSDB_LITE
 }  // namespace ROCKSDB_NAMESPACE

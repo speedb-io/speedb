@@ -17,13 +17,13 @@
 #include <sstream>
 #include <string>
 
-#include "cache/cache_entry_roles.h"
 #include "cache/cache_reservation_manager.h"
 #include "db/db_test_util.h"
 #include "options/options_helper.h"
 #include "plugin/speedb/paired_filter/speedb_paired_bloom.h"
 #include "port/stack_trace.h"
 #include "rocksdb/advanced_options.h"
+#include "rocksdb/cache.h"
 #include "rocksdb/convenience.h"
 #include "rocksdb/filter_policy.h"
 #include "rocksdb/perf_context.h"
@@ -239,13 +239,12 @@ TEST_P(SpdbDBBloomFilterTestWithParam,
       3, (*(get_perf_context()->level_to_perf_context))[0].bloom_filter_useful);
 
   // No bloom on extractor changed
-#ifndef ROCKSDB_LITE
+
   ASSERT_OK(db_->SetOptions({{"prefix_extractor", "capped:10"}}));
   ASSERT_EQ("NOT_FOUND", Get("foobarbar"));
   ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_USEFUL), 3);
   ASSERT_EQ(
       3, (*(get_perf_context()->level_to_perf_context))[0].bloom_filter_useful);
-#endif  // ROCKSDB_LITE
 
   get_perf_context()->Reset();
 }
@@ -298,13 +297,12 @@ TEST_P(SpdbDBBloomFilterTestWithParam, GetFilterByPrefixBloom) {
       3, (*(get_perf_context()->level_to_perf_context))[0].bloom_filter_useful);
 
   // No bloom on extractor changed
-#ifndef ROCKSDB_LITE
+
   ASSERT_OK(db_->SetOptions({{"prefix_extractor", "capped:10"}}));
   ASSERT_EQ("NOT_FOUND", Get("foobarbar"));
   ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_USEFUL), 3);
   ASSERT_EQ(
       3, (*(get_perf_context()->level_to_perf_context))[0].bloom_filter_useful);
-#endif  // ROCKSDB_LITE
 
   get_perf_context()->Reset();
 }
@@ -544,7 +542,6 @@ TEST_P(SpdbDBBloomFilterTestWithParam, BloomFilter) {
       ASSERT_LE(reads, 3 * N / 100);
     }
 
-#ifndef ROCKSDB_LITE
     // Sanity check some table properties
     std::map<std::string, std::string> props;
     ASSERT_TRUE(db_->GetMapProperty(
@@ -564,7 +561,6 @@ TEST_P(SpdbDBBloomFilterTestWithParam, BloomFilter) {
 
     // // // fprintf(stderr, "filter_size:%d, num_filter_entries:%d,
     // nkeys:%d\n", (int)filter_size, (int)num_filter_entries, (int)nkeys);
-#endif  // ROCKSDB_LITE
 
     env_->delay_sstable_sync_.store(false, std::memory_order_release);
     Close();
@@ -630,10 +626,9 @@ TEST_P(SpdbDBBloomFilterTestWithParam, SkipFilterOnEssentiallyZeroBpk) {
     PutFn();
     GetFn();
   };
-#ifndef ROCKSDB_LITE
+
   std::map<std::string, std::string> props;
   const auto& kAggTableProps = DB::Properties::kAggregatedTableProperties;
-#endif  // ROCKSDB_LITE
 
   Options options = CurrentOptions();
   options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
@@ -655,11 +650,9 @@ TEST_P(SpdbDBBloomFilterTestWithParam, SkipFilterOnEssentiallyZeroBpk) {
   EXPECT_EQ(TestGetTickerCount(options, BLOOM_FILTER_FULL_POSITIVE), 0);
   EXPECT_EQ(TestGetTickerCount(options, BLOOM_FILTER_FULL_TRUE_POSITIVE), 0);
 
-#ifndef ROCKSDB_LITE
   props.clear();
   ASSERT_TRUE(db_->GetMapProperty(kAggTableProps, &props));
   EXPECT_EQ(props["filter_size"], "0");
-#endif  // ROCKSDB_LITE
 
   // Test 2: use custom API to skip filters -> no filter constructed
   // or read.
@@ -673,11 +666,9 @@ TEST_P(SpdbDBBloomFilterTestWithParam, SkipFilterOnEssentiallyZeroBpk) {
   EXPECT_EQ(TestGetTickerCount(options, BLOOM_FILTER_FULL_POSITIVE), 0);
   EXPECT_EQ(TestGetTickerCount(options, BLOOM_FILTER_FULL_TRUE_POSITIVE), 0);
 
-#ifndef ROCKSDB_LITE
   props.clear();
   ASSERT_TRUE(db_->GetMapProperty(kAggTableProps, &props));
   EXPECT_EQ(props["filter_size"], "0");
-#endif  // ROCKSDB_LITE
 
   // Control test: using an actual filter with 100% FP rate -> the filter
   // is constructed and checked on read.
@@ -693,11 +684,10 @@ TEST_P(SpdbDBBloomFilterTestWithParam, SkipFilterOnEssentiallyZeroBpk) {
   EXPECT_EQ(
       TestGetAndResetTickerCount(options, BLOOM_FILTER_FULL_TRUE_POSITIVE),
       maxKey);
-#ifndef ROCKSDB_LITE
+
   props.clear();
   ASSERT_TRUE(db_->GetMapProperty(kAggTableProps, &props));
   EXPECT_NE(props["filter_size"], "0");
-#endif  // ROCKSDB_LITE
 
   // Test 3 (options test): Able to read existing filters with longstanding
   // generated options file entry `filter_policy=rocksdb.BuiltinBloomFilter`
@@ -723,11 +713,9 @@ TEST_P(SpdbDBBloomFilterTestWithParam, SkipFilterOnEssentiallyZeroBpk) {
   EXPECT_EQ(TestGetTickerCount(options, BLOOM_FILTER_FULL_POSITIVE), 0);
   EXPECT_EQ(TestGetTickerCount(options, BLOOM_FILTER_FULL_TRUE_POSITIVE), 0);
 
-#ifndef ROCKSDB_LITE
   props.clear();
   ASSERT_TRUE(db_->GetMapProperty(kAggTableProps, &props));
   EXPECT_EQ(props["filter_size"], "0");
-#endif  // ROCKSDB_LITE
 }
 
 INSTANTIATE_TEST_CASE_P(DBBloomFilterTestWithParam,
@@ -894,15 +882,12 @@ class FilterConstructResPeakTrackingCache : public CacheWrapper {
         last_peak_tracked_(false),
         cache_res_increments_sum_(0) {}
 
-  using Cache::Insert;
-  Status Insert(
-      const Slice& key, void* value, size_t charge,
-      void (*deleter)(const Slice& key, void* value), Handle** handle = nullptr,
-      Priority priority = Priority::LOW,
-      Cache::ItemOwnerId item_owner_id = Cache::kUnknownItemId) override {
-    Status s = target_->Insert(key, value, charge, deleter, handle, priority,
-                               item_owner_id);
-    if (deleter == kNoopDeleterForFilterConstruction) {
+  Status Insert(const Slice& key, ObjectPtr value,
+                const CacheItemHelper* helper, size_t charge,
+                Handle** handle = nullptr,
+                Priority priority = Priority::LOW) override {
+    Status s = target_->Insert(key, value, helper, charge, handle, priority);
+    if (helper->del_cb == kNoopDeleterForFilterConstruction) {
       if (last_peak_tracked_) {
         cache_res_peak_ = 0;
         cache_res_increment_ = 0;
@@ -917,8 +902,8 @@ class FilterConstructResPeakTrackingCache : public CacheWrapper {
 
   using Cache::Release;
   bool Release(Handle* handle, bool erase_if_last_ref = false) override {
-    auto deleter = GetDeleter(handle);
-    if (deleter == kNoopDeleterForFilterConstruction) {
+    auto helper = GetCacheItemHelper(handle);
+    if (helper->del_cb == kNoopDeleterForFilterConstruction) {
       if (!last_peak_tracked_) {
         cache_res_peaks_.push_back(cache_res_peak_);
         cache_res_increments_sum_ += cache_res_increment_;
@@ -936,8 +921,14 @@ class FilterConstructResPeakTrackingCache : public CacheWrapper {
     return cache_res_increments_sum_;
   }
 
+  static const char* kClassName() {
+    return "FilterConstructResPeakTrackingCache";
+  }
+  const char* Name() const override { return kClassName(); }
+
  private:
   static const Cache::DeleterFn kNoopDeleterForFilterConstruction;
+  static const Cache::CacheItemHelper kHelper;
 
   std::size_t cur_cache_res_;
   std::size_t cache_res_peak_;
@@ -947,10 +938,15 @@ class FilterConstructResPeakTrackingCache : public CacheWrapper {
   std::size_t cache_res_increments_sum_;
 };
 
+const Cache::CacheItemHelper FilterConstructResPeakTrackingCache::kHelper{
+    CacheEntryRole::kFilterConstruction,
+    FilterConstructResPeakTrackingCache::kNoopDeleterForFilterConstruction};
+
 const Cache::DeleterFn
     FilterConstructResPeakTrackingCache::kNoopDeleterForFilterConstruction =
-        CacheReservationManagerImpl<
-            CacheEntryRole::kFilterConstruction>::TEST_GetNoopDeleterForRole();
+        CacheReservationManagerImpl<CacheEntryRole::kFilterConstruction>::
+            TEST_GetCacheItemHelperForRole()
+                ->del_cb;
 
 // To align with the type of hash entry being reserved in implementation.
 using FilterConstructionReserveMemoryHash = uint64_t;
@@ -1370,7 +1366,7 @@ TEST_P(DBFilterConstructionCorruptionTestWithParam, DetectCorruption) {
 }
 
 // RocksDB lite does not support dynamic options
-#ifndef ROCKSDB_LITE
+
 TEST_P(DBFilterConstructionCorruptionTestWithParam,
        DynamicallyTurnOnAndOffDetectConstructCorruption) {
   Options options = CurrentOptions();
@@ -1454,7 +1450,6 @@ TEST_P(DBFilterConstructionCorruptionTestWithParam,
       db_->GetOptions().table_factory->GetOptions<BlockBasedTableOptions>();
   EXPECT_FALSE(updated_table_options->detect_filter_construct_corruption);
 }
-#endif  // ROCKSDB_LITE
 
 namespace {
 // // // // NOTE: This class is referenced by HISTORY.md as a model for a
@@ -1642,7 +1637,7 @@ namespace {
 // // //         EXPECT_LE(useful_count, maxKey * 0.91);
 // // //       }
 // // //     } else {
-// // // #ifndef ROCKSDB_LITE
+// // //
 // // //       // Also try external SST file
 // // //       {
 // // //         std::string file_path = dbname_ + "/external.sst";
@@ -1878,7 +1873,6 @@ TEST_F(SpdbDBBloomFilterTest, MemtablePrefixBloomOutOfDomain) {
   ASSERT_EQ(kKey, iter->key());
 }
 
-#ifndef ROCKSDB_LITE
 namespace {
 static const std::string kPlainTable = "test_PlainTableBloom";
 }  // namespace
@@ -2298,8 +2292,7 @@ TEST_F(SpdbDBBloomFilterTest, OptimizeFiltersForHits) {
       BottommostLevelCompaction::kSkip;
   compact_options.change_level = true;
   compact_options.target_level = 7;
-  ASSERT_TRUE(db_->CompactRange(compact_options, handles_[1], nullptr, nullptr)
-                  .IsNotSupported());
+  ASSERT_OK(db_->CompactRange(compact_options, handles_[1], nullptr, nullptr));
 
   ASSERT_EQ(trivial_move, 1);
   ASSERT_EQ(non_trivial_move, 0);
@@ -2724,8 +2717,6 @@ TEST_F(SpdbDBBloomFilterTest, DynamicBloomFilterOptions) {
   ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_CHECKED), 12);
   ASSERT_EQ(TestGetTickerCount(options, BLOOM_FILTER_PREFIX_USEFUL), 3);
 }
-
-#endif  // ROCKSDB_LITE
 
 }  // namespace ROCKSDB_NAMESPACE
 

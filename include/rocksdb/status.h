@@ -108,6 +108,7 @@ class Status {
     kOverwritten = 12,
     kTxnNotPrepared = 13,
     kIOFenced = 14,
+    kMergeOperatorFailed = 15,
     kMaxSubCode
   };
 
@@ -129,6 +130,9 @@ class Status {
 
   Status(Code _code, SubCode _subcode, Severity _sev, const Slice& msg)
       : Status(_code, _subcode, msg, "", _sev) {}
+
+  static Status CopyAppendMessage(const Status& s, const Slice& delim,
+                                  const Slice& msg);
 
   Severity severity() const {
     MarkChecked();

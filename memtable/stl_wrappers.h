@@ -32,5 +32,5 @@ struct Compare : private Base {
   }
 };
 
-}
+}  // namespace stl_wrappers
 }  // namespace ROCKSDB_NAMESPACE

@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <cinttypes>
 #include <limits>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -28,7 +29,6 @@
 #include "db/range_del_aggregator.h"
 #include "db/table_properties_collector.h"
 #include "db/version_set.h"
-#include "db/write_controller.h"
 #include "file/sst_file_manager_impl.h"
 #include "logging/logging.h"
 #include "monitoring/thread_status_util.h"
@@ -37,6 +37,7 @@
 #include "rocksdb/convenience.h"
 #include "rocksdb/table.h"
 #include "rocksdb/utilities/options_type.h"
+#include "rocksdb/write_controller.h"
 #include "table/merging_iterator.h"
 #include "util/autovector.h"
 #include "util/cast_util.h"
@@ -54,11 +55,9 @@ ColumnFamilyHandleImpl::ColumnFamilyHandleImpl(
 
 ColumnFamilyHandleImpl::~ColumnFamilyHandleImpl() {
   if (cfd_ != nullptr) {
-#ifndef ROCKSDB_LITE
     for (auto& listener : cfd_->ioptions()->listeners) {
       listener->OnColumnFamilyHandleDeletionStarted(this);
     }
-#endif  // ROCKSDB_LITE
     // Job id == 0 means that this is not our background process, but rather
     // user thread
     // Need to hold some shared pointers owned by the initial_cf_options
@@ -89,15 +88,10 @@ const std::string& ColumnFamilyHandleImpl::GetName() const {
 }
 
 Status ColumnFamilyHandleImpl::GetDescriptor(ColumnFamilyDescriptor* desc) {
-#ifndef ROCKSDB_LITE
   // accessing mutable cf-options requires db mutex.
   InstrumentedMutexLock l(mutex_);
   *desc = ColumnFamilyDescriptor(cfd()->GetName(), cfd()->GetLatestCFOptions());
   return Status::OK();
-#else
-  (void)desc;
-  return Status::NotSupported();
-#endif  // !ROCKSDB_LITE
 }
 
 const Comparator* ColumnFamilyHandleImpl::GetComparator() const {
@@ -193,8 +187,7 @@ Status CheckCFPathsSupported(const DBOptions& db_options,
       return Status::NotSupported(
           "More than one CF paths are only supported in "
           "universal and level compaction styles. ");
-    } else if (cf_options.cf_paths.empty() &&
-               db_options.db_paths.size() > 1) {
+    } else if (cf_options.cf_paths.empty() && db_options.db_paths.size() > 1) {
       return Status::NotSupported(
           "More than one DB paths are only supported in "
           "universal and level compaction styles. ");
@@ -292,7 +285,6 @@ ColumnFamilyOptions SanitizeOptions(const ImmutableDBOptions& db_options,
   }
 
   if (result.compaction_style == kCompactionStyleFIFO) {
-    result.num_levels = 1;
     // since we delete level0 files in FIFO compaction when there are too many
     // of them, these options don't really mean anything
     result.level0_slowdown_writes_trigger = std::numeric_limits<int>::max();
@@ -350,18 +342,17 @@ ColumnFamilyOptions SanitizeOptions(const ImmutableDBOptions& db_options,
         result.hard_pending_compaction_bytes_limit;
   }
 
-#ifndef ROCKSDB_LITE
   // When the DB is stopped, it's possible that there are some .trash files that
   // were not deleted yet, when we open the DB we will find these .trash files
   // and schedule them to be deleted (or delete immediately if SstFileManager
   // was not used)
-  auto sfm = static_cast<SstFileManagerImpl*>(db_options.sst_file_manager.get());
+  auto sfm =
+      static_cast<SstFileManagerImpl*>(db_options.sst_file_manager.get());
   for (size_t i = 0; i < result.cf_paths.size(); i++) {
     DeleteScheduler::CleanupDirectory(db_options.env, sfm,
                                       result.cf_paths[i].path)
         .PermitUncheckedError();
   }
-#endif
 
   if (result.cf_paths.empty()) {
     result.cf_paths = db_options.db_paths;
@@ -530,6 +521,7 @@ const uint32_t ColumnFamilyData::kDummyColumnFamilyDataId =
 ColumnFamilyData::ColumnFamilyData(
     uint32_t id, const std::string& name, Version* _dummy_versions,
     Cache* _table_cache, WriteBufferManager* write_buffer_manager,
+    std::shared_ptr<WriteController> write_controller,
     const ColumnFamilyOptions& cf_options, const ImmutableDBOptions& db_options,
     const FileOptions* file_options, ColumnFamilySet* column_family_set,
     BlockCacheTracer* const block_cache_tracer,
@@ -549,6 +541,7 @@ ColumnFamilyData::ColumnFamilyData(
       is_delete_range_supported_(
           cf_options.table_factory->IsDeleteRangeSupported()),
       write_buffer_manager_(write_buffer_manager),
+      write_controller_(write_controller),
       mem_(nullptr),
       imm_(ioptions_.min_write_buffer_number_to_merge,
            ioptions_.max_write_buffer_number_to_maintain,
@@ -559,7 +552,6 @@ ColumnFamilyData::ColumnFamilyData(
       next_(nullptr),
       prev_(nullptr),
       log_number_(0),
-      flush_reason_(FlushReason::kOthers),
       column_family_set_(column_family_set),
       queued_for_flush_(false),
       queued_for_compaction_(false),
@@ -567,7 +559,8 @@ ColumnFamilyData::ColumnFamilyData(
       allow_2pc_(db_options.allow_2pc),
       last_memtable_id_(0),
       db_paths_registered_(false),
-      mempurge_used_(false) {
+      mempurge_used_(false),
+      next_epoch_number_(1) {
   if (id_ != kDummyColumnFamilyDataId) {
     // TODO(cc): RegisterDbPaths can be expensive, considering moving it
     // outside of this constructor which might be called with db mutex held.
@@ -604,7 +597,6 @@ ColumnFamilyData::ColumnFamilyData(
     if (ioptions_.compaction_style == kCompactionStyleLevel) {
       compaction_picker_.reset(
           new LevelCompactionPicker(ioptions_, &internal_comparator_));
-#ifndef ROCKSDB_LITE
     } else if (ioptions_.compaction_style == kCompactionStyleUniversal) {
       compaction_picker_.reset(
           new UniversalCompactionPicker(ioptions_, &internal_comparator_));
@@ -612,13 +604,12 @@ ColumnFamilyData::ColumnFamilyData(
       compaction_picker_.reset(
           new FIFOCompactionPicker(ioptions_, &internal_comparator_));
     } else if (ioptions_.compaction_style == kCompactionStyleNone) {
-      compaction_picker_.reset(new NullCompactionPicker(
-          ioptions_, &internal_comparator_));
+      compaction_picker_.reset(
+          new NullCompactionPicker(ioptions_, &internal_comparator_));
       ROCKS_LOG_WARN(ioptions_.logger,
                      "Column family %s does not use any background compaction. "
                      "Compactions can only be done via CompactFiles\n",
                      GetName().c_str());
-#endif  // !ROCKSDB_LITE
     } else {
       ROCKS_LOG_ERROR(ioptions_.logger,
                       "Unable to recognize the specified compaction style %d. "
@@ -629,12 +620,13 @@ ColumnFamilyData::ColumnFamilyData(
     }
 
     if (column_family_set_->NumberOfColumnFamilies() < 10) {
-      ROCKS_LOG_INFO(ioptions_.logger,
-                     "--------------- Options for column family [%s]:\n",
-                     name.c_str());
+      ROCKS_LOG_HEADER(ioptions_.logger,
+                       "--------------- Options for column family [%s]:\n",
+                       name.c_str());
       initial_cf_options_.Dump(ioptions_.logger);
     } else {
-      ROCKS_LOG_INFO(ioptions_.logger, "\t(skipping printing options)\n");
+      ROCKS_LOG_INFO(ioptions_.logger,
+                     "\t(skipping printing options of [%s])\n", name.c_str());
     }
   }
 
@@ -669,6 +661,7 @@ ColumnFamilyData::ColumnFamilyData(
 // DB mutex held
 ColumnFamilyData::~ColumnFamilyData() {
   assert(refs_.load(std::memory_order_relaxed) == 0);
+  ResetCFRate(this);
   // remove from linked list
   auto prev = prev_;
   auto next = next_;
@@ -761,9 +754,7 @@ void ColumnFamilyData::SetDropped() {
   // can't drop default CF
   assert(id_ != 0);
   dropped_ = true;
-  if (column_family_set_->write_controller()->is_dynamic_delay()) {
-    column_family_set_->DeleteSelfFromMapAndMaybeUpdateDelayRate(id_);
-  }
+  ResetCFRate(this);
   write_controller_token_.reset();
 
   // remove from column_family_set
@@ -894,7 +885,7 @@ int GetL0ThresholdSpeedupCompaction(int level0_file_num_compaction_trigger,
     return static_cast<int>(res);
   }
 }
-}  // namespace
+}  // anonymous namespace
 
 namespace {
 const int kMemtablePenalty = 10;
@@ -909,16 +900,10 @@ double ColumnFamilyData::TEST_CalculateWriteDelayDivider(
       compaction_needed_bytes, mutable_cf_options, write_stall_cause);
 }
 
-uint64_t ColumnFamilyData::UpdateCFRate(uint32_t id, uint64_t write_rate) {
-  return column_family_set_->UpdateCFRate(id, write_rate);
-}
-
-std::unique_ptr<WriteControllerToken> ColumnFamilyData::DynamicSetupDelay(
-    WriteController* write_controller, uint64_t compaction_needed_bytes,
+void ColumnFamilyData::DynamicSetupDelay(
+    uint64_t max_write_rate, uint64_t compaction_needed_bytes,
     const MutableCFOptions& mutable_cf_options,
     WriteStallCause& write_stall_cause) {
-  uint64_t max_write_rate = write_controller->max_delayed_write_rate();
-
   const double rate_divider =
       CalculateWriteDelayDividerAndMaybeUpdateWriteStallCause(
           compaction_needed_bytes, mutable_cf_options, write_stall_cause);
@@ -928,14 +913,10 @@ std::unique_ptr<WriteControllerToken> ColumnFamilyData::DynamicSetupDelay(
     write_rate = WriteController::kMinWriteRate;
   }
 
-  // GetDelayToken returns a DelayWriteToken and also sets the
-  // delayed_write_rate_ which is used by all cfs and dbs using this write
-  // controller. because it also sets the delayed_write_rate_, we need to set
-  // only the smallest active delay request.
-  return write_controller->GetDelayToken(UpdateCFRate(id_, write_rate));
+  UpdateCFRate(this, write_rate);
 }
 
-std::pair<WriteStallCondition, ColumnFamilyData::WriteStallCause>
+std::pair<WriteStallCondition, WriteStallCause>
 ColumnFamilyData::GetWriteStallConditionAndCause(
     int num_unflushed_memtables, int num_l0_files,
     uint64_t num_compaction_needed_bytes,
@@ -980,7 +961,7 @@ double
 ColumnFamilyData::CalculateWriteDelayDividerAndMaybeUpdateWriteStallCause(
     uint64_t compaction_needed_bytes,
     const MutableCFOptions& mutable_cf_options,
-    ColumnFamilyData::WriteStallCause& write_stall_cause) {
+    WriteStallCause& write_stall_cause) {
   assert(current_ != nullptr);
 
   const auto* vstorage = current_->storage_info();
@@ -1051,11 +1032,11 @@ ColumnFamilyData::CalculateWriteDelayDividerAndMaybeUpdateWriteStallCause(
 }
 
 WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
-      const MutableCFOptions& mutable_cf_options) {
+    const MutableCFOptions& mutable_cf_options) {
   auto write_stall_condition = WriteStallCondition::kNormal;
   if (current_ != nullptr) {
     auto* vstorage = current_->storage_info();
-    auto write_controller = column_family_set_->write_controller_ptr();
+    auto write_controller = write_controller_ptr();
     uint64_t compaction_needed_bytes =
         vstorage->estimated_compaction_needed_bytes();
 
@@ -1076,11 +1057,12 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
     // write_stall_cause. this is only relevant in the kDelayed case.
     if (dynamic_delay) {
       if (write_stall_condition == WriteStallCondition::kDelayed) {
-        write_controller_token_ =
-            DynamicSetupDelay(write_controller, compaction_needed_bytes,
-                              mutable_cf_options, write_stall_cause);
+        DynamicSetupDelay(write_controller->max_delayed_write_rate(),
+                          compaction_needed_bytes, mutable_cf_options,
+                          write_stall_cause);
+        write_controller_token_.reset();
       } else {
-        column_family_set_->DeleteSelfFromMapAndMaybeUpdateDelayRate(id_);
+        write_controller->HandleRemoveDelayReq(this);
       }
     }
 
@@ -1100,7 +1082,8 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
       internal_stats_->AddCFStats(InternalStats::L0_FILE_COUNT_LIMIT_STOPS, 1);
       if (compaction_picker_->IsLevel0CompactionInProgress()) {
         internal_stats_->AddCFStats(
-            InternalStats::LOCKED_L0_FILE_COUNT_LIMIT_STOPS, 1);
+            InternalStats::L0_FILE_COUNT_LIMIT_STOPS_WITH_ONGOING_COMPACTION,
+            1);
       }
       ROCKS_LOG_WARN(ioptions_.logger,
                      "[%s] Stopping writes because we have %d level-0 files",
@@ -1123,7 +1106,7 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
                        prev_compaction_needed_bytes_, was_stopped,
                        mutable_cf_options.disable_auto_compactions);
       }
-      internal_stats_->AddCFStats(InternalStats::MEMTABLE_LIMIT_SLOWDOWNS, 1);
+      internal_stats_->AddCFStats(InternalStats::MEMTABLE_LIMIT_DELAYS, 1);
       ROCKS_LOG_WARN(
           ioptions_.logger,
           "[%s] Stalling writes because we have %d immutable memtables "
@@ -1143,11 +1126,11 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
                        prev_compaction_needed_bytes_, was_stopped || near_stop,
                        mutable_cf_options.disable_auto_compactions);
       }
-      internal_stats_->AddCFStats(InternalStats::L0_FILE_COUNT_LIMIT_SLOWDOWNS,
-                                  1);
+      internal_stats_->AddCFStats(InternalStats::L0_FILE_COUNT_LIMIT_DELAYS, 1);
       if (compaction_picker_->IsLevel0CompactionInProgress()) {
         internal_stats_->AddCFStats(
-            InternalStats::LOCKED_L0_FILE_COUNT_LIMIT_SLOWDOWNS, 1);
+            InternalStats::L0_FILE_COUNT_LIMIT_DELAYS_WITH_ONGOING_COMPACTION,
+            1);
       }
       ROCKS_LOG_WARN(ioptions_.logger,
                      "[%s] Stalling writes because we have %d level-0 files "
@@ -1175,7 +1158,7 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
                        mutable_cf_options.disable_auto_compactions);
       }
       internal_stats_->AddCFStats(
-          InternalStats::PENDING_COMPACTION_BYTES_LIMIT_SLOWDOWNS, 1);
+          InternalStats::PENDING_COMPACTION_BYTES_LIMIT_DELAYS, 1);
       ROCKS_LOG_WARN(
           ioptions_.logger,
           "[%s] Stalling writes because of estimated pending compaction "
@@ -1281,12 +1264,9 @@ bool ColumnFamilyData::NeedsCompaction() const {
 Compaction* ColumnFamilyData::PickCompaction(
     const MutableCFOptions& mutable_options,
     const MutableDBOptions& mutable_db_options, LogBuffer* log_buffer) {
-  SequenceNumber earliest_mem_seqno =
-      std::min(mem_->GetEarliestSequenceNumber(),
-               imm_.current()->GetEarliestSequenceNumber(false));
   auto* result = compaction_picker_->PickCompaction(
       GetName(), mutable_options, mutable_db_options, current_->storage_info(),
-      log_buffer, earliest_mem_seqno);
+      log_buffer);
   if (result != nullptr) {
     result->SetInputVersion(current_);
   }
@@ -1373,6 +1353,7 @@ Compaction* ColumnFamilyData::CompactRange(
   if (result != nullptr) {
     result->SetInputVersion(current_);
   }
+  TEST_SYNC_POINT("ColumnFamilyData::CompactRange:Return");
   return result;
 }
 
@@ -1456,8 +1437,8 @@ bool ColumnFamilyData::ReturnThreadLocalSuperVersion(SuperVersion* sv) {
   return false;
 }
 
-void ColumnFamilyData::InstallSuperVersion(
-    SuperVersionContext* sv_context, InstrumentedMutex* db_mutex) {
+void ColumnFamilyData::InstallSuperVersion(SuperVersionContext* sv_context,
+                                           InstrumentedMutex* db_mutex) {
   db_mutex->AssertHeld();
   return InstallSuperVersion(sv_context, mutable_cf_options_);
 }
@@ -1595,7 +1576,6 @@ Status ColumnFamilyData::ValidateOptions(
   return s;
 }
 
-#ifndef ROCKSDB_LITE
 Status ColumnFamilyData::SetOptions(
     const DBOptions& db_opts,
     const std::unordered_map<std::string, std::string>& options_map) {
@@ -1614,7 +1594,6 @@ Status ColumnFamilyData::SetOptions(
   }
   return s;
 }
-#endif  // ROCKSDB_LITE
 
 // REQUIRES: DB mutex held
 Env::WriteLifeTimeHint ColumnFamilyData::CalculateSSTWriteHint(int level) {
@@ -1634,8 +1613,8 @@ Env::WriteLifeTimeHint ColumnFamilyData::CalculateSSTWriteHint(int level) {
     // than base_level.
     return Env::WLTH_MEDIUM;
   }
-  return static_cast<Env::WriteLifeTimeHint>(level - base_level +
-                            static_cast<int>(Env::WLTH_MEDIUM));
+  return static_cast<Env::WriteLifeTimeHint>(
+      level - base_level + static_cast<int>(Env::WLTH_MEDIUM));
 }
 
 Status ColumnFamilyData::AddDirectories(
@@ -1673,6 +1652,13 @@ FSDirectory* ColumnFamilyData::GetDataDir(size_t path_id) const {
   return data_dirs_[path_id].get();
 }
 
+void ColumnFamilyData::RecoverEpochNumbers() {
+  assert(current_);
+  auto* vstorage = current_->storage_info();
+  assert(vstorage);
+  vstorage->RecoverEpochNumbers(this);
+}
+
 ColumnFamilySet::ColumnFamilySet(
     const std::string& dbname, const ImmutableDBOptions* db_options,
     const FileOptions& file_options, Cache* table_cache,
@@ -1685,8 +1671,8 @@ ColumnFamilySet::ColumnFamilySet(
       file_options_(file_options),
       dummy_cfd_(new ColumnFamilyData(
           ColumnFamilyData::kDummyColumnFamilyDataId, "", nullptr, nullptr,
-          nullptr, ColumnFamilyOptions(), *db_options, &file_options_, nullptr,
-          block_cache_tracer, io_tracer, db_id, db_session_id)),
+          nullptr, nullptr, ColumnFamilyOptions(), *db_options, &file_options_,
+          nullptr, block_cache_tracer, io_tracer, db_id, db_session_id)),
       default_cfd_cache_(nullptr),
       db_name_(dbname),
       db_options_(db_options),
@@ -1700,10 +1686,11 @@ ColumnFamilySet::ColumnFamilySet(
   // initialize linked list
   dummy_cfd_->prev_ = dummy_cfd_;
   dummy_cfd_->next_ = dummy_cfd_;
-  write_controller_->AddToDbRateMap(&cf_id_to_write_rate_);
+  write_buffer_manager_->RegisterWriteController(write_controller_);
 }
 
 ColumnFamilySet::~ColumnFamilySet() {
+  write_buffer_manager_->DeregisterWriteController(write_controller_);
   while (column_family_data_.size() > 0) {
     // cfd destructor will delete itself from column_family_data_
     auto cfd = column_family_data_.begin()->second;
@@ -1731,8 +1718,8 @@ ColumnFamilyData* ColumnFamilySet::GetColumnFamily(uint32_t id) const {
   }
 }
 
-ColumnFamilyData* ColumnFamilySet::GetColumnFamily(const std::string& name)
-    const {
+ColumnFamilyData* ColumnFamilySet::GetColumnFamily(
+    const std::string& name) const {
   auto cfd_iter = column_families_.find(name);
   if (cfd_iter != column_families_.end()) {
     auto cfd = GetColumnFamily(cfd_iter->second);
@@ -1763,9 +1750,9 @@ ColumnFamilyData* ColumnFamilySet::CreateColumnFamily(
     const ColumnFamilyOptions& options) {
   assert(column_families_.find(name) == column_families_.end());
   ColumnFamilyData* new_cfd = new ColumnFamilyData(
-      id, name, dummy_versions, table_cache_, write_buffer_manager_, options,
-      *db_options_, &file_options_, this, block_cache_tracer_, io_tracer_,
-      db_id_, db_session_id_);
+      id, name, dummy_versions, table_cache_, write_buffer_manager_,
+      write_controller_, options, *db_options_, &file_options_, this,
+      block_cache_tracer_, io_tracer_, db_id_, db_session_id_);
   column_families_.insert({name, id});
   column_family_data_.insert({id, new_cfd});
   max_column_family_ = std::max(max_column_family_, id);
@@ -1781,18 +1768,15 @@ ColumnFamilyData* ColumnFamilySet::CreateColumnFamily(
   return new_cfd;
 }
 
-// returns the min rate to set
-uint64_t ColumnFamilySet::UpdateCFRate(uint32_t id, uint64_t write_rate) {
-  return write_controller_->InsertToMapAndGetMinRate(id, &cf_id_to_write_rate_,
-                                                     write_rate);
+void ColumnFamilyData::UpdateCFRate(void* client_id, uint64_t write_rate) {
+  if (write_controller_ && write_controller_->is_dynamic_delay()) {
+    write_controller_->HandleNewDelayReq(client_id, write_rate);
+  }
 }
 
-// Removes the cf from the cf_id_to_write_rate_ map if it exists and if this cf
-// was the one with the min write rate then find and set a new min.
-void ColumnFamilySet::DeleteSelfFromMapAndMaybeUpdateDelayRate(uint32_t id) {
-  if (IsInRateMap(id)) {
-    write_controller_->DeleteSelfFromMapAndMaybeUpdateDelayRate(
-        id, &cf_id_to_write_rate_);
+void ColumnFamilyData::ResetCFRate(void* client_id) {
+  if (write_controller_ && write_controller_->is_dynamic_delay()) {
+    write_controller_->HandleRemoveDelayReq(client_id);
   }
 }
 

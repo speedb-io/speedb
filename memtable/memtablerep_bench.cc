@@ -467,8 +467,8 @@ class FillBenchmark : public Benchmark {
     num_write_ops_per_thread_ = FLAGS_num_operations;
   }
 
-  void RunThreads(std::vector<port::Thread>* /*threads*/, uint64_t* bytes_written,
-                  uint64_t* bytes_read, bool /*write*/,
+  void RunThreads(std::vector<port::Thread>* /*threads*/,
+                  uint64_t* bytes_written, uint64_t* bytes_read, bool /*write*/,
                   uint64_t* read_hits) override {
     FillBenchmarkThread(table_, key_gen_, bytes_written, bytes_read, sequence_,
                         num_write_ops_per_thread_, read_hits)();
@@ -580,7 +580,6 @@ int main(int argc, char** argv) {
   if (FLAGS_memtablerep == "skiplist") {
     // Needed because of a different name/default than CreateFromString
     factory.reset(new ROCKSDB_NAMESPACE::SkipListFactory);
-#ifndef ROCKSDB_LITE
   } else if (FLAGS_memtablerep == "hashskiplist" ||
              FLAGS_memtablerep == "prefix_hash") {
     factory.reset(ROCKSDB_NAMESPACE::NewHashSkipListRepFactory(
@@ -596,7 +595,6 @@ int main(int argc, char** argv) {
         FLAGS_if_log_bucket_dist_when_flash, FLAGS_threshold_use_skiplist));
     options.prefix_extractor.reset(
         ROCKSDB_NAMESPACE::NewFixedPrefixTransform(FLAGS_prefix_length));
-#endif  // ROCKSDB_LITE
   } else {
     ROCKSDB_NAMESPACE::ConfigOptions config_options;
     config_options.ignore_unsupported_options = false;

@@ -109,6 +109,7 @@ Status FilePrefetchBuffer::ReadAsync(const IOOptions& opts,
                                      RandomAccessFileReader* reader,
                                      uint64_t read_len,
                                      uint64_t rounddown_start, uint32_t index) {
+  TEST_SYNC_POINT("FilePrefetchBuffer::ReadAsync");
   // callback for async read request.
   auto fp = std::bind(&FilePrefetchBuffer::PrefetchAsyncCallback, this,
                       std::placeholders::_1, std::placeholders::_2);
@@ -161,6 +162,9 @@ Status FilePrefetchBuffer::Prefetch(const IOOptions& opts,
 
   Status s = Read(opts, reader, rate_limiter_priority, read_len, chunk_len,
                   rounddown_offset, curr_);
+  if (usage_ == FilePrefetchBufferUsage::kTableOpenPrefetchTail && s.ok()) {
+    RecordInHistogram(stats_, TABLE_OPEN_PREFETCH_TAIL_READ_BYTES, read_len);
+  }
   return s;
 }
 
@@ -247,10 +251,14 @@ void FilePrefetchBuffer::AbortAllIOs() {
   // Release io_handles.
   if (bufs_[curr_].io_handle_ != nullptr && bufs_[curr_].del_fn_ != nullptr) {
     DestroyAndClearIOHandle(curr_);
+  } else {
+    bufs_[curr_].async_read_in_progress_ = false;
   }
 
   if (bufs_[second].io_handle_ != nullptr && bufs_[second].del_fn_ != nullptr) {
     DestroyAndClearIOHandle(second);
+  } else {
+    bufs_[second].async_read_in_progress_ = false;
   }
 }
 
@@ -325,7 +333,16 @@ Status FilePrefetchBuffer::HandleOverlappingData(
     uint64_t& tmp_offset, size_t& tmp_length) {
   Status s;
   size_t alignment = reader->file()->GetRequiredBufferAlignment();
-  uint32_t second = curr_ ^ 1;
+  uint32_t second;
+
+  // Check if the first buffer has the required offset and the async read is
+  // still in progress. This should only happen if a prefetch was initiated
+  // by Seek, but the next access is at another offset.
+  if (bufs_[curr_].async_read_in_progress_ &&
+      IsOffsetInBufferWithAsyncProgress(offset, curr_)) {
+    PollAndUpdateBuffersIfNeeded(offset);
+  }
+  second = curr_ ^ 1;
 
   // If data is overlapping over two buffers, copy the data from curr_ and
   // call ReadAsync on curr_.
@@ -555,10 +572,11 @@ Status FilePrefetchBuffer::PrefetchAsyncInternal(
     bufs_[second].offset_ = rounddown_start2;
     assert(roundup_len2 >= chunk_len2);
     uint64_t read_len2 = static_cast<size_t>(roundup_len2 - chunk_len2);
-    Status tmp_s = ReadAsync(opts, reader, read_len2, rounddown_start2, second);
-    if (!tmp_s.ok()) {
+    s = ReadAsync(opts, reader, read_len2, rounddown_start2, second);
+    if (!s.ok()) {
       DestroyAndClearIOHandle(second);
       bufs_[second].buffer_.Clear();
+      return s;
     }
   }
 
@@ -594,6 +612,22 @@ bool FilePrefetchBuffer::TryReadFromCache(const IOOptions& opts,
                                           Slice* result, Status* status,
                                           Env::IOPriority rate_limiter_priority,
                                           bool for_compaction /* = false */) {
+  bool ret = TryReadFromCacheUntracked(opts, reader, offset, n, result, status,
+                                       rate_limiter_priority, for_compaction);
+  if (usage_ == FilePrefetchBufferUsage::kTableOpenPrefetchTail && enable_) {
+    if (ret) {
+      RecordTick(stats_, TABLE_OPEN_PREFETCH_TAIL_HIT);
+    } else {
+      RecordTick(stats_, TABLE_OPEN_PREFETCH_TAIL_MISS);
+    }
+  }
+  return ret;
+}
+
+bool FilePrefetchBuffer::TryReadFromCacheUntracked(
+    const IOOptions& opts, RandomAccessFileReader* reader, uint64_t offset,
+    size_t n, Slice* result, Status* status,
+    Env::IOPriority rate_limiter_priority, bool for_compaction /* = false */) {
   if (track_min_offset_ && offset < min_offset_read_) {
     min_offset_read_ = static_cast<size_t>(offset);
   }
@@ -648,6 +682,22 @@ bool FilePrefetchBuffer::TryReadFromCache(const IOOptions& opts,
 }
 
 bool FilePrefetchBuffer::TryReadFromCacheAsync(
+    const IOOptions& opts, RandomAccessFileReader* reader, uint64_t offset,
+    size_t n, Slice* result, Status* status,
+    Env::IOPriority rate_limiter_priority) {
+  bool ret = TryReadFromCacheAsyncUntracked(opts, reader, offset, n, result,
+                                            status, rate_limiter_priority);
+  if (usage_ == FilePrefetchBufferUsage::kTableOpenPrefetchTail && enable_) {
+    if (ret) {
+      RecordTick(stats_, TABLE_OPEN_PREFETCH_TAIL_HIT);
+    } else {
+      RecordTick(stats_, TABLE_OPEN_PREFETCH_TAIL_MISS);
+    }
+  }
+  return ret;
+}
+
+bool FilePrefetchBuffer::TryReadFromCacheAsyncUntracked(
     const IOOptions& opts, RandomAccessFileReader* reader, uint64_t offset,
     size_t n, Slice* result, Status* status,
     Env::IOPriority rate_limiter_priority) {

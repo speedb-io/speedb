@@ -16,6 +16,7 @@
 #include <optional>
 #include <string>
 
+#include "rocksdb/advanced_cache.h"
 #include "rocksdb/cache.h"
 #include "test_util/sync_point.h"
 #include "test_util/testharness.h"
@@ -23,7 +24,6 @@
 namespace ROCKSDB_NAMESPACE {
 class WriteBufferManagerTest : public testing::Test {};
 
-#ifndef ROCKSDB_LITE
 const size_t kSizeDummyEntry = 256 * 1024;
 
 namespace {
@@ -126,8 +126,8 @@ TEST_F(ChargeWriteBufferTest, Basic) {
   // Allocate another 512KB, memory_used_ = 845KB
   wbf->ReserveMem(512 * 1024);
   // 2 more dummy entries are added for size 512 KB
-  // since ceil((memory_used_ - dummy_entries_in_cache_usage) % kSizeDummyEntry)
-  // = 2
+  // since ceil((memory_used_ - dummy_entries_in_cache_usage) %
+  // kSizeDummyEntry) = 2
   ASSERT_EQ(wbf->dummy_entries_in_cache_usage(), 4 * kSizeDummyEntry);
   ASSERT_GE(cache->GetPinnedUsage(), 4 * 256 * 1024);
   ASSERT_LT(cache->GetPinnedUsage(), 4 * 256 * 1024 + kMetaDataChargeOverhead);
@@ -171,8 +171,8 @@ TEST_F(ChargeWriteBufferTest, Basic) {
   // Free 20MB, memory_used_ = 31565KB
   // It will releae 80 dummy entries from cache since
   // since memory_used_ < dummy_entries_in_cache_usage * (3/4)
-  // and floor((dummy_entries_in_cache_usage - memory_used_) % kSizeDummyEntry)
-  // = 80
+  // and floor((dummy_entries_in_cache_usage - memory_used_) %
+  // kSizeDummyEntry) = 80
   BeginAndFree(*wbf, 20 * 1024 * 1024);
   ASSERT_EQ(wbf->dummy_entries_in_cache_usage(), 124 * kSizeDummyEntry);
   ASSERT_GE(cache->GetPinnedUsage(), 124 * 256 * 1024);
@@ -193,8 +193,8 @@ TEST_F(ChargeWriteBufferTest, Basic) {
   // Free 20MB, memory_used_ = 11069KB
   // It will releae 80 dummy entries from cache
   // since memory_used_ < dummy_entries_in_cache_usage * (3/4)
-  // and floor((dummy_entries_in_cache_usage - memory_used_) % kSizeDummyEntry)
-  // = 80
+  // and floor((dummy_entries_in_cache_usage - memory_used_) %
+  // kSizeDummyEntry) = 80
   ScheduleBeginAndFreeMem(*wbf, 20 * 1024 * 1024);
   ASSERT_EQ(wbf->dummy_entries_in_cache_usage(), 44 * kSizeDummyEntry);
   ASSERT_GE(cache->GetPinnedUsage(), 44 * 256 * 1024);
@@ -317,8 +317,6 @@ TEST_F(ChargeWriteBufferTest, BasicWithCacheFull) {
   ASSERT_LT(cache->GetPinnedUsage(),
             46 * kSizeDummyEntry + kMetaDataChargeOverhead);
 }
-
-#endif  // ROCKSDB_LITE
 
 #define VALIDATE_USAGE_STATE(memory_change_size, expected_state,   \
                              expected_factor)                      \
@@ -524,9 +522,9 @@ class WriteBufferManagerFlushInitiationTest
     }
   };
 
-  // Sync Test Point callback called when the flush initiation thread completes
-  // initating all flushes and resumes waiting for the condition variable to be
-  // signalled again
+  // Sync Test Point callback called when the flush initiation thread
+  // completes initating all flushes and resumes waiting for the condition
+  // variable to be signalled again
   void DoneInitiationsAttemptTestPointCb(void* /*  arg */) {
     if (actual_num_cbs_ == expected_num_cbs_) {
       auto sync_point_name =
@@ -665,7 +663,8 @@ TEST_P(WriteBufferManagerFlushInitiationTest, NonWbmInitiatedFlush) {
   wbm_->FlushStarted(false /* wbm_initiated */);
   IncNumRunningFlushes();
 
-  // Reach the 1st step => No need to initiate a flush (one is already running)
+  // Reach the 1st step => No need to initiate a flush (one is already
+  // running)
   wbm_->ReserveMem(flush_step_size_);
   CALL_WRAPPER(ValidateState(false));
 
@@ -1077,6 +1076,7 @@ INSTANTIATE_TEST_CASE_P(WriteBufferManagerFlushInitiationTest,
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {
+  ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

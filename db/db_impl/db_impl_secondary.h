@@ -5,7 +5,6 @@
 
 #pragma once
 
-#ifndef ROCKSDB_LITE
 
 #include <string>
 #include <vector>
@@ -47,6 +46,7 @@ class LogReaderContainer {
     delete reporter_;
     delete status_;
   }
+
  private:
   struct LogReporter : public log::Reader::Reporter {
     Env* env;
@@ -247,7 +247,6 @@ class DBImplSecondary : public DBImpl {
   // method can take long time due to all the I/O and CPU costs.
   Status TryCatchUpWithPrimary() override;
 
-
   // Try to find log reader using log_number from log_readers_ map, initialize
   // if it doesn't exist
   Status MaybeInitLogReader(uint64_t log_number,
@@ -269,12 +268,10 @@ class DBImplSecondary : public DBImpl {
 #endif  // NDEBUG
 
  protected:
-#ifndef ROCKSDB_LITE
   Status FlushForGetLiveFiles() override {
     // No-op for read-only DB
     return Status::OK();
   }
-#endif  // !ROCKSDB_LITE
 
   // ColumnFamilyCollector is a write batch handler which does nothing
   // except recording unique column family IDs
@@ -407,4 +404,3 @@ class DBImplSecondary : public DBImpl {
 
 }  // namespace ROCKSDB_NAMESPACE
 
-#endif  // !ROCKSDB_LITE

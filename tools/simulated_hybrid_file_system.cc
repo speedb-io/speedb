@@ -3,9 +3,6 @@
 //  COPYING file in the root directory) and Apache 2.0 License
 //  (found in the LICENSE.Apache file in the root directory).
 
-#include "util/stop_watch.h"
-#ifndef ROCKSDB_LITE
-
 #include "tools/simulated_hybrid_file_system.h"
 
 #include <algorithm>
@@ -13,6 +10,7 @@
 #include <string>
 
 #include "rocksdb/rate_limiter.h"
+#include "util/stop_watch.h"
 
 namespace ROCKSDB_NAMESPACE {
 
@@ -243,4 +241,3 @@ IOStatus SimulatedWritableFile::Sync(const IOOptions& options,
 }
 }  // namespace ROCKSDB_NAMESPACE
 
-#endif  // ROCKSDB_LITE

@@ -59,6 +59,11 @@ There are few options when compiling Speedb:
 
 -   If you wish to run microbench (e.g, `make microbench`, `make ribbon_bench`
     or `cmake -DWITH_BENCHMARK=1`), Google benchmark >= 1.6.0 is needed.
+    -  You can do the following to install Google benchmark. These commands are copied from `./build_tools/ubuntu20_image/Dockerfile`:
+
+    `$ git clone --depth 1 --branch v1.7.0 https://github.com/google/benchmark.git ~/benchmark`
+
+    `$ cd ~/benchmark && mkdir build && cd build && cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release -DBENCHMARK_ENABLE_GTEST_TESTS=0 && ninja && ninja install`
 
 ## Supported platforms
 
@@ -119,6 +124,8 @@ There are few options when compiling Speedb:
         -   With CentOS 8:
 
                 sudo dnf install libzstd-devel
+* **iOS**:
+  * Run: `TARGET_OS=IOS make static_lib`. When building the project which uses rocksdb iOS library, make sure to define an important pre-processing macros: `IOS_CROSS_COMPILE`.
 
         -   From source:
 

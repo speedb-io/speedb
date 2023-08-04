@@ -18,11 +18,11 @@
 
 #pragma once
 
-#ifndef ROCKSDB_LITE
 
 #include <algorithm>
 #include <iostream>
 #include <vector>
+
 #include "rocksdb/env.h"
 
 namespace ROCKSDB_NAMESPACE {
@@ -190,4 +190,3 @@ class EnvMirror : public EnvWrapper {
 
 }  // namespace ROCKSDB_NAMESPACE
 
-#endif  // ROCKSDB_LITE

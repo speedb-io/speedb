@@ -26,6 +26,9 @@
 #include "rocksdb/flush_block_policy.h"
 #include "rocksdb/rocksdb_namespace.h"
 #include "rocksdb/table.h"
+#include "rocksdb/table_pinning_policy.h"
+#include "rocksdb/utilities/customizable_util.h"
+#include "rocksdb/utilities/object_registry.h"
 #include "rocksdb/utilities/options_type.h"
 #include "table/block_based/block_based_table_builder.h"
 #include "table/block_based/block_based_table_reader.h"
@@ -165,7 +168,6 @@ size_t TailPrefetchStats::GetSuggestedPrefetchSize() {
   return std::min(kMaxPrefetchSize, max_qualified_size);
 }
 
-#ifndef ROCKSDB_LITE
 
 const std::string kOptNameMetadataCacheOpts = "metadata_cache_options";
 
@@ -226,14 +228,10 @@ static std::unordered_map<std::string,
         {"kFlushOnly",
          BlockBasedTableOptions::PrepopulateBlockCache::kFlushOnly}};
 
-#endif  // ROCKSDB_LITE
-
 static std::unordered_map<std::string, OptionTypeInfo>
     block_based_table_type_info = {
-#ifndef ROCKSDB_LITE
         /* currently not supported
           std::shared_ptr<Cache> block_cache = nullptr;
-          std::shared_ptr<Cache> block_cache_compressed = nullptr;
           CacheUsageOptions cache_usage_options;
          */
         {"flush_block_policy_factory",
@@ -522,15 +520,8 @@ static std::unordered_map<std::string, OptionTypeInfo>
             return Cache::CreateFromString(opts, value, cache);
           }}},
         {"block_cache_compressed",
-         {offsetof(struct BlockBasedTableOptions, block_cache_compressed),
-          OptionType::kUnknown, OptionVerificationType::kNormal,
-          (OptionTypeFlags::kCompareNever | OptionTypeFlags::kDontSerialize),
-          // Parses the input value as a Cache
-          [](const ConfigOptions& opts, const std::string&,
-             const std::string& value, void* addr) {
-            auto* cache = static_cast<std::shared_ptr<Cache>*>(addr);
-            return Cache::CreateFromString(opts, value, cache);
-          }}},
+         {0, OptionType::kUnknown, OptionVerificationType::kDeprecated,
+          OptionTypeFlags::kNone}},
         {"max_auto_readahead_size",
          {offsetof(struct BlockBasedTableOptions, max_auto_readahead_size),
           OptionType::kSizeT, OptionVerificationType::kNormal,
@@ -550,7 +541,6 @@ static std::unordered_map<std::string, OptionTypeInfo>
           OptionType::kUInt64T, OptionVerificationType::kNormal,
           OptionTypeFlags::kMutable}},
 
-#endif  // ROCKSDB_LITE
 };
 
 // TODO(myabandeh): We should return an error instead of silently changing the
@@ -566,6 +556,10 @@ BlockBasedTableFactory::BlockBasedTableFactory(
   if (table_options_.flush_block_policy_factory == nullptr) {
     table_options_.flush_block_policy_factory.reset(
         new FlushBlockBySizePolicyFactory());
+  }
+  if (table_options_.pinning_policy == nullptr) {
+    table_options_.pinning_policy.reset(
+        NewDefaultPinningPolicy(table_options_));
   }
   if (table_options_.no_block_cache) {
     table_options_.block_cache.reset();
@@ -641,36 +635,25 @@ namespace {
 // they must not share an underlying key space with each other.
 Status CheckCacheOptionCompatibility(const BlockBasedTableOptions& bbto) {
   int cache_count = (bbto.block_cache != nullptr) +
-                    (bbto.block_cache_compressed != nullptr) +
                     (bbto.persistent_cache != nullptr);
   if (cache_count <= 1) {
     // Nothing to share / overlap
     return Status::OK();
   }
 
-  // Simple pointer equality
-  if (bbto.block_cache == bbto.block_cache_compressed) {
-    return Status::InvalidArgument(
-        "block_cache same as block_cache_compressed not currently supported, "
-        "and would be bad for performance anyway");
-  }
-
   // More complex test of shared key space, in case the instances are wrappers
   // for some shared underlying cache.
+  static Cache::CacheItemHelper kHelper{CacheEntryRole::kMisc};
   CacheKey sentinel_key = CacheKey::CreateUniqueForProcessLifetime();
-  static char kRegularBlockCacheMarker = 'b';
-  static char kCompressedBlockCacheMarker = 'c';
-  static char kPersistentCacheMarker = 'p';
+  struct SentinelValue {
+    explicit SentinelValue(char _c) : c(_c) {}
+    char c;
+  };
+  static SentinelValue kRegularBlockCacheMarker{'b'};
+  static char kPersistentCacheMarker{'p'};
   if (bbto.block_cache) {
     bbto.block_cache
-        ->Insert(sentinel_key.AsSlice(), &kRegularBlockCacheMarker, 1,
-                 GetNoopDeleterForRole<CacheEntryRole::kMisc>())
-        .PermitUncheckedError();
-  }
-  if (bbto.block_cache_compressed) {
-    bbto.block_cache_compressed
-        ->Insert(sentinel_key.AsSlice(), &kCompressedBlockCacheMarker, 1,
-                 GetNoopDeleterForRole<CacheEntryRole::kMisc>())
+        ->Insert(sentinel_key.AsSlice(), &kRegularBlockCacheMarker, &kHelper, 1)
         .PermitUncheckedError();
   }
   if (bbto.persistent_cache) {
@@ -684,14 +667,10 @@ Status CheckCacheOptionCompatibility(const BlockBasedTableOptions& bbto) {
   if (bbto.block_cache) {
     auto handle = bbto.block_cache->Lookup(sentinel_key.AsSlice());
     if (handle) {
-      auto v = static_cast<char*>(bbto.block_cache->Value(handle));
-      char c = *v;
+      auto v = static_cast<SentinelValue*>(bbto.block_cache->Value(handle));
+      char c = v->c;
       bbto.block_cache->Release(handle);
-      if (v == &kCompressedBlockCacheMarker) {
-        return Status::InvalidArgument(
-            "block_cache and block_cache_compressed share the same key space, "
-            "which is not supported");
-      } else if (c == kPersistentCacheMarker) {
+      if (c == kPersistentCacheMarker) {
         return Status::InvalidArgument(
             "block_cache and persistent_cache share the same key space, "
             "which is not supported");
@@ -700,41 +679,16 @@ Status CheckCacheOptionCompatibility(const BlockBasedTableOptions& bbto) {
       }
     }
   }
-  if (bbto.block_cache_compressed) {
-    auto handle = bbto.block_cache_compressed->Lookup(sentinel_key.AsSlice());
-    if (handle) {
-      auto v = static_cast<char*>(bbto.block_cache_compressed->Value(handle));
-      char c = *v;
-      bbto.block_cache_compressed->Release(handle);
-      if (v == &kRegularBlockCacheMarker) {
-        return Status::InvalidArgument(
-            "block_cache_compressed and block_cache share the same key space, "
-            "which is not supported");
-      } else if (c == kPersistentCacheMarker) {
-        return Status::InvalidArgument(
-            "block_cache_compressed and persistent_cache share the same key "
-            "space, "
-            "which is not supported");
-      } else if (v != &kCompressedBlockCacheMarker) {
-        return Status::Corruption(
-            "Unexpected mutation to block_cache_compressed");
-      }
-    }
-  }
+
   if (bbto.persistent_cache) {
     std::unique_ptr<char[]> data;
     size_t size = 0;
     bbto.persistent_cache->Lookup(sentinel_key.AsSlice(), &data, &size)
         .PermitUncheckedError();
     if (data && size > 0) {
-      if (data[0] == kRegularBlockCacheMarker) {
+      if (data[0] == kRegularBlockCacheMarker.c) {
         return Status::InvalidArgument(
             "persistent_cache and block_cache share the same key space, "
-            "which is not supported");
-      } else if (data[0] == kCompressedBlockCacheMarker) {
-        return Status::InvalidArgument(
-            "persistent_cache and block_cache_compressed share the same key "
-            "space, "
             "which is not supported");
       } else if (data[0] != kPersistentCacheMarker) {
         return Status::Corruption("Unexpected mutation to persistent_cache");
@@ -757,7 +711,8 @@ Status BlockBasedTableFactory::NewTableReader(
       file_size, table_reader, table_reader_cache_res_mgr_,
       table_reader_options.prefix_extractor, prefetch_index_and_filter_in_cache,
       table_reader_options.skip_filters, table_reader_options.level,
-      table_reader_options.immortal, table_reader_options.largest_seqno,
+      table_reader_options.is_bottommost, table_reader_options.immortal,
+      table_reader_options.largest_seqno,
       table_reader_options.force_direct_prefetch, &tail_prefetch_stats_,
       table_reader_options.block_cache_tracer,
       table_reader_options.max_file_size_for_l0_meta_pin,
@@ -925,6 +880,19 @@ std::string BlockBasedTableFactory::GetPrintableOptions() const {
   snprintf(buffer, kBufferSize, "  pin_top_level_index_and_filter: %d\n",
            table_options_.pin_top_level_index_and_filter);
   ret.append(buffer);
+  ret.append("  metadata_cache_options:\n");
+  snprintf(buffer, kBufferSize, "    top_level_index_pinning: %d\n",
+           static_cast<int>(
+               table_options_.metadata_cache_options.top_level_index_pinning));
+  ret.append(buffer);
+  snprintf(buffer, kBufferSize, "    partition_pinning: %d\n",
+           static_cast<int>(
+               table_options_.metadata_cache_options.partition_pinning));
+  ret.append(buffer);
+  snprintf(buffer, kBufferSize, "    unpartitioned_pinning: %d\n",
+           static_cast<int>(
+               table_options_.metadata_cache_options.unpartitioned_pinning));
+  ret.append(buffer);
   snprintf(buffer, kBufferSize, "  index_type: %d\n",
            table_options_.index_type);
   ret.append(buffer);
@@ -955,20 +923,6 @@ std::string BlockBasedTableFactory::GetPrintableOptions() const {
     ret.append("  block_cache_options:\n");
     ret.append(table_options_.block_cache->GetPrintableOptions());
   }
-  snprintf(buffer, kBufferSize, "  block_cache_compressed: %p\n",
-           static_cast<void*>(table_options_.block_cache_compressed.get()));
-  ret.append(buffer);
-  if (table_options_.block_cache_compressed) {
-    const char* block_cache_compressed_name =
-        table_options_.block_cache_compressed->Name();
-    if (block_cache_compressed_name != nullptr) {
-      snprintf(buffer, kBufferSize, "  block_cache_name: %s\n",
-               block_cache_compressed_name);
-      ret.append(buffer);
-    }
-    ret.append("  block_cache_compressed_options:\n");
-    ret.append(table_options_.block_cache_compressed->GetPrintableOptions());
-  }
   snprintf(buffer, kBufferSize, "  persistent_cache: %p\n",
            static_cast<void*>(table_options_.persistent_cache.get()));
   ret.append(buffer);
@@ -994,6 +948,9 @@ std::string BlockBasedTableFactory::GetPrintableOptions() const {
   ret.append(buffer);
   snprintf(buffer, kBufferSize, "  partition_filters: %d\n",
            table_options_.partition_filters);
+  ret.append(buffer);
+  snprintf(buffer, kBufferSize, "  optimize_filters_for_memory: %d\n",
+           table_options_.optimize_filters_for_memory);
   ret.append(buffer);
   snprintf(buffer, kBufferSize, "  use_delta_encoding: %d\n",
            table_options_.use_delta_encoding);
@@ -1052,7 +1009,6 @@ const void* BlockBasedTableFactory::GetOptionsPtr(
   }
 }
 
-#ifndef ROCKSDB_LITE
 // Take a default BlockBasedTableOptions "table_options" in addition to a
 // map "opts_map" of option name to option value to construct the new
 // BlockBasedTableOptions "new_table_options".
@@ -1109,18 +1065,6 @@ Status BlockBasedTableFactory::ParseOption(const ConfigOptions& config_options,
 }
 
 Status GetBlockBasedTableOptionsFromString(
-    const BlockBasedTableOptions& table_options, const std::string& opts_str,
-    BlockBasedTableOptions* new_table_options) {
-  ConfigOptions config_options;
-  config_options.input_strings_escaped = false;
-  config_options.ignore_unknown_options = false;
-  config_options.invoke_prepare_options = false;
-  config_options.ignore_unsupported_options = false;
-
-  return GetBlockBasedTableOptionsFromString(config_options, table_options,
-                                             opts_str, new_table_options);
-}
-Status GetBlockBasedTableOptionsFromString(
     const ConfigOptions& config_options,
     const BlockBasedTableOptions& table_options, const std::string& opts_str,
     BlockBasedTableOptions* new_table_options) {
@@ -1140,20 +1084,6 @@ Status GetBlockBasedTableOptionsFromString(
 }
 
 Status GetBlockBasedTableOptionsFromMap(
-    const BlockBasedTableOptions& table_options,
-    const std::unordered_map<std::string, std::string>& opts_map,
-    BlockBasedTableOptions* new_table_options, bool input_strings_escaped,
-    bool ignore_unknown_options) {
-  ConfigOptions config_options;
-  config_options.input_strings_escaped = input_strings_escaped;
-  config_options.ignore_unknown_options = ignore_unknown_options;
-  config_options.invoke_prepare_options = false;
-
-  return GetBlockBasedTableOptionsFromMap(config_options, table_options,
-                                          opts_map, new_table_options);
-}
-
-Status GetBlockBasedTableOptionsFromMap(
     const ConfigOptions& config_options,
     const BlockBasedTableOptions& table_options,
     const std::unordered_map<std::string, std::string>& opts_map,
@@ -1168,7 +1098,6 @@ Status GetBlockBasedTableOptionsFromMap(
   }
   return s;
 }
-#endif  // !ROCKSDB_LITE
 
 TableFactory* NewBlockBasedTableFactory(
     const BlockBasedTableOptions& _table_options) {

@@ -71,8 +71,9 @@ Status BuildTable(
     int job_id, const Env::IOPriority io_priority,
     TableProperties* table_properties, Env::WriteLifeTimeHint write_hint,
     const std::string* full_history_ts_low,
-    BlobFileCompletionCallback* blob_callback, uint64_t* num_input_entries,
-    uint64_t* memtable_payload_bytes, uint64_t* memtable_garbage_bytes) {
+    BlobFileCompletionCallback* blob_callback, Version* version,
+    uint64_t* num_input_entries, uint64_t* memtable_payload_bytes,
+    uint64_t* memtable_garbage_bytes) {
   assert((tboptions.column_family_id ==
           TablePropertiesCollectorFactory::Context::kUnknownColumnFamily) ==
          tboptions.column_family_name.empty());
@@ -90,7 +91,7 @@ Status BuildTable(
   iter->SeekToFirst();
   std::unique_ptr<CompactionRangeDelAggregator> range_del_agg(
       new CompactionRangeDelAggregator(&tboptions.internal_comparator,
-                                       snapshots));
+                                       snapshots, full_history_ts_low));
   uint64_t num_unfragmented_tombstones = 0;
   uint64_t total_tombstone_payload_bytes = 0;
   for (auto& range_del_iter : range_del_iters) {
@@ -106,11 +107,9 @@ Status BuildTable(
   std::vector<std::string> blob_file_paths;
   std::string file_checksum = kUnknownFileChecksum;
   std::string file_checksum_func_name = kUnknownFileChecksumFuncName;
-#ifndef ROCKSDB_LITE
   EventHelpers::NotifyTableFileCreationStarted(ioptions.listeners, dbname,
                                                tboptions.column_family_name,
                                                fname, job_id, tboptions.reason);
-#endif  // !ROCKSDB_LITE
   Env* env = db_options.env;
   assert(env);
   FileSystem* fs = db_options.fs.get();
@@ -175,10 +174,10 @@ Status BuildTable(
       builder = NewTableBuilder(tboptions, file_writer.get());
     }
 
+    auto ucmp = tboptions.internal_comparator.user_comparator();
     MergeHelper merge(
-        env, tboptions.internal_comparator.user_comparator(),
-        ioptions.merge_operator.get(), compaction_filter.get(), ioptions.logger,
-        true /* internal key corruption is not ok */,
+        env, ucmp, ioptions.merge_operator.get(), compaction_filter.get(),
+        ioptions.logger, true /* internal key corruption is not ok */,
         snapshots.empty() ? 0 : snapshots.back(), snapshot_checker);
 
     std::unique_ptr<BlobFileBuilder> blob_file_builder(
@@ -196,25 +195,79 @@ Status BuildTable(
 
     const std::atomic<bool> kManualCompactionCanceledFalse{false};
     CompactionIterator c_iter(
-        iter, tboptions.internal_comparator.user_comparator(), &merge,
-        kMaxSequenceNumber, &snapshots, earliest_write_conflict_snapshot,
-        job_snapshot, snapshot_checker, env,
+        iter, ucmp, &merge, kMaxSequenceNumber, &snapshots,
+        earliest_write_conflict_snapshot, job_snapshot, snapshot_checker, env,
         ShouldReportDetailedTime(env, ioptions.stats),
         true /* internal key corruption is not ok */, range_del_agg.get(),
         blob_file_builder.get(), ioptions.allow_data_in_errors,
         ioptions.enforce_single_del_contracts,
         /*manual_compaction_canceled=*/kManualCompactionCanceledFalse,
         /*compaction=*/nullptr, compaction_filter.get(),
-        /*shutting_down=*/nullptr, db_options.info_log, full_history_ts_low);
-
+        /*shutting_down=*/nullptr, db_options.info_log, full_history_ts_low,
+        ioptions.use_clean_delete_during_flush);
+    const InternalKeyComparator& icmp = tboptions.internal_comparator;
+    auto range_del_it = range_del_agg->NewIterator();
+    range_del_it->SeekToFirst();
+    Slice last_tombstone_start_user_key{};
     c_iter.SeekToFirst();
+
     for (; c_iter.Valid(); c_iter.Next()) {
       const Slice& key = c_iter.key();
       const Slice& value = c_iter.value();
       const ParsedInternalKey& ikey = c_iter.ikey();
+      auto internal_key = InternalKey(key, ikey.sequence, ikey.type);
       // Generate a rolling 64-bit hash of the key and values
       // Note :
       // Here "key" integrates 'sequence_number'+'kType'+'user key'.
+      if (ioptions.use_clean_delete_during_flush &&
+          tboptions.reason == TableFileCreationReason::kFlush &&
+          ikey.type == kTypeValue) {
+        bool was_skipped = false;
+        while (range_del_it->Valid()) {
+          auto tombstone = range_del_it->Tombstone();
+          auto kv = tombstone.Serialize();
+          if (icmp.Compare(kv.first, internal_key) > 0) {
+            // the record smaller than the current range delete iter proceed as
+            // usual
+            break;
+          }
+          if ((icmp.Compare(kv.first, internal_key) <= 0) &&
+              (icmp.Compare(internal_key, tombstone.SerializeEndKey()) <= 0)) {
+            // the key is in delete range... check if we can skip it...
+            if (c_iter.CanBeSkipped()) {
+              was_skipped = true;
+            }
+            break;
+          } else {
+            // the record is above the current range delete iter. need progress
+            // range delete iter and check again. first update the current range
+            // delete iter for boundaries
+            builder->Add(kv.first.Encode(), kv.second);
+            InternalKey tombstone_end = tombstone.SerializeEndKey();
+            meta->UpdateBoundariesForRange(kv.first, tombstone_end,
+                                           tombstone.seq_, icmp);
+            if (version) {
+              if (last_tombstone_start_user_key.empty() ||
+                  ucmp->CompareWithoutTimestamp(last_tombstone_start_user_key,
+                                                range_del_it->start_key()) <
+                      0) {
+                SizeApproximationOptions approx_opts;
+                approx_opts.files_size_error_margin = 0.1;
+                meta->compensated_range_deletion_size +=
+                    versions->ApproximateSize(approx_opts, version,
+                                              kv.first.Encode(),
+                                              tombstone_end.Encode(), 0, -1,
+                                              TableReaderCaller::kFlush);
+              }
+              last_tombstone_start_user_key = range_del_it->start_key();
+            }
+            range_del_it->Next();
+          }
+        }
+        if (was_skipped) {
+          continue;
+        }
+      }
       s = output_validator.Add(key, value);
       if (!s.ok()) {
         break;
@@ -240,15 +293,26 @@ Status BuildTable(
     }
 
     if (s.ok()) {
-      auto range_del_it = range_del_agg->NewIterator();
-      for (range_del_it->SeekToFirst(); range_del_it->Valid();
-           range_del_it->Next()) {
+      for (; range_del_it->Valid(); range_del_it->Next()) {
         auto tombstone = range_del_it->Tombstone();
         auto kv = tombstone.Serialize();
         builder->Add(kv.first.Encode(), kv.second);
-        meta->UpdateBoundariesForRange(kv.first, tombstone.SerializeEndKey(),
-                                       tombstone.seq_,
-                                       tboptions.internal_comparator);
+        InternalKey tombstone_end = tombstone.SerializeEndKey();
+        meta->UpdateBoundariesForRange(kv.first, tombstone_end, tombstone.seq_,
+                                       icmp);
+        if (version) {
+          if (last_tombstone_start_user_key.empty() ||
+              ucmp->CompareWithoutTimestamp(last_tombstone_start_user_key,
+                                            range_del_it->start_key()) < 0) {
+            SizeApproximationOptions approx_opts;
+            approx_opts.files_size_error_margin = 0.1;
+            meta->compensated_range_deletion_size += versions->ApproximateSize(
+                approx_opts, version, kv.first.Encode(), tombstone_end.Encode(),
+                0 /* start_level */, -1 /* end_level */,
+                TableReaderCaller::kFlush);
+          }
+          last_tombstone_start_user_key = range_del_it->start_key();
+        }
       }
     }
 
@@ -281,7 +345,8 @@ Status BuildTable(
       meta->fd.file_size = file_size;
       meta->marked_for_compaction = builder->NeedCompact();
       assert(meta->fd.GetFileSize() > 0);
-      tp = builder->GetTableProperties(); // refresh now that builder is finished
+      tp = builder
+               ->GetTableProperties();  // refresh now that builder is finished
       if (memtable_payload_bytes != nullptr &&
           memtable_garbage_bytes != nullptr) {
         const CompactionIterationStats& ci_stats = c_iter.iter_stats();

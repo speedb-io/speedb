@@ -3,10 +3,10 @@
 //  COPYING file in the root directory) and Apache 2.0 License
 //  (found in the LICENSE.Apache file in the root directory).
 
-#if !defined(GFLAGS) || defined(ROCKSDB_LITE)
+#if !defined(GFLAGS)
 #include <cstdio>
 int main() {
-  fprintf(stderr, "filter_bench requires gflags and !ROCKSDB_LITE\n");
+  fprintf(stderr, "filter_bench requires gflags\n");
   return 1;
 }
 #else
@@ -168,7 +168,7 @@ struct KeyMaker {
       len += FastRange32(
           (val_num >> FLAGS_vary_key_size_log2_interval) * 1234567891, 5);
     }
-    char * data = buf_.get() + start;
+    char *data = buf_.get() + start;
     // Populate key data such that all data makes it into a key of at
     // least 8 bytes. We also don't want all the within-filter key
     // variance confined to a contiguous 32 bits, because then a 32 bit
@@ -843,4 +843,4 @@ int main(int argc, char **argv) {
   return 0;
 }
 
-#endif  // !defined(GFLAGS) || defined(ROCKSDB_LITE)
+#endif  // !defined(GFLAGS)

@@ -8,11 +8,13 @@
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 
 #include "rocksdb/status.h"
+
 #include <stdio.h>
 #ifdef OS_WIN
 #include <string.h>
 #endif
 #include <cstring>
+
 #include "port/port.h"
 
 #ifdef ROCKSDB_ASSERT_STATUS_CHECKED
@@ -43,9 +45,10 @@ static const char* msgs[static_cast<int>(Status::kMaxSubCode)] = {
     "Insufficient capacity for merge operands",
     // kManualCompactionPaused
     "Manual compaction paused",
-    " (overwritten)",    // kOverwritten, subcode of OK
-    "Txn not prepared",  // kTxnNotPrepared
-    "IO fenced off",     // kIOFenced
+    " (overwritten)",         // kOverwritten, subcode of OK
+    "Txn not prepared",       // kTxnNotPrepared
+    "IO fenced off",          // kIOFenced
+    "Merge operator failed",  // kMergeOperatorFailed
 };
 
 void Status::PrintFailure() {
@@ -76,6 +79,13 @@ Status::Status(Code _code, SubCode _subcode, const Slice& msg,
   }
   result[size] = '\0';  // null terminator for C style string
   state_.reset(result);
+}
+
+Status Status::CopyAppendMessage(const Status& s, const Slice& delim,
+                                 const Slice& msg) {
+  // (No attempt at efficiency)
+  return Status(s.code(), s.subcode(), s.severity(),
+                std::string(s.getState()) + delim.ToString() + msg.ToString());
 }
 
 std::string Status::ToString() const {

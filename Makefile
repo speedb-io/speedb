@@ -36,13 +36,6 @@ STRIPFLAGS = -S -x
 # Set the default DEBUG_LEVEL to 1
 DEBUG_LEVEL?=1
 
-# LIB_MODE says whether or not to use/build "shared" or "static" libraries.
-# Mode "static" means to link against static libraries (.a)
-# Mode "shared" means to link against shared libraries (.so, .sl, .dylib, etc)
-#
-# Set the default LIB_MODE to static
-LIB_MODE?=static
-
 # OBJ_DIR is where the object files reside.  Default to the current directory
 OBJ_DIR?=.
 
@@ -73,29 +66,23 @@ else ifneq ($(filter jtest rocksdbjava%, $(MAKECMDGOALS)),)
 	endif
 endif
 
-$(info $$DEBUG_LEVEL is ${DEBUG_LEVEL})
+# LIB_MODE says whether or not to use/build "shared" or "static" libraries.
+# Mode "static" means to link against static libraries (.a)
+# Mode "shared" means to link against shared libraries (.so, .sl, .dylib, etc)
+#
+ifeq ($(DEBUG_LEVEL), 0)
+# For optimized, set the default LIB_MODE to static for code size/efficiency
+	LIB_MODE?=static
+else
+# For debug, set the default LIB_MODE to shared for efficient `make check` etc.
+	LIB_MODE?=shared
+endif
 
-# Lite build flag.
-LITE ?= 0
-ifeq ($(LITE), 0)
-ifneq ($(filter -DROCKSDB_LITE,$(OPT)),)
-  # Be backward compatible and support older format where OPT=-DROCKSDB_LITE is
-  # specified instead of LITE=1 on the command line.
-  LITE=1
-endif
-else ifeq ($(LITE), 1)
-ifeq ($(filter -DROCKSDB_LITE,$(OPT)),)
-	OPT += -DROCKSDB_LITE
-endif
-endif
+$(info $$DEBUG_LEVEL is $(DEBUG_LEVEL), $$LIB_MODE is $(LIB_MODE))
 
 # Figure out optimize level.
 ifneq ($(DEBUG_LEVEL), 2)
-ifeq ($(LITE), 0)
 	OPTIMIZE_LEVEL ?= -O2
-else
-	OPTIMIZE_LEVEL ?= -Os
-endif
 endif
 # `OPTIMIZE_LEVEL` is empty when the user does not set it and `DEBUG_LEVEL=2`.
 # In that case, the compiler default (`-O0` for gcc and clang) will be used.
@@ -373,13 +360,6 @@ endif
 ifeq ($(PLATFORM), OS_SOLARIS)
 	PLATFORM_CXXFLAGS += -D _GLIBCXX_USE_C99
 endif
-ifneq ($(filter -DROCKSDB_LITE,$(OPT)),)
-	# found
-	CFLAGS += -fno-exceptions
-	CXXFLAGS += -fno-exceptions
-	# LUA is not supported under ROCKSDB_LITE
-	LUA_PATH =
-endif
 
 ifeq ($(LIB_MODE),shared)
 # So that binaries are executable from build location, in addition to install location
@@ -546,7 +526,7 @@ ifneq ($(strip $(FOLLY_PATH)),)
 
 	# Add -ldl at the end as gcc resolves a symbol in a library by searching only in libraries specified later
 	# in the command line
-	PLATFORM_LDFLAGS += $(BOOST_PATH)/lib/libboost_context.a $(BOOST_PATH)/lib/libboost_filesystem.a $(BOOST_PATH)/lib/libboost_atomic.a $(BOOST_PATH)/lib/libboost_program_options.a $(BOOST_PATH)/lib/libboost_regex.a $(BOOST_PATH)/lib/libboost_system.a $(BOOST_PATH)/lib/libboost_thread.a $(DBL_CONV_PATH)/lib/libdouble-conversion.a $(FOLLY_PATH)/lib/libfolly.a $(FMT_LIB_PATH)/libfmt.a $(GLOG_LIB_PATH)/libglog.so $(GFLAGS_PATH)/lib/libgflags.so.2.2 -ldl
+	PLATFORM_LDFLAGS += $(FOLLY_PATH)/lib/libfolly.a $(BOOST_PATH)/lib/libboost_context.a $(BOOST_PATH)/lib/libboost_filesystem.a $(BOOST_PATH)/lib/libboost_atomic.a $(BOOST_PATH)/lib/libboost_program_options.a $(BOOST_PATH)/lib/libboost_regex.a $(BOOST_PATH)/lib/libboost_system.a $(BOOST_PATH)/lib/libboost_thread.a $(DBL_CONV_PATH)/lib/libdouble-conversion.a $(FMT_LIB_PATH)/libfmt.a $(GLOG_LIB_PATH)/libglog.so $(GFLAGS_PATH)/lib/libgflags.so.2.2 $(LIBEVENT_PATH)/lib/libevent-2.1.so -ldl
 	PLATFORM_LDFLAGS += -Wl,-rpath=$(GFLAGS_PATH)/lib -Wl,-rpath=$(GLOG_LIB_PATH) -Wl,-rpath=$(LIBEVENT_PATH)/lib -Wl,-rpath=$(LIBSODIUM_PATH)/lib -Wl,-rpath=$(LIBEVENT_PATH)/lib
 endif
 	PLATFORM_CCFLAGS += -DUSE_FOLLY -DFOLLY_NO_CONFIG
@@ -697,7 +677,7 @@ ifneq ($(filter check-headers, $(MAKECMDGOALS)),)
 # TODO: add/support JNI headers
 	DEV_HEADER_DIRS := $(sort include/ $(dir $(ALL_SOURCES)))
 # Some headers like in port/ are platform-specific
-	DEV_HEADERS := $(shell $(FIND) $(DEV_HEADER_DIRS) -type f -name '*.h' | egrep -v 'port/|plugin/|lua/|range_tree/')
+	DEV_HEADERS := $(shell $(FIND) $(DEV_HEADER_DIRS) -type f -name '*.h' | grep -E -v 'port/|plugin/|lua/|range_tree/')
 else
 	DEV_HEADERS :=
 endif
@@ -978,6 +958,7 @@ OUTPUT_DIR ?= /tmp
 .PHONY: check_0 check_1
 check_0: $(TESTS)
 	$(AM_V_GEN)./build_tools/gtest-parallel --output_dir=$(OUTPUT_DIR) --workers=$(J) --non_gtest_tests $(NON_PARALLEL_TESTS_LIST) $(PARALLEL_TESTS_LIST)
+	find ./build_tools | grep -E "(pycache|__pycache__|\.pyc$$)" | xargs rm -rf
 
 check_1: $(TESTS)
 	$(AM_V_GEN)for t in $(TESTS); do                          \
@@ -989,6 +970,7 @@ valgrind-exclude-regexp = InlineSkipTest.ConcurrentInsert|TransactionStressTest.
 .PHONY: valgrind_check_0 valgrind_check_1
 valgrind_check_0: $(TESTS)
 	$(AM_V_GEN) $(VALGRIND_VER) $(VALGRIND_OPTS) ./build_tools/gtest-parallel --output_dir=$(OUTPUT_DIR) --workers=$(J) --non_gtest_tests $(NON_PARALLEL_TESTS_LIST) $(PARALLEL_TESTS_LIST) 
+	find ./build_tools | grep -E "(pycache|__pycache__|\.pyc$$)" | xargs rm -rf
 
 valgrind_check_1: $(TESTS)
 	$(AM_V_GEN)for t in $(filter-out %skiplist_test options_settable_test,$(TESTS)); do \
@@ -1006,11 +988,9 @@ CLEAN_FILES += t LOG
 check: all $(if $(shell [ "$(J)" != "1" ] && echo 1),check_0,check_1)
 ifneq ($(PLATFORM), OS_AIX)
 	$(PYTHON) tools/check_all_python.py
-ifeq ($(filter -DROCKSDB_LITE,$(OPT)),)
 ifndef ASSERT_STATUS_CHECKED # not yet working with these tests
 	$(PYTHON) tools/ldb_test.py
 	sh tools/rocksdb_dump_test.sh
-endif
 endif
 endif
 ifndef SKIP_FORMAT_BUCK_CHECKS
@@ -1149,9 +1129,9 @@ clean: clean-ext-libraries-all clean-rocks clean-rocksjava
 clean-not-downloaded: clean-ext-libraries-bin clean-rocks clean-not-downloaded-rocksjava
 
 clean-rocks:
-	echo shared=$(ALL_SHARED_LIBS)
-	echo static=$(ALL_STATIC_LIBS)
-	rm -f $(BENCHMARKS) $(TOOLS) $(TESTS) $(PARALLEL_TEST) $(ALL_STATIC_LIBS) $(ALL_SHARED_LIBS) $(MICROBENCHS)
+# Not practical to exactly match all versions/variants in naming (e.g. debug or not)
+	rm -f ${LIBNAME}*.so* ${LIBNAME}*.a
+	rm -f $(BENCHMARKS) $(TOOLS) $(TESTS) $(PARALLEL_TEST) $(MICROBENCHS)
 	rm -rf $(CLEAN_FILES) ios-x86 ios-arm scan_build_report
 	$(FIND) . -name "*.[oda]" -exec rm -f {} \;
 	$(FIND) . -type f \( -name "*.gcda" -o -name "*.gcno" \) -exec rm -f {} \;
@@ -1752,7 +1732,7 @@ memtable_list_test: $(OBJ_DIR)/db/memtable_list_test.o $(TEST_LIBRARY) $(LIBRARY
 write_callback_test: $(OBJ_DIR)/db/write_callback_test.o $(TEST_LIBRARY) $(LIBRARY)
 	$(AM_LINK)
 
-heap_test: $(OBJ_DIR)/util/heap_test.o $(GTEST)
+heap_test: $(OBJ_DIR)/util/heap_test.o $(TEST_LIBRARY) $(LIBRARY)
 	$(AM_LINK)
 
 point_lock_manager_test: utilities/transactions/lock/point/point_lock_manager_test.o $(TEST_LIBRARY) $(LIBRARY)
@@ -1979,7 +1959,7 @@ JAVA_INCLUDE = -I$(JAVA_HOME)/include/ -I$(JAVA_HOME)/include/linux
 ifeq ($(PLATFORM), OS_SOLARIS)
 	ARCH := $(shell isainfo -b)
 else ifeq ($(PLATFORM), OS_OPENBSD)
-	ifneq (,$(filter amd64 ppc64 ppc64le s390x arm64 aarch64 sparc64, $(MACHINE)))
+	ifneq (,$(filter amd64 ppc64 ppc64le s390x arm64 aarch64 sparc64 loongarch64, $(MACHINE)))
 		ARCH := 64
 	else
 		ARCH := 32
@@ -2000,7 +1980,7 @@ ifneq ($(origin JNI_LIBC), undefined)
 endif
 
 ifeq (,$(JNILIBNAME))
-ifneq (,$(filter ppc% s390x arm64 aarch64 sparc64, $(MACHINE)))
+ifneq (,$(filter ppc% s390x arm64 aarch64 sparc64 loongarch64, $(MACHINE)))
 	JNILIBNAME = lib$(PROJECT_NAME)jni-linux-$(MACHINE)$(JNI_LIBC_POSTFIX).so
 else
 	JNILIBNAME = lib$(PROJECT_NAME)jni-linux$(ARCH)$(JNI_LIBC_POSTFIX).so
@@ -2398,18 +2378,6 @@ build_size:
 	$(REPORT_BUILD_STATISTIC) $(PROJECT_NAME).build_size.shared_lib $$(stat --printf="%s" `readlink $(LIBNAME).$(PLATFORM_SHARED_EXT)`)
 	strip -x `readlink $(LIBNAME).$(PLATFORM_SHARED_EXT)`
 	$(REPORT_BUILD_STATISTIC) $(PROJECT_NAME).build_size.shared_lib_stripped $$(stat --printf="%s" `readlink $(LIBNAME).$(PLATFORM_SHARED_EXT)`)
-	# === lite build, static ===
-	$(MAKE) clean
-	$(MAKE) LITE=1 static_lib
-	$(REPORT_BUILD_STATISTIC) $(PROJECT_NAME).build_size.static_lib_lite $$(stat --printf="%s" $(LIBNAME).$(PLATFORM_SHARED_EXT))
-	strip -x $(LIBNAME).a
-	$(REPORT_BUILD_STATISTIC) $(PROJECT_NAME).build_size.static_lib_lite_stripped $$(stat --printf="%s" $(LIBNAME).$(PLATFORM_SHARED_EXT))
-	# === lite build, shared ===
-	$(MAKE) clean
-	$(MAKE) LITE=1 shared_lib
-	$(REPORT_BUILD_STATISTIC) $(PROJECT_NAME).build_size.shared_lib_lite $$(stat --printf="%s" `readlink $(LIBNAME).$(PLATFORM_SHARED_EXT)`)
-	strip -x `readlink $(LIBNAME).$(PLATFORM_SHARED_EXT)`
-	$(REPORT_BUILD_STATISTIC) $(PROJECT_NAME).build_size.shared_lib_lite_stripped $$(stat --printf="%s" `readlink $(LIBNAME).$(PLATFORM_SHARED_EXT)`)
 
 # ---------------------------------------------------------------------------
 #  	Platform-specific compilation

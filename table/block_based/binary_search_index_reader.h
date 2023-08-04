@@ -20,6 +20,7 @@ class BinarySearchIndexReader : public BlockBasedTable::IndexReaderCommon {
   // On success, index_reader will be populated; otherwise it will remain
   // unmodified.
   static Status Create(const BlockBasedTable* table, const ReadOptions& ro,
+                       const TablePinningOptions& tpo,
                        FilePrefetchBuffer* prefetch_buffer, bool use_cache,
                        bool prefetch, bool pin,
                        BlockCacheLookupContext* lookup_context,
@@ -42,7 +43,8 @@ class BinarySearchIndexReader : public BlockBasedTable::IndexReaderCommon {
 
  private:
   BinarySearchIndexReader(const BlockBasedTable* t,
-                          CachableEntry<Block>&& index_block)
-      : IndexReaderCommon(t, std::move(index_block)) {}
+                          CachableEntry<Block>&& index_block,
+                          std::unique_ptr<PinnedEntry>&& pinned)
+      : IndexReaderCommon(t, std::move(index_block), std::move(pinned)) {}
 };
 }  // namespace ROCKSDB_NAMESPACE

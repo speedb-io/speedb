@@ -8,7 +8,6 @@ on:  # this workflow is planned to be called by the ci_pipeline and it will comp
 
 jobs:
   changedfiles:
-    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     outputs:
       output1: ${{ steps.changes.outputs.diff_list }}
@@ -29,7 +28,6 @@ jobs:
         run: |
           echo "New files in this PR ${{ steps.changes.outputs.diff_list }}"
   lint:
-    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     needs: changedfiles
     env: 

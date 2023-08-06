@@ -107,5 +107,5 @@ jobs:
     uses: ./.github/workflows/test_fuzz.yml
 
   Check-Licence-And-History:
-    if: ${{  github.event_name == 'pull_request' }}
+    if: ${{  github.event_name == 'pull_request_review' }}
     uses: ./.github/workflows/check_license_and_history.yml

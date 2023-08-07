@@ -1313,7 +1313,6 @@ Status DBImpl::SetCFOptionsImpl(
   LogFlush(immutable_db_options_.info_log);
   return s;
 }
-#endif  // ROCKSDB_LITE
 
 Status DBImpl::SetDBOptions(
     const std::unordered_map<std::string, std::string>& options_map) {

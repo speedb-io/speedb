@@ -3,7 +3,6 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import argparse
-import datetime
 
 import os
 import random
@@ -732,7 +731,7 @@ def finalize_and_sanitize(src_params, counter):
         dest_params["readpercent"] += dest_params.get("iterpercent", 0)
         dest_params["iterpercent"] = 0
     if dest_params.get("prefix_size") == -1:
-        dest_params["readpercent"] += dest_params.get("prefixpercent", 0)
+        dest_params["readpercent"] += dest_params.get("prefixpercent", 20)
         dest_params["prefixpercent"] = 0
     if (
         dest_params.get("prefix_size") == -1
@@ -767,15 +766,6 @@ def finalize_and_sanitize(src_params, counter):
     if dest_params.get("filter_uri") != "":
         dest_params["bloom_bits"] = random.choice([random.randint(1,19),
                                          random.lognormvariate(2.3, 1.3)])
-
-    # make sure bloom_bits is not 0 when filter_uri is used since it fails in CreateFilterPolicy.
-    if dest_params.get("filter_uri") != "":
-        dest_params["bloom_bits"] = random.choice([random.randint(1,19),
-                                         random.lognormvariate(2.3, 1.3)])
-
-    # If initiate_wbm_flushes is enabled, db_write_buffer_size must be > 0, otherwise db_stress crashes 
-    if dest_params.get("initiate_wbm_flushes") == 1:
-      dest_params["db_write_buffer_size"]= random.choice([1024 * 1024, 8 * 1024 * 1024, 128 * 1024 * 1024, 1024 * 1024 * 1024])
 
     return dest_params
 
@@ -894,70 +884,6 @@ def execute_cmd(cmd, timeout):
         outs, errs = child.communicate()
 
     return hit_timeout, child.returncode, outs.decode("utf-8"), errs.decode("utf-8")
-
-
-# old copy of the db is kept at same src dir as new db. 
-def copy_tree_and_remove_old(counter, dbname):
-    dest = dbname + "_" + str(counter)
-    shutil.copytree(dbname, dest)
-    shutil.copytree(expected_values_dir, dest + "/" + "expected_values_dir")
-    old_db = dbname + "_" + str(counter - 2)
-    if counter > 1:
-        shutil.rmtree(old_db, True)
-
-
-def gen_narrow_cmd_params(args):
-    params = {}
-    params.update(narrow_params)
-    # add these to avoid a key error in finalize_and_sanitize
-    params["mmap_read"] = 0
-    params["use_direct_io_for_flush_and_compaction"] = 0
-    params["partition_filters"] = 0
-    params["use_direct_reads"] = 0
-    params["user_timestamp_size"] = 0
-    params["ribbon_starting_level"] = 0
-    params["secondary_cache_uri"] = ""
-
-    for k, v in vars(args).items():
-        if v is not None:
-            params[k] = v
-            
-    return params
-
-
-def narrow_crash_main(args, unknown_args):
-    cmd_params = gen_narrow_cmd_params(args)
-    dbname = get_dbname('narrow')
-    exit_time = time.time() + cmd_params['duration']
-    
-    store_ops_supplied(cmd_params)
-
-    print("Running narrow-crash-test\n")
-    
-    counter = 0
-    
-    while time.time() < exit_time:
-        randomize_operation_type_percentages(cmd_params)
-        cmd = gen_cmd(dict(cmd_params, **{'db': dbname}), unknown_args, counter)
-
-        hit_timeout, retcode, outs, errs = execute_cmd(cmd, cmd_params['duration'])
-        copy_tree_and_remove_old(counter, dbname)
-        counter += 1
-
-        for line in errs.splitlines():
-            if line and not line.startswith('WARNING'):
-                run_had_errors = True
-                print('stderr has error message:')
-                print('***' + line + '***')
-        
-        if retcode != 0:
-            raise SystemExit('TEST FAILED. See kill option and exit code above!!!\n')
-
-        time.sleep(2)  # time to stabilize before the next run
-
-    shutil.rmtree(dbname, True)
-    for ctr in range(max(0, counter - 2), counter):
-        shutil.rmtree('{}_{}'.format(dbname, ctr), True)
 
 
 # old copy of the db is kept at same src dir as new db. 

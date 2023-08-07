@@ -493,20 +493,6 @@ class ColumnFamilyTestBase : public testing::Test {
     return divider;
   }
 
-  double CalculateWriteDelayDivider(
-      ColumnFamilyData* cfd, uint64_t compaction_needed_bytes,
-      const MutableCFOptions& mutable_cf_options) {
-    // add lock to guard current_ (*Version)
-    ROCKSDB_NAMESPACE::ColumnFamilyData::WriteStallCause write_stall_cause =
-        ROCKSDB_NAMESPACE::ColumnFamilyData::WriteStallCause::kNone;
-
-    dbfull()->TEST_LockMutex();
-    double divider = cfd->TEST_CalculateWriteDelayDivider(
-        compaction_needed_bytes, mutable_cf_options, write_stall_cause);
-    dbfull()->TEST_UnlockMutex();
-    return divider;
-  }
-
   std::vector<ColumnFamilyHandle*> handles_;
   std::vector<std::string> names_;
   std::vector<std::set<std::string>> keys_;

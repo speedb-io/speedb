@@ -137,14 +137,6 @@ Status TableCache::GetTableReader(
     } else {
       expected_unique_id = kNullUniqueId64x2;  // null ID == no verification
     }
-    TableReaderOptions table_reader_options(
-        ioptions_, prefix_extractor, file_options, internal_comparator,
-        skip_filters, immortal_tables_, false /* force_direct_prefetch */,
-        level, block_cache_tracer_, max_file_size_for_l0_meta_pin,
-        db_session_id_, file_meta.fd.GetNumber(), expected_unique_id,
-        file_meta.fd.largest_seqno);
-    table_reader_options.cache_owner_id = cache_owner_id_;
-
     s = ioptions_.table_factory->NewTableReader(
         ro,
         TableReaderOptions(ioptions_, prefix_extractor, file_options,

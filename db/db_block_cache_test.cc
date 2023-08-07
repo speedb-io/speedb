@@ -35,12 +35,6 @@
 
 namespace ROCKSDB_NAMESPACE {
 
-namespace {
-const std::vector<CacheEntryRole> CacheCfStatsRoles{
-    CacheEntryRole::kDataBlock, CacheEntryRole::kFilterBlock,
-    CacheEntryRole::kIndexBlock};
-}
-
 class DBBlockCacheTest : public DBTestBase {
  private:
   size_t miss_count_ = 0;
@@ -973,10 +967,7 @@ static void ClearCache(Cache* cache) {
       // Keep the stats collector
       return;
     }
-    if ((owner_id_to_clear == Cache::kUnknownItemId) ||
-        (item_owner_id == owner_id_to_clear)) {
-      keys.push_back(key.ToString());
-    }
+    keys.push_back(key.ToString());
   };
   cache->ApplyToAllEntries(callback, opts);
   for (auto& k : keys) {
@@ -1039,7 +1030,7 @@ TEST_F(DBBlockCacheTest, CacheEntryRoleStats) {
       std::array<size_t, kNumCacheEntryRoles> expected{};
       // For CacheEntryStatsCollector
       expected[static_cast<size_t>(CacheEntryRole::kMisc)] = 1;
-      CALL_WRAPPER(ValidateCacheStats(cache, expected));
+      EXPECT_EQ(expected, GetCacheEntryRoleCountsBg());
       std::array<size_t, kNumCacheEntryRoles> prev_expected = expected;
 
       // First access only filters
@@ -1049,13 +1040,13 @@ TEST_F(DBBlockCacheTest, CacheEntryRoleStats) {
         expected[static_cast<size_t>(CacheEntryRole::kFilterMetaBlock)] += 2;
       }
       // Within some time window, we will get cached entry stats
-      CALL_WRAPPER(ValidateCacheStats(cache, prev_expected));
+      EXPECT_EQ(prev_expected, GetCacheEntryRoleCountsBg());
       // Not enough to force a miss
       env_->MockSleepForSeconds(45);
-      CALL_WRAPPER(ValidateCacheStats(cache, prev_expected));
+      EXPECT_EQ(prev_expected, GetCacheEntryRoleCountsBg());
       // Enough to force a miss
       env_->MockSleepForSeconds(601);
-      CALL_WRAPPER(ValidateCacheStats(cache, expected));
+      EXPECT_EQ(expected, GetCacheEntryRoleCountsBg());
 
       // Now access index and data block
       ASSERT_EQ("value", Get("foo"));
@@ -1077,7 +1068,7 @@ TEST_F(DBBlockCacheTest, CacheEntryRoleStats) {
             env_->MockSleepForSeconds(20);
           });
       SyncPoint::GetInstance()->EnableProcessing();
-      CALL_WRAPPER(ValidateCacheStats(cache, expected));
+      EXPECT_EQ(expected, GetCacheEntryRoleCountsBg());
       prev_expected = expected;
       SyncPoint::GetInstance()->DisableProcessing();
       SyncPoint::GetInstance()->ClearAllCallBacks();
@@ -1093,10 +1084,10 @@ TEST_F(DBBlockCacheTest, CacheEntryRoleStats) {
       // Because of the simulated long scan, this is not enough to force
       // a miss
       env_->MockSleepForSeconds(601);
-      CALL_WRAPPER(ValidateCacheStats(cache, prev_expected));
+      EXPECT_EQ(prev_expected, GetCacheEntryRoleCountsBg());
       // But this is enough
       env_->MockSleepForSeconds(10000);
-      CALL_WRAPPER(ValidateCacheStats(cache, expected));
+      EXPECT_EQ(expected, GetCacheEntryRoleCountsBg());
       prev_expected = expected;
 
       // Also check the GetProperty interface
@@ -1156,11 +1147,11 @@ TEST_F(DBBlockCacheTest, CacheEntryRoleStats) {
       // For Fill-it-up
       expected[static_cast<size_t>(CacheEntryRole::kMisc)]++;
       // Still able to hit on saved stats
-      CALL_WRAPPER(ValidateCacheStats(cache, prev_expected));
-
+      EXPECT_EQ(prev_expected, GetCacheEntryRoleCountsBg());
       // Enough to force a miss
       env_->MockSleepForSeconds(1000);
-      CALL_WRAPPER(ValidateCacheStats(cache, expected));
+      EXPECT_EQ(expected, GetCacheEntryRoleCountsBg());
+
       cache->Release(h);
 
       // Now we test that the DB mutex is not held during scans, for the ways
@@ -1340,90 +1331,6 @@ TEST_F(DBBlockCacheTest, HyperClockCacheReportProblems) {
   DummyFillCache(*cache, value_size_est * 20, handles);
   dbfull()->DumpStats();
   EXPECT_EQ(logger->PopCounts(), (std::array<int, 3>{{0, 1, 0}}));
-}
-
-TEST_F(DBBlockCacheTest, ItemIdAllocation) {
-  const size_t capacity = size_t{1} << 25;
-  auto cache{NewLRUCache(capacity)};
-
-  size_t max_num_ids = Cache::kMaxOwnerItemId - Cache::kMinOwnerItemId + 1;
-  auto expected_num_free_ids = max_num_ids;
-
-  // Allocate 10 id-s
-  auto expected_next_id = Cache::kMinOwnerItemId;
-  for (auto i = 0U; i < 10U; ++i) {
-    ASSERT_EQ(cache->GetNextItemOwnerId(), expected_next_id);
-    ++expected_next_id;
-    --expected_num_free_ids;
-  }
-  --expected_next_id;
-
-  // Release all 10 allocated id-s in reverse order
-  Cache::ItemOwnerId to_discard_id = expected_next_id;
-  for (auto i = 0U; i < 10U; ++i) {
-    auto temp = to_discard_id;
-    cache->DiscardItemOwnerId(&temp);
-    ASSERT_EQ(temp, Cache::kUnknownItemId);
-
-    ASSERT_GT(to_discard_id, 0U);
-    --to_discard_id;
-    ++expected_num_free_ids;
-  }
-
-  // Allocate 10 id-s and expect to get the id-s from the free list
-  // in the reverse order
-  ASSERT_EQ(expected_next_id, Cache::kMinOwnerItemId + 9U);
-  for (auto i = 0U; i < 10U; ++i) {
-    ASSERT_EQ(cache->GetNextItemOwnerId(), expected_next_id);
-    ASSERT_GT(expected_next_id, 0U);
-    --expected_next_id;
-    --expected_num_free_ids;
-  }
-
-  ASSERT_EQ(expected_num_free_ids, max_num_ids - 10U);
-
-  // Free list should now be empty
-  // Exhaust all of the id-s before wrap around
-  expected_next_id = Cache::kMinOwnerItemId + 10U;
-  while (expected_num_free_ids > 0U) {
-    ASSERT_EQ(cache->GetNextItemOwnerId(), expected_next_id);
-    ++expected_next_id;
-    --expected_num_free_ids;
-  }
-
-  // Expecting next allocations to fail
-  for (auto i = 0U; i < 5U; ++i) {
-    ASSERT_EQ(cache->GetNextItemOwnerId(), Cache::kUnknownItemId);
-  }
-
-  // Free some arbitrary id-s
-  Cache::ItemOwnerId owner_id = 5000U;
-  cache->DiscardItemOwnerId(&owner_id);
-  owner_id = 1000;
-  cache->DiscardItemOwnerId(&owner_id);
-  owner_id = 3000;
-  cache->DiscardItemOwnerId(&owner_id);
-
-  // Expect allocations to return id-s in the same order as freed
-  ASSERT_EQ(cache->GetNextItemOwnerId(), 5000);
-  ASSERT_EQ(cache->GetNextItemOwnerId(), 1000);
-  ASSERT_EQ(cache->GetNextItemOwnerId(), 3000);
-
-  // All id-s exhausted again
-  ASSERT_EQ(cache->GetNextItemOwnerId(), Cache::kUnknownItemId);
-
-  // Verify the max size of the free list
-  for (auto i = 0U; i < 2 * Cache::kMaxFreeItemOwnersIdListSize; ++i) {
-    owner_id = Cache::kMinOwnerItemId + i;
-    cache->DiscardItemOwnerId(&owner_id);
-  }
-
-  for (auto i = 0U; i < Cache::kMaxFreeItemOwnersIdListSize; ++i) {
-    ASSERT_EQ(cache->GetNextItemOwnerId(), Cache::kMinOwnerItemId + i);
-  }
-
-  // All id-s exhausted again
-  ASSERT_EQ(cache->GetNextItemOwnerId(), Cache::kUnknownItemId);
 }
 
 class DBBlockCacheKeyTest

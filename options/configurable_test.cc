@@ -850,7 +850,6 @@ TEST_F(ConfigurableTest, OptionsAddrOffsetTest) {
   ASSERT_EQ(cto->s, "T");
   ASSERT_EQ(cto->u, "X");
 }
-#endif
 
 static std::unordered_map<std::string, ConfigTestFactoryFunc> TestFactories = {
     {"Simple", []() { return SimpleConfigurable::Create("simple"); }},

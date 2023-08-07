@@ -63,9 +63,8 @@ class LRUCacheTest : public testing::Test {
                              nullptr /*handle*/, priority));
   }
 
-  void Insert(char key, Cache::Priority priority = Cache::Priority::LOW,
-              Cache::ItemOwnerId item_owner_id = Cache::kUnknownItemId) {
-    Insert(std::string(1, key), priority, item_owner_id);
+  void Insert(char key, Cache::Priority priority = Cache::Priority::LOW) {
+    Insert(std::string(1, key), priority);
   }
 
   bool Lookup(const std::string& key) {

@@ -10,11 +10,9 @@
 
 #pragma once
 
-#include <array>
 #include <map>
 #include <memory>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "cache/cache_entry_roles.h"
@@ -480,14 +478,6 @@ class InternalStats {
     uint32_t copies_of_last_collection = 0;
     uint64_t last_start_time_micros_ = 0;
     uint64_t last_end_time_micros_ = 0;
-    // Mapping of the total charge of all items per owner
-    bool charge_per_item_owner_supported = false;
-    // Instances of this class are created per cf, but cache stats collection
-    // is expensive and cf-agnostic anyway. Therefore, we store the values
-    // for all cf-s in every instance.
-    std::unordered_map<Cache::ItemOwnerId,
-                       std::array<size_t, kNumCacheEntryRoles>>
-        charge_per_item_owner;
 
     void Clear() {
       // Wipe everything except collection_count
@@ -506,12 +496,6 @@ class InternalStats {
     std::string ToString(SystemClock* clock) const;
     void ToMap(std::map<std::string, std::string>* values,
                SystemClock* clock) const;
-
-    std::string CacheOwnerStatsToString(const std::string& cf_name,
-                                        Cache::ItemOwnerId cache_owner_id);
-    void CacheOwnerStatsToMap(const std::string& cf_name,
-                              Cache::ItemOwnerId cache_owner_id,
-                              std::map<std::string, std::string>* values) const;
 
    private:
     uint64_t GetLastDurationMicros() const;

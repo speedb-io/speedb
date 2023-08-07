@@ -20,7 +20,6 @@
 #include "db/table_properties_collector.h"
 #include "db/write_batch_internal.h"
 #include "options/cf_options.h"
-#include "rocksdb/cache.h"
 #include "rocksdb/compaction_job_stats.h"
 #include "rocksdb/db.h"
 #include "rocksdb/env.h"
@@ -806,8 +805,6 @@ class ColumnFamilySet {
   std::shared_ptr<IOTracer> io_tracer_;
   const std::string& db_id_;
   std::string db_session_id_;
-
-  std::unordered_map<uint32_t, uint64_t> cf_id_to_write_rate_;
 };
 
 // A wrapper for ColumnFamilySet that supports releasing DB mutex during each

@@ -90,8 +90,6 @@ struct TableReaderOptions {
 
   // Known unique_id or {}, kNullUniqueId64x2 means unknown
   UniqueId64x2 unique_id;
-
-  Cache::ItemOwnerId cache_owner_id = Cache::kUnknownItemId;
 };
 
 struct TableBuilderOptions {

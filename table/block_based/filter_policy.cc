@@ -1842,11 +1842,6 @@ double FilterPolicy::ExtractBitsPerKeyFromUri(const std::string& uri) {
   return ParseDouble(vals[1]);
 }
 
-double FilterPolicy::ExtractBitsPerKeyFromUri(const std::string& uri) {
-  const std::vector<std::string> vals = StringSplit(uri, ':');
-  return ParseDouble(vals[1]);
-}
-
 Status FilterPolicy::CreateFromString(
     const ConfigOptions& options, const std::string& value,
     std::shared_ptr<const FilterPolicy>* policy) {

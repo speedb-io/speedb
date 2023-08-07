@@ -159,54 +159,6 @@ DEFINE_string(
     "3.Some additional flags may only be set for the master group (e.g., "
     "env-related flags).\n");
 
-namespace ROCKSDB_NAMESPACE {
-// Forward Declaration
-class Benchmark;
-}  // namespace ROCKSDB_NAMESPACE
-
-namespace {
-// The benchmark needs to be created before running the first group, retained
-// between groups, and destroyed after running the last group
-std::unique_ptr<ROCKSDB_NAMESPACE::Benchmark> benchmark;
-
-int ErrorExit(const char* format, ...) {
-  std::string extended_format = std::string("\nERROR: ") + format + "\n";
-  va_list arglist;
-  va_start(arglist, format);
-  vfprintf(stderr, extended_format.c_str(), arglist);
-  va_end(arglist);
-
-  benchmark.reset();
-  exit(1);
-}
-
-}  // namespace
-
-// The groups flags is NOT a standard GFLAGS flag. It is a special flag that is
-// used to indicate that the tool is run in a multiple-groups mode (see the help
-// description for the flag for more details). It is defined using GFLAGS
-// definition syntax so it is included in GFLAGS' automatic help generation.
-DEFINE_string(
-    groups, "",
-    "Run db_bench in benchmark groups mode (The default is single-group mode). "
-    "\n\n=====> IMPORTANT: '-groups' MUST BE THE SECOND ARGUMENT !!!!. \n\n"
-    "In this mode benchmarks are grouped, and each group has its own "
-    "configuration. "
-    "The first group is the MASTER group. This group sets the "
-    "initial configuration for all subsequent groups. Subsequent "
-    "groups may override the initial configuration."
-    "\n\nSyntax: ./db_bench -groups '<group1>' '<group2>' '<group3>' ...  \n\n"
-    "Each group consists of valid db_bench flags, and, most likely, a set of "
-    "benchmarks to run as part of that group. "
-    "\n\nNotes:\n"
-    "1.DB-s are opened when running the master group. They stay open in "
-    "subsequent groups, as long as not recreated as a result of a benchmark "
-    "requiring a fresh db.\n"
-    "2.DB options may only be configured during the running of the master "
-    "group. Attempting to override them later is SILENTLY ignored.\n"
-    "3.Some additional flags may only be set for the master group (e.g., "
-    "env-related flags).\n");
-
 DEFINE_string(
     benchmarks,
     "fillseq,"

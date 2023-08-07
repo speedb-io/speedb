@@ -684,7 +684,6 @@ InternalStats::CacheEntryRoleStats::GetEntryCallback() {
         static_cast<size_t>(helper ? helper->role : CacheEntryRole::kMisc);
     entry_counts[role_idx]++;
     total_charges[role_idx] += charge;
-    charge_per_item_owner[item_owner_id][role_idx] += charge;
   };
 }
 
@@ -701,8 +700,6 @@ void InternalStats::CacheEntryRoleStats::BeginCollection(
   cache_usage = cache->GetUsage();
   table_size = cache->GetTableAddressCount();
   occupancy = cache->GetOccupancyCount();
-  // Currently only LRUCache supports this feature
-  charge_per_item_owner_supported = (cache->Name() == std::string("LRUCache"));
 }
 
 void InternalStats::CacheEntryRoleStats::EndCollection(
@@ -744,41 +741,6 @@ std::string InternalStats::CacheEntryRoleStats::ToString(
     }
   }
   str << "\n";
-  return str.str();
-}
-
-std::string InternalStats::CacheEntryRoleStats::CacheOwnerStatsToString(
-    const std::string& cf_name, Cache::ItemOwnerId cache_owner_id) {
-  if (charge_per_item_owner_supported == false) {
-    return "";
-  }
-
-  std::ostringstream str;
-  const auto& cf_charges_per_role_pos =
-      charge_per_item_owner.find(cache_owner_id);
-
-  std::vector<CacheEntryRole> roles{CacheEntryRole::kDataBlock,
-                                    CacheEntryRole::kFilterBlock,
-                                    CacheEntryRole::kIndexBlock};
-  std::array<size_t, kNumCacheEntryRoles> roles_total_charge{};
-
-  str << "Block cache [" << cf_name << "] ";
-
-  if (cf_charges_per_role_pos != charge_per_item_owner.end()) {
-    const std::array<size_t, kNumCacheEntryRoles>& cf_charges_per_role =
-        cf_charges_per_role_pos->second;
-    for (auto role : roles) {
-      auto role_idx = static_cast<unsigned int>(role);
-      roles_total_charge[role_idx] = cf_charges_per_role[role_idx];
-    }
-  }
-
-  for (auto role : roles) {
-    auto role_idx = static_cast<unsigned int>(role);
-    str << " " << kCacheEntryRoleToCamelString[role_idx] << "("
-        << BytesToHumanString(roles_total_charge[role_idx]) << ")";
-  }
-  str << '\n';
   return str.str();
 }
 
@@ -2099,8 +2061,6 @@ void InternalStats::DumpCFStatsNoFileHistogram(bool is_periodic,
     // Skip if stats are extremely old (> 1 day, incl not yet populated)
     if (now_micros - stats.last_end_time_micros_ < kDayInMicros) {
       value->append(stats.ToString(clock_));
-      value->append(stats.CacheOwnerStatsToString(cfd_->GetName(),
-                                                  cfd_->GetCacheOwnerId()));
     }
   }
 }

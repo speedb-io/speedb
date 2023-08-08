@@ -132,7 +132,7 @@ Status Configurable::ConfigureOptions(
     const ConfigOptions& config_options,
     const std::unordered_map<std::string, std::string>& opts_map,
     std::unordered_map<std::string, std::string>* unused) {
-  std::string curr_opts;
+  std::unordered_map<std::string, std::string> curr_opts;
   Status s;
   if (!opts_map.empty()) {
     // There are options in the map.
@@ -145,8 +145,8 @@ Status Configurable::ConfigureOptions(
       // If we are not ignoring unused, get the defaults in case we need to
       // reset
       copy.depth = ConfigOptions::kDepthDetailed;
-      copy.delimiter = "; ";
-      GetOptionString(copy, &curr_opts).PermitUncheckedError();
+      ConfigurableHelper::SerializeOptions(copy, *this, &curr_opts)
+          .PermitUncheckedError();
     }
 
     s = ConfigurableHelper::ConfigureOptions(copy, *this, opts_map, unused);
@@ -160,7 +160,7 @@ Status Configurable::ConfigureOptions(
     reset.invoke_prepare_options = true;
     reset.ignore_unsupported_options = true;
     // There are some options to reset from this current error
-    ConfigureFromString(reset, curr_opts).PermitUncheckedError();
+    ConfigureFromMap(reset, curr_opts).PermitUncheckedError();
   }
   return s;
 }

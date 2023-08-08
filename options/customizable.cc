@@ -7,6 +7,7 @@
 
 #include <sstream>
 
+#include "options/configurable_helper.h"
 #include "options/options_helper.h"
 #include "port/port.h"
 #include "rocksdb/convenience.h"
@@ -94,14 +95,11 @@ Status Customizable::GetOptionsMap(
     if (status.ok() && customizable->IsInstanceOf(*id)) {
       // The new ID and the old ID match, so the objects are the same type.
       // Try to get the existing options, ignoring any errors
-      ConfigOptions embedded = config_options;
-      embedded.delimiter = ";";
-      std::string curr_opts;
-      if (customizable->GetOptionString(embedded, &curr_opts).ok()) {
-        std::unordered_map<std::string, std::string> curr_props;
-        if (StringToMap(curr_opts, &curr_props).ok()) {
-          props->insert(curr_props.begin(), curr_props.end());
-        }
+      std::unordered_map<std::string, std::string> curr_opts;
+      if (ConfigurableHelper::SerializeOptions(config_options, *customizable,
+                                               &curr_opts)
+              .ok()) {
+        props->insert(curr_opts.begin(), curr_opts.end());
       }
     }
   } else {

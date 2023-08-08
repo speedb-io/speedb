@@ -614,8 +614,8 @@ ColumnFamilyOptions* ColumnFamilyOptions::EnableSpeedbFeaturesCF(
   auto db_wbf_size = shared_options.write_buffer_manager->buffer_size();
   // cf write_buffer_size
   write_buffer_size = std::min<size_t>(db_wbf_size / 4, 64ul << 20);
-  max_write_buffer_number = 32;
-  min_write_buffer_number_to_merge = max_write_buffer_number - 1;
+  max_write_buffer_number = 4;
+  min_write_buffer_number_to_merge = 1;
   // set the pinning option for indexes and filters
   {
     ConfigOptions config_options;

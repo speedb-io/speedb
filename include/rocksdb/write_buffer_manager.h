@@ -61,15 +61,18 @@ class WriteBufferManager final {
 
   struct FlushInitiationOptions {
     static constexpr size_t kDfltMaxNumParallelFlushes = 4U;
+    static constexpr size_t kDfltStartFlushesPercent = 40U;
 
     FlushInitiationOptions() {}
 
-    FlushInitiationOptions(size_t _max_num_parallel_flushes)
-        : max_num_parallel_flushes(_max_num_parallel_flushes) {}
+    FlushInitiationOptions(size_t _max_num_parallel_flushes, size_t _start_flushes_percent)
+        : max_num_parallel_flushes(_max_num_parallel_flushes),
+          start_flushes_percent(_start_flushes_percent) {}
 
     FlushInitiationOptions Sanitize() const;
 
     size_t max_num_parallel_flushes = kDfltMaxNumParallelFlushes;
+    size_t start_flushes_percent = kDfltStartFlushesPercent;
   };
 
   static constexpr bool kDfltAllowStall = false;

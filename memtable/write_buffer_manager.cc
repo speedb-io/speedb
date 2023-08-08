@@ -29,7 +29,12 @@ auto WriteBufferManager::FlushInitiationOptions::Sanitize() const
     sanitized_max_num_parallel_flushes = kDfltMaxNumParallelFlushes;
   }
 
-  return FlushInitiationOptions(sanitized_max_num_parallel_flushes);
+  size_t sanitized_start_flushes_percent = start_flushes_percent;
+  if (sanitized_start_flushes_percent > 100 ) {
+    sanitized_start_flushes_percent = kDfltInitiateFlushes;
+  }
+
+  return FlushInitiationOptions(sanitized_max_num_parallel_flushes, sanitized_start_flushes_percent);
 }
 
 WriteBufferManager::WriteBufferManager(
@@ -315,6 +320,14 @@ std::string WriteBufferManager::GetPrintableOptions() const {
            "wbm.initiate_flushes", IsInitiatingFlushes());
   ret.append(buffer);
 
+  snprintf(buffer, kBufferSize, "%*s: %d\n", field_width,
+           "wbm.max_num_parallel_flushes", (int)flush_initiation_options_.max_num_parallel_flushes);
+  ret.append(buffer);
+
+  snprintf(buffer, kBufferSize, "%*s: %d\n", field_width,
+           "wbm.start_flushes_percent", (int)flush_initiation_options_.start_flushes_percent);
+  ret.append(buffer);
+
   return ret;
 }
 
@@ -597,9 +610,9 @@ void WriteBufferManager::InitFlushInitiationVars(size_t quota) {
   {
     InstrumentedMutexLock lock(flushes_mu_.get());
     additional_flush_step_size_ =
-        quota * kStartFlushPercentThreshold / 100 /
-        flush_initiation_options_.max_num_parallel_flushes;
-    flush_initiation_start_size_ = additional_flush_step_size_;
+        quota * (100 - flush_initiation_options_.start_flushes_percent) / 100 /
+        flush_initiation_options_.max_num_parallel_flushes;    
+    flush_initiation_start_size_ = (quota * flush_initiation_options_.start_flushes_percent) / 100;
     min_mutable_flush_size_ = std::min<size_t>(
         quota / (2 * flush_initiation_options_.max_num_parallel_flushes),
         64 * (1 << 20));

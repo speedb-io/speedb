@@ -558,9 +558,15 @@ DEFINE_bool(initiate_wbm_flushes,
 DEFINE_uint32(max_num_parallel_flushes,
               ROCKSDB_NAMESPACE::WriteBufferManager::FlushInitiationOptions::
                   kDfltMaxNumParallelFlushes,
-              "In case FLAGGS_initiate_wbm_flushes is true, this flag will "
+              "In case FLAGS_initiate_wbm_flushes is true, this flag will "
               "overwrite the default "
               "max number of parallel flushes.");
+
+DEFINE_uint32(start_wbm_flushes_percent,
+              ROCKSDB_NAMESPACE::WriteBufferManager::FlushInitiationOptions::kDfltStartFlushesPercent,
+              "In case FLAGS_initiate_wbm_flushes is true, this flag will "
+              "overwrite the default "
+              "start proactive flushes percent.");
 
 DEFINE_uint32(
     start_delay_percent,
@@ -4967,6 +4973,12 @@ class Benchmark {
       flush_initiation_options.max_num_parallel_flushes =
           FLAGS_max_num_parallel_flushes;
     }
+
+    if (FLAGS_start_wbm_flushes_percent > 0U) {
+      flush_initiation_options.start_flushes_percent =
+          FLAGS_start_wbm_flushes_percent;
+    }
+    
     if (options.write_buffer_manager == nullptr) {
       if (FLAGS_cost_write_buffer_to_cache) {
         options.write_buffer_manager.reset(new WriteBufferManager(

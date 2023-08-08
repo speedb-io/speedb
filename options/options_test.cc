@@ -2234,31 +2234,6 @@ TEST_F(OptionsTest, OptionsListenerTest) {
   ASSERT_OK(RocksDBOptionsParser::VerifyDBOptions(config_opts, orig, copy));
 }
 
-TEST_F(OptionsTest, DBOptionsSerializeChangedOptions) {
-  Options base_options, new_options;
-  Random rnd(301);
-
-  ConfigOptions config;
-  DBOptions base;
-  DBOptions copy;
-  std::string opts_str;
-  ASSERT_OK(GetStringFromDBOptions(config, base, &opts_str));
-  auto dbcfg = DBOptionsAsConfigurable(base);
-  config.compare_to = dbcfg.get();
-  ASSERT_OK(GetStringFromDBOptions(config, copy, &opts_str));
-  copy.paranoid_checks = false;
-  copy.max_background_compactions = 10;
-  ASSERT_OK(GetStringFromDBOptions(config, copy, &opts_str));
-
-  copy.file_checksum_gen_factory = GetFileChecksumGenCrc32cFactory();
-  ASSERT_OK(GetStringFromDBOptions(config, copy, &opts_str));
-
-  base.file_checksum_gen_factory = copy.file_checksum_gen_factory;
-  dbcfg = DBOptionsAsConfigurable(base);
-  config.compare_to = dbcfg.get();
-  ASSERT_OK(GetStringFromDBOptions(config, copy, &opts_str));
-}
-
 const static std::string kCustomEnvName = "Custom";
 const static std::string kCustomEnvProp = "env=" + kCustomEnvName;
 

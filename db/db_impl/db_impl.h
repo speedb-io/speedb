@@ -23,6 +23,7 @@
 #include "db/column_family.h"
 #include "db/compaction/compaction_iterator.h"
 #include "db/compaction/compaction_job.h"
+#include "db/db_impl/compact_range_threads_mngr.h"
 #include "db/db_impl/db_spdb_impl_write.h"
 #include "db/error_handler.h"
 #include "db/event_helpers.h"
@@ -1604,6 +1605,11 @@ class DBImpl : public DB {
   friend class DBCompactionTest_CompactionDuringShutdown_Test;
   friend class StatsHistoryTest_PersistentStatsCreateColumnFamilies_Test;
 #ifndef NDEBUG
+  // Since all of the ut-s inherit from DBTestBase, this should be the only
+  // friend. Methods should be added (as applicable) to DBTestBase to allow
+  // access to the internals of DBImpl to ut-s
+  friend class DBTestBase;
+
   friend class DBTest2_ReadCallbackTest_Test;
   friend class WriteCallbackPTest_WriteWithCallbackTest_Test;
   friend class XFTransactionWriteHandler;
@@ -2344,6 +2350,17 @@ class DBImpl : public DB {
 
   bool ShouldReferenceSuperVersion(const MergeContext& merge_context);
 
+  void CompactRangeNonBlockingThread(const CompactRangeOptions options,
+                                     ColumnFamilyData* cfd, std::string begin,
+                                     std::string end,
+                                     const std::string trim_ts);
+
+  Status CompactRangeInternalBlocking(const CompactRangeOptions& options,
+                                      ColumnFamilyData* cfd, const Slice* begin,
+                                      const Slice* end,
+                                      const std::string& trim_ts);
+
+ private:
   // Lock over the persistent DB state.  Non-nullptr iff successfully acquired.
   FileLock* db_lock_;
 
@@ -2756,6 +2773,10 @@ class DBImpl : public DB {
   // The number of LockWAL called without matching UnlockWAL call.
   // See also lock_wal_write_token_
   uint32_t lock_wal_count_;
+
+  // Tracks threads created internally to handle non-blocking
+  // CompactRange() requests.
+  CompactRangeThreadsMngr compact_range_threads_mngr_;
 };
 
 class GetWithTimestampReadCallback : public ReadCallback {

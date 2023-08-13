@@ -622,6 +622,10 @@ Status DBImpl::CloseHelper() {
     cfd->UnrefAndTryDelete();
   }
 
+  // Wait for all non-blocking manual compactions that may still be in progress.
+  // Do it only after cleaning up all compaction-related activity above.
+  compact_range_threads_mngr_.Shutdown();
+
   if (default_cf_handle_ != nullptr || persist_stats_cf_handle_ != nullptr) {
     // we need to delete handle outside of lock because it does its own locking
     mutex_.Unlock();

@@ -7,7 +7,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 
+#include <atomic>
+#include <chrono>
+#include <functional>
+#include <future>
+#include <memory>
+#include <mutex>
 #include <tuple>
+#include <unordered_map>
 
 #include "compaction/compaction_picker_universal.h"
 #include "db/blob/blob_index.h"
@@ -27,6 +34,13 @@
 #include "utilities/fault_injection_env.h"
 #include "utilities/fault_injection_fs.h"
 
+//
+// NOTE:
+// The "MCC" suffix in the names of tests and test base classes
+// means: "Manual Compaction Control"
+// These are tests that have a paremeter that controls whether manual compaction
+// will be blocking or non-blocking.
+//
 namespace ROCKSDB_NAMESPACE {
 
 // SYNC_POINT is not supported in released Windows mode.
@@ -116,6 +130,253 @@ class DBCompactionTest : public DBTestBase {
   }
 };
 
+namespace {
+
+using CbFuture = std::future<Status>;
+using ValidateCompletionStatusFunc =
+    std::function<void(Status completion_status)>;
+
+void DefaultCompletionStatusValidation(Status completion_status,
+                                       bool expect_success,
+                                       Status* expected_completion_status) {
+  if (expect_success) {
+    ASSERT_OK(completion_status);
+  } else {
+    ASSERT_NOK(completion_status);
+    if (expected_completion_status != nullptr) {
+      ASSERT_EQ(completion_status, *expected_completion_status)
+          << "actual:" << completion_status.ToString()
+          << ", expected:" << expected_completion_status->ToString();
+    }
+  }
+}
+
+class CompactRangeCompleteCb : public CompactRangeCompletedCbIf {
+ public:
+  CompactRangeCompleteCb(bool expect_success,
+                         Status* expected_completion_status,
+                         std::atomic<uint64_t>* num_times_cb_called)
+      : num_times_cb_called_(num_times_cb_called) {
+    if (expected_completion_status != nullptr) {
+      if (expect_success) {
+        assert(expected_completion_status->ok());
+      } else {
+        assert(expected_completion_status->ok() == false);
+      }
+    }
+
+    validate_completion_status_func_ =
+        std::bind(DefaultCompletionStatusValidation, std::placeholders::_1,
+                  expect_success, expected_completion_status);
+  }
+
+  CompactRangeCompleteCb(ValidateCompletionStatusFunc validation_func,
+                         std::atomic<uint64_t>* num_times_cb_called)
+      : validate_completion_status_func_(validation_func),
+        num_times_cb_called_(num_times_cb_called) {
+    my_promise_ = std::make_unique<std::promise<Status>>();
+  }
+
+  ~CompactRangeCompleteCb() = default;
+
+  CbFuture GetFuture() { return my_promise_->get_future(); }
+
+  void CompletedCb(Status completion_status) override {
+    validate_completion_status_func_(completion_status);
+    ++(*num_times_cb_called_);
+    my_promise_->set_value(completion_status);
+  }
+
+ private:
+  ValidateCompletionStatusFunc validate_completion_status_func_;
+  std::atomic<uint64_t>* num_times_cb_called_ = nullptr;
+  std::unique_ptr<std::promise<Status>> my_promise_;
+};
+
+using CbPtr = std::shared_ptr<CompactRangeCompletedCbIf>;
+
+struct CompactRangeHelper {
+  CompactRangeHelper(bool blocking) : blocking_(blocking) {}
+  virtual ~CompactRangeHelper() = default;
+
+  void TearDown() {
+    ASSERT_EQ(num_times_cb_called_, num_times_nb_compact_range_called_);
+  }
+
+  // The following 3 MyCompactRange() overloads are compatible with the 3
+  // DBTestBase::Compact() overloads
+  CbPtr MyCompact(int cf, const Slice& start, const Slice& limit,
+                  uint32_t target_path_id,
+                  bool wait_for_compact_range_to_complete = true) {
+    CompactRangeOptions compact_options;
+    compact_options.target_path_id = target_path_id;
+    return MyCompactRange(compact_options, GetCfHandle(cf), &start, &limit,
+                          true /* expect_sucsess */, nullptr,
+                          wait_for_compact_range_to_complete);
+  }
+
+  CbPtr MyCompact(int cf, const Slice& start, const Slice& limit,
+                  bool wait_for_compact_range_to_complete = true) {
+    return MyCompactRange(CompactRangeOptions(), GetCfHandle(cf), &start,
+                          &limit, true /* expect_sucsess */, nullptr,
+                          wait_for_compact_range_to_complete);
+  }
+
+  CbPtr MyCompact(const Slice& start, const Slice& limit,
+                  bool wait_for_compact_range_to_complete = true) {
+    return MyCompactRange(CompactRangeOptions(), nullptr /* cf_handle */,
+                          &start, &limit, true /* expect_sucsess */, nullptr,
+                          wait_for_compact_range_to_complete);
+  }
+
+  CbPtr MyCompactRange(CompactRangeOptions compact_range_options,
+                       const Slice* begin, const Slice* end,
+                       bool expect_success,
+                       Status* expected_completion_status = nullptr,
+                       bool wait_for_compact_range_to_complete = true) {
+    auto cb_ptr =
+        MyCompactRange(compact_range_options, nullptr /* cf_handle */, begin,
+                       end, expect_success, expected_completion_status,
+                       wait_for_compact_range_to_complete);
+    if (cb_ptr != nullptr) {
+      assert(cb_to_future_map_.find(cb_ptr) != cb_to_future_map_.end());
+    }
+    return cb_ptr;
+  }
+
+  CbPtr MyCompactRange(
+      CompactRangeOptions compact_range_options, const Slice* begin,
+      const Slice* end,
+      ValidateCompletionStatusFunc validation_completion_status_func,
+      bool wait_for_compact_range_to_complete = true) {
+    auto cb_ptr = MyCompactRange(compact_range_options, nullptr /* cf_handle */,
+                                 begin, end, validation_completion_status_func,
+                                 wait_for_compact_range_to_complete);
+    if (cb_ptr != nullptr) {
+      assert(cb_to_future_map_.find(cb_ptr) != cb_to_future_map_.end());
+    }
+    return cb_ptr;
+  }
+
+  CbPtr MyCompactRange(CompactRangeOptions compact_range_options,
+                       ColumnFamilyHandle* cf_handle, const Slice* begin,
+                       const Slice* end, bool expect_success,
+                       Status* expected_completion_status = nullptr,
+                       bool wait_for_compact_range_to_complete = true) {
+    auto validate_completion_status_func =
+        std::bind(DefaultCompletionStatusValidation, std::placeholders::_1,
+                  expect_success, expected_completion_status);
+    return MyCompactRange(compact_range_options, cf_handle, begin, end,
+                          validate_completion_status_func,
+                          wait_for_compact_range_to_complete);
+  }
+
+  // Use a void helper function so we may call ASSERT_XXX gtest macros
+  void CompactRangeNonBlockingHelper(CbPtr completion_cb,
+                                     CompactRangeOptions& compact_range_options,
+                                     ColumnFamilyHandle* cf_handle,
+                                     const Slice* begin, const Slice* end) {
+    compact_range_options.async_completion_cb = completion_cb;
+
+    Status status;
+    if (cf_handle == nullptr) {
+      status = GetDb()->CompactRange(compact_range_options, begin, end);
+    } else {
+      status =
+          GetDb()->CompactRange(compact_range_options, cf_handle, begin, end);
+    }
+    ASSERT_OK(status);
+    ++num_times_nb_compact_range_called_;
+  }
+
+  CbPtr MyCompactRange(
+      CompactRangeOptions compact_range_options, ColumnFamilyHandle* cf_handle,
+      const Slice* begin, const Slice* end,
+      ValidateCompletionStatusFunc validate_completion_status_func,
+      bool wait_for_compact_range_to_complete = true) {
+    if (blocking_) {
+      CbPtr completion_cb = std::make_shared<CompactRangeCompleteCb>(
+          validate_completion_status_func, &num_times_cb_called_);
+
+      CompactRangeNonBlockingHelper(completion_cb, compact_range_options,
+                                    cf_handle, begin, end);
+
+      {
+        std::lock_guard<std::mutex> lock(map_mutex_);
+        auto cb_future =
+            static_cast<CompactRangeCompleteCb*>(completion_cb.get())
+                ->GetFuture();
+
+        cb_to_future_map_[completion_cb] = std::move(cb_future);
+      }
+
+      if (wait_for_compact_range_to_complete) {
+        WaitForCompactRangeToComplete(completion_cb);
+        return nullptr;
+      } else {
+        return completion_cb;
+      }
+
+    } else {
+      // BLOCKING
+      Status status;
+      if (cf_handle == nullptr) {
+        status = GetDb()->CompactRange(compact_range_options, begin, end);
+      } else {
+        status =
+            GetDb()->CompactRange(compact_range_options, cf_handle, begin, end);
+      }
+
+      validate_completion_status_func(status);
+      return {};
+    }
+  }
+
+  void WaitForCompactRangeToComplete(CbPtr cb_ptr) {
+    if (cb_ptr == nullptr) {
+      return;
+    }
+
+    std::lock_guard<std::mutex> lock(map_mutex_);
+
+    auto cb_map_iter = cb_to_future_map_.find(cb_ptr);
+    ASSERT_NE(cb_map_iter, cb_to_future_map_.end());
+
+    auto& my_future = cb_map_iter->second;
+    auto future_wait_status = my_future.wait_for(std::chrono::seconds(10));
+    ASSERT_EQ(future_wait_status, std::future_status::ready)
+        << "Future Status:" << static_cast<int>(future_wait_status);
+
+    cb_to_future_map_.erase(cb_ptr);
+  }
+
+  virtual DBImpl* GetDb() = 0;
+  virtual ColumnFamilyHandle* GetCfHandle(int cf) = 0;
+
+  bool blocking_ = false;
+  std::atomic<uint64_t> num_times_nb_compact_range_called_ = 0U;
+  std::atomic<uint64_t> num_times_cb_called_ = 0U;
+  std::mutex map_mutex_;
+  std::unordered_map<CbPtr, CbFuture> cb_to_future_map_;
+};
+
+#define CR_HELPER_OVERRIDES                                    \
+  void TearDown() override { CompactRangeHelper::TearDown(); } \
+                                                               \
+  DBImpl* GetDb() override { return dbfull(); };               \
+  ColumnFamilyHandle* GetCfHandle(int cf) override { return handles_[cf]; };
+
+}  // namespace
+
+class DBCompactionTestWithMCC : public DBCompactionTest,
+                                public CompactRangeHelper,
+                                public testing::WithParamInterface<bool> {
+ public:
+  DBCompactionTestWithMCC() : CompactRangeHelper(GetParam()) {}
+
+  CR_HELPER_OVERRIDES;
+};
+
 class DBCompactionTestWithParam
     : public DBTestBase,
       public testing::WithParamInterface<std::tuple<uint32_t, bool>> {
@@ -134,22 +395,56 @@ class DBCompactionTestWithParam
   bool exclusive_manual_compaction_;
 };
 
+class DBCompactionTestWithParamWithMCC
+    : public DBTestBase,
+      public CompactRangeHelper,
+      public testing::WithParamInterface<std::tuple<uint32_t, bool, bool>> {
+ public:
+  DBCompactionTestWithParamWithMCC()
+      : DBTestBase("db_compaction_test", /*env_do_fsync=*/true),
+        CompactRangeHelper(std::get<2>(GetParam())) {
+    max_subcompactions_ = std::get<0>(GetParam());
+    exclusive_manual_compaction_ = std::get<1>(GetParam());
+  }
+
+  // Required if inheriting from testing::WithParamInterface<>
+  static void SetUpTestCase() {}
+  static void TearDownTestCase() {
+    ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->DisableProcessing();
+  }
+
+  CR_HELPER_OVERRIDES;
+
+  uint32_t max_subcompactions_;
+  bool exclusive_manual_compaction_;
+};
+
 class DBCompactionTestWithBottommostParam
     : public DBTestBase,
-      public testing::WithParamInterface<BottommostLevelCompaction> {
+      public CompactRangeHelper,
+      public testing::WithParamInterface<
+          std::tuple<BottommostLevelCompaction, bool>> {
  public:
   DBCompactionTestWithBottommostParam()
-      : DBTestBase("db_compaction_test", /*env_do_fsync=*/true) {
-    bottommost_level_compaction_ = GetParam();
+      : DBTestBase("db_compaction_test", /*env_do_fsync=*/true),
+        CompactRangeHelper(std::get<1>(GetParam())) {
+    bottommost_level_compaction_ = std::get<0>(GetParam());
   }
+
+  CR_HELPER_OVERRIDES;
 
   BottommostLevelCompaction bottommost_level_compaction_;
 };
 
-class DBCompactionDirectIOTest : public DBCompactionTest,
-                                 public ::testing::WithParamInterface<bool> {
+class DBCompactionDirectIOTest
+    : public DBCompactionTest,
+      public CompactRangeHelper,
+      public ::testing::WithParamInterface<std::tuple<bool, bool>> {
  public:
-  DBCompactionDirectIOTest() : DBCompactionTest() {}
+  DBCompactionDirectIOTest()
+      : DBCompactionTest(), CompactRangeHelper(std::get<1>(GetParam())) {}
+
+  CR_HELPER_OVERRIDES;
 };
 
 // Param = true : target level is non-empty
@@ -157,9 +452,13 @@ class DBCompactionDirectIOTest : public DBCompactionTest,
 //  is not empty.
 class ChangeLevelConflictsWithAuto
     : public DBCompactionTest,
-      public ::testing::WithParamInterface<bool> {
+      public CompactRangeHelper,
+      public ::testing::WithParamInterface<std::tuple<bool, bool>> {
  public:
-  ChangeLevelConflictsWithAuto() : DBCompactionTest() {}
+  ChangeLevelConflictsWithAuto()
+      : DBCompactionTest(), CompactRangeHelper(std::get<1>(GetParam())) {}
+
+  CR_HELPER_OVERRIDES;
 };
 
 // Param = true: grab the compaction pressure token (enable
@@ -437,7 +736,7 @@ TEST_F(DBCompactionTest, SkipStatsUpdateTest) {
   SyncPoint::GetInstance()->DisableProcessing();
 }
 
-TEST_F(DBCompactionTest, TestTableReaderForCompaction) {
+TEST_P(DBCompactionTestWithMCC, TestTableReaderForCompaction) {
   Options options = CurrentOptions();
   options.env = env_;
   options.max_open_files = 20;
@@ -517,7 +816,7 @@ TEST_F(DBCompactionTest, TestTableReaderForCompaction) {
   cro.change_level = true;
   cro.target_level = 2;
   cro.bottommost_level_compaction = BottommostLevelCompaction::kForceOptimized;
-  ASSERT_OK(db_->CompactRange(cro, nullptr, nullptr));
+  MyCompactRange(cro, nullptr, nullptr, true);
   // Only verifying compaction outputs issues one table cache lookup
   // for both data block and range deletion block).
   // May preload table cache too.
@@ -598,7 +897,7 @@ TEST_P(DBCompactionTestWithParam, CompactionDeletionTriggerReopen) {
   }
 }
 
-TEST_F(DBCompactionTest, CompactRangeBottomPri) {
+TEST_P(DBCompactionTestWithMCC, CompactRangeBottomPri) {
   ASSERT_OK(Put(Key(50), ""));
   ASSERT_OK(Flush());
   ASSERT_OK(Put(Key(100), ""));
@@ -610,7 +909,7 @@ TEST_F(DBCompactionTest, CompactRangeBottomPri) {
     CompactRangeOptions cro;
     cro.change_level = true;
     cro.target_level = 2;
-    ASSERT_OK(dbfull()->CompactRange(cro, nullptr, nullptr));
+    MyCompactRange(cro, nullptr, nullptr, true);
   }
   ASSERT_EQ("0,0,3", FilesPerLevel(0));
 
@@ -643,7 +942,7 @@ TEST_F(DBCompactionTest, CompactRangeBottomPri) {
       });
   SyncPoint::GetInstance()->EnableProcessing();
   env_->SetBackgroundThreads(1, Env::Priority::BOTTOM);
-  ASSERT_OK(dbfull()->CompactRange(CompactRangeOptions(), nullptr, nullptr));
+  MyCompactRange(CompactRangeOptions(), nullptr, nullptr, true);
   ASSERT_EQ(1, low_pri_count);
   ASSERT_EQ(1, bottom_pri_count);
   ASSERT_EQ("0,0,2", FilesPerLevel(0));
@@ -651,12 +950,12 @@ TEST_F(DBCompactionTest, CompactRangeBottomPri) {
   // Recompact bottom most level uses bottom pool
   CompactRangeOptions cro;
   cro.bottommost_level_compaction = BottommostLevelCompaction::kForce;
-  ASSERT_OK(dbfull()->CompactRange(cro, nullptr, nullptr));
+  MyCompactRange(cro, nullptr, nullptr, true);
   ASSERT_EQ(1, low_pri_count);
   ASSERT_EQ(2, bottom_pri_count);
 
   env_->SetBackgroundThreads(0, Env::Priority::BOTTOM);
-  ASSERT_OK(dbfull()->CompactRange(cro, nullptr, nullptr));
+  MyCompactRange(cro, nullptr, nullptr, true);
   // Low pri pool is used if bottom pool has size 0.
   ASSERT_EQ(2, low_pri_count);
   ASSERT_EQ(2, bottom_pri_count);
@@ -929,7 +1228,7 @@ TEST_F(DBCompactionTest, MinorCompactionsHappen) {
   } while (ChangeCompactOptions());
 }
 
-TEST_F(DBCompactionTest, UserKeyCrossFile1) {
+TEST_P(DBCompactionTestWithMCC, UserKeyCrossFile1) {
   Options options = CurrentOptions();
   options.compaction_style = kCompactionStyleLevel;
   options.level0_file_num_compaction_trigger = 3;
@@ -949,7 +1248,8 @@ TEST_F(DBCompactionTest, UserKeyCrossFile1) {
   ASSERT_EQ("NOT_FOUND", Get("3"));
 
   // move both files down to l1
-  ASSERT_OK(dbfull()->CompactRange(CompactRangeOptions(), nullptr, nullptr));
+  MyCompactRange(CompactRangeOptions(), nullptr, nullptr, true);
+
   ASSERT_EQ("NOT_FOUND", Get("3"));
 
   for (int i = 0; i < 3; i++) {
@@ -962,7 +1262,7 @@ TEST_F(DBCompactionTest, UserKeyCrossFile1) {
   ASSERT_EQ("NOT_FOUND", Get("3"));
 }
 
-TEST_F(DBCompactionTest, UserKeyCrossFile2) {
+TEST_P(DBCompactionTestWithMCC, UserKeyCrossFile2) {
   Options options = CurrentOptions();
   options.compaction_style = kCompactionStyleLevel;
   options.level0_file_num_compaction_trigger = 3;
@@ -982,7 +1282,7 @@ TEST_F(DBCompactionTest, UserKeyCrossFile2) {
   ASSERT_EQ("NOT_FOUND", Get("3"));
 
   // move both files down to l1
-  ASSERT_OK(dbfull()->CompactRange(CompactRangeOptions(), nullptr, nullptr));
+  MyCompactRange(CompactRangeOptions(), nullptr, nullptr, true);
   ASSERT_EQ("NOT_FOUND", Get("3"));
 
   for (int i = 0; i < 3; i++) {
@@ -995,7 +1295,7 @@ TEST_F(DBCompactionTest, UserKeyCrossFile2) {
   ASSERT_EQ("NOT_FOUND", Get("3"));
 }
 
-TEST_F(DBCompactionTest, CompactionSstPartitioner) {
+TEST_P(DBCompactionTestWithMCC, CompactionSstPartitioner) {
   Options options = CurrentOptions();
   options.compaction_style = kCompactionStyleLevel;
   options.level0_file_num_compaction_trigger = 3;
@@ -1016,7 +1316,7 @@ TEST_F(DBCompactionTest, CompactionSstPartitioner) {
   ASSERT_OK(dbfull()->TEST_WaitForFlushMemTable());
 
   // move both files down to l1
-  ASSERT_OK(dbfull()->CompactRange(CompactRangeOptions(), nullptr, nullptr));
+  MyCompactRange(CompactRangeOptions(), nullptr, nullptr, true);
 
   std::vector<LiveFileMetaData> files;
   dbfull()->GetLiveFilesMetaData(&files);
@@ -1025,7 +1325,7 @@ TEST_F(DBCompactionTest, CompactionSstPartitioner) {
   ASSERT_EQ("B", Get("bbbb1"));
 }
 
-TEST_F(DBCompactionTest, CompactionSstPartitionWithManualCompaction) {
+TEST_P(DBCompactionTestWithMCC, CompactionSstPartitionWithManualCompaction) {
   Options options = CurrentOptions();
   options.compaction_style = kCompactionStyleLevel;
   options.level0_file_num_compaction_trigger = 3;
@@ -1048,7 +1348,7 @@ TEST_F(DBCompactionTest, CompactionSstPartitionWithManualCompaction) {
   CompactRangeOptions compact_options;
   compact_options.bottommost_level_compaction =
       BottommostLevelCompaction::kForceOptimized;
-  ASSERT_OK(dbfull()->CompactRange(CompactRangeOptions(), nullptr, nullptr));
+  MyCompactRange(CompactRangeOptions(), nullptr, nullptr, true);
 
   // Check (compacted but no partitioning yet)
   std::vector<LiveFileMetaData> files;
@@ -1065,7 +1365,7 @@ TEST_F(DBCompactionTest, CompactionSstPartitionWithManualCompaction) {
   // overlap with actual entries
   Slice from("000017");
   Slice to("000019");
-  ASSERT_OK(dbfull()->CompactRange(compact_options, &from, &to));
+  MyCompactRange(compact_options, &from, &to, true);
 
   // Check (no partitioning yet)
   files.clear();
@@ -1079,7 +1379,7 @@ TEST_F(DBCompactionTest, CompactionSstPartitionWithManualCompaction) {
   // NOTE: `to` is INCLUSIVE
   from = Slice("000019");
   to = Slice("000020");
-  ASSERT_OK(dbfull()->CompactRange(compact_options, &from, &to));
+  MyCompactRange(compact_options, &from, &to, true);
 
   // Check (must be partitioned)
   files.clear();
@@ -1229,7 +1529,7 @@ TEST_F(DBCompactionTest, RecoverDuringMemtableCompaction) {
   } while (ChangeOptions());
 }
 
-TEST_P(DBCompactionTestWithParam, TrivialMoveOneFile) {
+TEST_P(DBCompactionTestWithParamWithMCC, TrivialMoveOneFile) {
   int32_t trivial_move = 0;
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::BackgroundCompaction:TrivialMove",
@@ -1265,7 +1565,7 @@ TEST_P(DBCompactionTestWithParam, TrivialMoveOneFile) {
   cro.exclusive_manual_compaction = exclusive_manual_compaction_;
 
   // Compaction will initiate a trivial move from L0 to L1
-  ASSERT_OK(dbfull()->CompactRange(cro, nullptr, nullptr));
+  MyCompactRange(cro, nullptr, nullptr, true);
 
   // File moved From L0 to L1
   ASSERT_EQ(NumTableFilesAtLevel(0, 0), 0);  // 0 files in L0
@@ -1285,7 +1585,7 @@ TEST_P(DBCompactionTestWithParam, TrivialMoveOneFile) {
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->DisableProcessing();
 }
 
-TEST_P(DBCompactionTestWithParam, TrivialMoveNonOverlappingFiles) {
+TEST_P(DBCompactionTestWithParamWithMCC, TrivialMoveNonOverlappingFiles) {
   int32_t trivial_move = 0;
   int32_t non_trivial_move = 0;
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
@@ -1328,7 +1628,7 @@ TEST_P(DBCompactionTestWithParam, TrivialMoveNonOverlappingFiles) {
 
   // Since data is non-overlapping we expect compaction to initiate
   // a trivial move
-  ASSERT_OK(db_->CompactRange(cro, nullptr, nullptr));
+  MyCompactRange(cro, nullptr, nullptr, true);
   // We expect that all the files were trivially moved from L0 to L1
   ASSERT_EQ(NumTableFilesAtLevel(0, 0), 0);
   ASSERT_EQ(NumTableFilesAtLevel(1, 0) /* level1_files */, level0_files);
@@ -1366,7 +1666,7 @@ TEST_P(DBCompactionTestWithParam, TrivialMoveNonOverlappingFiles) {
     ASSERT_OK(Flush());
   }
 
-  ASSERT_OK(db_->CompactRange(cro, nullptr, nullptr));
+  MyCompactRange(cro, nullptr, nullptr, true);
 
   for (size_t i = 0; i < ranges.size(); i++) {
     for (int32_t j = ranges[i].first; j <= ranges[i].second; j++) {
@@ -1379,7 +1679,7 @@ TEST_P(DBCompactionTestWithParam, TrivialMoveNonOverlappingFiles) {
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->DisableProcessing();
 }
 
-TEST_P(DBCompactionTestWithParam, TrivialMoveTargetLevel) {
+TEST_P(DBCompactionTestWithParamWithMCC, TrivialMoveTargetLevel) {
   int32_t trivial_move = 0;
   int32_t non_trivial_move = 0;
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
@@ -1423,7 +1723,7 @@ TEST_P(DBCompactionTestWithParam, TrivialMoveTargetLevel) {
   compact_options.change_level = true;
   compact_options.target_level = 6;
   compact_options.exclusive_manual_compaction = exclusive_manual_compaction_;
-  ASSERT_OK(db_->CompactRange(compact_options, nullptr, nullptr));
+  MyCompactRange(compact_options, nullptr, nullptr, true);
   // 2 files in L6
   ASSERT_EQ("0,0,0,0,0,0,2", FilesPerLevel(0));
 
@@ -1438,7 +1738,7 @@ TEST_P(DBCompactionTestWithParam, TrivialMoveTargetLevel) {
   }
 }
 
-TEST_P(DBCompactionTestWithParam, PartialOverlappingL0) {
+TEST_P(DBCompactionTestWithParamWithMCC, PartialOverlappingL0) {
   class SubCompactionEventListener : public EventListener {
    public:
     void OnSubcompactionCompleted(const SubcompactionJobInfo&) override {
@@ -1463,7 +1763,7 @@ TEST_P(DBCompactionTestWithParam, PartialOverlappingL0) {
   ASSERT_OK(Put("key", ""));
   ASSERT_OK(Put("kez", ""));
   ASSERT_OK(Flush());
-  ASSERT_OK(db_->CompactRange(CompactRangeOptions(), nullptr, nullptr));
+  MyCompactRange(CompactRangeOptions(), nullptr, nullptr, true);
 
   // Ranges that are only briefly overlapping so that they won't be trivially
   // moved but subcompaction ranges would only contain a subset of files.
@@ -1506,7 +1806,7 @@ TEST_P(DBCompactionTestWithParam, PartialOverlappingL0) {
   }
 }
 
-TEST_P(DBCompactionTestWithParam, ManualCompactionPartial) {
+TEST_P(DBCompactionTestWithParamWithMCC, ManualCompactionPartial) {
   int32_t trivial_move = 0;
   int32_t non_trivial_move = 0;
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
@@ -1573,7 +1873,7 @@ TEST_P(DBCompactionTestWithParam, ManualCompactionPartial) {
   compact_options.target_level = 6;
   compact_options.exclusive_manual_compaction = exclusive_manual_compaction_;
   // Trivial move the two non-overlapping files to level 6
-  ASSERT_OK(db_->CompactRange(compact_options, nullptr, nullptr));
+  MyCompactRange(compact_options, nullptr, nullptr, true);
   // 2 files in L6
   ASSERT_EQ("0,0,0,0,0,0,2", FilesPerLevel(0));
 
@@ -1608,7 +1908,10 @@ TEST_P(DBCompactionTestWithParam, ManualCompactionPartial) {
     Slice begin(begin_string);
     Slice end(end_string);
     // First non-trivial compaction is triggered
-    ASSERT_OK(db_->CompactRange(compact_options, &begin, &end));
+    auto cb_handle =
+        MyCompactRange(compact_options, &begin, &end, true, nullptr,
+                       false /* wait_for_compact_range_to_complete */);
+    WaitForCompactRangeToComplete(cb_handle);
   });
 
   TEST_SYNC_POINT("DBCompaction::ManualPartial:1");
@@ -1777,7 +2080,7 @@ TEST_F(DBCompactionTest, DISABLED_ManualPartialFill) {
   }
 }
 
-TEST_F(DBCompactionTest, ManualCompactionWithUnorderedWrite) {
+TEST_P(DBCompactionTestWithMCC, ManualCompactionWithUnorderedWrite) {
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->LoadDependency(
       {{"DBImpl::WriteImpl:UnorderedWriteAfterWriteWAL",
         "DBCompactionTest::ManualCompactionWithUnorderedWrite:WaitWriteWAL"},
@@ -1796,7 +2099,7 @@ TEST_F(DBCompactionTest, ManualCompactionWithUnorderedWrite) {
 
   TEST_SYNC_POINT(
       "DBCompactionTest::ManualCompactionWithUnorderedWrite:WaitWriteWAL");
-  ASSERT_OK(db_->CompactRange(CompactRangeOptions(), nullptr, nullptr));
+  MyCompactRange(CompactRangeOptions(), nullptr, nullptr, true);
 
   writer.join();
   ASSERT_EQ(Get("foo"), "v2");
@@ -1808,7 +2111,7 @@ TEST_F(DBCompactionTest, ManualCompactionWithUnorderedWrite) {
   ASSERT_EQ(Get("foo"), "v2");
 }
 
-TEST_F(DBCompactionTest, DeleteFileRange) {
+TEST_P(DBCompactionTestWithMCC, DeleteFileRange) {
   Options options = CurrentOptions();
   options.write_buffer_size = 10 * 1024 * 1024;
   options.max_bytes_for_level_multiplier = 2;
@@ -1842,7 +2145,7 @@ TEST_F(DBCompactionTest, DeleteFileRange) {
   CompactRangeOptions compact_options;
   compact_options.change_level = true;
   compact_options.target_level = 2;
-  ASSERT_OK(db_->CompactRange(compact_options, nullptr, nullptr));
+  MyCompactRange(compact_options, nullptr, nullptr, true);
   // 2 files in L2
   ASSERT_EQ("0,0,2", FilesPerLevel(0));
 
@@ -1910,7 +2213,7 @@ TEST_F(DBCompactionTest, DeleteFileRange) {
   // Note that we don't delete level 0 files
   compact_options.change_level = true;
   compact_options.target_level = 1;
-  ASSERT_OK(db_->CompactRange(compact_options, nullptr, nullptr));
+  MyCompactRange(compact_options, nullptr, nullptr, true);
   ASSERT_OK(dbfull()->TEST_WaitForCompact());
 
   ASSERT_OK(
@@ -1928,7 +2231,7 @@ TEST_F(DBCompactionTest, DeleteFileRange) {
   ASSERT_GT(old_num_files, new_num_files);
 }
 
-TEST_F(DBCompactionTest, DeleteFilesInRanges) {
+TEST_P(DBCompactionTestWithMCC, DeleteFilesInRanges) {
   Options options = CurrentOptions();
   options.write_buffer_size = 10 * 1024 * 1024;
   options.max_bytes_for_level_multiplier = 2;
@@ -1955,7 +2258,7 @@ TEST_F(DBCompactionTest, DeleteFilesInRanges) {
   CompactRangeOptions compact_options;
   compact_options.change_level = true;
   compact_options.target_level = 2;
-  ASSERT_OK(db_->CompactRange(compact_options, nullptr, nullptr));
+  MyCompactRange(compact_options, nullptr, nullptr, true);
   ASSERT_EQ("0,0,10", FilesPerLevel(0));
 
   // file [0 => 100), [200 => 300), ... [800, 900)
@@ -2098,7 +2401,7 @@ TEST_F(DBCompactionTest, DeleteFileRangeFileEndpointsOverlapBug) {
   db_->ReleaseSnapshot(snapshot);
 }
 
-TEST_P(DBCompactionTestWithParam, TrivialMoveToLastLevelWithFiles) {
+TEST_P(DBCompactionTestWithParamWithMCC, TrivialMoveToLastLevelWithFiles) {
   int32_t trivial_move = 0;
   int32_t non_trivial_move = 0;
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
@@ -2131,7 +2434,7 @@ TEST_P(DBCompactionTestWithParam, TrivialMoveToLastLevelWithFiles) {
   compact_options.change_level = true;
   compact_options.target_level = 3;
   compact_options.exclusive_manual_compaction = exclusive_manual_compaction_;
-  ASSERT_OK(db_->CompactRange(compact_options, nullptr, nullptr));
+  MyCompactRange(compact_options, nullptr, nullptr, true);
   ASSERT_EQ("0,0,0,1", FilesPerLevel(0));
   ASSERT_EQ(trivial_move, 1);
   ASSERT_EQ(non_trivial_move, 0);
@@ -2147,7 +2450,7 @@ TEST_P(DBCompactionTestWithParam, TrivialMoveToLastLevelWithFiles) {
   CompactRangeOptions cro;
   cro.exclusive_manual_compaction = exclusive_manual_compaction_;
   // Compaction will do L0=>L1 L1=>L2 L2=>L3 (3 trivial moves)
-  ASSERT_OK(db_->CompactRange(cro, nullptr, nullptr));
+  MyCompactRange(cro, nullptr, nullptr, true);
   ASSERT_EQ("0,0,0,2", FilesPerLevel(0));
   ASSERT_EQ(trivial_move, 4);
   ASSERT_EQ(non_trivial_move, 0);
@@ -2524,7 +2827,7 @@ TEST_P(DBCompactionTestWithParam, LevelCompactionCFPathUse) {
   Destroy(options, true);
 }
 
-TEST_P(DBCompactionTestWithParam, ConvertCompactionStyle) {
+TEST_P(DBCompactionTestWithParamWithMCC, ConvertCompactionStyle) {
   Random rnd(301);
   int max_key_level_insert = 200;
   int max_key_universal_insert = 600;
@@ -2583,8 +2886,7 @@ TEST_P(DBCompactionTestWithParam, ConvertCompactionStyle) {
   compact_options.bottommost_level_compaction =
       BottommostLevelCompaction::kForce;
   compact_options.exclusive_manual_compaction = exclusive_manual_compaction_;
-  ASSERT_OK(
-      dbfull()->CompactRange(compact_options, handles_[1], nullptr, nullptr));
+  MyCompactRange(compact_options, handles_[1], nullptr, nullptr, true);
 
   // Only 1 file in L0
   ASSERT_EQ("1", FilesPerLevel(1));
@@ -2680,7 +2982,7 @@ TEST_F(DBCompactionTest, L0_CompactionBug_Issue44_b) {
   } while (ChangeCompactOptions());
 }
 
-TEST_F(DBCompactionTest, ManualAutoRace) {
+TEST_P(DBCompactionTestWithMCC, ManualAutoRace) {
   CreateAndReopenWithCF({"pikachu"}, CurrentOptions());
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->LoadDependency(
       {{"DBImpl::BGWorkCompaction", "DBCompactionTest::ManualAutoRace:1"},
@@ -2714,7 +3016,7 @@ TEST_F(DBCompactionTest, ManualAutoRace) {
   // before processing so that it will be cancelled.
   CompactRangeOptions cro;
   cro.exclusive_manual_compaction = true;
-  ASSERT_OK(dbfull()->CompactRange(cro, handles_[1], nullptr, nullptr));
+  MyCompactRange(cro, handles_[1], nullptr, nullptr, true);
   ASSERT_EQ("0,1", FilesPerLevel(1));
 
   // Eventually the cancelled compaction will be rescheduled and executed.
@@ -2723,7 +3025,7 @@ TEST_F(DBCompactionTest, ManualAutoRace) {
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->DisableProcessing();
 }
 
-TEST_P(DBCompactionTestWithParam, ManualCompaction) {
+TEST_P(DBCompactionTestWithParamWithMCC, ManualCompaction) {
   Options options = CurrentOptions();
   options.max_subcompactions = max_subcompactions_;
   options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
@@ -2736,15 +3038,15 @@ TEST_P(DBCompactionTestWithParam, ManualCompaction) {
     ASSERT_EQ("1,1,1", FilesPerLevel(1));
 
     // Compaction range falls before files
-    Compact(1, "", "c");
+    MyCompact(1, "", "c");
     ASSERT_EQ("1,1,1", FilesPerLevel(1));
 
     // Compaction range falls after files
-    Compact(1, "r", "z");
+    MyCompact(1, "r", "z");
     ASSERT_EQ("1,1,1", FilesPerLevel(1));
 
     // Compaction range overlaps files
-    Compact(1, "p", "q");
+    MyCompact(1, "p", "q");
     ASSERT_EQ("0,0,1", FilesPerLevel(1));
 
     // Populate a different range
@@ -2752,7 +3054,7 @@ TEST_P(DBCompactionTestWithParam, ManualCompaction) {
     ASSERT_EQ("1,1,2", FilesPerLevel(1));
 
     // Compact just the new range
-    Compact(1, "b", "f");
+    MyCompact(1, "b", "f");
     ASSERT_EQ("0,0,2", FilesPerLevel(1));
 
     // Compact all
@@ -2763,7 +3065,7 @@ TEST_P(DBCompactionTestWithParam, ManualCompaction) {
         options.statistics->getTickerCount(BLOCK_CACHE_ADD);
     CompactRangeOptions cro;
     cro.exclusive_manual_compaction = exclusive_manual_compaction_;
-    ASSERT_OK(db_->CompactRange(cro, handles_[1], nullptr, nullptr));
+    MyCompactRange(cro, handles_[1], nullptr, nullptr, true);
     // Verify manual compaction doesn't fill block cache
     ASSERT_EQ(prev_block_cache_add,
               options.statistics->getTickerCount(BLOCK_CACHE_ADD));
@@ -2781,7 +3083,7 @@ TEST_P(DBCompactionTestWithParam, ManualCompaction) {
   }
 }
 
-TEST_P(DBCompactionTestWithParam, ManualLevelCompactionOutputPathId) {
+TEST_P(DBCompactionTestWithParamWithMCC, ManualLevelCompactionOutputPathId) {
   Options options = CurrentOptions();
   options.db_paths.emplace_back(dbname_ + "_2", 2 * 10485760);
   options.db_paths.emplace_back(dbname_ + "_3", 100 * 10485760);
@@ -2802,15 +3104,17 @@ TEST_P(DBCompactionTestWithParam, ManualLevelCompactionOutputPathId) {
     ASSERT_EQ(0, GetSstFileCount(dbname_));
 
     // Compaction range falls before files
-    Compact(1, "", "c");
+    MyCompact(1, "", "c");
     ASSERT_EQ("3", FilesPerLevel(1));
 
     // Compaction range falls after files
-    Compact(1, "r", "z");
+    MyCompact(1, "r", "z");
     ASSERT_EQ("3", FilesPerLevel(1));
 
+    uint32_t target_path_id = 1U;
+
     // Compaction range overlaps files
-    Compact(1, "p", "q", 1);
+    MyCompact(1, "p", "q", target_path_id);
     ASSERT_OK(dbfull()->TEST_WaitForCompact());
     ASSERT_EQ("0,1", FilesPerLevel(1));
     ASSERT_EQ(1, GetSstFileCount(options.db_paths[1].path));
@@ -2826,7 +3130,7 @@ TEST_P(DBCompactionTestWithParam, ManualLevelCompactionOutputPathId) {
     ASSERT_EQ("3,1", FilesPerLevel(1));
 
     // Compact just the new range
-    Compact(1, "b", "f", 1);
+    MyCompact(1, "b", "f", target_path_id);
     ASSERT_OK(dbfull()->TEST_WaitForCompact());
     ASSERT_EQ("0,2", FilesPerLevel(1));
     ASSERT_EQ(2, GetSstFileCount(options.db_paths[1].path));
@@ -2843,8 +3147,7 @@ TEST_P(DBCompactionTestWithParam, ManualLevelCompactionOutputPathId) {
     CompactRangeOptions compact_options;
     compact_options.target_path_id = 1;
     compact_options.exclusive_manual_compaction = exclusive_manual_compaction_;
-    ASSERT_OK(
-        db_->CompactRange(compact_options, handles_[1], nullptr, nullptr));
+    MyCompactRange(compact_options, handles_[1], nullptr, nullptr, true);
     ASSERT_OK(dbfull()->TEST_WaitForCompact());
 
     ASSERT_EQ("0,1", FilesPerLevel(1));
@@ -2866,15 +3169,15 @@ TEST_P(DBCompactionTestWithParam, ManualLevelCompactionOutputPathId) {
   }
 }
 
-TEST_F(DBCompactionTest, FilesDeletedAfterCompaction) {
+TEST_P(DBCompactionTestWithMCC, FilesDeletedAfterCompaction) {
   do {
     CreateAndReopenWithCF({"pikachu"}, CurrentOptions());
     ASSERT_OK(Put(1, "foo", "v2"));
-    Compact(1, "a", "z");
+    MyCompact(1, "a", "z");
     const size_t num_files = CountLiveFiles();
     for (int i = 0; i < 10; i++) {
       ASSERT_OK(Put(1, "foo", "v2"));
-      Compact(1, "a", "z");
+      MyCompact(1, "a", "z");
     }
     ASSERT_EQ(CountLiveFiles(), num_files);
   } while (ChangeCompactOptions());
@@ -3244,7 +3547,7 @@ TEST_F(DBCompactionTest, SanitizeCompactionOptionsTest) {
 // TODO(aekmekji): Make sure that the reason this fails when run with
 // max_subcompactions > 1 is not a correctness issue but just inherent to
 // running parallel L0-L1 compactions
-TEST_F(DBCompactionTest, SuggestCompactRangeNoTwoLevel0Compactions) {
+TEST_P(DBCompactionTestWithMCC, SuggestCompactRangeNoTwoLevel0Compactions) {
   Options options = CurrentOptions();
   options.compaction_style = kCompactionStyleLevel;
   options.write_buffer_size = 110 << 10;
@@ -3264,7 +3567,7 @@ TEST_F(DBCompactionTest, SuggestCompactRangeNoTwoLevel0Compactions) {
   for (int num = 0; num < 10; num++) {
     GenerateNewRandomFile(&rnd);
   }
-  ASSERT_OK(db_->CompactRange(CompactRangeOptions(), nullptr, nullptr));
+  MyCompactRange(CompactRangeOptions(), nullptr, nullptr, true);
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->LoadDependency(
       {{"CompactionJob::Run():Start",
@@ -3305,7 +3608,7 @@ static std::string ShortKey(int i) {
   return std::string(buf);
 }
 
-TEST_P(DBCompactionTestWithParam, ForceBottommostLevelCompaction) {
+TEST_P(DBCompactionTestWithParamWithMCC, ForceBottommostLevelCompaction) {
   int32_t trivial_move = 0;
   int32_t non_trivial_move = 0;
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
@@ -3357,7 +3660,7 @@ TEST_P(DBCompactionTestWithParam, ForceBottommostLevelCompaction) {
   CompactRangeOptions compact_options;
   compact_options.change_level = true;
   compact_options.target_level = 3;
-  ASSERT_OK(db_->CompactRange(compact_options, nullptr, nullptr));
+  MyCompactRange(compact_options, nullptr, nullptr, true);
   ASSERT_EQ("0,0,0,1", FilesPerLevel(0));
   ASSERT_EQ(trivial_move, 1);
   ASSERT_EQ(non_trivial_move, 0);
@@ -3375,7 +3678,7 @@ TEST_P(DBCompactionTestWithParam, ForceBottommostLevelCompaction) {
   compact_options = CompactRangeOptions();
   compact_options.bottommost_level_compaction =
       BottommostLevelCompaction::kForceOptimized;
-  ASSERT_OK(db_->CompactRange(compact_options, nullptr, nullptr));
+  MyCompactRange(compact_options, nullptr, nullptr, true);
   ASSERT_EQ("0,0,0,1", FilesPerLevel(0));
   ASSERT_EQ(trivial_move, 4);
   ASSERT_EQ(non_trivial_move, 1);
@@ -3395,7 +3698,7 @@ TEST_P(DBCompactionTestWithParam, ForceBottommostLevelCompaction) {
       BottommostLevelCompaction::kSkip;
   // Compaction will do L0=>L1 L1=>L2 L2=>L3 (3 trivial moves)
   // and will skip bottommost level compaction
-  ASSERT_OK(db_->CompactRange(compact_options, nullptr, nullptr));
+  MyCompactRange(compact_options, nullptr, nullptr, true);
   ASSERT_EQ("0,0,0,2", FilesPerLevel(0));
   ASSERT_EQ(trivial_move, 3);
   ASSERT_EQ(non_trivial_move, 0);
@@ -3596,7 +3899,7 @@ TEST_P(DBCompactionTestWithParam, FullCompactionInBottomPriThreadPool) {
   Env::Default()->SetBackgroundThreads(0, Env::Priority::BOTTOM);
 }
 
-TEST_F(DBCompactionTest, CancelCompactionWaitingOnConflict) {
+TEST_P(DBCompactionTestWithParamWithMCC, CancelCompactionWaitingOnConflict) {
   // This test verifies cancellation of a compaction waiting to be scheduled due
   // to conflict with a running compaction.
   //
@@ -3635,8 +3938,9 @@ TEST_F(DBCompactionTest, CancelCompactionWaitingOnConflict) {
         "DBCompactionTest::CancelCompactionWaitingOnConflict:"
         "PreDisableManualCompaction"}});
   auto manual_compaction_thread = port::Thread([this]() {
-    ASSERT_TRUE(db_->CompactRange(CompactRangeOptions(), nullptr, nullptr)
-                    .IsIncomplete());
+    auto expected_completion_status = Status::Incomplete();
+    MyCompactRange(CompactRangeOptions(), nullptr, nullptr, false,
+                   &expected_completion_status);
   });
 
   // Cancel it. Thread should be joinable, i.e., manual compaction was unblocked
@@ -4918,7 +5222,7 @@ TEST_F(DBCompactionTest, LevelPeriodicCompactionWithCompactionFilters) {
   }
 }
 
-TEST_F(DBCompactionTest, CompactRangeDelayedByL0FileCount) {
+TEST_P(DBCompactionTestWithParamWithMCC, CompactRangeDelayedByL0FileCount) {
   // Verify that, when `CompactRangeOptions::allow_write_stall == false`, manual
   // compaction only triggers flush after it's sure stall won't be triggered for
   // L0 file count going too high.
@@ -4962,7 +5266,7 @@ TEST_F(DBCompactionTest, CompactRangeDelayedByL0FileCount) {
     auto manual_compaction_thread = port::Thread([this]() {
       CompactRangeOptions cro;
       cro.allow_write_stall = false;
-      ASSERT_OK(db_->CompactRange(cro, nullptr, nullptr));
+      MyCompactRange(cro, nullptr, nullptr, true);
     });
 
     manual_compaction_thread.join();
@@ -4973,7 +5277,7 @@ TEST_F(DBCompactionTest, CompactRangeDelayedByL0FileCount) {
   }
 }
 
-TEST_F(DBCompactionTest, CompactRangeDelayedByImmMemTableCount) {
+TEST_P(DBCompactionTestWithMCC, CompactRangeDelayedByImmMemTableCount) {
   // Verify that, when `CompactRangeOptions::allow_write_stall == false`, manual
   // compaction only triggers flush after it's sure stall won't be triggered for
   // immutable memtable count going too high.
@@ -5019,7 +5323,7 @@ TEST_F(DBCompactionTest, CompactRangeDelayedByImmMemTableCount) {
     auto manual_compaction_thread = port::Thread([this]() {
       CompactRangeOptions cro;
       cro.allow_write_stall = false;
-      ASSERT_OK(db_->CompactRange(cro, nullptr, nullptr));
+      MyCompactRange(cro, nullptr, nullptr, true);
     });
 
     manual_compaction_thread.join();
@@ -5030,7 +5334,7 @@ TEST_F(DBCompactionTest, CompactRangeDelayedByImmMemTableCount) {
   }
 }
 
-TEST_F(DBCompactionTest, CompactRangeShutdownWhileDelayed) {
+TEST_P(DBCompactionTestWithMCC, CompactRangeShutdownWhileDelayed) {
   // Verify that, when `CompactRangeOptions::allow_write_stall == false`, delay
   // does not hang if CF is dropped or DB is closed
   const int kNumL0FilesTrigger = 4;
@@ -5065,11 +5369,13 @@ TEST_F(DBCompactionTest, CompactRangeShutdownWhileDelayed) {
       CompactRangeOptions cro;
       cro.allow_write_stall = false;
       if (i == 0) {
-        ASSERT_TRUE(db_->CompactRange(cro, handles_[1], nullptr, nullptr)
-                        .IsColumnFamilyDropped());
+        auto expected_completion_status = Status::ColumnFamilyDropped();
+        MyCompactRange(cro, handles_[1], nullptr, nullptr, false,
+                       &expected_completion_status);
       } else {
-        ASSERT_TRUE(db_->CompactRange(cro, handles_[1], nullptr, nullptr)
-                        .IsShutdownInProgress());
+        auto expected_completion_status = Status::ShutdownInProgress();
+        MyCompactRange(cro, handles_[1], nullptr, nullptr, false,
+                       &expected_completion_status);
       }
     });
 
@@ -5088,7 +5394,7 @@ TEST_F(DBCompactionTest, CompactRangeShutdownWhileDelayed) {
   }
 }
 
-TEST_F(DBCompactionTest, CompactRangeSkipFlushAfterDelay) {
+TEST_P(DBCompactionTestWithMCC, CompactRangeSkipFlushAfterDelay) {
   // Verify that, when `CompactRangeOptions::allow_write_stall == false`,
   // CompactRange skips its flush if the delay is long enough that the memtables
   // existing at the beginning of the call have already been flushed.
@@ -5123,7 +5429,7 @@ TEST_F(DBCompactionTest, CompactRangeSkipFlushAfterDelay) {
   auto manual_compaction_thread = port::Thread([this]() {
     CompactRangeOptions cro;
     cro.allow_write_stall = false;
-    ASSERT_OK(db_->CompactRange(cro, nullptr, nullptr));
+    MyCompactRange(cro, nullptr, nullptr, true);
   });
 
   TEST_SYNC_POINT("DBCompactionTest::CompactRangeSkipFlushAfterDelay:PreFlush");
@@ -5144,7 +5450,7 @@ TEST_F(DBCompactionTest, CompactRangeSkipFlushAfterDelay) {
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->DisableProcessing();
 }
 
-TEST_F(DBCompactionTest, CompactRangeFlushOverlappingMemtable) {
+TEST_P(DBCompactionTestWithMCC, CompactRangeFlushOverlappingMemtable) {
   // Verify memtable only gets flushed if it contains data overlapping the range
   // provided to `CompactRange`. Tests all kinds of overlap/non-overlap.
   const int kNumEndpointKeys = 5;
@@ -5178,8 +5484,7 @@ TEST_F(DBCompactionTest, CompactRangeFlushOverlappingMemtable) {
       ASSERT_OK(Put("b", "val"));
       ASSERT_OK(Put("d", "val"));
       CompactRangeOptions compact_range_opts;
-      ASSERT_OK(db_->CompactRange(compact_range_opts, begin_ptr, end_ptr));
-
+      MyCompactRange(compact_range_opts, begin_ptr, end_ptr, true);
       uint64_t get_prop_tmp, num_memtable_entries = 0;
       ASSERT_TRUE(db_->GetIntProperty(DB::Properties::kNumEntriesImmMemTables,
                                       &get_prop_tmp));
@@ -5224,7 +5529,7 @@ TEST_F(DBCompactionTest, CompactionStatsTest) {
   VerifyCompactionStats(*cfd, *collector);
 }
 
-TEST_F(DBCompactionTest, SubcompactionEvent) {
+TEST_P(DBCompactionTestWithMCC, SubcompactionEvent) {
   class SubCompactionEventListener : public EventListener {
    public:
     void OnCompactionBegin(DB* /*db*/, const CompactionJobInfo& ci) override {
@@ -5307,8 +5612,7 @@ TEST_F(DBCompactionTest, SubcompactionEvent) {
 
   CompactRangeOptions comp_opts;
   comp_opts.max_subcompactions = 4;
-  Status s = dbfull()->CompactRange(comp_opts, nullptr, nullptr);
-  ASSERT_OK(s);
+  MyCompactRange(comp_opts, nullptr, nullptr, true);
   ASSERT_OK(dbfull()->TEST_WaitForCompact());
   // make sure there's no running compaction
   ASSERT_EQ(listener->GetRunningCompactionCount(), 0);
@@ -5402,7 +5706,7 @@ TEST_F(DBCompactionTest, CompactionHasEmptyOutput) {
   ASSERT_EQ(2, collector->num_ssts_creation_started());
 }
 
-TEST_F(DBCompactionTest, CompactionLimiter) {
+TEST_P(DBCompactionTestWithMCC, CompactionLimiter) {
   const int kNumKeysPerFile = 10;
   const int kMaxBackgroundThreads = 64;
 
@@ -5584,7 +5888,7 @@ TEST_F(DBCompactionTest, CompactionLimiter) {
   ASSERT_OK(dbfull()->TEST_WaitForFlushMemTable(handles_[cf_test]));
   ASSERT_EQ(1, NumTableFilesAtLevel(0, cf_test));
 
-  Compact(cf_test, Key(0), Key(keyIndex));
+  MyCompact(cf_test, Key(0), Key(keyIndex));
   ASSERT_OK(dbfull()->TEST_WaitForCompact());
 }
 
@@ -5594,12 +5898,23 @@ INSTANTIATE_TEST_CASE_P(DBCompactionTestWithParam, DBCompactionTestWithParam,
                                           std::make_tuple(4, true),
                                           std::make_tuple(4, false)));
 
+INSTANTIATE_TEST_CASE_P(DBCompactionTestWithParamWithMCC,
+                        DBCompactionTestWithParamWithMCC,
+                        ::testing::Values(std::make_tuple(1, true, false),
+                                          std::make_tuple(1, true, true),
+                                          std::make_tuple(1, false, false),
+                                          std::make_tuple(1, false, true),
+                                          std::make_tuple(4, true, false),
+                                          std::make_tuple(4, true, true),
+                                          std::make_tuple(4, false, false),
+                                          std::make_tuple(4, false, true)));
+
 TEST_P(DBCompactionDirectIOTest, DirectIO) {
   Options options = CurrentOptions();
   Destroy(options);
   options.create_if_missing = true;
   options.disable_auto_compactions = true;
-  options.use_direct_io_for_flush_and_compaction = GetParam();
+  options.use_direct_io_for_flush_and_compaction = std::get<0>(GetParam());
   options.env = MockEnv::Create(Env::Default());
   Reopen(options);
   bool readahead = false;
@@ -5617,7 +5932,7 @@ TEST_P(DBCompactionDirectIOTest, DirectIO) {
   CreateAndReopenWithCF({"pikachu"}, options);
   MakeTables(3, "p", "q", 1);
   ASSERT_EQ("1,1,1", FilesPerLevel(1));
-  Compact(1, "p", "q");
+  MyCompact(1, "p", "q");
   ASSERT_EQ(readahead, options.use_direct_reads);
   ASSERT_EQ("0,0,1", FilesPerLevel(1));
   Destroy(options);
@@ -5625,7 +5940,7 @@ TEST_P(DBCompactionDirectIOTest, DirectIO) {
 }
 
 INSTANTIATE_TEST_CASE_P(DBCompactionDirectIOTest, DBCompactionDirectIOTest,
-                        testing::Bool());
+                        ::testing::Combine(testing::Bool(), ::testing::Bool()));
 
 class CompactionPriTest : public DBTestBase,
                           public testing::WithParamInterface<uint32_t> {
@@ -6069,7 +6384,7 @@ class NoopMergeOperator : public MergeOperator {
   const char* Name() const override { return "Noop"; }
 };
 
-TEST_F(DBCompactionTest, PartialManualCompaction) {
+TEST_P(DBCompactionTestWithMCC, PartialManualCompaction) {
   Options opts = CurrentOptions();
   opts.num_levels = 3;
   opts.level0_file_num_compaction_trigger = 10;
@@ -6096,10 +6411,10 @@ TEST_F(DBCompactionTest, PartialManualCompaction) {
 
   CompactRangeOptions cro;
   cro.bottommost_level_compaction = BottommostLevelCompaction::kForceOptimized;
-  ASSERT_OK(dbfull()->CompactRange(cro, nullptr, nullptr));
+  MyCompactRange(cro, nullptr, nullptr, true);
 }
 
-TEST_F(DBCompactionTest, ManualCompactionFailsInReadOnlyMode) {
+TEST_P(DBCompactionTestWithMCC, ManualCompactionFailsInReadOnlyMode) {
   // Regression test for bug where manual compaction hangs forever when the DB
   // is in read-only mode. Verify it now at least returns, despite failing.
   const int kNumL0Files = 4;
@@ -6132,8 +6447,8 @@ TEST_F(DBCompactionTest, ManualCompactionFailsInReadOnlyMode) {
   cro.exclusive_manual_compaction = false;
   Slice begin_key("key1");
   Slice end_key("key2");
-  ASSERT_NOK(dbfull()->CompactRange(cro, &begin_key, &end_key));
-  ASSERT_NOK(dbfull()->CompactRange(cro, &begin_key, &end_key));
+  MyCompactRange(cro, &begin_key, &end_key, false);
+  MyCompactRange(cro, &begin_key, &end_key, false);
 
   // Close before mock_env destruct.
   Close();
@@ -6142,7 +6457,7 @@ TEST_F(DBCompactionTest, ManualCompactionFailsInReadOnlyMode) {
 // ManualCompactionBottomLevelOptimization tests the bottom level manual
 // compaction optimization to skip recompacting files created by Ln-1 to Ln
 // compaction
-TEST_F(DBCompactionTest, ManualCompactionBottomLevelOptimized) {
+TEST_P(DBCompactionTestWithMCC, ManualCompactionBottomLevelOptimized) {
   Options opts = CurrentOptions();
   opts.num_levels = 3;
   opts.level0_file_num_compaction_trigger = 5;
@@ -6183,7 +6498,7 @@ TEST_F(DBCompactionTest, ManualCompactionBottomLevelOptimized) {
 
   CompactRangeOptions cro;
   cro.bottommost_level_compaction = BottommostLevelCompaction::kForceOptimized;
-  ASSERT_OK(dbfull()->CompactRange(cro, nullptr, nullptr));
+  MyCompactRange(cro, nullptr, nullptr, true);
 
   const std::vector<InternalStats::CompactionStats>& comp_stats2 =
       internal_stats_ptr->TEST_GetCompactionStats();
@@ -6191,7 +6506,7 @@ TEST_F(DBCompactionTest, ManualCompactionBottomLevelOptimized) {
   ASSERT_EQ(num, 0);
 }
 
-TEST_F(DBCompactionTest, ManualCompactionMax) {
+TEST_P(DBCompactionTestWithMCC, ManualCompactionMax) {
   uint64_t l1_avg_size = 0, l2_avg_size = 0;
   auto generate_sst_func = [&]() {
     Random rnd(301);
@@ -6242,7 +6557,7 @@ TEST_F(DBCompactionTest, ManualCompactionMax) {
   generate_sst_func();
   num_compactions.store(0);
   CompactRangeOptions cro;
-  ASSERT_OK(db_->CompactRange(cro, nullptr, nullptr));
+  MyCompactRange(cro, nullptr, nullptr, true);
   ASSERT_TRUE(num_compactions.load() == 1);
 
   // split the compaction to 5
@@ -6254,7 +6569,7 @@ TEST_F(DBCompactionTest, ManualCompactionMax) {
   opts.target_file_size_base = total_size / num_split;
   Reopen(opts);
   num_compactions.store(0);
-  ASSERT_OK(db_->CompactRange(cro, nullptr, nullptr));
+  MyCompactRange(cro, nullptr, nullptr, true);
   ASSERT_TRUE(num_compactions.load() == num_split);
 
   // very small max_compaction_bytes, it should still move forward
@@ -6263,7 +6578,7 @@ TEST_F(DBCompactionTest, ManualCompactionMax) {
   DestroyAndReopen(opts);
   generate_sst_func();
   num_compactions.store(0);
-  ASSERT_OK(db_->CompactRange(cro, nullptr, nullptr));
+  MyCompactRange(cro, nullptr, nullptr, true);
   ASSERT_TRUE(num_compactions.load() > 10);
 
   // dynamically set the option
@@ -6278,11 +6593,11 @@ TEST_F(DBCompactionTest, ManualCompactionMax) {
   ASSERT_OK(s);
 
   num_compactions.store(0);
-  ASSERT_OK(db_->CompactRange(cro, nullptr, nullptr));
+  MyCompactRange(cro, nullptr, nullptr, true);
   ASSERT_TRUE(num_compactions.load() == num_split);
 }
 
-TEST_F(DBCompactionTest, CompactionDuringShutdown) {
+TEST_P(DBCompactionTestWithMCC, CompactionDuringShutdown) {
   Options opts = CurrentOptions();
   opts.level0_file_num_compaction_trigger = 2;
   opts.disable_auto_compactions = true;
@@ -6304,11 +6619,15 @@ TEST_F(DBCompactionTest, CompactionDuringShutdown) {
 
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->SetCallBack(
       "DBImpl::BackgroundCompaction:NonTrivial:BeforeRun",
-      [&](void* /*arg*/) { dbfull()->shutting_down_.store(true); });
+      [&](void* /*arg*/) { dbfull_shutting_down().store(true); });
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->EnableProcessing();
-  Status s = dbfull()->CompactRange(CompactRangeOptions(), nullptr, nullptr);
-  ASSERT_TRUE(s.ok() || s.IsShutdownInProgress());
-  ASSERT_OK(dbfull()->error_handler_.GetBGError());
+
+  ValidateCompletionStatusFunc validate_func = [](Status s) {
+    ASSERT_TRUE(s.ok() || s.IsShutdownInProgress());
+  };
+
+  MyCompactRange(CompactRangeOptions(), nullptr, nullptr, validate_func);
+  ASSERT_OK(dbfull_error_handler().GetBGError());
 }
 
 // FixFileIngestionCompactionDeadlock tests and verifies that compaction and
@@ -6383,11 +6702,16 @@ TEST_P(DBCompactionTestWithParam, FixFileIngestionCompactionDeadlock) {
 
 class DBCompactionTestWithOngoingFileIngestionParam
     : public DBCompactionTest,
-      public testing::WithParamInterface<std::string> {
+      public CompactRangeHelper,
+      public testing::WithParamInterface<std::tuple<std::string, bool>> {
  public:
-  DBCompactionTestWithOngoingFileIngestionParam() : DBCompactionTest() {
-    compaction_path_to_test_ = GetParam();
+  DBCompactionTestWithOngoingFileIngestionParam()
+      : DBCompactionTest(), CompactRangeHelper(std::get<1>(GetParam())) {
+    compaction_path_to_test_ = std::get<0>(GetParam());
   }
+
+  CR_HELPER_OVERRIDES;
+
   void SetupOptions() {
     options_ = CurrentOptions();
     options_.create_if_missing = true;
@@ -6489,8 +6813,7 @@ class DBCompactionTestWithOngoingFileIngestionParam
       TEST_SYNC_POINT("PreCompaction");
       // Without proper range conflict check,
       // this would have been `Status::Corruption` about overlapping ranges
-      Status s = dbfull()->CompactRange(cro, &start, &end);
-      EXPECT_OK(s);
+      MyCompactRange(cro, &start, &end, true);
     } else if (compaction_path_to_test_ == "RefitLevelCompactRange") {
       CompactRangeOptions cro;
       cro.change_level = true;
@@ -6500,15 +6823,17 @@ class DBCompactionTestWithOngoingFileIngestionParam
       std::string end_key = "k4";
       Slice end(end_key);
       TEST_SYNC_POINT("PreCompaction");
-      Status s = dbfull()->CompactRange(cro, &start, &end);
-      // Without proper range conflict check,
-      // this would have been `Status::Corruption` about overlapping ranges
-      // To see this, remove the fix AND replace
-      // `DBImpl::CompactRange:PostRefitLevel` in sync point dependency with
-      // `DBImpl::ReFitLevel:PostRegisterCompaction`
-      EXPECT_TRUE(s.IsNotSupported());
-      EXPECT_TRUE(s.ToString().find("some ongoing compaction's output") !=
-                  std::string::npos);
+      ValidateCompletionStatusFunc validate_func = [](Status s) {
+        // Without proper range conflict check,
+        // this would have been `Status::Corruption` about overlapping ranges
+        // To see this, remove the fix AND replace
+        // `DBImpl::CompactRange:PostRefitLevel` in sync point dependency with
+        // `DBImpl::ReFitLevel:PostRegisterCompaction`
+        EXPECT_TRUE(s.IsNotSupported());
+        EXPECT_TRUE(s.ToString().find("some ongoing compaction's output") !=
+                    std::string::npos);
+      };
+      MyCompactRange(cro, &start, &end, validate_func);
     } else if (compaction_path_to_test_ == "CompactFiles") {
       ColumnFamilyMetaData cf_meta_data;
       db_->GetColumnFamilyMetaData(&cf_meta_data);
@@ -6542,12 +6867,14 @@ class DBCompactionTestWithOngoingFileIngestionParam
   std::shared_ptr<test::SleepingBackgroundTask> sleeping_task_;
 };
 
-INSTANTIATE_TEST_CASE_P(DBCompactionTestWithOngoingFileIngestionParam,
-                        DBCompactionTestWithOngoingFileIngestionParam,
-                        ::testing::Values("AutoCompaction",
-                                          "NonRefitLevelCompactRange",
-                                          "RefitLevelCompactRange",
-                                          "CompactFiles"));
+INSTANTIATE_TEST_CASE_P(
+    DBCompactionTestWithOngoingFileIngestionParam,
+    DBCompactionTestWithOngoingFileIngestionParam,
+    ::testing::Combine(::testing::Values("AutoCompaction",
+                                         "NonRefitLevelCompactRange",
+                                         "RefitLevelCompactRange",
+                                         "CompactFiles"),
+                       ::testing::Bool()));
 
 TEST_P(DBCompactionTestWithOngoingFileIngestionParam, RangeConflictCheck) {
   SetupOptions();
@@ -6946,7 +7273,18 @@ class DBCompactionTestL0FilesMisorderCorruption : public DBCompactionTest {
   std::shared_ptr<test::SleepingBackgroundTask> sleeping_task_;
 };
 
-TEST_F(DBCompactionTestL0FilesMisorderCorruption,
+class DBCompactionTestL0FilesMisorderCorruptionWithMCC
+    : public DBCompactionTestL0FilesMisorderCorruption,
+      public CompactRangeHelper,
+      public testing::WithParamInterface<bool> {
+ public:
+  DBCompactionTestL0FilesMisorderCorruptionWithMCC()
+      : CompactRangeHelper(GetParam()) {}
+
+  CR_HELPER_OVERRIDES;
+};
+
+TEST_P(DBCompactionTestL0FilesMisorderCorruptionWithMCC,
        FlushAfterIntraL0LevelCompactionWithIngestedFile) {
   SetupOptions(CompactionStyle::kCompactionStyleLevel, "");
   DestroyAndReopen(options_);
@@ -6955,7 +7293,7 @@ TEST_F(DBCompactionTestL0FilesMisorderCorruption,
     ASSERT_OK(Put(Key(i), ""));  // Prevents trivial move
   }
   ASSERT_OK(Flush());
-  Compact("", Key(99));
+  MyCompact("", Key(99));
   ASSERT_EQ(0, NumTableFilesAtLevel(0));
 
   // To get accurate NumTableFilesAtLevel(0) when the number reaches
@@ -7205,6 +7543,17 @@ class DBCompactionTestL0FilesMisorderCorruptionWithParam
       : DBCompactionTestL0FilesMisorderCorruption() {}
 };
 
+class DBCompactionTestL0FilesMisorderCorruptionWithParamAndMCC
+    : public DBCompactionTestL0FilesMisorderCorruption,
+      public CompactRangeHelper,
+      public testing::WithParamInterface<std::tuple<CompactionStyle, bool>> {
+ public:
+  DBCompactionTestL0FilesMisorderCorruptionWithParamAndMCC()
+      : CompactRangeHelper(std::get<1>(GetParam())) {}
+
+  CR_HELPER_OVERRIDES;
+};
+
 // TODO: add `CompactionStyle::kCompactionStyleLevel` to testing parameter,
 // which requires careful unit test
 // design for ingesting file to L0 and CompactRange()/CompactFile() to L0
@@ -7213,6 +7562,17 @@ INSTANTIATE_TEST_CASE_P(
     DBCompactionTestL0FilesMisorderCorruptionWithParam,
     ::testing::Values(CompactionStyle::kCompactionStyleUniversal,
                       CompactionStyle::kCompactionStyleFIFO));
+
+// TODO: add `CompactionStyle::kCompactionStyleLevel` to testing parameter,
+// which requires careful unit test
+// design for ingesting file to L0 and CompactRange()/CompactFile() to L0
+INSTANTIATE_TEST_CASE_P(
+    DBCompactionTestL0FilesMisorderCorruptionWithParamAndMCC,
+    DBCompactionTestL0FilesMisorderCorruptionWithParamAndMCC,
+    ::testing::Combine(
+        ::testing::Values(CompactionStyle::kCompactionStyleUniversal,
+                          CompactionStyle::kCompactionStyleFIFO),
+        ::testing::Bool()));
 
 TEST_P(DBCompactionTestL0FilesMisorderCorruptionWithParam,
        FlushAfterIntraL0CompactFileWithIngestedFile) {
@@ -7280,9 +7640,9 @@ TEST_P(DBCompactionTestL0FilesMisorderCorruptionWithParam,
   Destroy(options_);
 }
 
-TEST_P(DBCompactionTestL0FilesMisorderCorruptionWithParam,
+TEST_P(DBCompactionTestL0FilesMisorderCorruptionWithParamAndMCC,
        FlushAfterIntraL0CompactRangeWithIngestedFile) {
-  SetupOptions(GetParam(), "CompactRange");
+  SetupOptions(std::get<0>(GetParam()), "CompactRange");
   DestroyAndReopen(options_);
 
   // To create below LSM tree
@@ -7314,7 +7674,7 @@ TEST_P(DBCompactionTestL0FilesMisorderCorruptionWithParam,
   // (1) doesn't overlap with memtable therefore the memtable won't be flushed
   // (2) should target at compacting s0 with s1 and s2
   Slice start("k3"), end("k5");
-  ASSERT_OK(db_->CompactRange(CompactRangeOptions(), &start, &end));
+  MyCompactRange(CompactRangeOptions(), &start, &end, true);
   // After compaction, we have LSM tree:
   //
   // memtable: m1 [                 k2:new@4, k1:new@3]
@@ -7368,7 +7728,7 @@ TEST_P(DBCompactionTestWithBottommostParam, SequenceKeysManualCompaction) {
 
   auto cro = CompactRangeOptions();
   cro.bottommost_level_compaction = bottommost_level_compaction_;
-  ASSERT_OK(db_->CompactRange(cro, nullptr, nullptr));
+  MyCompactRange(cro, nullptr, nullptr, true);
   if (bottommost_level_compaction_ == BottommostLevelCompaction::kForce ||
       bottommost_level_compaction_ ==
           BottommostLevelCompaction::kForceOptimized) {
@@ -7383,10 +7743,12 @@ TEST_P(DBCompactionTestWithBottommostParam, SequenceKeysManualCompaction) {
 
 INSTANTIATE_TEST_CASE_P(
     DBCompactionTestWithBottommostParam, DBCompactionTestWithBottommostParam,
-    ::testing::Values(BottommostLevelCompaction::kSkip,
-                      BottommostLevelCompaction::kIfHaveCompactionFilter,
-                      BottommostLevelCompaction::kForce,
-                      BottommostLevelCompaction::kForceOptimized));
+    ::testing::Combine(
+        ::testing::Values(BottommostLevelCompaction::kSkip,
+                          BottommostLevelCompaction::kIfHaveCompactionFilter,
+                          BottommostLevelCompaction::kForce,
+                          BottommostLevelCompaction::kForceOptimized),
+        ::testing::Bool()));
 
 TEST_F(DBCompactionTest, UpdateLevelSubCompactionTest) {
   Options options = CurrentOptions();
@@ -7506,7 +7868,7 @@ TEST_P(ChangeLevelConflictsWithAuto, TestConflict) {
     CompactRangeOptions cro;
     cro.change_level = true;
     cro.target_level = 2;
-    ASSERT_OK(dbfull()->CompactRange(cro, nullptr, nullptr));
+    MyCompactRange(cro, nullptr, nullptr, true);
   }
   ASSERT_EQ("0,0,1", FilesPerLevel(0));
 
@@ -7541,10 +7903,10 @@ TEST_P(ChangeLevelConflictsWithAuto, TestConflict) {
   {
     CompactRangeOptions cro;
     cro.change_level = true;
-    cro.target_level = GetParam() ? 1 : 0;
+    cro.target_level = std::get<0>(GetParam()) ? 1 : 0;
     // This should return non-OK, but it's more important for the test to
     // make sure that the DB is not corrupted.
-    ASSERT_NOK(dbfull()->CompactRange(cro, nullptr, nullptr));
+    MyCompactRange(cro, nullptr, nullptr, false);
   }
   auto_comp.join();
   // Refitting didn't happen.
@@ -7555,7 +7917,8 @@ TEST_P(ChangeLevelConflictsWithAuto, TestConflict) {
 }
 
 INSTANTIATE_TEST_CASE_P(ChangeLevelConflictsWithAuto,
-                        ChangeLevelConflictsWithAuto, testing::Bool());
+                        ChangeLevelConflictsWithAuto,
+                        ::testing::Combine(testing::Bool(), ::testing::Bool()));
 
 TEST_F(DBCompactionTest, ChangeLevelCompactRangeConflictsWithManual) {
   // A `CompactRange()` with `change_level == true` needs to execute its final
@@ -7650,7 +8013,7 @@ TEST_F(DBCompactionTest, ChangeLevelCompactRangeConflictsWithManual) {
   refit_level_thread.join();
 }
 
-TEST_F(DBCompactionTest, ChangeLevelErrorPathTest) {
+TEST_P(DBCompactionTestWithMCC, ChangeLevelErrorPathTest) {
   // This test is added to ensure that RefitLevel() error paths are clearing
   // internal flags and to test that subsequent valid RefitLevel() calls
   // succeeds
@@ -7672,7 +8035,7 @@ TEST_F(DBCompactionTest, ChangeLevelErrorPathTest) {
     CompactRangeOptions cro;
     cro.change_level = true;
     cro.target_level = 2;
-    ASSERT_OK(dbfull()->CompactRange(cro, nullptr, nullptr));
+    MyCompactRange(cro, nullptr, nullptr, true);
   }
   ASSERT_EQ("0,0,2", FilesPerLevel(0));
 
@@ -7695,7 +8058,7 @@ TEST_F(DBCompactionTest, ChangeLevelErrorPathTest) {
     CompactRangeOptions cro;
     cro.change_level = true;
     cro.target_level = 1;
-    ASSERT_OK(dbfull()->CompactRange(cro, &begin, &end));
+    MyCompactRange(cro, &begin, &end, true);
   }
   ASSERT_EQ("0,3,2", FilesPerLevel(0));
 
@@ -7711,7 +8074,7 @@ TEST_F(DBCompactionTest, ChangeLevelErrorPathTest) {
     CompactRangeOptions cro;
     cro.change_level = true;
     cro.target_level = 1;
-    ASSERT_NOK(dbfull()->CompactRange(cro, &begin, &end));
+    MyCompactRange(cro, &begin, &end, false);
   }
   ASSERT_EQ("0,3,2", FilesPerLevel(0));
 
@@ -7720,12 +8083,12 @@ TEST_F(DBCompactionTest, ChangeLevelErrorPathTest) {
     CompactRangeOptions cro;
     cro.change_level = true;
     cro.target_level = 1;
-    ASSERT_OK(dbfull()->CompactRange(cro, nullptr, nullptr));
+    MyCompactRange(cro, nullptr, nullptr, true);
   }
   ASSERT_EQ("0,5", FilesPerLevel(0));
 }
 
-TEST_F(DBCompactionTest, CompactionWithBlob) {
+TEST_P(DBCompactionTestWithMCC, CompactionWithBlob) {
   Options options;
   options.env = env_;
   options.disable_auto_compactions = true;
@@ -7757,7 +8120,7 @@ TEST_F(DBCompactionTest, CompactionWithBlob) {
   constexpr Slice* begin = nullptr;
   constexpr Slice* end = nullptr;
 
-  ASSERT_OK(db_->CompactRange(CompactRangeOptions(), begin, end));
+  MyCompactRange(CompactRangeOptions(), begin, end, true);
 
   ASSERT_EQ(Get(first_key), third_value);
   ASSERT_EQ(Get(second_key), third_value);
@@ -7808,17 +8171,24 @@ TEST_F(DBCompactionTest, CompactionWithBlob) {
 
 class DBCompactionTestBlobError
     : public DBCompactionTest,
-      public testing::WithParamInterface<std::string> {
+      public CompactRangeHelper,
+      public testing::WithParamInterface<std::tuple<std::string, bool>> {
  public:
-  DBCompactionTestBlobError() : sync_point_(GetParam()) {}
+  DBCompactionTestBlobError()
+      : CompactRangeHelper(std::get<1>(GetParam())),
+        sync_point_(std::get<0>(GetParam())) {}
+
+  CR_HELPER_OVERRIDES;
 
   std::string sync_point_;
 };
 
-INSTANTIATE_TEST_CASE_P(DBCompactionTestBlobError, DBCompactionTestBlobError,
-                        ::testing::ValuesIn(std::vector<std::string>{
-                            "BlobFileBuilder::WriteBlobToFile:AddRecord",
-                            "BlobFileBuilder::WriteBlobToFile:AppendFooter"}));
+INSTANTIATE_TEST_CASE_P(
+    DBCompactionTestBlobError, DBCompactionTestBlobError,
+    ::testing::Combine(::testing::ValuesIn(std::vector<std::string>{
+                           "BlobFileBuilder::WriteBlobToFile:AddRecord",
+                           "BlobFileBuilder::WriteBlobToFile:AppendFooter"}),
+                       ::testing::Bool()));
 
 TEST_P(DBCompactionTestBlobError, CompactionError) {
   Options options;
@@ -7860,7 +8230,9 @@ TEST_P(DBCompactionTestBlobError, CompactionError) {
   constexpr Slice* begin = nullptr;
   constexpr Slice* end = nullptr;
 
-  ASSERT_TRUE(db_->CompactRange(CompactRangeOptions(), begin, end).IsIOError());
+  auto expected_completion_status = Status::IOError();
+  MyCompactRange(CompactRangeOptions(), begin, end, false,
+                 &expected_completion_status);
 
   SyncPoint::GetInstance()->DisableProcessing();
   SyncPoint::GetInstance()->ClearAllCallBacks();
@@ -7907,11 +8279,15 @@ TEST_P(DBCompactionTestBlobError, CompactionError) {
 
 class DBCompactionTestBlobGC
     : public DBCompactionTest,
-      public testing::WithParamInterface<std::tuple<double, bool>> {
+      public CompactRangeHelper,
+      public testing::WithParamInterface<std::tuple<double, bool, bool>> {
  public:
   DBCompactionTestBlobGC()
-      : blob_gc_age_cutoff_(std::get<0>(GetParam())),
+      : CompactRangeHelper(std::get<2>(GetParam())),
+        blob_gc_age_cutoff_(std::get<0>(GetParam())),
         updated_enable_blob_files_(std::get<1>(GetParam())) {}
+
+  CR_HELPER_OVERRIDES;
 
   double blob_gc_age_cutoff_;
   bool updated_enable_blob_files_;
@@ -7919,6 +8295,7 @@ class DBCompactionTestBlobGC
 
 INSTANTIATE_TEST_CASE_P(DBCompactionTestBlobGC, DBCompactionTestBlobGC,
                         ::testing::Combine(::testing::Values(0.0, 0.5, 1.0),
+                                           ::testing::Bool(),
                                            ::testing::Bool()));
 
 TEST_P(DBCompactionTestBlobGC, CompactionWithBlobGCOverrides) {
@@ -7949,7 +8326,7 @@ TEST_P(DBCompactionTestBlobGC, CompactionWithBlobGCOverrides) {
   cro.blob_garbage_collection_policy = BlobGarbageCollectionPolicy::kForce;
   cro.blob_garbage_collection_age_cutoff = blob_gc_age_cutoff_;
 
-  ASSERT_OK(db_->CompactRange(cro, nullptr, nullptr));
+  MyCompactRange(cro, nullptr, nullptr, true);
 
   // Check that the GC stats are correct
   {
@@ -8038,7 +8415,7 @@ TEST_P(DBCompactionTestBlobGC, CompactionWithBlobGC) {
   constexpr Slice* begin = nullptr;
   constexpr Slice* end = nullptr;
 
-  ASSERT_OK(db_->CompactRange(CompactRangeOptions(), begin, end));
+  MyCompactRange(CompactRangeOptions(), begin, end, true);
 
   ASSERT_EQ(Get(first_key), first_value);
   ASSERT_EQ(Get(second_key), second_value);
@@ -8086,7 +8463,7 @@ TEST_P(DBCompactionTestBlobGC, CompactionWithBlobGC) {
   }
 }
 
-TEST_F(DBCompactionTest, CompactionWithBlobGCError_CorruptIndex) {
+TEST_P(DBCompactionTestWithMCC, CompactionWithBlobGCError_CorruptIndex) {
   Options options;
   options.env = env_;
   options.disable_auto_compactions = true;
@@ -8129,14 +8506,15 @@ TEST_F(DBCompactionTest, CompactionWithBlobGCError_CorruptIndex) {
   constexpr Slice* begin = nullptr;
   constexpr Slice* end = nullptr;
 
-  ASSERT_TRUE(
-      db_->CompactRange(CompactRangeOptions(), begin, end).IsCorruption());
+  auto expected_completion_status = Status::Corruption();
+  MyCompactRange(CompactRangeOptions(), begin, end, false,
+                 &expected_completion_status);
 
   SyncPoint::GetInstance()->DisableProcessing();
   SyncPoint::GetInstance()->ClearAllCallBacks();
 }
 
-TEST_F(DBCompactionTest, CompactionWithBlobGCError_InlinedTTLIndex) {
+TEST_P(DBCompactionTestWithMCC, CompactionWithBlobGCError_InlinedTTLIndex) {
   constexpr uint64_t min_blob_size = 10;
 
   Options options;
@@ -8185,11 +8563,13 @@ TEST_F(DBCompactionTest, CompactionWithBlobGCError_InlinedTTLIndex) {
   constexpr Slice* begin = nullptr;
   constexpr Slice* end = nullptr;
 
-  ASSERT_TRUE(
-      db_->CompactRange(CompactRangeOptions(), begin, end).IsCorruption());
+  auto expected_completion_status = Status::Corruption();
+  MyCompactRange(CompactRangeOptions(), begin, end, false,
+                 &expected_completion_status);
 }
 
-TEST_F(DBCompactionTest, CompactionWithBlobGCError_IndexWithInvalidFileNumber) {
+TEST_P(DBCompactionTestWithMCC,
+       CompactionWithBlobGCError_IndexWithInvalidFileNumber) {
   Options options;
   options.env = env_;
   options.disable_auto_compactions = true;
@@ -8235,8 +8615,9 @@ TEST_F(DBCompactionTest, CompactionWithBlobGCError_IndexWithInvalidFileNumber) {
   constexpr Slice* begin = nullptr;
   constexpr Slice* end = nullptr;
 
-  ASSERT_TRUE(
-      db_->CompactRange(CompactRangeOptions(), begin, end).IsCorruption());
+  auto expected_completion_status = Status::Corruption();
+  MyCompactRange(CompactRangeOptions(), begin, end, false,
+                 &expected_completion_status);
 }
 
 TEST_F(DBCompactionTest, CompactionWithChecksumHandoff1) {
@@ -8593,7 +8974,7 @@ TEST_F(DBCompactionTest, FIFOWarm) {
   Destroy(options);
 }
 
-TEST_F(DBCompactionTest, DisableMultiManualCompaction) {
+TEST_P(DBCompactionTestWithMCC, DisableMultiManualCompaction) {
   const int kNumL0Files = 10;
 
   Options options = CurrentOptions();
@@ -8633,8 +9014,8 @@ TEST_F(DBCompactionTest, DisableMultiManualCompaction) {
     std::string end_str = Key(3);
     Slice b = begin_str;
     Slice e = end_str;
-    auto s = db_->CompactRange(cro, &b, &e);
-    ASSERT_TRUE(s.IsIncomplete());
+    auto expected_completion_status = Status::Incomplete();
+    MyCompactRange(cro, &b, &e, false, &expected_completion_status);
   });
 
   port::Thread compact_thread2([&]() {
@@ -8644,8 +9025,8 @@ TEST_F(DBCompactionTest, DisableMultiManualCompaction) {
     std::string end_str = Key(7);
     Slice b = begin_str;
     Slice e = end_str;
-    auto s = db_->CompactRange(cro, &b, &e);
-    ASSERT_TRUE(s.IsIncomplete());
+    auto expected_completion_status = Status::Incomplete();
+    MyCompactRange(cro, &b, &e, false, &expected_completion_status);
   });
 
   // Disable manual compaction should cancel both manual compactions and both
@@ -8663,7 +9044,7 @@ TEST_F(DBCompactionTest, DisableMultiManualCompaction) {
   ASSERT_OK(dbfull()->TEST_WaitForCompact(true));
 }
 
-TEST_F(DBCompactionTest, DisableJustStartedManualCompaction) {
+TEST_P(DBCompactionTestWithMCC, DisableJustStartedManualCompaction) {
   const int kNumL0Files = 4;
 
   Options options = CurrentOptions();
@@ -8691,8 +9072,8 @@ TEST_F(DBCompactionTest, DisableJustStartedManualCompaction) {
   port::Thread compact_thread([&]() {
     CompactRangeOptions cro;
     cro.exclusive_manual_compaction = true;
-    auto s = db_->CompactRange(cro, nullptr, nullptr);
-    ASSERT_TRUE(s.IsIncomplete());
+    auto expected_completion_status = Status::Incomplete();
+    MyCompactRange(cro, nullptr, nullptr, false, &expected_completion_status);
   });
   TEST_SYNC_POINT(
       "DBCompactionTest::DisableJustStartedManualCompaction:"
@@ -8702,7 +9083,7 @@ TEST_F(DBCompactionTest, DisableJustStartedManualCompaction) {
   compact_thread.join();
 }
 
-TEST_F(DBCompactionTest, DisableInProgressManualCompaction) {
+TEST_P(DBCompactionTestWithMCC, DisableInProgressManualCompaction) {
   const int kNumL0Files = 4;
 
   Options options = CurrentOptions();
@@ -8727,8 +9108,8 @@ TEST_F(DBCompactionTest, DisableInProgressManualCompaction) {
   port::Thread compact_thread([&]() {
     CompactRangeOptions cro;
     cro.exclusive_manual_compaction = true;
-    auto s = db_->CompactRange(cro, nullptr, nullptr);
-    ASSERT_TRUE(s.IsIncomplete());
+    auto expected_completion_status = Status::Incomplete();
+    MyCompactRange(cro, nullptr, nullptr, false, &expected_completion_status);
   });
 
   TEST_SYNC_POINT(
@@ -8739,7 +9120,7 @@ TEST_F(DBCompactionTest, DisableInProgressManualCompaction) {
   compact_thread.join();
 }
 
-TEST_F(DBCompactionTest, DisableManualCompactionThreadQueueFull) {
+TEST_P(DBCompactionTestWithMCC, DisableManualCompactionThreadQueueFull) {
   const int kNumL0Files = 4;
 
   SyncPoint::GetInstance()->LoadDependency(
@@ -8770,8 +9151,8 @@ TEST_F(DBCompactionTest, DisableManualCompactionThreadQueueFull) {
   port::Thread compact_thread([&]() {
     CompactRangeOptions cro;
     cro.exclusive_manual_compaction = true;
-    auto s = db_->CompactRange(cro, nullptr, nullptr);
-    ASSERT_TRUE(s.IsIncomplete());
+    auto expected_completion_status = Status::Incomplete();
+    MyCompactRange(cro, nullptr, nullptr, false, &expected_completion_status);
   });
 
   TEST_SYNC_POINT(
@@ -8801,7 +9182,7 @@ TEST_F(DBCompactionTest, DisableManualCompactionThreadQueueFull) {
   ASSERT_EQ("0,1", FilesPerLevel(0));
 }
 
-TEST_F(DBCompactionTest, DisableManualCompactionThreadQueueFullDBClose) {
+TEST_P(DBCompactionTestWithMCC, DisableManualCompactionThreadQueueFullDBClose) {
   const int kNumL0Files = 4;
 
   SyncPoint::GetInstance()->LoadDependency(
@@ -8832,8 +9213,8 @@ TEST_F(DBCompactionTest, DisableManualCompactionThreadQueueFullDBClose) {
   port::Thread compact_thread([&]() {
     CompactRangeOptions cro;
     cro.exclusive_manual_compaction = true;
-    auto s = db_->CompactRange(cro, nullptr, nullptr);
-    ASSERT_TRUE(s.IsIncomplete());
+    auto expected_completion_status = Status::Incomplete();
+    MyCompactRange(cro, nullptr, nullptr, false, &expected_completion_status);
   });
 
   TEST_SYNC_POINT(
@@ -8866,7 +9247,7 @@ TEST_F(DBCompactionTest, DisableManualCompactionThreadQueueFullDBClose) {
   }
 }
 
-TEST_F(DBCompactionTest, DBCloseWithManualCompaction) {
+TEST_P(DBCompactionTestWithMCC, DBCloseWithManualCompaction) {
   const int kNumL0Files = 4;
 
   SyncPoint::GetInstance()->LoadDependency(
@@ -8897,8 +9278,8 @@ TEST_F(DBCompactionTest, DBCloseWithManualCompaction) {
   port::Thread compact_thread([&]() {
     CompactRangeOptions cro;
     cro.exclusive_manual_compaction = true;
-    auto s = db_->CompactRange(cro, nullptr, nullptr);
-    ASSERT_TRUE(s.IsIncomplete());
+    auto expected_completion_status = Status::Incomplete();
+    MyCompactRange(cro, nullptr, nullptr, false, &expected_completion_status);
   });
 
   TEST_SYNC_POINT(
@@ -8928,7 +9309,7 @@ TEST_F(DBCompactionTest, DBCloseWithManualCompaction) {
   }
 }
 
-TEST_F(DBCompactionTest,
+TEST_P(DBCompactionTestWithMCC,
        DisableManualCompactionDoesNotWaitForDrainingAutomaticCompaction) {
   // When `CompactRangeOptions::exclusive_manual_compaction == true`, we wait
   // for automatic compactions to drain before starting the manual compaction.
@@ -8965,13 +9346,14 @@ TEST_F(DBCompactionTest,
 
   CompactRangeOptions cro;
   cro.exclusive_manual_compaction = true;
-  ASSERT_TRUE(db_->CompactRange(cro, nullptr, nullptr).IsIncomplete());
+  auto expected_completion_status = Status::Incomplete();
+  MyCompactRange(cro, nullptr, nullptr, false, &expected_completion_status);
 
   ASSERT_OK(dbfull()->TEST_WaitForCompact());
   ASSERT_TRUE(callback_completed);
 }
 
-TEST_F(DBCompactionTest, ChangeLevelConflictsWithManual) {
+TEST_P(DBCompactionTestWithMCC, ChangeLevelConflictsWithManual) {
   Options options = CurrentOptions();
   options.num_levels = 3;
   Reopen(options);
@@ -8984,7 +9366,7 @@ TEST_F(DBCompactionTest, ChangeLevelConflictsWithManual) {
     CompactRangeOptions cro;
     cro.change_level = true;
     cro.target_level = 2;
-    ASSERT_OK(dbfull()->CompactRange(cro, nullptr, nullptr));
+    MyCompactRange(cro, nullptr, nullptr, true);
   }
   ASSERT_EQ("0,0,1", FilesPerLevel(0));
 
@@ -9032,7 +9414,7 @@ TEST_F(DBCompactionTest, ChangeLevelConflictsWithManual) {
     CompactRangeOptions cro;
     cro.change_level = true;
     cro.target_level = 1;
-    ASSERT_OK(dbfull()->CompactRange(cro, nullptr, nullptr));
+    MyCompactRange(cro, nullptr, nullptr, true);
   });
 
   TEST_SYNC_POINT(
@@ -9040,14 +9422,15 @@ TEST_F(DBCompactionTest, ChangeLevelConflictsWithManual) {
       "PreForegroundCompactRange");
   ASSERT_OK(Put(Key(0), rnd.RandomString(990)));
   ASSERT_OK(Put(Key(1), rnd.RandomString(990)));
-  ASSERT_TRUE(dbfull()
-                  ->CompactRange(CompactRangeOptions(), nullptr, nullptr)
-                  .IsIncomplete());
+  auto expected_completion_status = Status::Incomplete();
+  MyCompactRange(CompactRangeOptions(), nullptr, nullptr, false,
+                 &expected_completion_status);
 
   refit_level_thread.join();
 }
 
-TEST_F(DBCompactionTest, BottomPriCompactionCountsTowardConcurrencyLimit) {
+TEST_P(DBCompactionTestWithMCC,
+       BottomPriCompactionCountsTowardConcurrencyLimit) {
   // Flushes several files to trigger compaction while lock is released during
   // a bottom-pri compaction. Verifies it does not get scheduled to thread pool
   // because per-DB limit for compaction parallelism is one (default).
@@ -9080,7 +9463,7 @@ TEST_F(DBCompactionTest, BottomPriCompactionCountsTowardConcurrencyLimit) {
     CompactRangeOptions cro;
     cro.bottommost_level_compaction = BottommostLevelCompaction::kForce;
     cro.exclusive_manual_compaction = false;
-    ASSERT_OK(dbfull()->CompactRange(cro, nullptr, nullptr));
+    MyCompactRange(cro, nullptr, nullptr, true);
   });
 
   // Sleep in the low-pri thread so any newly scheduled compaction will be
@@ -9141,6 +9524,9 @@ TEST_F(DBCompactionTest, BottommostFileCompactionAllowIngestBehind) {
   // it used to wait forever before the fix.
   // ASSERT_OK(dbfull()->TEST_WaitForCompact(true /* wait_unscheduled */));
 }
+
+INSTANTIATE_TEST_CASE_P(DBCompactionTestWithMCC, DBCompactionTestWithMCC,
+                        testing::Bool());
 
 }  // namespace ROCKSDB_NAMESPACE
 

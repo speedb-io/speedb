@@ -8,7 +8,11 @@
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 #include <cinttypes>
 #include <deque>
+#include <functional>
 #include <limits>
+#include <memory>
+#include <sstream>
+#include <thread>
 
 #include "db/builder.h"
 #include "db/db_impl/db_impl.h"
@@ -20,6 +24,7 @@
 #include "monitoring/perf_context_imp.h"
 #include "monitoring/thread_status_updater.h"
 #include "monitoring/thread_status_util.h"
+#include "port/port.h"
 #include "test_util/sync_point.h"
 #include "util/cast_util.h"
 #include "util/concurrent_task_limiter_impl.h"
@@ -893,12 +898,23 @@ Status DBImpl::CompactRange(const CompactRangeOptions& options,
                             ColumnFamilyHandle* column_family,
                             const Slice* begin_without_ts,
                             const Slice* end_without_ts) {
+  auto HandleImmediateReturn = [&options](Status completion_status) {
+    if (options.async_completion_cb) {
+      options.async_completion_cb->InternalCompletedCb(completion_status);
+      return Status::OK();
+    } else {
+      return completion_status;
+    }
+  };
+
   if (manual_compaction_paused_.load(std::memory_order_acquire) > 0) {
-    return Status::Incomplete(Status::SubCode::kManualCompactionPaused);
+    return HandleImmediateReturn(
+        Status::Incomplete(Status::SubCode::kManualCompactionPaused));
   }
 
   if (options.canceled && options.canceled->load(std::memory_order_acquire)) {
-    return Status::Incomplete(Status::SubCode::kManualCompactionPaused);
+    return HandleImmediateReturn(
+        Status::Incomplete(Status::SubCode::kManualCompactionPaused));
   }
 
   const Comparator* const ucmp = column_family->GetComparator();
@@ -987,6 +1003,30 @@ Status DBImpl::IncreaseFullHistoryTsLowImpl(ColumnFamilyData* cfd,
   return Status::OK();
 }
 
+void DBImpl::CompactRangeNonBlockingThread(const CompactRangeOptions options,
+                                           ColumnFamilyData* cfd,
+                                           std::string begin_str,
+                                           std::string end_str,
+                                           const std::string trim_ts) {
+  assert(options.async_completion_cb);
+
+  if (shutdown_initiated_) {
+    options.async_completion_cb->InternalCompletedCb(
+        Status::ShutdownInProgress());
+    return;
+  }
+
+  Slice begin{begin_str};
+  Slice* begin_to_use = begin.empty() ? nullptr : &begin;
+  Slice end{end_str};
+  Slice* end_to_use = end.empty() ? nullptr : &end;
+
+  auto status = CompactRangeInternalBlocking(options, cfd, begin_to_use,
+                                             end_to_use, trim_ts);
+
+  options.async_completion_cb->InternalCompletedCb(status);
+}
+
 Status DBImpl::CompactRangeInternal(const CompactRangeOptions& options,
                                     ColumnFamilyHandle* column_family,
                                     const Slice* begin, const Slice* end,
@@ -994,27 +1034,61 @@ Status DBImpl::CompactRangeInternal(const CompactRangeOptions& options,
   auto cfh = static_cast_with_check<ColumnFamilyHandleImpl>(column_family);
   auto cfd = cfh->cfd();
 
-  if (options.target_path_id >= cfd->ioptions()->cf_paths.size()) {
-    return Status::InvalidArgument("Invalid target path ID");
-  }
+  auto HandleImmediateReturn = [&options](Status completion_status) {
+    if (options.async_completion_cb) {
+      options.async_completion_cb->InternalCompletedCb(completion_status);
+      return Status::OK();
+    } else {
+      return completion_status;
+    }
+  };
 
-  bool flush_needed = true;
+  if (options.target_path_id >= cfd->ioptions()->cf_paths.size()) {
+    return HandleImmediateReturn(
+        Status::InvalidArgument("Invalid target path ID"));
+  }
 
   // Update full_history_ts_low if it's set
   if (options.full_history_ts_low != nullptr &&
       !options.full_history_ts_low->empty()) {
     std::string ts_low = options.full_history_ts_low->ToString();
     if (begin != nullptr || end != nullptr) {
-      return Status::InvalidArgument(
-          "Cannot specify compaction range with full_history_ts_low");
+      return HandleImmediateReturn(Status::InvalidArgument(
+          "Cannot specify compaction range with full_history_ts_low"));
     }
     Status s = IncreaseFullHistoryTsLowImpl(cfd, ts_low);
     if (!s.ok()) {
       LogFlush(immutable_db_options_.info_log);
-      return s;
+      return HandleImmediateReturn(s);
     }
   }
 
+  if (options.async_completion_cb) {
+    std::string begin_str;
+    if (begin != nullptr) {
+      begin_str.assign(begin->data(), begin->size());
+    }
+    std::string end_str;
+    if (end != nullptr) {
+      end_str.assign(end->data(), end->size());
+    }
+    port::Thread compact_range_thread(&DBImpl::CompactRangeNonBlockingThread,
+                                      this, options, cfd, begin_str, end_str,
+                                      trim_ts);
+    compact_range_threads_mngr_.AddThread(std::move(compact_range_thread),
+                                          options.async_completion_cb);
+    return Status::OK();
+  } else {
+    return CompactRangeInternalBlocking(options, cfd, begin, end, trim_ts);
+  }
+}
+
+Status DBImpl::CompactRangeInternalBlocking(const CompactRangeOptions& options,
+                                            ColumnFamilyData* cfd,
+                                            const Slice* begin,
+                                            const Slice* end,
+                                            const std::string& trim_ts) {
+  bool flush_needed = true;
   Status s;
   if (begin != nullptr && end != nullptr) {
     // TODO(ajkr): We could also optimize away the flush in certain cases where

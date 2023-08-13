@@ -98,4 +98,20 @@ public class CompactRangeOptionsTest {
     opt.setMaxSubcompactions(value);
     assertThat(opt.maxSubcompactions()).isEqualTo(value);
   }
+
+  @Test
+  public void asyncCompletionCb() {
+    CompactRangeOptions opt = new CompactRangeOptions();
+
+    try (final AbstractCompactRangeCompletedCb completeCb = new TestCompactRangeCompletedCb()) {
+      opt.setAsyncCompletionCb(completeCb);
+    }
+  }
+
+  private static class TestCompactRangeCompletedCb extends AbstractCompactRangeCompletedCb {
+    @Override
+    public void CompactRangeCompleted(final Status completionStatus) {
+      System.err.println("In TestCompactRangeCompletedCb::CompactRangeCompleted");
+    }
+  }
 }

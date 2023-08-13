@@ -34,6 +34,7 @@
 #include "rocksdb/utilities/memory_util.h"
 #include "rocksdb/utilities/transaction_db.h"
 #include "rocksdb/utilities/write_batch_with_index.h"
+#include "rocksjni/compact_range_completed_jnicallback.h"
 #include "rocksjni/compaction_filter_factory_jnicallback.h"
 #include "rocksjni/comparatorjnicallback.h"
 #include "rocksjni/cplusplus_to_java_convert.h"
@@ -8321,6 +8322,44 @@ class AbstractEventListenerJni
     assert(jclazz != nullptr);
     static jmethodID mid = env->GetMethodID(jclazz, "onErrorRecoveryCompleted",
                                             "(Lorg/rocksdb/Status;)V");
+    assert(mid != nullptr);
+    return mid;
+  }
+};
+
+// The portal class for org.rocksdb.AbstractCompactRangeCompletedCb
+class AbstractCompactRangeCompletedCbJni
+    : public RocksDBNativeClass<
+          const ROCKSDB_NAMESPACE::CompactRangeCompletedJniCallback*,
+          AbstractCompactRangeCompletedCbJni> {
+ public:
+  /**
+   * Get the Java Class org.rocksdb.AbstractCompactRangeCompletedCb
+   *
+   * @param env A pointer to the Java environment
+   *
+   * @return The Java Class or nullptr if one of the
+   *     ClassFormatError, ClassCircularityError, NoClassDefFoundError,
+   *     OutOfMemoryError or ExceptionInInitializerError exceptions is thrown
+   */
+  static jclass getJClass(JNIEnv* env) {
+    return RocksDBNativeClass::getJClass(
+        env, "org/rocksdb/AbstractCompactRangeCompletedCb");
+  }
+
+  /**
+   * Get the Java Method:
+   * AbstractCompactRangeCompletedCb#compactRangeCompletedCbProxy
+   *
+   * @param env A pointer to the Java environment
+   *
+   * @return The Java Method ID
+   */
+  static jmethodID getCompletedCbProxyMethodId(JNIEnv* env) {
+    jclass jclazz = getJClass(env);
+    assert(jclazz != nullptr);
+    static jmethodID mid = env->GetMethodID(
+        jclazz, "compactRangeCompletedCbProxy", "(Lorg/rocksdb/Status;)V");
     assert(mid != nullptr);
     return mid;
   }

@@ -21,7 +21,7 @@ CFLAGS += -Wstrict-prototypes
 
 all: simple_example column_families_example compaction_filter_example compact_files_example c_simple_example optimistic_transaction_example \
 	 transaction_example options_file_example rocksdb_backup_restore_example speedb_is_awesome_example speedb_with_ttl_example \
-	 enable_speedb_features_example on_thread_start_callback_example
+	 enable_speedb_features_example on_thread_start_callback_example speedb_non_blocking_compact_range_example
 
 simple_example: static_lib simple_example.cc
 	$(CXX) $(CXXFLAGS) $@.cc -o$@ ../$(LIBNAME).a -I../include -O2 -std=c++17 $(PLATFORM_LDFLAGS) $(PLATFORM_CXXFLAGS) $(EXEC_LDFLAGS)
@@ -64,13 +64,17 @@ speedb_with_ttl_example: static_lib speedb_with_ttl_example.cc
 on_thread_start_callback_example: static_lib on_thread_start_callback_example.cc
 	$(CXX) $(CXXFLAGS) $@.cc -o$@ ../$(LIBNAME).a -I../include -O2 -std=c++17 $(PLATFORM_LDFLAGS) $(PLATFORM_CXXFLAGS) $(EXEC_LDFLAGS)
 
+speedb_non_blocking_compact_range_example: static_lib speedb_non_blocking_compact_range_example.cc
+	$(CXX) $(CXXFLAGS) $@.cc -o$@ ../$(LIBNAME).a -I../include -O2 -std=c++17 $(PLATFORM_LDFLAGS) $(PLATFORM_CXXFLAGS) $(EXEC_LDFLAGS)
+
 rocksdb_backup_restore_example: static_lib rocksdb_backup_restore_example.cc
 	$(CXX) $(CXXFLAGS) $@.cc -o$@ ../$(LIBNAME).a -I../include -O2 -std=c++17 $(PLATFORM_LDFLAGS) $(PLATFORM_CXXFLAGS) $(EXEC_LDFLAGS)
 
 clean:
 	rm -rf ./simple_example ./column_families_example ./compact_files_example ./compaction_filter_example ./c_simple_example c_simple_example.o \
 		   ./optimistic_transaction_example ./transaction_example ./options_file_example ./multi_processes_example ./rocksdb_backup_restore_example \
-		   ./speedb_is_awesome_example ./speedb_with_ttl_example ./enable_speedb_features_example ./on_thread_start_callback_example
+		   ./speedb_is_awesome_example ./speedb_with_ttl_example ./enable_speedb_features_example ./on_thread_start_callback_example \
+			 ./speedb_non_blocking_compact_range_example
 
 static_lib:
 	LIBNAME="$(LIBNAME)" $(MAKE) -C .. static_lib

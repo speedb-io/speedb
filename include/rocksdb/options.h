@@ -56,8 +56,9 @@ class Statistics;
 class InternalKeyComparator;
 class WalFilter;
 class WriteBufferManager;
-class FileSystem;
 class WriteController;
+class FileSystem;
+class SharedOptions;
 
 struct Options;
 struct DbPath;
@@ -105,6 +106,18 @@ struct ColumnFamilyOptions : public AdvancedColumnFamilyOptions {
   ColumnFamilyOptions* OptimizeUniversalStyleCompaction(
       uint64_t memtable_memory_budget = 512 * 1024 * 1024);
 
+  // Default values for some parameters in ColumnFamilyOptions are not
+  // optimized for Speedb features, As a starting point for configuring
+  // Speedb Features.
+  // please avoid changing:
+  // write_buffer_size, cache, write_controller, write_buffer_manager,
+  // table_factory, memtable_factory.
+  // the function might override any of those major options, some more options
+  // might be overridden please read the code.
+  // use example can be found in  enable_speedb_features_example.cc
+  // bucket count is initialized to 0; max_write_buffer_number is initialized to
+  // 32
+  ColumnFamilyOptions* EnableSpeedbFeaturesCF(SharedOptions& shared_options);
   // -------------------
   // Parameters that affect behavior
 
@@ -481,6 +494,19 @@ struct DBOptions {
   // cores. You almost definitely want to call this function if your system is
   // bottlenecked by RocksDB.
   DBOptions* IncreaseParallelism(int total_threads = 16);
+
+  // Enable Speedb features function for DBOptions
+  //
+  // please avoid changing:
+  // write_buffer_size cache, write_controller, delayed_write_rate
+  // bytes_per_sync, write_buffer_manager, use_dynamic_delay table_factory and
+  // memtable_factory we will initialize and configure those.
+  // the function might override any of those major options, some more options
+  // might be overridden please read the code.
+  // use example can be fuond in  enable_speedb_features_example.cc
+  DBOptions* EnableSpeedbFeaturesDB(SharedOptions& shared_options);
+
+  // #endif  // ROCKSDB_LITE
 
   // If true, the database will be created if it is missing.
   // Default: false
@@ -1523,6 +1549,17 @@ struct Options : public DBOptions, public ColumnFamilyOptions {
   // Use this if your DB is very small (like under 1GB) and you don't want to
   // spend lots of memory for memtables.
   Options* OptimizeForSmallDb();
+  // Default values for some parameters in Options are not
+  // optimized for Speedb features, As a starting point for configuring
+  // Speedb Features.
+  // if you choose to use it you should not change:
+  // total_ram_size_bytes, max_background_jobs, delayed_write_rate,
+  // write_buffer_size cache, write_controller,
+  // write_buffer_manager,bytes_per_sync, use_dynamic_delay table_factory and
+  // memtable_factory we will initialize and configure those.
+  // the function might overide any of those.
+  // use example can be found in  enable_speedb_features_example.cc
+  Options* EnableSpeedbFeatures(SharedOptions& shared_options);
 
   // Disable some checks that should not be necessary in the absence of
   // software logic errors or CPU+memory hardware errors. This can improve
@@ -2229,6 +2266,39 @@ struct WaitForCompactOptions {
   // when timeout == 0, WaitForCompact() will wait as long as there's background
   // work to finish.
   std::chrono::microseconds timeout = std::chrono::microseconds::zero();
+};
+
+// use this class to arrange multiple db shared options as a group
+// this class includes all the shared_ptrs from DBOptions.
+// it is also includes initialization for Speedb features
+// more info and use example can be found in  enable_speedb_features_example.cc
+class SharedOptions {
+ public:
+  SharedOptions();
+  SharedOptions(size_t total_ram_size_bytes, size_t total_threads,
+                size_t delayed_write_rate = 256 * 1024 * 1024ul);
+  size_t GetTotalThreads() { return total_threads_; }
+  size_t GetTotalRamSizeBytes() { return total_ram_size_bytes_; }
+  size_t GetDelayedWriteRate() { return delayed_write_rate_; }
+  // this function will increase write buffer manager by increased_by amount
+  // as long as the result is not bigger than the maximum size of
+  // total_ram_size_ /4
+  void IncreaseWriteBufferSize(size_t increase_by);
+
+  std::shared_ptr<Cache> cache = nullptr;
+  std::shared_ptr<WriteController> write_controller = nullptr;
+  std::shared_ptr<WriteBufferManager> write_buffer_manager = nullptr;
+  Env* env = Env::Default();
+  std::shared_ptr<RateLimiter> rate_limiter = nullptr;
+  std::shared_ptr<SstFileManager> sst_file_manager = nullptr;
+  std::shared_ptr<Logger> info_log = nullptr;
+  std::vector<std::shared_ptr<EventListener>> listeners;
+  std::shared_ptr<FileChecksumGenFactory> file_checksum_gen_factory = nullptr;
+
+ private:
+  size_t total_threads_ = 0;
+  size_t total_ram_size_bytes_ = 0;
+  size_t delayed_write_rate_ = 0;
 };
 
 }  // namespace ROCKSDB_NAMESPACE

@@ -22,6 +22,11 @@
 Based on RocksDB 8.1.1
 
 ### New Features
+ * Enable Speedb Features : Speedb users currently configure the database manually. New Speedb users are required to spend a lot of effort reading the documentation of the Speedb features.
+ The purpose of this feature is to help users enable and set Speedb options easily to a default configuration.
+ The SharedOptions class was added to improve the usability of multiple databases cases by arranging shared options.(#543)
+
+### New Features
 * Delay writes gradually based on memory usage of the WriteBufferManager (WBM).
 Before this PR, setting allow_stall in the WBM's constructor meant that writes are completely stopped when the WBM's memory usage exceeds its quota. The goal here is to gradually decrease
 the users write speed before that threshold is reached in order to gain stability.

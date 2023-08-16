@@ -597,7 +597,7 @@ int main(int argc, char** argv) {
     options.prefix_extractor.reset(
         ROCKSDB_NAMESPACE::NewFixedPrefixTransform(FLAGS_prefix_length));
   } else if (FLAGS_memtablerep == "hashspdb") {
-    factory.reset(ROCKSDB_NAMESPACE::NewHashSpdbRepFactory(FLAGS_bucket_count);
+    factory.reset(ROCKSDB_NAMESPACE::NewHashSpdbRepFactory(FLAGS_bucket_count));
   } else {
     ROCKSDB_NAMESPACE::ConfigOptions config_options;
     config_options.ignore_unsupported_options = false;

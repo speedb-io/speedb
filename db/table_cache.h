@@ -237,6 +237,10 @@ class TableCache {
     }
   }
 
+  void SetBlockCacheOwnerId(Cache::ItemOwnerId cache_owner_id) {
+    cache_owner_id_ = cache_owner_id;
+  }
+
  private:
   // Build a table reader
   Status GetTableReader(
@@ -278,6 +282,7 @@ class TableCache {
   Striped<CacheAlignedWrapper<port::Mutex>> loader_mutex_;
   std::shared_ptr<IOTracer> io_tracer_;
   std::string db_session_id_;
+  Cache::ItemOwnerId cache_owner_id_ = Cache::kUnknownItemOwnerId;
 };
 
 }  // namespace ROCKSDB_NAMESPACE

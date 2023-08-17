@@ -563,6 +563,8 @@ class ColumnFamilyData {
   static constexpr uint64_t kLaggingFlushesThreshold = 10U;
   void SetNumTimedQueuedForFlush(uint64_t num) { num_queued_for_flush_ = num; }
 
+  Cache::ItemOwnerId GetCacheOwnerId() const { return cache_owner_id_; }
+
   // Allocate and return a new epoch number
   uint64_t NewEpochNumber() { return next_epoch_number_.fetch_add(1); }
 
@@ -688,6 +690,8 @@ class ColumnFamilyData {
   uint64_t num_queued_for_flush_ = 0U;
 
   std::atomic<uint64_t> next_epoch_number_;
+
+  Cache::ItemOwnerId cache_owner_id_ = Cache::kUnknownItemOwnerId;
 };
 
 // ColumnFamilySet has interesting thread-safety requirements

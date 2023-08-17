@@ -585,7 +585,7 @@ Status BlockBasedTableFactory::NewTableReader(
       table_reader_options.block_cache_tracer,
       table_reader_options.max_file_size_for_l0_meta_pin,
       table_reader_options.cur_db_session_id, table_reader_options.cur_file_num,
-      table_reader_options.unique_id);
+      table_reader_options.unique_id, table_reader_options.cache_owner_id);
 }
 
 TableBuilder* BlockBasedTableFactory::NewTableBuilder(

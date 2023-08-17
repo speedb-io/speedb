@@ -646,6 +646,11 @@ ColumnFamilyData::ColumnFamilyData(
               CacheReservationManagerImpl<CacheEntryRole::kFileMetadata>>(
               bbto->block_cache)));
     }
+
+    if (bbto->block_cache && table_cache_) {
+      cache_owner_id_ = bbto->block_cache->GetNextItemOwnerId();
+      table_cache_->SetBlockCacheOwnerId(cache_owner_id_);
+    }
   }
 }
 
@@ -658,6 +663,12 @@ ColumnFamilyData::~ColumnFamilyData() {
   auto next = next_;
   prev->next_ = next;
   next->prev_ = prev;
+
+  const BlockBasedTableOptions* bbto =
+      ioptions_.table_factory->GetOptions<BlockBasedTableOptions>();
+  if (bbto && bbto->block_cache) {
+    bbto->block_cache->DiscardItemOwnerId(&cache_owner_id_);
+  }
 
   if (!dropped_ && column_family_set_ != nullptr) {
     // If it's dropped, it's already removed from column family set

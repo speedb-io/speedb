@@ -5,6 +5,7 @@
 ### New Features
 * Snapshot optimization - The most important information inside a snapshot is its Sequence number, which allows the compaction to know if the key-value should be deleted or not. The sequence number is being changed when modification happens in the db. This feature allows the db to take a snapshot without acquiring db mutex when the last snapshot has the same sequence number as a new one. In transactional db with mostly read operations, it should improve performance when used with multithreaded environment and as well other scenarios of taking large amount of snapshots with mostly read operations.
 * Add a TablePinningPolicy to the BlockBasedTableOptions.  This class controls when blocks should be pinned in memory for a block based table.  The default behavior uses the MetadataCacheOptions to control pinning and behaves identical to the previous releases. 
+* Redo of Index/Filter/Data blocks sizes in Block (LRU) Block Cache per CF after rebase on RocksDB 8.1 . This was part of v2.3.0 and was broken due to changes made in RocksDB. This feature provides per CF information on the size of its Index / Filter / Data blocks in the block cache (only for LRUCache at the moment). The information is printed to the log and the kBlockCacheCfStats and kFastBlockCacheCfStats properties were added to support obtaining the information programmatically.
 
 ### Enhancements
 * db_bench: add estimate-table-readers-mem benchmark which prints these stats.

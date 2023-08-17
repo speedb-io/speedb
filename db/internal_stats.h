@@ -480,6 +480,10 @@ class InternalStats {
     uint64_t last_end_time_micros_ = 0;
     uint32_t hash_seed = 0;
 
+    std::unordered_map<Cache::ItemOwnerId,
+                       std::array<size_t, kNumCacheEntryRoles>>
+        charge_per_item_owner;
+
     void Clear() {
       // Wipe everything except collection_count
       uint32_t saved_collection_count = collection_count;
@@ -489,7 +493,8 @@ class InternalStats {
 
     void BeginCollection(Cache*, SystemClock*, uint64_t start_time_micros);
     std::function<void(const Slice& key, Cache::ObjectPtr value, size_t charge,
-                       const Cache::CacheItemHelper* helper)>
+                       const Cache::CacheItemHelper* helper,
+                       Cache::ItemOwnerId item_owner_id)>
     GetEntryCallback();
     void EndCollection(Cache*, SystemClock*, uint64_t end_time_micros);
     void SkippedCollection();
@@ -497,6 +502,12 @@ class InternalStats {
     std::string ToString(SystemClock* clock) const;
     void ToMap(std::map<std::string, std::string>* values,
                SystemClock* clock) const;
+
+    std::string CacheOwnerStatsToString(const std::string& cf_name,
+                                        Cache::ItemOwnerId cache_owner_id);
+    void CacheOwnerStatsToMap(const std::string& cf_name,
+                              Cache::ItemOwnerId cache_owner_id,
+                              std::map<std::string, std::string>* values) const;
 
    private:
     uint64_t GetLastDurationMicros() const;
@@ -847,6 +858,15 @@ class InternalStats {
                                      Slice suffix);
   bool HandleFastBlockCacheEntryStats(std::string* value, Slice suffix);
   bool HandleFastBlockCacheEntryStatsMap(
+      std::map<std::string, std::string>* values, Slice suffix);
+  bool HandleBlockCacheCfStatsInternal(std::string* value, bool fast);
+  bool HandleBlockCacheCfStatsMapInternal(
+      std::map<std::string, std::string>* values, bool fast);
+  bool HandleBlockCacheCfStats(std::string* value, Slice suffix);
+  bool HandleBlockCacheCfStatsMap(std::map<std::string, std::string>* values,
+                                  Slice suffix);
+  bool HandleFastBlockCacheCfStats(std::string* value, Slice suffix);
+  bool HandleFastBlockCacheCfStatsMap(
       std::map<std::string, std::string>* values, Slice suffix);
   bool HandleLiveSstFilesSizeAtTemperature(std::string* value, Slice suffix);
   bool HandleNumBlobFiles(uint64_t* value, DBImpl* db, Version* version);

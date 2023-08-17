@@ -101,4 +101,19 @@ std::string BlockCacheEntryStatsMapKeys::UsedPercent(CacheEntryRole role) {
   return GetPrefixedCacheEntryRoleName(kPrefix, role);
 }
 
+const std::string& BlockCacheCfStatsMapKeys::CfName() {
+  static const std::string kCfName = "cf_name";
+  return kCfName;
+}
+
+const std::string& BlockCacheCfStatsMapKeys::CacheId() {
+  static const std::string kCacheId = "id";
+  return kCacheId;
+}
+
+std::string BlockCacheCfStatsMapKeys::UsedBytes(CacheEntryRole role) {
+  const static std::string kPrefix = "bytes.";
+  return GetPrefixedCacheEntryRoleName(kPrefix, role);
+}
+
 }  // namespace ROCKSDB_NAMESPACE

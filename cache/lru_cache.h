@@ -59,6 +59,7 @@ struct LRUHandle {
   uint32_t hash;
   // The number of external refs to this entry. The cache itself is not counted.
   uint32_t refs;
+  Cache::ItemOwnerId item_owner_id = Cache::kUnknownItemOwnerId;
 
   // Mutable flags - access controlled by mutex
   // The m_ and M_ prefixes (and im_ and IM_ later) are to hopefully avoid
@@ -302,6 +303,12 @@ class ALIGN_AS(CACHE_LINE_SIZE) LRUCacheShard final : public CacheShardBase {
                 const Cache::CacheItemHelper* helper, size_t charge,
                 LRUHandle** handle, Cache::Priority priority);
 
+  Status InsertWithOwnerId(const Slice& key, uint32_t hash,
+                           Cache::ObjectPtr value,
+                           const Cache::CacheItemHelper* helper, size_t charge,
+                           Cache::ItemOwnerId /* item_owner_id */,
+                           LRUHandle** handle, Cache::Priority priority);
+
   LRUHandle* CreateStandalone(const Slice& key, uint32_t hash,
                               Cache::ObjectPtr obj,
                               const Cache::CacheItemHelper* helper,
@@ -325,10 +332,11 @@ class ALIGN_AS(CACHE_LINE_SIZE) LRUCacheShard final : public CacheShardBase {
   size_t GetOccupancyCount() const;
   size_t GetTableAddressCount() const;
 
-  void ApplyToSomeEntries(
+  void ApplyToSomeEntriesWithOwnerId(
       const std::function<void(const Slice& key, Cache::ObjectPtr value,
                                size_t charge,
-                               const Cache::CacheItemHelper* helper)>& callback,
+                               const Cache::CacheItemHelper* helper,
+                               Cache::ItemOwnerId item_owner_id)>& callback,
       size_t average_entries_per_lock, size_t* state);
 
   void EraseUnRefEntries();
@@ -373,7 +381,8 @@ class ALIGN_AS(CACHE_LINE_SIZE) LRUCacheShard final : public CacheShardBase {
 
   LRUHandle* CreateHandle(const Slice& key, uint32_t hash,
                           Cache::ObjectPtr value,
-                          const Cache::CacheItemHelper* helper, size_t charge);
+                          const Cache::CacheItemHelper* helper, size_t charge,
+                          Cache::ItemOwnerId item_owner_id);
 
   // Initialized before use.
   size_t capacity_;

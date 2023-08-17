@@ -114,7 +114,8 @@ class BlockBasedTable : public TableReader {
       size_t max_file_size_for_l0_meta_pin = 0,
       const std::string& cur_db_session_id = "", uint64_t cur_file_num = 0,
       UniqueId64x2 expected_unique_id = {},
-      const bool user_defined_timestamps_persisted = true);
+      const bool user_defined_timestamps_persisted = true,
+      Cache::ItemOwnerId cache_owner_id = Cache::kUnknownItemOwnerId);
 
   bool PrefixRangeMayMatch(const Slice& internal_key,
                            const ReadOptions& read_options,
@@ -568,7 +569,8 @@ struct BlockBasedTable::Rep {
       const BlockBasedTableOptions& _table_opt,
       const InternalKeyComparator& _internal_comparator, bool skip_filters,
       uint64_t _file_size, int _level, const bool _immortal_table,
-      const bool _user_defined_timestamps_persisted = true)
+      const bool _user_defined_timestamps_persisted = true,
+      Cache::ItemOwnerId _cache_owner_id = Cache::kUnknownItemOwnerId)
       : ioptions(_ioptions),
         env_options(_env_options),
         table_options(_table_opt),
@@ -582,7 +584,8 @@ struct BlockBasedTable::Rep {
         file_size(_file_size),
         level(_level),
         immortal_table(_immortal_table),
-        user_defined_timestamps_persisted(_user_defined_timestamps_persisted) {}
+        user_defined_timestamps_persisted(_user_defined_timestamps_persisted),
+        cache_owner_id(_cache_owner_id) {}
   ~Rep() { status.PermitUncheckedError(); }
   const ImmutableOptions& ioptions;
   const EnvOptions& env_options;
@@ -671,6 +674,8 @@ struct BlockBasedTable::Rep {
   // partitioned filters), the `first_internal_key` in `IndexValue`, the
   // `end_key` for range deletion entries.
   const bool user_defined_timestamps_persisted;
+
+  Cache::ItemOwnerId cache_owner_id = Cache::kUnknownItemOwnerId;
 
   std::unique_ptr<CacheReservationManager::CacheReservationHandle>
       table_reader_cache_res_handle = nullptr;

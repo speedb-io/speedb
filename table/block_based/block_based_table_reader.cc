@@ -582,7 +582,8 @@ Status BlockBasedTable::Open(
     BlockCacheTracer* const block_cache_tracer,
     size_t max_file_size_for_l0_meta_pin, const std::string& cur_db_session_id,
     uint64_t cur_file_num, UniqueId64x2 expected_unique_id,
-    const bool user_defined_timestamps_persisted) {
+    const bool user_defined_timestamps_persisted,
+    Cache::ItemOwnerId cache_owner_id) {
   table_reader->reset();
 
   Status s;
@@ -645,7 +646,7 @@ Status BlockBasedTable::Open(
   BlockCacheLookupContext lookup_context{TableReaderCaller::kPrefetch};
   Rep* rep = new BlockBasedTable::Rep(
       ioptions, env_options, table_options, internal_comparator, skip_filters,
-      file_size, level, immortal_table, user_defined_timestamps_persisted);
+      file_size, level, immortal_table, user_defined_timestamps_persisted, cache_owner_id);
   rep->file = std::move(file);
   rep->footer = footer;
 
@@ -1362,7 +1363,8 @@ WithBlocklikeCheck<Status, TBlocklike> BlockBasedTable::PutDataBlockToCache(
     s = block_cache.InsertFull(cache_key, block_holder.get(), charge,
                                &cache_handle, GetCachePriority<TBlocklike>(),
                                rep_->ioptions.lowest_used_cache_tier,
-                               compressed_block_contents.data, block_comp_type);
+                               compressed_block_contents.data, block_comp_type,
+                               rep_->cache_owner_id);
 
     if (s.ok()) {
       assert(cache_handle != nullptr);

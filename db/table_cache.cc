@@ -146,16 +146,19 @@ Status TableCache::GetTableReader(
     } else {
       expected_unique_id = kNullUniqueId64x2;  // null ID == no verification
     }
+
+    TableReaderOptions table_reader_options(
+        ioptions_, prefix_extractor, file_options, internal_comparator,
+        block_protection_bytes_per_key, skip_filters, immortal_tables_,
+        false /* force_direct_prefetch */, level, is_bottom, block_cache_tracer_,
+        max_file_size_for_l0_meta_pin, db_session_id_,
+        file_meta.fd.GetNumber(), expected_unique_id,
+        file_meta.fd.largest_seqno, file_meta.tail_size,
+        file_meta.user_defined_timestamps_persisted);
+    table_reader_options.cache_owner_id = cache_owner_id_;
+
     s = ioptions_.table_factory->NewTableReader(
-        ro,
-        TableReaderOptions(
-            ioptions_, prefix_extractor, file_options, internal_comparator,
-            block_protection_bytes_per_key, skip_filters, immortal_tables_,
-            false /* force_direct_prefetch */, level, is_bottom, block_cache_tracer_,
-            max_file_size_for_l0_meta_pin, db_session_id_,
-            file_meta.fd.GetNumber(), expected_unique_id,
-            file_meta.fd.largest_seqno, file_meta.tail_size,
-            file_meta.user_defined_timestamps_persisted),
+        ro, table_reader_options,
         std::move(file_reader), file_meta.fd.GetFileSize(), table_reader,
         prefetch_index_and_filter_in_cache);
     TEST_SYNC_POINT("TableCache::GetTableReader:0");

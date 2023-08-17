@@ -307,13 +307,16 @@ class FullTypedCacheInterface
       TypedHandle** handle = nullptr, Priority priority = Priority::LOW,
       CacheTier lowest_used_cache_tier = CacheTier::kNonVolatileBlockTier,
       const Slice& compressed = Slice(),
-      CompressionType type = CompressionType::kNoCompression) {
+      CompressionType type = CompressionType::kNoCompression,
+      Cache::ItemOwnerId item_owner_id = Cache::kUnknownItemOwnerId) {
+
     auto untyped_handle = reinterpret_cast<Handle**>(handle);
     auto helper = lowest_used_cache_tier > CacheTier::kVolatileTier
                       ? GetFullHelper()
                       : GetBasicHelper();
-    return this->cache_->Insert(key, UpCastValue(value), helper, charge,
-                                untyped_handle, priority, compressed, type);
+    return this->cache_->InsertWithOwnerId(key, UpCastValue(value), helper,
+                                           charge, item_owner_id,
+                                           untyped_handle, priority, compressed, type);
   }
 
   // Like SecondaryCache::InsertSaved, with SecondaryCache compatibility

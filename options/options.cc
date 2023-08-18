@@ -671,15 +671,7 @@ ColumnFamilyOptions* ColumnFamilyOptions::EnableSpeedbFeaturesCF(
   if (prefix_extractor) {
     memtable_factory.reset(NewHashSkipListRepFactory());
   } else {
-    std::string memtablerep = "speedb.HashSpdRepFactory";
-    std::string memtable_opt;
-    memtable_opt = ":" + std::to_string(0);
-    std::unique_ptr<MemTableRepFactory> mem_factory_ptr;
-
-    auto s = MemTableRepFactory::CreateFromString(
-        ConfigOptions(), memtablerep + memtable_opt, &mem_factory_ptr);
-    assert(s.ok());
-    memtable_factory.reset(mem_factory_ptr.release());
+    memtable_factory.reset(NewHashSpdbRepFactory());
   }
   return this;
 }

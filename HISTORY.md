@@ -1,6 +1,7 @@
 # Speedb Change Log 
 
 ## Unreleased
+* move hashSpdb memtable from plugin to main code (#639)
 
 ### New Features
 * Snapshot optimization - The most important information inside a snapshot is its Sequence number, which allows the compaction to know if the key-value should be deleted or not. The sequence number is being changed when modification happens in the db. This feature allows the db to take a snapshot without acquiring db mutex when the last snapshot has the same sequence number as a new one. In transactional db with mostly read operations, it should improve performance when used with multithreaded environment and as well other scenarios of taking large amount of snapshots with mostly read operations.
@@ -58,7 +59,6 @@ Also switch to waiting a sec on the CV each time. This is required since a bg er
 * db_bench: Create a WBM once for all db-s regardless of their use in different groups (#550)
 * Tombstone unit test faiure (#560)
 * build: Remove unused variables in unit tests (#581)
-
 ### Miscellaneous
 * disable failing unit tests and paired bloom filter stress testing
 * version: update Speedb patch version to 2.4.1 (#503)

@@ -1871,7 +1871,7 @@ DEFINE_int64(multiread_stride, 0,
              "Stride length for the keys in a MultiGet batch");
 DEFINE_bool(multiread_batched, false, "Use the new MultiGet API");
 
-DEFINE_string(memtablerep, "speedb.HashSpdRepFactory", "");
+DEFINE_string(memtablerep, "hash_spdb", "");
 DEFINE_int64(hash_bucket_count, 1000000, "hash bucket count");
 DEFINE_bool(use_seek_parralel_threshold, true,
             "if use seek parralel threshold .");
@@ -1974,7 +1974,6 @@ DEFINE_uint64(total_ram_size, 512 * 1024 * 1024ul,
 namespace ROCKSDB_NAMESPACE {
 namespace {
 static Status CreateMemTableRepFactory(
-    const ConfigOptions& config_options,
     std::shared_ptr<MemTableRepFactory>* factory) {
   Status s;
   if (!strcasecmp(FLAGS_memtablerep.c_str(), SkipListFactory::kNickName())) {
@@ -1983,15 +1982,8 @@ static Status CreateMemTableRepFactory(
     factory->reset(NewHashSkipListRepFactory(FLAGS_hash_bucket_count));
   } else if (!strcasecmp(FLAGS_memtablerep.c_str(), "hash_linkedlist")) {
     factory->reset(NewHashLinkListRepFactory(FLAGS_hash_bucket_count));
-  } else {
-    std::unique_ptr<MemTableRepFactory> unique;
-    std::string memtable_opt;
-    memtable_opt = ":" + std::to_string(0);
-    s = MemTableRepFactory::CreateFromString(
-        config_options, FLAGS_memtablerep + memtable_opt, &unique);
-    if (s.ok()) {
-      factory->reset(unique.release());
-    }
+  } else if (!strcasecmp(FLAGS_memtablerep.c_str(), "hash_spdb")) {
+    factory->reset(NewHashSpdbRepFactory(0));
   }
   return s;
 }
@@ -4604,8 +4596,7 @@ class Benchmark {
         FLAGS_level_compaction_dynamic_level_bytes;
     options.max_bytes_for_level_multiplier =
         FLAGS_max_bytes_for_level_multiplier;
-    Status s =
-        CreateMemTableRepFactory(config_options, &options.memtable_factory);
+    Status s = CreateMemTableRepFactory(&options.memtable_factory);
     if (!s.ok()) {
       ErrorExit("Could not create memtable factory: %s", s.ToString().c_str());
     } else if ((FLAGS_prefix_size == 0) &&

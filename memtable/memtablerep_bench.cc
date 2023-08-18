@@ -63,11 +63,12 @@ DEFINE_string(memtablerep, "skiplist",
               "\tvector              -- backed by an std::vector\n"
               "\thashskiplist        -- backed by a hash skip list\n"
               "\thashlinklist        -- backed by a hash linked list\n"
+              "\thashspdb            -- backed by a hash spdb\n"
               "\tcuckoo              -- backed by a cuckoo hash table");
 
 DEFINE_int64(bucket_count, 1000000,
              "bucket_count parameter to pass into NewHashSkiplistRepFactory or "
-             "NewHashLinkListRepFactory");
+             "NewHashLinkListRepFactory NewHashSpdbRepFactory");
 
 DEFINE_int32(
     hashskiplist_height, 4,
@@ -595,6 +596,8 @@ int main(int argc, char** argv) {
         FLAGS_if_log_bucket_dist_when_flash, FLAGS_threshold_use_skiplist));
     options.prefix_extractor.reset(
         ROCKSDB_NAMESPACE::NewFixedPrefixTransform(FLAGS_prefix_length));
+  } else if (FLAGS_memtablerep == "hashspdb") {
+    factory.reset(ROCKSDB_NAMESPACE::NewHashSpdbRepFactory(FLAGS_bucket_count));
   } else {
     ROCKSDB_NAMESPACE::ConfigOptions config_options;
     config_options.ignore_unsupported_options = false;

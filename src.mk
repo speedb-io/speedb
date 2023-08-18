@@ -135,6 +135,7 @@ LIB_SOURCES =                                                   \
   memory/memory_allocator.cc                                    \
   memtable/alloc_tracker.cc                                     \
   memtable/hash_linklist_rep.cc                                 \
+  memtable/hash_spdb_rep.cc                                     \
   memtable/hash_skiplist_rep.cc                                 \
   memtable/skiplistrep.cc                                       \
   memtable/vectorrep.cc                                         \

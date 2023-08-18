@@ -519,4 +519,7 @@ extern MemTableRepFactory* NewHashLinkListRepFactory(
     bool if_log_bucket_dist_when_flash = true,
     uint32_t threshold_use_skiplist = 256);
 
+// The factory is to create memtables based on a sorted hash table - spdb hash:
+extern MemTableRepFactory* NewHashSpdbRepFactory(size_t bucket_count = 1000000);
+
 }  // namespace ROCKSDB_NAMESPACE

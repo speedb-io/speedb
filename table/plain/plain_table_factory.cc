@@ -194,6 +194,19 @@ static int RegisterBuiltinMemTableRepFactory(ObjectLibrary& library,
         return guard->get();
       });
   library.AddFactory<MemTableRepFactory>(
+      AsPattern("HashSpdbRepFactory", "hash_spdb"),
+      [](const std::string& uri, std::unique_ptr<MemTableRepFactory>* guard,
+         std::string* /*errmsg*/) {
+        auto colon = uri.find(":");
+        if (colon != std::string::npos) {
+          size_t hash_bucket_count = ParseSizeT(uri.substr(colon + 1));
+          guard->reset(NewHashSpdbRepFactory(hash_bucket_count));
+        } else {
+          guard->reset(NewHashSpdbRepFactory());
+        }
+        return guard->get();
+      });
+  library.AddFactory<MemTableRepFactory>(
       AsPattern("HashSkipListRepFactory", "prefix_hash"),
       [](const std::string& uri, std::unique_ptr<MemTableRepFactory>* guard,
          std::string* /*errmsg*/) {

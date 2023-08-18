@@ -15,7 +15,6 @@
 #include "plugin/speedb/speedb_registry.h"
 
 #include "paired_filter/speedb_paired_bloom.h"
-#include "plugin/speedb/memtable/hash_spd_rep.h"
 #include "plugin/speedb/pinning_policy/scoped_pinning_policy.h"
 #include "rocksdb/utilities/object_registry.h"
 #include "util/string_util.h"
@@ -31,21 +30,6 @@ SpdbPairedBloomFilterPolicy* NewSpdbPairedBloomFilterWithBits(
 }
 
 int register_SpeedbPlugins(ObjectLibrary& library, const std::string&) {
-  library.AddFactory<MemTableRepFactory>(
-      ObjectLibrary::PatternEntry(HashSpdRepFactory::kClassName(), true)
-          .AddNumber(":"),
-      [](const std::string& uri, std::unique_ptr<MemTableRepFactory>* guard,
-         std::string* /*errmsg*/) {
-        auto colon = uri.find(":");
-        if (colon != std::string::npos) {
-          size_t buckets = ParseSizeT(uri.substr(colon + 1));
-          guard->reset(new HashSpdRepFactory(buckets));
-        } else {
-          guard->reset(new HashSpdRepFactory());
-        }
-        return guard->get();
-      });
-
   library.AddFactory<const FilterPolicy>(
       ObjectLibrary::PatternEntry(SpdbPairedBloomFilterPolicy::kClassName(),
                                   false)

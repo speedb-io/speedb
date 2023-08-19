@@ -41,6 +41,24 @@ public class MemTableTest {
   }
 
   @Test
+  public void hashSpdbMemTable() throws RocksDBException {
+    try (final Options options = new Options()) {
+      // Test HashSpdbMemTableConfig
+      HashSpdbMemTableConfig memTableConfig = new HashSpdbMemTableConfig();
+      assertThat(memTableConfig.bucketCount()).isEqualTo(1000000);
+      memTableConfig.setBucketCount(2000000);
+      assertThat(memTableConfig.bucketCount()).isEqualTo(2000000);
+      assertThat(memTableConfig.height()).isEqualTo(4);
+      memTableConfig.setHeight(5);
+      assertThat(memTableConfig.height()).isEqualTo(5);
+      assertThat(memTableConfig.branchingFactor()).isEqualTo(4);
+      memTableConfig.setBranchingFactor(6);
+      assertThat(memTableConfig.branchingFactor()).isEqualTo(6);
+      options.setMemTableConfig(memTableConfig);
+    }
+  }
+
+  @Test
   public void skipListMemTable() throws RocksDBException {
     try(final Options options = new Options()) {
       final SkipListMemTableConfig skipMemTableConfig = new SkipListMemTableConfig();

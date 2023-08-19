@@ -39,6 +39,7 @@ NATIVE_JAVA_CLASSES = \
 	org.rocksdb.IngestExternalFileOptions\
 	org.rocksdb.HashLinkedListMemTableConfig\
 	org.rocksdb.HashSkipListMemTableConfig\
+	org.rocksdb.HashSpdbMemTableConfig\
 	org.rocksdb.ConcurrentTaskLimiter\
 	org.rocksdb.ConcurrentTaskLimiterImpl\
 	org.rocksdb.KeyMayExist\

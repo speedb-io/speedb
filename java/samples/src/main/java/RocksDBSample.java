@@ -79,6 +79,9 @@ public class RocksDBSample {
       options.setMemTableConfig(new SkipListMemTableConfig());
       assert (options.memTableFactoryName().equals("SkipListFactory"));
 
+      options.setMemTableConfig(new HashSpdbMemTableConfig().setBucketCount(1000000));
+      assert (options.memTableFactoryName().equals("HashSpdbMemTableConfig"));
+
       options.setTableFormatConfig(new PlainTableConfig());
       // Plain-Table requires mmap read
       options.setAllowMmapReads(true);

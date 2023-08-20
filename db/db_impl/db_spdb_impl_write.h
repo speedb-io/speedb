@@ -93,7 +93,7 @@ class SpdbWriteImpl {
   std::condition_variable flush_thread_cv_;
   port::Mutex add_buffer_mutex_;
   port::RWMutexWr flush_rwlock_;
-  std::thread flush_thread_;
+  port::Thread flush_thread_;
   port::RWMutexWr wal_buffers_rwlock_;
   port::Mutex wal_write_mutex_;
   port::Mutex wb_list_mutex_;

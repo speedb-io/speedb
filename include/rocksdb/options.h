@@ -1511,6 +1511,8 @@ struct DBOptions {
   // Defaults to check once per hour.  Set to 0 to disable the task.
   unsigned int refresh_options_sec = 60 * 60;
   std::string refresh_options_file;
+  std::shared_ptr<std::function<void(std::thread::native_handle_type)>>
+      on_thread_start_callback = nullptr;
 };
 
 // Options to control the behavior of a database (passed to DB::Open)

@@ -259,6 +259,9 @@ TEST_F(OptionsSettableTest, DBOptionsAllFieldsSettable) {
        sizeof(std::shared_ptr<CompactionService>)},
       {offsetof(struct DBOptions, daily_offpeak_time_utc), sizeof(std::string)},
       {offsetof(struct DBOptions, refresh_options_file), sizeof(std::string)},
+      {offsetof(struct DBOptions, on_thread_start_callback),
+       sizeof(std::shared_ptr<
+              std::function<void(std::thread::native_handle_type)>>)},
   };
 
   char* options_ptr = new char[sizeof(DBOptions)];

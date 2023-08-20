@@ -1943,6 +1943,7 @@ Status DBImpl::Open(const DBOptions& db_options, const std::string& dbname,
                     const std::vector<ColumnFamilyDescriptor>& column_families,
                     std::vector<ColumnFamilyHandle*>* handles, DB** dbptr,
                     const bool seq_per_batch, const bool batch_per_txn) {
+  port::Thread::on_thread_start_callback = db_options.on_thread_start_callback;
   Status s = ValidateOptionsByTable(db_options, column_families);
   if (!s.ok()) {
     return s;

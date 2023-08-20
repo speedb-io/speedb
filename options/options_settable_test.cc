@@ -258,6 +258,9 @@ TEST_F(OptionsSettableTest, DBOptionsAllFieldsSettable) {
       {offsetof(struct DBOptions, compaction_service),
        sizeof(std::shared_ptr<CompactionService>)},
       {offsetof(struct DBOptions, refresh_options_file), sizeof(std::string)},
+      {offsetof(struct DBOptions, on_thread_start_callback),
+       sizeof(std::shared_ptr<
+              std::function<void(std::thread::native_handle_type)>>)},
   };
 
   char* options_ptr = new char[sizeof(DBOptions)];

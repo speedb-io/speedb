@@ -36,7 +36,6 @@ jlong Java_org_rocksdb_HashSkipListMemTableConfig_newMemTableFactoryHandle(
 /*
  * Class:     org_rocksdb_HashSpdbMemTableConfig
  * Method:    newMemTableFactoryHandle
- * Signature: (JII)J
  */
 jlong Java_org_rocksdb_HashSpdbMemTableConfig_newMemTableFactoryHandle(
     JNIEnv* env, jobject /*jobj*/, jlong jbucket_count) {

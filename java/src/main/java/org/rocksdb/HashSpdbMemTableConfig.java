@@ -27,6 +27,13 @@ public class HashSpdbMemTableConfig extends MemTableConfig {
     return this;
   }
 
+  /**
+   * @return the number of hash buckets
+   */
+  public long bucketCount() {
+    return bucketCount_;
+  }
+
   @Override
   protected long newMemTableFactoryHandle() {
     return newMemTableFactoryHandle(bucketCount_);

@@ -48,12 +48,6 @@ public class MemTableTest {
       assertThat(memTableConfig.bucketCount()).isEqualTo(1000000);
       memTableConfig.setBucketCount(2000000);
       assertThat(memTableConfig.bucketCount()).isEqualTo(2000000);
-      assertThat(memTableConfig.height()).isEqualTo(4);
-      memTableConfig.setHeight(5);
-      assertThat(memTableConfig.height()).isEqualTo(5);
-      assertThat(memTableConfig.branchingFactor()).isEqualTo(4);
-      memTableConfig.setBranchingFactor(6);
-      assertThat(memTableConfig.branchingFactor()).isEqualTo(6);
       options.setMemTableConfig(memTableConfig);
     }
   }

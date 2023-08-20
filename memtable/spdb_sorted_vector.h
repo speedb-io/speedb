@@ -194,7 +194,7 @@ class SpdbVectorContainer {
     spdb_vectors_.push_front(spdb_vector);
     spdb_vector->SetVectorListIter(std::prev(spdb_vectors_.end()));
     curr_vector_.store(spdb_vector.get());
-    sort_thread_ = std::thread(&SpdbVectorContainer::SortThread, this);
+    sort_thread_ = port::Thread(&SpdbVectorContainer::SortThread, this);
   }
 
   ~SpdbVectorContainer() {
@@ -246,7 +246,7 @@ class SpdbVectorContainer {
   std::atomic<bool> immutable_;
   // sort thread info
   std::atomic<size_t> num_elements_;
-  std::thread sort_thread_;
+  port::Thread sort_thread_;
   std::mutex sort_thread_mutex_;
   std::condition_variable sort_thread_cv_;
 };

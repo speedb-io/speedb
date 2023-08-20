@@ -25,6 +25,7 @@
 #include <vector>
 
 #include "rocksdb/cache.h"
+#include "rocksdb/port_defs.h"
 
 namespace ROCKSDB_NAMESPACE {
 struct Options;
@@ -447,7 +448,7 @@ class WriteBufferManager final {
   // reason to wakeup. See the thread's code for more details
   bool new_flushes_wakeup_ = false;
 
-  std::thread flushes_thread_;
+  port::Thread flushes_thread_;
   bool terminate_flushes_thread_ = false;
 };
 

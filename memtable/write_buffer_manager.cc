@@ -608,7 +608,7 @@ void WriteBufferManager::InitFlushInitiationVars(size_t quota) {
 
   if (flushes_thread_.joinable() == false) {
     flushes_thread_ =
-        std::thread(&WriteBufferManager::InitiateFlushesThread, this);
+        port::Thread(&WriteBufferManager::InitiateFlushesThread, this);
   }
 }
 

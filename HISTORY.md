@@ -12,6 +12,11 @@
 ### Enhancements
 * db_bench: add estimate-table-readers-mem benchmark which prints these stats.
 
+* A new option on_thread_start_callback has been added. It allows to set thread affinity or perform other optimizations (e.g. NUMA pinning) to speedb background threads. 
+An example file on_thread_start_callback_example.cc has been provided to demonstrate how to use this feature.
+
+
+
 ### Bug Fixes
 * unit tests: fix GlobalWriteControllerTest.GlobalAndWBMSetupDelay by waiting for the memtable memory release.
 * spdb memtable: use_seek_parallel_threshold option parameter mishandled (#570)

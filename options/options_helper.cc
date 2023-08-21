@@ -972,12 +972,9 @@ Status OptionTypeInfo::Parse(const ConfigOptions& config_options,
       return Status::NotSupported("Deserializing the option " + opt_name +
                                   " is not supported");
     } else {
-      printf("MJR: Error parsing[%s][%s]\n", opt_name.c_str(), value.c_str());
       return Status::InvalidArgument("Error parsing:", opt_name);
     }
   } catch (std::exception& e) {
-    printf("MJR: Caught exception parsing[%s][%s]=[%s]\n", opt_name.c_str(),
-           value.c_str(), e.what());
     return Status::InvalidArgument("Error parsing " + opt_name + ":" +
                                    std::string(e.what()));
   }
@@ -1130,29 +1127,13 @@ Status OptionTypeInfo::SerializeType(
     const std::unordered_map<std::string, OptionTypeInfo>& type_map,
     const void* opt_addr,
     std::unordered_map<std::string, std::string>* options) {
-  Status status;
   for (const auto& iter : type_map) {
     std::string single;
     const auto& opt_name = iter.first;
     const auto& opt_info = iter.second;
     if (opt_info.ShouldSerialize()) {
-      if (!config_options.mutable_options_only) {
-        status =
-            opt_info.Serialize(config_options, opt_name, opt_addr, &single);
-      } else if (opt_info.IsMutable()) {
-        ConfigOptions copy = config_options;
-        copy.mutable_options_only = false;
-        status = opt_info.Serialize(copy, opt_name, opt_addr, &single);
-      } else if (opt_info.IsConfigurable()) {
-        // If it is a Configurable and we are either printing all of the
-        // details or not printing only the name, this option should be
-        // included in the list
-        if (config_options.IsDetailed() ||
-            !opt_info.IsEnabled(OptionTypeFlags::kStringNameOnly)) {
-          status =
-              opt_info.Serialize(config_options, opt_name, opt_addr, &single);
-        }
-      }
+      Status status = ConfigurableHelper::SerializeOption(
+          config_options, opt_name, opt_info, opt_addr, &single);
       if (!status.ok()) {
         return status;
       } else if (!single.empty()) {
@@ -1160,7 +1141,7 @@ Status OptionTypeInfo::SerializeType(
       }
     }
   }
-  return status;
+  return Status::OK();
 }
 
 Status OptionTypeInfo::SerializeStruct(
@@ -1290,7 +1271,8 @@ bool OptionTypeInfo::AreEqual(const ConfigOptions& config_options,
                               const void* const that_ptr,
                               std::string* mismatch) const {
   auto level = GetSanityLevel();
-  if (!config_options.IsCheckEnabled(level)) {
+  if (config_options.compare_to == nullptr &&
+      !config_options.IsCheckEnabled(level)) {
     return true;  // If the sanity level is not being checked, skip it
   }
   if (this_ptr == nullptr || that_ptr == nullptr) {
@@ -1317,7 +1299,8 @@ bool OptionTypeInfo::AreEqual(const ConfigOptions& config_options,
       } else if (this_config != nullptr && that_config != nullptr) {
         std::string bad_name;
         bool matches;
-        if (level < config_options.sanity_level) {
+        if (config_options.compare_to == nullptr &&
+            level < config_options.sanity_level) {
           ConfigOptions copy = config_options;
           copy.sanity_level = level;
           matches = this_config->AreEquivalent(copy, that_config, &bad_name);
@@ -1397,26 +1380,6 @@ bool OptionTypeInfo::StructsAreEqual(
     }
   }
   return matches;
-}
-
-bool MatchesOptionsTypeFromMap(
-    const ConfigOptions& config_options,
-    const std::unordered_map<std::string, OptionTypeInfo>& type_map,
-    const void* const this_ptr, const void* const that_ptr,
-    std::string* mismatch) {
-  for (auto& pair : type_map) {
-    // We skip checking deprecated variables as they might
-    // contain random values since they might not be initialized
-    if (config_options.IsCheckEnabled(pair.second.GetSanityLevel())) {
-      if (!pair.second.AreEqual(config_options, pair.first, this_ptr, that_ptr,
-                                mismatch) &&
-          !pair.second.AreEqualByName(config_options, pair.first, this_ptr,
-                                      that_ptr)) {
-        return false;
-      }
-    }
-  }
-  return true;
 }
 
 bool OptionTypeInfo::AreEqualByName(const ConfigOptions& config_options,

@@ -137,6 +137,11 @@ class ConfigurableHelper {
       const ConfigOptions& config_options, const Configurable& configurable,
       std::unordered_map<std::string, std::string>* options);
 
+  static Status SerializeOption(const ConfigOptions& config_options,
+                                const std::string& opt_name,
+                                const OptionTypeInfo& opt_info,
+                                const void* opt_addr, std::string* value);
+
   // Internal method to list the option names for this object.
   // Classes may override this value to change its behavior.
   // @see ListOptions for more details
@@ -157,6 +162,9 @@ class ConfigurableHelper {
                             const Configurable& this_one,
                             const Configurable& that_one,
                             std::string* mismatch);
+
+  static bool MayBeEquivalent(const Configurable& this_one,
+                              const Configurable& that_one);
 
  private:
   // Looks for the option specified by name in the RegisteredOptions.

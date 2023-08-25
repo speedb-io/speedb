@@ -18,6 +18,7 @@ namespace ROCKSDB_NAMESPACE {
 class Env;
 class Logger;
 class ObjectRegistry;
+class OptionsFormatter;
 
 struct ColumnFamilyOptions;
 struct DBOptions;
@@ -93,6 +94,8 @@ struct ConfigOptions {
   // The object registry to use for this options
   std::shared_ptr<ObjectRegistry> registry;
 
+  std::shared_ptr<OptionsFormatter> formatter;
+
   bool IsShallow() const { return depth == Depth::kDepthShallow; }
   bool IsDetailed() const { return depth == Depth::kDepthDetailed; }
 
@@ -103,12 +106,13 @@ struct ConfigOptions {
   bool IsCheckEnabled(SanityLevel level) const {
     return (level > SanityLevel::kSanityLevelNone && level <= sanity_level);
   }
+
   // Converts the map of options to a single string representation
   std::string ToString(
       const std::string& prefix,
       const std::unordered_map<std::string, std::string>& options) const;
   // Converts the vector options to a single string representation
-  std::string ToString(char separator,
+  std::string ToString(const std::string& prefix, char separator,
                        const std::vector<std::string>& elems) const;
 };
 
@@ -402,15 +406,13 @@ Status GetStringFromDBOptions(const ConfigOptions& config_options,
                               std::string* opts_str);
 
 Status GetStringFromDBOptions(std::string* opts_str,
-                              const DBOptions& db_options,
-                              const std::string& delimiter = ";  ");
+                              const DBOptions& db_options);
 
 Status GetStringFromColumnFamilyOptions(const ConfigOptions& config_options,
                                         const ColumnFamilyOptions& cf_options,
                                         std::string* opts_str);
 Status GetStringFromColumnFamilyOptions(std::string* opts_str,
-                                        const ColumnFamilyOptions& cf_options,
-                                        const std::string& delimiter = ";  ");
+                                        const ColumnFamilyOptions& cf_options);
 Status GetStringFromCompressionType(std::string* compression_str,
                                     CompressionType compression_type);
 

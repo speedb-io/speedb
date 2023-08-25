@@ -537,21 +537,19 @@ static std::unordered_map<std::string, OptionTypeInfo>
             }
             return s;
           },
-          [](const ConfigOptions& opts, const std::string& /*name*/,
+          [](const ConfigOptions& opts, const std::string& name,
              const void* addr, std::string* value) {
             const auto listeners =
                 static_cast<const std::vector<std::shared_ptr<EventListener>>*>(
                     addr);
-            ConfigOptions embedded = opts;
-            embedded.delimiter = ";";
             std::vector<std::string> vec;
             for (const auto& listener : *listeners) {
               auto id = listener->GetId();
               if (!id.empty()) {
-                vec.push_back(listener->ToString(embedded, ""));
+                vec.push_back(listener->ToString(opts, ""));
               }
             }
-            *value = opts.ToString(':', vec);
+            *value = opts.ToString(name, ':', vec);
             return Status::OK();
           },
           nullptr}},

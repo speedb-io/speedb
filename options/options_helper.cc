@@ -26,6 +26,7 @@
 #include "rocksdb/slice_transform.h"
 #include "rocksdb/table.h"
 #include "rocksdb/utilities/object_registry.h"
+#include "rocksdb/utilities/options_formatter.h"
 #include "rocksdb/utilities/options_type.h"
 #include "util/string_util.h"
 
@@ -41,65 +42,22 @@ ConfigOptions::ConfigOptions(const DBOptions& db_opts) : env(db_opts.env) {
 }
 
 std::string ConfigOptions::ToString(
-    const std::string& /*prefix*/,
+    const std::string& prefix,
     const std::unordered_map<std::string, std::string>& options) const {
-  std::string result;
-  std::string id;
-  for (const auto& it : options) {
-    if (it.first == OptionTypeInfo::kIdPropName()) {
-      id = it.second;
-    } else {
-      if (!result.empty()) {
-        result.append(delimiter);
-      }
-      // if (!prefix.empty()) {
-      // result.append(prefix);
-      // }
-      result.append(it.first);
-      result.append("=");
-      if (it.second.find('=') != std::string::npos && it.second[0] != '{') {
-        result.append("{" + it.second + "}");
-      } else {
-        result.append(it.second);
-      }
-    }
-  }
-  if (id.empty()) {
-    return result;
-  } else if (result.empty()) {
-    return id;
+  if (formatter) {
+    return formatter->ToString(prefix, options);
   } else {
-    std::string id_string = /*prefix + */ OptionTypeInfo::kIdPropName();
-    id_string.append("=");
-    id_string.append(id);
-    return id_string + delimiter + result;
+    return OptionsFormatter::Default()->ToString(prefix, options);
   }
 }
 
 std::string ConfigOptions::ToString(
-    char separator, const std::vector<std::string>& elems) const {
-  std::string result;
-  int printed = 0;
-  for (const auto& elem : elems) {
-    if (printed++ > 0) {
-      result += separator;
-    }
-    if (elem.find(separator) != std::string::npos) {
-      // If the element contains embedded separators, put it inside of brackets
-      result.append("{" + elem + "}");
-    } else if (elem.find("=") != std::string::npos) {
-      // If the element contains embedded options, put it inside of brackets
-      result.append("{" + elem + "}");
-    } else {
-      result += elem;
-    }
-  }
-  if (result.find("=") != std::string::npos) {
-    return "{" + result + "}";
-  } else if (printed > 1 && result.at(0) == '{') {
-    return "{" + result + "}";
+    const std::string& prefix, char separator,
+    const std::vector<std::string>& elems) const {
+  if (formatter) {
+    return formatter->ToString(prefix, separator, elems);
   } else {
-    return result;
+    return OptionsFormatter::Default()->ToString(prefix, separator, elems);
   }
 }
 
@@ -682,12 +640,9 @@ Status StringToMap(const std::string& opts_str,
   return Status::OK();
 }
 
-
 Status GetStringFromDBOptions(std::string* opt_string,
-                              const DBOptions& db_options,
-                              const std::string& delimiter) {
+                              const DBOptions& db_options) {
   ConfigOptions config_options(db_options);
-  config_options.delimiter = delimiter;
   return GetStringFromDBOptions(config_options, db_options, opt_string);
 }
 
@@ -700,12 +655,9 @@ Status GetStringFromDBOptions(const ConfigOptions& config_options,
   return config->GetOptionString(config_options, opt_string);
 }
 
-
 Status GetStringFromColumnFamilyOptions(std::string* opt_string,
-                                        const ColumnFamilyOptions& cf_options,
-                                        const std::string& delimiter) {
+                                        const ColumnFamilyOptions& cf_options) {
   ConfigOptions config_options;
-  config_options.delimiter = delimiter;
   return GetStringFromColumnFamilyOptions(config_options, cf_options,
                                           opt_string);
 }
@@ -972,12 +924,9 @@ Status OptionTypeInfo::Parse(const ConfigOptions& config_options,
       return Status::NotSupported("Deserializing the option " + opt_name +
                                   " is not supported");
     } else {
-      printf("MJR: Error parsing[%s][%s]\n", opt_name.c_str(), value.c_str());
       return Status::InvalidArgument("Error parsing:", opt_name);
     }
   } catch (std::exception& e) {
-    printf("MJR: Caught exception parsing[%s][%s]=[%s]\n", opt_name.c_str(),
-           value.c_str(), e.what());
     return Status::InvalidArgument("Error parsing " + opt_name + ":" +
                                    std::string(e.what()));
   }
@@ -1092,13 +1041,12 @@ Status OptionTypeInfo::Serialize(const ConfigOptions& config_options,
       }
     } else {
       ConfigOptions embedded = config_options;
-      embedded.delimiter = ";";
       // If this option is mutable, everything inside it should be considered
       // mutable
       if (IsMutable()) {
         embedded.mutable_options_only = false;
       }
-      std::string value = custom->ToString(embedded);
+      std::string value = custom->ToString(embedded, opt_name);
       if (!embedded.mutable_options_only ||
           value.find("=") != std::string::npos) {
         *opt_value = value;
@@ -1111,8 +1059,7 @@ Status OptionTypeInfo::Serialize(const ConfigOptions& config_options,
     const Configurable* config = AsRawPointer<Configurable>(opt_ptr);
     if (config != nullptr) {
       ConfigOptions embedded = config_options;
-      embedded.delimiter = ";";
-      *opt_value = config->ToString(embedded);
+      *opt_value = config->ToString(embedded, opt_name);
     }
     return Status::OK();
   } else if (config_options.mutable_options_only && !IsMutable()) {
@@ -1170,12 +1117,8 @@ Status OptionTypeInfo::SerializeStruct(
   assert(struct_map);
   Status status;
   if (EndsWith(opt_name, struct_name)) {
-    // We are going to write the struct as "{ prop1=value1; prop2=value2;}.
-    // Set the delimiter to ";" so that the everything will be on one line.
-    ConfigOptions embedded = config_options;
-    embedded.delimiter = ";";
-
-    status = TypeToString(embedded, opt_name, *struct_map, opt_addr, value);
+    status =
+        TypeToString(config_options, opt_name, *struct_map, opt_addr, value);
     if (!status.ok()) {
       return status;
     }

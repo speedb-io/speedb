@@ -470,7 +470,6 @@ Status Configurable::GetOptionString(const ConfigOptions& config_options,
 std::string Configurable::ToString(const ConfigOptions& config_options,
                                    const std::string& prefix) const {
   std::unordered_map<std::string, std::string> options;
-  Status status = SerializeOptions(config_options, &options);
   Status s = SerializeOptions(config_options, &options);
   assert(s.ok());
   if (s.ok()) {
@@ -506,16 +505,14 @@ Status ConfigurableHelper::GetOption(const ConfigOptions& config_options,
   const auto opt_info =
       FindOption(configurable.options_, short_name, &opt_name, &opt_ptr);
   if (opt_info != nullptr) {
-    ConfigOptions embedded = config_options;
-    embedded.delimiter = ";";
     if (short_name == opt_name) {
-      return opt_info->Serialize(embedded, opt_name, opt_ptr, value);
+      return opt_info->Serialize(config_options, opt_name, opt_ptr, value);
     } else if (opt_info->IsStruct()) {
-      return opt_info->Serialize(embedded, opt_name, opt_ptr, value);
+      return opt_info->Serialize(config_options, opt_name, opt_ptr, value);
     } else if (opt_info->IsConfigurable()) {
       auto const* config = opt_info->AsRawPointer<Configurable>(opt_ptr);
       if (config != nullptr) {
-        return config->GetOption(embedded, opt_name, value);
+        return config->GetOption(config_options, opt_name, value);
       }
     }
   }

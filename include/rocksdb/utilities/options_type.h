@@ -1176,7 +1176,7 @@ Status SerializeVector(const ConfigOptions& config_options,
         opt_vec.emplace_back(elem_str);
       }
     }
-    *value = config_options.ToString(separator, opt_vec);
+    *value = config_options.ToString(name, separator, opt_vec);
   }
   return Status::OK();
 }

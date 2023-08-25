@@ -18,6 +18,7 @@
 #include "db/db_test_util.h"
 #include "memory/jemalloc_nodump_allocator.h"
 #include "memory/memkind_kmem_allocator.h"
+#include "options/options_formatter_impl.h"
 #include "options/options_helper.h"
 #include "options/options_parser.h"
 #include "port/stack_trace.h"
@@ -340,9 +341,10 @@ TEST_F(CustomizableTest, ConfigureFromPropsTest) {
   ASSERT_EQ(simple->cu->GetId(), "A");
   std::string opt_str;
   std::string mismatch;
-  config_options_.delimiter = "\n";
+  config_options_.formatter = std::make_shared<PropertiesOptionsFormatter>();
   std::unordered_map<std::string, std::string> props;
   ASSERT_OK(configurable->GetOptionString(config_options_, &opt_str));
+  printf("MJR: OptionsStringForProps[%s\n**]\n", opt_str.c_str());
   GetMapFromProperties(opt_str, &props);
   std::unique_ptr<Configurable> copy(new SimpleConfigurable());
   ASSERT_OK(copy->ConfigureFromMap(config_options_, props));

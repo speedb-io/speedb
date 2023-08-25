@@ -243,7 +243,6 @@ Status SliceTransform::CreateFromString(
 std::string SliceTransform::AsString() const {
   if (HasRegisteredOptions()) {
     ConfigOptions opts;
-    opts.delimiter = ";";
     return ToString(opts);
   }
   return GetId();

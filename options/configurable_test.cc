@@ -15,6 +15,7 @@
 #include <unordered_map>
 
 #include "options/configurable_helper.h"
+#include "options/options_formatter_impl.h"
 #include "options/options_helper.h"
 #include "options/options_parser.h"
 #include "rocksdb/configurable.h"
@@ -38,6 +39,7 @@ class StringLogger : public Logger {
     char buffer[1000];
     vsnprintf(buffer, sizeof(buffer), format, ap);
     string_.append(buffer);
+    string_.append("\n");
   }
   const std::string& str() const { return string_; }
   void clear() { string_.clear(); }
@@ -663,6 +665,38 @@ TEST_F(ConfigurableTest, NullOptionMapTest) {
   ASSERT_TRUE(base->AreEquivalent(config_options_, copy.get(), &str));
 }
 
+TEST_F(ConfigurableTest, LoggerTest) {
+  StringLogger logger;
+
+  ConfigOptions cfg;
+  cfg.formatter = std::make_shared<LogOptionsFormatter>();
+
+  ColumnFamilyOptions cf_opts;
+  printf("MJR: TF Opts Orig=[\n%s\n]\n",
+         cf_opts.table_factory->GetPrintableOptions().c_str());
+  printf("MJR:+++++++++++\n");
+  cf_opts.Dump(&logger);
+  printf("MJR: CF Opts Orig=[\n%s\n]\n", logger.str().c_str());
+  logger.clear();
+  printf("MJR:+++++++++++\n");
+  printf("MJR:+++++++++++\n");
+  DBOptions db_opts;
+  db_opts.Dump(&logger);
+  printf("MJR: DB Opts Orig=[\n%s\n]\n", logger.str().c_str());
+  logger.clear();
+
+  printf("MJR:***********\n");
+  printf("MJR: TF Opts Log=[\n%s\n]\n",
+         cf_opts.table_factory->ToString(cfg).c_str());
+  printf("MJR:+++++++++++\n");
+  auto cf_cfg = CFOptionsAsConfigurable(cf_opts);
+  printf("MJR: CF Opts Log=[\n%s\n]\n", cf_cfg->ToString(cfg).c_str());
+
+  printf("MJR:+++++++++++\n");
+  auto db_cfg = DBOptionsAsConfigurable(db_opts);
+  printf("MJR: DB Opts Log=[\n%s\n]\n", db_cfg->ToString(cfg).c_str());
+}
+
 static std::unordered_map<std::string, ConfigTestFactoryFunc> TestFactories = {
     {"Simple", []() { return SimpleConfigurable::Create("simple"); }},
     {"Struct", []() { return SimpleStructFactory(); }},
@@ -799,7 +833,7 @@ TEST_P(ConfigurableParamTest, ConfigureFromPropsTest) {
   std::unique_ptr<Configurable> copy(CreateConfigurable());
 
   ASSERT_OK(object_->ConfigureFromString(config_options_, configuration_));
-  config_options_.delimiter = "\n";
+  config_options_.formatter = std::make_shared<PropertiesOptionsFormatter>();
   ASSERT_OK(object_->GetOptionString(config_options_, &opt_str));
   std::istringstream iss(opt_str);
   std::unordered_map<std::string, std::string> copy_map;

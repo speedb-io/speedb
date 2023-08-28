@@ -774,7 +774,7 @@ Status CompactionServiceInput::Write(std::string* output) {
   Status s =
       OptionTypeInfo::SerializeType(cf, cs_input_type_info, this, &options);
   if (s.ok()) {
-    output->append(cf.ToString("", options) + cf.delimiter);
+    output->append(cf.ToString("", options));
   }
   return s;
 }
@@ -809,7 +809,7 @@ Status CompactionServiceResult::Write(std::string* output) {
   Status s =
       OptionTypeInfo::SerializeType(cf, cs_result_type_info, this, &options);
   if (s.ok()) {
-    output->append(cf.ToString("", options) + cf.delimiter);
+    output->append(cf.ToString("", options));
   }
   return s;
 }

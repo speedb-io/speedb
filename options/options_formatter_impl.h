@@ -54,6 +54,26 @@ class DefaultOptionsFormatter : public OptionsFormatter {
                   std::vector<std::string>* elems) const override;
 
  protected:
+  // Returns the next token marked by the delimiter from "opts" after start in
+  // token and updates end to point to where that token stops. Delimiters inside
+  // of braces are ignored. Returns OK if a token is found and an error if the
+  // input opts string is mis-formatted.
+  // Given "a=AA;b=BB;" start=2 and delimiter=";", token is "AA" and end points
+  // to "b" Given "{a=A;b=B}", the token would be "a=A;b=B"
+  //
+  // @param opts The string in which to find the next token
+  // @param delimiter The delimiter between tokens
+  // @param start     The position in opts to start looking for the token
+  // @param ed        Returns the end position in opts of the token
+  // @param token     Returns the token
+  // @returns OK if a token was found
+  // @return InvalidArgument if the braces mismatch
+  //          (e.g. "{a={b=c;}" ) -- missing closing brace
+  // @return InvalidArgument if an expected delimiter is not found
+  //        e.g. "{a=b}c=d;" -- missing delimiter before "c"
+  Status NextToken(const std::string& opts, char delimiter, size_t start,
+                   size_t* end, std::string* token) const;
+
   void AppendElem(const std::string& name, const std::string& value,
                   std::string* result) const;
 };

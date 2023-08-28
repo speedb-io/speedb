@@ -521,7 +521,6 @@ TEST_F(OptionsUtilTest, BadLatestOptions) {
   options.env = env_.get();
   config_opts.env = env_.get();
   config_opts.ignore_unknown_options = false;
-  config_opts.delimiter = "\n";
 
   ConfigOptions ignore_opts = config_opts;
   ignore_opts.ignore_unknown_options = true;

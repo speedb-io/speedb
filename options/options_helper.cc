@@ -805,59 +805,6 @@ std::unordered_map<std::string, PrepopulateBlobCache>
         {"kDisable", PrepopulateBlobCache::kDisable},
         {"kFlushOnly", PrepopulateBlobCache::kFlushOnly}};
 
-Status OptionTypeInfo::NextToken(const std::string& opts, char delimiter,
-                                 size_t pos, size_t* end, std::string* token) {
-  while (pos < opts.size() && isspace(opts[pos])) {
-    ++pos;
-  }
-  // Empty value at the end
-  if (pos >= opts.size()) {
-    *token = "";
-    *end = std::string::npos;
-    return Status::OK();
-  } else if (opts[pos] == '{') {
-    int count = 1;
-    size_t brace_pos = pos + 1;
-    while (brace_pos < opts.size()) {
-      if (opts[brace_pos] == '{') {
-        ++count;
-      } else if (opts[brace_pos] == '}') {
-        --count;
-        if (count == 0) {
-          break;
-        }
-      }
-      ++brace_pos;
-    }
-    // found the matching closing brace
-    if (count == 0) {
-      *token = trim(opts.substr(pos + 1, brace_pos - pos - 1));
-      // skip all whitespace and move to the next delimiter
-      // brace_pos points to the next position after the matching '}'
-      pos = brace_pos + 1;
-      while (pos < opts.size() && isspace(opts[pos])) {
-        ++pos;
-      }
-      if (pos < opts.size() && opts[pos] != delimiter) {
-        return Status::InvalidArgument("Unexpected chars after nested options");
-      }
-      *end = pos;
-    } else {
-      return Status::InvalidArgument(
-          "Mismatched curly braces for nested options");
-    }
-  } else {
-    *end = opts.find(delimiter, pos);
-    if (*end == std::string::npos) {
-      // It either ends with a trailing semi-colon or the last key-value pair
-      *token = trim(opts.substr(pos));
-    } else {
-      *token = trim(opts.substr(pos, *end - pos));
-    }
-  }
-  return Status::OK();
-}
-
 Status OptionTypeInfo::Parse(const ConfigOptions& config_options,
                              const std::string& opt_name,
                              const std::string& value, void* opt_ptr) const {

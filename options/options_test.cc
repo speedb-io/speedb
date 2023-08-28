@@ -416,9 +416,13 @@ TEST_F(OptionsTest, GetColumnFamilyOptionsFromStringTest) {
          std::unique_ptr<const Comparator>* /*guard*/,
          std::string* /* errmsg */) { return ReverseBytewiseComparator(); });
 
-  ASSERT_OK(GetColumnFamilyOptionsFromString(config_options, base_cf_opt,
-                                             "comparator=" + kCompName + ";",
-                                             &new_cf_opt));
+  ASSERT_OK(GetColumnFamilyOptionsFromString(
+      config_options, base_cf_opt,
+      config_options.ToString("", {{
+                                      "comparator",
+                                      kCompName,
+                                  }}),
+      &new_cf_opt));
   ASSERT_EQ(new_cf_opt.comparator, ReverseBytewiseComparator());
 
   // MergeOperator from object registry

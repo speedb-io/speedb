@@ -1606,7 +1606,7 @@ TEST_F(CompactionJobTest, InputSerialization) {
   CompactionServiceInput deserialized2;
   output.clear();
   ASSERT_OK(input.Write(&output));
-  output.append("new_field=123;");
+  output.append(";new_field=123;");
 
   ASSERT_OK(CompactionServiceInput::Read(output, &deserialized2));
   ASSERT_TRUE(deserialized2.TEST_Equals(&input));
@@ -1706,7 +1706,7 @@ TEST_F(CompactionJobTest, ResultSerialization) {
   CompactionServiceResult deserialized2;
   output.clear();
   ASSERT_OK(result.Write(&output));
-  output.append("new_field=123;");
+  output.append(";new_field=123;");
 
   ASSERT_OK(CompactionServiceResult::Read(output, &deserialized2));
   ASSERT_TRUE(deserialized2.TEST_Equals(&result));

@@ -167,7 +167,7 @@ class Customizable : public Configurable {
   // options for use in potentially creating a new Customizable object (this
   // method is primarily a support method for LoadSharedObject et al for new
   // Customizable objects). The opt_value may be either name-value pairs
-  // separated by ";" (a=b; c=d), or a simple name (a). In order to create a new
+  // or a simple name (a). In order to create a new
   // Customizable, the ID is determined by:
   // - If the value is a simple name (e.g. "BlockBasedTable"), the id is this
   // name;

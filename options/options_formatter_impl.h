@@ -19,6 +19,11 @@ class LogOptionsFormatter : public OptionsFormatter {
                            options) const override;
   std::string ToString(const std::string& prefix, char separator,
                        const std::vector<std::string>& elems) const override;
+  Status ToMap(const std::string& /*opts_str*/,
+               std::unordered_map<std::string, std::string>* /*opts_map*/)
+      const override {
+    return Status::NotSupported();
+  }
 
  protected:
   void AppendElem(const std::string& prefix, const std::string& name,
@@ -35,6 +40,9 @@ class DefaultOptionsFormatter : public OptionsFormatter {
   std::string ToString(const std::string& prefix,
                        const std::unordered_map<std::string, std::string>&
                            options) const override;
+  Status ToMap(
+      const std::string& opts_str,
+      std::unordered_map<std::string, std::string>* opts_map) const override;
   std::string ToString(const std::string& prefix, char separator,
                        const std::vector<std::string>& elems) const override;
 
@@ -52,6 +60,9 @@ class PropertiesOptionsFormatter : public DefaultOptionsFormatter {
   std::string ToString(const std::string& prefix,
                        const std::unordered_map<std::string, std::string>&
                            options) const override;
+  Status ToMap(const std::string& /*opts_str*/,
+               std::unordered_map<std::string, std::string>* /*opts_map*/)
+      const override;
 };
 
 }  // namespace ROCKSDB_NAMESPACE

@@ -51,6 +51,16 @@ std::string ConfigOptions::ToString(
   }
 }
 
+Status ConfigOptions::ToMap(
+    const std::string& opts_str,
+    std::unordered_map<std::string, std::string>* opts_map) const {
+  if (formatter) {
+    return formatter->ToMap(opts_str, opts_map);
+  } else {
+    return OptionsFormatter::Default()->ToMap(opts_str, opts_map);
+  }
+}
+
 std::string ConfigOptions::ToString(
     const std::string& prefix, char separator,
     const std::vector<std::string>& elems) const {
@@ -599,6 +609,11 @@ Status ConfigureFromMap(
 
 Status StringToMap(const std::string& opts_str,
                    std::unordered_map<std::string, std::string>* opts_map) {
+  return StringToMap(opts_str, ';', opts_map);
+}
+
+Status StringToMap(const std::string& opts_str, char delim,
+                   std::unordered_map<std::string, std::string>* opts_map) {
   assert(opts_map);
   // Example:
   //   opts_str = "write_buffer_size=1024;max_write_buffer_number=2;"
@@ -624,7 +639,7 @@ Status StringToMap(const std::string& opts_str,
     }
 
     std::string value;
-    Status s = OptionTypeInfo::NextToken(opts, ';', eq_pos + 1, &pos, &value);
+    Status s = OptionTypeInfo::NextToken(opts, delim, eq_pos + 1, &pos, &value);
     if (!s.ok()) {
       return s;
     } else {
@@ -706,7 +721,7 @@ Status GetColumnFamilyOptionsFromString(const ConfigOptions& config_options,
                                         const std::string& opts_str,
                                         ColumnFamilyOptions* new_options) {
   std::unordered_map<std::string, std::string> opts_map;
-  Status s = StringToMap(opts_str, &opts_map);
+  Status s = config_options.ToMap(opts_str, &opts_map);
   if (!s.ok()) {
     *new_options = base_options;
     return s;
@@ -738,7 +753,7 @@ Status GetDBOptionsFromString(const ConfigOptions& config_options,
                               const std::string& opts_str,
                               DBOptions* new_options) {
   std::unordered_map<std::string, std::string> opts_map;
-  Status s = StringToMap(opts_str, &opts_map);
+  Status s = config_options.ToMap(opts_str, &opts_map);
   if (!s.ok()) {
     *new_options = base_options;
     return s;
@@ -766,7 +781,7 @@ Status GetOptionsFromString(const ConfigOptions& config_options,
 
   assert(new_options);
   *new_options = base_options;
-  Status s = StringToMap(opts_str, &opts_map);
+  Status s = config_options.ToMap(opts_str, &opts_map);
   if (!s.ok()) {
     return s;
   }
@@ -937,7 +952,7 @@ Status OptionTypeInfo::ParseType(
     const std::unordered_map<std::string, OptionTypeInfo>& type_map,
     void* opt_addr, std::unordered_map<std::string, std::string>* unused) {
   std::unordered_map<std::string, std::string> opts_map;
-  Status status = StringToMap(opts_str, &opts_map);
+  Status status = config_options.ToMap(opts_str, &opts_map);
   if (!status.ok()) {
     return status;
   } else {

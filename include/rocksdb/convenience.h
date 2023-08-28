@@ -111,6 +111,8 @@ struct ConfigOptions {
   std::string ToString(
       const std::string& prefix,
       const std::unordered_map<std::string, std::string>& options) const;
+  Status ToMap(const std::string& opts_str,
+               std::unordered_map<std::string, std::string>* opts_map) const;
   // Converts the vector options to a single string representation
   std::string ToString(const std::string& prefix, char separator,
                        const std::vector<std::string>& elems) const;

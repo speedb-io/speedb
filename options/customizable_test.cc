@@ -228,21 +228,6 @@ class SimpleConfigurable : public Configurable {
   }
 };
 
-static void GetMapFromProperties(
-    const std::string& props,
-    std::unordered_map<std::string, std::string>* map) {
-  std::istringstream iss(props);
-  std::unordered_map<std::string, std::string> copy_map;
-  std::string line;
-  map->clear();
-  for (int line_num = 0; std::getline(iss, line); line_num++) {
-    std::string name;
-    std::string value;
-    ASSERT_OK(
-        RocksDBOptionsParser::ParseStatement(&name, &value, line, line_num));
-    (*map)[name] = value;
-  }
-}
 }  // namespace
 
 Status TestCustomizable::CreateFromString(
@@ -342,12 +327,10 @@ TEST_F(CustomizableTest, ConfigureFromPropsTest) {
   std::string opt_str;
   std::string mismatch;
   config_options_.formatter = std::make_shared<PropertiesOptionsFormatter>();
-  std::unordered_map<std::string, std::string> props;
   ASSERT_OK(configurable->GetOptionString(config_options_, &opt_str));
-  printf("MJR: OptionsStringForProps[%s\n**]\n", opt_str.c_str());
-  GetMapFromProperties(opt_str, &props);
+
   std::unique_ptr<Configurable> copy(new SimpleConfigurable());
-  ASSERT_OK(copy->ConfigureFromMap(config_options_, props));
+  ASSERT_OK(copy->ConfigureFromString(config_options_, opt_str));
   ASSERT_TRUE(
       configurable->AreEquivalent(config_options_, copy.get(), &mismatch));
 }

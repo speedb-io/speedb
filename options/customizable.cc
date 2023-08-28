@@ -90,8 +90,8 @@ Status Customizable::GetOptionsMap(
     *id = "";
     props->clear();
   } else if (customizable != nullptr) {
-    status =
-        Configurable::GetOptionsMap(value, customizable->GetId(), id, props);
+    status = Configurable::GetOptionsMap(config_options, value,
+                                         customizable->GetId(), id, props);
     if (status.ok() && customizable->IsInstanceOf(*id)) {
       // The new ID and the old ID match, so the objects are the same type.
       // Try to get the existing options, ignoring any errors
@@ -103,7 +103,7 @@ Status Customizable::GetOptionsMap(
       }
     }
   } else {
-    status = Configurable::GetOptionsMap(value, "", id, props);
+    status = Configurable::GetOptionsMap(config_options, value, "", id, props);
   }
   return status;
 }

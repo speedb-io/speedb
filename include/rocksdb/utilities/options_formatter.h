@@ -26,6 +26,10 @@ class OptionsFormatter : public Customizable {
   virtual std::string ToString(
       const std::string& prefix,
       const std::unordered_map<std::string, std::string>& options) const = 0;
+  virtual Status ToMap(
+      const std::string& opts_str,
+      std::unordered_map<std::string, std::string>* opts_map) const = 0;
+
   // Converts the vector options to a single string representation
   virtual std::string ToString(const std::string& prefix, char separator,
                                const std::vector<std::string>& elems) const = 0;

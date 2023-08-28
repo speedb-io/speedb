@@ -8,6 +8,7 @@
 #include <memory>
 
 #include "options/options_formatter_impl.h"
+#include "options/options_parser.h"
 #include "rocksdb/utilities/customizable_util.h"
 #include "rocksdb/utilities/object_registry.h"
 #include "rocksdb/utilities/options_type.h"
@@ -50,6 +51,13 @@ std::string DefaultOptionsFormatter::ToString(
     return id_string + ";" + result;
   }
 }
+
+Status DefaultOptionsFormatter::ToMap(
+    const std::string& opts_str,
+    std::unordered_map<std::string, std::string>* opts_map) const {
+  return StringToMap(opts_str, opts_map);
+}
+
 // Converts the vector options to a single string representation
 std::string DefaultOptionsFormatter::ToString(
     const std::string& /*prefix*/, char separator,
@@ -106,6 +114,36 @@ std::string PropertiesOptionsFormatter::ToString(
   }
 }
 
+Status PropertiesOptionsFormatter::ToMap(
+    const std::string& props,
+    std::unordered_map<std::string, std::string>* map) const {
+  if (props.find('\n') != std::string::npos) {
+    size_t pos = 0;
+    int line_num = 0;
+    Status s;
+    while (s.ok() && pos < props.size()) {
+      size_t nl_pos = props.find('\n', pos);
+      std::string name;
+      std::string value;
+      if (nl_pos == std::string::npos) {
+        s = RocksDBOptionsParser::ParseStatement(&name, &value,
+                                                 props.substr(pos), line_num);
+        pos = props.size();
+      } else {
+        s = RocksDBOptionsParser::ParseStatement(
+            &name, &value, props.substr(pos, nl_pos - pos), line_num);
+        pos = nl_pos + 1;
+      }
+      if (s.ok()) {
+        (*map)[name] = value;
+        line_num++;
+      }
+    }
+    return s;
+  } else {
+    return DefaultOptionsFormatter::ToMap(props, map);
+  }
+}
 void LogOptionsFormatter::AppendElem(const std::string& prefix,
                                      const std::string& name,
                                      const std::string& value,

@@ -71,6 +71,15 @@ std::string ConfigOptions::ToString(
   }
 }
 
+Status ConfigOptions::ToVector(const std::string& opts_str, char delim,
+                               std::vector<std::string>* elems) const {
+  if (formatter) {
+    return formatter->ToVector(opts_str, delim, elems);
+  } else {
+    return OptionsFormatter::Default()->ToVector(opts_str, delim, elems);
+  }
+}
+
 Status ValidateOptions(const DBOptions& db_opts,
                        const ColumnFamilyOptions& cf_opts) {
   Status s;

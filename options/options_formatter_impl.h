@@ -25,6 +25,11 @@ class LogOptionsFormatter : public OptionsFormatter {
     return Status::NotSupported();
   }
 
+  Status ToVector(const std::string& /*opts_str*/, char /*delim*/,
+                  std::vector<std::string>* /*elems*/) const override {
+    return Status::NotSupported();
+  }
+
  protected:
   void AppendElem(const std::string& prefix, const std::string& name,
                   const std::string& value, std::string* result) const;
@@ -45,6 +50,8 @@ class DefaultOptionsFormatter : public OptionsFormatter {
       std::unordered_map<std::string, std::string>* opts_map) const override;
   std::string ToString(const std::string& prefix, char separator,
                        const std::vector<std::string>& elems) const override;
+  Status ToVector(const std::string& opts_str, char delim,
+                  std::vector<std::string>* elems) const override;
 
  protected:
   void AppendElem(const std::string& name, const std::string& value,

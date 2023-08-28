@@ -111,11 +111,19 @@ struct ConfigOptions {
   std::string ToString(
       const std::string& prefix,
       const std::unordered_map<std::string, std::string>& options) const;
+
+  // Converts the string representation into a map of name/value options
   Status ToMap(const std::string& opts_str,
                std::unordered_map<std::string, std::string>* opts_map) const;
+
   // Converts the vector options to a single string representation
   std::string ToString(const std::string& prefix, char separator,
                        const std::vector<std::string>& elems) const;
+
+  // Converts the string representation into vector of elements based on the
+  // separator
+  Status ToVector(const std::string& opts_str, char separator,
+                  std::vector<std::string>* elems) const;
 };
 
 

@@ -26,6 +26,8 @@ class OptionsFormatter : public Customizable {
   virtual std::string ToString(
       const std::string& prefix,
       const std::unordered_map<std::string, std::string>& options) const = 0;
+
+  // Converts the string representation into a map of name/value options
   virtual Status ToMap(
       const std::string& opts_str,
       std::unordered_map<std::string, std::string>* opts_map) const = 0;
@@ -33,6 +35,11 @@ class OptionsFormatter : public Customizable {
   // Converts the vector options to a single string representation
   virtual std::string ToString(const std::string& prefix, char separator,
                                const std::vector<std::string>& elems) const = 0;
+
+  // Converts the string representation into vector of elements based on the
+  // separator
+  virtual Status ToVector(const std::string& opts_str, char separator,
+                          std::vector<std::string>* elems) const = 0;
 };
 
 }  // namespace ROCKSDB_NAMESPACE

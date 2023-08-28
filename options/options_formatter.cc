@@ -87,6 +87,23 @@ std::string DefaultOptionsFormatter::ToString(
   }
 }
 
+Status DefaultOptionsFormatter::ToVector(
+    const std::string& opts_str, char separator,
+    std::vector<std::string>* elems) const {
+  Status status;
+  for (size_t start = 0, end = 0;
+       status.ok() && start < opts_str.size() && end != std::string::npos;
+       start = end + 1) {
+    std::string token;
+    status =
+        OptionTypeInfo::NextToken(opts_str, separator, start, &end, &token);
+    if (status.ok()) {
+      elems->emplace_back(token);
+    }
+  }
+  return status;
+}
+
 std::string PropertiesOptionsFormatter::ToString(
     const std::string& prefix,
     const std::unordered_map<std::string, std::string>& options) const {

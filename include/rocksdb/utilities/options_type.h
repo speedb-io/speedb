@@ -1111,18 +1111,14 @@ Status ParseVector(const ConfigOptions& config_options,
                    const std::string& name, const std::string& value,
                    std::vector<T>* result) {
   result->clear();
-  Status status;
-
-  // Turn off ignore_unknown_objects so we can tell if the returned
-  // object is valid or not.
-  ConfigOptions copy = config_options;
-  copy.ignore_unsupported_options = false;
-  for (size_t start = 0, end = 0;
-       status.ok() && start < value.size() && end != std::string::npos;
-       start = end + 1) {
-    std::string token;
-    status = OptionTypeInfo::NextToken(value, separator, start, &end, &token);
-    if (status.ok()) {
+  std::vector<std::string> tokens;
+  Status status = config_options.ToVector(value, separator, &tokens);
+  if (status.ok()) {
+    // Turn off ignore_unknown_objects so we can tell if the returned
+    // object is valid or not.
+    ConfigOptions copy = config_options;
+    copy.ignore_unsupported_options = false;
+    for (const auto& token : tokens) {
       T elem;
       status = elem_info.Parse(copy, name, token, &elem);
       if (status.ok()) {
@@ -1132,6 +1128,8 @@ Status ParseVector(const ConfigOptions& config_options,
         // If we were ignoring unsupported options and this one should be
         // ignored, ignore it by setting the status to OK
         status = Status::OK();
+      } else {
+        return status;
       }
     }
   }
@@ -1165,11 +1163,9 @@ Status SerializeVector(const ConfigOptions& config_options,
     value->clear();
   } else {
     std::vector<std::string> opt_vec;
-    ConfigOptions embedded = config_options;
-    embedded.delimiter = ";";
     for (const auto& elem : vec) {
       std::string elem_str;
-      Status s = elem_info.Serialize(embedded, name, &elem, &elem_str);
+      Status s = elem_info.Serialize(config_options, name, &elem, &elem_str);
       if (!s.ok()) {
         return s;
       } else if (!elem_str.empty()) {

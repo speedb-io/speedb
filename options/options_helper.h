@@ -65,13 +65,6 @@ std::unique_ptr<Configurable> CFOptionsAsConfigurable(
     const ColumnFamilyOptions& opts,
     const std::unordered_map<std::string, std::string>* opt_map = nullptr);
 
-extern Status StringToMap(
-    const std::string& opts_str,
-    std::unordered_map<std::string, std::string>* opts_map);
-extern Status StringToMap(
-    const std::string& opts_str, char delim,
-    std::unordered_map<std::string, std::string>* opts_map);
-
 struct OptionsHelper {
   static const std::string kCFOptionsName /*= "ColumnFamilyOptions"*/;
   static const std::string kDBOptionsName /*= "DBOptions" */;

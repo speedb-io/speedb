@@ -174,8 +174,7 @@ Status Configurable::ConfigureFromString(const ConfigOptions& config_options,
                                          const std::string& opts_str) {
   Status s;
   if (!opts_str.empty()) {
-    if (opts_str.find(';') != std::string::npos ||
-        opts_str.find('=') != std::string::npos) {
+    if (opts_str.find('=') != std::string::npos) {
       std::unordered_map<std::string, std::string> opt_map;
       s = config_options.ToMap(opts_str, &opt_map);
       if (s.ok()) {

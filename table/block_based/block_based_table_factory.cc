@@ -929,7 +929,7 @@ Status GetBlockBasedTableOptionsFromString(
     const BlockBasedTableOptions& table_options, const std::string& opts_str,
     BlockBasedTableOptions* new_table_options) {
   std::unordered_map<std::string, std::string> opts_map;
-  Status s = StringToMap(opts_str, &opts_map);
+  Status s = config_options.ToMap(opts_str, &opts_map);
   if (!s.ok()) {
     return s;
   }

@@ -12,6 +12,7 @@
 #include "rocksdb/utilities/customizable_util.h"
 #include "rocksdb/utilities/object_registry.h"
 #include "rocksdb/utilities/options_type.h"
+#include "util/string_util.h"
 
 namespace ROCKSDB_NAMESPACE {
 void DefaultOptionsFormatter::AppendElem(const std::string& name,
@@ -55,7 +56,47 @@ std::string DefaultOptionsFormatter::ToString(
 Status DefaultOptionsFormatter::ToMap(
     const std::string& opts_str,
     std::unordered_map<std::string, std::string>* opts_map) const {
-  return StringToMap(opts_str, opts_map);
+  static const char kDelim = ';';
+  assert(opts_map);
+  // Example:
+  //   opts_str = "write_buffer_size=1024;max_write_buffer_number=2;"
+  //              "nested_opt={opt1=1;opt2=2};max_bytes_for_level_base=100"
+  size_t pos = 0;
+  std::string opts = trim(opts_str);
+  // If the input string starts and ends with "{...}", strip off the brackets
+  while (opts.size() > 2 && opts[0] == '{' && opts[opts.size() - 1] == '}') {
+    opts = trim(opts.substr(1, opts.size() - 2));
+  }
+
+  while (pos < opts.size()) {
+    size_t eq_pos = opts.find_first_of("={};", pos);
+    if (eq_pos == std::string::npos) {
+      return Status::InvalidArgument("Mismatched key value pair, '=' expected");
+    } else if (opts[eq_pos] != '=') {
+      return Status::InvalidArgument("Unexpected char in key");
+    }
+
+    std::string key = trim(opts.substr(pos, eq_pos - pos));
+    if (key.empty()) {
+      return Status::InvalidArgument("Empty key found");
+    }
+
+    std::string value;
+    Status s =
+        OptionTypeInfo::NextToken(opts, kDelim, eq_pos + 1, &pos, &value);
+    if (!s.ok()) {
+      return s;
+    } else {
+      (*opts_map)[key] = value;
+      if (pos == std::string::npos) {
+        break;
+      } else {
+        pos++;
+      }
+    }
+  }
+
+  return Status::OK();
 }
 
 // Converts the vector options to a single string representation

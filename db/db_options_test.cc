@@ -44,7 +44,7 @@ class DBOptionsTest : public DBTestBase {
 
     EXPECT_OK(GetStringFromMutableDBOptions(
         config_options, MutableDBOptions(options), &options_str));
-    EXPECT_OK(StringToMap(options_str, &mutable_map));
+    EXPECT_OK(config_options.ToMap(options_str, &mutable_map));
 
     return mutable_map;
   }
@@ -57,7 +57,7 @@ class DBOptionsTest : public DBTestBase {
     std::unordered_map<std::string, std::string> mutable_map;
     EXPECT_OK(GetStringFromMutableCFOptions(
         config_options, MutableCFOptions(options), &options_str));
-    EXPECT_OK(StringToMap(options_str, &mutable_map));
+    EXPECT_OK(config_options.ToMap(options_str, &mutable_map));
     return mutable_map;
   }
 

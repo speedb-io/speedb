@@ -618,7 +618,7 @@ ColumnFamilyOptions* ColumnFamilyOptions::EnableSpeedbFeaturesCF(
   min_write_buffer_number_to_merge = 1;
   // set the pinning option for indexes and filters
   {
-    ConfigOptions config_options; 
+    ConfigOptions config_options;
     config_options.ignore_unknown_options = false;
     config_options.ignore_unsupported_options = false;
     BlockBasedTableOptions block_based_table_options;
@@ -635,15 +635,17 @@ ColumnFamilyOptions* ColumnFamilyOptions::EnableSpeedbFeaturesCF(
     // block_based_table_options.metadata_cache_options.partition_pinning =
     //     PinningTier::kAll;
     // block_based_table_options.block_cache = shared_options.cache;
-    // auto& cache_usage_options = block_based_table_options.cache_usage_options;
-    // CacheEntryRoleOptions role_options;
-    // role_options.charged = CacheEntryRoleOptions::Decision::kEnabled;
+    // auto& cache_usage_options =
+    // block_based_table_options.cache_usage_options; CacheEntryRoleOptions
+    // role_options; role_options.charged =
+    // CacheEntryRoleOptions::Decision::kEnabled;
     // cache_usage_options.options_overrides.insert(
     //     {CacheEntryRole::kFilterConstruction, role_options});
     // cache_usage_options.options_overrides.insert(
     //     {CacheEntryRole::kBlockBasedTableReader, role_options});
     // cache_usage_options.options_overrides.insert(
-    //     {CacheEntryRole::kCompressionDictionaryBuildingBuffer, role_options});
+    //     {CacheEntryRole::kCompressionDictionaryBuildingBuffer,
+    //     role_options});
     // cache_usage_options.options_overrides.insert(
     //     {CacheEntryRole::kFileMetadata, role_options});
     table_factory.reset(NewBlockBasedTableFactory(block_based_table_options));

@@ -77,6 +77,7 @@ struct ConfigOptions {
   bool mutable_options_only = false;
 
   // The separator between options when converting to a string
+  // This option is now deprecated and replaced by the formatter field
   std::string delimiter = ";";
 
   // Controls how to traverse options during print/match stages
@@ -94,6 +95,7 @@ struct ConfigOptions {
   // The object registry to use for this options
   std::shared_ptr<ObjectRegistry> registry;
 
+  // Helper class for printing and parsing options to/from strings.
   std::shared_ptr<OptionsFormatter> formatter;
 
   bool IsShallow() const { return depth == Depth::kDepthShallow; }

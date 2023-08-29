@@ -7,6 +7,7 @@
 ### Enhancements
 
 ### Bug Fixes
+db_bench: fix SeekRandomWriteRandom valid check. Use key and value only after checking iterator is valid.
 
 ### Miscellaneous
 

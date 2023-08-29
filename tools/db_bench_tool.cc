@@ -8149,13 +8149,14 @@ class Benchmark {
         }
 
         for (int j = 0; j < FLAGS_seek_nexts && iter_to_use->Valid(); ++j) {
+          bytes += iter_to_use->key().size() + iter_to_use->value().size();
+
           if (!FLAGS_reverse_iterator) {
             iter_to_use->Next();
           } else {
             iter_to_use->Prev();
           }
           assert(iter_to_use->status().ok());
-          bytes += iter_to_use->key().size() + iter_to_use->value().size();
         }
 
         if (seeks % 256 == 255) {

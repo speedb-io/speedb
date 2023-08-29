@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-mac:
     runs-on: macos-11
 
     steps:
@@ -14,10 +14,71 @@ jobs:
         with:
           distribution: 'temurin' # See 'Supported distributions' for available options
           java-version: '8'
-      - run: |
+      - name: build jar
+        run: |
           echo $JAVA_HOME
           export CPPFLAGS="-I$JAVA_HOME/include"
           export CXXFLAGS="-I$JAVA_HOME/include"
           brew install zlib
           brew install bzip2 lz4 snappy
           ROCKSDB_DISABLE_JEMALLOC=1 PORTABLE=1 DEBUG_LEVEL=0 make -j 4 rocksdbjavastatic
+
+
+  build-ubuntu:
+    runs-on: ubuntu
+
+    container:
+      image: centos:7.9.2009
+
+    steps:
+      - name: pre
+        run: |
+          yum install -y centos-release-scl epel-release
+          yum install -y make devtoolset-11-gcc-c++ \
+            coreutils wget unzip which git python3 openssl openssl-devel \
+            libzstd-devel lz4-devel snappy-devel zlib-devel readline-devel \
+            java-1.8.0-openjdk-devel
+          echo "PATH=/opt/rh/devtoolset-11/root/usr/bin:${PATH}" >> $GITHUB_ENV
+          echo "RELEASE_VERSION=${GITHUB_REF_NAME#speedb/v}" >> $GITHUB_ENV
+
+      - name: Install CMake
+        run: |
+          CMAKE_RELEASE=3.20.1
+          wget https://github.com/Kitware/CMake/releases/download/v${CMAKE_RELEASE}/cmake-${CMAKE_RELEASE}.tar.gz
+          tar xf cmake-${CMAKE_RELEASE}.tar.gz
+          cd cmake-${CMAKE_RELEASE}
+          ./bootstrap
+          make -j$(nproc) && make install
+          cd .. && rm -rf cmake-${CMAKE_RELEASE}*
+
+      - uses: actions/checkout@v3
+
+      - run: mkdir "$GITHUB_WORKSPACE/out"
+
+      - name: Build and package release libraries
+        run: |
+          rm -rf build && mkdir build && cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DSPDB_RELEASE_BUILD=1 -DPORTABLE=1 -DWITH_GFLAGS=0 -DWITH_SNAPPY=1 -DWITH_LZ4=1 -DWITH_ZLIB=1 -DWITH_ZSTD=1
+          mkdir -p "$GITHUB_WORKSPACE/out/root"
+          DESTDIR="$GITHUB_WORKSPACE/out/root" make -j$(nproc) install
+          ( cd "$GITHUB_WORKSPACE/out/root" && tar czf ../speedb-${RELEASE_VERSION}.tar.gz . )
+          rm -rf "$GITHUB_WORKSPACE/out/root"
+          cd .. && rm -rf build
+
+      - name: Build Jar
+        run: |
+          make clean
+          SPDB_RELEASE_BUILD=1 LIB_MODE=static DEBUG_LEVEL=0 PORTABLE=1 JAVA_HOME=/usr/lib/jvm/java-openjdk make -j$(nproc) rocksdbjavastatic
+          cp "java/target/speedbjni-${RELEASE_VERSION}-linux64.jar" "$GITHUB_WORKSPACE/out"
+
+      - name: Build db_bench
+        run: |
+          yum install -y gflags-devel
+          rm -rf build && mkdir build && cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DSPDB_RELEASE_BUILD=1 -DPORTABLE=1 -DWITH_GFLAGS=1 \
+            -DWITH_SNAPPY=1 -DWITH_LZ4=1 -DWITH_ZLIB=1 -DWITH_ZSTD=1 \
+            -DWITH_BENCHMARK_TOOLS=1 -DROCKSDB_BUILD_SHARED=1
+          make -j$(nproc) db_bench
+          cp ../docs/db_bench_README.txt .
+          tar czf "$GITHUB_WORKSPACE/out/db_bench-speedb-${RELEASE_VERSION}.tar.gz" db_bench db_bench_README.txt
+          cd .. && rm -rf build

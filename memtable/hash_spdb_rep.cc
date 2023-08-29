@@ -399,10 +399,10 @@ void SpdbVectorContainer::SortThread() {
 class HashSpdbRep : public MemTableRep {
  public:
   HashSpdbRep(const MemTableRep::KeyComparator& compare, Allocator* allocator,
-              size_t bucket_size, bool use_seek_parallel_threshold = false);
+              size_t bucket_size);
 
-  HashSpdbRep(Allocator* allocator, size_t bucket_size,
-              bool use_seek_parallel_threshold = false);
+  HashSpdbRep(Allocator* allocator, size_t bucket_size);
+
   void PostCreate(const MemTableRep::KeyComparator& compare,
                   Allocator* allocator);
 
@@ -443,22 +443,17 @@ class HashSpdbRep : public MemTableRep {
 
  private:
   SpdbHashTable spdb_hash_table_;
-  bool use_seek_parallel_threshold_ = false;
   std::shared_ptr<SpdbVectorContainer> spdb_vectors_cont_ = nullptr;
 };
 
 HashSpdbRep::HashSpdbRep(const MemTableRep::KeyComparator& compare,
-                         Allocator* allocator, size_t bucket_size,
-                         bool use_seek_parallel_threshold)
-    : HashSpdbRep(allocator, bucket_size, use_seek_parallel_threshold) {
+                         Allocator* allocator, size_t bucket_size)
+    : HashSpdbRep(allocator, bucket_size) {
   spdb_vectors_cont_ = std::make_shared<SpdbVectorContainer>(compare);
 }
 
-HashSpdbRep::HashSpdbRep(Allocator* allocator, size_t bucket_size,
-                         bool use_seek_parallel_threshold)
-    : MemTableRep(allocator),
-      spdb_hash_table_(bucket_size),
-      use_seek_parallel_threshold_(use_seek_parallel_threshold) {}
+HashSpdbRep::HashSpdbRep(Allocator* allocator, size_t bucket_size)
+    : MemTableRep(allocator), spdb_hash_table_(bucket_size) {}
 
 void HashSpdbRep::PostCreate(const MemTableRep::KeyComparator& compare,
                              Allocator* allocator) {
@@ -522,8 +517,7 @@ void HashSpdbRep::Get(const LookupKey& k, void* callback_args,
 
 MemTableRep::Iterator* HashSpdbRep::GetIterator(Arena* arena) {
   const bool empty_iter =
-      spdb_vectors_cont_->IsEmpty() ||
-      (use_seek_parallel_threshold_ && !spdb_vectors_cont_->IsReadOnly());
+      spdb_vectors_cont_->IsEmpty() || !spdb_vectors_cont_->IsReadOnly();
   if (arena != nullptr) {
     void* mem;
     if (empty_iter) {
@@ -543,7 +537,6 @@ MemTableRep::Iterator* HashSpdbRep::GetIterator(Arena* arena) {
 struct HashSpdbRepOptions {
   static const char* kName() { return "HashSpdbRepOptions"; }
   size_t hash_bucket_count;
-  bool use_seek_parallel_threshold;
 };
 
 static std::unordered_map<std::string, OptionTypeInfo> hash_spdb_factory_info =
@@ -552,22 +545,12 @@ static std::unordered_map<std::string, OptionTypeInfo> hash_spdb_factory_info =
          {offsetof(struct HashSpdbRepOptions, hash_bucket_count),
           OptionType::kSizeT, OptionVerificationType::kNormal,
           OptionTypeFlags::kNone}},
-        {"use_seek_parallel_threshold",
-         {offsetof(struct HashSpdbRepOptions, use_seek_parallel_threshold),
-          OptionType::kBoolean, OptionVerificationType::kNormal,
-          OptionTypeFlags::kNone}},
 };
 
 class HashSpdbRepFactory : public MemTableRepFactory {
  public:
   explicit HashSpdbRepFactory(size_t hash_bucket_count = 1000000) {
     options_.hash_bucket_count = hash_bucket_count;
-    options_.use_seek_parallel_threshold = false;
-
-    if (hash_bucket_count == 0) {
-      options_.use_seek_parallel_threshold = true;
-      options_.hash_bucket_count = 1000000;
-    }
     RegisterOptions(&options_, &hash_spdb_factory_info);
   }
 
@@ -597,9 +580,7 @@ class HashSpdbRepFactory : public MemTableRepFactory {
 // HashSpdbRepFactory
 
 MemTableRep* HashSpdbRepFactory::PreCreateMemTableRep() {
-  MemTableRep* hash_spdb =
-      new HashSpdbRep(nullptr, options_.hash_bucket_count,
-                      options_.use_seek_parallel_threshold);
+  MemTableRep* hash_spdb = new HashSpdbRep(nullptr, options_.hash_bucket_count);
   return hash_spdb;
 }
 
@@ -613,8 +594,7 @@ void HashSpdbRepFactory::PostCreateMemTableRep(
 MemTableRep* HashSpdbRepFactory::CreateMemTableRep(
     const MemTableRep::KeyComparator& compare, Allocator* allocator,
     const SliceTransform* /*transform*/, Logger* /*logger*/) {
-  return new HashSpdbRep(compare, allocator, options_.hash_bucket_count,
-                         options_.use_seek_parallel_threshold);
+  return new HashSpdbRep(compare, allocator, options_.hash_bucket_count);
 }
 
 MemTableRepFactory* NewHashSpdbRepFactory(size_t bucket_count) {

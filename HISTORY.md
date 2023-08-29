@@ -16,6 +16,7 @@ Fix RepeatableThread to work properly with on thread start callback feature (htt
 ### Bug Fixes
 * db_bench: fix SeekRandomWriteRandom valid check. Use key and value only after checking iterator is valid.
 * Fix a JAVA build issue introduced by #597 (#680)
+* support hash spdb as part of enable speedb features  (#653)
 
 ### Miscellaneous
 * Unit tests: Disable CancelCompactionWaitingOnConflict and CompactionLimiter in db_compaction_test since they sometimes fail or get stuck. These need to be investigated and reenabled.

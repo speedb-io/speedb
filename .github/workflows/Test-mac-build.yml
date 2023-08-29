@@ -25,7 +25,7 @@ jobs:
 
 
   build-ubuntu:
-    runs-on: ubuntu
+    runs-on: ubuntu-latest
 
     container:
       image: centos:7.9.2009

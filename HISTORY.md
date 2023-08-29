@@ -1,8 +1,17 @@
 # Speedb Change Log 
 
 ## Unreleased
-* move hashSpdb memtable from plugin to main code (#639)
-* Support Spdb memtable in Java and C (#548)
+
+### New Features
+
+### Enhancements
+
+### Bug Fixes
+
+### Miscellaneous
+
+## Grapes v2.6.0 (8/22/2023)
+Based on RocksDB 8.1.1
 
 ### New Features
 * Snapshot optimization - The most important information inside a snapshot is its Sequence number, which allows the compaction to know if the key-value should be deleted or not. The sequence number is being changed when modification happens in the db. This feature allows the db to take a snapshot without acquiring db mutex when the last snapshot has the same sequence number as a new one. In transactional db with mostly read operations, it should improve performance when used with multithreaded environment and as well other scenarios of taking large amount of snapshots with mostly read operations.
@@ -11,11 +20,9 @@
 
 ### Enhancements
 * db_bench: add estimate-table-readers-mem benchmark which prints these stats.
-
 * A new option on_thread_start_callback has been added. It allows to set thread affinity or perform other optimizations (e.g. NUMA pinning) to speedb background threads. 
 An example file on_thread_start_callback_example.cc has been provided to demonstrate how to use this feature.
-
-
+* Support Spdb memtable in Java and C (#548)
 
 ### Bug Fixes
 * unit tests: fix GlobalWriteControllerTest.GlobalAndWBMSetupDelay by waiting for the memtable memory release.
@@ -27,6 +34,9 @@ An example file on_thread_start_callback_example.cc has been provided to demonst
 * unit tests: fix DBCompactionTest.DisableMultiManualCompaction by blocking all bg compaction threads which increased by default to 8 in #194.
 * Proactive Flushes: fix accounting with non-WBM initiated flushes.
 
+### Miscellaneous
+* move hashSpdb memtable from plugin to main code (#639)
+
 ## Fig v2.5.0 (06/14/2023)
 Based on RocksDB 8.1.1
 
@@ -34,14 +44,18 @@ Based on RocksDB 8.1.1
  * Enable Speedb Features : Speedb users currently configure the database manually. New Speedb users are required to spend a lot of effort reading the documentation of the Speedb features.
  The purpose of this feature is to help users enable and set Speedb options easily to a default configuration.
  The SharedOptions class was added to improve the usability of multiple databases cases by arranging shared options.(#543)
-
-### New Features
 * Delay writes gradually based on memory usage of the WriteBufferManager (WBM).
 Before this PR, setting allow_stall in the WBM's constructor meant that writes are completely stopped when the WBM's memory usage exceeds its quota. The goal here is to gradually decrease
 the users write speed before that threshold is reached in order to gain stability.
 To use this feature, pass allow_stall = true to the ctor of WBM and the db needs to be opened with options.use_dynamic_delay = true. The WBM will setup delay requests starting from (start_delay_percent * _buffer_size) / 100 (default value is 70) (start_delay_percent is another WBM ctor parameter).
 Changes to the WBM's memory are tracked in WriteBufferManager::ReserveMem and FreeMem.
 Once the WBM reached its capacity, if allow_stall == true, writes will be stopped using the old ShouldStall() and WBMStallWrites(). (#423)
+* Prevent flush entry followed delete operations
+currently during memtable flush ,  if key has a match key in the
+delete range table and this record has no snapshot related to it,
+we still write it with its value to SST file.
+This feature keeps only the delete record and reduce SST size for later compaction.
+(#411)
 
 ### Enhancements
 * CI: add a workflow for building and publishing jar to maven central (#507)
@@ -66,11 +80,13 @@ Also switch to waiting a sec on the CV each time. This is required since a bg er
 * db_bench: Create a WBM once for all db-s regardless of their use in different groups (#550)
 * Tombstone unit test faiure (#560)
 * build: Remove unused variables in unit tests (#581)
+
 ### Miscellaneous
 * disable failing unit tests and paired bloom filter stress testing
 * version: update Speedb patch version to 2.4.1 (#503)
 
 ## Speedb v2.4.1 ( 04/19/2023)
+
 ### Enhancements
 * Add the ability to create any Filter Policy in java (including ribbon filter and the Speedb paired bloom filter) by @mrambacher in #387
 
@@ -78,6 +94,7 @@ Also switch to waiting a sec on the CV each time. This is required since a bg er
 * Write Flow: Reduce debug log size. Note: the write flow is still experimental in this release (#461) by @ayulas in #472
 
 ## Ephedra v2.4.0 (04/05/2023)
+
 ### New Features
 * New beezcli: Interactive CLI that offers data access and admin commands by @ofriedma in #427
 * Global delayed write rate: manage the delayed write rate across multiple CFs/databases by @Yuval-Ariel in #392

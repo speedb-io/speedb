@@ -630,31 +630,31 @@ ColumnFamilyOptions* ColumnFamilyOptions::EnableSpeedbFeaturesCF(
     block_based_table_options.cache_index_and_filter_blocks_with_high_priority =
         true;
     block_based_table_options.pin_l0_filter_and_index_blocks_in_cache = false;
-    // block_based_table_options.metadata_cache_options.unpartitioned_pinning =
-    //     PinningTier::kAll;
-    // block_based_table_options.metadata_cache_options.partition_pinning =
-    //     PinningTier::kAll;
-    // block_based_table_options.block_cache = shared_options.cache;
-    // auto& cache_usage_options =
-    // block_based_table_options.cache_usage_options; CacheEntryRoleOptions
-    // role_options; role_options.charged =
-    // CacheEntryRoleOptions::Decision::kEnabled;
-    // cache_usage_options.options_overrides.insert(
-    //     {CacheEntryRole::kFilterConstruction, role_options});
-    // cache_usage_options.options_overrides.insert(
-    //     {CacheEntryRole::kBlockBasedTableReader, role_options});
-    // cache_usage_options.options_overrides.insert(
-    //     {CacheEntryRole::kCompressionDictionaryBuildingBuffer,
-    //     role_options});
-    // cache_usage_options.options_overrides.insert(
-    //     {CacheEntryRole::kFileMetadata, role_options});
+    block_based_table_options.metadata_cache_options.unpartitioned_pinning =
+        PinningTier::kAll;
+    block_based_table_options.metadata_cache_options.partition_pinning =
+        PinningTier::kAll;
+    block_based_table_options.block_cache = shared_options.cache;
+    auto& cache_usage_options =
+    block_based_table_options.cache_usage_options; CacheEntryRoleOptions
+    role_options; role_options.charged =
+    CacheEntryRoleOptions::Decision::kEnabled;
+    cache_usage_options.options_overrides.insert(
+        {CacheEntryRole::kFilterConstruction, role_options});
+    cache_usage_options.options_overrides.insert(
+        {CacheEntryRole::kBlockBasedTableReader, role_options});
+    cache_usage_options.options_overrides.insert(
+        {CacheEntryRole::kCompressionDictionaryBuildingBuffer,
+        role_options});
+    cache_usage_options.options_overrides.insert(
+        {CacheEntryRole::kFileMetadata, role_options});
     table_factory.reset(NewBlockBasedTableFactory(block_based_table_options));
   }
-  if (prefix_extractor) {
+  // if (prefix_extractor) {
     memtable_factory.reset(NewHashSkipListRepFactory());
-  } else {
-    memtable_factory.reset(NewHashSpdbRepFactory());
-  }
+  // } else {
+  //   memtable_factory.reset(NewHashSpdbRepFactory());
+  // }
   return this;
 }
 

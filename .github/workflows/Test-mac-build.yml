@@ -49,7 +49,6 @@ jobs:
           cd cmake-${CMAKE_RELEASE}
           ./bootstrap
           make -j$(nproc) && make install
-          cd .. && rm -rf cmake-${CMAKE_RELEASE}*
 
       - uses: actions/checkout@v3
 
@@ -59,18 +58,12 @@ jobs:
         run: |
           rm -rf build && mkdir build && cd build
           cmake .. -DCMAKE_BUILD_TYPE=Release -DSPDB_RELEASE_BUILD=1 -DPORTABLE=1 -DWITH_GFLAGS=0 -DWITH_SNAPPY=1 -DWITH_LZ4=1 -DWITH_ZLIB=1 -DWITH_ZSTD=1
-          mkdir -p "$GITHUB_WORKSPACE/out/root"
-          DESTDIR="$GITHUB_WORKSPACE/out/root" make -j$(nproc) install
-          ( cd "$GITHUB_WORKSPACE/out/root" && tar czf ../speedb-${RELEASE_VERSION}.tar.gz . )
-          rm -rf "$GITHUB_WORKSPACE/out/root"
-          cd .. && rm -rf build
-
+          
       - name: Build Jar
         run: |
           make clean
           SPDB_RELEASE_BUILD=1 LIB_MODE=static DEBUG_LEVEL=0 PORTABLE=1 JAVA_HOME=/usr/lib/jvm/java-openjdk make -j$(nproc) rocksdbjavastatic
-          cp "java/target/speedbjni-${RELEASE_VERSION}-linux64.jar" "$GITHUB_WORKSPACE/out"
-
+         
       - name: Build db_bench
         run: |
           yum install -y gflags-devel
@@ -79,6 +72,3 @@ jobs:
             -DWITH_SNAPPY=1 -DWITH_LZ4=1 -DWITH_ZLIB=1 -DWITH_ZSTD=1 \
             -DWITH_BENCHMARK_TOOLS=1 -DROCKSDB_BUILD_SHARED=1
           make -j$(nproc) db_bench
-          cp ../docs/db_bench_README.txt .
-          tar czf "$GITHUB_WORKSPACE/out/db_bench-speedb-${RELEASE_VERSION}.tar.gz" db_bench db_bench_README.txt
-          cd .. && rm -rf build

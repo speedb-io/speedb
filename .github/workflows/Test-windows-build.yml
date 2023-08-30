@@ -30,6 +30,27 @@ jobs:
       - name: Add msbuild to PATH
         uses: microsoft/setup-msbuild@v1.1    
 
+      - name: install snappy 
+        shell: powershell
+        run: |
+            echo $env:CODE_HOME
+            dir C:/Users/
+            dir C:/Users/runner
+            mkdir $env:CODE_HOME
+            cd $env:CODE_HOME
+            curl https://github.com/gflags/gflags/archive/refs/tags/v2.2.2.zip -o v2.2.2.zip
+            Expand-Archive -Path snappy.zip -DestinationPath snappy-tmp
+            mv .\snappy-1.1.9\snappy-1.1.9\ .
+            rmdir .\snappy-1.1.9\
+            mv .\snappy-tmp\snappy-1.1.9\ .
+            rmdir .\snappy-tmp\
+            cd .\snappy-1.1.9\
+            mkdir build
+            cd .\build\
+            cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_GENERATOR_PLATFORM=x64 -DSNAPPY_BUILD_TESTS=OFF -DSNAPPY_BUILD_BENCHMARKS=OFF ..
+            msbuild Snappy.sln /p:Configuration=Debug /p:Platform=x64
+            msbuild Snappy.sln /p:Configuration=Release /p:Platform=x64        
+
       - name: install third-party  
         shell: powershell
         run: |                  
@@ -52,28 +73,8 @@ jobs:
             #     dir C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin
             echo "run msbuild"
             msbuild.exe Snappy.sln -maxCpuCount -property:Configuration=Debug -property:Platform=x64
-      
-      - name: install snappy 
-        shell: powershell
-        run: |
-            echo $env:CODE_HOME
-            dir C:/Users/
-            dir C:/Users/runner
-            mkdir $env:CODE_HOME
-            cd $env:CODE_HOME
-            curl https://github.com/gflags/gflags/archive/refs/tags/v2.2.2.zip -o v2.2.2.zip
-            Expand-Archive -Path snappy.zip -DestinationPath snappy-tmp
-            mv .\snappy-1.1.9\snappy-1.1.9\ .
-            rmdir .\snappy-1.1.9\
-            mv .\snappy-tmp\snappy-1.1.9\ .
-            rmdir .\snappy-tmp\
-            cd .\snappy-1.1.9\
-            mkdir build
-            cd .\build\
-            cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_GENERATOR_PLATFORM=x64 -DSNAPPY_BUILD_TESTS=OFF -DSNAPPY_BUILD_BENCHMARKS=OFF ..
-            msbuild Snappy.sln /p:Configuration=Debug /p:Platform=x64
-            msbuild Snappy.sln /p:Configuration=Release /p:Platform=x64
-      
+    
+     
       - name: "Build RocksDB"      
         run: |
             mkdir build

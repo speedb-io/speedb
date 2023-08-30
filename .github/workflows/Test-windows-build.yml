@@ -23,8 +23,8 @@ jobs:
           java-version: '8'
 
       - name: install third-party  
-        run: |
-            shell: powershell.exe
+        shell: powershell.exe
+        run: |            
             mkdir "$Env:THIRDPARTY_HOME"
             echo "Installing CMake..."
             choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' -y
@@ -51,6 +51,6 @@ jobs:
             msbuild.exe build/rocksdb.sln -maxCpuCount -property:Configuration=Debug -property:Platform=x64
      
       - name: Test RocksDB
-        run: |
-          shell: powershell.exe
+        shell: powershell.exe
+        run: |          
           build_tools\run_ci_db_test.ps1 -SuiteRun arena_test,db_basic_test,db_test,db_test2,db_merge_operand_test,bloom_test,c_test,coding_test,crc32c_test,dynamic_bloom_test,env_basic_test,env_test,hash_test,random_test -Concurrency 16

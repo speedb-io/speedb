@@ -47,7 +47,7 @@ jobs:
             cd build
             & $Env:CMAKE_BIN -G "$Env:CMAKE_GENERATOR" ..                        
             echo "show path"
-            $Env:Path
+            echo $Env:Path
             echo "list files"
             #     dir C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin
             echo "run msbuild"
@@ -56,6 +56,8 @@ jobs:
       - name: install snappy 
         shell: powershell
         run: |
+            echo $env:CODE_HOME
+            dir C:/Users/runner/code
             mkdir $env:CODE_HOME
             cd $env:CODE_HOME
             curl https://github.com/gflags/gflags/archive/refs/tags/v2.2.2.zip -o v2.2.2.zip

@@ -56,10 +56,13 @@ jobs:
         run: |
             mkdir build
             cd build
-            & $Env:CMAKE_BIN -G "$Env:CMAKE_GENERATOR" -DCMAKE_BUILD_TYPE=Debug -DOPTDBG=1 -DPORTABLE=1 -DSNAPPY=1 -DJNI=1 ..
+            #& $Env:CMAKE_BIN -G "$Env:CMAKE_GENERATOR" -DCMAKE_BUILD_TYPE=Debug -DOPTDBG=1 -DPORTABLE=1 -DSNAPPY=1 -DJNI=1 ..
+            & $Env:CMAKE_BIN -G "$Env:CMAKE_GENERATOR" -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_STANDARD=20 -A x64 -DJNI=1 -DGFLAGS=1 -DOPTDBG=1 -DPORTABLE=1 -DSNAPPY=1 -DJNI=1 -DSNAPPY=1 -DLZ4=1 -DZLIB=1 -DZSTD=1 -DXPRESS=1 -DFAIL_ON_WARNINGS=0 ..
             cd ..
             echo "Building with VS version: $Env:CMAKE_GENERATOR"
-            msbuild.exe build/rocksdb.sln -maxCpuCount -property:Configuration=Debug -property:Platform=x64
+            #msbuild speedb.sln /p:Configuration=Release /t:speedbjni-shared
+            #msbuild.exe build/rocksdb.sln -maxCpuCount -property:Configuration=Debug -property:Platform=x64
+            msbuild.exe build/speedb.sln -maxCpuCount -property:Configuration=Debug -property:Platform=x64
      
       - name: Test RocksDB
         shell: powershell

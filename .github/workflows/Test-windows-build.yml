@@ -38,8 +38,12 @@ jobs:
             dir C:/Users/runneradmin
             mkdir $env:CODE_HOME
             cd $env:CODE_HOME
-            curl https://github.com/gflags/gflags/archive/refs/tags/v2.2.2.zip -o v2.2.2.zip
+            curl https://github.com/gflags/gflags/archive/refs/tags/v2.2.2.zip -o snappy.zip
+            echo "dir 11"
+            dir
             Expand-Archive -Path snappy.zip -DestinationPath snappy-tmp
+            echo "dir 22"
+            dir
             mv .\snappy-1.1.9\snappy-1.1.9\ .
             rmdir .\snappy-1.1.9\
             mv .\snappy-tmp\snappy-1.1.9\ .

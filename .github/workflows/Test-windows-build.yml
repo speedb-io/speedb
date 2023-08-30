@@ -39,6 +39,11 @@ jobs:
             cd build
             & $Env:CMAKE_BIN -G "$Env:CMAKE_GENERATOR" ..
             echo "C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+            echo "show path"
+            $Env:Path
+            echo "list files"
+            dir C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin
+            echo "run msbuild"
             msbuild.exe Snappy.sln -maxCpuCount -property:Configuration=Debug -property:Platform=x64
       
       - name: "Build RocksDB"      

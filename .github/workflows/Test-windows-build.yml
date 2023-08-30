@@ -24,6 +24,7 @@ jobs:
 
       - name: install third-party  
         run: |
+            shell: powershell.exe
             mkdir "$Env:THIRDPARTY_HOME"
             echo "Installing CMake..."
             choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' -y

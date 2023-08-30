@@ -7,14 +7,14 @@ jobs:
   build-windows:
     runs-on: windows-2022
     env: 
-        THIRDPARTY_HOME: C:/Users/runner/thirdparty
+        THIRDPARTY_HOME: C:/Users/runneradmin/thirdparty
         CMAKE_HOME: C:/Program Files/CMake
         CMAKE_BIN: C:/Program Files/CMake/bin/cmake.exe
-        SNAPPY_HOME: C:/Users/runner/thirdparty/snappy-1.1.8
-        SNAPPY_INCLUDE: C:/Users/runner/thirdparty/snappy-1.1.8;C:/Users/circleci/thirdparty/snappy-1.1.8/build
-        SNAPPY_LIB_DEBUG: C:/Users/runner/thirdparty/snappy-1.1.8/build/Debug/snappy.lib
+        SNAPPY_HOME: C:/Users/runneradmin/thirdparty/snappy-1.1.8
+        SNAPPY_INCLUDE: C:/Users/runneradmin/thirdparty/snappy-1.1.8;C:/Users/circleci/thirdparty/snappy-1.1.8/build
+        SNAPPY_LIB_DEBUG: C:/Users/runneradmin/thirdparty/snappy-1.1.8/build/Debug/snappy.lib
         CMAKE_GENERATOR: Visual Studio 17 2022
-        CODE_HOME: C:/Users/runner/code
+        CODE_HOME: C:/Users/runneradmin/code
     steps:
       - uses: actions/checkout@v3
       - name: Set up JDK 17
@@ -35,7 +35,7 @@ jobs:
         run: |
             echo $env:CODE_HOME
             dir C:/Users/
-            dir C:/Users/runner
+            dir C:/Users/runneradmin
             mkdir $env:CODE_HOME
             cd $env:CODE_HOME
             curl https://github.com/gflags/gflags/archive/refs/tags/v2.2.2.zip -o v2.2.2.zip

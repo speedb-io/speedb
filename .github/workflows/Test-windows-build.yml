@@ -57,7 +57,8 @@ jobs:
         shell: powershell
         run: |
             echo $env:CODE_HOME
-            dir C:/Users/runner/code
+            dir C:/Users/
+            dir C:/Users/runner
             mkdir $env:CODE_HOME
             cd $env:CODE_HOME
             curl https://github.com/gflags/gflags/archive/refs/tags/v2.2.2.zip -o v2.2.2.zip

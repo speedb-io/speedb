@@ -46,8 +46,6 @@ jobs:
             dir
             echo "dir 33"
             dir snappy-tmp 
-            mv .\snappy-1.1.9\snappy-1.1.9\ .
-            rmdir .\snappy-1.1.9\
             mv .\snappy-tmp\snappy-1.1.9\ .
             rmdir .\snappy-tmp\
             cd .\snappy-1.1.9\

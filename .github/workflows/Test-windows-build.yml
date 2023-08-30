@@ -14,6 +14,7 @@ jobs:
         SNAPPY_INCLUDE: C:/Users/runner/thirdparty/snappy-1.1.8;C:/Users/circleci/thirdparty/snappy-1.1.8/build
         SNAPPY_LIB_DEBUG: C:/Users/runner/thirdparty/snappy-1.1.8/build/Debug/snappy.lib
         CMAKE_GENERATOR: Visual Studio 17 2022
+        CODE_HOME: C:\Users\builder\code
     steps:
       - uses: actions/checkout@v3
       - name: Set up JDK 17
@@ -51,6 +52,24 @@ jobs:
             #     dir C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin
             echo "run msbuild"
             msbuild.exe Snappy.sln -maxCpuCount -property:Configuration=Debug -property:Platform=x64
+      
+      - name: install snappy 
+        shell: powershell
+        run: |
+            mkdir $env:CODE_HOME
+            cd $env:CODE_HOME
+            curl https://github.com/gflags/gflags/archive/refs/tags/v2.2.2.zip -o v2.2.2.zip
+            Expand-Archive -Path snappy.zip -DestinationPath snappy-tmp
+            mv .\snappy-1.1.9\snappy-1.1.9\ .
+            rmdir .\snappy-1.1.9\
+            mv .\snappy-tmp\snappy-1.1.9\ .
+            rmdir .\snappy-tmp\
+            cd .\snappy-1.1.9\
+            mkdir build
+            cd .\build\
+            cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_GENERATOR_PLATFORM=x64 -DSNAPPY_BUILD_TESTS=OFF -DSNAPPY_BUILD_BENCHMARKS=OFF ..
+            msbuild Snappy.sln /p:Configuration=Debug /p:Platform=x64
+            msbuild Snappy.sln /p:Configuration=Release /p:Platform=x64
       
       - name: "Build RocksDB"      
         run: |

@@ -21,6 +21,10 @@ jobs:
         with:
           distribution: 'temurin' # See 'Supported distributions' for available options
           java-version: '8'
+        
+      - name: update the PATH
+        run: |
+          echo "C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append    
 
       - name: install third-party  
         shell: powershell
@@ -37,8 +41,7 @@ jobs:
             cd snappy-1.1.8
             mkdir build
             cd build
-            & $Env:CMAKE_BIN -G "$Env:CMAKE_GENERATOR" ..
-            echo "C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+            & $Env:CMAKE_BIN -G "$Env:CMAKE_GENERATOR" ..                        
             echo "show path"
             $Env:Path
             echo "list files"

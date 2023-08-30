@@ -1,0 +1,55 @@
+name: Build on Windows test
+
+on: 
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-2022
+    env: 
+        THIRDPARTY_HOME: C:/Users/runner/thirdparty
+        CMAKE_HOME: C:/Program Files/CMake
+        CMAKE_BIN: C:/Program Files/CMake/bin/cmake.exe
+        SNAPPY_HOME: C:/Users/runner/thirdparty/snappy-1.1.8
+        SNAPPY_INCLUDE: C:/Users/runner/thirdparty/snappy-1.1.8;C:/Users/circleci/thirdparty/snappy-1.1.8/build
+        SNAPPY_LIB_DEBUG: C:/Users/runner/thirdparty/snappy-1.1.8/build/Debug/snappy.lib
+        CMAKE_GENERATOR: Visual Studio 17 2022
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin' # See 'Supported distributions' for available options
+          java-version: '8'
+
+      - name: install third-party  
+        run: |
+            mkdir "$Env:THIRDPARTY_HOME"
+            echo "Installing CMake..."
+            choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' -y
+            echo "Running mkdir 111"
+            echo ""
+            mkdir "$Env:THIRDPARTY_HOME"
+            cd $Env:THIRDPARTY_HOME
+            echo "Building Snappy dependency..."
+            curl https://github.com/google/snappy/archive/refs/tags/1.1.8.zip -O snappy-1.1.8.zip
+            unzip -q snappy-1.1.8.zip
+            cd snappy-1.1.8
+            mkdir build
+            cd build
+            & $Env:CMAKE_BIN -G "$Env:CMAKE_GENERATOR" ..
+            msbuild.exe Snappy.sln -maxCpuCount -property:Configuration=Debug -property:Platform=x64
+      
+      - name: "Build RocksDB"      
+        run: |
+            mkdir build
+            cd build
+            & $Env:CMAKE_BIN -G "$Env:CMAKE_GENERATOR" -DCMAKE_BUILD_TYPE=Debug -DOPTDBG=1 -DPORTABLE=1 -DSNAPPY=1 -DJNI=1 ..
+            cd ..
+            echo "Building with VS version: $Env:CMAKE_GENERATOR"
+            msbuild.exe build/rocksdb.sln -maxCpuCount -property:Configuration=Debug -property:Platform=x64
+     
+      - name: Test RocksDB
+        run: |
+          shell: powershell.exe
+          build_tools\run_ci_db_test.ps1 -SuiteRun arena_test,db_basic_test,db_test,db_test2,db_merge_operand_test,bloom_test,c_test,coding_test,crc32c_test,dynamic_bloom_test,env_basic_test,env_test,hash_test,random_test -Concurrency 16

@@ -148,7 +148,7 @@ jobs:
             cd .\gflags-2.2.2\
             mkdir target
             cd target
-            $Env:CMAKE_BIN -G "$Env:CMAKE_GENERATOR" -A x64 ..    
+            cmake -G "Visual Studio 17 2022" -A x64 ..
             msbuild gflags.sln /p:Configuration=Release /p:Platform=x64
 
     

@@ -144,9 +144,15 @@ jobs:
         run: |
             cd $Env:THIRDPARTY_HOME
             curl https://github.com/gflags/gflags/archive/refs/tags/v2.2.2.zip -o v2.2.2.zip
+            echo "list files"
+            dir
             Expand-Archive -Path .\v2.2.2.zip -DestinationPath gflags-2.2.2
+            echo "list files aaa "
+            dir          
             cd .\gflags-2.2.2\
             mkdir target
+            echo "list files bbb "
+            dir  
             cd target
             cmake -G "Visual Studio 17 2022" -A x64 ..
             msbuild gflags.sln /p:Configuration=Release /p:Platform=x64

@@ -80,10 +80,14 @@ jobs:
             curl https://github.com/gflags/gflags/archive/refs/tags/v2.2.2.zip -o v2.2.2.zip
             echo "list files"
             dir
-            Expand-Archive -Path .\v2.2.2.zip -DestinationPath gflags-2.2.2
+            Expand-Archive -Path .\v2.2.2.zip -DestinationPath gflags-tmp
             echo "list files aaa "
             dir          
-            cd .\gflags-2.2.2\
+            mv .\gflags-tmp\gflags-2.2.2 .
+            echo "list files aaaaaa "
+            dir  
+            rmdir gflags-tmp
+            cd gflags-2.2.2
             mkdir target
             echo "list files bbb "
             dir  

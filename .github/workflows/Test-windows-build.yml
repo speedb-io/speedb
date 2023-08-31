@@ -125,6 +125,20 @@ jobs:
             cd visual\VS2017
             devenv lz4.sln /upgrade
             msbuild lz4.sln /p:Configuration=Release /p:Platform=x64
+
+      - name: install zctd
+        shell: powershell
+        run: |
+            cd $Env:THIRDPARTY_HOME
+            curl   https://github.com/facebook/zstd/archive/v1.5.2.zip -o zstd-tmp.zip
+            Expand-Archive -Path zstd-tmp.zip -DestinationPath zstd-tmp
+            mv .\zstd-tmp\zstd-1.5.2\ .
+            rmdir .\zstd-tmp\
+            cd zstd-1.5.2\build\VS2010
+            devenv zstd.sln /upgrade
+            msbuild zstd.sln /p:Configuration=Debug /p:Platform=x64
+            msbuild zstd.sln /p:Configuration=Release /p:Platform=x64
+
     
       - name: "Build Speedb"      
         run: |

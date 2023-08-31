@@ -117,8 +117,8 @@ jobs:
             dir C:\Users\runneradmin\thirdparty\snappy-1.1.9\
             echo "listing the build folder"
             dir C:\Users\runneradmin\thirdparty\snappy-1.1.9\build
-            echo "listing the file"
-            dir C:\Users\runneradmin\thirdparty\snappy-1.1.9\snappy.h
+            echo "listing the folder that should contain snappy.h"
+            dir C:\Users\runneradmin\thirdparty\snappy-1.1.9\
 
       - name: install zlib
         shell: powershell

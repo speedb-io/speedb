@@ -95,6 +95,7 @@ jobs:
         run: |
             echo "listing the snappy.h"
             dir C:\Users\runneradmin\thirdparty\snappy-1.1.8\snappy.h
+            copy C:\Users\runneradmin\thirdparty\snappy-1.1.8\build\snappy-stubs-public.h C:\Users\runneradmin\thirdparty\snappy-1.1.8\ 
             mkdir build
             cd build
             #& $Env:CMAKE_BIN -G "$Env:CMAKE_GENERATOR" -DCMAKE_BUILD_TYPE=Debug -DOPTDBG=1 -DPORTABLE=1 -DSNAPPY=1 -DJNI=1 ..

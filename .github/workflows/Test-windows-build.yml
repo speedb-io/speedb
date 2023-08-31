@@ -139,6 +139,17 @@ jobs:
             msbuild zstd.sln /p:Configuration=Debug /p:Platform=x64
             msbuild zstd.sln /p:Configuration=Release /p:Platform=x64
 
+      - name: install gflags
+        shell: powershell
+        run: |
+            cd $Env:THIRDPARTY_HOME
+            curl https://github.com/gflags/gflags/archive/refs/tags/v2.2.2.zip -o v2.2.2.zip
+            cd .\gflags-2.2.2\
+            mkdir target
+            cd target
+            cmake -G "Visual Studio 16 2019" -A x64 ..    
+            msbuild gflags.sln /p:Configuration=Release /p:Platform=x64
+
     
       - name: "Build Speedb"      
         run: |

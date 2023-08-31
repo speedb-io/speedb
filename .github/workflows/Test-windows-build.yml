@@ -163,6 +163,8 @@ jobs:
     
       - name: "Build Speedb"      
         run: |
+            echo "listing snappy.lib"
+            dir C:\Users\runneradmin\thirdparty\snappy-1.1.9\build\Release\snappy.lib
             echo "listing the snappy.h"
             dir C:\Users\runneradmin\thirdparty\snappy-1.1.8\snappy.h
             copy C:\Users\runneradmin\thirdparty\snappy-1.1.8\build\snappy-stubs-public.h C:\Users\runneradmin\thirdparty\snappy-1.1.8\ 

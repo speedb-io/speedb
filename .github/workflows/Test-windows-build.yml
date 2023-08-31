@@ -89,11 +89,11 @@ jobs:
             dir C:\Users\runneradmin\thirdparty\snappy-1.1.8\snappy.h
             echo "installing zlib"
             cd $Env:THIRDPARTY_HOME
-            curl  http://zlib.net/zlib1213.zip -o  zlib1213.zip
-            Expand-Archive -Path zlib1213.zip -DestinationPath zlib-tmp
-            mv .\zlib-tmp\zlib-1.2.13\ .
+            curl   https://zlib.net/zlib13.zip -o  zlib13.zip
+            Expand-Archive -Path zlib13.zip -DestinationPath zlib-tmp
+            mv .\zlib-tmp\zlib-1.3\ .
             rmdir zlib-tmp
-            cd zlib-1.2.13\contrib\vstudio\vc14
+            cd zlib-1.3\contrib\vstudio\vc14
             devenv zlibvc.sln /upgrade
             msbuild zlibvc.sln /p:Configuration=Debug /p:Platform=x64
             msbuild zlibvc.sln /p:Configuration=Release /p:Platform=x64

@@ -144,10 +144,11 @@ jobs:
         run: |
             cd $Env:THIRDPARTY_HOME
             curl https://github.com/gflags/gflags/archive/refs/tags/v2.2.2.zip -o v2.2.2.zip
+            Expand-Archive -Path .\v2.2.2.zip -DestinationPath gflags-2.2.2
             cd .\gflags-2.2.2\
             mkdir target
             cd target
-            cmake -G "Visual Studio 16 2019" -A x64 ..    
+            $Env:CMAKE_BIN -G "$Env:CMAKE_GENERATOR" -A x64 ..    
             msbuild gflags.sln /p:Configuration=Release /p:Platform=x64
 
     

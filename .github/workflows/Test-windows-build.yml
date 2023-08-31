@@ -65,8 +65,6 @@ jobs:
         run: |                  
             echo "Installing CMake..."
             choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' -y
-            echo "Running mkdir 111"
-            echo ""
             mkdir "$Env:THIRDPARTY_HOME"
             cd $Env:THIRDPARTY_HOME
             echo "Building Snappy dependency..."
@@ -89,9 +87,21 @@ jobs:
             dir C:\Users\runneradmin\thirdparty\snappy-1.1.8\build
             echo "listing the file"
             dir C:\Users\runneradmin\thirdparty\snappy-1.1.8\snappy.h
+            echo "installing zlib"
+            cd $Env:THIRDPARTY_HOME
+            curl  http://zlib.net/zlib1213.zip -o  zlib1213.zip
+            Expand-Archive -Path zlib1213.zip -DestinationPath zlib-tmp
+            mv .\zlib-tmp\zlib-1.2.13\ .
+            rmdir zlib-tmp
+            cd zlib-1.2.13\contrib\vstudio\vc14
+            devenv zlibvc.sln /upgrade
+            msbuild zlibvc.sln /p:Configuration=Debug /p:Platform=x64
+            msbuild zlibvc.sln /p:Configuration=Release /p:Platform=x64
+            copy x64\ZlibDllDebug\zlibwapi.lib x64\ZlibStatDebug\
+            copy x64\ZlibDllRelease\zlibwapi.lib x64\ZlibStatRelease\
 
      
-      - name: "Build RocksDB"      
+      - name: "Build Speedb"      
         run: |
             echo "listing the snappy.h"
             dir C:\Users\runneradmin\thirdparty\snappy-1.1.8\snappy.h

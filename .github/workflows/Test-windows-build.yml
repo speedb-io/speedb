@@ -87,7 +87,7 @@ jobs:
           cd .\build
           echo "print current directory"
           pwd
-          & cmake -G "Visual Studio 17 2022" ..                        
+          & cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_GENERATOR_PLATFORM=x64 -DSNAPPY_BUILD_TESTS=OFF -DSNAPPY_BUILD_BENCHMARKS=OFF ..                        
           msbuild.exe Snappy.sln -maxCpuCount -property:Configuration=Release -property:Platform=x64
           
 

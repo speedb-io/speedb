@@ -106,7 +106,9 @@ jobs:
             echo "list content of snappy-1.1.9"
             dir
             mkdir build
-            cd build
+            cd .\build
+            echo "print current directory"
+            pwd
             & $Env:CMAKE_BIN -G "$Env:CMAKE_GENERATOR" ..                        
             msbuild.exe Snappy.sln -maxCpuCount -property:Configuration=Release -property:Platform=x64
  

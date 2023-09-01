@@ -37,9 +37,9 @@
 #include <atomic>
 
 #include "memory/allocator.h"
+#include "memory/arena.h"
 #include "port/port.h"
 #include "util/random.h"
-
 namespace ROCKSDB_NAMESPACE {
 
 template <typename Key, class Comparator>
@@ -206,7 +206,8 @@ template <typename Key, class Comparator>
 typename SkipList<Key, Comparator>::Node* SkipList<Key, Comparator>::NewNode(
     const Key& key, int height) {
   char* mem = allocator_->AllocateAligned(
-      sizeof(Node) + sizeof(std::atomic<Node*>) * (height - 1));
+      sizeof(Node) + sizeof(std::atomic<Node*>) * (height - 1),
+      ArenaTracker::ArenaStats::SkipList);
   return new (mem) Node(key);
 }
 
@@ -425,8 +426,8 @@ SkipList<Key, Comparator>::SkipList(const Comparator cmp, Allocator* allocator,
   // Allocate the prev_ Node* array, directly from the passed-in allocator.
   // prev_ does not need to be freed, as its life cycle is tied up with
   // the allocator as a whole.
-  prev_ = reinterpret_cast<Node**>(
-      allocator_->AllocateAligned(sizeof(Node*) * kMaxHeight_));
+  prev_ = reinterpret_cast<Node**>(allocator_->AllocateAligned(
+      sizeof(Node*) * kMaxHeight_, ArenaTracker::ArenaStats::SkipList));
   for (int i = 0; i < kMaxHeight_; i++) {
     head_->SetNext(i, nullptr);
     prev_[i] = head_;

@@ -10,6 +10,7 @@
 #include <memory>
 #include <string>
 
+#include "memory/arena.h"
 #include "port/port.h"
 #include "rocksdb/slice.h"
 #include "table/multiget_context.h"

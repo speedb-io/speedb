@@ -37,7 +37,8 @@ void ArenaWrappedDBIter::Init(
     const SequenceNumber& sequence, uint64_t max_sequential_skip_in_iteration,
     uint64_t version_number, ReadCallback* read_callback, DBImpl* db_impl,
     ColumnFamilyData* cfd, bool expose_blob_index, bool allow_refresh) {
-  auto mem = arena_.AllocateAligned(sizeof(DBIter));
+  auto mem = arena_.AllocateAligned(
+      sizeof(DBIter), ArenaTracker::ArenaStats::ArenaWrappedDBIter);
   db_iter_ =
       new (mem) DBIter(env, read_options, ioptions, mutable_cf_options,
                        ioptions.user_comparator, /* iter */ nullptr, version,

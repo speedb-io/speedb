@@ -517,8 +517,9 @@ HashLinkListRep::HashLinkListRep(
       logger_(logger),
       bucket_entries_logging_threshold_(bucket_entries_logging_threshold),
       if_log_bucket_dist_when_flash_(if_log_bucket_dist_when_flash) {
-  char* mem = allocator_->AllocateAligned(sizeof(Pointer) * bucket_size,
-                                          huge_page_tlb_size, logger);
+  char* mem = allocator_->AllocateAligned(
+      sizeof(Pointer) * bucket_size, ArenaTracker::ArenaStats::HashLinkList,
+      huge_page_tlb_size, logger);
 
   buckets_ = new (mem) Pointer[bucket_size];
 
@@ -530,7 +531,8 @@ HashLinkListRep::HashLinkListRep(
 HashLinkListRep::~HashLinkListRep() {}
 
 KeyHandle HashLinkListRep::Allocate(const size_t len, char** buf) {
-  char* mem = allocator_->AllocateAligned(sizeof(Node) + len);
+  char* mem = allocator_->AllocateAligned(
+      sizeof(Node) + len, ArenaTracker::ArenaStats::HashLinkList);
   Node* x = new (mem) Node();
   *buf = x->key;
   return static_cast<void*>(x);
@@ -608,7 +610,8 @@ void HashLinkListRep::Insert(KeyHandle handle) {
     // the new node. Otherwise, we might need to change next pointer of first.
     // In that case, a reader might sees the next pointer is NULL and wrongly
     // think the node is a bucket header.
-    auto* mem = allocator_->AllocateAligned(sizeof(BucketHeader));
+    auto* mem = allocator_->AllocateAligned(
+        sizeof(BucketHeader), ArenaTracker::ArenaStats::HashLinkList);
     header = new (mem) BucketHeader(first, 1);
     bucket.store(header, std::memory_order_release);
   } else {
@@ -643,7 +646,8 @@ void HashLinkListRep::Insert(KeyHandle handle) {
     LinkListIterator bucket_iter(
         this, reinterpret_cast<Node*>(
                   first_next_pointer->load(std::memory_order_relaxed)));
-    auto mem = allocator_->AllocateAligned(sizeof(SkipListBucketHeader));
+    auto mem = allocator_->AllocateAligned(
+        sizeof(SkipListBucketHeader), ArenaTracker::ArenaStats::HashLinkList);
     SkipListBucketHeader* new_skip_list_header = new (mem)
         SkipListBucketHeader(compare_, allocator_, header->GetNumEntries() + 1);
     auto& skip_list = new_skip_list_header->skip_list;
@@ -799,7 +803,9 @@ MemTableRep::Iterator* HashLinkListRep::GetIterator(Arena* alloc_arena,
   if (alloc_arena == nullptr) {
     return new FullListIterator(list, new_arena);
   } else {
-    auto mem = alloc_arena->AllocateAligned(sizeof(FullListIterator));
+    auto mem = alloc_arena->AllocateAligned(
+        sizeof(FullListIterator),
+        ArenaTracker::ArenaStats::HashLinkListIterator);
     return new (mem) FullListIterator(list, new_arena);
   }
 }
@@ -809,7 +815,9 @@ MemTableRep::Iterator* HashLinkListRep::GetDynamicPrefixIterator(
   if (alloc_arena == nullptr) {
     return new DynamicIterator(*this);
   } else {
-    auto mem = alloc_arena->AllocateAligned(sizeof(DynamicIterator));
+    auto mem = alloc_arena->AllocateAligned(
+        sizeof(DynamicIterator),
+        ArenaTracker::ArenaStats::HashLinkListDynamicIterator);
     return new (mem) DynamicIterator(*this);
   }
 }

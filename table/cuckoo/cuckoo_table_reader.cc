@@ -400,7 +400,9 @@ InternalIterator* CuckooTableReader::NewIterator(
   if (arena == nullptr) {
     iter = new CuckooTableIterator(this);
   } else {
-    auto iter_mem = arena->AllocateAligned(sizeof(CuckooTableIterator));
+    auto iter_mem =
+        arena->AllocateAligned(sizeof(CuckooTableIterator),
+                               ArenaTracker::ArenaStats::CuckooTableIterator);
     iter = new (iter_mem) CuckooTableIterator(this);
   }
   return iter;

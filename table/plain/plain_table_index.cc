@@ -158,7 +158,9 @@ Slice PlainTableIndexBuilder::FillIndexes(
                   sub_index_size_);
   auto total_allocate_size = GetTotalSize();
   char* allocated = arena_->AllocateAligned(
-      total_allocate_size, huge_page_tlb_size_, ioptions_.logger);
+      total_allocate_size,
+      ArenaTracker::ArenaStats::PlainTableIndexBuilderFillIndexes,
+      huge_page_tlb_size_, ioptions_.logger);
 
   auto temp_ptr = EncodeVarint32(allocated, index_size_);
   uint32_t* index =

@@ -870,7 +870,9 @@ void DoGenerateLevelFilesBrief(LevelFilesBrief* file_level,
 
   size_t num = files.size();
   file_level->num_files = num;
-  char* mem = arena->AllocateAligned(num * sizeof(FdWithKeyRange));
+  char* mem = arena->AllocateAligned(
+      num * sizeof(FdWithKeyRange),
+      ArenaTracker::ArenaStats::DoGenerateLevelFilesBrief);
   file_level->files = new (mem) FdWithKeyRange[num];
 
   for (size_t i = 0; i < num; i++) {
@@ -880,7 +882,9 @@ void DoGenerateLevelFilesBrief(LevelFilesBrief* file_level,
     // Copy key slice to sequential memory
     size_t smallest_size = smallest_key.size();
     size_t largest_size = largest_key.size();
-    mem = arena->AllocateAligned(smallest_size + largest_size);
+    mem = arena->AllocateAligned(
+        smallest_size + largest_size,
+        ArenaTracker::ArenaStats::DoGenerateLevelFilesBrief);
     memcpy(mem, smallest_key.data(), smallest_size);
     memcpy(mem + smallest_size, largest_key.data(), largest_size);
 
@@ -1906,7 +1910,8 @@ InternalIterator* Version::TEST_GetLevelIterator(
     const ReadOptions& read_options, MergeIteratorBuilder* merge_iter_builder,
     int level, bool allow_unprepared_value) {
   auto* arena = merge_iter_builder->GetArena();
-  auto* mem = arena->AllocateAligned(sizeof(LevelIterator));
+  auto* mem = arena->AllocateAligned(
+      sizeof(LevelIterator), ArenaTracker::ArenaStats::TEST_GetLevelIterator);
   TruncatedRangeDelIterator*** tombstone_iter_ptr = nullptr;
   auto level_iter = new (mem) LevelIterator(
       cfd_->table_cache(), read_options, file_options_,
@@ -2040,7 +2045,9 @@ void Version::AddIteratorsForLevel(const ReadOptions& read_options,
     // For levels > 0, we can use a concatenating iterator that sequentially
     // walks through the non-overlapping files in the level, opening them
     // lazily.
-    auto* mem = arena->AllocateAligned(sizeof(LevelIterator));
+    auto* mem = arena->AllocateAligned(
+        sizeof(LevelIterator),
+        ArenaTracker::ArenaStats::VersionAddIteratorsForLevel);
     TruncatedRangeDelIterator*** tombstone_iter_ptr = nullptr;
     auto level_iter = new (mem) LevelIterator(
         cfd_->table_cache(), read_options, soptions,
@@ -2103,7 +2110,9 @@ Status Version::OverlapWithLevelIterator(const ReadOptions& read_options,
       }
     }
   } else if (storage_info_.LevelFilesBrief(level).num_files > 0) {
-    auto mem = arena.AllocateAligned(sizeof(LevelIterator));
+    auto mem = arena.AllocateAligned(
+        sizeof(LevelIterator),
+        ArenaTracker::ArenaStats::VersionOverlapWithLevelIterator);
     ScopedArenaIterator iter(new (mem) LevelIterator(
         cfd_->table_cache(), read_options, file_options,
         cfd_->internal_comparator(), &storage_info_.LevelFilesBrief(level),

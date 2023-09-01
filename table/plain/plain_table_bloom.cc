@@ -56,7 +56,9 @@ void PlainTableBloomV1::SetTotalBits(Allocator* allocator, uint32_t total_bits,
   }
   assert(allocator);
 
-  char* raw = allocator->AllocateAligned(sz, huge_page_tlb_size, logger);
+  char* raw = allocator->AllocateAligned(
+      sz, ArenaTracker::ArenaStats::PlainTableBloomV1, huge_page_tlb_size,
+      logger);
   memset(raw, 0, sz);
   auto cache_line_offset = reinterpret_cast<uintptr_t>(raw) % CACHE_LINE_SIZE;
   if (kNumBlocks > 0 && cache_line_offset > 0) {

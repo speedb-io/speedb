@@ -49,6 +49,7 @@
 #include <type_traits>
 
 #include "memory/allocator.h"
+#include "memory/arena.h"
 #include "port/likely.h"
 #include "port/port.h"
 #include "rocksdb/slice.h"
@@ -679,7 +680,9 @@ InlineSkipList<Comparator>::AllocateNode(size_t key_size, int height) {
   // raw + prefix, and holds the bottom-mode (level 0) skip list pointer
   // next_[0].  key_size is the bytes for the key, which comes just after
   // the Node.
-  char* raw = allocator_->AllocateAligned(prefix + sizeof(Node) + key_size);
+  char* raw =
+      allocator_->AllocateAligned(prefix + sizeof(Node) + key_size,
+                                  ArenaTracker::ArenaStats::InlineSkipList);
   Node* x = reinterpret_cast<Node*>(raw + prefix);
 
   // Once we've linked the node into the skip list we don't actually need
@@ -698,7 +701,9 @@ typename InlineSkipList<Comparator>::Splice*
 InlineSkipList<Comparator>::AllocateSplice() {
   // size of prev_ and next_
   size_t array_size = sizeof(Node*) * (kMaxHeight_ + 1);
-  char* raw = allocator_->AllocateAligned(sizeof(Splice) + array_size * 2);
+  char* raw =
+      allocator_->AllocateAligned(sizeof(Splice) + array_size * 2,
+                                  ArenaTracker::ArenaStats::InlineSkipList);
   Splice* splice = reinterpret_cast<Splice*>(raw);
   splice->height_ = 0;
   splice->prev_ = reinterpret_cast<Node**>(raw + sizeof(Splice));

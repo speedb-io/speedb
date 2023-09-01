@@ -27,6 +27,7 @@
 #include "utilities/memory_allocators.h"
 
 namespace ROCKSDB_NAMESPACE {
+
 namespace {
 static std::unordered_map<std::string, OptionTypeInfo> ma_wrapper_type_info = {
     {Customizable::kTargetPropName(),

@@ -11,6 +11,7 @@
 
 #include <cassert>
 #include <cinttypes>
+#include <iostream>
 #include <string>
 
 #include "logging/logging.h"
@@ -155,6 +156,7 @@ inline void BlockFetcher::PrepareBufferForBlockFromFile() {
         AllocateBlock(block_size_with_trailer_, memory_allocator_compressed_);
     used_buf_ = compressed_buf_.get();
   } else {
+    // std::cout << block_size_with_trailer_ << std::endl;
     heap_buf_ = AllocateBlock(block_size_with_trailer_, memory_allocator_);
     used_buf_ = heap_buf_.get();
   }

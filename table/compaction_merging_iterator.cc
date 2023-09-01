@@ -361,7 +361,9 @@ InternalIterator* NewCompactionMergingIterator(
                                            false /* is_arena_mode */,
                                            range_tombstone_iters);
     } else {
-      auto mem = arena->AllocateAligned(sizeof(CompactionMergingIterator));
+      auto mem = arena->AllocateAligned(
+          sizeof(CompactionMergingIterator),
+          ArenaTracker::ArenaStats::CompactionMergingIterator);
       return new (mem) CompactionMergingIterator(comparator, children, n,
                                                  true /* is_arena_mode */,
                                                  range_tombstone_iters);

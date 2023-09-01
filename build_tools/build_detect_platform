@@ -456,7 +456,11 @@ EOF
 EOF
         if [ "$?" = 0 ]; then
             COMMON_FLAGS="$COMMON_FLAGS -DROCKSDB_MALLOC_USABLE_SIZE"
+            if test $MEMORY_REPORTING; then
+                COMMON_FLAGS="$COMMON_FLAGS -DMEMORY_REPORTING"
+            fi
         fi
+
     fi
 
     if ! test $ROCKSDB_DISABLE_MEMKIND; then

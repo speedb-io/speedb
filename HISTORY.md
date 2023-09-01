@@ -8,6 +8,7 @@ Based on RocksDB 8.6.7
 * Rebase on RocksDB 8.6.7
 
 ### Enhancements
+* Added memory reporting to the logs to be able to monitor which component in the Arena is using the memory and CacheAllocation overall memory usage, print some statistics. This feature requires compiling with MEMORY_REPORTING flag (#481)
 * Added a kUseBaseAddress flag and GetBaseOffset flag to OptionTypeInfo.  If this flag is set and a function is used for processing options, the function is passed the base address of the struct rather than the specific field (#397)
 
 ### Bug Fixes

@@ -1162,10 +1162,46 @@ void DBImpl::DumpStats() {
     stats.clear();
     DumpMallocStats(&stats);
     if (!stats.empty()) {
-      ROCKS_LOG_INFO(immutable_db_options_.info_log,
-                     "------- Malloc STATS -------");
-      ROCKS_LOG_INFO(immutable_db_options_.info_log, "%s", stats.c_str());
+      ROCKS_LOG_INFO(immutable_db_options_.info_log, "--- Malloc STATS %s",
+                     stats.c_str());
     }
+#ifdef MEMORY_REPORTING
+    ROCKS_LOG_INFO(immutable_db_options_.info_log,
+                   "Arena Stats: Arena total: %" PRIu64,
+                   Arena::arena_tracker_.total.load());
+    for (const auto& it : Arena::arena_tracker_.arena_stats) {
+      ROCKS_LOG_INFO(immutable_db_options_.info_log, "%s : %" PRIu64, it.first,
+                     it.second.load());
+    }
+    ROCKS_LOG_INFO(immutable_db_options_.info_log, "CF stats: ");
+    uint64_t cfs_total_memory = 0;
+    for (auto cfd : *versions_->GetColumnFamilySet()) {
+      if (cfd->initialized()) {
+        std::string cf_name = cfd->GetName();
+        uint64_t allocated_cf = cfd->mem()->ApproximateMemoryUsageFast() +
+                                cfd->imm()->ApproximateMemoryUsage();
+        cfs_total_memory += allocated_cf;
+        ROCKS_LOG_INFO(immutable_db_options_.info_log,
+                       "CF Name: %s , memory used: %" PRIu64, cf_name.c_str(),
+                       allocated_cf);
+      }
+    }
+    ROCKS_LOG_INFO(immutable_db_options_.info_log,
+                   "Total CF memory usage: %" PRIu64, cfs_total_memory);
+    std::string out;
+    this->GetProperty("rocksdb.block-cache-usage", &out);
+    ROCKS_LOG_INFO(immutable_db_options_.info_log,
+                   "rocksdb.block-cache-usage: %s", out.c_str());
+    this->GetProperty("rocksdb.estimate-table-readers-mem", &out);
+    ROCKS_LOG_INFO(immutable_db_options_.info_log,
+                   "rocksdb.estimate-table-readers-mem: %s", out.c_str());
+    this->GetProperty("rocksdb.block-cache-pinned-usage", &out);
+    ROCKS_LOG_INFO(immutable_db_options_.info_log,
+                   "rocksdb.block-cache-pinned-usage: %s", out.c_str());
+    ROCKS_LOG_INFO(immutable_db_options_.info_log,
+                   "Total CacheAllocationUsage: %" PRIu64,
+                   ROCKSDB_NAMESPACE::blockfetchermem::mem.load());
+#endif
   }
 
   PrintStatistics();

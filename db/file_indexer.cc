@@ -86,7 +86,9 @@ void FileIndexer::UpdateIndex(Arena* arena, const size_t num_levels,
   num_levels_ = num_levels;
   next_level_index_.resize(num_levels);
 
-  char* mem = arena->AllocateAligned(num_levels_ * sizeof(int32_t));
+  char* mem =
+      arena->AllocateAligned(num_levels_ * sizeof(int32_t),
+                             ArenaTracker::ArenaStats::FileIndexerUpdateIndex);
   level_rb_ = new (mem) int32_t[num_levels_];
   for (size_t i = 0; i < num_levels_; i++) {
     level_rb_[i] = -1;
@@ -103,7 +105,9 @@ void FileIndexer::UpdateIndex(Arena* arena, const size_t num_levels,
     }
     IndexLevel& index_level = next_level_index_[level];
     index_level.num_index = upper_size;
-    mem = arena->AllocateAligned(upper_size * sizeof(IndexUnit));
+    mem = arena->AllocateAligned(
+        upper_size * sizeof(IndexUnit),
+        ArenaTracker::ArenaStats::FileIndexerUpdateIndex);
     index_level.index_units = new (mem) IndexUnit[upper_size];
 
     CalculateLB(

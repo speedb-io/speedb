@@ -46,13 +46,13 @@ void MemoryAllocatedBytesTest(size_t huge_page_size) {
   //   allocate requested size separately
   req_sz = 12 * 1024;
   for (int i = 0; i < N; i++) {
-    arena.Allocate(req_sz);
+    arena.Allocate(req_sz, ArenaTracker::ArenaStats::arena_test);
   }
   expected_memory_allocated = req_sz * N + Arena::kInlineSize;
   ASSERT_PRED2(CheckMemoryAllocated, arena.MemoryAllocatedBytes(),
                expected_memory_allocated);
 
-  arena.Allocate(Arena::kInlineSize - 1);
+  arena.Allocate(Arena::kInlineSize - 1, ArenaTracker::ArenaStats::arena_test);
 
   // requested size < quarter of a block:
   //   allocate a block with the default size, then try to use unused part
@@ -60,7 +60,7 @@ void MemoryAllocatedBytesTest(size_t huge_page_size) {
   //   Allocate(99) call. All the remaining calls won't lead to new allocation.
   req_sz = 99;
   for (int i = 0; i < N; i++) {
-    arena.Allocate(req_sz);
+    arena.Allocate(req_sz, ArenaTracker::ArenaStats::arena_test);
   }
   if (huge_page_size) {
     ASSERT_TRUE(
@@ -79,7 +79,7 @@ void MemoryAllocatedBytesTest(size_t huge_page_size) {
   expected_memory_allocated = arena.MemoryAllocatedBytes();
   req_sz = 8 * 1024 * 1024;
   for (int i = 0; i < N; i++) {
-    arena.Allocate(req_sz);
+    arena.Allocate(req_sz, ArenaTracker::ArenaStats::arena_test);
   }
   expected_memory_allocated += req_sz * N;
   ASSERT_PRED2(CheckMemoryAllocated, arena.MemoryAllocatedBytes(),
@@ -98,11 +98,13 @@ static void ApproximateMemoryUsageTest(size_t huge_page_size) {
   // allocate inline bytes
   const size_t kAlignUnit = alignof(max_align_t);
   EXPECT_TRUE(arena.IsInInlineBlock());
-  arena.AllocateAligned(kAlignUnit);
+  arena.AllocateAligned(kAlignUnit, ArenaTracker::ArenaStats::arena_test);
   EXPECT_TRUE(arena.IsInInlineBlock());
-  arena.AllocateAligned(Arena::kInlineSize / 2 - (2 * kAlignUnit));
+  arena.AllocateAligned(Arena::kInlineSize / 2 - (2 * kAlignUnit),
+                        ArenaTracker::ArenaStats::arena_test);
   EXPECT_TRUE(arena.IsInInlineBlock());
-  arena.AllocateAligned(Arena::kInlineSize / 2);
+  arena.AllocateAligned(Arena::kInlineSize / 2,
+                        ArenaTracker::ArenaStats::arena_test);
   EXPECT_TRUE(arena.IsInInlineBlock());
   ASSERT_EQ(arena.ApproximateMemoryUsage(), Arena::kInlineSize - kAlignUnit);
   ASSERT_PRED2(CheckMemoryAllocated, arena.MemoryAllocatedBytes(),
@@ -111,7 +113,7 @@ static void ApproximateMemoryUsageTest(size_t huge_page_size) {
   auto num_blocks = kBlockSize / kEntrySize;
 
   // first allocation
-  arena.AllocateAligned(kEntrySize);
+  arena.AllocateAligned(kEntrySize, ArenaTracker::ArenaStats::arena_test);
   EXPECT_FALSE(arena.IsInInlineBlock());
   auto mem_usage = arena.MemoryAllocatedBytes();
   if (huge_page_size) {
@@ -125,7 +127,7 @@ static void ApproximateMemoryUsageTest(size_t huge_page_size) {
   auto usage = arena.ApproximateMemoryUsage();
   ASSERT_LT(usage, mem_usage);
   for (size_t i = 1; i < num_blocks; ++i) {
-    arena.AllocateAligned(kEntrySize);
+    arena.AllocateAligned(kEntrySize, ArenaTracker::ArenaStats::arena_test);
     ASSERT_EQ(mem_usage, arena.MemoryAllocatedBytes());
     ASSERT_EQ(arena.ApproximateMemoryUsage(), usage + kEntrySize);
     EXPECT_FALSE(arena.IsInInlineBlock());
@@ -160,9 +162,9 @@ static void SimpleTest(size_t huge_page_size) {
     }
     char* r;
     if (rnd.OneIn(10)) {
-      r = arena.AllocateAligned(s);
+      r = arena.AllocateAligned(s, ArenaTracker::ArenaStats::arena_test);
     } else {
-      r = arena.Allocate(s);
+      r = arena.Allocate(s, ArenaTracker::ArenaStats::arena_test);
     }
 
     for (unsigned int b = 0; b < s; b++) {
@@ -273,7 +275,7 @@ TEST_F(ArenaTest, UnmappedAllocation) {
   // The allocator might give us back recycled memory for a while, but
   // shouldn't last forever.
   for (int i = 0;; ++i) {
-    char* p = arena.Allocate(kBlockSize);
+    char* p = arena.Allocate(kBlockSize, ArenaTracker::ArenaStats::arena_test);
 
     // Start counting page faults
     PopMinorPageFaultCount();

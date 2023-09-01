@@ -20,7 +20,8 @@ void LogBuffer::AddLogToBuffer(size_t max_log_size, const char* format,
     return;
   }
 
-  char* alloc_mem = arena_.AllocateAligned(max_log_size);
+  char* alloc_mem = arena_.AllocateAligned(
+      max_log_size, ArenaTracker::ArenaStats::LogBufferAddLogToBuffer);
   BufferedLog* buffered_log = new (alloc_mem) BufferedLog();
   char* p = buffered_log->message;
   char* limit = alloc_mem + max_log_size - 1;

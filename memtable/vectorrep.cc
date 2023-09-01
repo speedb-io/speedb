@@ -268,7 +268,8 @@ MemTableRep::Iterator* VectorRep::GetIterator(Arena* arena,
                                               bool /*part_of_flush*/) {
   char* mem = nullptr;
   if (arena != nullptr) {
-    mem = arena->AllocateAligned(sizeof(Iterator));
+    mem = arena->AllocateAligned(sizeof(Iterator),
+                                 ArenaTracker::ArenaStats::VectorMemtable);
   }
   ReadLock l(&rwlock_);
   // Do not sort here. The sorting would be done the first time

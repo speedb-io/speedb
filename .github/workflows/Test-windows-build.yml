@@ -63,22 +63,22 @@ jobs:
             dir C:\Users\runneradmin\code\snappy-1.1.9\
 
            
-    #   - name: install snappy
-    #     shell: powershell
-    #     run: |      
-    #       cd $Env:THIRDPARTY_HOME
-    #       curl https://github.com/google/snappy/archive/refs/tags/1.1.9.zip -O snappy-1.1.9.zip
-    #       Expand-Archive -Path snappy-1.1.9.zip -DestinationPath snappy-tmp
-    #       mv .\snappy-tmp\snappy-1.1.9\ .
-    #       cd snappy-1.1.9
-    #       echo "list content of snappy-1.1.9"
-    #       dir
-    #       mkdir build
-    #       cd .\build
-    #       echo "print current directory"
-    #       pwd
-    #       & cmake -G "Visual Studio 17 2022" ..                        
-    #       msbuild.exe Snappy.sln -maxCpuCount -property:Configuration=Release -property:Platform=x64
+      - name: install snappy
+        shell: powershell
+        run: |      
+          cd $Env:THIRDPARTY_HOME
+          curl https://github.com/google/snappy/archive/refs/tags/1.1.9.zip -O snappy-1.1.9.zip
+          Expand-Archive -Path snappy-1.1.9.zip -DestinationPath snappy-tmp
+          mv .\snappy-tmp\snappy-1.1.9\ .
+          cd snappy-1.1.9
+          echo "list content of snappy-1.1.9"
+          dir
+          mkdir build
+          cd .\build
+          echo "print current directory"
+          pwd
+          & cmake -G "Visual Studio 17 2022" ..                        
+          msbuild.exe Snappy.sln -maxCpuCount -property:Configuration=Release -property:Platform=x64
 
             
 

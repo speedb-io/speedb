@@ -470,7 +470,6 @@ Status Configurable::GetOptionString(const ConfigOptions& config_options,
 std::string Configurable::ToString(const ConfigOptions& config_options,
                                    const std::string& prefix) const {
   std::unordered_map<std::string, std::string> options;
-  Status status = SerializeOptions(config_options, &options);
   Status s = SerializeOptions(config_options, &options);
   assert(s.ok());
   if (s.ok()) {

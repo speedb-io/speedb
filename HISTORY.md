@@ -1,7 +1,7 @@
 # Speedb Change Log 
 
 ## Unreleased
-
+* Support EnableSpeedbFeatures methodology in java.
 ### New Features
 
 ### Enhancements

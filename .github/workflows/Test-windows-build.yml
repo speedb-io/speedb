@@ -34,7 +34,7 @@ jobs:
       - name: Setup VS Dev
         uses: seanmiddleditch/gha-setup-vsdevenv@v4
 
-      - name: install cmake # probably not needed, check removing
+      - name: install cmake 
         shell: powershell
         run: |                  
             echo "Installing CMake..."

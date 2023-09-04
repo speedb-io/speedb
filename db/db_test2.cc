@@ -2048,6 +2048,46 @@ TEST_F(DBTest2, DuplicateSnapshot) {
   }
 }
 
+#ifdef SPEEDB_SNAP_OPTIMIZATION
+// This test should run only if there is snapshot optimization enabled
+TEST_F(DBTest2, RefSnapshot) {
+  Options options;
+  options = CurrentOptions(options);
+  std::vector<const Snapshot*> snapshots;
+  DBImpl* dbi = static_cast_with_check<DBImpl>(db_);
+  SequenceNumber oldest_ww_snap, first_ww_snap;
+
+  ASSERT_OK(Put("k", "v"));  // inc seq
+  snapshots.push_back(db_->GetSnapshot());
+  snapshots.push_back(db_->GetSnapshot());
+  ASSERT_OK(Put("k", "v"));  // inc seq
+  snapshots.push_back(db_->GetSnapshot());
+  snapshots.push_back(dbi->GetSnapshotForWriteConflictBoundary());
+  first_ww_snap = snapshots.back()->GetSequenceNumber();
+  ASSERT_OK(Put("k", "v"));  // inc seq
+  snapshots.push_back(dbi->GetSnapshotForWriteConflictBoundary());
+  snapshots.push_back(db_->GetSnapshot());
+  ASSERT_OK(Put("k", "v"));  // inc seq
+  snapshots.push_back(db_->GetSnapshot());
+  snapshots.push_back(db_->GetSnapshot());  // this should create a reference
+
+  {
+    InstrumentedMutexLock l(dbi->mutex());
+    auto seqs = dbi->snapshots().GetAll(&oldest_ww_snap);
+    ASSERT_EQ(seqs.size(), 4);  // duplicates are not counted
+    ASSERT_EQ(oldest_ww_snap, first_ww_snap);
+    ASSERT_EQ(dbi->snapshots().count(),
+              6);  // how many snapshots stored in SnapshotList
+    ASSERT_EQ(dbi->snapshots().logical_count(),
+              8);  // how many snapshots in the system
+  }
+
+  for (auto s : snapshots) {
+    db_->ReleaseSnapshot(s);
+  }
+}
+#endif
+
 class PinL0IndexAndFilterBlocksTest
     : public DBTestBase,
       public testing::WithParamInterface<std::tuple<bool, bool>> {

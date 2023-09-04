@@ -23,6 +23,7 @@
 #include <limits>
 #include <memory>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "rocksdb/customizable.h"

@@ -133,6 +133,7 @@ LIB_SOURCES =                                                   \
   memory/memory_allocator.cc                                    \
   memtable/alloc_tracker.cc                                     \
   memtable/hash_linklist_rep.cc                                 \
+  memtable/hash_spdb_rep.cc                                     \
   memtable/hash_skiplist_rep.cc                                 \
   memtable/skiplistrep.cc                                       \
   memtable/vectorrep.cc                                         \
@@ -192,6 +193,7 @@ LIB_SOURCES =                                                   \
   table/block_based/partitioned_index_iterator.cc               \
   table/block_based/partitioned_index_reader.cc                 \
   table/block_based/reader_common.cc                            \
+  table/block_based/table_pinning_policy.cc                     \
   table/block_based/uncompression_dict_reader.cc                \
   table/block_fetcher.cc                                        \
   table/cuckoo/cuckoo_table_builder.cc                          \

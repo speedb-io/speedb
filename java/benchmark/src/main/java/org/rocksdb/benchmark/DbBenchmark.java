@@ -515,6 +515,9 @@ public class DbBenchmark {
                 .setBucketCount(hashBucketCount_));
         options.useFixedLengthPrefixExtractor(prefixSize_);
         break;
+      case "hash_spdb":
+        options.setMemTableConfig(new HashSpdbMemTableConfig().setBucketCount(hashBucketCount_));
+        break;
       default:
         System.err.format(
             "unable to detect the specified memtable, " +

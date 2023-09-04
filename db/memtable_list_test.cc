@@ -11,10 +11,10 @@
 
 #include "db/merge_context.h"
 #include "db/version_set.h"
-#include "db/write_controller.h"
 #include "rocksdb/db.h"
 #include "rocksdb/status.h"
 #include "rocksdb/write_buffer_manager.h"
+#include "rocksdb/write_controller.h"
 #include "test_util/testharness.h"
 #include "test_util/testutil.h"
 #include "util/string_util.h"

@@ -11,3 +11,4 @@ transaction_example
 rocksdb_backup_restore_example
 speedb_is_awesome_example
 speedb_with_ttl_example
+on_thread_start_callback_example

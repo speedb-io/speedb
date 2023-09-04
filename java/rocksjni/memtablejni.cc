@@ -7,6 +7,7 @@
 
 #include "include/org_rocksdb_HashLinkedListMemTableConfig.h"
 #include "include/org_rocksdb_HashSkipListMemTableConfig.h"
+#include "include/org_rocksdb_HashSpdbMemTableConfig.h"
 #include "include/org_rocksdb_SkipListMemTableConfig.h"
 #include "include/org_rocksdb_VectorMemTableConfig.h"
 #include "rocksdb/memtablerep.h"
@@ -27,6 +28,22 @@ jlong Java_org_rocksdb_HashSkipListMemTableConfig_newMemTableFactoryHandle(
     return GET_CPLUSPLUS_POINTER(ROCKSDB_NAMESPACE::NewHashSkipListRepFactory(
         static_cast<size_t>(jbucket_count), static_cast<int32_t>(jheight),
         static_cast<int32_t>(jbranching_factor)));
+  }
+  ROCKSDB_NAMESPACE::IllegalArgumentExceptionJni::ThrowNew(env, s);
+  return 0;
+}
+
+/*
+ * Class:     org_rocksdb_HashSpdbMemTableConfig
+ * Method:    newMemTableFactoryHandle
+ */
+jlong Java_org_rocksdb_HashSpdbMemTableConfig_newMemTableFactoryHandle(
+    JNIEnv* env, jobject /*jobj*/, jlong jbucket_count) {
+  ROCKSDB_NAMESPACE::Status s =
+      ROCKSDB_NAMESPACE::JniUtil::check_if_jlong_fits_size_t(jbucket_count);
+  if (s.ok()) {
+    return GET_CPLUSPLUS_POINTER(ROCKSDB_NAMESPACE::NewHashSpdbRepFactory(
+        static_cast<size_t>(jbucket_count)));
   }
   ROCKSDB_NAMESPACE::IllegalArgumentExceptionJni::ThrowNew(env, s);
   return 0;

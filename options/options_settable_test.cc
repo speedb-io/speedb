@@ -13,6 +13,7 @@
 #include "options/db_options.h"
 #include "options/options_helper.h"
 #include "rocksdb/convenience.h"
+#include "rocksdb/table_pinning_policy.h"
 #include "test_util/testharness.h"
 
 #ifndef GFLAGS
@@ -129,6 +130,8 @@ TEST_F(OptionsSettableTest, BlockBasedTableOptionsAllFieldsSettable) {
        sizeof(CacheUsageOptions)},
       {offsetof(struct BlockBasedTableOptions, filter_policy),
        sizeof(std::shared_ptr<const FilterPolicy>)},
+      {offsetof(struct BlockBasedTableOptions, pinning_policy),
+       sizeof(std::shared_ptr<TablePinningPolicy>)},
   };
 
   // In this test, we catch a new option of BlockBasedTableOptions that is not
@@ -255,6 +258,9 @@ TEST_F(OptionsSettableTest, DBOptionsAllFieldsSettable) {
       {offsetof(struct DBOptions, compaction_service),
        sizeof(std::shared_ptr<CompactionService>)},
       {offsetof(struct DBOptions, refresh_options_file), sizeof(std::string)},
+      {offsetof(struct DBOptions, on_thread_start_callback),
+       sizeof(std::shared_ptr<
+              std::function<void(std::thread::native_handle_type)>>)},
   };
 
   char* options_ptr = new char[sizeof(DBOptions)];

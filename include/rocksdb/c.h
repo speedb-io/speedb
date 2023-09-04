@@ -1516,6 +1516,8 @@ extern ROCKSDB_LIBRARY_API uint64_t
 rocksdb_options_get_max_compaction_bytes(rocksdb_options_t*);
 extern ROCKSDB_LIBRARY_API void rocksdb_options_set_hash_skip_list_rep(
     rocksdb_options_t*, size_t, int32_t, int32_t);
+extern ROCKSDB_LIBRARY_API void rocksdb_options_set_hash_spdb_rep(
+    rocksdb_options_t*, size_t);
 extern ROCKSDB_LIBRARY_API void rocksdb_options_set_hash_link_list_rep(
     rocksdb_options_t*, size_t);
 extern ROCKSDB_LIBRARY_API void rocksdb_options_set_plain_table_factory(

@@ -608,7 +608,7 @@ void WriteBufferManager::InitFlushInitiationVars(size_t quota) {
 
   if (flushes_thread_.joinable() == false) {
     flushes_thread_ =
-        std::thread(&WriteBufferManager::InitiateFlushesThread, this);
+        port::Thread(&WriteBufferManager::InitiateFlushesThread, this);
   }
 }
 
@@ -661,6 +661,16 @@ void WriteBufferManager::InitiateFlushesThread() {
       while (num_flushes_to_initiate_ > 0U) {
         bool was_flush_initiated = false;
         {
+          // Below an initiator is requested to initate a flush. The initiator
+          // may call another WBM method that relies on these counters. The
+          // counters are updated here, while under the flushes_mu_ lock
+          // (released below) to ensure num_flushes_to_initiate_ can't become
+          // negative Not recalculating flush initiation size since the
+          // increment & decrement cancel each other with respect to the recalc.
+          ++num_running_flushes_;
+          assert(num_flushes_to_initiate_ > 0U);
+          --num_flushes_to_initiate_;
+
           // Unlocking the flushed_mu_ since flushing (via the initiator cb) may
           // call a WBM service (e.g., ReserveMem()), that, in turn, needs to
           // flushes_mu_lock the same mutex => will get stuck
@@ -672,18 +682,15 @@ void WriteBufferManager::InitiateFlushesThread() {
           // 2. Have all existing initiators failed to initiate a flush?
           if (flush_initiators_.empty() ||
               (num_repeated_failures_to_initiate >= flush_initiators_.size())) {
+            // No flush was initiated => undo the counters update
+            assert(num_running_flushes_ > 0U);
+            --num_running_flushes_;
+            ++num_flushes_to_initiate_;
             break;
           }
           assert(IsInitiatorIdxValid(next_candidate_initiator_idx_));
           auto& initiator = flush_initiators_[next_candidate_initiator_idx_];
           UpdateNextCandidateInitiatorIdx();
-
-          // Assuming initiator would flush (flushes_mu_lock is unlocked and
-          // called initiator may call another method that relies on these
-          // counters) Not recalculating flush initiation size since the
-          // increment & decrement cancel each other with respect to the recalc
-          ++num_running_flushes_;
-          --num_flushes_to_initiate_;
 
           // TODO: Use a weak-pointer for the registered initiators. That would
           // allow us to release the flushes_initiators_mu_ mutex before calling
@@ -693,6 +700,7 @@ void WriteBufferManager::InitiateFlushesThread() {
 
         if (!was_flush_initiated) {
           // No flush was initiated => undo the counters update
+          assert(num_running_flushes_ > 0U);
           --num_running_flushes_;
           ++num_flushes_to_initiate_;
           ++num_repeated_failures_to_initiate;
@@ -731,6 +739,12 @@ void WriteBufferManager::FlushStarted(bool wbm_initiated) {
   flushes_mu_->Lock();
 
   ++num_running_flushes_;
+  // Any number of non-wbm-initiated flushes may be initiated, so, we must not
+  // underflow num_flushes_to_initiate_
+  if (num_flushes_to_initiate_ > 0U) {
+    --num_flushes_to_initiate_;
+  }
+
   size_t curr_memory_used = memory_usage();
   RecalcFlushInitiationSize();
   ReevaluateNeedForMoreFlushesLockHeld(curr_memory_used);

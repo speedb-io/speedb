@@ -83,7 +83,8 @@ class CacheEntryStatsCollector {
       last_start_time_micros_ = start_time_micros;
       working_stats_.BeginCollection(cache_, clock_, start_time_micros);
 
-      cache_->ApplyToAllEntries(working_stats_.GetEntryCallback(), {});
+      cache_->ApplyToAllEntriesWithOwnerId(working_stats_.GetEntryCallback(),
+                                           {});
       TEST_SYNC_POINT_CALLBACK(
           "CacheEntryStatsCollector::GetStats:AfterApplyToAllEntries", nullptr);
 

@@ -24,6 +24,7 @@
 #include "rocksdb/utilities/leveldb_options.h"
 #include "rocksdb/utilities/object_registry.h"
 #include "rocksdb/utilities/options_type.h"
+#include "rocksdb/write_controller.h"
 #include "table/block_based/filter_policy_internal.h"
 #include "test_util/testharness.h"
 #include "test_util/testutil.h"
@@ -4968,6 +4969,151 @@ TEST_F(ConfigOptionsTest, ConfiguringOptionsDoesNotRevertRateLimiterBandwidth) {
 
 INSTANTIATE_TEST_CASE_P(OptionsSanityCheckTest, OptionsSanityCheckTest,
                         ::testing::Bool());
+
+class SharedOptionsTest : public testing::Test {};
+
+TEST_F(SharedOptionsTest, SharedOptionsTest) {
+  size_t total_ram_size_bytes = 100 * 1024 * 1024 * 1024ul;
+  size_t delayed_write_rate = 256 * 1024 * 1024ul;
+  size_t total_threads = 8;
+  SharedOptions so(total_ram_size_bytes, total_threads, delayed_write_rate);
+
+  ASSERT_TRUE(so.GetTotalThreads() == total_threads);
+  ASSERT_TRUE(so.GetDelayedWriteRate() == delayed_write_rate);
+  ASSERT_TRUE(so.GetTotalRamSizeBytes() == total_ram_size_bytes);
+
+  ASSERT_TRUE(so.write_buffer_manager->buffer_size() == 1);
+  ASSERT_TRUE(so.cache->GetCapacity() == total_ram_size_bytes);
+  ASSERT_TRUE(so.write_buffer_manager->IsInitiatingFlushes() == true);
+  ASSERT_TRUE(so.write_controller->max_delayed_write_rate() ==
+              delayed_write_rate);
+  ASSERT_TRUE(so.write_controller->is_dynamic_delay());
+  ASSERT_TRUE(so.rate_limiter == nullptr);
+  ASSERT_TRUE(so.sst_file_manager == nullptr);
+  ASSERT_TRUE(so.info_log == nullptr);
+  ASSERT_TRUE(so.file_checksum_gen_factory == nullptr);
+}
+
+TEST_F(SharedOptionsTest, EnableSpeedbFeatures) {
+  Options op1, op2, op3;
+  size_t total_ram_size_bytes = 100 * 1024 * 1024 * 1024ul;
+  size_t delayed_write_rate = 256 * 1024 * 1024ul;
+  int total_threads = 8;
+  SharedOptions so(total_ram_size_bytes, total_threads, delayed_write_rate);
+  // create the DB if it's not already present
+  op1.create_if_missing = true;
+  op2.create_if_missing = true;
+  op3.create_if_missing = true;
+
+  op1.EnableSpeedbFeatures(so);
+  ASSERT_TRUE(op1.write_buffer_manager->buffer_size() ==
+              1 * 512 * 1024 * 1024ul);
+  op2.EnableSpeedbFeatures(so);
+  ASSERT_TRUE(op2.write_buffer_manager->buffer_size() ==
+              2 * 512 * 1024 * 1024ul);
+  op3.EnableSpeedbFeatures(so);
+  ASSERT_TRUE(op3.write_buffer_manager->buffer_size() ==
+              3 * 512 * 1024 * 1024ul);
+
+  ASSERT_EQ(op1.env, so.env);
+  ASSERT_EQ(op2.env, so.env);
+  ASSERT_EQ(op3.env, so.env);
+
+  ASSERT_EQ(op1.max_background_jobs, (int)so.GetTotalThreads());
+  ASSERT_EQ(op2.max_background_jobs, (int)so.GetTotalThreads());
+  ASSERT_EQ(op3.max_background_jobs, (int)so.GetTotalThreads());
+
+  ASSERT_EQ(op1.delayed_write_rate, so.GetDelayedWriteRate());
+  ASSERT_EQ(op2.delayed_write_rate, so.GetDelayedWriteRate());
+  ASSERT_EQ(op3.delayed_write_rate, so.GetDelayedWriteRate());
+
+  ASSERT_EQ(op1.write_buffer_manager, so.write_buffer_manager);
+  ASSERT_EQ(op2.write_buffer_manager, so.write_buffer_manager);
+  ASSERT_EQ(op3.write_buffer_manager, so.write_buffer_manager);
+
+  ASSERT_EQ(op1.write_buffer_manager->buffer_size(), 3 * 512 * 1024 * 1024ul);
+  ASSERT_EQ(op2.write_buffer_manager->buffer_size(), 3 * 512 * 1024 * 1024ul);
+  ASSERT_EQ(op3.write_buffer_manager->buffer_size(), 3 * 512 * 1024 * 1024ul);
+
+  const auto* sanitized_table_options =
+      op1.table_factory->GetOptions<BlockBasedTableOptions>();
+  ASSERT_EQ(sanitized_table_options->block_cache, so.cache);
+}
+
+TEST_F(SharedOptionsTest, EnableSpeedbFeaturesDB) {
+  DBOptions op;
+  size_t total_ram_size_bytes = 100 * 1024 * 1024 * 1024ul;
+  size_t delayed_write_rate = 256 * 1024 * 1024ul;
+  int total_threads = 8;
+  SharedOptions so(total_ram_size_bytes, total_threads, delayed_write_rate);
+
+  op.EnableSpeedbFeaturesDB(so);
+
+  ASSERT_EQ(op.env, so.env);
+
+  ASSERT_EQ(op.max_background_jobs, (int)so.GetTotalThreads());
+
+  ASSERT_EQ(op.delayed_write_rate, so.GetDelayedWriteRate());
+
+  ASSERT_EQ(op.write_buffer_manager, so.write_buffer_manager);
+
+  ASSERT_EQ(op.write_buffer_manager->buffer_size(), 1);
+}
+
+TEST_F(SharedOptionsTest, EnableSpeedbFeaturesCF) {
+  Options op;
+  ColumnFamilyOptions cfo;
+
+  size_t total_ram_size_bytes = 100 * 1024 * 1024 * 1024ul;
+  size_t delayed_write_rate = 256 * 1024 * 1024;
+  int total_threads = 8;
+
+  SharedOptions so(total_ram_size_bytes, total_threads, delayed_write_rate);
+
+  // create the DB if it's not already present
+  op.create_if_missing = true;
+  op.EnableSpeedbFeatures(so);
+  ASSERT_EQ(op.write_buffer_manager->buffer_size(), 1 * 512 * 1024 * 1024ul);
+  cfo.EnableSpeedbFeaturesCF(so);
+  ASSERT_EQ(op.write_buffer_manager->buffer_size(), 2 * 512 * 1024 * 1024ul);
+  ASSERT_EQ(
+      op.write_buffer_size,
+      std::min<size_t>(op.write_buffer_manager->buffer_size() / 4, 64ul << 20));
+  ASSERT_EQ(op.max_write_buffer_number, 4);
+  ASSERT_EQ(op.min_write_buffer_number_to_merge, 1);
+  ASSERT_EQ(op.env, so.env);
+  const auto* sanitized_table_options =
+      op.table_factory->GetOptions<BlockBasedTableOptions>();
+  ASSERT_EQ(sanitized_table_options->block_cache, so.cache);
+
+  const auto sanitized_options_overrides =
+      sanitized_table_options->cache_usage_options.options_overrides;
+  EXPECT_EQ(sanitized_options_overrides.size(), kNumCacheEntryRoles);
+  for (auto options_overrides_iter = sanitized_options_overrides.cbegin();
+       options_overrides_iter != sanitized_options_overrides.cend();
+       ++options_overrides_iter) {
+    CacheEntryRoleOptions role_options = options_overrides_iter->second;
+    CacheEntryRoleOptions default_options =
+        sanitized_table_options->cache_usage_options.options;
+    if (options_overrides_iter->first == CacheEntryRole::kFilterConstruction) {
+      ASSERT_EQ(role_options.charged,
+                CacheEntryRoleOptions::Decision::kEnabled);
+    } else if (options_overrides_iter->first ==
+               CacheEntryRole::kBlockBasedTableReader) {
+      ASSERT_EQ(role_options.charged,
+                CacheEntryRoleOptions::Decision::kEnabled);
+    } else if (options_overrides_iter->first ==
+               CacheEntryRole::kCompressionDictionaryBuildingBuffer) {
+      ASSERT_EQ(role_options.charged,
+                CacheEntryRoleOptions::Decision::kEnabled);
+    } else if (options_overrides_iter->first == CacheEntryRole::kFileMetadata) {
+      ASSERT_EQ(role_options.charged,
+                CacheEntryRoleOptions::Decision::kEnabled);
+    } else {
+      EXPECT_TRUE(role_options == default_options);
+    }
+  }
+}
 
 }  // namespace ROCKSDB_NAMESPACE
 

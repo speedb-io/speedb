@@ -19,6 +19,7 @@
 #include "rocksdb/cache.h"
 #include "rocksdb/compaction_filter.h"
 #include "rocksdb/comparator.h"
+#include "rocksdb/convenience.h"
 #include "rocksdb/env.h"
 #include "rocksdb/filter_policy.h"
 #include "rocksdb/memtablerep.h"
@@ -31,6 +32,7 @@
 #include "rocksdb/table_properties.h"
 #include "rocksdb/wal_filter.h"
 #include "rocksdb/write_buffer_manager.h"
+#include "rocksdb/write_controller.h"
 #include "table/block_based/block_based_table_factory.h"
 #include "util/compression.h"
 
@@ -531,6 +533,59 @@ Options* Options::OldDefaults(int rocksdb_major_version,
   return this;
 }
 
+Options* Options::EnableSpeedbFeatures(SharedOptions& shared_options) {
+  EnableSpeedbFeaturesDB(shared_options);
+  EnableSpeedbFeaturesCF(shared_options);
+  return this;
+}
+
+SharedOptions::SharedOptions(size_t total_ram_size_bytes, size_t total_threads,
+                             size_t delayed_write_rate) {
+  total_threads_ = total_threads;
+  total_ram_size_bytes_ = total_ram_size_bytes;
+  delayed_write_rate_ = delayed_write_rate;
+  // initial_write_buffer_size_ is initialized to 1 to avoid from empty memory
+  // which might cause some problems
+  int initial_write_buffer_size_ = 1;
+  cache = NewLRUCache(total_ram_size_bytes_);
+  write_controller.reset(
+      new WriteController(true /*dynamic_delay*/, delayed_write_rate_));
+  write_buffer_manager.reset(new WriteBufferManager(
+      initial_write_buffer_size_, cache, true /*allow_stall*/));
+}
+
+void SharedOptions::IncreaseWriteBufferSize(size_t increase_by) {
+  // Max write_buffer_manager->buffer_size()
+  size_t wbm_max_buf_size = total_ram_size_bytes_ / 4;
+  size_t current_buffer_size = write_buffer_manager->buffer_size();
+  size_t set_buf_res = 0;
+
+  if (current_buffer_size == 1 && increase_by > 1) {
+    set_buf_res = increase_by;
+    if (wbm_max_buf_size < increase_by) {
+      set_buf_res = wbm_max_buf_size;
+    }
+  } else if (wbm_max_buf_size > current_buffer_size + increase_by) {
+    set_buf_res = current_buffer_size + increase_by;
+  } else if (wbm_max_buf_size <= current_buffer_size + increase_by) {
+    set_buf_res = wbm_max_buf_size;
+  }
+  if (set_buf_res != 0) {
+    write_buffer_manager->SetBufferSize(set_buf_res);
+  }
+}
+
+DBOptions* DBOptions::EnableSpeedbFeaturesDB(SharedOptions& shared_options) {
+  env = shared_options.env;
+  IncreaseParallelism((int)shared_options.GetTotalThreads());
+  delayed_write_rate = shared_options.GetDelayedWriteRate();
+  bytes_per_sync = 1ul << 20;
+  use_dynamic_delay = true;
+  write_buffer_manager = shared_options.write_buffer_manager;
+  write_controller = shared_options.write_controller;
+  return this;
+}
+
 DBOptions* DBOptions::OldDefaults(int rocksdb_major_version,
                                   int rocksdb_minor_version) {
   if (rocksdb_major_version < 4 ||
@@ -547,6 +602,57 @@ DBOptions* DBOptions::OldDefaults(int rocksdb_major_version,
   }
   max_open_files = 5000;
   wal_recovery_mode = WALRecoveryMode::kTolerateCorruptedTailRecords;
+  return this;
+}
+
+ColumnFamilyOptions* ColumnFamilyOptions::EnableSpeedbFeaturesCF(
+    SharedOptions& shared_options) {
+  // to disable flush due to write buffer full
+  // each new column family will ask the write buffer manager to increase the
+  // write buffer size by 512 * 1024 * 1024ul
+  shared_options.IncreaseWriteBufferSize(512 * 1024 * 1024ul);
+  auto db_wbf_size = shared_options.write_buffer_manager->buffer_size();
+  // cf write_buffer_size
+  write_buffer_size = std::min<size_t>(db_wbf_size / 4, 64ul << 20);
+  max_write_buffer_number = 4;
+  min_write_buffer_number_to_merge = 1;
+  // set the pinning option for indexes and filters
+  {
+    ConfigOptions config_options;
+    config_options.ignore_unknown_options = false;
+    config_options.ignore_unsupported_options = false;
+    BlockBasedTableOptions block_based_table_options;
+    Status s = FilterPolicy::CreateFromString(
+        config_options, "speedb.PairedBloomFilter:10",
+        &block_based_table_options.filter_policy);
+    assert(s.ok());
+    block_based_table_options.cache_index_and_filter_blocks = true;
+    block_based_table_options.cache_index_and_filter_blocks_with_high_priority =
+        true;
+    block_based_table_options.pin_l0_filter_and_index_blocks_in_cache = false;
+    block_based_table_options.metadata_cache_options.unpartitioned_pinning =
+        PinningTier::kAll;
+    block_based_table_options.metadata_cache_options.partition_pinning =
+        PinningTier::kAll;
+    block_based_table_options.block_cache = shared_options.cache;
+    auto& cache_usage_options = block_based_table_options.cache_usage_options;
+    CacheEntryRoleOptions role_options;
+    role_options.charged = CacheEntryRoleOptions::Decision::kEnabled;
+    cache_usage_options.options_overrides.insert(
+        {CacheEntryRole::kFilterConstruction, role_options});
+    cache_usage_options.options_overrides.insert(
+        {CacheEntryRole::kBlockBasedTableReader, role_options});
+    cache_usage_options.options_overrides.insert(
+        {CacheEntryRole::kCompressionDictionaryBuildingBuffer, role_options});
+    cache_usage_options.options_overrides.insert(
+        {CacheEntryRole::kFileMetadata, role_options});
+    table_factory.reset(NewBlockBasedTableFactory(block_based_table_options));
+  }
+  if (prefix_extractor) {
+    memtable_factory.reset(NewHashSkipListRepFactory());
+  } else {
+    memtable_factory.reset(NewHashSpdbRepFactory());
+  }
   return this;
 }
 

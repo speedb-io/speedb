@@ -39,7 +39,8 @@ namespace ROCKSDB_NAMESPACE {
 extern const bool kDefaultToAdaptiveMutex = false;
 
 namespace port {
-
+std::shared_ptr<std::function<void(std::thread::native_handle_type)>>
+    ThreadWithCb::on_thread_start_callback;
 #ifdef ROCKSDB_WINDOWS_UTF8_FILENAMES
 std::string utf16_to_utf8(const std::wstring& utf16) {
   std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>, wchar_t> convert;

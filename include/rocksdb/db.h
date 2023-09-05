@@ -22,6 +22,7 @@
 #include "rocksdb/listener.h"
 #include "rocksdb/metadata.h"
 #include "rocksdb/options.h"
+#include "rocksdb/port_defs.h"
 #include "rocksdb/snapshot.h"
 #include "rocksdb/sst_file_writer.h"
 #include "rocksdb/thread_status.h"
@@ -985,6 +986,14 @@ class DB {
     //  "rocksdb.fast-block-cache-entry-stats" - same as above, but returns
     //      stale values more frequently to reduce overhead and latency.
     static const std::string kFastBlockCacheEntryStats;
+
+    //  "rocksdb.block-cache-cf-stats" - returns a multi-line string
+    //      with statistics on block cache usage for a specific column-family.
+    static const std::string kBlockCacheCfStats;
+
+    //  "rocksdb.fast-block-cache-cf-stats" - same as above, but returns
+    //      stale values more frequently to reduce overhead and latency.
+    static const std::string kFastBlockCacheCfStats;
 
     //  "rocksdb.num-immutable-mem-table" - returns number of immutable
     //      memtables that have not yet been flushed.

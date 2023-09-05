@@ -3734,6 +3734,13 @@ void rocksdb_options_set_hash_skip_list_rep(rocksdb_options_t* opt,
   opt->rep.memtable_factory.reset(factory);
 }
 
+void rocksdb_options_set_hash_spdb_rep(rocksdb_options_t* opt,
+                                       size_t bucket_count) {
+  ROCKSDB_NAMESPACE::MemTableRepFactory* factory =
+      ROCKSDB_NAMESPACE::NewHashSpdbRepFactory(bucket_count);
+  opt->rep.memtable_factory.reset(factory);
+}
+
 void rocksdb_options_set_hash_link_list_rep(rocksdb_options_t* opt,
                                             size_t bucket_count) {
   opt->rep.memtable_factory.reset(

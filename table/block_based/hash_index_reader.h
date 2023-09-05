@@ -16,6 +16,7 @@ namespace ROCKSDB_NAMESPACE {
 class HashIndexReader : public BlockBasedTable::IndexReaderCommon {
  public:
   static Status Create(const BlockBasedTable* table, const ReadOptions& ro,
+                       const TablePinningOptions& tpo,
                        FilePrefetchBuffer* prefetch_buffer,
                        InternalIterator* meta_index_iter, bool use_cache,
                        bool prefetch, bool pin,
@@ -41,8 +42,9 @@ class HashIndexReader : public BlockBasedTable::IndexReaderCommon {
   }
 
  private:
-  HashIndexReader(const BlockBasedTable* t, CachableEntry<Block>&& index_block)
-      : IndexReaderCommon(t, std::move(index_block)) {}
+  HashIndexReader(const BlockBasedTable* t, CachableEntry<Block>&& index_block,
+                  std::unique_ptr<PinnedEntry>&& pinned)
+      : IndexReaderCommon(t, std::move(index_block), std::move(pinned)) {}
 
   std::unique_ptr<BlockPrefixIndex> prefix_index_;
 };

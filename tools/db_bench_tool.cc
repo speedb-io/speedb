@@ -7705,6 +7705,8 @@ class Benchmark {
 
       thread->stats.FinishedOps(&single_db, single_db.db, 1, kSeek);
     }
+    (void)num_seek_to_first;
+    (void)num_next;
     delete iter;
   }
 

@@ -27,16 +27,14 @@ namespace ROCKSDB_NAMESPACE {
 
 Status ImportColumnFamilyJob::Prepare(uint64_t next_file_number,
                                       SuperVersion* sv) {
-  Status status;
-
   // Read the information of files we are importing
   for (const auto& file_metadata : metadata_) {
     const auto file_path = file_metadata.db_path + "/" + file_metadata.name;
     IngestedFileInfo file_to_import;
-    status = GetIngestedFileInfo(file_path, next_file_number++, sv,
-                                 file_metadata, &file_to_import);
-    if (!status.ok()) {
-      return status;
+    Status s = GetIngestedFileInfo(file_path, next_file_number++, sv,
+                                   file_metadata, &file_to_import);
+    if (!s.ok()) {
+      return s;
     }
     files_to_import_.push_back(file_to_import);
   }
@@ -55,6 +53,8 @@ Status ImportColumnFamilyJob::Prepare(uint64_t next_file_number,
       return Status::Corruption("File has corrupted keys");
     }
   }
+
+  Status status;
 
   // Copy/Move external files into DB
   auto hardlink_files = import_options_.move_files;

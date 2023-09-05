@@ -35,6 +35,7 @@
 #include "rocksdb/write_controller.h"
 #include "table/block_based/block_based_table_factory.h"
 #include "util/compression.h"
+#include "rocksdb/table_pinning_policy.h"
 
 namespace ROCKSDB_NAMESPACE {
 
@@ -626,26 +627,16 @@ ColumnFamilyOptions* ColumnFamilyOptions::EnableSpeedbFeaturesCF(
         config_options, "speedb.PairedBloomFilter:10",
         &block_based_table_options.filter_policy);
     assert(s.ok());
-    block_based_table_options.cache_index_and_filter_blocks = true;
-    block_based_table_options.cache_index_and_filter_blocks_with_high_priority =
-        true;
-    block_based_table_options.pin_l0_filter_and_index_blocks_in_cache = false;
-    block_based_table_options.metadata_cache_options.unpartitioned_pinning =
-        PinningTier::kAll;
-    block_based_table_options.metadata_cache_options.partition_pinning =
-        PinningTier::kAll;
+    block_based_table_options.cache_index_and_filter_blocks = true;  
     block_based_table_options.block_cache = shared_options.cache;
     auto& cache_usage_options = block_based_table_options.cache_usage_options;
-    CacheEntryRoleOptions role_options;
-    role_options.charged = CacheEntryRoleOptions::Decision::kEnabled;
-    cache_usage_options.options_overrides.insert(
-        {CacheEntryRole::kFilterConstruction, role_options});
-    cache_usage_options.options_overrides.insert(
-        {CacheEntryRole::kBlockBasedTableReader, role_options});
-    cache_usage_options.options_overrides.insert(
-        {CacheEntryRole::kCompressionDictionaryBuildingBuffer, role_options});
-    cache_usage_options.options_overrides.insert(
-        {CacheEntryRole::kFileMetadata, role_options});
+    std::string pinning_policy_s = "id=speedb_scoped_pinning_policy; capacity=";
+    pinning_policy_s += 0.8 * shared_options.GetTotalRamSizeBytes();
+    pinning_policy_s += "; bottom_percent=60; mid_percent=75";
+    Status s = TablePinningPolicy::CreateFromString(config_options, 
+    pinning_policy_s,
+     &block_based_table_options.pinning_policy);
+    
     table_factory.reset(NewBlockBasedTableFactory(block_based_table_options));
   }
   if (prefix_extractor) {

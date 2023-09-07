@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+Fix RepeatableThread to work properly with on thread start callback feature (https://github.com/speedb-io/speedb/pull/667).
+
 ### New Features
 
 ### Enhancements

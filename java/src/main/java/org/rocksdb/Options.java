@@ -178,6 +178,22 @@ public class Options extends RocksObject
     return this;
   }
 
+  ////
+  @Override
+  public Options enableSpeedbFeatures() {
+    enableSpeedbFeatures(nativeHandle_);
+    return this;
+  }
+
+  @Override
+  public Options enableSpeedbFeatures(final Cache cache) {
+    enableSpeedbFeatures(nativeHandle_, cache.getNativeHandle());
+    return this;
+  }
+  ////
+
+
+
   @Override
   public Options optimizeForPointLookup(
       long blockCacheSizeMb) {
@@ -2341,6 +2357,10 @@ public class Options extends RocksObject
       final long handle, final int majorVersion, final int minorVersion);
   private native void optimizeForSmallDb(final long handle);
   private static native void optimizeForSmallDb(final long handle, final long cacheHandle);
+  ///
+  private native void enableSpeedbFeaturesCF(final long handle);
+  private static native void enableSpeedbFeaturesCF(final long handle, final long cacheHandle);
+  ///
   private native void optimizeForPointLookup(long handle,
       long blockCacheSizeMb);
   private native void optimizeLevelStyleCompaction(long handle,

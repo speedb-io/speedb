@@ -3253,6 +3253,37 @@ void Java_org_rocksdb_Options_optimizeForSmallDb__JJ(JNIEnv*, jclass,
   cf_options_ptr->OptimizeForSmallDb(cache_sptr_ptr);
 }
 
+////
+/*
+ * Class:     org_rocksdb_Options
+ * Method:    enableSpeedbFeatures
+ * Signature: (J)V
+ */
+void Java_org_rocksdb_Options_enableSpeedbFeatures__J(JNIEnv*, jobject,
+                                                    jlong jhandle) {
+  reinterpret_cast<ROCKSDB_NAMESPACE::Options*>(jhandle)->enableSpeedbFeatures();
+}
+
+/*
+ * Class:     org_rocksdb_Options
+ * Method:    enableSpeedbFeatures
+ * Signature: (JJ)V
+ */
+void Java_org_rocksdb_Options_enableSpeedbFeatures__JJ(JNIEnv*, jclass,
+                                                     jlong jhandle,
+                                                     jlong cache_handle) {
+  auto* cache_sptr_ptr =
+      reinterpret_cast<std::shared_ptr<ROCKSDB_NAMESPACE::Cache>*>(
+          cache_handle);
+  auto* options_ptr = reinterpret_cast<ROCKSDB_NAMESPACE::Options*>(jhandle);
+  auto* cf_options_ptr =
+      static_cast<ROCKSDB_NAMESPACE::ColumnFamilyOptions*>(options_ptr);
+  cf_options_ptr->enableSpeedbFeatures(cache_sptr_ptr);
+}
+////
+
+
+
 /*
  * Class:     org_rocksdb_Options
  * Method:    optimizeForPointLookup
@@ -4062,6 +4093,34 @@ void Java_org_rocksdb_ColumnFamilyOptions_optimizeForSmallDb__JJ(
   reinterpret_cast<ROCKSDB_NAMESPACE::ColumnFamilyOptions*>(jhandle)
       ->OptimizeForSmallDb(cache_sptr_ptr);
 }
+
+////
+/*
+ * Class:     org_rocksdb_ColumnFamilyOptions
+ * Method:    enableSpeedbFeaturesCF
+ * Signature: (J)V
+ */
+void Java_org_rocksdb_ColumnFamilyOptions_enableSpeedbFeaturesCF__J(JNIEnv*,
+                                                                jobject,
+                                                                jlong jhandle) {
+  reinterpret_cast<ROCKSDB_NAMESPACE::ColumnFamilyOptions*>(jhandle)
+      ->enableSpeedbFeaturesCF();
+}
+
+/*
+ * Class:     org_rocksdb_ColumnFamilyOptions
+ * Method:    enableSpeedbFeaturesCF
+ * Signature: (JJ)V
+ */
+void Java_org_rocksdb_ColumnFamilyOptions_enableSpeedbFeaturesCF__JJ(
+    JNIEnv*, jclass, jlong jhandle, jlong cache_handle) {
+  auto* cache_sptr_ptr =
+      reinterpret_cast<std::shared_ptr<ROCKSDB_NAMESPACE::Cache>*>(
+          cache_handle);
+  reinterpret_cast<ROCKSDB_NAMESPACE::ColumnFamilyOptions*>(jhandle)
+      ->enableSpeedbFeaturesCF(cache_sptr_ptr);
+}
+////
 
 /*
  * Class:     org_rocksdb_ColumnFamilyOptions
@@ -5896,6 +5955,19 @@ void Java_org_rocksdb_DBOptions_optimizeForSmallDb(JNIEnv*, jobject,
   reinterpret_cast<ROCKSDB_NAMESPACE::DBOptions*>(jhandle)
       ->OptimizeForSmallDb();
 }
+
+////
+/*
+ * Class:     org_rocksdb_DBOptions
+ * Method:    enableSpeedbFeaturesDB
+ * Signature: (J)V
+ */
+void Java_org_rocksdb_DBOptions_enableSpeedbFeaturesDB(JNIEnv*, jobject,
+                                                   jlong jhandle) {
+  reinterpret_cast<ROCKSDB_NAMESPACE::DBOptions*>(jhandle)
+      ->enableSpeedbFeaturesDB();
+}
+////
 
 /*
  * Class:     org_rocksdb_DBOptions

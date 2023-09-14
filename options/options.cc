@@ -623,16 +623,16 @@ ColumnFamilyOptions* ColumnFamilyOptions::EnableSpeedbFeaturesCF(
     config_options.ignore_unknown_options = false;
     config_options.ignore_unsupported_options = false;
     BlockBasedTableOptions block_based_table_options;
-    // Status s = FilterPolicy::CreateFromString(
-    //     config_options, "speedb.PairedBloomFilter:10",
-    //     &block_based_table_options.filter_policy);
-    // assert(s.ok());
+    Status s = FilterPolicy::CreateFromString(
+        config_options, "bloomfilter:10",
+        &block_based_table_options.filter_policy);
+    assert(s.ok());
     block_based_table_options.cache_index_and_filter_blocks = true;  
     block_based_table_options.block_cache = shared_options.cache;
     std::string pinning_policy_s = "id=speedb_scoped_pinning_policy; capacity=";
     pinning_policy_s += 0.8 * shared_options.GetTotalRamSizeBytes();
     pinning_policy_s += "; bottom_percent=60; mid_percent=75";
-    Status s = TablePinningPolicy::CreateFromString(config_options, 
+    s = TablePinningPolicy::CreateFromString(config_options, 
     pinning_policy_s,
      &block_based_table_options.pinning_policy);
     assert(s.ok());

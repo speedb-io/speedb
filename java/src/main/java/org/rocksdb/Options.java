@@ -179,17 +179,17 @@ public class Options extends RocksObject
   }
 
   ////
-  @Override
-  public Options enableSpeedbFeatures() {
-    enableSpeedbFeatures(nativeHandle_);
-    return this;
-  }
+  // @Override
+  // public Options enableSpeedbFeatures() {
+  //   enableSpeedbFeatures(nativeHandle_);
+  //   return this;
+  // }
 
-  @Override
-  public Options enableSpeedbFeatures(final Cache cache) {
-    enableSpeedbFeatures(nativeHandle_, cache.getNativeHandle());
-    return this;
-  }
+  // @Override
+  // public Options enableSpeedbFeatures(final Cache cache) {
+  //   enableSpeedbFeatures(nativeHandle_, cache.getNativeHandle());
+  //   return this;
+  // }
   ////
 
 

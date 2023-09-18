@@ -380,6 +380,7 @@ ifdef COMPILE_WITH_ASAN
 	EXEC_LDFLAGS += -fsanitize=address
 	PLATFORM_CCFLAGS += -fsanitize=address
 	PLATFORM_CXXFLAGS += -fsanitize=address
+	PLATFORM_LDFLAGS += -fsanitize=address
 ifeq ($(LIB_MODE),shared)
 ifdef USE_CLANG
 # Fix false ODR violation; see https://github.com/google/sanitizers/issues/1017

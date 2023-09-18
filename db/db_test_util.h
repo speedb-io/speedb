@@ -12,6 +12,7 @@
 #include <fcntl.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cinttypes>
 #include <map>
 #include <memory>
@@ -1105,6 +1106,9 @@ class DBTestBase : public testing::Test {
                          anon::OptionsOverride()) const;
 
   DBImpl* dbfull() { return static_cast_with_check<DBImpl>(db_); }
+
+  std::atomic<bool>& dbfull_shutting_down() { return dbfull()->shutting_down_; }
+  ErrorHandler& dbfull_error_handler() { return dbfull()->error_handler_; }
 
   void CreateColumnFamilies(const std::vector<std::string>& cfs,
                             const Options& options);

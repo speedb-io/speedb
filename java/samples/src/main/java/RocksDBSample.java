@@ -4,17 +4,47 @@
 //  (found in the LICENSE.Apache file in the root directory).
 
 import java.lang.IllegalArgumentException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.ArrayList;
-
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.rocksdb.*;
 import org.rocksdb.util.SizeUnit;
 
 public class RocksDBSample {
   static {
     RocksDB.loadLibrary();
+  }
+
+  private static class MyCompactRangeCompletedCb extends AbstractCompactRangeCompletedCb {
+    public MyCompactRangeCompletedCb() {
+      completedCbCalled = new AtomicBoolean();
+    }
+
+    @Override
+    public void CompactRangeCompleted(final Status completionStatus) {
+      assert (completionStatus.getCode() == Status.Code.Ok);
+      System.out.println(
+          "Non-Blocking Compact Range Completed with Status:" + completionStatus.getCodeString());
+      completedCbCalled.set(true);
+    }
+
+    public AtomicBoolean completedCbCalled;
+  }
+
+  private static MyCompactRangeCompletedCb InitiateNonBlockingCompactRange(final RocksDB db) {
+    final MyCompactRangeCompletedCb cb = new MyCompactRangeCompletedCb();
+    final CompactRangeOptions cro = new CompactRangeOptions().setAsyncCompletionCb(cb);
+
+    cb.completedCbCalled.set(false);
+    try {
+      db.compactRange(null, null, null, cro);
+    } catch (RocksDBException e) {
+      assert (false);
+    }
+
+    return cb;
   }
 
   public static void main(final String[] args) {
@@ -137,6 +167,9 @@ public class RocksDBSample {
           }
           System.out.println("");
         }
+
+        // Initiate Non-Blocking Compact Range and continue operations
+        MyCompactRangeCompletedCb completionCb = InitiateNonBlockingCompactRange(db);
 
         // write batch test
         try (final WriteOptions writeOpt = new WriteOptions()) {
@@ -290,6 +323,21 @@ public class RocksDBSample {
         for (final byte[] value1 : values) {
           assert (value1 != null);
         }
+
+        // Now just verify that the non-blocking CompactRange() has completed asynchronously
+        try {
+          int totalWaitTimeMs = 0;
+          while ((completionCb.completedCbCalled.get() == false) && (totalWaitTimeMs < 5000)) {
+            Thread.sleep(100);
+            totalWaitTimeMs += 100;
+          }
+          if (completionCb.completedCbCalled.get() == false) {
+            assert (false);
+          }
+        } catch (InterruptedException e) {
+          assert (false);
+        }
+
       } catch (final RocksDBException e) {
         System.err.println(e);
       }

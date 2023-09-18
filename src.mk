@@ -56,6 +56,7 @@ LIB_SOURCES =                                                   \
   db/db_impl/db_impl_secondary.cc                               \
   db/db_impl/db_impl_write.cc                                   \
   db/db_impl/db_spdb_impl_write.cc                              \
+  db/db_impl/compact_range_threads_mngr.cc                      \
   db/db_info_dumper.cc                                          \
   db/db_iter.cc                                                 \
   db/dbformat.cc                                                \
@@ -652,6 +653,8 @@ JNI_NATIVE_SOURCES =                                          \
   java/rocksjni/cache.cc                                      \
   java/rocksjni/columnfamilyhandle.cc                         \
   java/rocksjni/compact_range_options.cc                      \
+  java/rocksjni/compact_range_completion_cb.cc                \
+  java/rocksjni/compact_range_completed_jnicallback.cc        \
   java/rocksjni/compaction_filter.cc                          \
   java/rocksjni/compaction_filter_factory.cc                  \
   java/rocksjni/compaction_filter_factory_jnicallback.cc      \

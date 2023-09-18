@@ -31,6 +31,8 @@ set(JNI_NATIVE_SOURCES
         rocksjni/compaction_options_fifo.cc
         rocksjni/compaction_options_universal.cc
         rocksjni/compact_range_options.cc
+        rocksjni/compact_range_completion_cb.cc
+        rocksjni/compact_range_completed_jnicallback.cc
         rocksjni/comparator.cc
         rocksjni/comparatorjnicallback.cc
         rocksjni/compression_options.cc

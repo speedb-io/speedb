@@ -135,4 +135,20 @@ public class CompactRangeOptionsTest {
     opt.setCanceled(true);
     assertThat(opt.canceled()).isEqualTo(true);
   }
+
+  @Test
+  public void asyncCompletionCb() {
+    CompactRangeOptions opt = new CompactRangeOptions();
+
+    try (final AbstractCompactRangeCompletedCb completeCb = new TestCompactRangeCompletedCb()) {
+      opt.setAsyncCompletionCb(completeCb);
+    }
+  }
+
+  private static class TestCompactRangeCompletedCb extends AbstractCompactRangeCompletedCb {
+    @Override
+    public void CompactRangeCompleted(final Status completionStatus) {
+      System.err.println("In TestCompactRangeCompletedCb::CompactRangeCompleted");
+    }
+  }
 }

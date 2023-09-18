@@ -11,6 +11,7 @@
 #include "include/org_rocksdb_CompactRangeOptions.h"
 #include "rocksdb/options.h"
 #include "rocksjni/cplusplus_to_java_convert.h"
+#include "rocksjni/jnicallback.h"
 #include "rocksjni/portal.h"
 #include "util/coding.h"
 
@@ -322,6 +323,21 @@ jboolean Java_org_rocksdb_CompactRangeOptions_canceled(JNIEnv*, jobject,
   auto* options =
       reinterpret_cast<Java_org_rocksdb_CompactRangeOptions*>(jhandle);
   return options->get_canceled();
+}
+
+/*
+ * Class:     org_rocksdb_CompactRangeOptions
+ * Method:    setAsyncCompletionCb
+ * Signature: (JJ)V
+ */
+void Java_org_rocksdb_CompactRangeOptions_setAsyncCompletionCb(
+    JNIEnv* /*env*/, jobject /*jobj*/, jlong jhandle,
+    jlong completion_cb_handle) {
+  auto* options =
+      reinterpret_cast<ROCKSDB_NAMESPACE::CompactRangeOptions*>(jhandle);
+  options->async_completion_cb = *reinterpret_cast<
+      std::shared_ptr<ROCKSDB_NAMESPACE::CompactRangeCompletedCbIf>*>(
+      completion_cb_handle);
 }
 
 /*

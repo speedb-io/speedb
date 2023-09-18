@@ -1410,6 +1410,21 @@ class DB {
   //
   // In case of user-defined timestamp, if enabled, `begin` and `end` should
   // not contain timestamp.
+  // Non-Blocking Compactions:
+  // A non-blocking compaction is initiated by setting the async_completion_cb
+  // option in the CompactRangeOptions options parameter. By default (unless
+  // explicitly set by the caller), the CompactRange() will be blocking. When
+  // async_completion_cb is set, the CompactRange() call will return control to
+  // the caller immediately. The manual compaction iteslf will be performed in
+  // an internally created thread. The manual compaction will ALWAYS call the
+  // specified callback upon completion and provide the completion status.
+  //
+  // NOTES:
+  // 1. The callback object must be alive until the callback has been called.
+  // 2. The callback MAY be called in the context of the caller's thread when
+  // there are conditions
+  //    that prevent manual compaction from running. Otherwise, the callback
+  //    will be called in the context of the internally created thread.
   virtual Status CompactRange(const CompactRangeOptions& options,
                               ColumnFamilyHandle* column_family,
                               const Slice* begin, const Slice* end) = 0;

@@ -269,6 +269,22 @@ public class CompactRangeOptions extends RocksObject {
   }
 
   private static native long newCompactRangeOptions();
+
+  /**
+   * Calling this method makes the call to compaction range using these options
+   * non-blocking.
+   *
+   * @return This CompactRangeOptions
+   * @param completionCb Callback that will be called when the non-blocking manual
+   * compaction completes.
+   */
+  public CompactRangeOptions setAsyncCompletionCb(
+      final AbstractCompactRangeCompletedCb completionCb) {
+    assert (isOwningHandle());
+    setAsyncCompletionCb(nativeHandle_, completionCb.nativeHandle_);
+    return this;
+  }
+
   @Override protected final native void disposeInternal(final long handle);
 
   private native boolean exclusiveManualCompaction(final long handle);
@@ -301,4 +317,6 @@ public class CompactRangeOptions extends RocksObject {
   private native void setCanceled(final long handle, final boolean canceled);
 
   private native boolean canceled(final long handle);
+  
+  private native void setAsyncCompletionCb(final long nativeHandle_, final long completeCbHandle);
 }

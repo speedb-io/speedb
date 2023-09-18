@@ -34,7 +34,8 @@ git grep -n 'using namespace' -- ':!build_tools' ':!docs' \
     ':!third-party/gtest-1.8.1/fused-src/gtest/gtest.h' \
     ':!examples/speedb_with_ttl_example.cc' \
     ':!examples/enable_speedb_features_example.cc' \
-    ':!examples/on_thread_start_callback_example.cc'
+    ':!examples/on_thread_start_callback_example.cc' \
+    ':!examples/speedb_non_blocking_compact_range_example.cc'
 if [ "$?" != "1" ]; then
   echo '^^^^ Do not use "using namespace"'
   BAD=1

@@ -40,7 +40,7 @@ class ThreadWithCb {
   }
 
   ThreadWithCb() {}
-  bool joinable() { return thread_.joinable(); }
+  bool joinable() const { return thread_.joinable(); }
 
   void join() { thread_.join(); }
 

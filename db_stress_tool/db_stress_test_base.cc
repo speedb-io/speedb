@@ -8,6 +8,8 @@
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 //
 
+#include <chrono>
+#include <future>
 #include <ios>
 #include <thread>
 
@@ -19,6 +21,7 @@
 #include "db_stress_tool/db_stress_table_properties_collector.h"
 #include "rocksdb/convenience.h"
 #include "rocksdb/filter_policy.h"
+#include "rocksdb/options.h"
 #include "rocksdb/secondary_cache.h"
 #include "rocksdb/sst_file_manager.h"
 #include "rocksdb/table_pinning_policy.h"
@@ -2228,6 +2231,26 @@ Status StressTest::MaybeReleaseSnapshots(ThreadState* thread, uint64_t i) {
   return Status::OK();
 }
 
+namespace {
+using CbFuture = std::future<Status>;
+
+class CompactRangeCompleteCb : public CompactRangeCompletedCbIf {
+ public:
+  CompactRangeCompleteCb() {
+    my_promise_ = std::make_unique<std::promise<Status>>();
+  }
+
+  CbFuture GetFuture() { return my_promise_->get_future(); }
+
+  void CompletedCb(Status completion_status) override {
+    my_promise_->set_value(completion_status);
+  }
+
+ private:
+  std::unique_ptr<std::promise<Status>> my_promise_;
+};
+}  // namespace
+
 void StressTest::TestCompactRange(ThreadState* thread, int64_t rand_key,
                                   const Slice& start_key,
                                   ColumnFamilyHandle* column_family) {
@@ -2274,10 +2297,34 @@ void StressTest::TestCompactRange(ThreadState* thread, int64_t rand_key,
         GetRangeHash(thread, pre_snapshot, column_family, start_key, end_key);
   }
 
-  Status status = db_->CompactRange(cro, column_family, &start_key, &end_key);
+  Status status;
+
+  if (thread->rand.OneIn(2)) {
+    auto completion_cb = std::make_shared<CompactRangeCompleteCb>();
+    cro.async_completion_cb = completion_cb;
+    status = db_->CompactRange(cro, column_family, &start_key, &end_key);
+
+    auto completion_cb_future = completion_cb->GetFuture();
+    auto future_wait_status =
+        completion_cb_future.wait_for(std::chrono::seconds(60));
+    if (future_wait_status == std::future_status::ready) {
+      // Obtain the actual completion status
+      status = completion_cb_future.get();
+    } else {
+      fprintf(stderr,
+              "Non-Blocking CompactRange() Didn't Complete Successfuly in "
+              "Time: %d\n",
+              static_cast<int>(future_wait_status));
+      // Already notified about the error, fake success for the check +
+      // notification below
+      status = Status::OK();
+    }
+  } else {
+    status = db_->CompactRange(cro, column_family, &start_key, &end_key);
+  }
 
   if (!status.ok()) {
-    fprintf(stdout, "Unable to perform CompactRange(): %s\n",
+    fprintf(stderr, "Unable to perform CompactRange(): %s\n",
             status.ToString().c_str());
   }
 

@@ -5,16 +5,19 @@
 //
 // Test for issue 178: a manual compaction causes deleted data to reappear.
 #include <cstdlib>
+#include <functional>
 
 #include "port/port.h"
 #include "rocksdb/compaction_filter.h"
 #include "rocksdb/db.h"
 #include "rocksdb/slice.h"
 #include "rocksdb/write_batch.h"
+#include "test_util/sync_point.h"
 #include "test_util/testharness.h"
 
 using ROCKSDB_NAMESPACE::CompactionFilter;
 using ROCKSDB_NAMESPACE::CompactionStyle;
+using ROCKSDB_NAMESPACE::CompactRangeCompletedCbIf;
 using ROCKSDB_NAMESPACE::CompactRangeOptions;
 using ROCKSDB_NAMESPACE::CompressionType;
 using ROCKSDB_NAMESPACE::DB;
@@ -24,9 +27,9 @@ using ROCKSDB_NAMESPACE::Iterator;
 using ROCKSDB_NAMESPACE::Options;
 using ROCKSDB_NAMESPACE::ReadOptions;
 using ROCKSDB_NAMESPACE::Slice;
+using ROCKSDB_NAMESPACE::Status;
 using ROCKSDB_NAMESPACE::WriteBatch;
 using ROCKSDB_NAMESPACE::WriteOptions;
-
 namespace {
 
 // Reasoning: previously the number was 1100000. Since the keys are written to
@@ -44,16 +47,50 @@ std::string Key1(int i) {
 
 std::string Key2(int i) { return Key1(i) + "_xxx"; }
 
-class ManualCompactionTest : public testing::Test {
+class ManualCompactionTest : public testing::Test,
+                             public testing::WithParamInterface<bool> {
  public:
   ManualCompactionTest() {
+    blocking_ = GetParam();
+
     // Get rid of any state from an old run.
     dbname_ = ROCKSDB_NAMESPACE::test::PerThreadDBPath(
         "rocksdb_manual_compaction_test");
     EXPECT_OK(DestroyDB(dbname_, Options()));
   }
 
+  void TearDown() override {
+    ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->DisableProcessing();
+  }
+
+  class CompactRangeCompleteCb : public CompactRangeCompletedCbIf {
+   public:
+    void CompletedCb(Status completion_status) override {
+      ASSERT_OK(completion_status);
+      TEST_SYNC_POINT("TestCompactRangeComplete");
+    }
+  };
+
+  void SetupTestPointsIfApplicable(const std::string& test_point_name) {
+    if (blocking_) {
+      ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->LoadDependency(
+          {{"TestCompactRangeComplete", test_point_name}});
+      ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->EnableProcessing();
+    }
+  }
+
+  CompactRangeOptions GetCompactRangeOptions() {
+    CompactRangeOptions cr_options;
+    if (blocking_) {
+      cr_options.async_completion_cb =
+          std::make_shared<CompactRangeCompleteCb>();
+    }
+
+    return cr_options;
+  }
+
   std::string dbname_;
+  bool blocking_ = false;
 };
 
 class DestroyAllCompactionFilter : public CompactionFilter {
@@ -96,7 +133,7 @@ class LogCompactionFilter : public CompactionFilter {
   mutable std::map<std::string, int> key_level_;
 };
 
-TEST_F(ManualCompactionTest, CompactTouchesAllKeys) {
+TEST_P(ManualCompactionTest, CompactTouchesAllKeys) {
   for (int iter = 0; iter < 2; ++iter) {
     DB* db;
     Options options;
@@ -117,7 +154,13 @@ TEST_F(ManualCompactionTest, CompactTouchesAllKeys) {
     ASSERT_OK(db->Put(WriteOptions(), Slice("key4"), Slice("destroy")));
 
     Slice key4("key4");
-    ASSERT_OK(db->CompactRange(CompactRangeOptions(), nullptr, &key4));
+
+    const std::string test_point_name = "WaitForCompactRangeComplete";
+    SetupTestPointsIfApplicable(test_point_name);
+
+    ASSERT_OK(db->CompactRange(GetCompactRangeOptions(), nullptr, &key4));
+    TEST_SYNC_POINT(test_point_name);
+
     Iterator* itr = db->NewIterator(ReadOptions());
     itr->SeekToFirst();
     ASSERT_TRUE(itr->Valid());
@@ -132,7 +175,7 @@ TEST_F(ManualCompactionTest, CompactTouchesAllKeys) {
   }
 }
 
-TEST_F(ManualCompactionTest, Test) {
+TEST_P(ManualCompactionTest, Test) {
   // Open database.  Disable compression since it affects the creation
   // of layers and the code below is trying to test against a very
   // specific scenario.
@@ -170,8 +213,12 @@ TEST_F(ManualCompactionTest, Test) {
   Slice least(start_key.data(), start_key.size());
   Slice greatest(end_key.data(), end_key.size());
 
+  const std::string test_point_name = "WaitForCompactRangeComplete";
+  SetupTestPointsIfApplicable(test_point_name);
+
   // commenting out the line below causes the example to work correctly
-  ASSERT_OK(db->CompactRange(CompactRangeOptions(), &least, &greatest));
+  ASSERT_OK(db->CompactRange(GetCompactRangeOptions(), &least, &greatest));
+  TEST_SYNC_POINT(test_point_name);
 
   // count the keys
   Iterator* iter = db->NewIterator(ReadOptions());
@@ -187,7 +234,7 @@ TEST_F(ManualCompactionTest, Test) {
   ASSERT_OK(DestroyDB(dbname_, Options()));
 }
 
-TEST_F(ManualCompactionTest, SkipLevel) {
+TEST_P(ManualCompactionTest, SkipLevel) {
   DB* db;
   Options options;
   options.num_levels = 3;
@@ -211,67 +258,95 @@ TEST_F(ManualCompactionTest, SkipLevel) {
   ASSERT_OK(db->Flush(fo));
 
   {
+    const std::string test_point_name1 = "WaitForCompactRangeComplete1";
+    SetupTestPointsIfApplicable(test_point_name1);
+
     // L0: 1, 2, [4, 8]
     // no file has keys in range [5, 7]
     Slice start("5");
     Slice end("7");
     filter->Reset();
-    ASSERT_OK(db->CompactRange(CompactRangeOptions(), &start, &end));
+
+    // commenting out the line below causes the example to work correctly
+    ASSERT_OK(db->CompactRange(GetCompactRangeOptions(), &start, &end));
+    TEST_SYNC_POINT(test_point_name1);
     ASSERT_EQ(0, filter->NumKeys());
   }
 
   {
+    const std::string test_point_name2 = "WaitForCompactRangeComplete2";
+    SetupTestPointsIfApplicable(test_point_name2);
+
     // L0: 1, 2, [4, 8]
     // [3, 7] overlaps with 4 in L0
     Slice start("3");
     Slice end("7");
     filter->Reset();
-    ASSERT_OK(db->CompactRange(CompactRangeOptions(), &start, &end));
+
+    // commenting out the line below causes the example to work correctly
+    ASSERT_OK(db->CompactRange(GetCompactRangeOptions(), &start, &end));
+    TEST_SYNC_POINT(test_point_name2);
     ASSERT_EQ(2, filter->NumKeys());
     ASSERT_EQ(0, filter->KeyLevel("4"));
     ASSERT_EQ(0, filter->KeyLevel("8"));
   }
 
   {
+    const std::string test_point_name3 = "WaitForCompactRangeComplete3";
+    SetupTestPointsIfApplicable(test_point_name3);
+
     // L0: 1, 2
     // L1: [4, 8]
     // no file has keys in range (-inf, 0]
     Slice end("0");
     filter->Reset();
-    ASSERT_OK(db->CompactRange(CompactRangeOptions(), nullptr, &end));
+    ASSERT_OK(db->CompactRange(GetCompactRangeOptions(), nullptr, &end));
+    TEST_SYNC_POINT(test_point_name3);
     ASSERT_EQ(0, filter->NumKeys());
   }
 
   {
+    const std::string test_point_name4 = "WaitForCompactRangeComplete4";
+    SetupTestPointsIfApplicable(test_point_name4);
+
     // L0: 1, 2
     // L1: [4, 8]
     // no file has keys in range [9, inf)
     Slice start("9");
     filter->Reset();
-    ASSERT_OK(db->CompactRange(CompactRangeOptions(), &start, nullptr));
+    ASSERT_OK(db->CompactRange(GetCompactRangeOptions(), &start, nullptr));
+    TEST_SYNC_POINT(test_point_name4);
     ASSERT_EQ(0, filter->NumKeys());
   }
 
   {
+    const std::string test_point_name5 = "WaitForCompactRangeComplete5";
+    SetupTestPointsIfApplicable(test_point_name5);
+
     // L0: 1, 2
     // L1: [4, 8]
     // [2, 2] overlaps with 2 in L0
     Slice start("2");
     Slice end("2");
     filter->Reset();
-    ASSERT_OK(db->CompactRange(CompactRangeOptions(), &start, &end));
+    ASSERT_OK(db->CompactRange(GetCompactRangeOptions(), &start, &end));
+    TEST_SYNC_POINT(test_point_name5);
     ASSERT_EQ(1, filter->NumKeys());
     ASSERT_EQ(0, filter->KeyLevel("2"));
   }
 
   {
+    const std::string test_point_name6 = "WaitForCompactRangeComplete6";
+    SetupTestPointsIfApplicable(test_point_name6);
+
     // L0: 1
     // L1: 2, [4, 8]
     // [2, 5] overlaps with 2 and [4, 8) in L1, skip L0
     Slice start("2");
     Slice end("5");
     filter->Reset();
-    ASSERT_OK(db->CompactRange(CompactRangeOptions(), &start, &end));
+    ASSERT_OK(db->CompactRange(GetCompactRangeOptions(), &start, &end));
+    TEST_SYNC_POINT(test_point_name6);
     ASSERT_EQ(3, filter->NumKeys());
     ASSERT_EQ(1, filter->KeyLevel("2"));
     ASSERT_EQ(1, filter->KeyLevel("4"));
@@ -279,12 +354,16 @@ TEST_F(ManualCompactionTest, SkipLevel) {
   }
 
   {
+    const std::string test_point_name7 = "WaitForCompactRangeComplete7";
+    SetupTestPointsIfApplicable(test_point_name7);
+
     // L0: 1
     // L1: [2, 4, 8]
     // [0, inf) overlaps all files
     Slice start("0");
     filter->Reset();
-    ASSERT_OK(db->CompactRange(CompactRangeOptions(), &start, nullptr));
+    ASSERT_OK(db->CompactRange(GetCompactRangeOptions(), &start, nullptr));
+    TEST_SYNC_POINT(test_point_name7);
     ASSERT_EQ(4, filter->NumKeys());
     // 1 is first compacted to L1 and then further compacted into [2, 4, 8],
     // so finally the logged level for 1 is L1.
@@ -298,6 +377,9 @@ TEST_F(ManualCompactionTest, SkipLevel) {
   delete db;
   ASSERT_OK(DestroyDB(dbname_, options));
 }
+
+INSTANTIATE_TEST_CASE_P(ManualCompactionTest, ManualCompactionTest,
+                        testing::Bool());
 
 }  // anonymous namespace
 

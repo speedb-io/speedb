@@ -4,16 +4,16 @@
 //  (found in the LICENSE.Apache file in the root directory).
 package org.rocksdb;
 
-import org.junit.*;
-import org.junit.rules.ExpectedException;
-import org.junit.rules.TemporaryFolder;
-
-import java.nio.ByteBuffer;
-import java.util.*;
-
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.fail;
+
+import java.nio.ByteBuffer;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+import org.junit.*;
+import org.junit.rules.ExpectedException;
+import org.junit.rules.TemporaryFolder;
 
 public class RocksDBTest {
 
@@ -750,6 +750,75 @@ public class RocksDBTest {
           }
           db.compactRange(columnFamilyHandles.get(1),
               "0".getBytes(), "201".getBytes());
+        } finally {
+          for (final ColumnFamilyHandle handle : columnFamilyHandles) {
+            handle.close();
+          }
+        }
+      }
+    }
+  }
+
+  private static class TestCompactRangeCompletedCb extends AbstractCompactRangeCompletedCb {
+    public TestCompactRangeCompletedCb() {
+      completedCbCalled = new AtomicBoolean();
+    }
+
+    @Override
+    public void CompactRangeCompleted(final Status completionStatus) {
+      completedCbCalled.set(true);
+    }
+
+    public AtomicBoolean completedCbCalled;
+  }
+
+  @Test
+  public void fullCompactRangeColumnFamilyNonBlocking() throws RocksDBException {
+    try (final DBOptions opt =
+             new DBOptions().setCreateIfMissing(true).setCreateMissingColumnFamilies(true);
+         final ColumnFamilyOptions new_cf_opts = new ColumnFamilyOptions()
+                                                     .setDisableAutoCompactions(true)
+                                                     .setCompactionStyle(CompactionStyle.LEVEL)
+                                                     .setNumLevels(4)
+                                                     .setWriteBufferSize(100 << 10)
+                                                     .setLevelZeroFileNumCompactionTrigger(3)
+                                                     .setTargetFileSizeBase(200 << 10)
+                                                     .setTargetFileSizeMultiplier(1)
+                                                     .setMaxBytesForLevelBase(500 << 10)
+                                                     .setMaxBytesForLevelMultiplier(1)
+                                                     .setDisableAutoCompactions(false);
+         final TestCompactRangeCompletedCb cb = new TestCompactRangeCompletedCb();
+         final CompactRangeOptions cro = new CompactRangeOptions().setAsyncCompletionCb(cb)) {
+      final List<ColumnFamilyDescriptor> columnFamilyDescriptors =
+          Arrays.asList(new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY),
+              new ColumnFamilyDescriptor("new_cf".getBytes(), new_cf_opts));
+
+      // open database
+      final List<ColumnFamilyHandle> columnFamilyHandles = new ArrayList<>();
+      try (final RocksDB db = RocksDB.open(opt, dbFolder.getRoot().getAbsolutePath(),
+               columnFamilyDescriptors, columnFamilyHandles)) {
+        try {
+          // fill database with key/value pairs
+          byte[] b = new byte[10000];
+          for (int i = 0; i < 200; i++) {
+            rand.nextBytes(b);
+            db.put(columnFamilyHandles.get(1), String.valueOf(i).getBytes(), b);
+          }
+          cb.completedCbCalled.set(false);
+          db.compactRange(null, null, null, cro);
+          try {
+            int totalWaitTimeMs = 0;
+            while ((cb.completedCbCalled.get() == false) && (totalWaitTimeMs < 5000)) {
+              Thread.sleep(100);
+              totalWaitTimeMs += 100;
+            }
+            if (cb.completedCbCalled.get() == false) {
+              fail("Callback wasn't called");
+            }
+          } catch (InterruptedException e) {
+            fail("InterruptedException");
+          }
+
         } finally {
           for (final ColumnFamilyHandle handle : columnFamilyHandles) {
             handle.close();

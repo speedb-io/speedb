@@ -481,6 +481,8 @@ class ColumnFamilyData {
   WriteStallCondition RecalculateWriteStallConditions(
       const MutableCFOptions& mutable_cf_options);
 
+  bool IsLastLevelWithData(int level) const;
+
   // REQUIREMENT: db mutex must be held
   double TEST_CalculateWriteDelayDivider(
       uint64_t compaction_needed_bytes,
@@ -488,6 +490,8 @@ class ColumnFamilyData {
       WriteStallCause& write_stall_cause);
 
   void TEST_ResetWriteControllerToken() { write_controller_token_.reset(); }
+
+  VersionStorageInfo* TEST_GetCurrentStorageInfo();
 
  private:
   void UpdateCFRate(void* client_id, uint64_t write_rate);

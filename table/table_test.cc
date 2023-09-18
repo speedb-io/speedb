@@ -445,7 +445,8 @@ class TableConstructor : public Constructor {
     return ioptions.table_factory->NewTableReader(
         TableReaderOptions(ioptions, moptions.prefix_extractor, soptions,
                            *last_internal_comparator_, /*skip_filters*/ false,
-                           /*immortal*/ false, false, level_, false,
+                           /*immortal*/ false, false, level_,
+                           /*bottommost*/ false, /*last_level_with_data*/ false,
                            &block_cache_tracer_, moptions.write_buffer_size, "",
                            file_num_, kNullUniqueId64x2, largest_seqno_),
         std::move(file_reader_), TEST_GetSink()->contents().size(),

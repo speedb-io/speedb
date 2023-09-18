@@ -7754,17 +7754,13 @@ class Benchmark {
 
     fprintf(stderr, "num reads to do %" PRIu64 "\n", reads_);
     Duration duration(FLAGS_duration, reads_);
-    uint64_t num_seek_to_first = 0;
-    uint64_t num_next = 0;
     while (!duration.Done(1)) {
       if (!iter->Valid()) {
         iter->SeekToFirst();
-        num_seek_to_first++;
       } else if (!iter->status().ok()) {
         ErrorExit("Iterator error: %s", iter->status().ToString().c_str());
       } else {
         iter->Next();
-        num_next++;
       }
 
       thread->stats.FinishedOps(&single_db, single_db.db, 1, kSeek);

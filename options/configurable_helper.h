@@ -6,14 +6,17 @@
 #pragma once
 
 #include <map>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
 #include "rocksdb/configurable.h"
 #include "rocksdb/convenience.h"
+#include "rocksdb/use_case.h"
 
 namespace ROCKSDB_NAMESPACE {
+class UseCaseConfig;
 // Helper class defining static methods for supporting the Configurable
 // class.  The purpose of this class is to keep the Configurable class
 // as tight as possible and provide methods for doing the actual work
@@ -158,6 +161,19 @@ class ConfigurableHelper {
                             const Configurable& this_one,
                             const Configurable& that_one,
                             std::string* mismatch);
+
+  static bool CheckUseCases(
+      const ConfigOptions& config_options, const Configurable& configurable,
+      const std::vector<std::unordered_map<std::string, UseCaseConfig>*>& uses,
+      std::set<std::string>& valid, std::set<std::string>& invalid,
+      std::unordered_map<std::string, UseCaseConfig>* unused);
+
+  static int CheckSomeUseCases(
+      const ConfigOptions& config_options, const Configurable& configurable,
+      const std::unordered_map<std::string, OptionTypeInfo>& type_map,
+      const void* opt_ptr,
+      std::vector<std::pair<std::string, UseCaseConfig>>& uses,
+      std::set<std::string>& valid, std::set<std::string>& invalid);
 
  private:
   // Looks for the option specified by name in the RegisteredOptions.

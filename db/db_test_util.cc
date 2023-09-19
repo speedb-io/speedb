@@ -1264,12 +1264,15 @@ void DBTestBase::FillLevels(const std::string& smallest,
   MakeTables(db_->NumberLevels(handles_[cf]), smallest, largest, cf);
 }
 
-void DBTestBase::MoveFilesToLevel(int level, int cf) {
+void DBTestBase::MoveFilesToLevel(int level, int cf,
+                                  bool disallow_trivial_move) {
   for (int l = 0; l < level; ++l) {
     if (cf > 0) {
-      EXPECT_OK(dbfull()->TEST_CompactRange(l, nullptr, nullptr, handles_[cf]));
+      EXPECT_OK(dbfull()->TEST_CompactRange(l, nullptr, nullptr, handles_[cf],
+                                            disallow_trivial_move));
     } else {
-      EXPECT_OK(dbfull()->TEST_CompactRange(l, nullptr, nullptr));
+      EXPECT_OK(dbfull()->TEST_CompactRange(l, nullptr, nullptr, nullptr,
+                                            disallow_trivial_move));
     }
   }
 }

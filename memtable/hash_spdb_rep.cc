@@ -315,7 +315,6 @@ void SpdbVectorContainer::Insert(const char* key) {
     sort_thread_cv_.notify_one();
   }
 }
-bool SpdbVectorContainer::IsEmpty() const { return num_elements_.load() == 0; }
 
 // copy the list of vectors to the iter_anchors
 bool SpdbVectorContainer::InitIterator(IterAnchors& iter_anchor) {
@@ -399,9 +398,9 @@ void SpdbVectorContainer::SortThread() {
 class HashSpdbRep : public MemTableRep {
  public:
   HashSpdbRep(const MemTableRep::KeyComparator& compare, Allocator* allocator,
-              size_t bucket_size);
+              size_t bucket_size, size_t vector_size);
 
-  HashSpdbRep(Allocator* allocator, size_t bucket_size);
+  HashSpdbRep(Allocator* allocator, size_t bucket_size, size_t vector_size);
 
   void PostCreate(const MemTableRep::KeyComparator& compare,
                   Allocator* allocator);
@@ -444,21 +443,23 @@ class HashSpdbRep : public MemTableRep {
  private:
   SpdbHashTable spdb_hash_table_;
   std::shared_ptr<SpdbVectorContainer> spdb_vectors_cont_ = nullptr;
+
 };
 
 HashSpdbRep::HashSpdbRep(const MemTableRep::KeyComparator& compare,
-                         Allocator* allocator, size_t bucket_size)
+                         Allocator* allocator, size_t bucket_size, bool use_merge)
     : HashSpdbRep(allocator, bucket_size) {
   spdb_vectors_cont_ = std::make_shared<SpdbVectorContainer>(compare);
 }
 
-HashSpdbRep::HashSpdbRep(Allocator* allocator, size_t bucket_size)
+HashSpdbRep::HashSpdbRep(Allocator* allocator, size_t bucket_size, size_t vector_size)
     : MemTableRep(allocator), spdb_hash_table_(bucket_size) {}
 
 void HashSpdbRep::PostCreate(const MemTableRep::KeyComparator& compare,
-                             Allocator* allocator) {
+                             Allocator* allocator,
+                             bool use_merge) {
   allocator_ = allocator;
-  spdb_vectors_cont_ = std::make_shared<SpdbVectorContainer>(compare);
+  spdb_vectors_cont_ = std::make_shared<SpdbVectorContainer>(compare, use_merge);
 }
 
 HashSpdbRep::~HashSpdbRep() {
@@ -537,6 +538,7 @@ MemTableRep::Iterator* HashSpdbRep::GetIterator(Arena* arena) {
 struct HashSpdbRepOptions {
   static const char* kName() { return "HashSpdbRepOptions"; }
   size_t hash_bucket_count;
+  bool   use_merge;
 };
 
 static std::unordered_map<std::string, OptionTypeInfo> hash_spdb_factory_info =
@@ -545,12 +547,17 @@ static std::unordered_map<std::string, OptionTypeInfo> hash_spdb_factory_info =
          {offsetof(struct HashSpdbRepOptions, hash_bucket_count),
           OptionType::kSizeT, OptionVerificationType::kNormal,
           OptionTypeFlags::kNone}},
-};
+        {"use_merge",
+         {offsetof(struct HashSpdbRepOptions, use_merge),
+          OptionType::kBoolean, OptionVerificationType::kNormal,
+          OptionTypeFlags::kNone}},   
+  };
 
 class HashSpdbRepFactory : public MemTableRepFactory {
  public:
-  explicit HashSpdbRepFactory(size_t hash_bucket_count = 1000000) {
+  explicit HashSpdbRepFactory(size_t hash_bucket_count = 1000000, bool use_merge = true) {
     options_.hash_bucket_count = hash_bucket_count;
+    options_.use_merge = use_merge;
     RegisterOptions(&options_, &hash_spdb_factory_info);
   }
 
@@ -580,8 +587,7 @@ class HashSpdbRepFactory : public MemTableRepFactory {
 // HashSpdbRepFactory
 
 MemTableRep* HashSpdbRepFactory::PreCreateMemTableRep() {
-  MemTableRep* hash_spdb = new HashSpdbRep(nullptr, options_.hash_bucket_count);
-  return hash_spdb;
+  return new HashSpdbRep(nullptr, options_.hash_bucket_count, options_.vector_size);
 }
 
 void HashSpdbRepFactory::PostCreateMemTableRep(
@@ -594,11 +600,14 @@ void HashSpdbRepFactory::PostCreateMemTableRep(
 MemTableRep* HashSpdbRepFactory::CreateMemTableRep(
     const MemTableRep::KeyComparator& compare, Allocator* allocator,
     const SliceTransform* /*transform*/, Logger* /*logger*/) {
-  return new HashSpdbRep(compare, allocator, options_.hash_bucket_count);
+  return new HashSpdbRep(compare, allocator, options_.hash_bucket_count, options_.vector_size);
 }
 
-MemTableRepFactory* NewHashSpdbRepFactory(size_t bucket_count) {
-  return new HashSpdbRepFactory(bucket_count);
+MemTableRepFactory* NewHashSpdbRepFactory(size_t bucket_count, bool use_merge) {
+  return new HashSpdbRepFactory(bucket_count, use_merge);
 }
+
+
+
 
 }  // namespace ROCKSDB_NAMESPACE

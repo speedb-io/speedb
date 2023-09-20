@@ -649,9 +649,9 @@ ColumnFamilyOptions* ColumnFamilyOptions::EnableSpeedbFeaturesCF(
     table_factory.reset(NewBlockBasedTableFactory(block_based_table_options));
   }
   if (prefix_extractor) {
-    memtable_factory.reset(NewHashSkipListRepFactory());
+    memtable_factory.reset(NewHashSkipListRepFactory(GetBucketSize()));
   } else {
-    memtable_factory.reset(NewHashSpdbRepFactory());
+    memtable_factory.reset(NewHashSpdbRepFactory(GetBucketSize()));
   }
   return this;
 }

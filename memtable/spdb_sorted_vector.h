@@ -185,11 +185,12 @@ using IterAnchors = std::list<SortHeapItem*>;
 
 class SpdbVectorContainer {
  public:
-  SpdbVectorContainer(const MemTableRep::KeyComparator& comparator)
+  SpdbVectorContainer(const MemTableRep::KeyComparator& comparator, bool use_merge)
       : comparator_(comparator),
         switch_spdb_vector_limit_(10000),
         immutable_(false),
-        num_elements_(0) {
+        num_elements_(0),
+        use_merge_(use_merge) {
     SpdbVectorPtr spdb_vector(new SpdbVector(switch_spdb_vector_limit_));
     spdb_vectors_.push_front(spdb_vector);
     spdb_vector->SetVectorListIter(std::prev(spdb_vectors_.end()));
@@ -206,10 +207,29 @@ class SpdbVectorContainer {
 
   void Insert(const char* key);
 
-  bool IsEmpty() const;
+  bool IsEmpty() const { return num_elements_.load() == 0; };
 
   bool IsReadOnly() const { return immutable_.load(); }
 
+  MemTableRep::Iterator* GetIterator(Arena* arena) {
+    void* mem;
+    bool non_merge_iter = IsEmpty() || (!IsReadOnly() && !use_merge_)
+    if (IsEmpty()) {
+      if (arena != nullptr) {
+      mem = arena->AllocateAligned(sizeof(SpdbVectorIteratorEmpty));
+      return new (mem) SpdbVectorIteratorEmpty();
+    } else {
+      mem = arena->AllocateAligned(sizeof(SpdbVectorIterator));
+      return new (mem) SpdbVectorIterator(spdb_vectors_cont_, GetComparator());
+    }
+  }
+  if (empty_iter) {
+    return new SpdbVectorIteratorEmpty();
+  } else {
+    return new SpdbVectorIterator(spdb_vectors_cont_, GetComparator());
+  }    
+    }
+  }
   // create a list of current vectors
   bool InitIterator(IterAnchors& iter_anchor);
 
@@ -232,6 +252,10 @@ class SpdbVectorContainer {
   const MemTableRep::KeyComparator& GetComparator() const {
     return comparator_;
   }
+ enum IterType {
+  NON_MERGED_ITER = 0,
+  MERGED_ITER
+ } 
 
  private:
   void SortThread();
@@ -246,6 +270,7 @@ class SpdbVectorContainer {
   std::atomic<bool> immutable_;
   // sort thread info
   std::atomic<size_t> num_elements_;
+  bool use_merge_;
   port::Thread sort_thread_;
   std::mutex sort_thread_mutex_;
   std::condition_variable sort_thread_cv_;

@@ -2193,6 +2193,7 @@ class SharedOptions {
   size_t GetTotalThreads() { return total_threads_; }
   size_t GetTotalRamSizeBytes() { return total_ram_size_bytes_; }
   size_t GetDelayedWriteRate() { return delayed_write_rate_; }
+  size_t GetBucketSize() { return bucket_size_; }
   // this function will increase write buffer manager by increased_by amount
   // as long as the result is not bigger than the maximum size of
   // total_ram_size_ /4
@@ -2212,6 +2213,7 @@ class SharedOptions {
   size_t total_threads_ = 0;
   size_t total_ram_size_bytes_ = 0;
   size_t delayed_write_rate_ = 0;
+  size_t bucket_size_ = 1000000;
 };
 
 }  // namespace ROCKSDB_NAMESPACE

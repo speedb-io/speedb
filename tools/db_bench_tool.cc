@@ -1967,7 +1967,7 @@ static Status CreateMemTableRepFactory(
   } else if (!strcasecmp(FLAGS_memtablerep.c_str(), "hash_linkedlist")) {
     factory->reset(NewHashLinkListRepFactory(FLAGS_hash_bucket_count));
   } else if (!strcasecmp(FLAGS_memtablerep.c_str(), "hash_spdb")) {
-    factory->reset(NewHashSpdbRepFactory(FLAGS_hash_bucket_count));
+    factory->reset(NewHashSpdbRepFactory(FLAGS_hash_bucket_count, false));
   }
   return s;
 }

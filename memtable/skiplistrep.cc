@@ -323,7 +323,7 @@ class SkipListRep : public MemTableRep {
     InlineSkipList<const MemTableRep::KeyComparator&>::Iterator prev_;
   };
 
-  MemTableRep::Iterator* GetIterator(Arena* arena = nullptr) override {
+  MemTableRep::Iterator* GetIterator(Arena* arena = nullptr, bool part_of_flush = false) override {
     if (lookahead_ > 0) {
       void* mem =
           arena ? arena->AllocateAligned(sizeof(SkipListRep::LookaheadIterator))

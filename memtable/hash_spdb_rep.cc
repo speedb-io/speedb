@@ -435,7 +435,7 @@ class HashSpdbRep : public MemTableRep {
 
   ~HashSpdbRep() override;
 
-  MemTableRep::Iterator* GetIterator(Arena* arena = nullptr) override;
+  MemTableRep::Iterator* GetIterator(Arena* arena = nullptr, bool part_of_flush = false) override;
 
   const MemTableRep::KeyComparator& GetComparator() const {
     return spdb_vectors_cont_->GetComparator();
@@ -515,7 +515,7 @@ void HashSpdbRep::Get(const LookupKey& k, void* callback_args,
                        !spdb_vectors_cont_->IsReadOnly());
 }
 
-MemTableRep::Iterator* HashSpdbRep::GetIterator(Arena* arena) {
+MemTableRep::Iterator* HashSpdbRep::GetIterator(Arena* arena, bool part_of_flush) {
   const bool empty_iter =
       spdb_vectors_cont_->IsEmpty() || !spdb_vectors_cont_->IsReadOnly();
   if (arena != nullptr) {

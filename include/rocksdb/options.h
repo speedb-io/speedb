@@ -1782,6 +1782,10 @@ struct ReadOptions {
   // Default: false
   bool skip_expired_data = false;
 
+  // If true, the iterator is created as part of flush
+  // Default: false
+  bool part_of_flush = false; 
+
   ReadOptions();
   ReadOptions(bool cksum, bool cache);
 };

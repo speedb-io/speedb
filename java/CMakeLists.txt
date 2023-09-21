@@ -92,6 +92,7 @@ set(JNI_NATIVE_SOURCES
 set(JAVA_MAIN_CLASSES
   src/main/java/org/rocksdb/AbstractCompactionFilter.java
   src/main/java/org/rocksdb/AbstractCompactionFilterFactory.java
+  src/main/java/org/rocksdb/AbstractCompactRangeCompletedCb.java
   src/main/java/org/rocksdb/AbstractComparator.java
   src/main/java/org/rocksdb/AbstractEventListener.java
   src/main/java/org/rocksdb/AbstractImmutableNativeReference.java
@@ -134,6 +135,7 @@ set(JAVA_MAIN_CLASSES
   src/main/java/org/rocksdb/CompactionPriority.java
   src/main/java/org/rocksdb/CompactionReason.java
   src/main/java/org/rocksdb/CompactRangeOptions.java
+  src/main/java/org/rocksdb/CompactRangeCompletedCb.java
   src/main/java/org/rocksdb/CompactionStopStyle.java
   src/main/java/org/rocksdb/CompactionStyle.java
   src/main/java/org/rocksdb/ComparatorOptions.java
@@ -419,6 +421,7 @@ if(${CMAKE_VERSION} VERSION_LESS "3.11.4")
   set(NATIVE_JAVA_CLASSES
           org.rocksdb.AbstractCompactionFilter
           org.rocksdb.AbstractCompactionFilterFactory
+          org.rocksdb.AbstractCompactRangeCompletedCb
           org.rocksdb.AbstractComparator
           org.rocksdb.AbstractEventListener
           org.rocksdb.AbstractImmutableNativeReference
@@ -446,6 +449,7 @@ if(${CMAKE_VERSION} VERSION_LESS "3.11.4")
           org.rocksdb.CompactionOptionsFIFO
           org.rocksdb.CompactionOptionsUniversal
           org.rocksdb.CompactRangeOptions
+          org.rocksdb.CompactRangeCompletedCb
           org.rocksdb.ComparatorOptions
           org.rocksdb.CompressionOptions
           org.rocksdb.ConcurrentTaskLimiterImpl

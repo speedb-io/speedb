@@ -1255,7 +1255,8 @@ class DBTestBase : public testing::Test {
   void FillLevels(const std::string& smallest, const std::string& largest,
                   int cf);
 
-  void MoveFilesToLevel(int level, int cf = 0);
+  void MoveFilesToLevel(int level, int cf = 0,
+                        bool disallow_trivial_move = false);
 
   void DumpFileCounts(const char* label);
 

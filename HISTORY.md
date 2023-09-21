@@ -10,7 +10,8 @@ Fix RepeatableThread to work properly with on thread start callback feature (htt
 ### Enhancements
 
 ### Bug Fixes
-db_bench: fix SeekRandomWriteRandom valid check. Use key and value only after checking iterator is valid.
+* db_bench: fix SeekRandomWriteRandom valid check. Use key and value only after checking iterator is valid.
+* Fix a JAVA build issue introduced by #597 (#680)
 
 ### Miscellaneous
 

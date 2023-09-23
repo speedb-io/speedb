@@ -23,6 +23,8 @@ using ROCKSDB_NAMESPACE::ReadOptions;
 using ROCKSDB_NAMESPACE::Status;
 using ROCKSDB_NAMESPACE::WriteOptions;
 using ROCKSDB_NAMESPACE::FlushOptions;
+using ROCKSDB_NAMESPACE::CompactRangeOptions;
+
 
 #if defined(OS_WIN)
 std::string kDBPath = "C:\\Windows\\TEMP\\rocksdb_compact_files_example";
@@ -45,38 +47,42 @@ int main() {
   // if background compaction is not working, write will stall
   // because of options.level0_stop_writes_trigger
   
-  for (int i = 1; i < 1999; ++i) {
+  for (int i = 1; i < 100; ++i) {
     db->Put(WriteOptions(), std::to_string(i), std::to_string(i));
   }
   db->Flush(FlushOptions());
-  std::string value;
-  for (int i = 1; i < 1999; ++i) {
+  // compact to level 3
+  CompactRangeOptions cr_options;
+  cr_options.change_level=true;
+  cr_options.target_level=3;
+  db->CompactRange(cr_options,nullptr, nullptr);
+  for (int i = 1; i < 97; ++i) {
     db->Put(WriteOptions(), std::to_string(i), std::to_string(i));
   }
+  db->Flush(FlushOptions());
+  for (int i = 1; i < 97; ++i) {
+    db->Put(WriteOptions(), std::to_string(i), std::to_string(i));
+  }
+  // this delete should delete the entrire db
+  db->DeleteRange(WriteOptions(), nullptr, std::to_string(1), std::to_string(100));
   
-  for (int i = 54; i <= 66; ++i) {
-    auto s=db->Get(ReadOptions(), std::to_string(i), &value);
-    if (!s.IsNotFound()) {
-      printf("found value for %d\n",i);
-    }
+  std::string value;
+  s = db->Get(ReadOptions(), std::to_string(99), &value);
+  if (s.ok()) {    
+    printf("before flush found value!!\n");
   }
-  printf ("delete range [54, 66) \n");
-  db->DeleteRange(WriteOptions(), nullptr, std::to_string(54), std::to_string(66));
-  // verify the values are not there
-  for (int i = 54; i <= 66; ++i) {
-    auto s=db->Get(ReadOptions(), std::to_string(i), &value);
-    if (!s.IsNotFound()) {
-      printf("found value for %d\n",i);
-    }
-  }
-  printf ("flush \n");
   db->Flush(FlushOptions());
-  for (int i = 54; i <= 66; ++i) {
-    auto s=db->Get(ReadOptions(), std::to_string(i), &value);
-    if (!!s.IsNotFound()) {
-      printf("found value for %d\n",i);
-    }
+  s = db->Get(ReadOptions(), std::to_string(99), &value);
+  if (s.ok()) {    
+    printf("after flush found value!!\n");
+  }  
+  cr_options.target_level=2;
+  db->CompactRange(cr_options,nullptr, nullptr);
+  s = db->Get(ReadOptions(), std::to_string(99), &value);
+  if (s.ok()) {    
+    printf("after compact range found value!!\n");
   }
+  db->Close();
   delete db;
 
   return 0;

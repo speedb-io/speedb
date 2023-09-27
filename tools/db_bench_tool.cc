@@ -4965,12 +4965,14 @@ class Benchmark {
       }
     }
 
-    if (FLAGS_use_dynamic_delay && FLAGS_num_multi_db > 1) {
-      if (options.delayed_write_rate <= 0) {
-        options.delayed_write_rate = 16 * 1024 * 1024;
+    if (options.write_controller == nullptr) {
+      if (FLAGS_use_dynamic_delay && FLAGS_num_multi_db > 1) {
+        if (options.delayed_write_rate <= 0) {
+          options.delayed_write_rate = 16 * 1024 * 1024;
+        }
+        options.write_controller.reset(new WriteController(
+            options.use_dynamic_delay, options.delayed_write_rate));
       }
-      options.write_controller.reset(new WriteController(
-          options.use_dynamic_delay, options.delayed_write_rate));
     }
 
     // Integrated BlobDB

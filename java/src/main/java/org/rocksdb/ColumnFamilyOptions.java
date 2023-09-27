@@ -144,6 +144,12 @@ public class ColumnFamilyOptions extends RocksObject
   }
 
   @Override
+  public ColumnFamilyOptions enableSpeedbFeatures(final SharedOptions sharedOptions) {
+    enableSpeedbFeatures(nativeHandle_, sharedOptions.getNativeHandle());
+    return this;
+  }
+
+  @Override
   public ColumnFamilyOptions optimizeForSmallDb() {
     optimizeForSmallDb(nativeHandle_);
     return this;
@@ -1332,6 +1338,7 @@ public class ColumnFamilyOptions extends RocksObject
       final long handle, final int majorVersion, final int minorVersion);
   private native void optimizeForSmallDb(final long handle);
   private static native void optimizeForSmallDb(final long handle, final long cacheHandle);
+  private static native void enableSpeedbFeatures(final long handle, final long sharedOptionsHandle);
   private native void optimizeForPointLookup(long handle,
       long blockCacheSizeMb);
   private native void optimizeLevelStyleCompaction(long handle,

@@ -18,6 +18,13 @@ public interface DBOptionsInterface<T extends DBOptionsInterface<T>> {
   T optimizeForSmallDb();
 
   /**
+   * Use this .
+   *
+   * @return the instance of the current object.
+   */
+  T enableSpeedbFeatures(SharedOptions sharedOptions);
+
+  /**
    * Use the specified object to interact with the environment,
    * e.g. to read/write files, schedule background work, etc.
    * Default: {@link Env#getDefault()}

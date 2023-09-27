@@ -147,6 +147,7 @@ public class Options extends RocksObject
     prepareForBulkLoad(nativeHandle_);
     return this;
   }
+  
 
   @Override
   public boolean createIfMissing() {
@@ -177,22 +178,12 @@ public class Options extends RocksObject
     optimizeForSmallDb(nativeHandle_, cache.getNativeHandle());
     return this;
   }
-
-  ////
-  // @Override
-  // public Options enableSpeedbFeatures() {
-  //   enableSpeedbFeatures(nativeHandle_);
-  //   return this;
-  // }
-
-  // @Override
-  // public Options enableSpeedbFeatures(final Cache cache) {
-  //   enableSpeedbFeatures(nativeHandle_, cache.getNativeHandle());
-  //   return this;
-  // }
-  ////
-
-
+  
+  @Override
+  public Options enableSpeedbFeatures(final SharedOptions sharedOptions) {
+    enableSpeedbFeatures(nativeHandle_, sharedOptions.getNativeHandle());
+    return this;
+  }
 
   @Override
   public Options optimizeForPointLookup(
@@ -2142,6 +2133,7 @@ public class Options extends RocksObject
   @Override protected final native void disposeInternal(final long handle);
   private native void setEnv(long optHandle, long envHandle);
   private native void prepareForBulkLoad(long handle);
+  private static native void enableSpeedbFeatures(final long handle, long sharedOptionsHandle);
 
   // DB native handles
   private native void setIncreaseParallelism(long handle, int totalThreads);
@@ -2357,10 +2349,6 @@ public class Options extends RocksObject
       final long handle, final int majorVersion, final int minorVersion);
   private native void optimizeForSmallDb(final long handle);
   private static native void optimizeForSmallDb(final long handle, final long cacheHandle);
-  ///
-  private native void enableSpeedbFeaturesCF(final long handle);
-  private static native void enableSpeedbFeaturesCF(final long handle, final long cacheHandle);
-  ///
   private native void optimizeForPointLookup(long handle,
       long blockCacheSizeMb);
   private native void optimizeLevelStyleCompaction(long handle,

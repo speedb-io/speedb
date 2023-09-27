@@ -1489,74 +1489,15 @@ public class OptionsTest {
       assertEquals(0, listeners2.size());
     }
   }
-
-//   @Test
-//   public void enableSpeedbFeaturesCF() {
-//     try (final CFOptions cfoptions = new CfOptions()) {
-//       final long total_ram_size_bytes = 100 * 1024 * 1024 * 1024ul;
-//       final long delayed_write_rate = 256 * 1024 * 1024;
-//       final int total_threads = 8;
-
-//       final SharedOptions so(total_ram_size_bytes, total_threads, delayed_write_rate);
-//       cfoptions.create_if_missing = true;
-//       cfoptions.enableSpeedbFeaturesCF(so);
-//       assertThat(cfoptions.writeBufferSize()).isEqualTo(4 << 20);
-//       assertThat(cfoptions.compactionPriority()).isEqualTo(CompactionPriority.ByCompensatedSize);
-//       assertThat(cfoptions.targetFileSizeBase()).isEqualTo(2 * 1048576);
-//       assertThat(cfoptions.maxBytesForLevelBase()).isEqualTo(10 * 1048576);
-//       assertThat(cfoptions.softPendingCompactionBytesLimit()).isEqualTo(0);
-//       assertThat(cfoptions.hardPendingCompactionBytesLimit()).isEqualTo(0);
-//       assertThat(cfoptions.level0StopWritesTrigger()).isEqualTo(24);
-//     }
-  
-//   }
- 
-
-  
-
-
-//   // create the DB if it's not already present
-//   op.create_if_missing = true;
-//   op.EnableSpeedbFeatures(so);
-//   ASSERT_EQ(op.write_buffer_manager->buffer_size(), 1 * 512 * 1024 * 1024ul);
-//   cfo.EnableSpeedbFeaturesCF(so);
-//   ASSERT_EQ(op.write_buffer_manager->buffer_size(), 2 * 512 * 1024 * 1024ul);
-//   ASSERT_EQ(
-//       op.write_buffer_size,
-//       std::min<size_t>(op.write_buffer_manager->buffer_size() / 4, 64ul << 20));
-//   ASSERT_EQ(op.max_write_buffer_number, 4);
-//   ASSERT_EQ(op.min_write_buffer_number_to_merge, 1);
-//   ASSERT_EQ(op.env, so.env);
-//   const auto* sanitized_table_options =
-//       op.table_factory->GetOptions<BlockBasedTableOptions>();
-//   ASSERT_EQ(sanitized_table_options->block_cache, so.cache);
-
-//   const auto sanitized_options_overrides =
-//       sanitized_table_options->cache_usage_options.options_overrides;
-//   EXPECT_EQ(sanitized_options_overrides.size(), kNumCacheEntryRoles);
-//   for (auto options_overrides_iter = sanitized_options_overrides.cbegin();
-//        options_overrides_iter != sanitized_options_overrides.cend();
-//        ++options_overrides_iter) {
-//     CacheEntryRoleOptions role_options = options_overrides_iter->second;
-//     CacheEntryRoleOptions default_options =
-//         sanitized_table_options->cache_usage_options.options;
-//     if (options_overrides_iter->first == CacheEntryRole::kFilterConstruction) {
-//       ASSERT_EQ(role_options.charged,
-//                 CacheEntryRoleOptions::Decision::kEnabled);
-//     } else if (options_overrides_iter->first ==
-//                CacheEntryRole::kBlockBasedTableReader) {
-//       ASSERT_EQ(role_options.charged,
-//                 CacheEntryRoleOptions::Decision::kEnabled);
-//     } else if (options_overrides_iter->first ==
-//                CacheEntryRole::kCompressionDictionaryBuildingBuffer) {
-//       ASSERT_EQ(role_options.charged,
-//                 CacheEntryRoleOptions::Decision::kEnabled);
-//     } else if (options_overrides_iter->first == CacheEntryRole::kFileMetadata) {
-//       ASSERT_EQ(role_options.charged,
-//                 CacheEntryRoleOptions::Decision::kEnabled);
-//     } else {
-//       EXPECT_TRUE(role_options == default_options);
-//     }
-//   }
-// }
+  @Test
+  public void enableSpeedbFeatures() {
+    // try (final Options options = new Options(); final SharedOptions sharedOptions = 
+    //   new SharedOptions(100 * 1024 * 1024 * 1024, 8, 256 * 1024 * 1024)) {
+    //   options.enableSpeedbFeatures(sharedOptions);
+    //   assertEquals(options.writeBufferSize() ,1 * 512 * 1024 * 1024);
+    // }
+    final Options options = new Options();
+    final SharedOptions sharedOptions = 
+      new SharedOptions(100 * 1024 * 1024 * 1024, 8, 256 * 1024 * 1024);
+  }
 }

@@ -39,6 +39,11 @@ public interface ColumnFamilyOptionsInterface<T extends ColumnFamilyOptionsInter
   T optimizeForSmallDb(Cache cache);
 
   /**
+   * 
+   */
+  T enableSpeedbFeatures(final SharedOptions sharedOptions);
+
+  /**
    * Use this if you don't need to keep the data sorted, i.e. you'll never use
    * an iterator, only Put() and Get() API calls
    *

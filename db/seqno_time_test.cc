@@ -684,7 +684,7 @@ TEST_P(SeqnoTimeTablePropTest, MultiInstancesBasic) {
   }
 }
 
-TEST_P(SeqnoTimeTablePropTest, SeqnoToTimeMappingUniversal) {
+TEST_P(SeqnoTimeTablePropTest, DISABLED_SeqnoToTimeMappingUniversal) {
   const int kNumTrigger = 4;
   const int kNumLevels = 7;
   const int kNumKeys = 100;

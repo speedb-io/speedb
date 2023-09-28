@@ -8,7 +8,7 @@ on:
 
 jobs:
   pre_build:
-    runs-on: ubu4mvn 
+    runs-on: ubu-mvn-g
     env:
       VERSION_FILE: speedb/version.h
     outputs:

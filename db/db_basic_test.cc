@@ -27,7 +27,11 @@
 #include "utilities/fault_injection_env.h"
 #include "utilities/merge_operators.h"
 #include "utilities/merge_operators/string_append/stringappend.h"
-
+#if defined(OS_WIN)
+#include "winbase.h"
+#elif (OS_LINUX)
+#include <pthread.h>
+#endif
 namespace ROCKSDB_NAMESPACE {
 
 static bool enable_io_uring = true;
@@ -2207,10 +2211,8 @@ TEST_F(DBBasicTest, DBSetThreadAffinity) {
   options.env = env;
   auto f = [](std::thread::native_handle_type thr) {
 #if defined(OS_WIN)
-#include "winbase.h"
     SetThreadAffinityMask(thr, 0);
-#else
-#include "pthread.h"
+#elif (OS_LINUX)
     cpu_set_t cpuset;
     CPU_ZERO(&cpuset);
     CPU_SET(0, &cpuset);

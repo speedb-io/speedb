@@ -22,8 +22,8 @@ namespace ROCKSDB_NAMESPACE {
 std::unique_ptr<WriteControllerToken> WriteController::GetStopToken() {
   if (total_stopped_ == 0) {
     std::lock_guard<std::mutex> lock(loggers_map_mu_);
-    for (auto& logger_and_clientss : loggers_to_client_ids_map_) {
-      ROCKS_LOG_WARN(logger_and_clientss.first.get(),
+    for (auto& logger_and_clients : loggers_to_client_ids_map_) {
+      ROCKS_LOG_WARN(logger_and_clients.first.get(),
                      "WC enforcing stop writes");
     }
   }

@@ -631,7 +631,7 @@ ColumnFamilyOptions* ColumnFamilyOptions::EnableSpeedbFeaturesCF(
     block_based_table_options.block_cache = shared_options.cache;
     std::string pinning_policy_s = "id=speedb_scoped_pinning_policy; capacity=";
     pinning_policy_s += 0.8 * shared_options.GetTotalRamSizeBytes();
-    pinning_policy_s += "; bottom_percent=60; mid_percent=75";
+    pinning_policy_s += "; bottom_percent=70; mid_percent=90";
     s = TablePinningPolicy::CreateFromString(config_options, 
     pinning_policy_s,
      &block_based_table_options.pinning_policy);

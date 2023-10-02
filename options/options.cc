@@ -624,7 +624,7 @@ ColumnFamilyOptions* ColumnFamilyOptions::EnableSpeedbFeaturesCF(
     config_options.ignore_unsupported_options = false;
     BlockBasedTableOptions block_based_table_options;
     Status s = FilterPolicy::CreateFromString(
-        config_options, "bloomfilter:10",
+        config_options, "speedb.PairedBloomFilter:10",
         &block_based_table_options.filter_policy);
     assert(s.ok());
     block_based_table_options.cache_index_and_filter_blocks = true;  

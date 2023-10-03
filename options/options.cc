@@ -43,6 +43,7 @@
 #include "rocksdb/sst_file_manager.h"
 #include "rocksdb/sst_partitioner.h"
 #include "rocksdb/table.h"
+#include "rocksdb/table_pinning_policy.h"
 #include "rocksdb/table_properties.h"
 #include "rocksdb/wal_filter.h"
 #include "rocksdb/write_buffer_manager.h"
@@ -641,25 +642,29 @@ ColumnFamilyOptions* ColumnFamilyOptions::EnableSpeedbFeaturesCF(
         &block_based_table_options.filter_policy);
     assert(s.ok());
     block_based_table_options.cache_index_and_filter_blocks = true;
+    block_based_table_options.block_cache = shared_options.cache;
     block_based_table_options.cache_index_and_filter_blocks_with_high_priority =
         true;
-    block_based_table_options.pin_l0_filter_and_index_blocks_in_cache = false;
-    block_based_table_options.metadata_cache_options.unpartitioned_pinning =
-        PinningTier::kAll;
-    block_based_table_options.metadata_cache_options.partition_pinning =
-        PinningTier::kAll;
-    block_based_table_options.block_cache = shared_options.cache;
-    auto& cache_usage_options = block_based_table_options.cache_usage_options;
-    CacheEntryRoleOptions role_options;
-    role_options.charged = CacheEntryRoleOptions::Decision::kEnabled;
-    cache_usage_options.options_overrides.insert(
-        {CacheEntryRole::kFilterConstruction, role_options});
-    cache_usage_options.options_overrides.insert(
-        {CacheEntryRole::kBlockBasedTableReader, role_options});
-    cache_usage_options.options_overrides.insert(
-        {CacheEntryRole::kCompressionDictionaryBuildingBuffer, role_options});
-    cache_usage_options.options_overrides.insert(
-        {CacheEntryRole::kFileMetadata, role_options});
+    // Calculate the size of the clean memory
+    auto clean_memory_capacity =
+        block_based_table_options.block_cache->GetCapacity();
+    if (shared_options.write_buffer_manager->cost_to_cache()) {
+      if (clean_memory_capacity >= db_wbf_size) {
+        clean_memory_capacity -= db_wbf_size;
+      } else {
+        assert(clean_memory_capacity >= db_wbf_size);
+        clean_memory_capacity = 0U;
+      }
+    }
+
+    auto pinning_capacity = 0.8 * clean_memory_capacity;
+
+    std::ostringstream oss;
+    oss << "id=speedb_scoped_pinning_policy; capacity=" << pinning_capacity;
+    s = TablePinningPolicy::CreateFromString(
+        config_options, oss.str(), &block_based_table_options.pinning_policy);
+    assert(s.ok());
+
     table_factory.reset(NewBlockBasedTableFactory(block_based_table_options));
   }
   if (prefix_extractor) {

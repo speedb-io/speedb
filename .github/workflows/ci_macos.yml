@@ -27,8 +27,21 @@ jobs:
         export CXXFLAGS="-I$JAVA_HOME/include"
         brew install zlib
         brew install bzip2 lz4 snappy
-        ROCKSDB_DISABLE_JEMALLOC=1 PORTABLE=1 DEBUG_LEVEL=0 make -j $(nproc) rocksdbjavastatic
+        ROCKSDB_DISABLE_JEMALLOC=1 PORTABLE=1 DEBUG_LEVEL=0 make -j 2 rocksdbjavastatic
 
-    - name: 'upload artifacts'    #This step executed only when this workflow is called by another and a version is provided
+  #  - name: 'upload artifacts'    #This step executed only when this workflow is called by another and a version is provided
+  #    if: inputs.verSion != ' '
+  #    run: aws s3 cp java/target/libspeedbjni-osx-x86_64.jnilib s3://spdb-builder/jar_test/v${{ inputs.verSion }}/libspeedbjni-osx-x86_64.jnilib
+
+    - name: Upload artifacts to S3
       if: inputs.verSion != ' '
-      run: aws s3 cp java/target/libspeedbjni-osx-x86_64.jnilib s3://spdb-builder/jar_test/v${{ inputs.verSion }}/libspeedbjni-osx-x86_64.jnilib
+      uses: NotCoffee418/s3-zip-upload@v1
+      env:
+        AWS_SECRET_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_BUCKET: ${{ secrets.AWS_BUCKET }}
+        BUCKET_NAME: spdb-builder
+        AWS_REGION:  us-east-1
+        SOURCE_MODE: FILE
+        SOURCE_PATH: java/target/libspeedbjni-osx-x86_64.jnilib
+        DEST_FILE: jar_test/v${{ inputs.verSion }}/libspeedbjni-osx-x86_64.jnilib

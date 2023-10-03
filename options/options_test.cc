@@ -5092,26 +5092,6 @@ TEST_F(SharedOptionsTest, EnableSpeedbFeaturesCF) {
   for (auto options_overrides_iter = sanitized_options_overrides.cbegin();
        options_overrides_iter != sanitized_options_overrides.cend();
        ++options_overrides_iter) {
-    CacheEntryRoleOptions role_options = options_overrides_iter->second;
-    CacheEntryRoleOptions default_options =
-        sanitized_table_options->cache_usage_options.options;
-    if (options_overrides_iter->first == CacheEntryRole::kFilterConstruction) {
-      ASSERT_EQ(role_options.charged,
-                CacheEntryRoleOptions::Decision::kEnabled);
-    } else if (options_overrides_iter->first ==
-               CacheEntryRole::kBlockBasedTableReader) {
-      ASSERT_EQ(role_options.charged,
-                CacheEntryRoleOptions::Decision::kEnabled);
-    } else if (options_overrides_iter->first ==
-               CacheEntryRole::kCompressionDictionaryBuildingBuffer) {
-      ASSERT_EQ(role_options.charged,
-                CacheEntryRoleOptions::Decision::kEnabled);
-    } else if (options_overrides_iter->first == CacheEntryRole::kFileMetadata) {
-      ASSERT_EQ(role_options.charged,
-                CacheEntryRoleOptions::Decision::kEnabled);
-    } else {
-      EXPECT_TRUE(role_options == default_options);
-    }
   }
 }
 

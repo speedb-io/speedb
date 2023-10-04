@@ -16,7 +16,7 @@ on:
 
 jobs:
   build-and-deploy:
-    runs-on: ubuArm64 # a test self hosted runner on a vm with MacOS
+    runs-on: ubuArm64G 
     steps:
     - name: 'Checkout GitHub Action'
       uses: actions/checkout@v3

@@ -169,5 +169,5 @@ jobs:
           BUCKET_NAME: spdb-builder
           AWS_REGION:  us-east-1
           SOURCE_MODE: FILE
-          SOURCE_PATH: runner_bld\java\Release\speedbjni-shared.dll
+          SOURCE_PATH: build\java\Release\speedbjni-shared.dll
           DEST_FILE: jar_test/v${{ inputs.verSion }}/libspeedbjni-win64.dll

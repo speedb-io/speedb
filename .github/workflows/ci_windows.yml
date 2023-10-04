@@ -136,6 +136,7 @@ jobs:
     
       - name: Build Speedb      
         run: |
+            copy C:\Users\runneradmin\thirdparty\snappy-1.1.9\build\snappy-stubs-public.h C:\Users\runneradmin\thirdparty\snappy-1.1.9\
             copy tools\thirdparty.txt thirdparty.inc # copy the thirdparty.inc that reflects the env on the runner machine
             mkdir build
             cd build

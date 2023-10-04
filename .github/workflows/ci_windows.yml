@@ -137,7 +137,7 @@ jobs:
       - name: Build Speedb      
         run: |
             copy C:\Users\runneradmin\thirdparty\snappy-1.1.9\build\snappy-stubs-public.h C:\Users\runneradmin\thirdparty\snappy-1.1.9\ 
-            copy tools/thirdparty.inc thirdparty.inc # copy the thirdparty.inc that reflects the env on the runner machine
+            copy tools/thirdparty.txt thirdparty.inc # copy the thirdparty.inc that reflects the env on the runner machine
             mkdir build
             cd build
             #& $Env:CMAKE_BIN -G "$Env:CMAKE_GENERATOR" -DCMAKE_BUILD_TYPE=Debug -DOPTDBG=1 -DPORTABLE=1 -DSNAPPY=1 -DJNI=1 ..

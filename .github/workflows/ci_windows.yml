@@ -150,7 +150,7 @@ jobs:
 
 
     #- name: 'build and present'
-    #  shell: powershell # For Linux, use bash
+    #  shell: powershell #For Linux, use bash
     #  run: |
     #    $env:THIRDPARTY_HOME='C:/Users/builder/code'
     #    cp  $env:THIRDPARTY_HOME\thirdparty.inc .   # copy the thirdparty.inc that reflects the env on the runner machine

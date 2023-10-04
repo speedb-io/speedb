@@ -8,7 +8,7 @@ on:
 
 jobs:
   pre_build:
-    runs-on: ubu4mvn 
+    runs-on: ubu-mvn-g
     env:
       VERSION_FILE: speedb/version.h
     outputs:
@@ -63,7 +63,7 @@ jobs:
    
   Build_and_upload:
     needs: [pre_build, Mac_i86, Windows, Ubuntu_ARM]
-    runs-on: ubu4mvn 
+    runs-on: ubu-mvn-g
     env:
       VERSION_FILE: speedb/version.h
       VERSION: ${{needs.pre_build.outputs.out1}}

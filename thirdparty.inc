@@ -1,7 +1,7 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 # Edit definitions below to specify paths to include files and libraries of all 3rd party libraries
 
-# TODO: Make this work with find_package and/or get rid of  it
+# TODO: Make this work with find_package and/or get rid of it
 #
 # This example assumes all the libraries locate in directories under THIRDPARTY_HOME environment variable
 # Set environment variable THIRDPARTY_HOME to point to your third party libraries home (Unix style dir separators)

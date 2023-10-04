@@ -136,7 +136,6 @@ jobs:
     
       - name: Build Speedb      
         run: |
-            copy C:\Users\runneradmin\thirdparty\snappy-1.1.9\build\snappy-stubs-public.h C:\Users\runneradmin\thirdparty\snappy-1.1.9\ 
             copy tools/thirdparty.txt thirdparty.inc # copy the thirdparty.inc that reflects the env on the runner machine
             mkdir build
             cd build
@@ -150,7 +149,7 @@ jobs:
 
 
     #- name: 'build and present'
-    #  shell: powershell #For Linux, use bash
+    #  shell: powershell # For Linux, use bash
     #  run: |
     #    $env:THIRDPARTY_HOME='C:/Users/builder/code'
     #    cp  $env:THIRDPARTY_HOME\thirdparty.inc .   # copy the thirdparty.inc that reflects the env on the runner machine

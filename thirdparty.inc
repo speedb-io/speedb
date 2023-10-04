@@ -12,10 +12,10 @@ set (THIRDPARTY_LIBS "")         # Initialization, don't touch
 #
 # Defaults
 #
-set(GFLAGS_HOME $ENV{THIRDPARTY_HOME}/Gflags.Library)
-set(GFLAGS_INCLUDE ${GFLAGS_HOME}/build/native/include)
-set(GFLAGS_LIB_DEBUG ${GFLAGS_HOME}/lib/native/debug/amd64/gflags.lib)
-set(GFLAGS_LIB_RELEASE ${GFLAGS_HOME}/lib/native/retail/amd64/gflags.lib)
+set(GFLAGS_HOME $ENV{THIRDPARTY_HOME}/gflags-2.2.2)
+set(GFLAGS_INCLUDE ${GFLAGS_HOME}/target/include)
+set(GFLAGS_LIB_DEBUG ${GFLAGS_HOME}/target/lib/Debug/gflags_static.lib)
+set(GFLAGS_LIB_RELEASE ${GFLAGS_HOME}/target/lib/Release/gflags_static.lib)
 
 # ================================================== GFLAGS ==================================================
 # For compatibility
@@ -52,10 +52,10 @@ endif ()
 #
 # Edit these 4 lines to define paths to Snappy
 #
-set(SNAPPY_HOME $ENV{THIRDPARTY_HOME}/Snappy.Library)
-set(SNAPPY_INCLUDE ${SNAPPY_HOME}/build/native/inc/inc)
-set(SNAPPY_LIB_DEBUG ${SNAPPY_HOME}/lib/native/debug/amd64/snappy.lib)
-set(SNAPPY_LIB_RELEASE ${SNAPPY_HOME}/lib/native/retail/amd64/snappy.lib)
+set(SNAPPY_HOME $ENV{THIRDPARTY_HOME}/snappy-1.1.9)
+set(SNAPPY_INCLUDE ${SNAPPY_HOME} ${SNAPPY_HOME}/build)
+set(SNAPPY_LIB_DEBUG ${SNAPPY_HOME}/build/Debug/snappy.lib)
+set(SNAPPY_LIB_RELEASE ${SNAPPY_HOME}/build/Release/snappy.lib)
 
 # For compatibility
 if(SNAPPY)
@@ -91,11 +91,10 @@ endif ()
 #
 # Edit these 4 lines to define paths to LZ4
 #
-set(LZ4_HOME $ENV{THIRDPARTY_HOME}/LZ4.Library)
-set(LZ4_INCLUDE ${LZ4_HOME}/build/native/inc/inc)
-set(LZ4_LIB_DEBUG ${LZ4_HOME}/lib/native/debug/amd64/lz4.lib)
-set(LZ4_LIB_RELEASE ${LZ4_HOME}/lib/native/retail/amd64/lz4.lib)
-
+set(LZ4_HOME $ENV{THIRDPARTY_HOME}/lz4-1.9.2)
+set(LZ4_INCLUDE ${LZ4_HOME}/lib)
+set(LZ4_LIB_DEBUG ${LZ4_HOME}/visual/VS2017/bin/x64_Debug/liblz4_static.lib)
+set(LZ4_LIB_RELEASE ${LZ4_HOME}/visual/VS2017/bin/x64_Release/liblz4_static.lib)
 
 # For compatibility
 if (LZ4)
@@ -131,10 +130,10 @@ endif ()
 #
 # Edit these 4 lines to define paths to ZLIB
 #
-set(ZLIB_HOME $ENV{THIRDPARTY_HOME}/ZLIB.Library)
-set(ZLIB_INCLUDE ${ZLIB_HOME}/build/native/inc/inc)
-set(ZLIB_LIB_DEBUG ${ZLIB_HOME}/lib/native/debug/amd64/zlib.lib)
-set(ZLIB_LIB_RELEASE ${ZLIB_HOME}/lib/native/retail/amd64/zlib.lib)
+set(ZLIB_HOME $ENV{THIRDPARTY_HOME}/zlib-1.3)
+set(ZLIB_INCLUDE ${ZLIB_HOME})
+set(ZLIB_LIB_DEBUG ${ZLIB_HOME}/contrib/vstudio/vc14/x64/ZlibStatDebug/zlibstat.lib)
+set(ZLIB_LIB_RELEASE ${ZLIB_HOME}/contrib/vstudio/vc14/x64/ZlibStatRelease/zlibstat.lib)
 
 # For compatibilty
 if (ZLIB)
@@ -190,10 +189,11 @@ endif ()
 #
 # Edit these 4 lines to define paths to ZSTD
 #
-set(ZSTD_HOME $ENV{THIRDPARTY_HOME}/ZSTD.Library)
-set(ZSTD_INCLUDE ${ZSTD_HOME}/build/native/inc)
-set(ZSTD_LIB_DEBUG ${ZSTD_HOME}/lib/native/debug/amd64/libzstd_static.lib)
-set(ZSTD_LIB_RELEASE ${ZSTD_HOME}/lib/native/retail/amd64/libzstd_static.lib)
+
+set(ZSTD_HOME $ENV{THIRDPARTY_HOME}/zstd-1.5.2)
+set(ZSTD_INCLUDE ${ZSTD_HOME}/lib ${ZSTD_HOME}/lib/dictBuilder)
+set(ZSTD_LIB_DEBUG ${ZSTD_HOME}/build/VS2010/bin/x64_Debug/libzstd_static.lib)
+set(ZSTD_LIB_RELEASE ${ZSTD_HOME}/build/VS2010/bin/x64_Release/libzstd_static.lib)
 
 # For compatibility
 if (ZSTD)

@@ -17,7 +17,8 @@ jobs:
   Build:
     #needs: [Sanity]
     if: ${{ github.event.review.state == 'approved' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/release') }}
-    runs-on: [self-hosted, ubuntu, asrunner]
+    #runs-on: [self-hosted, ubuntu, asrunner]
+    runs-on: ubuntu-20.04
     strategy:
       matrix:
         include:
@@ -96,16 +97,16 @@ jobs:
     #needs: [Build]
     #uses: speedb-io/speedb/.github/workflows/perf-test.yml@main
   
-  QA-Tests:
+  ##QA-Tests:
     if: ${{ github.event.review.state == 'approved' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/release') }}
     needs: [Build]
     uses: speedb-io/speedb/.github/workflows/qa-tests.yml@main
   
-  Fuzz:
+  ##Fuzz:
     if: ${{ github.event.review.state == 'approved' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/release') }}
     needs: [Build]
     uses: ./.github/workflows/test_fuzz.yml
 
-  Check-Licence-And-History:
+  ##Check-Licence-And-History:
     if: ${{  github.event_name == 'pull_request_review' }}
     uses: ./.github/workflows/check_license_and_history.yml

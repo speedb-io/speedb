@@ -44,8 +44,9 @@ jobs:
         python3 -m pip install lint-diffs flake8
         
         
-    - name: Checkout
-      uses: actions/checkout@v3 
+   # - name: Checkout
+    - uses: actions/checkout@v3 
+    - run: git config --system --add safe.directory /github/home
       
       
     - name: Prepare ccache timestamp

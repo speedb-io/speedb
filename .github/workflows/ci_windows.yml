@@ -136,27 +136,15 @@ jobs:
     
       - name: Build Speedb      
         run: |
-            copy C:\Users\runneradmin\thirdparty\snappy-1.1.9\build\snappy-stubs-public.h C:\Users\runneradmin\thirdparty\snappy-1.1.9\ 
+            copy C:\Users\runneradmin\thirdparty\snappy-1.1.9\build\snappy-stubs-public.h C:\Users\runneradmin\thirdparty\snappy-1.1.9\
+            copy tools\thirdparty.txt thirdparty.inc # copy the thirdparty.inc that reflects the env on the runner machine
             mkdir build
             cd build
-            #& $Env:CMAKE_BIN -G "$Env:CMAKE_GENERATOR" -DCMAKE_BUILD_TYPE=Debug -DOPTDBG=1 -DPORTABLE=1 -DSNAPPY=1 -DJNI=1 ..
             & $Env:CMAKE_BIN -G "$Env:CMAKE_GENERATOR" -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_STANDARD=20 -A x64 -DJNI=1 -DGFLAGS=1 -DOPTDBG=1 -DPORTABLE=1 -DSNAPPY=1 -DJNI=1 -DSNAPPY=1 -DLZ4=1 -DZLIB=1 -DZSTD=1 -DXPRESS=1 -DFAIL_ON_WARNINGS=0 ..
             cd ..
             echo "Building with VS version: $Env:CMAKE_GENERATOR"
             msbuild build/speedb.sln /p:Configuration=Release /t:speedbjni-shared
-            #msbuild.exe build/rocksdb.sln -maxCpuCount -property:Configuration=Debug -property:Platform=x64
             #msbuild.exe build/speedb.sln -maxCpuCount -property:Configuration=Debug -property:Platform=x64
-
-
-    #- name: 'build and present'
-    #  shell: powershell # For Linux, use bash
-    #  run: |
-    #    $env:THIRDPARTY_HOME='C:/Users/builder/code'
-    #    cp  $env:THIRDPARTY_HOME\thirdparty.inc .   # copy the thirdparty.inc that reflects the env on the runner machine
-    #    mkdir runner_bld
-    #    cd runner_bld
-    #    cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=20 -DJNI=1 -DGFLAGS=1 -DSNAPPY=1 -DLZ4=1 -DZLIB=1 -DZSTD=1 -DXPRESS=1 -DFAIL_ON_WARNINGS=0 ..
-    #    msbuild speedb.sln /p:Configuration=Release /t:speedbjni-shared
 
       - name: Upload artifacts to S3
         if: inputs.verSion != ' '
@@ -168,5 +156,5 @@ jobs:
           BUCKET_NAME: spdb-builder
           AWS_REGION:  us-east-1
           SOURCE_MODE: FILE
-          SOURCE_PATH: runner_bld\java\Release\speedbjni-shared.dll
+          SOURCE_PATH: build\java\Release\speedbjni-shared.dll
           DEST_FILE: jar_test/v${{ inputs.verSion }}/libspeedbjni-win64.dll

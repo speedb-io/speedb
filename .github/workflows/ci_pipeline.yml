@@ -67,6 +67,9 @@ jobs:
       
     - name: ${{ matrix.name }}
       run: |
+        echo "try git config"
+        git config --global --list
+        echo "done git config"
         if [ -d "$GITHUB_WORKSPACE/build" ]; then
           echo >&2 "error: the build directory should not exist" && false NIK 
         fi

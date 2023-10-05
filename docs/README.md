@@ -4,7 +4,7 @@ This directory will contain the user and feature documentation for RocksDB. The 
 
 ### Contributing
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for details on how to add or modify content.
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for details on how to add or modify content
 
 ### Run the Site Locally
 

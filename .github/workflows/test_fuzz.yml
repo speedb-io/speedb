@@ -6,9 +6,9 @@ on:
 
 jobs:
   Fuzz:
-    runs-on: [self-hosted, ubuntu, asrunner]
-    container:
-      image: ubuntu:18.04
+    runs-on: ubuntu-18.04 # [self-hosted, ubuntu, asrunner]
+    #container:
+    #  image: ubuntu:18.04
     strategy:
       matrix:
         include:
@@ -18,8 +18,8 @@ jobs:
     steps:
       - name: Pre-build
         run: |
-          echo "nameserver 8.8.8.8" > /etc/resolv.conf
-          apt update && apt install -y sudo python3 git clang-tools cmake make automake ucommon-utils libtool gettext pkg-config build-essential clang-10 zlib1g-dev libbz2-dev ninja-build liblzma-dev autoconf libsnappy-dev libzstd-dev liblz4-dev binutils m4 g++-10 unzip
+          #echo "nameserver 8.8.8.8" > /etc/resolv.conf
+          sudo apt update && sudo apt install -y python3 git clang-tools cmake make automake ucommon-utils libtool gettext pkg-config build-essential clang-10 zlib1g-dev libbz2-dev ninja-build liblzma-dev autoconf libsnappy-dev libzstd-dev liblz4-dev binutils m4 g++-10 unzip
       
       - uses: actions/checkout@v3
 
@@ -30,9 +30,9 @@ jobs:
              git checkout ffd86a32874e5c08a143019aad1aaf0907294c9f \n
              cd .. \n
              export CC=clang && export CXX=clang++ && mkdir LPM && cd LPM \n
-             ln -s /usr/lib/x86_64-linux-gnu/libstdc++.so.6 /usr/lib/x86_64-linux-gnu/libstdc++.so \n
-             ln -s /usr/bin/clang-10 /usr/bin/clang \n
-             ln -s /usr/bin/clang++-10 /usr/bin/clang++ \n
+             sudo ln -s /usr/lib/x86_64-linux-gnu/libstdc++.so.6 /usr/lib/x86_64-linux-gnu/libstdc++.so \n
+             sudo ln -s /usr/bin/clang-10 /usr/bin/clang \n
+             sudo ln -s /usr/bin/clang++-10 /usr/bin/clang++ \n
              cmake ../libprotobuf-mutator -GNinja -DLIB_PROTO_MUTATOR_DOWNLOAD_PROTOBUF=ON -DLIB_PROTO_MUTATOR_TESTING=OFF -DCMAKE_BUILD_TYPE=Release \n
              ninja \n
              ninja install \n

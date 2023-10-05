@@ -19,9 +19,9 @@ jobs:
       - name: Get changed files
         id: changes       
         run: |
-          git diff --name-only --diff-filter=ACMRT ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} 
+          git diff --name-only --diff-filter=ACMRT ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }}  -- . ':!.github' ':!*.md'
           echo "diff_list<<EOF" >> $GITHUB_OUTPUT
-          git diff --name-only --diff-filter=ACMRT ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} >> $GITHUB_OUTPUT
+          git diff --name-only --diff-filter=ACMRT ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }}  -- . ':!.github' ':!*.md' >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
           
       - name: list new files
@@ -33,6 +33,8 @@ jobs:
     env: 
       OUTPUT1: ${{needs.changedfiles.outputs.output1}}
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
       - name: Check License
         run: |  
           exit_code=0

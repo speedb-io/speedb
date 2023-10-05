@@ -14,8 +14,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
       - name: Get changed files
         id: changes       
         run: |
@@ -33,6 +31,8 @@ jobs:
     env: 
       OUTPUT1: ${{needs.changedfiles.outputs.output1}}
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
       - name: Check License
         run: |  
           exit_code=0

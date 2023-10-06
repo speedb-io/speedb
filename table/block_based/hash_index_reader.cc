@@ -1,3 +1,17 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -8,12 +22,14 @@
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 #include "table/block_based/hash_index_reader.h"
 
+#include "rocksdb/table_pinning_policy.h"
 #include "table/block_fetcher.h"
 #include "table/meta_blocks.h"
 
 namespace ROCKSDB_NAMESPACE {
 Status HashIndexReader::Create(const BlockBasedTable* table,
                                const ReadOptions& ro,
+                               const TablePinningOptions& tpo,
                                FilePrefetchBuffer* prefetch_buffer,
                                InternalIterator* meta_index_iter,
                                bool use_cache, bool prefetch, bool pin,
@@ -26,6 +42,7 @@ Status HashIndexReader::Create(const BlockBasedTable* table,
   const BlockBasedTable::Rep* rep = table->get_rep();
   assert(rep != nullptr);
 
+  std::unique_ptr<PinnedEntry> pinned;
   CachableEntry<Block> index_block;
   if (prefetch || !use_cache) {
     const Status s =
@@ -35,7 +52,11 @@ Status HashIndexReader::Create(const BlockBasedTable* table,
       return s;
     }
 
-    if (use_cache && !pin) {
+    if (pin) {
+      table->PinData(tpo, TablePinningPolicy::kIndex,
+                     index_block.GetValue()->ApproximateMemoryUsage(), &pinned);
+    }
+    if (use_cache && !pinned) {
       index_block.Reset();
     }
   }
@@ -44,7 +65,8 @@ Status HashIndexReader::Create(const BlockBasedTable* table,
   // hard error. We can still fall back to the original binary search index.
   // So, Create will succeed regardless, from this point on.
 
-  index_reader->reset(new HashIndexReader(table, std::move(index_block)));
+  index_reader->reset(
+      new HashIndexReader(table, std::move(index_block), std::move(pinned)));
 
   // Get prefixes block
   BlockHandle prefixes_handle;

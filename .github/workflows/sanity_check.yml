@@ -1,19 +1,19 @@
 name: Check buck targets and code format
-on: [push, workflow_call, workflow_dispatch]
+on: [push, workflow_call, workflow_dispatch, pull_request_target]
 permissions:
   contents: read
 
 jobs:
   check:
     name: Check TARGETS file and code format
-    #runs-on: ubuntu:20.04
-    runs-on: [self-hosted, ubuntu, asrunner]
-    container:
-      image: ubuntu:focal
+    runs-on: ubuntu-20.04
+    #runs-on: [self-hosted, ubuntu, asrunner]
+    #container:
+    #  image: ubuntu:focal
     steps:
     
     - name: pre
-      run: apt update && apt install -y sudo git make clang build-essential clang-format wget
+      run: sudo apt update && sudo apt install -y git make clang build-essential clang-format wget
     
     - name: Checkout feature branch
       uses: actions/checkout@v2
@@ -36,10 +36,10 @@ jobs:
         architecture: 'x64'
 
     - name: Install Dependencies
-      run: python -m pip install --upgrade pip
+      run: sudo python -m pip install --upgrade pip
 
     - name: Install argparse
-      run: pip install argparse
+      run: sudo pip install argparse
 
     - name: Download clang-format-diff.py
       run: |

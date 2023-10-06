@@ -24,6 +24,8 @@ set(JNI_NATIVE_SOURCES
         rocksjni/compaction_options_fifo.cc
         rocksjni/compaction_options_universal.cc
         rocksjni/compact_range_options.cc
+        rocksjni/compact_range_completion_cb.cc
+        rocksjni/compact_range_completed_jnicallback.cc
         rocksjni/comparator.cc
         rocksjni/comparatorjnicallback.cc
         rocksjni/compression_options.cc
@@ -90,6 +92,7 @@ set(JNI_NATIVE_SOURCES
 set(JAVA_MAIN_CLASSES
   src/main/java/org/rocksdb/AbstractCompactionFilter.java
   src/main/java/org/rocksdb/AbstractCompactionFilterFactory.java
+  src/main/java/org/rocksdb/AbstractCompactRangeCompletedCb.java
   src/main/java/org/rocksdb/AbstractComparator.java
   src/main/java/org/rocksdb/AbstractEventListener.java
   src/main/java/org/rocksdb/AbstractImmutableNativeReference.java
@@ -132,6 +135,7 @@ set(JAVA_MAIN_CLASSES
   src/main/java/org/rocksdb/CompactionPriority.java
   src/main/java/org/rocksdb/CompactionReason.java
   src/main/java/org/rocksdb/CompactRangeOptions.java
+  src/main/java/org/rocksdb/CompactRangeCompletedCb.java
   src/main/java/org/rocksdb/CompactionStopStyle.java
   src/main/java/org/rocksdb/CompactionStyle.java
   src/main/java/org/rocksdb/ComparatorOptions.java
@@ -157,6 +161,7 @@ set(JAVA_MAIN_CLASSES
   src/main/java/org/rocksdb/FlushOptions.java
   src/main/java/org/rocksdb/HashLinkedListMemTableConfig.java
   src/main/java/org/rocksdb/HashSkipListMemTableConfig.java
+  src/main/java/org/rocksdb/HashSpdbMemTableConfig.java
   src/main/java/org/rocksdb/HistogramData.java
   src/main/java/org/rocksdb/HistogramType.java
   src/main/java/org/rocksdb/Holder.java
@@ -416,6 +421,7 @@ if(${CMAKE_VERSION} VERSION_LESS "3.11.4")
   set(NATIVE_JAVA_CLASSES
           org.rocksdb.AbstractCompactionFilter
           org.rocksdb.AbstractCompactionFilterFactory
+          org.rocksdb.AbstractCompactRangeCompletedCb
           org.rocksdb.AbstractComparator
           org.rocksdb.AbstractEventListener
           org.rocksdb.AbstractImmutableNativeReference
@@ -443,6 +449,7 @@ if(${CMAKE_VERSION} VERSION_LESS "3.11.4")
           org.rocksdb.CompactionOptionsFIFO
           org.rocksdb.CompactionOptionsUniversal
           org.rocksdb.CompactRangeOptions
+          org.rocksdb.CompactRangeCompletedCb
           org.rocksdb.ComparatorOptions
           org.rocksdb.CompressionOptions
           org.rocksdb.ConcurrentTaskLimiterImpl
@@ -455,6 +462,7 @@ if(${CMAKE_VERSION} VERSION_LESS "3.11.4")
           org.rocksdb.FlushOptions
           org.rocksdb.HashLinkedListMemTableConfig
           org.rocksdb.HashSkipListMemTableConfig
+          org.rocksdb.HashSpdbMemTableConfig
           org.rocksdb.IngestExternalFileOptions
           org.rocksdb.Logger
           org.rocksdb.LRUCache

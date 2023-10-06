@@ -1,3 +1,17 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 // Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -614,6 +628,12 @@ class ALIGN_AS(CACHE_LINE_SIZE) ClockCacheShard final : public CacheShardBase {
                 Cache::ObjectPtr value, const Cache::CacheItemHelper* helper,
                 size_t charge, HandleImpl** handle, Cache::Priority priority);
 
+  Status InsertWithOwnerId(const Slice& key, const UniqueId64x2& hashed_key,
+                           Cache::ObjectPtr value,
+                           const Cache::CacheItemHelper* helper, size_t charge,
+                           Cache::ItemOwnerId /* item_owner_id */,
+                           HandleImpl** handle, Cache::Priority priority);
+
   HandleImpl* CreateStandalone(const Slice& key, const UniqueId64x2& hashed_key,
                                Cache::ObjectPtr obj,
                                const Cache::CacheItemHelper* helper,
@@ -643,10 +663,11 @@ class ALIGN_AS(CACHE_LINE_SIZE) ClockCacheShard final : public CacheShardBase {
 
   size_t GetTableAddressCount() const;
 
-  void ApplyToSomeEntries(
-      const std::function<void(const Slice& key, Cache::ObjectPtr obj,
+  void ApplyToSomeEntriesWithOwnerId(
+      const std::function<void(const Slice& key, Cache::ObjectPtr value,
                                size_t charge,
-                               const Cache::CacheItemHelper* helper)>& callback,
+                               const Cache::CacheItemHelper* helper,
+                               Cache::ItemOwnerId item_owner_id)>& callback,
       size_t average_entries_per_lock, size_t* state);
 
   void EraseUnRefEntries();

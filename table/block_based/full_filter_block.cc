@@ -1,3 +1,17 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -12,6 +26,7 @@
 #include "port/malloc.h"
 #include "port/port.h"
 #include "rocksdb/filter_policy.h"
+#include "rocksdb/table_pinning_policy.h"
 #include "table/block_based/block_based_table_reader.h"
 #include "util/coding.h"
 
@@ -120,8 +135,9 @@ Slice FullFilterBlockBuilder::Finish(
 
 FullFilterBlockReader::FullFilterBlockReader(
     const BlockBasedTable* t,
-    CachableEntry<ParsedFullFilterBlock>&& filter_block)
-    : FilterBlockReaderCommon(t, std::move(filter_block)) {}
+    CachableEntry<ParsedFullFilterBlock>&& filter_block,
+    std::unique_ptr<PinnedEntry>&& pinned)
+    : FilterBlockReaderCommon(t, std::move(filter_block), std::move(pinned)) {}
 
 bool FullFilterBlockReader::KeyMayMatch(const Slice& key, const bool no_io,
                                         const Slice* const /*const_ikey_ptr*/,
@@ -137,13 +153,15 @@ bool FullFilterBlockReader::KeyMayMatch(const Slice& key, const bool no_io,
 
 std::unique_ptr<FilterBlockReader> FullFilterBlockReader::Create(
     const BlockBasedTable* table, const ReadOptions& ro,
-    FilePrefetchBuffer* prefetch_buffer, bool use_cache, bool prefetch,
-    bool pin, BlockCacheLookupContext* lookup_context) {
+    const TablePinningOptions& tpo, FilePrefetchBuffer* prefetch_buffer,
+    bool use_cache, bool prefetch, bool pin,
+    BlockCacheLookupContext* lookup_context) {
   assert(table);
   assert(table->get_rep());
   assert(!pin || prefetch);
 
   CachableEntry<ParsedFullFilterBlock> filter_block;
+  std::unique_ptr<PinnedEntry> pinned;
   if (prefetch || !use_cache) {
     const Status s = ReadFilterBlock(table, prefetch_buffer, ro, use_cache,
                                      nullptr /* get_context */, lookup_context,
@@ -152,14 +170,19 @@ std::unique_ptr<FilterBlockReader> FullFilterBlockReader::Create(
       IGNORE_STATUS_IF_ERROR(s);
       return std::unique_ptr<FilterBlockReader>();
     }
+    if (pin) {
+      table->PinData(tpo, TablePinningPolicy::kFilter,
+                     filter_block.GetValue()->ApproximateMemoryUsage(),
+                     &pinned);
+    }
 
-    if (use_cache && !pin) {
+    if (use_cache && !pinned) {
       filter_block.Reset();
     }
   }
 
-  return std::unique_ptr<FilterBlockReader>(
-      new FullFilterBlockReader(table, std::move(filter_block)));
+  return std::unique_ptr<FilterBlockReader>(new FullFilterBlockReader(
+      table, std::move(filter_block), std::move(pinned)));
 }
 
 bool FullFilterBlockReader::PrefixMayMatch(

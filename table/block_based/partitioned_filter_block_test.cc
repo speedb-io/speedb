@@ -1,3 +1,17 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -9,7 +23,9 @@
 
 #include "block_cache.h"
 #include "index_builder.h"
+#include "port/stack_trace.h"
 #include "rocksdb/filter_policy.h"
+#include "rocksdb/table_pinning_policy.h"
 #include "table/block_based/block_based_table_reader.h"
 #include "table/block_based/filter_policy_internal.h"
 #include "table/format.h"
@@ -37,7 +53,8 @@ class MyPartitionedFilterBlockReader : public PartitionedFilterBlockReader {
   MyPartitionedFilterBlockReader(BlockBasedTable* t,
                                  CachableEntry<Block>&& filter_block)
       : PartitionedFilterBlockReader(
-            t, std::move(filter_block.As<Block_kFilterPartitionIndex>())) {
+            t, std::move(filter_block.As<Block_kFilterPartitionIndex>()),
+            std::unique_ptr<PinnedEntry>()) {
     for (const auto& pair : blooms) {
       const uint64_t offset = pair.first;
       const std::string& bloom = pair.second;

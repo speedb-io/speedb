@@ -54,5 +54,6 @@ int main() {
   // close DB
   s = db->Close();
   assert(s.ok());
+  delete db;
   return 0;
 }

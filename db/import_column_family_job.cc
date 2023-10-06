@@ -1,3 +1,17 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //  Copyright (c) Meta Platforms, Inc. and affiliates.
 //
 //  This source code is licensed under both the GPLv2 (found in the
@@ -247,7 +261,7 @@ Status ImportColumnFamilyJob::GetIngestedFileInfo(
           *cfd_->ioptions(), sv->mutable_cf_options.prefix_extractor,
           env_options_, cfd_->internal_comparator(),
           /*skip_filters*/ false, /*immortal*/ false,
-          /*force_direct_prefetch*/ false, /*level*/ -1,
+          /*force_direct_prefetch*/ false, /*level*/ -1, /*bottommost*/ false,
           /*block_cache_tracer*/ nullptr,
           /*max_file_size_for_l0_meta_pin*/ 0, versions_->DbSessionId(),
           /*cur_file_num*/ new_file_number),

@@ -2,24 +2,60 @@
 
 ## Unreleased
 
+Fix RepeatableThread to work properly with on thread start callback feature (https://github.com/speedb-io/speedb/pull/667).
+
+### New Features
+* Non-Blocking Manual Compaction (CompactRange()) - Support non-blocking manual compactions by setting a new CompactRangeOptions option (async_completion_cb). When set, the CompactRange() call will return control to the caller immediately. The manual compaction iteslf will be performed in an internally created thread. The manual compaction will ALWAYS call the specified callback upon completion and provide the completion status (#597).
+
+### Enhancements
+* Unit Testing: Expose the disallow_trivial_move flag in the MoveFilesToLevel testing utility (#677).
+
+### Bug Fixes
+* db_bench: fix SeekRandomWriteRandom valid check. Use key and value only after checking iterator is valid.
+* Fix a JAVA build issue introduced by #597 (#680)
+
+### Miscellaneous
+
+## Grapes v2.6.0 (8/22/2023)
+Based on RocksDB 8.1.1
+
+### New Features
+* Snapshot optimization - The most important information inside a snapshot is its Sequence number, which allows the compaction to know if the key-value should be deleted or not. The sequence number is being changed when modification happens in the db. This feature allows the db to take a snapshot without acquiring db mutex when the last snapshot has the same sequence number as a new one. In transactional db with mostly read operations, it should improve performance when used with multithreaded environment and as well other scenarios of taking large amount of snapshots with mostly read operations.
+* Add a TablePinningPolicy to the BlockBasedTableOptions.  This class controls when blocks should be pinned in memory for a block based table.  The default behavior uses the MetadataCacheOptions to control pinning and behaves identical to the previous releases. 
+* Redo of Index/Filter/Data blocks sizes in Block (LRU) Block Cache per CF after rebase on RocksDB 8.1 . This was part of v2.3.0 and was broken due to changes made in RocksDB. This feature provides per CF information on the size of its Index / Filter / Data blocks in the block cache (only for LRUCache at the moment). The information is printed to the log and the kBlockCacheCfStats and kFastBlockCacheCfStats properties were added to support obtaining the information programmatically.
+
 ### Enhancements
 * db_bench: add estimate-table-readers-mem benchmark which prints these stats.
+* A new option on_thread_start_callback has been added. It allows to set thread affinity or perform other optimizations (e.g. NUMA pinning) to speedb background threads. 
+An example file on_thread_start_callback_example.cc has been provided to demonstrate how to use this feature.
+* Support Spdb memtable in Java and C (#548)
 
 ### Bug Fixes
 * unit tests: fix GlobalWriteControllerTest.GlobalAndWBMSetupDelay by waiting for the memtable memory release.
 * spdb memtable: use_seek_parallel_threshold option parameter mishandled (#570)
+* build: Plug memtable global switch memtable stuck fix.  (#606)
+* build: Windows compilation fix (#568).
+* Logger: fix Block cache stats trace by spacing it from the last trace (#578).
+* WriteController: move the class to public interface which should have been done under #346.
+* unit tests: fix DBCompactionTest.DisableMultiManualCompaction by blocking all bg compaction threads which increased by default to 8 in #194.
+* Proactive Flushes: fix accounting with non-WBM initiated flushes.
+
+### Miscellaneous
+* move hashSpdb memtable from plugin to main code (#639)
 
 ## Fig v2.5.0 (06/14/2023)
 Based on RocksDB 8.1.1
 
 ### New Features
+ * Enable Speedb Features : Speedb users currently configure the database manually. New Speedb users are required to spend a lot of effort reading the documentation of the Speedb features.
+ The purpose of this feature is to help users enable and set Speedb options easily to a default configuration.
+ The SharedOptions class was added to improve the usability of multiple databases cases by arranging shared options.(#543)
 * Delay writes gradually based on memory usage of the WriteBufferManager (WBM).
 Before this PR, setting allow_stall in the WBM's constructor meant that writes are completely stopped when the WBM's memory usage exceeds its quota. The goal here is to gradually decrease
 the users write speed before that threshold is reached in order to gain stability.
 To use this feature, pass allow_stall = true to the ctor of WBM and the db needs to be opened with options.use_dynamic_delay = true. The WBM will setup delay requests starting from (start_delay_percent * _buffer_size) / 100 (default value is 70) (start_delay_percent is another WBM ctor parameter).
 Changes to the WBM's memory are tracked in WriteBufferManager::ReserveMem and FreeMem.
 Once the WBM reached its capacity, if allow_stall == true, writes will be stopped using the old ShouldStall() and WBMStallWrites(). (#423)
-
 * Prevent flush entry followed delete operations
 currently during memtable flush ,  if key has a match key in the
 delete range table and this record has no snapshot related to it,
@@ -56,6 +92,7 @@ Also switch to waiting a sec on the CV each time. This is required since a bg er
 * version: update Speedb patch version to 2.4.1 (#503)
 
 ## Speedb v2.4.1 ( 04/19/2023)
+
 ### Enhancements
 * Add the ability to create any Filter Policy in java (including ribbon filter and the Speedb paired bloom filter) by @mrambacher in #387
 
@@ -63,6 +100,7 @@ Also switch to waiting a sec on the CV each time. This is required since a bg er
 * Write Flow: Reduce debug log size. Note: the write flow is still experimental in this release (#461) by @ayulas in #472
 
 ## Ephedra v2.4.0 (04/05/2023)
+
 ### New Features
 * New beezcli: Interactive CLI that offers data access and admin commands by @ofriedma in #427
 * Global delayed write rate: manage the delayed write rate across multiple CFs/databases by @Yuval-Ariel in #392

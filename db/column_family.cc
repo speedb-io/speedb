@@ -1,3 +1,17 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -29,7 +43,6 @@
 #include "db/range_del_aggregator.h"
 #include "db/table_properties_collector.h"
 #include "db/version_set.h"
-#include "db/write_controller.h"
 #include "file/sst_file_manager_impl.h"
 #include "logging/logging.h"
 #include "monitoring/thread_status_util.h"
@@ -37,6 +50,7 @@
 #include "port/port.h"
 #include "rocksdb/convenience.h"
 #include "rocksdb/table.h"
+#include "rocksdb/write_controller.h"
 #include "table/merging_iterator.h"
 #include "util/autovector.h"
 #include "util/cast_util.h"
@@ -649,6 +663,11 @@ ColumnFamilyData::ColumnFamilyData(
               CacheReservationManagerImpl<CacheEntryRole::kFileMetadata>>(
               bbto->block_cache)));
     }
+
+    if (bbto->block_cache && table_cache_) {
+      cache_owner_id_ = bbto->block_cache->GetNextItemOwnerId();
+      table_cache_->SetBlockCacheOwnerId(cache_owner_id_);
+    }
   }
 }
 
@@ -661,6 +680,12 @@ ColumnFamilyData::~ColumnFamilyData() {
   auto next = next_;
   prev->next_ = next;
   next->prev_ = prev;
+
+  const BlockBasedTableOptions* bbto =
+      ioptions_.table_factory->GetOptions<BlockBasedTableOptions>();
+  if (bbto && bbto->block_cache) {
+    bbto->block_cache->DiscardItemOwnerId(&cache_owner_id_);
+  }
 
   if (!dropped_ && column_family_set_ != nullptr) {
     // If it's dropped, it's already removed from column family set

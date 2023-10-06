@@ -1,3 +1,17 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -153,6 +167,56 @@ void Cache::SetEvictionCallback(EvictionCallback&& fn) {
   // Overwriting non-empty with non-empty could indicate a bug
   assert(!eviction_callback_ || !fn);
   eviction_callback_ = std::move(fn);
+}
+
+// ==================================================================================================================================
+Cache::ItemOwnerId Cache::ItemOwnerIdAllocator::Allocate() {
+  // In practice, onwer-ids are allocated and freed when cf-s
+  // are created and destroyed => relatively rare => paying
+  // the price to always lock the mutex and simplify the code
+  std::lock_guard<std::mutex> lock(free_ids_mutex_);
+
+  // First allocate from the free list if possible
+  if (free_ids_.empty() == false) {
+    auto allocated_id = free_ids_.front();
+    free_ids_.pop_front();
+    return allocated_id;
+  }
+
+  // Nothing on the free list - try to allocate from the
+  // next item counter if not yet exhausted
+  if (has_wrapped_around_) {
+    // counter exhausted, allocation not possible
+    return kUnknownItemOwnerId;
+  }
+
+  auto allocated_id = next_item_owner_id_++;
+
+  if (allocated_id == kMaxItemOnwerId) {
+    has_wrapped_around_ = true;
+  }
+
+  return allocated_id;
+}
+
+void Cache::ItemOwnerIdAllocator::Free(ItemOwnerId* id) {
+  if (*id != kUnknownItemOwnerId) {
+    std::lock_guard<std::mutex> lock(free_ids_mutex_);
+    // The freed id is lost but this is a luxury feature. We can't
+    // pay too much space to support it.
+    if (free_ids_.size() < kMaxFreeItemOwnersIdListSize) {
+      free_ids_.push_back(*id);
+    }
+    *id = kUnknownItemOwnerId;
+  }
+}
+
+Cache::ItemOwnerId Cache::GetNextItemOwnerId() {
+  return owner_id_allocator_.Allocate();
+}
+
+void Cache::DiscardItemOwnerId(ItemOwnerId* item_owner_id) {
+  owner_id_allocator_.Free(item_owner_id);
 }
 
 }  // namespace ROCKSDB_NAMESPACE

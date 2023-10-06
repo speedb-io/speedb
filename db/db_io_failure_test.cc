@@ -1,3 +1,17 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -20,7 +34,7 @@ class DBIOFailureTest : public DBTestBase {
 };
 
 // Check that number of files does not grow when writes are dropped
-TEST_F(DBIOFailureTest, DISABLED_DropWrites) {
+TEST_F(DBIOFailureTest, DropWrites) {
   do {
     Options options = CurrentOptions();
     options.env = env_;
@@ -30,7 +44,7 @@ TEST_F(DBIOFailureTest, DISABLED_DropWrites) {
     ASSERT_OK(Put("foo", "v1"));
     ASSERT_EQ("v1", Get("foo"));
     Compact("a", "z");
-    const size_t num_files = CountFiles();
+    const auto num_files = GetSstFileCount(dbname_);
     // Force out-of-space errors
     env_->drop_writes_.store(true, std::memory_order_release);
     env_->sleep_counter_.Reset();
@@ -59,7 +73,7 @@ TEST_F(DBIOFailureTest, DISABLED_DropWrites) {
     ASSERT_EQ("5", property_value);
 
     env_->drop_writes_.store(false, std::memory_order_release);
-    const size_t count = CountFiles();
+    const auto count = GetSstFileCount(dbname_);
     ASSERT_LT(count, num_files + 3);
 
     // Check that compaction attempts slept after errors

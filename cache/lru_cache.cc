@@ -1,3 +1,17 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -165,10 +179,11 @@ void LRUCacheShard::EraseUnRefEntries() {
   }
 }
 
-void LRUCacheShard::ApplyToSomeEntries(
+void LRUCacheShard::ApplyToSomeEntriesWithOwnerId(
     const std::function<void(const Slice& key, Cache::ObjectPtr value,
                              size_t charge,
-                             const Cache::CacheItemHelper* helper)>& callback,
+                             const Cache::CacheItemHelper* helper,
+                             Cache::ItemOwnerId item_owner_id)>& callback,
     size_t average_entries_per_lock, size_t* state) {
   // The state is essentially going to be the starting hash, which works
   // nicely even if we resize between calls because we use upper-most
@@ -196,7 +211,7 @@ void LRUCacheShard::ApplyToSomeEntries(
       [callback,
        metadata_charge_policy = metadata_charge_policy_](LRUHandle* h) {
         callback(h->key(), h->value, h->GetCharge(metadata_charge_policy),
-                 h->helper);
+                 h->helper, h->item_owner_id);
       },
       index_begin, index_end);
 }
@@ -518,7 +533,8 @@ bool LRUCacheShard::Release(LRUHandle* e, bool /*useful*/,
 LRUHandle* LRUCacheShard::CreateHandle(const Slice& key, uint32_t hash,
                                        Cache::ObjectPtr value,
                                        const Cache::CacheItemHelper* helper,
-                                       size_t charge) {
+                                       size_t charge,
+                                       Cache::ItemOwnerId item_owner_id) {
   assert(helper);
   // value == nullptr is reserved for indicating failure in SecondaryCache
   assert(!(helper->IsSecondaryCacheCompatible() && value == nullptr));
@@ -539,7 +555,7 @@ LRUHandle* LRUCacheShard::CreateHandle(const Slice& key, uint32_t hash,
   e->next = e->prev = nullptr;
   memcpy(e->key_data, key.data(), key.size());
   e->CalcTotalCharge(charge, metadata_charge_policy_);
-
+  e->item_owner_id = item_owner_id;
   return e;
 }
 
@@ -548,7 +564,18 @@ Status LRUCacheShard::Insert(const Slice& key, uint32_t hash,
                              const Cache::CacheItemHelper* helper,
                              size_t charge, LRUHandle** handle,
                              Cache::Priority priority) {
-  LRUHandle* e = CreateHandle(key, hash, value, helper, charge);
+  return InsertWithOwnerId(key, hash, value, helper, charge,
+                           Cache::kUnknownItemOwnerId, handle, priority);
+}
+
+Status LRUCacheShard::InsertWithOwnerId(const Slice& key, uint32_t hash,
+                                        Cache::ObjectPtr value,
+                                        const Cache::CacheItemHelper* helper,
+                                        size_t charge,
+                                        Cache::ItemOwnerId item_owner_id,
+                                        LRUHandle** handle,
+                                        Cache::Priority priority) {
+  LRUHandle* e = CreateHandle(key, hash, value, helper, charge, item_owner_id);
   e->SetPriority(priority);
   e->SetInCache(true);
   return InsertItem(e, handle);
@@ -559,7 +586,8 @@ LRUHandle* LRUCacheShard::CreateStandalone(const Slice& key, uint32_t hash,
                                            const Cache::CacheItemHelper* helper,
                                            size_t charge,
                                            bool allow_uncharged) {
-  LRUHandle* e = CreateHandle(key, hash, value, helper, charge);
+  LRUHandle* e = CreateHandle(key, hash, value, helper, charge,
+                              Cache::kUnknownItemOwnerId);
   e->SetIsStandalone(true);
   e->Ref();
 

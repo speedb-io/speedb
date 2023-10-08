@@ -31,8 +31,8 @@ jobs:
             long_test: CRASH_TEST_EXT_ARGS="--duration=10000" make -j$(nproc) whitebox_asan_crash_test
     
     steps:
-      - name: Network hotfix
-        run: echo "nameserver 8.8.8.8"# > /etc/resolv.conf
+#      - name: Network hotfix
+#        run: echo "nameserver 8.8.8.8" > /etc/resolv.conf
     
       - name: Pre
         run: |

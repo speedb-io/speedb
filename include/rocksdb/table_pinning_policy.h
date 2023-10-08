@@ -23,6 +23,7 @@
 //
 #pragma once
 
+#include "rocksdb/advanced_cache.h"
 #include "rocksdb/customizable.h"
 #include "rocksdb/status.h"
 
@@ -30,6 +31,8 @@ namespace ROCKSDB_NAMESPACE {
 
 struct BlockBasedTableOptions;
 struct ConfigOptions;
+
+enum class HierarchyCategory { TOP_LEVEL, PARTITION, OTHER };
 
 // Struct that contains information about the table being evaluated for pinning
 struct TablePinningOptions {
@@ -49,18 +52,24 @@ struct TablePinningOptions {
 
 // Struct containing information about an entry that has been pinned
 struct PinnedEntry {
-  PinnedEntry() {}
-  PinnedEntry(int _level, uint8_t _type, size_t _size,
-              bool _is_last_level_with_data)
+  PinnedEntry() = default;
+
+  PinnedEntry(int _level, bool _is_last_level_with_data,
+              HierarchyCategory _category, Cache::ItemOwnerId _item_owner_id,
+              CacheEntryRole _role, size_t _size)
       : level(_level),
-        type(_type),
-        size(_size),
-        is_last_level_with_data(_is_last_level_with_data) {}
+        is_last_level_with_data(_is_last_level_with_data),
+        category(_category),
+        item_owner_id(_item_owner_id),
+        role(_role),
+        size(_size) {}
 
   int level = -1;
-  uint8_t type = 0;
-  size_t size = 0;
   bool is_last_level_with_data = false;
+  HierarchyCategory category = HierarchyCategory::OTHER;
+  Cache::ItemOwnerId item_owner_id = Cache::kUnknownItemOwnerId;
+  CacheEntryRole role = CacheEntryRole::kMisc;
+  size_t size = 0U;
 };
 
 // TablePinningPolicy provides a configurable way to determine when blocks
@@ -71,11 +80,6 @@ struct PinnedEntry {
 // including data loss, unreported corruption, deadlocks, and more.
 class TablePinningPolicy : public Customizable {
  public:
-  static const uint8_t kTopLevel = 1;
-  static const uint8_t kPartition = 2;
-  static const uint8_t kIndex = 3;
-  static const uint8_t kFilter = 4;
-  static const uint8_t kDictionary = 5;
   static const char* Type() { return "TablePinningPolicy"; }
 
   // Creates/Returns a new TablePinningPolicy based in the input value
@@ -88,14 +92,17 @@ class TablePinningPolicy : public Customizable {
   // pinning This method indicates that pinning might be possible, but does not
   // perform the pinning operation. Returns true if the data is a candidate for
   // pinning and false otherwise
-  virtual bool MayPin(const TablePinningOptions& tpo, uint8_t type,
+  virtual bool MayPin(const TablePinningOptions& tpo,
+                      HierarchyCategory category, CacheEntryRole role,
                       size_t size) const = 0;
 
   // Attempts to pin the block in memory.
   // If successful, pinned returns the pinned block
   // Returns true and updates pinned on success and false if the data cannot be
   // pinned
-  virtual bool PinData(const TablePinningOptions& tpo, uint8_t type,
+  virtual bool PinData(const TablePinningOptions& tpo,
+                       HierarchyCategory category,
+                       Cache::ItemOwnerId _item_owner_id, CacheEntryRole _role,
                        size_t size, std::unique_ptr<PinnedEntry>* pinned) = 0;
 
   // Releases and clears the pinned entry.
@@ -113,14 +120,15 @@ class TablePinningPolicyWrapper : public TablePinningPolicy {
   explicit TablePinningPolicyWrapper(
       const std::shared_ptr<TablePinningPolicy>& t)
       : target_(t) {}
-  bool MayPin(const TablePinningOptions& tpo, uint8_t type,
-              size_t size) const override {
-    return target_->MayPin(tpo, type, size);
+  bool MayPin(const TablePinningOptions& tpo, HierarchyCategory category,
+              CacheEntryRole role, size_t size) const override {
+    return target_->MayPin(tpo, category, role, size);
   }
 
-  bool PinData(const TablePinningOptions& tpo, uint8_t type, size_t size,
-               std::unique_ptr<PinnedEntry>* pinned) override {
-    return target_->PinData(tpo, type, size, pinned);
+  bool PinData(const TablePinningOptions& tpo, HierarchyCategory category,
+               Cache::ItemOwnerId item_owner_id, CacheEntryRole role,
+               size_t size, std::unique_ptr<PinnedEntry>* pinned) override {
+    return target_->PinData(tpo, category, item_owner_id, role, size, pinned);
   }
 
   void UnPinData(std::unique_ptr<PinnedEntry>&& pinned) override {

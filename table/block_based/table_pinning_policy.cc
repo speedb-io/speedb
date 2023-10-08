@@ -54,15 +54,16 @@ class DefaultPinningPolicy : public RecordingPinningPolicy {
   const char* Name() const override { return kClassName(); }
 
  protected:
-  bool CheckPin(const TablePinningOptions& tpo, uint8_t type, size_t /*size*/,
+  bool CheckPin(const TablePinningOptions& tpo, HierarchyCategory category,
+                CacheEntryRole /*role*/, size_t /*size*/,
                 size_t /*limit*/) const override {
     if (tpo.level < 0) {
       return false;
-    } else if (type == kTopLevel) {
+    } else if (category == HierarchyCategory::TOP_LEVEL) {
       return IsPinned(tpo, cache_options_.top_level_index_pinning,
                       pin_top_level_index_and_filter_ ? PinningTier::kAll
                                                       : PinningTier::kNone);
-    } else if (type == kPartition) {
+    } else if (category == HierarchyCategory::PARTITION) {
       return IsPinned(tpo, cache_options_.partition_pinning,
                       pin_l0_index_and_filter_ ? PinningTier::kFlushedAndSimilar
                                                : PinningTier::kNone);
@@ -112,35 +113,36 @@ static const uint8_t kNumTypes = 7;
 static const int kNumLevels = 7;
 
 RecordingPinningPolicy::RecordingPinningPolicy()
-    : usage_(0),
-      attempts_counter_(0),
-      pinned_counter_(0),
-      active_counter_(0),
-      usage_by_level_(kNumLevels + 1),
-      usage_by_type_(kNumTypes) {
-  for (int l = 0; l <= kNumLevels; l++) {
-    usage_by_level_[l].store(0);
-  }
-  for (uint8_t t = 0; t < kNumTypes; t++) {
-    usage_by_type_[t].store(0);
-  }
+    : usage_(0), attempts_counter_(0), pinned_counter_(0), active_counter_(0) {
+  // ,
+  // usage_by_level_(kNumLevels + 1),
+  // usage_by_type_(kNumTypes) {
+  // for (int l = 0; l <= kNumLevels; l++) {
+  //   usage_by_level_[l].store(0);
+  // }
+  // for (uint8_t t = 0; t < kNumTypes; t++) {
+  //   usage_by_type_[t].store(0);
+  // }
 }
 
 bool RecordingPinningPolicy::MayPin(const TablePinningOptions& tpo,
-                                    uint8_t type, size_t size) const {
+                                    HierarchyCategory category,
+                                    CacheEntryRole role, size_t size) const {
   attempts_counter_++;
-  return CheckPin(tpo, type, size, usage_);
+  return CheckPin(tpo, category, role, size, usage_);
 }
 
 bool RecordingPinningPolicy::PinData(const TablePinningOptions& tpo,
-                                     uint8_t type, size_t size,
+                                     HierarchyCategory category,
+                                     Cache::ItemOwnerId item_owner_id,
+                                     CacheEntryRole role, size_t size,
                                      std::unique_ptr<PinnedEntry>* pinned) {
   auto limit = usage_.fetch_add(size);
-  if (CheckPin(tpo, type, size, limit)) {
+  if (CheckPin(tpo, category, role, size, limit)) {
     pinned_counter_++;
-    pinned->reset(
-        new PinnedEntry(tpo.level, type, size, tpo.is_last_level_with_data));
-    RecordPinned(tpo.level, type, size, true);
+    pinned->reset(new PinnedEntry(tpo.level, tpo.is_last_level_with_data,
+                                  category, item_owner_id, role, size));
+    RecordPinned(tpo.level, category, item_owner_id, role, size, true);
     return true;
   } else {
     usage_.fetch_sub(size);
@@ -149,22 +151,26 @@ bool RecordingPinningPolicy::PinData(const TablePinningOptions& tpo,
 }
 
 void RecordingPinningPolicy::UnPinData(std::unique_ptr<PinnedEntry>&& pinned) {
-  RecordPinned(pinned->level, pinned->type, pinned->size, false);
+  RecordPinned(pinned->level, pinned->category, pinned->item_owner_id,
+               pinned->role, pinned->size, false);
   usage_ -= pinned->size;
   pinned.reset();
 }
 
-void RecordingPinningPolicy::RecordPinned(int level, uint8_t type, size_t size,
-                                          bool pinned) {
+void RecordingPinningPolicy::RecordPinned(int level,
+                                          HierarchyCategory /*category*/,
+                                          Cache::ItemOwnerId /*item_owner_id*/,
+                                          CacheEntryRole /*role*/,
+                                          size_t /*size*/, bool pinned) {
   if (level < 0 || level > kNumLevels) level = kNumLevels;
-  if (type >= kNumTypes) type = kNumTypes - 1;
+  // XXXXXX if (type >= kNumTypes) type = kNumTypes - 1;
   if (pinned) {
-    usage_by_level_[level] += size;
-    usage_by_type_[type] += size;
+    // usage_by_level_[level] += size;
+    // usage_by_type_[type] += size;
     active_counter_++;
   } else {
-    usage_by_level_[level] -= size;
-    usage_by_type_[type] -= size;
+    // usage_by_level_[level] -= size;
+    // usage_by_type_[type] -= size;
     active_counter_--;
   }
 }
@@ -187,14 +193,16 @@ std::string RecordingPinningPolicy::ToString() const {
 }
 size_t RecordingPinningPolicy::GetPinnedUsage() const { return usage_; }
 
-size_t RecordingPinningPolicy::GetPinnedUsageByLevel(int level) const {
-  if (level > kNumLevels) level = kNumLevels;
-  return usage_by_level_[level];
+size_t RecordingPinningPolicy::GetPinnedUsageByLevel(int /*level*/) const {
+  return 0U;
+  // if (level > kNumLevels) level = kNumLevels;
+  // return usage_by_level_[level];
 }
 
-size_t RecordingPinningPolicy::GetPinnedUsageByType(uint8_t type) const {
-  if (type >= kNumTypes) type = kNumTypes - 1;
-  return usage_by_type_[type];
+size_t RecordingPinningPolicy::GetPinnedUsageByType(uint8_t /*type*/) const {
+  return 0U;
+  // if (type >= kNumTypes) type = kNumTypes - 1;
+  // return usage_by_type_[type];
 }
 
 #ifndef ROCKSDB_LITE

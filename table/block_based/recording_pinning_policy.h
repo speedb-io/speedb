@@ -24,6 +24,7 @@
 #pragma once
 
 #include <atomic>
+#include <unordered_map>
 #include <vector>
 
 #include "rocksdb/table_pinning_policy.h"
@@ -34,10 +35,11 @@ class RecordingPinningPolicy : public TablePinningPolicy {
  public:
   RecordingPinningPolicy();
 
-  bool MayPin(const TablePinningOptions& tpo, uint8_t type,
-              size_t size) const override;
-  bool PinData(const TablePinningOptions& tpo, uint8_t type, size_t size,
-               std::unique_ptr<PinnedEntry>* pinned) override;
+  bool MayPin(const TablePinningOptions& tpo, HierarchyCategory category,
+              CacheEntryRole role, size_t size) const override;
+  bool PinData(const TablePinningOptions& tpo, HierarchyCategory category,
+               Cache::ItemOwnerId item_owner_id, CacheEntryRole role,
+               size_t size, std::unique_ptr<PinnedEntry>* pinned) override;
   void UnPinData(std::unique_ptr<PinnedEntry>&& pinned) override;
   std::string ToString() const override;
 
@@ -52,18 +54,22 @@ class RecordingPinningPolicy : public TablePinningPolicy {
 
  protected:
   // Updates the statistics with the new pinned information.
-  void RecordPinned(int level, uint8_t type, size_t size, bool pinned);
+  void RecordPinned(int level, HierarchyCategory category,
+                    Cache::ItemOwnerId item_owner_id, CacheEntryRole role,
+                    size_t size, bool pinned);
 
   // Checks whether the data can be pinned.
-  virtual bool CheckPin(const TablePinningOptions& tpo, uint8_t type,
+  virtual bool CheckPin(const TablePinningOptions& tpo,
+                        HierarchyCategory category, CacheEntryRole role,
                         size_t size, size_t limit) const = 0;
 
   std::atomic<size_t> usage_;
   mutable std::atomic<size_t> attempts_counter_;
   std::atomic<size_t> pinned_counter_;
   std::atomic<size_t> active_counter_;
-  std::vector<std::atomic<uint64_t>> usage_by_level_;
-  std::vector<std::atomic<uint64_t>> usage_by_type_;
+
+  // std::vector<std::atomic<uint64_t>> usage_by_level_;
+  // std::vector<std::atomic<uint64_t>> usage_by_type_;
 };
 
 }  // namespace ROCKSDB_NAMESPACE

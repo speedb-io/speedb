@@ -50,8 +50,8 @@ std::string ScopedPinningPolicy::GetId() const {
 }
 
 bool ScopedPinningPolicy::CheckPin(const TablePinningOptions& tpo,
-                                   uint8_t /* type */, size_t size,
-                                   size_t usage) const {
+                                   HierarchyCategory /* category */,
+                                   size_t size, size_t usage) const {
   auto proposed = usage + size;
   if (tpo.is_last_level_with_data &&
       options_.last_level_with_data_percent > 0) {

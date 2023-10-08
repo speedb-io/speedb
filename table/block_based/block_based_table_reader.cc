@@ -1088,7 +1088,8 @@ Status BlockBasedTable::PrefetchIndexAndFilterBlocks(
 
   rep_->index_reader = std::move(index_reader);
   bool pin_partition = table_options.pinning_policy->MayPin(
-      pinning_options, TablePinningPolicy::kPartition, 0);
+      pinning_options, HierarchyCategory::PARTITION,
+      CacheEntryRole::kIndexBlock, 0);
   // The partitions of partitioned index are always stored in cache. They
   // are hence follow the configuration for pin and prefetch regardless of
   // the value of cache_index_and_filter_blocks
@@ -1104,9 +1105,9 @@ Status BlockBasedTable::PrefetchIndexAndFilterBlocks(
     const bool pin_filter = table_options.pinning_policy->MayPin(
         pinning_options,
         (rep_->filter_type == Rep::FilterType::kPartitionedFilter)
-            ? TablePinningPolicy::kTopLevel
-            : TablePinningPolicy::kFilter,
-        rep_->filter_handle.size());
+            ? HierarchyCategory::TOP_LEVEL
+            : HierarchyCategory::OTHER,
+        CacheEntryRole::kFilterBlock, rep_->filter_handle.size());
 
     // prefetch the first level of filter
     // WART: this might be redundant (unnecessary cache hit) if !pin_filter,
@@ -1132,7 +1133,10 @@ Status BlockBasedTable::PrefetchIndexAndFilterBlocks(
   if (!rep_->compression_dict_handle.IsNull()) {
     std::unique_ptr<UncompressionDictReader> uncompression_dict_reader;
     const bool pin_dict = table_options.pinning_policy->MayPin(
-        pinning_options, TablePinningPolicy::kDictionary,
+        pinning_options, HierarchyCategory::OTHER,
+        // XXXXXXXXXX
+        CacheEntryRole::kOtherBlock,
+        // XXXXXXXXXXXXXXXXXXXX CacheEntryRole::kDictionary,
         rep_->compression_dict_handle.size());
 
     s = UncompressionDictReader::Create(
@@ -1154,10 +1158,13 @@ TablePinningPolicy* BlockBasedTable::GetPinningPolicy() const {
   return rep_->table_options.pinning_policy.get();
 }
 
-bool BlockBasedTable::PinData(const TablePinningOptions& tpo, uint8_t type,
-                              size_t size,
+bool BlockBasedTable::PinData(const TablePinningOptions& tpo,
+                              HierarchyCategory category,
+                              Cache::ItemOwnerId item_owner_id,
+                              CacheEntryRole role, size_t size,
                               std::unique_ptr<PinnedEntry>* pinned) const {
-  return rep_->table_options.pinning_policy->PinData(tpo, type, size, pinned);
+  return rep_->table_options.pinning_policy->PinData(
+      tpo, category, item_owner_id, role, size, pinned);
 }
 
 void BlockBasedTable::UnPinData(std::unique_ptr<PinnedEntry>&& pinned) const {
@@ -2440,7 +2447,8 @@ Status BlockBasedTable::CreateIndexReader(
     std::unique_ptr<IndexReader>* index_reader) {
   auto pinning_policy = GetPinningPolicy();
   // pin the first level of index
-  bool pin = pinning_policy->MayPin(tpo, TablePinningPolicy::kIndex,
+  bool pin = pinning_policy->MayPin(tpo, HierarchyCategory::OTHER,
+                                    CacheEntryRole::kIndexBlock,
                                     rep_->footer.index_handle().size());
   // prefetch the first level of index
   // WART: this might be redundant (unnecessary cache hit) if !pin_index,
@@ -2449,7 +2457,8 @@ Status BlockBasedTable::CreateIndexReader(
 
   switch (rep_->index_type) {
     case BlockBasedTableOptions::kTwoLevelIndexSearch: {
-      pin = pinning_policy->MayPin(tpo, TablePinningPolicy::kTopLevel,
+      pin = pinning_policy->MayPin(tpo, HierarchyCategory::TOP_LEVEL,
+                                   CacheEntryRole::kIndexBlock,
                                    rep_->footer.index_handle().size());
       return PartitionIndexReader::Create(this, ro, tpo, prefetch_buffer,
                                           use_cache, prefetch_index | pin, pin,

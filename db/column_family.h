@@ -605,6 +605,8 @@ class ColumnFamilyData {
   // of its files (if missing)
   void RecoverEpochNumbers();
 
+  const BlockBasedTableOptions* GetBlockBasedTableOptions() const;
+
  private:
   friend class ColumnFamilySet;
   ColumnFamilyData(uint32_t id, const std::string& name,
@@ -620,7 +622,7 @@ class ColumnFamilyData {
                    const std::string& db_id, const std::string& db_session_id);
 
   std::vector<std::string> GetDbPaths() const;
-
+  
   uint32_t id_;
   const std::string name_;
   Version* dummy_versions_;  // Head of circular doubly-linked list of versions.

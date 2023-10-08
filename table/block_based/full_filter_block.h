@@ -41,7 +41,7 @@ class FilterPolicy;
 class FilterBitsBuilder;
 class FilterBitsReader;
 struct PinnedEntry;
-struct TablePinningOptions;
+struct TablePinningInfo;
 
 // A FullFilterBlockBuilder is used to construct a full filter for a
 // particular Table.  It generates a single string which is stored as
@@ -117,11 +117,11 @@ class FullFilterBlockReader
   FullFilterBlockReader(
       const BlockBasedTable* t,
       CachableEntry<ParsedFullFilterBlock>&& filter_block,
-      std::unique_ptr<PinnedEntry>&& pinned = std::unique_ptr<PinnedEntry>());
+      std::unique_ptr<PinnedEntry> pinned = std::unique_ptr<PinnedEntry>());
 
   static std::unique_ptr<FilterBlockReader> Create(
       const BlockBasedTable* table, const ReadOptions& ro,
-      const TablePinningOptions& tpo, FilePrefetchBuffer* prefetch_buffer,
+      const TablePinningInfo& tpi, FilePrefetchBuffer* prefetch_buffer,
       bool use_cache, bool prefetch, bool pin,
       BlockCacheLookupContext* lookup_context);
 

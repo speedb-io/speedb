@@ -7481,8 +7481,8 @@ TEST_F(DBTest, ShuttingDownNotBlockStalledWrites) {
 
 class MyPinningPolicy : public TablePinningPolicy {
  public:
-  bool MayPin(const TablePinningOptions& /*tpo*/, uint8_t /*type*/,
-              size_t /*size*/) const override {
+  bool MayPin(const TablePinningInfo& /*tpi*/, pinning::HierarchyCategory /*category*/,
+              CacheEntryRole /*role*/, size_t /*size*/) const override {
     return true;
   }
 
@@ -7494,32 +7494,37 @@ class MyPinningPolicy : public TablePinningPolicy {
     ASSERT_EQ(0U, num_pinned_last_level_with_data_);
   }
 
-  bool PinData(const TablePinningOptions& tpo, uint8_t type, size_t size,
-               std::unique_ptr<PinnedEntry>* pinned) override {
-    pinned->reset(
-        new PinnedEntry(tpo.level, type, size, tpo.is_last_level_with_data));
+  bool PinData(const TablePinningInfo& tpi, pinning::HierarchyCategory category,
+               CacheEntryRole role, size_t size,
+               std::unique_ptr<PinnedEntry>* pinned_entry) override {
+    pinned_entry->reset(new PinnedEntry(tpi.level, tpi.is_last_level_with_data,
+                                  category, tpi.item_owner_id, role, size));
+    std::cout << "PinData: category=" << pinning::GetHierarchyCategoryName(category)
+              << ", role=" << GetCacheEntryRoleName(role) << ", "
+              << (*pinned_entry)->ToString();
+
     ++total_num_pinned_;
     usage_ += size;
-    if (tpo.is_last_level_with_data) {
+    if (tpi.is_last_level_with_data) {
       ++num_pinned_last_level_with_data_;
     }
 
     return true;
   }
 
-  void UnPinData(std::unique_ptr<PinnedEntry>&& pinned) override {
+  void UnPinData(std::unique_ptr<PinnedEntry> pinned_entry) override {
+    std::cout << "UnPinData: " << pinned_entry->ToString();
+
     ASSERT_GT(total_num_pinned_, 0U);
     --total_num_pinned_;
 
-    ASSERT_GE(usage_, pinned->size);
-    usage_ -= pinned->size;
+    ASSERT_GE(usage_, pinned_entry->size);
+    usage_ -= pinned_entry->size;
 
-    if (pinned->is_last_level_with_data) {
+    if (pinned_entry->is_last_level_with_data) {
       ASSERT_GT(num_pinned_last_level_with_data_, 0U);
       --num_pinned_last_level_with_data_;
     }
-
-    pinned.reset();
   }
 
   size_t GetPinnedUsage() const override { return usage_; }
@@ -7579,6 +7584,7 @@ TEST_F(DBTest, StaticPinningLastLevelWithData) {
   ASSERT_OK(Put(key2, value2));
   ASSERT_OK(Flush());
 
+  std::cout << "CompactRange #1\n";
   db_->CompactRange(CompactRangeOptions(), nullptr, nullptr);
 
   ASSERT_EQ(NumTableFilesAtLevel(0, 0), 0);
@@ -7596,6 +7602,7 @@ TEST_F(DBTest, StaticPinningLastLevelWithData) {
 
   // This will create a file at level-1 that is currently known to be the last
   // with data
+  std::cout << "CompactRange #2\n";
   db_->CompactRange(CompactRangeOptions(), nullptr, nullptr);
 
   ASSERT_EQ(NumTableFilesAtLevel(1, 0), 2);

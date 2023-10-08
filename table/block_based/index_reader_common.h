@@ -39,7 +39,7 @@ class BlockBasedTable::IndexReaderCommon : public BlockBasedTable::IndexReader {
                     std::unique_ptr<PinnedEntry>&& pinned)
       : table_(t),
         index_block_(std::move(index_block)),
-        pinned_(std::move(pinned)) {
+        pinned_entry_(std::move(pinned)) {
     assert(table_ != nullptr);
   }
 
@@ -107,7 +107,7 @@ class BlockBasedTable::IndexReaderCommon : public BlockBasedTable::IndexReader {
  private:
   const BlockBasedTable* table_;
   CachableEntry<Block> index_block_;
-  std::unique_ptr<PinnedEntry> pinned_;
+  std::unique_ptr<PinnedEntry> pinned_entry_;
 };
 
 }  // namespace ROCKSDB_NAMESPACE

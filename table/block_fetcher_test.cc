@@ -357,7 +357,7 @@ class BlockFetcherTest : public testing::Test {
     std::unique_ptr<BlockBasedTable::IndexReader> index_reader;
     ReadOptions ro;
     ASSERT_OK(BinarySearchIndexReader::Create(
-        table.get(), ro, TablePinningOptions(), nullptr /* prefetch_buffer */,
+        table.get(), ro, TablePinningInfo(), nullptr /* prefetch_buffer */,
         false /* use_cache */, false /* prefetch */, false /* pin */,
         nullptr /* lookup_context */, &index_reader));
 

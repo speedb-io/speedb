@@ -30,7 +30,7 @@ namespace ROCKSDB_NAMESPACE {
 
 Status UncompressionDictReader::Create(
     const BlockBasedTable* table, const ReadOptions& ro,
-    const TablePinningOptions& tpo, FilePrefetchBuffer* prefetch_buffer,
+    const TablePinningInfo& tpi, FilePrefetchBuffer* prefetch_buffer,
     bool use_cache, bool prefetch, bool pin,
     BlockCacheLookupContext* lookup_context,
     std::unique_ptr<UncompressionDictReader>* uncompression_dict_reader) {
@@ -40,7 +40,7 @@ Status UncompressionDictReader::Create(
   assert(uncompression_dict_reader);
 
   CachableEntry<UncompressionDict> uncompression_dict;
-  std::unique_ptr<PinnedEntry> pinned;
+  std::unique_ptr<PinnedEntry> pinned_entry;
 
   if (prefetch || !use_cache) {
     const Status s = ReadUncompressionDictionary(
@@ -51,23 +51,23 @@ Status UncompressionDictReader::Create(
     }
 
     if (pin) {
-      table->PinData(tpo, TablePinningPolicy::kDictionary,
+      table->PinData(tpi, pinning::HierarchyCategory::OTHER, CacheEntryRole::kOtherBlock,
                      uncompression_dict.GetValue()->ApproximateMemoryUsage(),
-                     &pinned);
+                     &pinned_entry);
     }
-    if (use_cache && !pinned) {
+    if (use_cache && !pinned_entry) {
       uncompression_dict.Reset();
     }
   }
 
   uncompression_dict_reader->reset(new UncompressionDictReader(
-      table, std::move(uncompression_dict), std::move(pinned)));
+      table, std::move(uncompression_dict), std::move(pinned_entry)));
 
   return Status::OK();
 }
 
 UncompressionDictReader::~UncompressionDictReader() {
-  table_->UnPinData(std::move(pinned_));
+  table_->UnPinData(std::move(pinned_entry_));
 }
 
 Status UncompressionDictReader::ReadUncompressionDictionary(

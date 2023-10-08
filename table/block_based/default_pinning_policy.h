@@ -23,6 +23,7 @@
 //
 #pragma once
 
+#include "rocksdb/table.h"
 #include "table/block_based/recording_pinning_policy.h"
 
 namespace ROCKSDB_NAMESPACE {
@@ -42,9 +43,10 @@ class DefaultPinningPolicy : public RecordingPinningPolicy {
   const char* NickName() const override { return kNickName(); }
 
  protected:
-  bool CheckPin(const TablePinningOptions& tpo, uint8_t type, size_t /*size*/,
-                size_t /*limit*/) const override;
-  bool IsPinned(const TablePinningOptions& tpo, PinningTier pinning_tier,
+  bool CheckPin(const TablePinningInfo& tpi, pinning::HierarchyCategory category,
+                CacheEntryRole role, size_t size, size_t limit) const override;
+
+  bool IsPinned(const TablePinningInfo& tpi, PinningTier pinning_tier,
                 PinningTier fallback_pinning_tier) const;
 
  protected:

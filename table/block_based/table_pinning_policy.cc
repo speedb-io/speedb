@@ -24,6 +24,8 @@
 
 #include "rocksdb/table_pinning_policy.h"
 
+#include <array>
+
 #include "rocksdb/status.h"
 #include "rocksdb/table.h"
 #include "rocksdb/utilities/customizable_util.h"
@@ -31,6 +33,104 @@
 #include "table/block_based/recording_pinning_policy.h"
 
 namespace ROCKSDB_NAMESPACE {
+
+namespace pinning {
+
+namespace {
+
+std::array<std::string, kNumHierarchyCategories>
+    kHierarchyCategoryToHyphenString{{"top-level", "partition", "other"}};
+
+}  // Unnamed namespace
+
+std::string GetHierarchyCategoryName(HierarchyCategory category) {
+  return kHierarchyCategoryToHyphenString[static_cast<size_t>(category)];
+}
+
+std::array<std::string, kNumLevelCategories>
+    kLevelCategoryToHyphenString{{"last-level-with-data", "middle-level", "other"}};
+
+std::string GetLevelCategoryName(LevelCategory category) {
+  return kLevelCategoryToHyphenString[static_cast<size_t>(category)];
+}
+
+bool IsLevelCategoryOther(int level) {
+  return ((level == 0) || (level == kUnknownLevel));
+}
+
+LevelCategory GetLevelCategory(int level, bool is_last_level_with_data) {
+  if (is_last_level_with_data) {
+    return LevelCategory::LAST_LEVEL_WITH_DATA;
+  } else if (IsLevelCategoryOther(level)) {
+    return LevelCategory::OTHER;
+  } else {
+    return LevelCategory::MIDDLE_LEVEL;
+  }
+}
+
+} // namespace pinning 
+
+TablePinningInfo::TablePinningInfo(int _level, bool _is_last_level_with_data,
+                   Cache::ItemOwnerId _item_owner_id, size_t _file_size,
+                   size_t _max_file_size_for_l0_meta_pin)
+      : level(_level),
+        is_last_level_with_data(_is_last_level_with_data),
+        item_owner_id(_item_owner_id),
+        file_size(_file_size),
+        max_file_size_for_l0_meta_pin(_max_file_size_for_l0_meta_pin) {
+  // Validate / Sanitize the level + is_last_level_with_data combination
+  if (is_last_level_with_data) {
+    assert(pinning::IsLevelCategoryOther(level) == false);
+    is_last_level_with_data = false;
+  }
+}
+
+std::string TablePinningInfo::ToString() const {
+  std::string result;
+
+  result.append("level=").append(std::to_string(level)).append(", ");
+  result.append("is_last_level_with_data=")
+      .append(std::to_string(is_last_level_with_data))
+      .append(", ");
+  result.append("item_owner_id=")
+      .append(std::to_string(item_owner_id))
+      .append(", ");
+  result.append("file_size=").append(std::to_string(file_size)).append(", ");
+  result.append("max_file_size_for_l0_meta_pin=").append(std::to_string(max_file_size_for_l0_meta_pin)).append("\n");
+
+  return result;
+}
+
+PinnedEntry::PinnedEntry(int _level, bool _is_last_level_with_data,
+                         pinning::HierarchyCategory _category,
+                         Cache::ItemOwnerId _item_owner_id,
+                         CacheEntryRole _role, size_t _size)
+    : level(_level),
+      is_last_level_with_data(_is_last_level_with_data),
+      category(_category),
+      item_owner_id(_item_owner_id),
+      role(_role),
+      size(_size) {}
+
+std::string PinnedEntry::ToString() const {
+  std::string result;
+
+  result.append("level=").append(std::to_string(level)).append(", ");
+  result.append("is_last_level_with_data=")
+      .append(std::to_string(is_last_level_with_data))
+      .append(", ");
+  result.append("category=")
+      .append(pinning::GetHierarchyCategoryName(category))
+      .append(", ");
+  result.append("item_owner_id=")
+      .append(std::to_string(item_owner_id))
+      .append(", ");
+  result.append("role=").append(GetCacheEntryRoleName(role)).append(", ");
+  result.append("size=").append(std::to_string(size)).append("\n");
+
+  return result;
+}
+
 namespace {
 class DefaultPinningPolicy : public RecordingPinningPolicy {
  public:
@@ -56,40 +156,49 @@ class DefaultPinningPolicy : public RecordingPinningPolicy {
   const char* NickName() const override { return kNickName(); }
 
  protected:
-  bool CheckPin(const TablePinningOptions& tpo, uint8_t type, size_t /*size*/,
+  bool CheckPin(const TablePinningInfo& tpi, pinning::HierarchyCategory category,
+                CacheEntryRole /*role*/, size_t /*size*/,
                 size_t /*limit*/) const override {
-    if (tpo.level < 0) {
+    if (tpi.level < 0) {
       return false;
-    } else if (type == kTopLevel) {
-      return IsPinned(tpo, cache_options_.top_level_index_pinning,
+    } else if (category == pinning::HierarchyCategory::TOP_LEVEL) {
+      return IsPinned(tpi, cache_options_.top_level_index_pinning,
                       pin_top_level_index_and_filter_ ? PinningTier::kAll
                                                       : PinningTier::kNone);
-    } else if (type == kPartition) {
-      return IsPinned(tpo, cache_options_.partition_pinning,
+    } else if (category == pinning::HierarchyCategory::PARTITION) {
+      return IsPinned(tpi, cache_options_.partition_pinning,
                       pin_l0_index_and_filter_ ? PinningTier::kFlushedAndSimilar
                                                : PinningTier::kNone);
     } else {
-      return IsPinned(tpo, cache_options_.unpartitioned_pinning,
+      return IsPinned(tpi, cache_options_.unpartitioned_pinning,
                       pin_l0_index_and_filter_ ? PinningTier::kFlushedAndSimilar
                                                : PinningTier::kNone);
     }
   }
 
  private:
-  bool IsPinned(const TablePinningOptions& tpo, PinningTier pinning_tier,
+  bool IsPinned(const TablePinningInfo& tpi, PinningTier pinning_tier,
                 PinningTier fallback_pinning_tier) const {
     // Fallback to fallback would lead to infinite recursion. Disallow it.
     assert(fallback_pinning_tier != PinningTier::kFallback);
 
+    // printf("pinning_tier=%d\n", (int)pinning_tier);
+
     switch (pinning_tier) {
       case PinningTier::kFallback:
-        return IsPinned(tpo, fallback_pinning_tier,
+        return IsPinned(tpi, fallback_pinning_tier,
                         PinningTier::kNone /* fallback_pinning_tier */);
       case PinningTier::kNone:
         return false;
-      case PinningTier::kFlushedAndSimilar:
-        return tpo.level == 0 &&
-               tpo.file_size <= tpo.max_file_size_for_l0_meta_pin;
+      case PinningTier::kFlushedAndSimilar: {
+        bool answer = (tpi.level == 0 &&
+                       tpi.file_size <= tpi.max_file_size_for_l0_meta_pin);
+        // printf("kFlushedAndSimilar: level=%d, file_size=%d,
+        // max_file_size_for_l0_meta_pin=%d\n", tpi.level, (int)tpi.file_size,
+        // (int)tpi.max_file_size_for_l0_meta_pin); return tpi.level == 0 &&
+        //        tpi.file_size <= tpi.max_file_size_for_l0_meta_pin;
+        return answer;
+      }
       case PinningTier::kAll:
         return true;
       default:
@@ -108,95 +217,6 @@ class DefaultPinningPolicy : public RecordingPinningPolicy {
 TablePinningPolicy* NewDefaultPinningPolicy(
     const BlockBasedTableOptions& bbto) {
   return new DefaultPinningPolicy(bbto);
-}
-
-static const uint8_t kNumTypes = 7;
-static const int kNumLevels = 7;
-
-RecordingPinningPolicy::RecordingPinningPolicy()
-    : usage_(0),
-      attempts_counter_(0),
-      pinned_counter_(0),
-      active_counter_(0),
-      usage_by_level_(kNumLevels + 1),
-      usage_by_type_(kNumTypes) {
-  for (int l = 0; l <= kNumLevels; l++) {
-    usage_by_level_[l].store(0);
-  }
-  for (uint8_t t = 0; t < kNumTypes; t++) {
-    usage_by_type_[t].store(0);
-  }
-}
-
-bool RecordingPinningPolicy::MayPin(const TablePinningOptions& tpo,
-                                    uint8_t type, size_t size) const {
-  attempts_counter_++;
-  return CheckPin(tpo, type, size, usage_);
-}
-
-bool RecordingPinningPolicy::PinData(const TablePinningOptions& tpo,
-                                     uint8_t type, size_t size,
-                                     std::unique_ptr<PinnedEntry>* pinned) {
-  auto limit = usage_.fetch_add(size);
-  if (CheckPin(tpo, type, size, limit)) {
-    pinned_counter_++;
-    pinned->reset(
-        new PinnedEntry(tpo.level, type, size, tpo.is_last_level_with_data));
-    RecordPinned(tpo.level, type, size, true);
-    return true;
-  } else {
-    usage_.fetch_sub(size);
-    return false;
-  }
-}
-
-void RecordingPinningPolicy::UnPinData(std::unique_ptr<PinnedEntry>&& pinned) {
-  RecordPinned(pinned->level, pinned->type, pinned->size, false);
-  usage_ -= pinned->size;
-  pinned.reset();
-}
-
-void RecordingPinningPolicy::RecordPinned(int level, uint8_t type, size_t size,
-                                          bool pinned) {
-  if (level < 0 || level > kNumLevels) level = kNumLevels;
-  if (type >= kNumTypes) type = kNumTypes - 1;
-  if (pinned) {
-    usage_by_level_[level] += size;
-    usage_by_type_[type] += size;
-    active_counter_++;
-  } else {
-    usage_by_level_[level] -= size;
-    usage_by_type_[type] -= size;
-    active_counter_--;
-  }
-}
-
-std::string RecordingPinningPolicy::ToString() const {
-  std::string result;
-  result.append("Pinned Memory=")
-      .append(std::to_string(usage_.load()))
-      .append("\n");
-  result.append("Pinned Attempts=")
-      .append(std::to_string(attempts_counter_.load()))
-      .append("\n");
-  result.append("Pinned Counter=")
-      .append(std::to_string(pinned_counter_.load()))
-      .append("\n");
-  result.append("Active Counter=")
-      .append(std::to_string(active_counter_.load()))
-      .append("\n");
-  return result;
-}
-size_t RecordingPinningPolicy::GetPinnedUsage() const { return usage_; }
-
-size_t RecordingPinningPolicy::GetPinnedUsageByLevel(int level) const {
-  if (level > kNumLevels) level = kNumLevels;
-  return usage_by_level_[level];
-}
-
-size_t RecordingPinningPolicy::GetPinnedUsageByType(uint8_t type) const {
-  if (type >= kNumTypes) type = kNumTypes - 1;
-  return usage_by_type_[type];
 }
 
 static int RegisterBuiltinPinningPolicies(ObjectLibrary& library,

@@ -42,7 +42,7 @@ class UncompressionDictReader {
  public:
   static Status Create(
       const BlockBasedTable* table, const ReadOptions& ro,
-      const TablePinningOptions& tpo, FilePrefetchBuffer* prefetch_buffer,
+      const TablePinningInfo& tpi, FilePrefetchBuffer* prefetch_buffer,
       bool use_cache, bool prefetch, bool pin,
       BlockCacheLookupContext* lookup_context,
       std::unique_ptr<UncompressionDictReader>* uncompression_dict_reader);
@@ -61,7 +61,7 @@ class UncompressionDictReader {
                           std::unique_ptr<PinnedEntry>&& pinned)
       : table_(t),
         uncompression_dict_(std::move(uncompression_dict)),
-        pinned_(std::move(pinned)) {
+        pinned_entry_(std::move(pinned)) {
     assert(table_);
   }
 
@@ -75,7 +75,7 @@ class UncompressionDictReader {
 
   const BlockBasedTable* table_;
   CachableEntry<UncompressionDict> uncompression_dict_;
-  std::unique_ptr<PinnedEntry> pinned_;
+  std::unique_ptr<PinnedEntry> pinned_entry_;
 };
 
 }  // namespace ROCKSDB_NAMESPACE

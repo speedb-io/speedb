@@ -51,17 +51,18 @@ std::string ScopedPinningPolicy::GetId() const {
   return GenerateIndividualId();
 }
 
-bool ScopedPinningPolicy::CheckPin(const TablePinningOptions& tpo,
-                                   uint8_t /* type */, size_t size,
+bool ScopedPinningPolicy::CheckPin(const TablePinningInfo& tpi,
+                                   pinning::HierarchyCategory /* category */,
+                                   CacheEntryRole /* role */, size_t size,
                                    size_t usage) const {
   auto proposed = usage + size;
-  if (tpo.is_last_level_with_data &&
+  if (tpi.is_last_level_with_data &&
       options_.last_level_with_data_percent > 0) {
     if (proposed >
         (options_.capacity * options_.last_level_with_data_percent / 100)) {
       return false;
     }
-  } else if (tpo.level > 0 && options_.mid_percent > 0) {
+  } else if (tpi.level > 0 && options_.mid_percent > 0) {
     if (proposed > (options_.capacity * options_.mid_percent / 100)) {
       return false;
     }

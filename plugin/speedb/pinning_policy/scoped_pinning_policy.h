@@ -19,7 +19,7 @@
 #include "table/block_based/recording_pinning_policy.h"
 
 namespace ROCKSDB_NAMESPACE {
-struct TablePinningOptions;
+struct TablePinningInfo;
 struct ScopedPinningOptions {
   static const char* kName() { return "ScopedPinningOptions"; }
 
@@ -51,8 +51,8 @@ class ScopedPinningPolicy : public RecordingPinningPolicy {
   std::string GetPrintableOptions() const override;
 
  protected:
-  bool CheckPin(const TablePinningOptions& tpo, uint8_t type, size_t size,
-                size_t limit) const override;
+  bool CheckPin(const TablePinningInfo& tpi, pinning::HierarchyCategory category,
+                CacheEntryRole role, size_t size, size_t limit) const override;
 
  private:
   ScopedPinningOptions options_;

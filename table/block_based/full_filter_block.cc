@@ -27,6 +27,7 @@
 #include "port/port.h"
 #include "rocksdb/filter_policy.h"
 #include "rocksdb/table_pinning_policy.h"
+#include "rocksdb/cache.h"
 #include "table/block_based/block_based_table_reader.h"
 #include "util/coding.h"
 
@@ -136,8 +137,8 @@ Slice FullFilterBlockBuilder::Finish(
 FullFilterBlockReader::FullFilterBlockReader(
     const BlockBasedTable* t,
     CachableEntry<ParsedFullFilterBlock>&& filter_block,
-    std::unique_ptr<PinnedEntry>&& pinned)
-    : FilterBlockReaderCommon(t, std::move(filter_block), std::move(pinned)) {}
+    std::unique_ptr<PinnedEntry> pinned_entry)
+    : FilterBlockReaderCommon(t, std::move(filter_block), std::move(pinned_entry)) {}
 
 bool FullFilterBlockReader::KeyMayMatch(const Slice& key, const bool no_io,
                                         const Slice* const /*const_ikey_ptr*/,
@@ -152,7 +153,7 @@ bool FullFilterBlockReader::KeyMayMatch(const Slice& key, const bool no_io,
 
 std::unique_ptr<FilterBlockReader> FullFilterBlockReader::Create(
     const BlockBasedTable* table, const ReadOptions& ro,
-    const TablePinningOptions& tpo, FilePrefetchBuffer* prefetch_buffer,
+    const TablePinningInfo& tpi, FilePrefetchBuffer* prefetch_buffer,
     bool use_cache, bool prefetch, bool pin,
     BlockCacheLookupContext* lookup_context) {
   assert(table);
@@ -160,7 +161,7 @@ std::unique_ptr<FilterBlockReader> FullFilterBlockReader::Create(
   assert(!pin || prefetch);
 
   CachableEntry<ParsedFullFilterBlock> filter_block;
-  std::unique_ptr<PinnedEntry> pinned;
+  std::unique_ptr<PinnedEntry> pinned_entry;
   if (prefetch || !use_cache) {
     const Status s = ReadFilterBlock(table, prefetch_buffer, ro, use_cache,
                                      nullptr /* get_context */, lookup_context,
@@ -170,18 +171,18 @@ std::unique_ptr<FilterBlockReader> FullFilterBlockReader::Create(
       return std::unique_ptr<FilterBlockReader>();
     }
     if (pin) {
-      table->PinData(tpo, TablePinningPolicy::kFilter,
+      table->PinData(tpi, pinning::HierarchyCategory::OTHER, CacheEntryRole::kFilterBlock,
                      filter_block.GetValue()->ApproximateMemoryUsage(),
-                     &pinned);
+                     &pinned_entry);
     }
 
-    if (use_cache && !pinned) {
+    if (use_cache && !pinned_entry) {
       filter_block.Reset();
     }
   }
 
   return std::unique_ptr<FilterBlockReader>(new FullFilterBlockReader(
-      table, std::move(filter_block), std::move(pinned)));
+      table, std::move(filter_block), std::move(pinned_entry)));
 }
 
 bool FullFilterBlockReader::PrefixMayMatch(
@@ -191,7 +192,7 @@ bool FullFilterBlockReader::PrefixMayMatch(
   return MayMatch(prefix, no_io, get_context, lookup_context, read_options);
 }
 
-bool FullFilterBlockReader::MayMatch(const Slice& entry, bool no_io,
+bool FullFilterBlockReader::MayMatch(const Slice& pinned_entry, bool no_io,
                                      GetContext* get_context,
                                      BlockCacheLookupContext* lookup_context,
                                      const ReadOptions& read_options) const {
@@ -210,7 +211,7 @@ bool FullFilterBlockReader::MayMatch(const Slice& entry, bool no_io,
       filter_block.GetValue()->filter_bits_reader();
 
   if (filter_bits_reader) {
-    if (filter_bits_reader->MayMatch(entry)) {
+    if (filter_bits_reader->MayMatch(pinned_entry)) {
       PERF_COUNTER_ADD(bloom_sst_hit_count, 1);
       return true;
     } else {

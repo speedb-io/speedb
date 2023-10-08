@@ -210,12 +210,12 @@ Slice PartitionedFilterBlockBuilder::Finish(
 PartitionedFilterBlockReader::PartitionedFilterBlockReader(
     const BlockBasedTable* t,
     CachableEntry<Block_kFilterPartitionIndex>&& filter_block,
-    std::unique_ptr<PinnedEntry>&& pinned)
-    : FilterBlockReaderCommon(t, std::move(filter_block), std::move(pinned)) {}
+    std::unique_ptr<PinnedEntry> pinned_entry)
+    : FilterBlockReaderCommon(t, std::move(filter_block), std::move(pinned_entry)) {}
 
 std::unique_ptr<FilterBlockReader> PartitionedFilterBlockReader::Create(
     const BlockBasedTable* table, const ReadOptions& ro,
-    const TablePinningOptions& tpo, FilePrefetchBuffer* prefetch_buffer,
+    const TablePinningInfo& tpi, FilePrefetchBuffer* prefetch_buffer,
     bool use_cache, bool prefetch, bool pin,
     BlockCacheLookupContext* lookup_context) {
   assert(table);
@@ -223,7 +223,7 @@ std::unique_ptr<FilterBlockReader> PartitionedFilterBlockReader::Create(
   assert(!pin || prefetch);
 
   CachableEntry<Block_kFilterPartitionIndex> filter_block;
-  std::unique_ptr<PinnedEntry> pinned;
+  std::unique_ptr<PinnedEntry> pinned_entry;
 
   if (prefetch || !use_cache) {
     const Status s = ReadFilterBlock(table, prefetch_buffer, ro, use_cache,
@@ -235,17 +235,17 @@ std::unique_ptr<FilterBlockReader> PartitionedFilterBlockReader::Create(
     }
 
     if (pin) {
-      table->PinData(tpo, TablePinningPolicy::kTopLevel,
+      table->PinData(tpi, pinning::HierarchyCategory::TOP_LEVEL, CacheEntryRole::kFilterBlock,
                      filter_block.GetValue()->ApproximateMemoryUsage(),
-                     &pinned);
+                     &pinned_entry);
     }
-    if (use_cache && !pinned) {
+    if (use_cache && !pinned_entry) {
       filter_block.Reset();
     }
   }
 
   return std::unique_ptr<FilterBlockReader>(new PartitionedFilterBlockReader(
-      table, std::move(filter_block), std::move(pinned)));
+      table, std::move(filter_block), std::move(pinned_entry)));
 }
 
 bool PartitionedFilterBlockReader::KeyMayMatch(

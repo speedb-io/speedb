@@ -31,7 +31,7 @@
 namespace ROCKSDB_NAMESPACE {
 Status PartitionIndexReader::Create(
     const BlockBasedTable* table, const ReadOptions& ro,
-    const TablePinningOptions& tpo, FilePrefetchBuffer* prefetch_buffer,
+    const TablePinningInfo& tpi, FilePrefetchBuffer* prefetch_buffer,
     bool use_cache, bool prefetch, bool pin,
     BlockCacheLookupContext* lookup_context,
     std::unique_ptr<IndexReader>* index_reader) {
@@ -41,7 +41,7 @@ Status PartitionIndexReader::Create(
   assert(index_reader != nullptr);
 
   CachableEntry<Block> index_block;
-  std::unique_ptr<PinnedEntry> pinned;
+  std::unique_ptr<PinnedEntry> pinned_entry;
   if (prefetch || !use_cache) {
     const Status s =
         ReadIndexBlock(table, prefetch_buffer, ro, use_cache,
@@ -51,17 +51,17 @@ Status PartitionIndexReader::Create(
     }
 
     if (pin) {
-      pin = table->PinData(tpo, TablePinningPolicy::kTopLevel,
+      pin = table->PinData(tpi, pinning::HierarchyCategory::TOP_LEVEL, CacheEntryRole::kIndexBlock,
                            index_block.GetValue()->ApproximateMemoryUsage(),
-                           &pinned);
+                           &pinned_entry);
     }
-    if (use_cache && !pinned) {
+    if (use_cache && !pinned_entry) {
       index_block.Reset();
     }
   }
 
   index_reader->reset(new PartitionIndexReader(table, std::move(index_block),
-                                               std::move(pinned)));
+                                               std::move(pinned_entry)));
 
   return Status::OK();
 }

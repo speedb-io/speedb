@@ -29,8 +29,8 @@
 namespace ROCKSDB_NAMESPACE {
 template <typename TBlocklike>
 FilterBlockReaderCommon<TBlocklike>::~FilterBlockReaderCommon() {
-  if (pinned_) {
-    table_->UnPinData(std::move(pinned_));
+  if (pinned_entry_) {
+    table_->UnPinData(std::move(pinned_entry_));
   }
 }
 

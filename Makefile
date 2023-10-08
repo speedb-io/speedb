@@ -1595,6 +1595,9 @@ block_based_table_reader_test: table/block_based/block_based_table_reader_test.o
 full_filter_block_test: $(OBJ_DIR)/table/block_based/full_filter_block_test.o $(TEST_LIBRARY) $(LIBRARY)
 	$(AM_LINK)
 
+recording_pinning_policy_test: $(OBJ_DIR)/table/block_based/recording_pinning_policy_test.o $(TEST_LIBRARY) $(LIBRARY)
+	$(AM_LINK)        
+
 partitioned_filter_block_test: $(OBJ_DIR)/table/block_based/partitioned_filter_block_test.o $(TEST_LIBRARY) $(LIBRARY)
 	$(AM_LINK)
 

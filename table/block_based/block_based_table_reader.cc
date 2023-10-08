@@ -795,11 +795,11 @@ Status BlockBasedTable::Open(
     return s;
   }
   rep->verify_checksum_set_on_open = ro.verify_checksums;
-  TablePinningOptions tpo(level, is_last_level_with_data, file_size,
-                          max_file_size_for_l0_meta_pin);
+  TablePinningInfo tpi(level, is_last_level_with_data, rep->cache_owner_id,
+                       file_size, max_file_size_for_l0_meta_pin);
   s = new_table->PrefetchIndexAndFilterBlocks(
       ro, prefetch_buffer.get(), metaindex_iter.get(), new_table.get(),
-      prefetch_all, table_options, tpo, &lookup_context);
+      prefetch_all, table_options, tpi, &lookup_context);
 
   if (s.ok()) {
     // Update tail prefetch stats
@@ -1034,7 +1034,7 @@ Status BlockBasedTable::PrefetchIndexAndFilterBlocks(
     const ReadOptions& ro, FilePrefetchBuffer* prefetch_buffer,
     InternalIterator* meta_iter, BlockBasedTable* new_table, bool prefetch_all,
     const BlockBasedTableOptions& table_options,
-    const TablePinningOptions& pinning_options,
+    const TablePinningInfo& pinning_options,
     BlockCacheLookupContext* lookup_context) {
   // Find filter handle and filter type
   if (rep_->filter_policy) {
@@ -1130,7 +1130,8 @@ Status BlockBasedTable::PrefetchIndexAndFilterBlocks(
 
   rep_->index_reader = std::move(index_reader);
   bool pin_partition = table_options.pinning_policy->MayPin(
-      pinning_options, TablePinningPolicy::kPartition, 0);
+      pinning_options, pinning::HierarchyCategory::PARTITION,
+      CacheEntryRole::kIndexBlock, 0);
   // The partitions of partitioned index are always stored in cache. They
   // are hence follow the configuration for pin and prefetch regardless of
   // the value of cache_index_and_filter_blocks
@@ -1147,9 +1148,9 @@ Status BlockBasedTable::PrefetchIndexAndFilterBlocks(
     const bool pin_filter = table_options.pinning_policy->MayPin(
         pinning_options,
         (rep_->filter_type == Rep::FilterType::kPartitionedFilter)
-            ? TablePinningPolicy::kTopLevel
-            : TablePinningPolicy::kFilter,
-        rep_->filter_handle.size());
+            ? pinning::HierarchyCategory::TOP_LEVEL
+            : pinning::HierarchyCategory::OTHER,
+        CacheEntryRole::kFilterBlock, rep_->filter_handle.size());
 
     // prefetch the first level of filter
     // WART: this might be redundant (unnecessary cache hit) if !pin_filter,
@@ -1175,7 +1176,8 @@ Status BlockBasedTable::PrefetchIndexAndFilterBlocks(
   if (!rep_->compression_dict_handle.IsNull()) {
     std::unique_ptr<UncompressionDictReader> uncompression_dict_reader;
     const bool pin_dict = table_options.pinning_policy->MayPin(
-        pinning_options, TablePinningPolicy::kDictionary,
+        pinning_options, pinning::HierarchyCategory::OTHER,
+        CacheEntryRole::kOtherBlock,
         rep_->compression_dict_handle.size());
 
     s = UncompressionDictReader::Create(
@@ -1201,15 +1203,17 @@ TablePinningPolicy* BlockBasedTable::GetPinningPolicy() const {
   return rep_->table_options.pinning_policy.get();
 }
 
-bool BlockBasedTable::PinData(const TablePinningOptions& tpo, uint8_t type,
+bool BlockBasedTable::PinData(const TablePinningInfo& tpi,
+                              pinning::HierarchyCategory category, CacheEntryRole role,
                               size_t size,
-                              std::unique_ptr<PinnedEntry>* pinned) const {
-  return rep_->table_options.pinning_policy->PinData(tpo, type, size, pinned);
+                              std::unique_ptr<PinnedEntry>* pinned_entry) const {
+  return rep_->table_options.pinning_policy->PinData(
+      tpi, category, role, size, pinned_entry);
 }
 
-void BlockBasedTable::UnPinData(std::unique_ptr<PinnedEntry>&& pinned) const {
-  if (pinned) {
-    rep_->table_options.pinning_policy->UnPinData(std::move(pinned));
+void BlockBasedTable::UnPinData(std::unique_ptr<PinnedEntry> pinned_entry) const {
+  if (pinned_entry) {
+    rep_->table_options.pinning_policy->UnPinData(std::move(pinned_entry));
   }
 }
 
@@ -1392,7 +1396,7 @@ WithBlocklikeCheck<Status, TBlocklike> BlockBasedTable::PutDataBlockToCache(
 }
 
 std::unique_ptr<FilterBlockReader> BlockBasedTable::CreateFilterBlockReader(
-    const ReadOptions& ro, const TablePinningOptions& tpo,
+    const ReadOptions& ro, const TablePinningInfo& tpi,
     FilePrefetchBuffer* prefetch_buffer, bool use_cache, bool prefetch,
     bool pin, BlockCacheLookupContext* lookup_context) {
   auto& rep = rep_;
@@ -1406,11 +1410,11 @@ std::unique_ptr<FilterBlockReader> BlockBasedTable::CreateFilterBlockReader(
   switch (filter_type) {
     case Rep::FilterType::kPartitionedFilter:
       return PartitionedFilterBlockReader::Create(
-          this, ro, tpo, prefetch_buffer, use_cache, prefetch, pin,
+          this, ro, tpi, prefetch_buffer, use_cache, prefetch, pin,
           lookup_context);
 
     case Rep::FilterType::kFullFilter:
-      return FullFilterBlockReader::Create(this, ro, tpo, prefetch_buffer,
+      return FullFilterBlockReader::Create(this, ro, tpi, prefetch_buffer,
                                            use_cache, prefetch, pin,
                                            lookup_context);
 
@@ -2538,7 +2542,7 @@ bool BlockBasedTable::TEST_KeyInCache(const ReadOptions& options,
 //  4. internal_comparator
 //  5. index_type
 Status BlockBasedTable::CreateIndexReader(
-    const ReadOptions& ro, const TablePinningOptions& tpo,
+    const ReadOptions& ro, const TablePinningInfo& tpi,
     FilePrefetchBuffer* prefetch_buffer, InternalIterator* meta_iter,
     bool use_cache, bool prefetch_index,
     BlockCacheLookupContext* lookup_context,
@@ -2554,7 +2558,8 @@ Status BlockBasedTable::CreateIndexReader(
 
   auto pinning_policy = GetPinningPolicy();
   // pin the first level of index
-  bool pin = pinning_policy->MayPin(tpo, TablePinningPolicy::kIndex,
+  bool pin = pinning_policy->MayPin(tpi, pinning::HierarchyCategory::OTHER,
+                                    CacheEntryRole::kIndexBlock,
                                     rep_->footer.index_handle().size());
   // prefetch the first level of index
   // WART: this might be redundant (unnecessary cache hit) if !pin_index,
@@ -2563,16 +2568,17 @@ Status BlockBasedTable::CreateIndexReader(
 
   switch (rep_->index_type) {
     case BlockBasedTableOptions::kTwoLevelIndexSearch: {
-      pin = pinning_policy->MayPin(tpo, TablePinningPolicy::kTopLevel,
+      pin = pinning_policy->MayPin(tpi, pinning::HierarchyCategory::TOP_LEVEL,
+                                   CacheEntryRole::kIndexBlock,
                                    rep_->footer.index_handle().size());
-      return PartitionIndexReader::Create(this, ro, tpo, prefetch_buffer,
+      return PartitionIndexReader::Create(this, ro, tpi, prefetch_buffer,
                                           use_cache, prefetch_index | pin, pin,
                                           lookup_context, index_reader);
     }
     case BlockBasedTableOptions::kBinarySearch:
       FALLTHROUGH_INTENDED;
     case BlockBasedTableOptions::kBinarySearchWithFirstKey: {
-      return BinarySearchIndexReader::Create(this, ro, tpo, prefetch_buffer,
+      return BinarySearchIndexReader::Create(this, ro, tpi, prefetch_buffer,
                                              use_cache, prefetch, pin,
                                              lookup_context, index_reader);
     }
@@ -2581,11 +2587,11 @@ Status BlockBasedTable::CreateIndexReader(
         ROCKS_LOG_WARN(rep_->ioptions.logger,
                        "Missing prefix extractor for hash index. Fall back to"
                        " binary search index.");
-        return BinarySearchIndexReader::Create(this, ro, tpo, prefetch_buffer,
+        return BinarySearchIndexReader::Create(this, ro, tpi, prefetch_buffer,
                                                use_cache, prefetch, pin,
                                                lookup_context, index_reader);
       } else {
-        return HashIndexReader::Create(this, ro, tpo, prefetch_buffer,
+        return HashIndexReader::Create(this, ro, tpi, prefetch_buffer,
                                        meta_iter, use_cache, prefetch, pin,
                                        lookup_context, index_reader);
       }

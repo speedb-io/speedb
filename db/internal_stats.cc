@@ -45,6 +45,8 @@
 #include "util/hash_containers.h"
 #include "util/string_util.h"
 
+#include "table/block_based/recording_pinning_policy.h"
+
 namespace ROCKSDB_NAMESPACE {
 
 
@@ -2226,6 +2228,23 @@ void InternalStats::DumpCFStatsNoFileHistogram(bool is_periodic,
       value->append(stats.ToString(clock_));
       value->append(stats.CacheOwnerStatsToString(cfd_->GetName(),
                                                   cfd_->GetCacheOwnerId()));
+    }
+  }
+
+  const BlockBasedTableOptions* bbto = cfd_->GetBlockBasedTableOptions();
+  if (bbto->pinning_policy) {
+    auto recording_policy = static_cast<const RecordingPinningPolicy*>(bbto->pinning_policy.get());
+    auto cfd_pinning_counters = recording_policy->GetOwnerIdPinnedUsageCounters(cfd_->GetCacheOwnerId());
+
+    printf("Pinning counter for CF:%s\n", cfd_->GetName().c_str());
+    for (auto level_category_idx = 0U; level_category_idx < cfd_pinning_counters.size(); ++level_category_idx) {
+      const RecordingPinningPolicy::PerRolePinnedCountersForQuery& role_counters = cfd_pinning_counters[level_category_idx];
+      for (auto role_idx = 0U; role_idx < role_counters.size(); ++role_idx) {
+        printf("Total-Pinned[%s][%s]=%d\n", 
+                pinning::GetLevelCategoryName(pinning::LevelCategory(level_category_idx)).c_str(), 
+                GetCacheEntryRoleName(CacheEntryRole(role_idx)).c_str(),
+                (int)role_counters[role_idx]);
+      }
     }
   }
 }

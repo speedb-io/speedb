@@ -11,7 +11,13 @@
 
 namespace ROCKSDB_NAMESPACE {
 
-// Define all public custom types here.
+// Define all PUBLIC COSTANTS here
+
+// To be used when one must specify a level but the level is unknown
+constexpr int kUnknownLevel = -1;
+
+
+// Define all PUBLIC CUSTOM TYPES here.
 
 using ColumnFamilyId = uint32_t;
 

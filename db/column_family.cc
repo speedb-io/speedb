@@ -671,6 +671,10 @@ ColumnFamilyData::ColumnFamilyData(
   }
 }
 
+const BlockBasedTableOptions* ColumnFamilyData::GetBlockBasedTableOptions() const {
+  return ioptions_.table_factory->GetOptions<BlockBasedTableOptions>();
+}
+
 // DB mutex held
 ColumnFamilyData::~ColumnFamilyData() {
   assert(refs_.load(std::memory_order_relaxed) == 0);

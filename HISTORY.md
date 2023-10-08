@@ -9,6 +9,7 @@ Fix RepeatableThread to work properly with on thread start callback feature (htt
 
 ### Enhancements
 * Unit Testing: Expose the disallow_trivial_move flag in the MoveFilesToLevel testing utility (#677).
+* Static Pinning: Report pinning policy name and paramteres to the log (#691).
 
 ### Bug Fixes
 * db_bench: fix SeekRandomWriteRandom valid check. Use key and value only after checking iterator is valid.

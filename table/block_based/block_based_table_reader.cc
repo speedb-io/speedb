@@ -780,6 +780,7 @@ Status BlockBasedTable::Open(
     return s;
   }
   TablePinningOptions tpo(level, is_last_level_with_data, file_size,
+                          rep->cache_owner_id,
                           max_file_size_for_l0_meta_pin);
   s = new_table->PrefetchIndexAndFilterBlocks(
       ro, prefetch_buffer.get(), metaindex_iter.get(), new_table.get(),
@@ -1160,11 +1161,10 @@ TablePinningPolicy* BlockBasedTable::GetPinningPolicy() const {
 
 bool BlockBasedTable::PinData(const TablePinningOptions& tpo,
                               HierarchyCategory category,
-                              Cache::ItemOwnerId item_owner_id,
                               CacheEntryRole role, size_t size,
                               std::unique_ptr<PinnedEntry>* pinned) const {
   return rep_->table_options.pinning_policy->PinData(
-      tpo, category, item_owner_id, role, size, pinned);
+      tpo, category, role, size, pinned);
 }
 
 void BlockBasedTable::UnPinData(std::unique_ptr<PinnedEntry>&& pinned) const {

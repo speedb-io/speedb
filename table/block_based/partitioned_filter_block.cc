@@ -228,7 +228,7 @@ std::unique_ptr<FilterBlockReader> PartitionedFilterBlockReader::Create(
     }
 
     if (pin) {
-      table->PinData(tpo, TablePinningPolicy::kTopLevel,
+      table->PinData(tpo, HierarchyCategory::TOP_LEVEL, CacheEntryRole::kFilterBlock,
                      filter_block.GetValue()->ApproximateMemoryUsage(),
                      &pinned);
     }

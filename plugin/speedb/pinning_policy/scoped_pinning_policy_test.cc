@@ -39,12 +39,11 @@ class ScopedPinningPolicyTest : public testing::Test {
     return scoped;
   }
   bool PinData(const TablePinningOptions& tpo, HierarchyCategory category,
-               Cache::ItemOwnerId item_owner_id, CacheEntryRole role,
+               CacheEntryRole role,
                size_t size,
                std::vector<std::unique_ptr<PinnedEntry>>& entries) {
     std::unique_ptr<PinnedEntry> p;
-    if (pinning_policy_->PinData(tpo, category, item_owner_id, role, size,
-                                 &p)) {
+    if (pinning_policy_->PinData(tpo, category, role, size, &p)) {
       EXPECT_NE(p.get(), nullptr);
       entries.emplace_back(std::move(p));
       return true;
@@ -127,9 +126,9 @@ TEST_F(ScopedPinningPolicyTest, TestLimits) {
   size_t bottom = capacity * opts->last_level_with_data_percent / 100;
   size_t mid = capacity * opts->mid_percent / 100;
 
-  TablePinningOptions l0(0, false, 0, 0);  // Level 0
-  TablePinningOptions lm(1, false, 0, 0);  // Mid level
-  TablePinningOptions lb(2, true, 0, 0);   // Bottom level
+  TablePinningOptions l0(0, false, Cache::kUnkonwnItemOwnerId, 0, 0);  // Level 0
+  TablePinningOptions lm(1, false, Cache::kUnkonwnItemOwnerId, 0, 0);  // Mid level
+  TablePinningOptions lb(2, true, Cache::kUnkonwnItemOwnerId, 0, 0);   // Bottom level
 
   std::vector<std::unique_ptr<PinnedEntry>> pinned_entries;
   std::unique_ptr<PinnedEntry> pinned;
@@ -139,49 +138,49 @@ TEST_F(ScopedPinningPolicyTest, TestLimits) {
   ASSERT_FALSE(policy->MayPin(lm, HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, capacity + 1));
   ASSERT_FALSE(policy->MayPin(lb, HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, capacity + 1));
   ASSERT_FALSE(
-      policy->PinData(l0, HierarchyCategory::OTHER, Cache::kUnknownItemOwnerId, CacheEntryRole::kIndexBlock, capacity + 1, &pinned));
+      policy->PinData(l0, HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, capacity + 1, &pinned));
   ASSERT_EQ(pinned, nullptr);
   ASSERT_FALSE(
-      policy->PinData(lm, HierarchyCategory::OTHER, Cache::kUnknownItemOwnerId, CacheEntryRole::kIndexBlock, capacity + 1, &pinned));
+      policy->PinData(lm, HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, capacity + 1, &pinned));
   ASSERT_EQ(pinned, nullptr);
   ASSERT_FALSE(
-      policy->PinData(lb, HierarchyCategory::OTHER, Cache::kUnknownItemOwnerId, CacheEntryRole::kIndexBlock, capacity + 1, &pinned));
+      policy->PinData(lb, HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, capacity + 1, &pinned));
   ASSERT_EQ(pinned, nullptr);
 
-  // Mid and bottom levels cannot pin more than their limits
+  // Mid and last-level-with-data levels cannot pin more than their limits
   ASSERT_FALSE(policy->MayPin(lm, HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, mid + 1));
   ASSERT_FALSE(
-      policy->PinData(lm, HierarchyCategory::OTHER, Cache::kUnknownItemOwnerId, CacheEntryRole::kIndexBlock, mid + 1, &pinned));
+      policy->PinData(lm, HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, mid + 1, &pinned));
   ASSERT_EQ(pinned, nullptr);
   ASSERT_FALSE(policy->MayPin(lb, HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, bottom + 1));
   ASSERT_FALSE(
-      policy->PinData(lb, HierarchyCategory::OTHER, Cache::kUnknownItemOwnerId, CacheEntryRole::kIndexBlock, bottom + 1, &pinned));
+      policy->PinData(lb, HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, bottom + 1, &pinned));
   ASSERT_EQ(pinned, nullptr);
 
-  ASSERT_TRUE(PinData(l0, HierarchyCategory::OTHER, Cache::kUnknownItemOwnerId, CacheEntryRole::kIndexBlock, 2, pinned_entries));
+  ASSERT_TRUE(PinData(l0, HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, 2, pinned_entries));
   ASSERT_FALSE(policy->MayPin(l0, HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, capacity - 1));
   ASSERT_FALSE(policy->MayPin(lm, HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, capacity - 1));
   ASSERT_FALSE(policy->MayPin(lb, HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, capacity - 1));
   ASSERT_FALSE(
-      policy->PinData(l0, HierarchyCategory::OTHER, Cache::kUnknownItemOwnerId, CacheEntryRole::kIndexBlock, capacity - 1, &pinned));
+      policy->PinData(l0, HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, capacity - 1, &pinned));
   ASSERT_EQ(pinned, nullptr);
   ASSERT_FALSE(
-      policy->PinData(lm, HierarchyCategory::OTHER, Cache::kUnknownItemOwnerId, CacheEntryRole::kIndexBlock, capacity - 1, &pinned));
+      policy->PinData(lm, HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, capacity - 1, &pinned));
   ASSERT_EQ(pinned, nullptr);
   ASSERT_FALSE(
-      policy->PinData(lb, HierarchyCategory::OTHER, Cache::kUnknownItemOwnerId, CacheEntryRole::kIndexBlock, capacity - 1, &pinned));
+      policy->PinData(lb, HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, capacity - 1, &pinned));
   ASSERT_EQ(pinned, nullptr);
   ASSERT_FALSE(policy->MayPin(lm, HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, mid - 1));
   ASSERT_FALSE(
-      policy->PinData(lm, HierarchyCategory::OTHER, Cache::kUnknownItemOwnerId, CacheEntryRole::kIndexBlock, mid - 1, &pinned));
+      policy->PinData(lm, HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, mid - 1, &pinned));
   ASSERT_EQ(pinned, nullptr);
   ASSERT_FALSE(policy->MayPin(lb, HierarchyCategory::TOP_LEVEL, CacheEntryRole::kMisc, bottom - 1));
   ASSERT_FALSE(
-      policy->PinData(lb, HierarchyCategory::TOP_LEVEL, Cache::kUnknownItemOwnerId, CacheEntryRole::kMisc, bottom - 1, &pinned));
+      policy->PinData(lb, HierarchyCategory::TOP_LEVEL, CacheEntryRole::kMisc, bottom - 1, &pinned));
   ASSERT_EQ(pinned, nullptr);
 
   ASSERT_TRUE(
-      PinData(lb, HierarchyCategory::TOP_LEVEL, Cache::kUnknownItemOwnerId, CacheEntryRole::kMisc, bottom - 3, pinned_entries));
+      PinData(lb, HierarchyCategory::TOP_LEVEL, CacheEntryRole::kMisc, bottom - 3, pinned_entries));
   ASSERT_EQ(policy->GetPinnedUsage(), bottom - 1);
   // ASSERT_EQ(policy->GetPinnedUsageByLevel(0), 2);
   // ASSERT_EQ(policy->GetPinnedUsageByLevel(lb.level), bottom - 3);

@@ -51,6 +51,7 @@ std::string ScopedPinningPolicy::GetId() const {
 
 bool ScopedPinningPolicy::CheckPin(const TablePinningOptions& tpo,
                                    HierarchyCategory /* category */,
+                                   CacheEntryRole /* role */,
                                    size_t size, size_t usage) const {
   auto proposed = usage + size;
   if (tpo.is_last_level_with_data &&

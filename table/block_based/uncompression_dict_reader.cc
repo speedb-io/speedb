@@ -51,7 +51,9 @@ Status UncompressionDictReader::Create(
     }
 
     if (pin) {
-      table->PinData(tpo, TablePinningPolicy::kDictionary,
+      // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+      // DICTIONARY ROLE!!!!!
+      table->PinData(tpo, HierarchyCategory::OTHER, CacheEntryRole::kMisc,
                      uncompression_dict.GetValue()->ApproximateMemoryUsage(),
                      &pinned);
     }

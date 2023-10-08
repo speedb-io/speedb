@@ -7445,10 +7445,10 @@ class MyPinningPolicy : public TablePinningPolicy {
   }
 
   bool PinData(const TablePinningOptions& tpo, HierarchyCategory category,
-               Cache::ItemOwnerId item_owner_id, CacheEntryRole role,
+               CacheEntryRole role,
                size_t size, std::unique_ptr<PinnedEntry>* pinned) override {
     pinned->reset(new PinnedEntry(tpo.level, tpo.is_last_level_with_data,
-                                  category, item_owner_id, role, size));
+                                  category, tpo.item_owner_id, role, size));
     ++total_num_pinned_;
     usage_ += size;
     if (tpo.is_last_level_with_data) {

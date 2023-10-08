@@ -38,7 +38,7 @@ class RecordingPinningPolicy : public TablePinningPolicy {
   bool MayPin(const TablePinningOptions& tpo, HierarchyCategory category,
               CacheEntryRole role, size_t size) const override;
   bool PinData(const TablePinningOptions& tpo, HierarchyCategory category,
-               Cache::ItemOwnerId item_owner_id, CacheEntryRole role,
+               CacheEntryRole role,
                size_t size, std::unique_ptr<PinnedEntry>* pinned) override;
   void UnPinData(std::unique_ptr<PinnedEntry>&& pinned) override;
   std::string ToString() const override;

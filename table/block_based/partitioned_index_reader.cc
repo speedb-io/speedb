@@ -51,7 +51,7 @@ Status PartitionIndexReader::Create(
     }
 
     if (pin) {
-      pin = table->PinData(tpo, TablePinningPolicy::kTopLevel,
+      pin = table->PinData(tpo, HierarchyCategory::TOP_LEVEL, CacheEntryRole::kIndexBlock,
                            index_block.GetValue()->ApproximateMemoryUsage(),
                            &pinned);
     }

@@ -134,15 +134,14 @@ bool RecordingPinningPolicy::MayPin(const TablePinningOptions& tpo,
 
 bool RecordingPinningPolicy::PinData(const TablePinningOptions& tpo,
                                      HierarchyCategory category,
-                                     Cache::ItemOwnerId item_owner_id,
                                      CacheEntryRole role, size_t size,
                                      std::unique_ptr<PinnedEntry>* pinned) {
   auto limit = usage_.fetch_add(size);
   if (CheckPin(tpo, category, role, size, limit)) {
     pinned_counter_++;
     pinned->reset(new PinnedEntry(tpo.level, tpo.is_last_level_with_data,
-                                  category, item_owner_id, role, size));
-    RecordPinned(tpo.level, category, item_owner_id, role, size, true);
+                                  category, tpo.item_owner_id, role, size));
+    RecordPinned(tpo.level, category, tpo.item_owner_id, role, size, true);
     return true;
   } else {
     usage_.fetch_sub(size);

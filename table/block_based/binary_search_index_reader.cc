@@ -45,7 +45,7 @@ Status BinarySearchIndexReader::Create(
     }
 
     if (pin) {
-      table->PinData(tpo, HierarchyCategory::OTHER, Cache::kUnknownItemOwnerId,
+      table->PinData(tpo, HierarchyCategory::OTHER,
                      CacheEntryRole::kIndexBlock,
                      index_block.GetValue()->ApproximateMemoryUsage(), &pinned);
     }

@@ -1418,7 +1418,7 @@ class MockTablePinningPolicy : public TablePinningPolicy {
   }
   bool PinData(const TablePinningOptions& /*tpo*/,
                HierarchyCategory /*category*/,
-               Cache::ItemOwnerId /*item_owner_id*/, CacheEntryRole /*role*/,
+               CacheEntryRole /*role*/,
                size_t /*size*/,
                std::unique_ptr<PinnedEntry>* /*pinned*/) override {
     return false;

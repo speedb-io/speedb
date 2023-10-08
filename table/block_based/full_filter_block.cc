@@ -27,6 +27,7 @@
 #include "port/port.h"
 #include "rocksdb/filter_policy.h"
 #include "rocksdb/table_pinning_policy.h"
+#include "rocksdb/cache.h"
 #include "table/block_based/block_based_table_reader.h"
 #include "util/coding.h"
 
@@ -171,7 +172,7 @@ std::unique_ptr<FilterBlockReader> FullFilterBlockReader::Create(
       return std::unique_ptr<FilterBlockReader>();
     }
     if (pin) {
-      table->PinData(tpo, TablePinningPolicy::kFilter,
+      table->PinData(tpo, HierarchyCategory::OTHER, CacheEntryRole::kFilterBlock,
                      filter_block.GetValue()->ApproximateMemoryUsage(),
                      &pinned);
     }

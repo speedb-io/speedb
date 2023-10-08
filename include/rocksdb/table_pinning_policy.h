@@ -39,13 +39,15 @@ struct TablePinningOptions {
   TablePinningOptions() = default;
 
   TablePinningOptions(int _level, bool _is_last_level_with_data,
-                      size_t _file_size, size_t _max_file_size_for_l0_meta_pin)
+                      Cache::ItemOwnerId _item_owner_id, size_t _file_size, size_t _max_file_size_for_l0_meta_pin)
       : level(_level),
         is_last_level_with_data(_is_last_level_with_data),
+        item_owner_id(_item_owner_id),
         file_size(_file_size),
         max_file_size_for_l0_meta_pin(_max_file_size_for_l0_meta_pin) {}
   int level = -1;
   bool is_last_level_with_data = false;
+  Cache::ItemOwnerId item_owner_id = Cache::kUnknownItemOwnerId;
   size_t file_size = 0;
   size_t max_file_size_for_l0_meta_pin = 0;
 };
@@ -102,7 +104,7 @@ class TablePinningPolicy : public Customizable {
   // pinned
   virtual bool PinData(const TablePinningOptions& tpo,
                        HierarchyCategory category,
-                       Cache::ItemOwnerId _item_owner_id, CacheEntryRole _role,
+                       CacheEntryRole _role,
                        size_t size, std::unique_ptr<PinnedEntry>* pinned) = 0;
 
   // Releases and clears the pinned entry.
@@ -126,9 +128,9 @@ class TablePinningPolicyWrapper : public TablePinningPolicy {
   }
 
   bool PinData(const TablePinningOptions& tpo, HierarchyCategory category,
-               Cache::ItemOwnerId item_owner_id, CacheEntryRole role,
+               CacheEntryRole role,
                size_t size, std::unique_ptr<PinnedEntry>* pinned) override {
-    return target_->PinData(tpo, category, item_owner_id, role, size, pinned);
+    return target_->PinData(tpo, category, role, size, pinned);
   }
 
   void UnPinData(std::unique_ptr<PinnedEntry>&& pinned) override {

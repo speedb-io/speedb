@@ -61,6 +61,7 @@
 #include "monitoring/histogram.h"
 #include "monitoring/statistics.h"
 #include "options/cf_options.h"
+#include "plugin/speedb/pinning_policy/scoped_pinning_policy.h"
 #include "port/port.h"
 #include "port/stack_trace.h"
 #include "rocksdb/cache.h"
@@ -818,7 +819,27 @@ DEFINE_bool(
     " Note `cache_index_and_filter_blocks` must be true for this option to have"
     " any effect.");
 
-DEFINE_string(pinning_policy, "", "URI for registry TablePinningPolicy");
+DEFINE_bool(scoped_pinning_policy, false, "Use Speedb's Scoped Pinning Policy");
+
+DEFINE_int32(scoped_pinning_capacity, -1,
+             "Pinning policy capacity. The default (-1) results in the "
+             "capacity being calculated "
+             "automatically. If the capacity is >= 0, the specified value will "
+             "be the capacity.");
+
+DEFINE_int32(
+    scoped_pinning_last_level_with_data_percent,
+    ROCKSDB_NAMESPACE::ScopedPinningOptions::kDefaultLastLevelWithDataPercent,
+    "Max percent of the pinning capacity to pin entites that are at "
+    "the bottom-most possible level."
+    "Applicable only when scoped_pinning_policy is true");
+
+DEFINE_int32(scoped_pinning_mid_percent,
+             ROCKSDB_NAMESPACE::ScopedPinningOptions::kDefaultMidPercent,
+             "Max percent of the pinning capacity to pin entites that are "
+             "above the bottom-most level,but at a >0 level"
+             "Must be >= scoped_pinning_last_level_with_data_percent."
+             "Applicable only when scoped_pinning_policy is true");
 
 DEFINE_int32(block_size,
              static_cast<int32_t>(
@@ -4819,14 +4840,27 @@ class Benchmark {
       } else {
         fprintf(stdout, "Integrated BlobDB: blob cache disabled\n");
       }
-      if (!FLAGS_pinning_policy.empty()) {
-        s = TablePinningPolicy::CreateFromString(
-            config_options, FLAGS_pinning_policy,
-            &block_based_options.pinning_policy);
-        if (!s.ok()) {
-          ErrorExit("Could not create pinning policy: %s",
-                    s.ToString().c_str());
+
+      if (FLAGS_scoped_pinning_policy) {
+        ScopedPinningOptions pinning_options;
+
+        size_t pinning_capacity = 0U;
+        if (FLAGS_scoped_pinning_capacity >= 0) {
+          pinning_capacity = FLAGS_scoped_pinning_capacity;
+        } else {
+          auto cache_capacity = FLAGS_cache_size;
+          if (FLAGS_cost_write_buffer_to_cache) {
+            assert(cache_capacity >= FLAGS_db_write_buffer_size);
+            cache_capacity -= FLAGS_db_write_buffer_size;
+          }
+          pinning_capacity = (80 * cache_capacity) / 100;
         }
+        pinning_options.capacity = pinning_capacity;
+        pinning_options.bottom_percent =
+            FLAGS_scoped_pinning_last_level_with_data_percent;
+        pinning_options.mid_percent = FLAGS_scoped_pinning_mid_percent;
+        block_based_options.pinning_policy =
+            std::make_shared<ScopedPinningPolicy>(pinning_options);
       }
 
       options.table_factory.reset(
@@ -9280,6 +9314,46 @@ void ValidateMetadataCacheOptions() {
   }
 }
 
+void ValidatePinningRelatedOptions() {
+  if (FLAGS_scoped_pinning_policy) {
+    if (FLAGS_cache_index_and_filter_blocks == false) {
+      ErrorExit(
+          "--cache_index_and_filter_blocks must be set for "
+          "--scoped_pinning_policy to have any affect.");
+    }
+
+    if (FLAGS_scoped_pinning_capacity < -1) {
+      ErrorExit(
+          "--scoped_pinning_capacity must be either -1 (auto-calc) or >= 0");
+    }
+
+    if ((FLAGS_scoped_pinning_last_level_with_data_percent < 0) ||
+        (FLAGS_scoped_pinning_last_level_with_data_percent > 100)) {
+      ErrorExit(
+          "--scoped_pinning_last_level_with_data_percent must be between 0 and "
+          "100");
+    }
+
+    if ((FLAGS_scoped_pinning_mid_percent < 0) ||
+        (FLAGS_scoped_pinning_mid_percent > 100)) {
+      ErrorExit("--scoped_pinning_mid_percent must be between 0 and 100");
+    }
+
+    if (FLAGS_scoped_pinning_last_level_with_data_percent >=
+        FLAGS_scoped_pinning_mid_percent) {
+      ErrorExit(
+          "--scoped_pinning_last_level_with_data_percent must be <= "
+          "--scoped_pinning_mid_percent must be between 0 and 100");
+    }
+
+    if (FLAGS_cost_write_buffer_to_cache) {
+      if (FLAGS_db_write_buffer_size > FLAGS_cache_size) {
+        ErrorExit("--cache_size must be >= --db_write_buffer_size");
+      }
+    }
+  }
+}
+
 namespace {
 // Records the values of applicable flags during the invocation of the first
 // group The user may not modify any of these in subsequent groups
@@ -9597,6 +9671,7 @@ int db_bench_tool_run_group(int group_num, int num_groups, int argc,
   }
 
   ValidateMetadataCacheOptions();
+  ValidatePinningRelatedOptions();
   ParseSanitizeAndValidateMultipleDBsFlags(first_group);
 
   if (first_group) {

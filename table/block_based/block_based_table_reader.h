@@ -290,7 +290,7 @@ class BlockBasedTable : public TableReader {
   const Rep* get_rep() const { return rep_; }
 
   TablePinningPolicy* GetPinningPolicy() const;
-  bool PinData(const TablePinningInfo& tpo, HierarchyCategory category,
+  bool PinData(const TablePinningInfo& tpi, HierarchyCategory category,
                CacheEntryRole role, size_t size,
                std::unique_ptr<PinnedEntry>* pinned) const;
   void UnPinData(std::unique_ptr<PinnedEntry>&& pinned) const;
@@ -439,7 +439,7 @@ class BlockBasedTable : public TableReader {
   // Optionally, user can pass a preloaded meta_index_iter for the index that
   // need to access extra meta blocks for index construction. This parameter
   // helps avoid re-reading meta index block if caller already created one.
-  Status CreateIndexReader(const ReadOptions& ro, const TablePinningInfo& tpo,
+  Status CreateIndexReader(const ReadOptions& ro, const TablePinningInfo& tpi,
                            FilePrefetchBuffer* prefetch_buffer,
                            InternalIterator* preloaded_meta_index_iter,
                            bool use_cache, bool prefetch,
@@ -494,7 +494,7 @@ class BlockBasedTable : public TableReader {
 
   // Create the filter from the filter block.
   std::unique_ptr<FilterBlockReader> CreateFilterBlockReader(
-      const ReadOptions& ro, const TablePinningInfo& tpo,
+      const ReadOptions& ro, const TablePinningInfo& tpi,
       FilePrefetchBuffer* prefetch_buffer, bool use_cache, bool prefetch,
       bool pin, BlockCacheLookupContext* lookup_context);
 

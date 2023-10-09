@@ -154,7 +154,7 @@ bool FullFilterBlockReader::KeyMayMatch(const Slice& key, const bool no_io,
 
 std::unique_ptr<FilterBlockReader> FullFilterBlockReader::Create(
     const BlockBasedTable* table, const ReadOptions& ro,
-    const TablePinningInfo& tpo, FilePrefetchBuffer* prefetch_buffer,
+    const TablePinningInfo& tpi, FilePrefetchBuffer* prefetch_buffer,
     bool use_cache, bool prefetch, bool pin,
     BlockCacheLookupContext* lookup_context) {
   assert(table);
@@ -172,7 +172,7 @@ std::unique_ptr<FilterBlockReader> FullFilterBlockReader::Create(
       return std::unique_ptr<FilterBlockReader>();
     }
     if (pin) {
-      table->PinData(tpo, HierarchyCategory::OTHER, CacheEntryRole::kFilterBlock,
+      table->PinData(tpi, HierarchyCategory::OTHER, CacheEntryRole::kFilterBlock,
                      filter_block.GetValue()->ApproximateMemoryUsage(),
                      &pinned);
     }

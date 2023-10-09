@@ -46,31 +46,31 @@ RecordingPinningPolicy::~RecordingPinningPolicy() {
   // fprintf(stderr, "%s\n", ToString().c_str());
 }
 
-bool RecordingPinningPolicy::MayPin(const TablePinningInfo& tpo,
+bool RecordingPinningPolicy::MayPin(const TablePinningInfo& tpi,
                                     HierarchyCategory category,
                                     CacheEntryRole role, size_t size) const {
   attempts_counter_++;
-  auto check_pin = CheckPin(tpo, category, role, size, usage_);
+  auto check_pin = CheckPin(tpi, category, role, size, usage_);
   // printf("MayPin: category=%s, role=%s, level=%d, check_pin=%d\n",
   // GetHierarchyCategoryName(category).c_str(),
-  // GetCacheEntryRoleName(role).c_str(), tpo.level, check_pin); return
-  // CheckPin(tpo, category, role, size, usage_);
+  // GetCacheEntryRoleName(role).c_str(), tpi.level, check_pin); return
+  // CheckPin(tpi, category, role, size, usage_);
   return check_pin;
 }
 
-bool RecordingPinningPolicy::PinData(const TablePinningInfo& tpo,
+bool RecordingPinningPolicy::PinData(const TablePinningInfo& tpi,
                                      HierarchyCategory category,
                                      CacheEntryRole role, size_t size,
                                      std::unique_ptr<PinnedEntry>* pinned) {
   auto limit = usage_.fetch_add(size);
-  if (CheckPin(tpo, category, role, size, limit)) {
+  if (CheckPin(tpi, category, role, size, limit)) {
     // printf("PinData: category=%s, role=%s, level=%d\n",
     // GetHierarchyCategoryName(category).c_str(),
-    // GetCacheEntryRoleName(role).c_str(), tpo.level);
+    // GetCacheEntryRoleName(role).c_str(), tpi.level);
     pinned_counter_++;
-    pinned->reset(new PinnedEntry(tpo.level, tpo.is_last_level_with_data,
-                                  category, tpo.item_owner_id, role, size));
-    RecordPinned(tpo.level, category, tpo.item_owner_id, role, size, true);
+    pinned->reset(new PinnedEntry(tpi.level, tpi.is_last_level_with_data,
+                                  category, tpi.item_owner_id, role, size));
+    RecordPinned(tpi.level, category, tpi.item_owner_id, role, size, true);
     return true;
   } else {
     usage_.fetch_sub(size);

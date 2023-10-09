@@ -208,7 +208,7 @@ PartitionedFilterBlockReader::PartitionedFilterBlockReader(
 
 std::unique_ptr<FilterBlockReader> PartitionedFilterBlockReader::Create(
     const BlockBasedTable* table, const ReadOptions& ro,
-    const TablePinningInfo& tpo, FilePrefetchBuffer* prefetch_buffer,
+    const TablePinningInfo& tpi, FilePrefetchBuffer* prefetch_buffer,
     bool use_cache, bool prefetch, bool pin,
     BlockCacheLookupContext* lookup_context) {
   assert(table);
@@ -228,7 +228,7 @@ std::unique_ptr<FilterBlockReader> PartitionedFilterBlockReader::Create(
     }
 
     if (pin) {
-      table->PinData(tpo, HierarchyCategory::TOP_LEVEL, CacheEntryRole::kFilterBlock,
+      table->PinData(tpi, HierarchyCategory::TOP_LEVEL, CacheEntryRole::kFilterBlock,
                      filter_block.GetValue()->ApproximateMemoryUsage(),
                      &pinned);
     }

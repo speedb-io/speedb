@@ -45,7 +45,7 @@ class ScopedPinningPolicy : public RecordingPinningPolicy {
   std::string GetId() const override;
 
  protected:
-  bool CheckPin(const TablePinningInfo& tpo, HierarchyCategory category,
+  bool CheckPin(const TablePinningInfo& tpi, HierarchyCategory category,
                 CacheEntryRole role, size_t size, size_t limit) const override;
 
  private:

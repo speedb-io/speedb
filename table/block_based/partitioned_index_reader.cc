@@ -31,7 +31,7 @@
 namespace ROCKSDB_NAMESPACE {
 Status PartitionIndexReader::Create(
     const BlockBasedTable* table, const ReadOptions& ro,
-    const TablePinningInfo& tpo, FilePrefetchBuffer* prefetch_buffer,
+    const TablePinningInfo& tpi, FilePrefetchBuffer* prefetch_buffer,
     bool use_cache, bool prefetch, bool pin,
     BlockCacheLookupContext* lookup_context,
     std::unique_ptr<IndexReader>* index_reader) {
@@ -51,7 +51,7 @@ Status PartitionIndexReader::Create(
     }
 
     if (pin) {
-      pin = table->PinData(tpo, HierarchyCategory::TOP_LEVEL, CacheEntryRole::kIndexBlock,
+      pin = table->PinData(tpi, HierarchyCategory::TOP_LEVEL, CacheEntryRole::kIndexBlock,
                            index_block.GetValue()->ApproximateMemoryUsage(),
                            &pinned);
     }

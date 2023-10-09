@@ -30,7 +30,7 @@ namespace ROCKSDB_NAMESPACE {
 
 Status UncompressionDictReader::Create(
     const BlockBasedTable* table, const ReadOptions& ro,
-    const TablePinningInfo& tpo, FilePrefetchBuffer* prefetch_buffer,
+    const TablePinningInfo& tpi, FilePrefetchBuffer* prefetch_buffer,
     bool use_cache, bool prefetch, bool pin,
     BlockCacheLookupContext* lookup_context,
     std::unique_ptr<UncompressionDictReader>* uncompression_dict_reader) {
@@ -53,7 +53,7 @@ Status UncompressionDictReader::Create(
     if (pin) {
       // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
       // DICTIONARY ROLE!!!!!
-      table->PinData(tpo, HierarchyCategory::OTHER, CacheEntryRole::kMisc,
+      table->PinData(tpi, HierarchyCategory::OTHER, CacheEntryRole::kMisc,
                      uncompression_dict.GetValue()->ApproximateMemoryUsage(),
                      &pinned);
     }

@@ -38,11 +38,11 @@ class ScopedPinningPolicyTest : public testing::Test {
     EXPECT_NE(scoped, nullptr);
     return scoped;
   }
-  bool PinData(const TablePinningInfo& tpo, HierarchyCategory category,
+  bool PinData(const TablePinningInfo& tpi, HierarchyCategory category,
                CacheEntryRole role, size_t size,
                std::vector<std::unique_ptr<PinnedEntry>>& entries) {
     std::unique_ptr<PinnedEntry> p;
-    if (pinning_policy_->PinData(tpo, category, role, size, &p)) {
+    if (pinning_policy_->PinData(tpi, category, role, size, &p)) {
       EXPECT_NE(p.get(), nullptr);
       entries.emplace_back(std::move(p));
       return true;

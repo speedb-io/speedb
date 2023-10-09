@@ -100,14 +100,14 @@ class TablePinningPolicy : public Customizable {
   // pinning This method indicates that pinning might be possible, but does not
   // perform the pinning operation. Returns true if the data is a candidate for
   // pinning and false otherwise
-  virtual bool MayPin(const TablePinningInfo& tpo, HierarchyCategory category,
+  virtual bool MayPin(const TablePinningInfo& tpi, HierarchyCategory category,
                       CacheEntryRole role, size_t size) const = 0;
 
   // Attempts to pin the block in memory.
   // If successful, pinned returns the pinned block
   // Returns true and updates pinned on success and false if the data cannot be
   // pinned
-  virtual bool PinData(const TablePinningInfo& tpo, HierarchyCategory category,
+  virtual bool PinData(const TablePinningInfo& tpi, HierarchyCategory category,
                        CacheEntryRole _role, size_t size,
                        std::unique_ptr<PinnedEntry>* pinned) = 0;
 
@@ -126,15 +126,15 @@ class TablePinningPolicyWrapper : public TablePinningPolicy {
   explicit TablePinningPolicyWrapper(
       const std::shared_ptr<TablePinningPolicy>& t)
       : target_(t) {}
-  bool MayPin(const TablePinningInfo& tpo, HierarchyCategory category,
+  bool MayPin(const TablePinningInfo& tpi, HierarchyCategory category,
               CacheEntryRole role, size_t size) const override {
-    return target_->MayPin(tpo, category, role, size);
+    return target_->MayPin(tpi, category, role, size);
   }
 
-  bool PinData(const TablePinningInfo& tpo, HierarchyCategory category,
+  bool PinData(const TablePinningInfo& tpi, HierarchyCategory category,
                CacheEntryRole role, size_t size,
                std::unique_ptr<PinnedEntry>* pinned) override {
-    return target_->PinData(tpo, category, role, size, pinned);
+    return target_->PinData(tpi, category, role, size, pinned);
   }
 
   void UnPinData(std::unique_ptr<PinnedEntry>&& pinned) override {

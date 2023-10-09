@@ -29,7 +29,7 @@
 namespace ROCKSDB_NAMESPACE {
 Status HashIndexReader::Create(const BlockBasedTable* table,
                                const ReadOptions& ro,
-                               const TablePinningInfo& tpo,
+                               const TablePinningInfo& tpi,
                                FilePrefetchBuffer* prefetch_buffer,
                                InternalIterator* meta_index_iter,
                                bool use_cache, bool prefetch, bool pin,
@@ -53,7 +53,7 @@ Status HashIndexReader::Create(const BlockBasedTable* table,
     }
 
     if (pin) {
-      table->PinData(tpo, HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock,
+      table->PinData(tpi, HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock,
                      index_block.GetValue()->ApproximateMemoryUsage(), &pinned);
     }
     if (use_cache && !pinned) {

@@ -27,7 +27,7 @@
 namespace ROCKSDB_NAMESPACE {
 Status BinarySearchIndexReader::Create(
     const BlockBasedTable* table, const ReadOptions& ro,
-    const TablePinningInfo& tpo, FilePrefetchBuffer* prefetch_buffer,
+    const TablePinningInfo& tpi, FilePrefetchBuffer* prefetch_buffer,
     bool use_cache, bool prefetch, bool pin,
     BlockCacheLookupContext* lookup_context,
     std::unique_ptr<IndexReader>* index_reader) {
@@ -45,7 +45,7 @@ Status BinarySearchIndexReader::Create(
     }
 
     if (pin) {
-      table->PinData(tpo, HierarchyCategory::OTHER,
+      table->PinData(tpi, HierarchyCategory::OTHER,
                      CacheEntryRole::kIndexBlock,
                      index_block.GetValue()->ApproximateMemoryUsage(), &pinned);
     }

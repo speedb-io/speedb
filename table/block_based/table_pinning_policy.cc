@@ -66,28 +66,28 @@ class DefaultPinningPolicy : public RecordingPinningPolicy {
   const char* Name() const override { return kClassName(); }
 
  protected:
-  bool CheckPin(const TablePinningInfo& tpo, HierarchyCategory category,
+  bool CheckPin(const TablePinningInfo& tpi, HierarchyCategory category,
                 CacheEntryRole /*role*/, size_t /*size*/,
                 size_t /*limit*/) const override {
-    if (tpo.level < 0) {
+    if (tpi.level < 0) {
       return false;
     } else if (category == HierarchyCategory::TOP_LEVEL) {
-      return IsPinned(tpo, cache_options_.top_level_index_pinning,
+      return IsPinned(tpi, cache_options_.top_level_index_pinning,
                       pin_top_level_index_and_filter_ ? PinningTier::kAll
                                                       : PinningTier::kNone);
     } else if (category == HierarchyCategory::PARTITION) {
-      return IsPinned(tpo, cache_options_.partition_pinning,
+      return IsPinned(tpi, cache_options_.partition_pinning,
                       pin_l0_index_and_filter_ ? PinningTier::kFlushedAndSimilar
                                                : PinningTier::kNone);
     } else {
-      return IsPinned(tpo, cache_options_.unpartitioned_pinning,
+      return IsPinned(tpi, cache_options_.unpartitioned_pinning,
                       pin_l0_index_and_filter_ ? PinningTier::kFlushedAndSimilar
                                                : PinningTier::kNone);
     }
   }
 
  private:
-  bool IsPinned(const TablePinningInfo& tpo, PinningTier pinning_tier,
+  bool IsPinned(const TablePinningInfo& tpi, PinningTier pinning_tier,
                 PinningTier fallback_pinning_tier) const {
     // Fallback to fallback would lead to infinite recursion. Disallow it.
     assert(fallback_pinning_tier != PinningTier::kFallback);
@@ -96,17 +96,17 @@ class DefaultPinningPolicy : public RecordingPinningPolicy {
 
     switch (pinning_tier) {
       case PinningTier::kFallback:
-        return IsPinned(tpo, fallback_pinning_tier,
+        return IsPinned(tpi, fallback_pinning_tier,
                         PinningTier::kNone /* fallback_pinning_tier */);
       case PinningTier::kNone:
         return false;
       case PinningTier::kFlushedAndSimilar: {
-        bool answer = (tpo.level == 0 &&
-                       tpo.file_size <= tpo.max_file_size_for_l0_meta_pin);
+        bool answer = (tpi.level == 0 &&
+                       tpi.file_size <= tpi.max_file_size_for_l0_meta_pin);
         // printf("kFlushedAndSimilar: level=%d, file_size=%d,
-        // max_file_size_for_l0_meta_pin=%d\n", tpo.level, (int)tpo.file_size,
-        // (int)tpo.max_file_size_for_l0_meta_pin); return tpo.level == 0 &&
-        //        tpo.file_size <= tpo.max_file_size_for_l0_meta_pin;
+        // max_file_size_for_l0_meta_pin=%d\n", tpi.level, (int)tpi.file_size,
+        // (int)tpi.max_file_size_for_l0_meta_pin); return tpi.level == 0 &&
+        //        tpi.file_size <= tpi.max_file_size_for_l0_meta_pin;
         return answer;
       }
       case PinningTier::kAll:

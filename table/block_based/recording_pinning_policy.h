@@ -36,9 +36,9 @@ class RecordingPinningPolicy : public TablePinningPolicy {
   RecordingPinningPolicy();
   ~RecordingPinningPolicy();
 
-  bool MayPin(const TablePinningInfo& tpo, HierarchyCategory category,
+  bool MayPin(const TablePinningInfo& tpi, HierarchyCategory category,
               CacheEntryRole role, size_t size) const override;
-  bool PinData(const TablePinningInfo& tpo, HierarchyCategory category,
+  bool PinData(const TablePinningInfo& tpi, HierarchyCategory category,
                CacheEntryRole role, size_t size,
                std::unique_ptr<PinnedEntry>* pinned) override;
   void UnPinData(std::unique_ptr<PinnedEntry>&& pinned) override;
@@ -60,7 +60,7 @@ class RecordingPinningPolicy : public TablePinningPolicy {
                     size_t size, bool pinned);
 
   // Checks whether the data can be pinned.
-  virtual bool CheckPin(const TablePinningInfo& tpo, HierarchyCategory category,
+  virtual bool CheckPin(const TablePinningInfo& tpi, HierarchyCategory category,
                         CacheEntryRole role, size_t size,
                         size_t limit) const = 0;
 

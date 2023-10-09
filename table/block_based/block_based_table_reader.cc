@@ -779,9 +779,8 @@ Status BlockBasedTable::Open(
   if (!s.ok()) {
     return s;
   }
-  TablePinningOptions tpo(level, is_last_level_with_data, file_size,
-                          rep->cache_owner_id,
-                          max_file_size_for_l0_meta_pin);
+  TablePinningOptions tpo(level, is_last_level_with_data, rep->cache_owner_id,
+                          file_size, max_file_size_for_l0_meta_pin);
   s = new_table->PrefetchIndexAndFilterBlocks(
       ro, prefetch_buffer.get(), metaindex_iter.get(), new_table.get(),
       prefetch_all, table_options, tpo, &lookup_context);

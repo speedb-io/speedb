@@ -34,6 +34,7 @@ namespace ROCKSDB_NAMESPACE {
 class RecordingPinningPolicy : public TablePinningPolicy {
  public:
   RecordingPinningPolicy();
+  ~RecordingPinningPolicy();
 
   bool MayPin(const TablePinningOptions& tpo, HierarchyCategory category,
               CacheEntryRole role, size_t size) const override;

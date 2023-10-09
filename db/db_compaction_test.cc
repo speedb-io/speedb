@@ -3779,6 +3779,8 @@ TEST_P(DBCompactionTestWithParam, IntraL0Compaction) {
   ASSERT_OK(dbfull()->TEST_WaitForCompact());
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->DisableProcessing();
 
+  // std::cout << "After TEST_WaitForCompact\n";
+
   std::vector<std::vector<FileMetaData>> level_to_files;
   dbfull()->TEST_GetFilesMetaData(dbfull()->DefaultColumnFamily(),
                                   &level_to_files);

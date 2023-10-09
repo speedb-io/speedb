@@ -34,6 +34,11 @@ struct ConfigOptions;
 
 enum class HierarchyCategory { TOP_LEVEL, PARTITION, OTHER };
 
+constexpr uint32_t kNumHierarchyCategories =
+    static_cast<uint32_t>(HierarchyCategory::OTHER) + 1;
+
+std::string GetHierarchyCategoryName();
+
 // Struct that contains information about the table being evaluated for pinning
 struct TablePinningOptions {
   TablePinningOptions() = default;

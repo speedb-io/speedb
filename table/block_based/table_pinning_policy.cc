@@ -24,6 +24,8 @@
 
 #include "rocksdb/table_pinning_policy.h"
 
+#include <array>
+
 #include "rocksdb/status.h"
 #include "rocksdb/table.h"
 #include "rocksdb/utilities/customizable_util.h"
@@ -31,6 +33,16 @@
 #include "table/block_based/recording_pinning_policy.h"
 
 namespace ROCKSDB_NAMESPACE {
+
+namespace {
+std::array<std::string, kNumHierarchyCategories>
+    kHierarchyCategoryToHyphenString{{"top-level", "partition", "other"}};
+}  // Unnamed namespace
+
+std::string GetHierarchyCategoryName(HierarchyCategory category) {
+  return kHierarchyCategoryToHyphenString[static_cast<size_t>(category)];
+}
+
 namespace {
 class DefaultPinningPolicy : public RecordingPinningPolicy {
  public:
@@ -80,15 +92,23 @@ class DefaultPinningPolicy : public RecordingPinningPolicy {
     // Fallback to fallback would lead to infinite recursion. Disallow it.
     assert(fallback_pinning_tier != PinningTier::kFallback);
 
+    // printf("pinning_tier=%d\n", (int)pinning_tier);
+
     switch (pinning_tier) {
       case PinningTier::kFallback:
         return IsPinned(tpo, fallback_pinning_tier,
                         PinningTier::kNone /* fallback_pinning_tier */);
       case PinningTier::kNone:
         return false;
-      case PinningTier::kFlushedAndSimilar:
-        return tpo.level == 0 &&
-               tpo.file_size <= tpo.max_file_size_for_l0_meta_pin;
+      case PinningTier::kFlushedAndSimilar: {
+        bool answer = (tpo.level == 0 &&
+                       tpo.file_size <= tpo.max_file_size_for_l0_meta_pin);
+        // printf("kFlushedAndSimilar: level=%d, file_size=%d,
+        // max_file_size_for_l0_meta_pin=%d\n", tpo.level, (int)tpo.file_size,
+        // (int)tpo.max_file_size_for_l0_meta_pin); return tpo.level == 0 &&
+        //        tpo.file_size <= tpo.max_file_size_for_l0_meta_pin;
+        return answer;
+      }
       case PinningTier::kAll:
         return true;
       default:
@@ -125,11 +145,20 @@ RecordingPinningPolicy::RecordingPinningPolicy()
   // }
 }
 
+RecordingPinningPolicy::~RecordingPinningPolicy() {
+  // fprintf(stderr, "%s\n", ToString().c_str());
+}
+
 bool RecordingPinningPolicy::MayPin(const TablePinningOptions& tpo,
                                     HierarchyCategory category,
                                     CacheEntryRole role, size_t size) const {
   attempts_counter_++;
-  return CheckPin(tpo, category, role, size, usage_);
+  auto check_pin = CheckPin(tpo, category, role, size, usage_);
+  // printf("MayPin: category=%s, role=%s, level=%d, check_pin=%d\n",
+  // GetHierarchyCategoryName(category).c_str(),
+  // GetCacheEntryRoleName(role).c_str(), tpo.level, check_pin); return
+  // CheckPin(tpo, category, role, size, usage_);
+  return check_pin;
 }
 
 bool RecordingPinningPolicy::PinData(const TablePinningOptions& tpo,
@@ -138,6 +167,9 @@ bool RecordingPinningPolicy::PinData(const TablePinningOptions& tpo,
                                      std::unique_ptr<PinnedEntry>* pinned) {
   auto limit = usage_.fetch_add(size);
   if (CheckPin(tpo, category, role, size, limit)) {
+    // printf("PinData: category=%s, role=%s, level=%d\n",
+    // GetHierarchyCategoryName(category).c_str(),
+    // GetCacheEntryRoleName(role).c_str(), tpo.level);
     pinned_counter_++;
     pinned->reset(new PinnedEntry(tpo.level, tpo.is_last_level_with_data,
                                   category, tpo.item_owner_id, role, size));

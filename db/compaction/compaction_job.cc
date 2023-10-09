@@ -2000,6 +2000,10 @@ void CompactionJob::LogCompaction() {
   Compaction* compaction = compact_->compaction;
   ColumnFamilyData* cfd = compaction->column_family_data();
 
+  // printf("Compaction Reason=%s, output_level=%d\n",
+  // GetCompactionReasonString(compaction->compaction_reason()),
+  // compaction->output_level());
+
   // Let's check if anything will get logged. Don't prepare all the info if
   // we're not logging
   if (db_options_.info_log_level <= InfoLogLevel::INFO_LEVEL) {

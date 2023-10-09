@@ -26,7 +26,10 @@
 #include <atomic>
 #include <unordered_map>
 #include <vector>
+#include <array>
+#include <mutex>
 
+#include "rocksdb/cache.h"
 #include "rocksdb/table_pinning_policy.h"
 
 namespace ROCKSDB_NAMESPACE {
@@ -69,8 +72,12 @@ class RecordingPinningPolicy : public TablePinningPolicy {
   std::atomic<size_t> pinned_counter_;
   std::atomic<size_t> active_counter_;
 
-  // std::vector<std::atomic<uint64_t>> usage_by_level_;
-  // std::vector<std::atomic<uint64_t>> usage_by_type_;
+  // Total pinned usage is kept per the following triplet: [owner-id, level, role];
+  // Counters are maintained per level rather than per level-0 / middle-level / last-level-with-data
+  // Since the last level with data 
+  using PerRolePinnedCounters = std::array<std::atomic<size_t>, kNumCacheEntryRoles>;
+  using PerLevelAndRolePinnedCounters = std::vector<PerRolePinnedCounters>;
+  std::unordered_map<Cache::ItemOwnerId, PerLevelAndRolePinnedCounters> pinned_counters;
 };
 
 }  // namespace ROCKSDB_NAMESPACE

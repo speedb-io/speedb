@@ -29,7 +29,7 @@
 namespace ROCKSDB_NAMESPACE {
 Status HashIndexReader::Create(const BlockBasedTable* table,
                                const ReadOptions& ro,
-                               const TablePinningOptions& tpo,
+                               const TablePinningInfo& tpo,
                                FilePrefetchBuffer* prefetch_buffer,
                                InternalIterator* meta_index_iter,
                                bool use_cache, bool prefetch, bool pin,

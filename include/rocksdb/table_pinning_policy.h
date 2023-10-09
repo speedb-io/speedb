@@ -40,11 +40,12 @@ constexpr uint32_t kNumHierarchyCategories =
 std::string GetHierarchyCategoryName();
 
 // Struct that contains information about the table being evaluated for pinning
-struct TablePinningOptions {
-  TablePinningOptions() = default;
+struct TablePinningInfo {
+  TablePinningInfo() = default;
 
-  TablePinningOptions(int _level, bool _is_last_level_with_data,
-                      Cache::ItemOwnerId _item_owner_id, size_t _file_size, size_t _max_file_size_for_l0_meta_pin)
+  TablePinningInfo(int _level, bool _is_last_level_with_data,
+                   Cache::ItemOwnerId _item_owner_id, size_t _file_size,
+                   size_t _max_file_size_for_l0_meta_pin)
       : level(_level),
         is_last_level_with_data(_is_last_level_with_data),
         item_owner_id(_item_owner_id),
@@ -99,18 +100,16 @@ class TablePinningPolicy : public Customizable {
   // pinning This method indicates that pinning might be possible, but does not
   // perform the pinning operation. Returns true if the data is a candidate for
   // pinning and false otherwise
-  virtual bool MayPin(const TablePinningOptions& tpo,
-                      HierarchyCategory category, CacheEntryRole role,
-                      size_t size) const = 0;
+  virtual bool MayPin(const TablePinningInfo& tpo, HierarchyCategory category,
+                      CacheEntryRole role, size_t size) const = 0;
 
   // Attempts to pin the block in memory.
   // If successful, pinned returns the pinned block
   // Returns true and updates pinned on success and false if the data cannot be
   // pinned
-  virtual bool PinData(const TablePinningOptions& tpo,
-                       HierarchyCategory category,
-                       CacheEntryRole _role,
-                       size_t size, std::unique_ptr<PinnedEntry>* pinned) = 0;
+  virtual bool PinData(const TablePinningInfo& tpo, HierarchyCategory category,
+                       CacheEntryRole _role, size_t size,
+                       std::unique_ptr<PinnedEntry>* pinned) = 0;
 
   // Releases and clears the pinned entry.
   virtual void UnPinData(std::unique_ptr<PinnedEntry>&& pinned) = 0;
@@ -127,14 +126,14 @@ class TablePinningPolicyWrapper : public TablePinningPolicy {
   explicit TablePinningPolicyWrapper(
       const std::shared_ptr<TablePinningPolicy>& t)
       : target_(t) {}
-  bool MayPin(const TablePinningOptions& tpo, HierarchyCategory category,
+  bool MayPin(const TablePinningInfo& tpo, HierarchyCategory category,
               CacheEntryRole role, size_t size) const override {
     return target_->MayPin(tpo, category, role, size);
   }
 
-  bool PinData(const TablePinningOptions& tpo, HierarchyCategory category,
-               CacheEntryRole role,
-               size_t size, std::unique_ptr<PinnedEntry>* pinned) override {
+  bool PinData(const TablePinningInfo& tpo, HierarchyCategory category,
+               CacheEntryRole role, size_t size,
+               std::unique_ptr<PinnedEntry>* pinned) override {
     return target_->PinData(tpo, category, role, size, pinned);
   }
 

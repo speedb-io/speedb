@@ -38,9 +38,8 @@ class ScopedPinningPolicyTest : public testing::Test {
     EXPECT_NE(scoped, nullptr);
     return scoped;
   }
-  bool PinData(const TablePinningOptions& tpo, HierarchyCategory category,
-               CacheEntryRole role,
-               size_t size,
+  bool PinData(const TablePinningInfo& tpo, HierarchyCategory category,
+               CacheEntryRole role, size_t size,
                std::vector<std::unique_ptr<PinnedEntry>>& entries) {
     std::unique_ptr<PinnedEntry> p;
     if (pinning_policy_->PinData(tpo, category, role, size, &p)) {
@@ -126,9 +125,9 @@ TEST_F(ScopedPinningPolicyTest, TestLimits) {
   size_t bottom = capacity * opts->last_level_with_data_percent / 100;
   size_t mid = capacity * opts->mid_percent / 100;
 
-  TablePinningOptions l0(0, false, Cache::kUnkonwnItemOwnerId, 0, 0);  // Level 0
-  TablePinningOptions lm(1, false, Cache::kUnkonwnItemOwnerId, 0, 0);  // Mid level
-  TablePinningOptions lb(2, true, Cache::kUnkonwnItemOwnerId, 0, 0);   // Bottom level
+  TablePinningInfo l0(0, false, Cache::kUnkonwnItemOwnerId, 0, 0);  // Level 0
+  TablePinningInfo lm(1, false, Cache::kUnkonwnItemOwnerId, 0, 0);  // Mid level
+  TablePinningInfo lb(2, true, Cache::kUnkonwnItemOwnerId, 0, 0);   // Bottom level
 
   std::vector<std::unique_ptr<PinnedEntry>> pinned_entries;
   std::unique_ptr<PinnedEntry> pinned;

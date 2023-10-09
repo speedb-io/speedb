@@ -19,7 +19,7 @@
 #include "table/block_based/recording_pinning_policy.h"
 
 namespace ROCKSDB_NAMESPACE {
-struct TablePinningOptions;
+struct TablePinningInfo;
 struct ScopedPinningOptions {
   static const char* kName() { return "ScopedPinningOptions"; }
   // Limit to how much data should be pinned
@@ -45,7 +45,7 @@ class ScopedPinningPolicy : public RecordingPinningPolicy {
   std::string GetId() const override;
 
  protected:
-  bool CheckPin(const TablePinningOptions& tpo, HierarchyCategory category,
+  bool CheckPin(const TablePinningInfo& tpo, HierarchyCategory category,
                 CacheEntryRole role, size_t size, size_t limit) const override;
 
  private:

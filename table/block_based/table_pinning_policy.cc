@@ -66,7 +66,7 @@ class DefaultPinningPolicy : public RecordingPinningPolicy {
   const char* Name() const override { return kClassName(); }
 
  protected:
-  bool CheckPin(const TablePinningOptions& tpo, HierarchyCategory category,
+  bool CheckPin(const TablePinningInfo& tpo, HierarchyCategory category,
                 CacheEntryRole /*role*/, size_t /*size*/,
                 size_t /*limit*/) const override {
     if (tpo.level < 0) {
@@ -87,7 +87,7 @@ class DefaultPinningPolicy : public RecordingPinningPolicy {
   }
 
  private:
-  bool IsPinned(const TablePinningOptions& tpo, PinningTier pinning_tier,
+  bool IsPinned(const TablePinningInfo& tpo, PinningTier pinning_tier,
                 PinningTier fallback_pinning_tier) const {
     // Fallback to fallback would lead to infinite recursion. Disallow it.
     assert(fallback_pinning_tier != PinningTier::kFallback);
@@ -149,7 +149,7 @@ RecordingPinningPolicy::~RecordingPinningPolicy() {
   // fprintf(stderr, "%s\n", ToString().c_str());
 }
 
-bool RecordingPinningPolicy::MayPin(const TablePinningOptions& tpo,
+bool RecordingPinningPolicy::MayPin(const TablePinningInfo& tpo,
                                     HierarchyCategory category,
                                     CacheEntryRole role, size_t size) const {
   attempts_counter_++;
@@ -161,7 +161,7 @@ bool RecordingPinningPolicy::MayPin(const TablePinningOptions& tpo,
   return check_pin;
 }
 
-bool RecordingPinningPolicy::PinData(const TablePinningOptions& tpo,
+bool RecordingPinningPolicy::PinData(const TablePinningInfo& tpo,
                                      HierarchyCategory category,
                                      CacheEntryRole role, size_t size,
                                      std::unique_ptr<PinnedEntry>* pinned) {

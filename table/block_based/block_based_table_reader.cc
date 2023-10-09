@@ -779,8 +779,8 @@ Status BlockBasedTable::Open(
   if (!s.ok()) {
     return s;
   }
-  TablePinningOptions tpo(level, is_last_level_with_data, rep->cache_owner_id,
-                          file_size, max_file_size_for_l0_meta_pin);
+  TablePinningInfo tpo(level, is_last_level_with_data, rep->cache_owner_id,
+                       file_size, max_file_size_for_l0_meta_pin);
   s = new_table->PrefetchIndexAndFilterBlocks(
       ro, prefetch_buffer.get(), metaindex_iter.get(), new_table.get(),
       prefetch_all, table_options, tpo, &lookup_context);
@@ -992,7 +992,7 @@ Status BlockBasedTable::PrefetchIndexAndFilterBlocks(
     const ReadOptions& ro, FilePrefetchBuffer* prefetch_buffer,
     InternalIterator* meta_iter, BlockBasedTable* new_table, bool prefetch_all,
     const BlockBasedTableOptions& table_options,
-    const TablePinningOptions& pinning_options,
+    const TablePinningInfo& pinning_options,
     BlockCacheLookupContext* lookup_context) {
   // Find filter handle and filter type
   if (rep_->filter_policy) {
@@ -1158,9 +1158,9 @@ TablePinningPolicy* BlockBasedTable::GetPinningPolicy() const {
   return rep_->table_options.pinning_policy.get();
 }
 
-bool BlockBasedTable::PinData(const TablePinningOptions& tpo,
-                              HierarchyCategory category,
-                              CacheEntryRole role, size_t size,
+bool BlockBasedTable::PinData(const TablePinningInfo& tpo,
+                              HierarchyCategory category, CacheEntryRole role,
+                              size_t size,
                               std::unique_ptr<PinnedEntry>* pinned) const {
   return rep_->table_options.pinning_policy->PinData(
       tpo, category, role, size, pinned);
@@ -1369,7 +1369,7 @@ WithBlocklikeCheck<Status, TBlocklike> BlockBasedTable::PutDataBlockToCache(
 }
 
 std::unique_ptr<FilterBlockReader> BlockBasedTable::CreateFilterBlockReader(
-    const ReadOptions& ro, const TablePinningOptions& tpo,
+    const ReadOptions& ro, const TablePinningInfo& tpo,
     FilePrefetchBuffer* prefetch_buffer, bool use_cache, bool prefetch,
     bool pin, BlockCacheLookupContext* lookup_context) {
   auto& rep = rep_;
@@ -2439,7 +2439,7 @@ bool BlockBasedTable::TEST_KeyInCache(const ReadOptions& options,
 //  4. internal_comparator
 //  5. index_type
 Status BlockBasedTable::CreateIndexReader(
-    const ReadOptions& ro, const TablePinningOptions& tpo,
+    const ReadOptions& ro, const TablePinningInfo& tpo,
     FilePrefetchBuffer* prefetch_buffer, InternalIterator* meta_iter,
     bool use_cache, bool prefetch_index,
     BlockCacheLookupContext* lookup_context,

@@ -36,11 +36,11 @@ class RecordingPinningPolicy : public TablePinningPolicy {
   RecordingPinningPolicy();
   ~RecordingPinningPolicy();
 
-  bool MayPin(const TablePinningOptions& tpo, HierarchyCategory category,
+  bool MayPin(const TablePinningInfo& tpo, HierarchyCategory category,
               CacheEntryRole role, size_t size) const override;
-  bool PinData(const TablePinningOptions& tpo, HierarchyCategory category,
-               CacheEntryRole role,
-               size_t size, std::unique_ptr<PinnedEntry>* pinned) override;
+  bool PinData(const TablePinningInfo& tpo, HierarchyCategory category,
+               CacheEntryRole role, size_t size,
+               std::unique_ptr<PinnedEntry>* pinned) override;
   void UnPinData(std::unique_ptr<PinnedEntry>&& pinned) override;
   std::string ToString() const override;
 
@@ -60,9 +60,9 @@ class RecordingPinningPolicy : public TablePinningPolicy {
                     size_t size, bool pinned);
 
   // Checks whether the data can be pinned.
-  virtual bool CheckPin(const TablePinningOptions& tpo,
-                        HierarchyCategory category, CacheEntryRole role,
-                        size_t size, size_t limit) const = 0;
+  virtual bool CheckPin(const TablePinningInfo& tpo, HierarchyCategory category,
+                        CacheEntryRole role, size_t size,
+                        size_t limit) const = 0;
 
   std::atomic<size_t> usage_;
   mutable std::atomic<size_t> attempts_counter_;

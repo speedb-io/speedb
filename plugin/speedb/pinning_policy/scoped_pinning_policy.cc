@@ -49,10 +49,10 @@ std::string ScopedPinningPolicy::GetId() const {
   return GenerateIndividualId();
 }
 
-bool ScopedPinningPolicy::CheckPin(const TablePinningOptions& tpo,
+bool ScopedPinningPolicy::CheckPin(const TablePinningInfo& tpo,
                                    HierarchyCategory /* category */,
-                                   CacheEntryRole /* role */,
-                                   size_t size, size_t usage) const {
+                                   CacheEntryRole /* role */, size_t size,
+                                   size_t usage) const {
   auto proposed = usage + size;
   if (tpo.is_last_level_with_data &&
       options_.last_level_with_data_percent > 0) {

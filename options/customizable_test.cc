@@ -1411,15 +1411,12 @@ class MockTablePinningPolicy : public TablePinningPolicy {
  public:
   static const char* kClassName() { return "Mock"; }
   const char* Name() const override { return kClassName(); }
-  bool MayPin(const TablePinningOptions& /*tpo*/,
-              HierarchyCategory /*category*/, CacheEntryRole /*role*/,
-              size_t /*size*/) const override {
+  bool MayPin(const TablePinningInfo& /*tpo*/, HierarchyCategory /*category*/,
+              CacheEntryRole /*role*/, size_t /*size*/) const override {
     return false;
   }
-  bool PinData(const TablePinningOptions& /*tpo*/,
-               HierarchyCategory /*category*/,
-               CacheEntryRole /*role*/,
-               size_t /*size*/,
+  bool PinData(const TablePinningInfo& /*tpo*/, HierarchyCategory /*category*/,
+               CacheEntryRole /*role*/, size_t /*size*/,
                std::unique_ptr<PinnedEntry>* /*pinned*/) override {
     return false;
   }

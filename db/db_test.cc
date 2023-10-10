@@ -7430,7 +7430,7 @@ TEST_F(DBTest, ShuttingDownNotBlockStalledWrites) {
 
 class MyPinningPolicy : public TablePinningPolicy {
  public:
-  bool MayPin(const TablePinningInfo& /*tpi*/, HierarchyCategory /*category*/,
+  bool MayPin(const TablePinningInfo& /*tpi*/, pinning::HierarchyCategory /*category*/,
               CacheEntryRole /*role*/, size_t /*size*/) const override {
     return true;
   }
@@ -7443,7 +7443,7 @@ class MyPinningPolicy : public TablePinningPolicy {
     ASSERT_EQ(0U, num_pinned_last_level_with_data_);
   }
 
-  bool PinData(const TablePinningInfo& tpi, HierarchyCategory category,
+  bool PinData(const TablePinningInfo& tpi, pinning::HierarchyCategory category,
                CacheEntryRole role, size_t size,
                std::unique_ptr<PinnedEntry>* pinned) override {
     pinned->reset(new PinnedEntry(tpi.level, tpi.is_last_level_with_data,

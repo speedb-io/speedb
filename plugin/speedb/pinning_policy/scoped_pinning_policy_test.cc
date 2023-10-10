@@ -38,7 +38,7 @@ class ScopedPinningPolicyTest : public testing::Test {
     EXPECT_NE(scoped, nullptr);
     return scoped;
   }
-  bool PinData(const TablePinningInfo& tpi, HierarchyCategory category,
+  bool PinData(const TablePinningInfo& tpi, pinning::HierarchyCategory category,
                CacheEntryRole role, size_t size,
                std::vector<std::unique_ptr<PinnedEntry>>& entries) {
     std::unique_ptr<PinnedEntry> p;
@@ -133,53 +133,53 @@ TEST_F(ScopedPinningPolicyTest, TestLimits) {
   std::unique_ptr<PinnedEntry> pinned;
 
   // Make sure we cannot pin more than capacity
-  ASSERT_FALSE(policy->MayPin(l0, HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, capacity + 1));
-  ASSERT_FALSE(policy->MayPin(lm, HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, capacity + 1));
-  ASSERT_FALSE(policy->MayPin(lb, HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, capacity + 1));
+  ASSERT_FALSE(policy->MayPin(l0, pinning::HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, capacity + 1));
+  ASSERT_FALSE(policy->MayPin(lm, pinning::HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, capacity + 1));
+  ASSERT_FALSE(policy->MayPin(lb, pinning::HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, capacity + 1));
   ASSERT_FALSE(
-      policy->PinData(l0, HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, capacity + 1, &pinned));
+      policy->PinData(l0, pinning::HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, capacity + 1, &pinned));
   ASSERT_EQ(pinned, nullptr);
   ASSERT_FALSE(
-      policy->PinData(lm, HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, capacity + 1, &pinned));
+      policy->PinData(lm, pinning::HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, capacity + 1, &pinned));
   ASSERT_EQ(pinned, nullptr);
   ASSERT_FALSE(
-      policy->PinData(lb, HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, capacity + 1, &pinned));
+      policy->PinData(lb, pinning::HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, capacity + 1, &pinned));
   ASSERT_EQ(pinned, nullptr);
 
   // Mid and last-level-with-data levels cannot pin more than their limits
-  ASSERT_FALSE(policy->MayPin(lm, HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, mid + 1));
+  ASSERT_FALSE(policy->MayPin(lm, pinning::HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, mid + 1));
   ASSERT_FALSE(
-      policy->PinData(lm, HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, mid + 1, &pinned));
+      policy->PinData(lm, pinning::HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, mid + 1, &pinned));
   ASSERT_EQ(pinned, nullptr);
-  ASSERT_FALSE(policy->MayPin(lb, HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, bottom + 1));
+  ASSERT_FALSE(policy->MayPin(lb, pinning::HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, bottom + 1));
   ASSERT_FALSE(
-      policy->PinData(lb, HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, bottom + 1, &pinned));
+      policy->PinData(lb, pinning::HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, bottom + 1, &pinned));
   ASSERT_EQ(pinned, nullptr);
 
-  ASSERT_TRUE(PinData(l0, HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, 2, pinned_entries));
-  ASSERT_FALSE(policy->MayPin(l0, HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, capacity - 1));
-  ASSERT_FALSE(policy->MayPin(lm, HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, capacity - 1));
-  ASSERT_FALSE(policy->MayPin(lb, HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, capacity - 1));
+  ASSERT_TRUE(PinData(l0, pinning::HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, 2, pinned_entries));
+  ASSERT_FALSE(policy->MayPin(l0, pinning::HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, capacity - 1));
+  ASSERT_FALSE(policy->MayPin(lm, pinning::HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, capacity - 1));
+  ASSERT_FALSE(policy->MayPin(lb, pinning::HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, capacity - 1));
   ASSERT_FALSE(
-      policy->PinData(l0, HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, capacity - 1, &pinned));
+      policy->PinData(l0, pinning::HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, capacity - 1, &pinned));
   ASSERT_EQ(pinned, nullptr);
   ASSERT_FALSE(
-      policy->PinData(lm, HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, capacity - 1, &pinned));
+      policy->PinData(lm, pinning::HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, capacity - 1, &pinned));
   ASSERT_EQ(pinned, nullptr);
   ASSERT_FALSE(
-      policy->PinData(lb, HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, capacity - 1, &pinned));
+      policy->PinData(lb, pinning::HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, capacity - 1, &pinned));
   ASSERT_EQ(pinned, nullptr);
-  ASSERT_FALSE(policy->MayPin(lm, HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, mid - 1));
+  ASSERT_FALSE(policy->MayPin(lm, pinning::HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, mid - 1));
   ASSERT_FALSE(
-      policy->PinData(lm, HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, mid - 1, &pinned));
+      policy->PinData(lm, pinning::HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock, mid - 1, &pinned));
   ASSERT_EQ(pinned, nullptr);
-  ASSERT_FALSE(policy->MayPin(lb, HierarchyCategory::TOP_LEVEL, CacheEntryRole::kMisc, bottom - 1));
+  ASSERT_FALSE(policy->MayPin(lb, pinning::HierarchyCategory::TOP_LEVEL, CacheEntryRole::kMisc, bottom - 1));
   ASSERT_FALSE(
-      policy->PinData(lb, HierarchyCategory::TOP_LEVEL, CacheEntryRole::kMisc, bottom - 1, &pinned));
+      policy->PinData(lb, pinning::HierarchyCategory::TOP_LEVEL, CacheEntryRole::kMisc, bottom - 1, &pinned));
   ASSERT_EQ(pinned, nullptr);
 
   ASSERT_TRUE(
-      PinData(lb, HierarchyCategory::TOP_LEVEL, CacheEntryRole::kMisc, bottom - 3, pinned_entries));
+      PinData(lb, pinning::HierarchyCategory::TOP_LEVEL, CacheEntryRole::kMisc, bottom - 3, pinned_entries));
   ASSERT_EQ(policy->GetPinnedUsage(), bottom - 1);
   // ASSERT_EQ(policy->GetPinnedUsageByLevel(0), 2);
   // ASSERT_EQ(policy->GetPinnedUsageByLevel(lb.level), bottom - 3);

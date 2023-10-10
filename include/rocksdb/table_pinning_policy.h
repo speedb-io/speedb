@@ -23,6 +23,7 @@
 //
 #pragma once
 
+#include "rocksdb/types.h"
 #include "rocksdb/advanced_cache.h"
 #include "rocksdb/customizable.h"
 #include "rocksdb/status.h"
@@ -32,12 +33,28 @@ namespace ROCKSDB_NAMESPACE {
 struct BlockBasedTableOptions;
 struct ConfigOptions;
 
+namespace pinning {
+// The hierarchy category is 
 enum class HierarchyCategory { TOP_LEVEL, PARTITION, OTHER };
 
 constexpr uint32_t kNumHierarchyCategories =
     static_cast<uint32_t>(HierarchyCategory::OTHER) + 1;
 
-std::string GetHierarchyCategoryName();
+std::string GetHierarchyCategoryName(HierarchyCategory category);
+
+// The hierarchy category is 
+// OTHER is used for both level-0 and unknown levels (kUnknownLevel)
+enum class LevelCategory { LAST_LEVEL_WITH_DATA, MIDDLE_LEVEL, OTHER };
+
+constexpr uint32_t kNumLevelCategories =
+    static_cast<uint32_t>(LevelCategory::OTHER) + 1;
+
+std::string GetLevelCategoryName(LevelCategory category);
+
+bool IsLevelCategoryOther(int level);
+
+LevelCategory GetLevelCategory(int level, bool is_last_level_with_data);
+}
 
 // Struct that contains information about the table being evaluated for pinning
 struct TablePinningInfo {
@@ -45,12 +62,8 @@ struct TablePinningInfo {
 
   TablePinningInfo(int _level, bool _is_last_level_with_data,
                    Cache::ItemOwnerId _item_owner_id, size_t _file_size,
-                   size_t _max_file_size_for_l0_meta_pin)
-      : level(_level),
-        is_last_level_with_data(_is_last_level_with_data),
-        item_owner_id(_item_owner_id),
-        file_size(_file_size),
-        max_file_size_for_l0_meta_pin(_max_file_size_for_l0_meta_pin) {}
+                   size_t _max_file_size_for_l0_meta_pin);
+
   int level = -1;
   bool is_last_level_with_data = false;
   Cache::ItemOwnerId item_owner_id = Cache::kUnknownItemOwnerId;
@@ -63,7 +76,7 @@ struct PinnedEntry {
   PinnedEntry() = default;
 
   PinnedEntry(int _level, bool _is_last_level_with_data,
-              HierarchyCategory _category, Cache::ItemOwnerId _item_owner_id,
+              pinning::HierarchyCategory _category, Cache::ItemOwnerId _item_owner_id,
               CacheEntryRole _role, size_t _size)
       : level(_level),
         is_last_level_with_data(_is_last_level_with_data),
@@ -74,7 +87,7 @@ struct PinnedEntry {
 
   int level = -1;
   bool is_last_level_with_data = false;
-  HierarchyCategory category = HierarchyCategory::OTHER;
+  pinning::HierarchyCategory category = pinning::HierarchyCategory::OTHER;
   Cache::ItemOwnerId item_owner_id = Cache::kUnknownItemOwnerId;
   CacheEntryRole role = CacheEntryRole::kMisc;
   size_t size = 0U;
@@ -100,14 +113,14 @@ class TablePinningPolicy : public Customizable {
   // pinning This method indicates that pinning might be possible, but does not
   // perform the pinning operation. Returns true if the data is a candidate for
   // pinning and false otherwise
-  virtual bool MayPin(const TablePinningInfo& tpi, HierarchyCategory category,
+  virtual bool MayPin(const TablePinningInfo& tpi, pinning::HierarchyCategory category,
                       CacheEntryRole role, size_t size) const = 0;
 
   // Attempts to pin the block in memory.
   // If successful, pinned returns the pinned block
   // Returns true and updates pinned on success and false if the data cannot be
   // pinned
-  virtual bool PinData(const TablePinningInfo& tpi, HierarchyCategory category,
+  virtual bool PinData(const TablePinningInfo& tpi, pinning::HierarchyCategory category,
                        CacheEntryRole _role, size_t size,
                        std::unique_ptr<PinnedEntry>* pinned) = 0;
 
@@ -119,6 +132,10 @@ class TablePinningPolicy : public Customizable {
 
   // Returns the info (e.g. statistics) associated with this policy.
   virtual std::string ToString() const = 0;
+
+ public:
+  virtual void AddCacheItemOwnerId(Cache::ItemOwnerId /* item_owner_id */) {};
+  virtual void RemoveCacheItemOwnerId(Cache::ItemOwnerId /* item_owner_id */) {};
 };
 
 class TablePinningPolicyWrapper : public TablePinningPolicy {
@@ -126,12 +143,12 @@ class TablePinningPolicyWrapper : public TablePinningPolicy {
   explicit TablePinningPolicyWrapper(
       const std::shared_ptr<TablePinningPolicy>& t)
       : target_(t) {}
-  bool MayPin(const TablePinningInfo& tpi, HierarchyCategory category,
+  bool MayPin(const TablePinningInfo& tpi, pinning::HierarchyCategory category,
               CacheEntryRole role, size_t size) const override {
     return target_->MayPin(tpi, category, role, size);
   }
 
-  bool PinData(const TablePinningInfo& tpi, HierarchyCategory category,
+  bool PinData(const TablePinningInfo& tpi, pinning::HierarchyCategory category,
                CacheEntryRole role, size_t size,
                std::unique_ptr<PinnedEntry>* pinned) override {
     return target_->PinData(tpi, category, role, size, pinned);

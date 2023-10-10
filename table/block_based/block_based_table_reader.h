@@ -290,7 +290,7 @@ class BlockBasedTable : public TableReader {
   const Rep* get_rep() const { return rep_; }
 
   TablePinningPolicy* GetPinningPolicy() const;
-  bool PinData(const TablePinningInfo& tpi, HierarchyCategory category,
+  bool PinData(const TablePinningInfo& tpi, pinning::HierarchyCategory category,
                CacheEntryRole role, size_t size,
                std::unique_ptr<PinnedEntry>* pinned) const;
   void UnPinData(std::unique_ptr<PinnedEntry>&& pinned) const;

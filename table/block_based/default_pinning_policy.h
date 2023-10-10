@@ -41,7 +41,7 @@ class DefaultPinningPolicy : public RecordingPinningPolicy {
   const char* Name() const override { return kClassName(); }
 
  protected:
-  bool CheckPin(const TablePinningInfo& tpi, HierarchyCategory category,
+  bool CheckPin(const TablePinningInfo& tpi, pinning::HierarchyCategory category,
                 CacheEntryRole role, size_t size, size_t limit) const override;
 
   bool IsPinned(const TablePinningInfo& tpi, PinningTier pinning_tier,

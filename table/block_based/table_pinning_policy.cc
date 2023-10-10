@@ -34,13 +34,55 @@
 
 namespace ROCKSDB_NAMESPACE {
 
+namespace pinning {
+
 namespace {
+
 std::array<std::string, kNumHierarchyCategories>
     kHierarchyCategoryToHyphenString{{"top-level", "partition", "other"}};
+
 }  // Unnamed namespace
 
 std::string GetHierarchyCategoryName(HierarchyCategory category) {
   return kHierarchyCategoryToHyphenString[static_cast<size_t>(category)];
+}
+
+std::array<std::string, kNumLevelCategories>
+    kLevelCategoryToHyphenString{{"last-level-with-data", "middle-level", "other"}};
+
+std::string GetLevelCategoryName(LevelCategory category) {
+  return kLevelCategoryToHyphenString[static_cast<size_t>(category)];
+}
+
+bool IsLevelCategoryOther(int level) {
+  return ((level == 0) || (level == kUnknownLevel));
+}
+
+LevelCategory GetLevelCategory(int level, bool is_last_level_with_data) {
+  if (is_last_level_with_data) {
+    return LevelCategory::LAST_LEVEL_WITH_DATA;
+  } else if (IsLevelCategoryOther(level)) {
+    return LevelCategory::OTHER;
+  } else {
+    return LevelCategory::MIDDLE_LEVEL;
+  }
+}
+
+} // namespace pinning 
+
+TablePinningInfo::TablePinningInfo(int _level, bool _is_last_level_with_data,
+                   Cache::ItemOwnerId _item_owner_id, size_t _file_size,
+                   size_t _max_file_size_for_l0_meta_pin)
+      : level(_level),
+        is_last_level_with_data(_is_last_level_with_data),
+        item_owner_id(_item_owner_id),
+        file_size(_file_size),
+        max_file_size_for_l0_meta_pin(_max_file_size_for_l0_meta_pin) {
+  // Validate / Sanitize the level + is_last_level_with_data combination
+  if (is_last_level_with_data) {
+    assert(pinning::IsLevelCategoryOther(level) == false);
+    is_last_level_with_data = false;
+  }
 }
 
 namespace {
@@ -66,16 +108,16 @@ class DefaultPinningPolicy : public RecordingPinningPolicy {
   const char* Name() const override { return kClassName(); }
 
  protected:
-  bool CheckPin(const TablePinningInfo& tpi, HierarchyCategory category,
+  bool CheckPin(const TablePinningInfo& tpi, pinning::HierarchyCategory category,
                 CacheEntryRole /*role*/, size_t /*size*/,
                 size_t /*limit*/) const override {
     if (tpi.level < 0) {
       return false;
-    } else if (category == HierarchyCategory::TOP_LEVEL) {
+    } else if (category == pinning::HierarchyCategory::TOP_LEVEL) {
       return IsPinned(tpi, cache_options_.top_level_index_pinning,
                       pin_top_level_index_and_filter_ ? PinningTier::kAll
                                                       : PinningTier::kNone);
-    } else if (category == HierarchyCategory::PARTITION) {
+    } else if (category == pinning::HierarchyCategory::PARTITION) {
       return IsPinned(tpi, cache_options_.partition_pinning,
                       pin_l0_index_and_filter_ ? PinningTier::kFlushedAndSimilar
                                                : PinningTier::kNone);

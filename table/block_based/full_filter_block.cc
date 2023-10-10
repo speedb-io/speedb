@@ -172,7 +172,7 @@ std::unique_ptr<FilterBlockReader> FullFilterBlockReader::Create(
       return std::unique_ptr<FilterBlockReader>();
     }
     if (pin) {
-      table->PinData(tpi, HierarchyCategory::OTHER, CacheEntryRole::kFilterBlock,
+      table->PinData(tpi, pinning::HierarchyCategory::OTHER, CacheEntryRole::kFilterBlock,
                      filter_block.GetValue()->ApproximateMemoryUsage(),
                      &pinned);
     }

@@ -5439,6 +5439,11 @@ cpp_unittest_wrapper(name="full_filter_block_test",
             extra_compiler_flags=[])
 
 
+cpp_unittest_wrapper(name="recording_pinning_policy_test",
+            srcs=["table/block_based/recording_pinning_policy_test.cc"],
+            deps=[":rocksdb_test_lib"],
+            extra_compiler_flags=[])
+
 cpp_unittest_wrapper(name="global_write_controller_test",
             srcs=["db/global_write_controller_test.cc"],
             deps=[":rocksdb_test_lib"],

@@ -53,7 +53,7 @@ Status HashIndexReader::Create(const BlockBasedTable* table,
     }
 
     if (pin) {
-      table->PinData(tpi, HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock,
+      table->PinData(tpi, pinning::HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock,
                      index_block.GetValue()->ApproximateMemoryUsage(), &pinned);
     }
     if (use_cache && !pinned) {

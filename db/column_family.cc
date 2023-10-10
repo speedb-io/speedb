@@ -52,6 +52,7 @@
 #include "rocksdb/convenience.h"
 #include "rocksdb/table.h"
 #include "rocksdb/write_controller.h"
+#include "rocksdb/table_pinning_policy.h"
 #include "table/merging_iterator.h"
 #include "util/autovector.h"
 #include "util/cast_util.h"
@@ -670,6 +671,10 @@ ColumnFamilyData::ColumnFamilyData(
     if (bbto->block_cache && table_cache_) {
       cache_owner_id_ = bbto->block_cache->GetNextItemOwnerId();
       table_cache_->SetBlockCacheOwnerId(cache_owner_id_);
+
+      if (bbto->pinning_policy) {
+        bbto->pinning_policy->AddCacheItemOwnerId(cache_owner_id_);
+      }
     }
   }
 }
@@ -688,6 +693,10 @@ ColumnFamilyData::~ColumnFamilyData() {
       ioptions_.table_factory->GetOptions<BlockBasedTableOptions>();
   if (bbto && bbto->block_cache) {
     bbto->block_cache->DiscardItemOwnerId(&cache_owner_id_);
+
+    if (bbto->pinning_policy) {
+      bbto->pinning_policy->RemoveCacheItemOwnerId(cache_owner_id_);
+    }
   }
 
   if (!dropped_ && column_family_set_ != nullptr) {

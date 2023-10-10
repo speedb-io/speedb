@@ -1764,11 +1764,15 @@ ColumnFamilySet::ColumnFamilySet(
   // initialize linked list
   dummy_cfd_->prev_ = dummy_cfd_;
   dummy_cfd_->next_ = dummy_cfd_;
-  write_buffer_manager_->RegisterWriteController(write_controller_);
+  wbm_client_id_ = write_buffer_manager_->RegisterWCAndLogger(
+      write_controller_, db_options_->info_log);
+  wc_client_id_ = write_controller_->RegisterLogger(db_options_->info_log);
 }
 
 ColumnFamilySet::~ColumnFamilySet() {
-  write_buffer_manager_->DeregisterWriteController(write_controller_);
+  write_buffer_manager_->DeregisterWCAndLogger(
+      write_controller_, db_options_->info_log, wbm_client_id_);
+  write_controller_->DeregisterLogger(db_options_->info_log, wc_client_id_);
   while (column_family_data_.size() > 0) {
     // cfd destructor will delete itself from column_family_data_
     auto cfd = column_family_data_.begin()->second;

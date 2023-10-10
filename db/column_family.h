@@ -852,6 +852,8 @@ class ColumnFamilySet {
   std::shared_ptr<IOTracer> io_tracer_;
   const std::string& db_id_;
   std::string db_session_id_;
+  uint64_t wbm_client_id_ = 0;
+  uint64_t wc_client_id_ = 0;
 };
 
 // A wrapper for ColumnFamilySet that supports releasing DB mutex during each

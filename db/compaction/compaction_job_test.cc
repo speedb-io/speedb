@@ -554,6 +554,8 @@ class CompactionJobTestBase : public testing::Test {
     DBOptions db_opts = BuildDBOptions(db_options_, mutable_db_options_);
     Status s = CreateLoggerFromOptions(dbname_, db_opts, &info_log);
     ASSERT_OK(s);
+    // calling reset() before changing immutable db options.
+    versions_.reset();
     db_options_.info_log = info_log;
 
     versions_.reset(

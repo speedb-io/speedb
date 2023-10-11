@@ -85,6 +85,22 @@ TablePinningInfo::TablePinningInfo(int _level, bool _is_last_level_with_data,
   }
 }
 
+std::string TablePinningInfo::ToString() const {
+  std::string result;
+
+  result.append("level=").append(std::to_string(level)).append(", ");
+  result.append("is_last_level_with_data=")
+      .append(std::to_string(is_last_level_with_data))
+      .append(", ");
+  result.append("item_owner_id=")
+      .append(std::to_string(item_owner_id))
+      .append(", ");
+  result.append("file_size=").append(std::to_string(file_size)).append(", ");
+  result.append("max_file_size_for_l0_meta_pin=").append(std::to_string(max_file_size_for_l0_meta_pin)).append("\n");
+
+  return result;
+}
+
 PinnedEntry::PinnedEntry(int _level, bool _is_last_level_with_data,
                          pinning::HierarchyCategory _category,
                          Cache::ItemOwnerId _item_owner_id,
@@ -99,17 +115,17 @@ PinnedEntry::PinnedEntry(int _level, bool _is_last_level_with_data,
 std::string PinnedEntry::ToString() const {
   std::string result;
 
-  result.append("level=").append(std::to_string(level)).append("\n");
+  result.append("level=").append(std::to_string(level)).append(", ");
   result.append("is_last_level_with_data=")
       .append(std::to_string(is_last_level_with_data))
-      .append("\n");
+      .append(", ");
   result.append("category=")
       .append(pinning::GetHierarchyCategoryName(category))
-      .append("\n");
+      .append(", ");
   result.append("item_owner_id=")
       .append(std::to_string(item_owner_id))
-      .append("\n");
-  result.append("role=").append(GetCacheEntryRoleName(role)).append("\n");
+      .append(", ");
+  result.append("role=").append(GetCacheEntryRoleName(role)).append(", ");
   result.append("size=").append(std::to_string(size)).append("\n");
 
   return result;

@@ -1131,6 +1131,7 @@ Status BlockBasedTable::PrefetchIndexAndFilterBlocks(
   }
 
   if (!rep_->compression_dict_handle.IsNull()) {
+    assert(0);
     std::unique_ptr<UncompressionDictReader> uncompression_dict_reader;
     const bool pin_dict = table_options.pinning_policy->MayPin(
         pinning_options, pinning::HierarchyCategory::OTHER,

@@ -1135,6 +1135,7 @@ void BlockBasedTableBuilder::CompressAndVerifyBlock(
     if (!is_data_block || r->compression_dict == nullptr) {
       compression_dict = &CompressionDict::GetEmptyDict();
     } else {
+      assert(0);
       compression_dict = r->compression_dict.get();
     }
     assert(compression_dict != nullptr);

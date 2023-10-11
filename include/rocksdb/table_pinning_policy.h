@@ -64,6 +64,8 @@ struct TablePinningInfo {
                    Cache::ItemOwnerId _item_owner_id, size_t _file_size,
                    size_t _max_file_size_for_l0_meta_pin);
 
+  std::string ToString() const;
+
   int level = -1;
   bool is_last_level_with_data = false;
   Cache::ItemOwnerId item_owner_id = Cache::kUnknownItemOwnerId;

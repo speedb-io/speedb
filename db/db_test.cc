@@ -7448,6 +7448,10 @@ class MyPinningPolicy : public TablePinningPolicy {
                std::unique_ptr<PinnedEntry>* pinned_entry) override {
     pinned_entry->reset(new PinnedEntry(tpi.level, tpi.is_last_level_with_data,
                                   category, tpi.item_owner_id, role, size));
+    std::cout << "PinData: category=" << pinning::GetHierarchyCategoryName(category)
+              << ", role=" << GetCacheEntryRoleName(role) << ", "
+              << (*pinned_entry)->ToString();
+
     ++total_num_pinned_;
     usage_ += size;
     if (tpi.is_last_level_with_data) {
@@ -7458,6 +7462,8 @@ class MyPinningPolicy : public TablePinningPolicy {
   }
 
   void UnPinData(std::unique_ptr<PinnedEntry> pinned_entry) override {
+    std::cout << "UnPinData: " << pinned_entry->ToString();
+
     ASSERT_GT(total_num_pinned_, 0U);
     --total_num_pinned_;
 
@@ -7527,6 +7533,7 @@ TEST_F(DBTest, StaticPinningLastLevelWithData) {
   ASSERT_OK(Put(key2, value2));
   ASSERT_OK(Flush());
 
+  std::cout << "CompactRange #1\n";
   db_->CompactRange(CompactRangeOptions(), nullptr, nullptr);
 
   ASSERT_EQ(NumTableFilesAtLevel(0, 0), 0);
@@ -7544,6 +7551,7 @@ TEST_F(DBTest, StaticPinningLastLevelWithData) {
 
   // This will create a file at level-1 that is currently known to be the last
   // with data
+  std::cout << "CompactRange #2\n";
   db_->CompactRange(CompactRangeOptions(), nullptr, nullptr);
 
   ASSERT_EQ(NumTableFilesAtLevel(1, 0), 2);

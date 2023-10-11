@@ -64,14 +64,13 @@ class RecordingPinningPolicy : public TablePinningPolicy {
 
  public:
   RecordingPinningPolicy();
-  ~RecordingPinningPolicy();
 
   bool MayPin(const TablePinningInfo& tpi, pinning::HierarchyCategory category,
               CacheEntryRole role, size_t size) const override;
   bool PinData(const TablePinningInfo& tpi, pinning::HierarchyCategory category,
                CacheEntryRole role, size_t size,
-               std::unique_ptr<PinnedEntry>* pinned) override;
-  void UnPinData(std::unique_ptr<PinnedEntry>&& pinned) override;
+               std::unique_ptr<PinnedEntry>* pinned_entry) override;
+  void UnPinData(std::unique_ptr<PinnedEntry> entry) override;
   std::string ToString() const override;
 
   void AddCacheItemOwnerId(Cache::ItemOwnerId item_owner_id) override;

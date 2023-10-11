@@ -27,7 +27,7 @@
 
 namespace ROCKSDB_NAMESPACE {
 BlockBasedTable::IndexReaderCommon::~IndexReaderCommon() {
-  table_->UnPinData(std::move(pinned_));
+  table_->UnPinData(std::move(pinned_entry_));
 }
 
 Status BlockBasedTable::IndexReaderCommon::ReadIndexBlock(

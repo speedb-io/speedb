@@ -292,8 +292,8 @@ class BlockBasedTable : public TableReader {
   TablePinningPolicy* GetPinningPolicy() const;
   bool PinData(const TablePinningInfo& tpi, pinning::HierarchyCategory category,
                CacheEntryRole role, size_t size,
-               std::unique_ptr<PinnedEntry>* pinned) const;
-  void UnPinData(std::unique_ptr<PinnedEntry>&& pinned) const;
+               std::unique_ptr<PinnedEntry>* pinned_entry) const;
+  void UnPinData(std::unique_ptr<PinnedEntry> pinned_entry) const;
   // input_iter: if it is not null, update this one and return it as Iterator
   template <typename TBlockIter>
   TBlockIter* NewDataBlockIterator(const ReadOptions& ro,

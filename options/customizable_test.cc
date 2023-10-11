@@ -1417,10 +1417,10 @@ class MockTablePinningPolicy : public TablePinningPolicy {
   }
   bool PinData(const TablePinningInfo& /*tpi*/, pinning::HierarchyCategory /*category*/,
                CacheEntryRole /*role*/, size_t /*size*/,
-               std::unique_ptr<PinnedEntry>* /*pinned*/) override {
+               std::unique_ptr<PinnedEntry>* /*pinned_entry*/) override {
     return false;
   }
-  void UnPinData(std::unique_ptr<PinnedEntry>&&) override {}
+  void UnPinData(std::unique_ptr<PinnedEntry>) override {}
   size_t GetPinnedUsage() const override { return 0; }
   std::string ToString() const override { return ""; }
 };

@@ -7445,8 +7445,8 @@ class MyPinningPolicy : public TablePinningPolicy {
 
   bool PinData(const TablePinningInfo& tpi, pinning::HierarchyCategory category,
                CacheEntryRole role, size_t size,
-               std::unique_ptr<PinnedEntry>* pinned) override {
-    pinned->reset(new PinnedEntry(tpi.level, tpi.is_last_level_with_data,
+               std::unique_ptr<PinnedEntry>* pinned_entry) override {
+    pinned_entry->reset(new PinnedEntry(tpi.level, tpi.is_last_level_with_data,
                                   category, tpi.item_owner_id, role, size));
     ++total_num_pinned_;
     usage_ += size;
@@ -7457,19 +7457,17 @@ class MyPinningPolicy : public TablePinningPolicy {
     return true;
   }
 
-  void UnPinData(std::unique_ptr<PinnedEntry>&& pinned) override {
+  void UnPinData(std::unique_ptr<PinnedEntry> pinned_entry) override {
     ASSERT_GT(total_num_pinned_, 0U);
     --total_num_pinned_;
 
-    ASSERT_GE(usage_, pinned->size);
-    usage_ -= pinned->size;
+    ASSERT_GE(usage_, pinned_entry->size);
+    usage_ -= pinned_entry->size;
 
-    if (pinned->is_last_level_with_data) {
+    if (pinned_entry->is_last_level_with_data) {
       ASSERT_GT(num_pinned_last_level_with_data_, 0U);
       --num_pinned_last_level_with_data_;
     }
-
-    pinned.reset();
   }
 
   size_t GetPinnedUsage() const override { return usage_; }

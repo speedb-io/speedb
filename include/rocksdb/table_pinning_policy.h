@@ -119,10 +119,10 @@ class TablePinningPolicy : public Customizable {
   // pinned
   virtual bool PinData(const TablePinningInfo& tpi, pinning::HierarchyCategory category,
                        CacheEntryRole _role, size_t size,
-                       std::unique_ptr<PinnedEntry>* pinned) = 0;
+                       std::unique_ptr<PinnedEntry>* pinned_entry) = 0;
 
   // Releases and clears the pinned entry.
-  virtual void UnPinData(std::unique_ptr<PinnedEntry>&& pinned) = 0;
+  virtual void UnPinData(std::unique_ptr<PinnedEntry> pinned_entry) = 0;
 
   // Returns the amount of data currently pinned.
   virtual size_t GetPinnedUsage() const = 0;
@@ -147,12 +147,12 @@ class TablePinningPolicyWrapper : public TablePinningPolicy {
 
   bool PinData(const TablePinningInfo& tpi, pinning::HierarchyCategory category,
                CacheEntryRole role, size_t size,
-               std::unique_ptr<PinnedEntry>* pinned) override {
-    return target_->PinData(tpi, category, role, size, pinned);
+               std::unique_ptr<PinnedEntry>* pinned_entry) override {
+    return target_->PinData(tpi, category, role, size, pinned_entry);
   }
 
-  void UnPinData(std::unique_ptr<PinnedEntry>&& pinned) override {
-    target_->UnPinData(std::move(pinned));
+  void UnPinData(std::unique_ptr<PinnedEntry> pinned_entry) override {
+    target_->UnPinData(std::move(pinned_entry));
   }
 
   size_t GetPinnedUsage() const override { return target_->GetPinnedUsage(); }

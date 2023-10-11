@@ -42,7 +42,7 @@ Status HashIndexReader::Create(const BlockBasedTable* table,
   const BlockBasedTable::Rep* rep = table->get_rep();
   assert(rep != nullptr);
 
-  std::unique_ptr<PinnedEntry> pinned;
+  std::unique_ptr<PinnedEntry> pinned_entry;
   CachableEntry<Block> index_block;
   if (prefetch || !use_cache) {
     const Status s =
@@ -54,9 +54,9 @@ Status HashIndexReader::Create(const BlockBasedTable* table,
 
     if (pin) {
       table->PinData(tpi, pinning::HierarchyCategory::OTHER, CacheEntryRole::kIndexBlock,
-                     index_block.GetValue()->ApproximateMemoryUsage(), &pinned);
+                     index_block.GetValue()->ApproximateMemoryUsage(), &pinned_entry);
     }
-    if (use_cache && !pinned) {
+    if (use_cache && !pinned_entry) {
       index_block.Reset();
     }
   }
@@ -66,7 +66,7 @@ Status HashIndexReader::Create(const BlockBasedTable* table,
   // So, Create will succeed regardless, from this point on.
 
   index_reader->reset(
-      new HashIndexReader(table, std::move(index_block), std::move(pinned)));
+      new HashIndexReader(table, std::move(index_block), std::move(pinned_entry)));
 
   // Get prefixes block
   BlockHandle prefixes_handle;

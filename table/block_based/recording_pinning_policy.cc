@@ -45,13 +45,13 @@ bool RecordingPinningPolicy::MayPin(const TablePinningInfo& tpi,
 bool RecordingPinningPolicy::PinData(const TablePinningInfo& tpi,
                                      pinning::HierarchyCategory category,
                                      CacheEntryRole role, size_t size,
-                                     std::unique_ptr<PinnedEntry>* pinned) {
+                                     std::unique_ptr<PinnedEntry>* pinned_entry) {
   auto limit = usage_.fetch_add(size);
   if (CheckPin(tpi, category, role, size, limit)) {
     pinned_counter_++;
-    pinned->reset(new PinnedEntry(tpi.level, tpi.is_last_level_with_data,
+    pinned_entry->reset(new PinnedEntry(tpi.level, tpi.is_last_level_with_data,
                                   category, tpi.item_owner_id, role, size));
-    RecordPinned(**pinned, true /* pinned */);
+    RecordPinned(**pinned_entry, true /* pinned */);
     return true;
   } else {
     usage_.fetch_sub(size);
@@ -59,10 +59,9 @@ bool RecordingPinningPolicy::PinData(const TablePinningInfo& tpi,
   }
 }
 
-void RecordingPinningPolicy::UnPinData(std::unique_ptr<PinnedEntry>&& pinned) {
-  RecordPinned(*pinned, false /* pinned */);
-  usage_ -= pinned->size;
-  pinned.reset();
+void RecordingPinningPolicy::UnPinData(std::unique_ptr<PinnedEntry> entry) {
+  RecordPinned(*entry, false /* pinned */);
+  usage_ -= entry->size;
 }
 
 size_t RecordingPinningPolicy::RecordPinned(const PinnedEntry& pinned_entry, bool pinned) {

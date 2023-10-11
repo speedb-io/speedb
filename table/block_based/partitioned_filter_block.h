@@ -120,7 +120,7 @@ class PartitionedFilterBlockReader
   PartitionedFilterBlockReader(
       const BlockBasedTable* t,
       CachableEntry<Block_kFilterPartitionIndex>&& filter_block,
-      std::unique_ptr<PinnedEntry>&& pinned);
+      std::unique_ptr<PinnedEntry> pinned_entry);
   static std::unique_ptr<FilterBlockReader> Create(
       const BlockBasedTable* table, const ReadOptions& ro,
       const TablePinningInfo& tpi, FilePrefetchBuffer* prefetch_buffer,

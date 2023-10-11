@@ -137,8 +137,8 @@ Slice FullFilterBlockBuilder::Finish(
 FullFilterBlockReader::FullFilterBlockReader(
     const BlockBasedTable* t,
     CachableEntry<ParsedFullFilterBlock>&& filter_block,
-    std::unique_ptr<PinnedEntry>&& pinned)
-    : FilterBlockReaderCommon(t, std::move(filter_block), std::move(pinned)) {}
+    std::unique_ptr<PinnedEntry> pinned_entry)
+    : FilterBlockReaderCommon(t, std::move(filter_block), std::move(pinned_entry)) {}
 
 bool FullFilterBlockReader::KeyMayMatch(const Slice& key, const bool no_io,
                                         const Slice* const /*const_ikey_ptr*/,
@@ -162,7 +162,7 @@ std::unique_ptr<FilterBlockReader> FullFilterBlockReader::Create(
   assert(!pin || prefetch);
 
   CachableEntry<ParsedFullFilterBlock> filter_block;
-  std::unique_ptr<PinnedEntry> pinned;
+  std::unique_ptr<PinnedEntry> pinned_entry;
   if (prefetch || !use_cache) {
     const Status s = ReadFilterBlock(table, prefetch_buffer, ro, use_cache,
                                      nullptr /* get_context */, lookup_context,
@@ -174,16 +174,16 @@ std::unique_ptr<FilterBlockReader> FullFilterBlockReader::Create(
     if (pin) {
       table->PinData(tpi, pinning::HierarchyCategory::OTHER, CacheEntryRole::kFilterBlock,
                      filter_block.GetValue()->ApproximateMemoryUsage(),
-                     &pinned);
+                     &pinned_entry);
     }
 
-    if (use_cache && !pinned) {
+    if (use_cache && !pinned_entry) {
       filter_block.Reset();
     }
   }
 
   return std::unique_ptr<FilterBlockReader>(new FullFilterBlockReader(
-      table, std::move(filter_block), std::move(pinned)));
+      table, std::move(filter_block), std::move(pinned_entry)));
 }
 
 bool FullFilterBlockReader::PrefixMayMatch(
@@ -196,7 +196,7 @@ bool FullFilterBlockReader::PrefixMayMatch(
 }
 
 bool FullFilterBlockReader::MayMatch(
-    const Slice& entry, bool no_io, GetContext* get_context,
+    const Slice& pinned_entry, bool no_io, GetContext* get_context,
     BlockCacheLookupContext* lookup_context,
     Env::IOPriority rate_limiter_priority) const {
   CachableEntry<ParsedFullFilterBlock> filter_block;
@@ -214,7 +214,7 @@ bool FullFilterBlockReader::MayMatch(
       filter_block.GetValue()->filter_bits_reader();
 
   if (filter_bits_reader) {
-    if (filter_bits_reader->MayMatch(entry)) {
+    if (filter_bits_reader->MayMatch(pinned_entry)) {
       PERF_COUNTER_ADD(bloom_sst_hit_count, 1);
       return true;
     } else {

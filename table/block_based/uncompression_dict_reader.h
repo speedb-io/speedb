@@ -60,7 +60,7 @@ class UncompressionDictReader {
                           std::unique_ptr<PinnedEntry>&& pinned)
       : table_(t),
         uncompression_dict_(std::move(uncompression_dict)),
-        pinned_(std::move(pinned)) {
+        pinned_entry_(std::move(pinned)) {
     assert(table_);
   }
 
@@ -74,7 +74,7 @@ class UncompressionDictReader {
 
   const BlockBasedTable* table_;
   CachableEntry<UncompressionDict> uncompression_dict_;
-  std::unique_ptr<PinnedEntry> pinned_;
+  std::unique_ptr<PinnedEntry> pinned_entry_;
 };
 
 }  // namespace ROCKSDB_NAMESPACE

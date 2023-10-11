@@ -1161,14 +1161,14 @@ TablePinningPolicy* BlockBasedTable::GetPinningPolicy() const {
 bool BlockBasedTable::PinData(const TablePinningInfo& tpi,
                               pinning::HierarchyCategory category, CacheEntryRole role,
                               size_t size,
-                              std::unique_ptr<PinnedEntry>* pinned) const {
+                              std::unique_ptr<PinnedEntry>* pinned_entry) const {
   return rep_->table_options.pinning_policy->PinData(
-      tpi, category, role, size, pinned);
+      tpi, category, role, size, pinned_entry);
 }
 
-void BlockBasedTable::UnPinData(std::unique_ptr<PinnedEntry>&& pinned) const {
-  if (pinned) {
-    rep_->table_options.pinning_policy->UnPinData(std::move(pinned));
+void BlockBasedTable::UnPinData(std::unique_ptr<PinnedEntry> pinned_entry) const {
+  if (pinned_entry) {
+    rep_->table_options.pinning_policy->UnPinData(std::move(pinned_entry));
   }
 }
 

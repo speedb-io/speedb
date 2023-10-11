@@ -117,7 +117,7 @@ class FullFilterBlockReader
   FullFilterBlockReader(
       const BlockBasedTable* t,
       CachableEntry<ParsedFullFilterBlock>&& filter_block,
-      std::unique_ptr<PinnedEntry>&& pinned = std::unique_ptr<PinnedEntry>());
+      std::unique_ptr<PinnedEntry> pinned = std::unique_ptr<PinnedEntry>());
 
   static std::unique_ptr<FilterBlockReader> Create(
       const BlockBasedTable* table, const ReadOptions& ro,

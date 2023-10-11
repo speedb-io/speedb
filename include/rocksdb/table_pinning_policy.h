@@ -129,10 +129,6 @@ class TablePinningPolicy : public Customizable {
 
   // Returns the info (e.g. statistics) associated with this policy.
   virtual std::string ToString() const = 0;
-
- public:
-  virtual void AddCacheItemOwnerId(Cache::ItemOwnerId /* item_owner_id */) {};
-  virtual void RemoveCacheItemOwnerId(Cache::ItemOwnerId /* item_owner_id */) {};
 };
 
 class TablePinningPolicyWrapper : public TablePinningPolicy {

@@ -671,10 +671,6 @@ ColumnFamilyData::ColumnFamilyData(
     if (bbto->block_cache && table_cache_) {
       cache_owner_id_ = bbto->block_cache->GetNextItemOwnerId();
       table_cache_->SetBlockCacheOwnerId(cache_owner_id_);
-
-      if (bbto->pinning_policy) {
-        bbto->pinning_policy->AddCacheItemOwnerId(cache_owner_id_);
-      }
     }
   }
 }
@@ -738,10 +734,6 @@ ColumnFamilyData::~ColumnFamilyData() {
   const BlockBasedTableOptions* bbto =
       ioptions_.table_factory->GetOptions<BlockBasedTableOptions>();
   if (bbto && bbto->block_cache) {
-    if (bbto->pinning_policy) {
-      bbto->pinning_policy->RemoveCacheItemOwnerId(cache_owner_id_);
-    }
-
     bbto->block_cache->DiscardItemOwnerId(&cache_owner_id_);
   }
 }

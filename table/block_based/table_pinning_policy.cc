@@ -85,6 +85,36 @@ TablePinningInfo::TablePinningInfo(int _level, bool _is_last_level_with_data,
   }
 }
 
+PinnedEntry::PinnedEntry(int _level, bool _is_last_level_with_data,
+                         pinning::HierarchyCategory _category,
+                         Cache::ItemOwnerId _item_owner_id,
+                         CacheEntryRole _role, size_t _size)
+    : level(_level),
+      is_last_level_with_data(_is_last_level_with_data),
+      category(_category),
+      item_owner_id(_item_owner_id),
+      role(_role),
+      size(_size) {}
+
+std::string PinnedEntry::ToString() const {
+  std::string result;
+
+  result.append("level=").append(std::to_string(level)).append("\n");
+  result.append("is_last_level_with_data=")
+      .append(std::to_string(is_last_level_with_data))
+      .append("\n");
+  result.append("category=")
+      .append(pinning::GetHierarchyCategoryName(category))
+      .append("\n");
+  result.append("item_owner_id=")
+      .append(std::to_string(item_owner_id))
+      .append("\n");
+  result.append("role=").append(GetCacheEntryRoleName(role)).append("\n");
+  result.append("size=").append(std::to_string(size)).append("\n");
+
+  return result;
+}
+
 namespace {
 class DefaultPinningPolicy : public RecordingPinningPolicy {
  public:

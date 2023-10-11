@@ -689,16 +689,6 @@ ColumnFamilyData::~ColumnFamilyData() {
   prev->next_ = next;
   next->prev_ = prev;
 
-  const BlockBasedTableOptions* bbto =
-      ioptions_.table_factory->GetOptions<BlockBasedTableOptions>();
-  if (bbto && bbto->block_cache) {
-    bbto->block_cache->DiscardItemOwnerId(&cache_owner_id_);
-
-    if (bbto->pinning_policy) {
-      bbto->pinning_policy->RemoveCacheItemOwnerId(cache_owner_id_);
-    }
-  }
-
   if (!dropped_ && column_family_set_ != nullptr) {
     // If it's dropped, it's already removed from column family set
     // If column_family_set_ == nullptr, this is dummy CFD and not in
@@ -743,6 +733,16 @@ ColumnFamilyData::~ColumnFamilyData() {
           "Failed to unregister data paths of column family (id: %d, name: %s)",
           id_, name_.c_str());
     }
+  }
+
+  const BlockBasedTableOptions* bbto =
+      ioptions_.table_factory->GetOptions<BlockBasedTableOptions>();
+  if (bbto && bbto->block_cache) {
+    if (bbto->pinning_policy) {
+      bbto->pinning_policy->RemoveCacheItemOwnerId(cache_owner_id_);
+    }
+
+    bbto->block_cache->DiscardItemOwnerId(&cache_owner_id_);
   }
 }
 

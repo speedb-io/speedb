@@ -87,7 +87,7 @@ class RecordingPinningPolicy : public TablePinningPolicy {
 
  protected:
   // Updates the statistics with the new pinned information.
-  void RecordPinned(const PinnedEntry& pinned_entry, bool pinned);
+  size_t RecordPinned(const PinnedEntry& pinned_entry, bool pinned);
 
   // Checks whether the data can be pinned.
   virtual bool CheckPin(const TablePinningInfo& tpi, 

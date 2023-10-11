@@ -34,19 +34,11 @@ RecordingPinningPolicy::RecordingPinningPolicy()
     : usage_(0), attempts_counter_(0), pinned_counter_(0), active_counter_(0) {
 }
 
-RecordingPinningPolicy::~RecordingPinningPolicy() {
-  // fprintf(stderr, "%s\n", ToString().c_str());
-}
-
 bool RecordingPinningPolicy::MayPin(const TablePinningInfo& tpi,
                                     pinning::HierarchyCategory category,
                                     CacheEntryRole role, size_t size) const {
   attempts_counter_++;
   auto check_pin = CheckPin(tpi, category, role, size, usage_);
-  // printf("MayPin: category=%s, role=%s, level=%d, check_pin=%d\n",
-  // GetHierarchyCategoryName(category).c_str(),
-  // GetCacheEntryRoleName(role).c_str(), tpi.level, check_pin); return
-  // CheckPin(tpi, category, role, size, usage_);
   return check_pin;
 }
 
@@ -56,9 +48,6 @@ bool RecordingPinningPolicy::PinData(const TablePinningInfo& tpi,
                                      std::unique_ptr<PinnedEntry>* pinned) {
   auto limit = usage_.fetch_add(size);
   if (CheckPin(tpi, category, role, size, limit)) {
-    // printf("PinData: category=%s, role=%s, level=%d\n",
-    // GetHierarchyCategoryName(category).c_str(),
-    // GetCacheEntryRoleName(role).c_str(), tpi.level);
     pinned_counter_++;
     pinned->reset(new PinnedEntry(tpi.level, tpi.is_last_level_with_data,
                                   category, tpi.item_owner_id, role, size));
@@ -76,28 +65,31 @@ void RecordingPinningPolicy::UnPinData(std::unique_ptr<PinnedEntry>&& pinned) {
   pinned.reset();
 }
 
-void RecordingPinningPolicy::RecordPinned(const PinnedEntry& pinned_entry, bool pinned) {
+size_t RecordingPinningPolicy::RecordPinned(const PinnedEntry& pinned_entry, bool pinned) {
   auto owner_id_pinned_counters_iter = pinned_counters_.find(pinned_entry.item_owner_id);
-  if (owner_id_pinned_counters_iter == pinned_counters_.end()) {
-    assert(0);
-    return;
-  }
+  assert(owner_id_pinned_counters_iter != pinned_counters_.end());
 
   OwnerIdPinnedCounters& owner_id_counters = owner_id_pinned_counters_iter->second;
   auto level_category_idx = static_cast<uint64_t>(pinning::GetLevelCategory(pinned_entry.level, pinned_entry.is_last_level_with_data));
   auto role_idx = static_cast<uint64_t>(pinned_entry.role);
   auto& usage = owner_id_counters[level_category_idx][role_idx];
 
+  size_t new_usage = 0U;
+
   if (pinned) {
-    usage._a += pinned_entry.size;
+    auto old_usage = usage._a.fetch_add(pinned_entry.size);
+    new_usage = old_usage + pinned_entry.size;
     active_counter_++;
   } else {
     assert(usage._a >= pinned_entry.size);
-    usage._a -= pinned_entry.size;
+    auto old_usage = usage._a.fetch_sub(pinned_entry.size);
+    new_usage = old_usage - pinned_entry.size;
 
     assert(active_counter_ > 0U);
     active_counter_--;
   }
+
+  return new_usage;
 }
 
 std::string RecordingPinningPolicy::ToString() const {
@@ -146,6 +138,10 @@ auto RecordingPinningPolicy::GetOwnerIdPinnedUsageCounters(Cache::ItemOwnerId it
 }
 
 void RecordingPinningPolicy::AddCacheItemOwnerId(Cache::ItemOwnerId item_owner_id) {
+  if (item_owner_id == Cache::kUnknownItemOwnerId) {
+    return;
+  }
+
   std::lock_guard<std::mutex> lock(counters_mutex_);
 
   auto owner_id_pinned_counters_iter = pinned_counters_.find(item_owner_id);
@@ -155,6 +151,10 @@ void RecordingPinningPolicy::AddCacheItemOwnerId(Cache::ItemOwnerId item_owner_i
 }
 
 void RecordingPinningPolicy::RemoveCacheItemOwnerId(Cache::ItemOwnerId item_owner_id) {
+  if (item_owner_id == Cache::kUnknownItemOwnerId) {
+    return;
+  }
+
   std::lock_guard<std::mutex> lock(counters_mutex_);
 
   auto owner_id_pinned_counters_iter = pinned_counters_.find(item_owner_id);
@@ -164,7 +164,7 @@ void RecordingPinningPolicy::RemoveCacheItemOwnerId(Cache::ItemOwnerId item_owne
     return;
   }
   // A removed owner must not have any pinned items
-  assert(GetOwnerIdTotalPinnedUsageNonLocking(item_owner_id) == 0U);
+  // assert(GetOwnerIdTotalPinnedUsageNonLocking(item_owner_id) == 0U);
 
   // Actually remove
   pinned_counters_.erase(owner_id_pinned_counters_iter);

@@ -76,14 +76,11 @@ struct PinnedEntry {
   PinnedEntry() = default;
 
   PinnedEntry(int _level, bool _is_last_level_with_data,
-              pinning::HierarchyCategory _category, Cache::ItemOwnerId _item_owner_id,
-              CacheEntryRole _role, size_t _size)
-      : level(_level),
-        is_last_level_with_data(_is_last_level_with_data),
-        category(_category),
-        item_owner_id(_item_owner_id),
-        role(_role),
-        size(_size) {}
+              pinning::HierarchyCategory _category,
+              Cache::ItemOwnerId _item_owner_id, CacheEntryRole _role,
+              size_t _size);
+
+  std::string ToString() const;
 
   int level = -1;
   bool is_last_level_with_data = false;

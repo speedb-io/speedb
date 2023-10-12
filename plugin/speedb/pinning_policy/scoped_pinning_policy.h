@@ -44,6 +44,8 @@ class ScopedPinningPolicy : public RecordingPinningPolicy {
   const char* NickName() const override { return kNickName(); }
   std::string GetId() const override;
 
+  std::string GetPrintableOptions() const override;
+
  protected:
   bool CheckPin(const TablePinningOptions& tpo, uint8_t type, size_t size,
                 size_t limit) const override;

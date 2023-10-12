@@ -99,6 +99,8 @@ class TablePinningPolicy : public Customizable {
   // Returns the amount of data currently pinned.
   virtual size_t GetPinnedUsage() const = 0;
 
+  virtual std::string GetPrintableOptions() const { return ""; }
+
   // Returns the info (e.g. statistics) associated with this policy.
   virtual std::string ToString() const = 0;
 };

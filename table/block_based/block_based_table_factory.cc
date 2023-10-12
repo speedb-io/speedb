@@ -816,6 +816,20 @@ std::string BlockBasedTableFactory::GetPrintableOptions() const {
     ret.append(buffer);
     ret.append(table_options_.persistent_cache->GetPrintableOptions());
   }
+  if (table_options_.pinning_policy) {
+    const char* pinning_policy_name = table_options_.pinning_policy->Name();
+    if (pinning_policy_name != nullptr) {
+      snprintf(buffer, kBufferSize, "  pinning_policy_name: %s\n",
+               pinning_policy_name);
+      ret.append(buffer);
+    }
+    auto pinning_printable_options =
+        table_options_.pinning_policy->GetPrintableOptions();
+    if (pinning_printable_options.empty() == false) {
+      ret.append("  pinning_policy_options:\n");
+      ret.append(pinning_printable_options);
+    }
+  }
   snprintf(buffer, kBufferSize, "  block_size: %" PRIu64 "\n",
            table_options_.block_size);
   ret.append(buffer);

@@ -48,7 +48,7 @@ jobs:
       - name: Check HISTORY
         run: |  
           set +e
-          git diff --name-only --diff-filter=A ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }}|grep -v "\.github" |grep -q [a-z,A-Z]
+          git diff --name-only --diff-filter=ACMRT ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }}|grep -v "\.github" |grep -q [a-z,A-Z]
           if [ $? -eq "0" ]; then
           #echo "New files were added, we need to make sure the history.md file was updated" 
             history_not_in=1

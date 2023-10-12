@@ -6,7 +6,7 @@ on:
 
 jobs:
   Fuzz:
-    runs-on: [self-hosted, ubuntu, asrunner]
+    runs-on: ubuntu-20.04 # [self-hosted, ubuntu, asrunner]
     container:
       image: ubuntu:18.04
     strategy:
@@ -18,8 +18,8 @@ jobs:
     steps:
       - name: Pre-build
         run: |
-          echo "nameserver 8.8.8.8" > /etc/resolv.conf
-          apt update && apt install -y sudo python3 git clang-tools cmake make automake ucommon-utils libtool gettext pkg-config build-essential clang-10 zlib1g-dev libbz2-dev ninja-build liblzma-dev autoconf libsnappy-dev libzstd-dev liblz4-dev binutils m4 g++-10 unzip
+          #echo "nameserver 8.8.8.8" > /etc/resolv.conf
+          apt update && apt install -y python3 git clang-tools cmake make automake ucommon-utils libtool gettext pkg-config build-essential clang-10 zlib1g-dev libbz2-dev ninja-build liblzma-dev autoconf libsnappy-dev libzstd-dev liblz4-dev binutils m4 g++-10 unzip
       
       - uses: actions/checkout@v3
 

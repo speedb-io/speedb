@@ -33,6 +33,8 @@ namespace ROCKSDB_NAMESPACE {
 class SystemClock;
 class WriteControllerToken;
 class ErrorHandler;
+class Logger;
+
 // WriteController is controlling write stalls in our write code-path. Write
 // stalls happen when compaction can't keep up with write rate.
 // All of the methods here (including WriteControllerToken's destructors) need
@@ -89,6 +91,13 @@ class WriteController {
   // Prerequisite: DB mutex held.
   uint64_t GetDelay(SystemClock* clock, uint64_t num_bytes);
 
+  using WCClientId = uint64_t;
+  using WCClientIds = std::unordered_set<WCClientId>;
+
+  WCClientId RegisterLogger(std::shared_ptr<Logger> logger);
+  void DeregisterLogger(std::shared_ptr<Logger> logger,
+                        WCClientId wc_client_id);
+
   void set_delayed_write_rate(uint64_t write_rate) {
     std::lock_guard<std::mutex> lock(metrics_mu_);
     // avoid divide 0
@@ -126,7 +135,7 @@ class WriteController {
   // and the Id (void*) is simply the pointer to their obj
   using ClientIdToRateMap = std::unordered_map<void*, uint64_t>;
 
-  void HandleNewDelayReq(void* client_id, uint64_t cf_write_rate);
+  void HandleNewDelayReq(void* client_id, uint64_t client_write_rate);
 
   // Removes a client's delay and updates the Write Controller's effective
   // delayed write rate if applicable
@@ -159,6 +168,15 @@ class WriteController {
   // The mutex used by stop_cv_
   std::mutex stop_mu_;
   std::condition_variable stop_cv_;
+
+  WCClientId next_client_id_ = 1;
+  // a map of Loggers to report to. The same Logger can be passed to several dbs
+  // so its required to save all the WCClientIds that were opened with this
+  // Logger.
+  std::unordered_map<std::shared_ptr<Logger>, WCClientIds>
+      loggers_to_client_ids_map_;
+  std::mutex loggers_map_mu_;
+
   /////// end of methods and members used when dynamic_delay_ == true. ///////
 
   uint64_t NowMicrosMonotonic(SystemClock* clock);
@@ -174,6 +192,7 @@ class WriteController {
 
   // mutex to protect below 4 members which is required when WriteController is
   // shared across several dbs.
+  // Sometimes taken under map_mu_ So never take metrics_mu_ and then map_mu_
   std::mutex metrics_mu_;
   // Number of bytes allowed to write without delay
   std::atomic<uint64_t> credit_in_bytes_;

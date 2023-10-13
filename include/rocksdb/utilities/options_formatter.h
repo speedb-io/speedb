@@ -12,6 +12,18 @@
 
 namespace ROCKSDB_NAMESPACE {
 
+// EXPERIMENTAL
+// Class to create string representations of name/value pairs
+// This class is an abstract class that can take name-value pairs and convert
+// them to strings and (potentially) revert that process (strings into
+// name-value pairs).  Currently, this class is used by the Options system to
+// take the serialized versions of options and save them in different
+// representations (such as the Options properties file).  This class could also
+// be used to save these values in different formats, such as written to a LOG
+// file or saved as JSON or XML objects.
+//
+// This class is currently experimental and the interfaces may need to be
+// changed to support additional formats.
 class OptionsFormatter : public Customizable {
  public:
   static const std::shared_ptr<OptionsFormatter>& Default();

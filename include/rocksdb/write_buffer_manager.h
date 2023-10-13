@@ -1,3 +1,17 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -33,6 +47,7 @@ class CacheReservationManager;
 class InstrumentedMutex;
 class InstrumentedCondVar;
 class WriteController;
+class Logger;
 
 // Interface to block and signal DB instances, intended for RocksDB
 // internal use only. Each DB instance contains ptr to StallInterface.
@@ -283,12 +298,22 @@ class WriteBufferManager final {
  public:
   uint16_t get_start_delay_percent() const { return start_delay_percent_; }
 
-  // Add this Write Controller(WC) to controllers_to_refcount_map_
-  // which the WBM is responsible for updating (when stalling is allowed).
-  // each time db is opened with this WC-WBM, add a ref count so we know when
-  // to remove this WC from the WBM when the last is no longer used.
-  void RegisterWriteController(std::shared_ptr<WriteController> wc);
-  void DeregisterWriteController(std::shared_ptr<WriteController> wc);
+  using WBMClientId = uint64_t;
+  using WBMClientIds = std::unordered_set<WBMClientId>;
+
+  // Add this WriteController(WC) and Logger to controllers_to_client_ids_map_
+  // and loggers_to_client_ids_map_ respectively.
+  // The WBM is responsible for updating (when stalling is allowed) these WCs
+  // and report through the Loggers.
+  // The connection between the WC and the Loggers can be looked up through
+  // controllers_to_loggers_map_ which this method also populates.
+  // When registering, a WBMClientId is returned which is later required for
+  // deregistering.
+  WBMClientId RegisterWCAndLogger(std::shared_ptr<WriteController> wc,
+                                  std::shared_ptr<Logger> logger);
+  void DeregisterWCAndLogger(std::shared_ptr<WriteController> wc,
+                             std::shared_ptr<Logger> logger,
+                             WBMClientId wbm_client_id);
 
  private:
   // The usage + delay factor are coded in a single (atomic) uint64_t value as
@@ -321,23 +346,43 @@ class WriteBufferManager final {
   std::atomic<uint64_t> coded_usage_state_ = kNoneCodedUsageState;
 
  private:
-  // returns true if wc was removed from controllers_to_refcount_map_
-  // which means its ref count reached 0.
-  bool RemoveFromControllersMap(std::shared_ptr<WriteController> wc);
+  // When Closing the db, remove this WC/Logger - wbm_client_id from its
+  // corresponding map. Returns true if the ptr (WC or Logger) is removed from
+  // the map when it has no more wbm_client_id. Meaning no db is using this
+  // WC/Logger with this WBM.
+  template <typename SharedPtrType>
+  bool RemoveFromMap(const SharedPtrType& ptr, WBMClientId wbm_client_id,
+                     std::mutex& mutex,
+                     std::unordered_map<SharedPtrType, WBMClientIds>& map);
 
   void UpdateControllerDelayState();
 
-  void ResetDelay();
+  void ResetDelay(UsageState usage_state, WriteController* wc,
+                  const std::unordered_set<Logger*>& loggers);
 
-  void WBMSetupDelay(uint64_t delay_factor);
+  void WBMSetupDelay(uint64_t delay_factor, WriteController* wc,
+                     const std::unordered_set<Logger*>& loggers);
 
-  // a list of all write controllers which are associated with this WBM.
-  // the WBM needs to update them when its delay requirements change.
-  // the key is the WC to update and the value is a ref count of how many dbs
-  // are using this WC with the WBM.
-  std::unordered_map<std::shared_ptr<WriteController>, uint64_t>
-      controllers_to_refcount_map_;
+  // A map of all write controllers which are associated with this WBM.
+  // The WBM needs to update them when its delay requirements change.
+  // The key is the WC to update and the value is an unordered_set of all
+  // wbm_client_ids opened with the WC. The WBMClientIds are used as unique
+  // identifiers of the connection between the WC and the db.
+  std::unordered_map<std::shared_ptr<WriteController>, WBMClientIds>
+      controllers_to_client_ids_map_;
   std::mutex controllers_map_mutex_;
+
+  // a map of Loggers similar to the above controllers_to_client_ids_map_.
+  std::unordered_map<std::shared_ptr<Logger>, WBMClientIds>
+      loggers_to_client_ids_map_;
+  std::mutex loggers_map_mutex_;
+
+  WBMClientId next_client_id_ = 1;
+  using Loggers = std::unordered_set<Logger*>;
+  // a map used to bind the Loggers to a specific WC so that the reports
+  // regarding a specific WC are sent through the right Logger.
+  // protected with controllers_map_mutex_
+  std::unordered_map<WriteController*, Loggers> controllers_to_loggers_map_;
 
  private:
   std::atomic<size_t> buffer_size_;

@@ -1,3 +1,17 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 // Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -11,6 +25,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <atomic>
 #include <limits>
 #include <memory>
 #include <string>
@@ -1941,6 +1956,39 @@ enum class BlobGarbageCollectionPolicy {
   kUseDefault,
 };
 
+// An abstract base class for non-blocking (asynchronous) manual compaction
+// See async_completion_cb below and the CompactRange() API call for more
+// details
+class CompactRangeCompletedCbIf {
+ public:
+  virtual ~CompactRangeCompletedCbIf() = default;
+
+  // Non-Blocking Manual Compaction Completion callback to be overridden
+  // by the user's derived class
+  virtual void CompletedCb(Status completion_status) = 0;
+
+  bool WasCbCalled() const { return was_cb_called_; }
+
+ private:
+  // This is the actual callback called from the internal manual compaction
+  // thread when manual compaction completes.
+  void InternalCompletedCb(Status completion_status) {
+    // Call the user's callback
+    CompletedCb(completion_status);
+    was_cb_called_ = true;
+  }
+
+ private:
+  // Once the callback is called the internal thread has completed
+  // and may safely be joined
+  std::atomic<bool> was_cb_called_ = false;
+
+ private:
+  // Needed to allow the internal thread (a member of DBImpl) to call
+  // the private InternalCompletedCb().
+  friend class DBImpl;
+};
+
 // CompactRangeOptions is used by CompactRange() call.
 struct CompactRangeOptions {
   // If true, no other compaction will run at the same time as this
@@ -1996,6 +2044,10 @@ struct CompactRangeOptions {
   // user-provided setting. This enables customers to selectively override the
   // age cutoff.
   double blob_garbage_collection_age_cutoff = -1;
+
+  // An optional completion callback to allow for non-blocking (async) operation
+  // Default: Empty (Blocking)
+  std::shared_ptr<CompactRangeCompletedCbIf> async_completion_cb;
 };
 
 // IngestExternalFileOptions is used by IngestExternalFile()

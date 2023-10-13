@@ -1,3 +1,17 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 // Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -1350,6 +1364,22 @@ class DB {
   // the files. In this case, client could set options.change_level to true, to
   // move the files back to the minimum level capable of holding the data set
   // or a given level (specified by non-negative options.target_level).
+  //
+  // Non-Blocking Compactions:
+  // A non-blocking compaction is initiated by setting the async_completion_cb
+  // option in the CompactRangeOptions options parameter. By default (unless
+  // explicitly set by the caller), the CompactRange() will be blocking. When
+  // async_completion_cb is set, the CompactRange() call will return control to
+  // the caller immediately. The manual compaction iteslf will be performed in
+  // an internally created thread. The manual compaction will ALWAYS call the
+  // specified callback upon completion and provide the completion status.
+  //
+  // NOTES:
+  // 1. The callback object must be alive until the callback has been called.
+  // 2. The callback MAY be called in the context of the caller's thread when
+  // there are conditions
+  //    that prevent manual compaction from running. Otherwise, the callback
+  //    will be called in the context of the internally created thread.
   virtual Status CompactRange(const CompactRangeOptions& options,
                               ColumnFamilyHandle* column_family,
                               const Slice* begin, const Slice* end) = 0;

@@ -8,7 +8,7 @@ on:
 
 jobs:
   pre_build:
-    runs-on: ubu4mvn 
+    runs-on: ubu-mvn-g
     env:
       VERSION_FILE: speedb/version.h
     outputs:
@@ -38,6 +38,10 @@ jobs:
     uses: ./.github/workflows/ci_macos.yml
     with:
       verSion: ${{ needs.pre_build.outputs.out1 }}     
+    secrets:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_BUCKET: ${{ secrets.AWS_BUCKET }}
   
   Mac_ARM:
     needs: pre_build
@@ -63,7 +67,7 @@ jobs:
    
   Build_and_upload:
     needs: [pre_build, Mac_i86, Windows, Ubuntu_ARM]
-    runs-on: ubu4mvn 
+    runs-on: ubu-mvn-g
     env:
       VERSION_FILE: speedb/version.h
       VERSION: ${{needs.pre_build.outputs.out1}}
@@ -100,9 +104,11 @@ jobs:
         mvn versions:set -DnewVersion=$VERSION-SNAPSHOT
         mvn deploy -X -e -DskipTests
         
-        mvn versions:set -DnewVersion=$the_version
+        #mvn versions:set -DnewVersion=$the_version
         #mvn clean deploy -P release -X -e -DskipTests
         
-    - name: show path
+    - name: show next step
       run: |
-        echo "versions:set -DnewVersion=$VERSION-SNAPSHOT"
+        echo "Make sure the SNAPSHOT is fine and run these to publish the artifact"
+        echo "run: mvn versions:set -DnewVersion=$the_version"
+        echo "run: mvn clean deploy -P release -X -e -DskipTests"

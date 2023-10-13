@@ -1,3 +1,17 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -1685,11 +1699,15 @@ ColumnFamilySet::ColumnFamilySet(
   // initialize linked list
   dummy_cfd_->prev_ = dummy_cfd_;
   dummy_cfd_->next_ = dummy_cfd_;
-  write_buffer_manager_->RegisterWriteController(write_controller_);
+  wbm_client_id_ = write_buffer_manager_->RegisterWCAndLogger(
+      write_controller_, db_options_->info_log);
+  wc_client_id_ = write_controller_->RegisterLogger(db_options_->info_log);
 }
 
 ColumnFamilySet::~ColumnFamilySet() {
-  write_buffer_manager_->DeregisterWriteController(write_controller_);
+  write_buffer_manager_->DeregisterWCAndLogger(
+      write_controller_, db_options_->info_log, wbm_client_id_);
+  write_controller_->DeregisterLogger(db_options_->info_log, wc_client_id_);
   while (column_family_data_.size() > 0) {
     // cfd destructor will delete itself from column_family_data_
     auto cfd = column_family_data_.begin()->second;

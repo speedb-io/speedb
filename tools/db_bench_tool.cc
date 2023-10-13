@@ -1,3 +1,17 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -4965,12 +4979,14 @@ class Benchmark {
       }
     }
 
-    if (FLAGS_use_dynamic_delay && FLAGS_num_multi_db > 1) {
-      if (options.delayed_write_rate <= 0) {
-        options.delayed_write_rate = 16 * 1024 * 1024;
+    if (options.write_controller == nullptr) {
+      if (FLAGS_use_dynamic_delay && FLAGS_num_multi_db > 1) {
+        if (options.delayed_write_rate <= 0) {
+          options.delayed_write_rate = 16 * 1024 * 1024;
+        }
+        options.write_controller.reset(new WriteController(
+            options.use_dynamic_delay, options.delayed_write_rate));
       }
-      options.write_controller.reset(new WriteController(
-          options.use_dynamic_delay, options.delayed_write_rate));
     }
 
     // Integrated BlobDB
@@ -7690,17 +7706,13 @@ class Benchmark {
 
     fprintf(stderr, "num reads to do %" PRIu64 "\n", reads_);
     Duration duration(FLAGS_duration, reads_);
-    uint64_t num_seek_to_first = 0;
-    uint64_t num_next = 0;
     while (!duration.Done(1)) {
       if (!iter->Valid()) {
         iter->SeekToFirst();
-        num_seek_to_first++;
       } else if (!iter->status().ok()) {
         ErrorExit("Iterator error: %s", iter->status().ToString().c_str());
       } else {
         iter->Next();
-        num_next++;
       }
 
       thread->stats.FinishedOps(&single_db, single_db.db, 1, kSeek);

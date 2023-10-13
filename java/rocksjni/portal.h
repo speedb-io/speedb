@@ -1,3 +1,17 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 // Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -34,6 +48,7 @@
 #include "rocksdb/utilities/memory_util.h"
 #include "rocksdb/utilities/transaction_db.h"
 #include "rocksdb/utilities/write_batch_with_index.h"
+#include "rocksjni/compact_range_completed_jnicallback.h"
 #include "rocksjni/compaction_filter_factory_jnicallback.h"
 #include "rocksjni/comparatorjnicallback.h"
 #include "rocksjni/cplusplus_to_java_convert.h"
@@ -8321,6 +8336,44 @@ class AbstractEventListenerJni
     assert(jclazz != nullptr);
     static jmethodID mid = env->GetMethodID(jclazz, "onErrorRecoveryCompleted",
                                             "(Lorg/rocksdb/Status;)V");
+    assert(mid != nullptr);
+    return mid;
+  }
+};
+
+// The portal class for org.rocksdb.AbstractCompactRangeCompletedCb
+class AbstractCompactRangeCompletedCbJni
+    : public RocksDBNativeClass<
+          const ROCKSDB_NAMESPACE::CompactRangeCompletedJniCallback*,
+          AbstractCompactRangeCompletedCbJni> {
+ public:
+  /**
+   * Get the Java Class org.rocksdb.AbstractCompactRangeCompletedCb
+   *
+   * @param env A pointer to the Java environment
+   *
+   * @return The Java Class or nullptr if one of the
+   *     ClassFormatError, ClassCircularityError, NoClassDefFoundError,
+   *     OutOfMemoryError or ExceptionInInitializerError exceptions is thrown
+   */
+  static jclass getJClass(JNIEnv* env) {
+    return RocksDBNativeClass::getJClass(
+        env, "org/rocksdb/AbstractCompactRangeCompletedCb");
+  }
+
+  /**
+   * Get the Java Method:
+   * AbstractCompactRangeCompletedCb#compactRangeCompletedCbProxy
+   *
+   * @param env A pointer to the Java environment
+   *
+   * @return The Java Method ID
+   */
+  static jmethodID getCompletedCbProxyMethodId(JNIEnv* env) {
+    jclass jclazz = getJClass(env);
+    assert(jclazz != nullptr);
+    static jmethodID mid = env->GetMethodID(
+        jclazz, "compactRangeCompletedCbProxy", "(Lorg/rocksdb/Status;)V");
     assert(mid != nullptr);
     return mid;
   }

@@ -1,3 +1,17 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -9,16 +23,28 @@
 #include <atomic>
 #include <cassert>
 #include <chrono>
+#include <cinttypes>
 #include <ratio>
 
 #include "db/error_handler.h"
+#include "logging/logging.h"
 #include "rocksdb/system_clock.h"
 #include "test_util/sync_point.h"
 
 namespace ROCKSDB_NAMESPACE {
 
 std::unique_ptr<WriteControllerToken> WriteController::GetStopToken() {
-  ++total_stopped_;
+  if (total_stopped_ == 0) {
+    std::lock_guard<std::mutex> lock(loggers_map_mu_);
+    for (auto& logger_and_clients : loggers_to_client_ids_map_) {
+      ROCKS_LOG_WARN(logger_and_clients.first.get(),
+                     "WC enforcing stop writes");
+    }
+  }
+  {
+    std::lock_guard<std::mutex> lock(stop_mu_);
+    ++total_stopped_;
+  }
   return std::unique_ptr<WriteControllerToken>(new StopWriteToken(this));
 }
 
@@ -37,6 +63,31 @@ std::unique_ptr<WriteControllerToken> WriteController::GetDelayToken(
   // for subsequent additional debts and for the next refill.
   set_delayed_write_rate(write_rate);
   return std::unique_ptr<WriteControllerToken>(new DelayWriteToken(this));
+}
+
+WriteController::WCClientId WriteController::RegisterLogger(
+    std::shared_ptr<Logger> logger) {
+  uint64_t client_id = 0;
+  {
+    std::lock_guard<std::mutex> lock(loggers_map_mu_);
+    assert(next_client_id_ != std::numeric_limits<uint64_t>::max());
+    client_id = next_client_id_++;
+    loggers_to_client_ids_map_[logger].insert(client_id);
+  }
+  return client_id;
+}
+
+void WriteController::DeregisterLogger(std::shared_ptr<Logger> logger,
+                                       WCClientId wc_client_id) {
+  std::lock_guard<std::mutex> lock(loggers_map_mu_);
+  assert(wc_client_id > 0);  // value of 0 means the logger wasn`t registered.
+  assert(loggers_to_client_ids_map_.count(logger));
+  assert(loggers_to_client_ids_map_[logger].empty() == false);
+  assert(loggers_to_client_ids_map_[logger].count(wc_client_id));
+  loggers_to_client_ids_map_[logger].erase(wc_client_id);
+  if (loggers_to_client_ids_map_[logger].empty()) {
+    loggers_to_client_ids_map_.erase(logger);
+  }
 }
 
 uint64_t WriteController::TEST_GetMapMinRate() { return GetMapMinRate(); }
@@ -77,22 +128,34 @@ bool WriteController::IsInRateMap(void* client_id) {
 // its write_rate is higher than the delayed_write_rate_ so we need to find a
 // new min from all clients via GetMapMinRate()
 void WriteController::HandleNewDelayReq(void* client_id,
-                                        uint64_t cf_write_rate) {
+                                        uint64_t client_write_rate) {
   assert(is_dynamic_delay());
-  std::lock_guard<std::mutex> lock(map_mu_);
+  std::unique_lock<std::mutex> lock(map_mu_);
   bool was_min = IsMinRate(client_id);
   bool inserted =
-      id_to_write_rate_map_.insert_or_assign(client_id, cf_write_rate).second;
+      id_to_write_rate_map_.insert_or_assign(client_id, client_write_rate)
+          .second;
   if (inserted) {
     total_delayed_++;
   }
   uint64_t min_rate = delayed_write_rate();
-  if (cf_write_rate <= min_rate) {
-    min_rate = cf_write_rate;
+  if (client_write_rate <= min_rate) {
+    min_rate = client_write_rate;
   } else if (was_min) {
     min_rate = GetMapMinRate();
   }
   set_delayed_write_rate(min_rate);
+  lock.unlock();
+
+  {
+    std::lock_guard<std::mutex> logger_lock(loggers_map_mu_);
+    for (auto& logger_and_clients : loggers_to_client_ids_map_) {
+      ROCKS_LOG_WARN(logger_and_clients.first.get(),
+                     "WC setting delay of %" PRIu64
+                     ", client_id: %p, client rate: %" PRIu64,
+                     min_rate, client_id, client_write_rate);
+    }
+  }
 }
 
 // Checks if the client is in the id_to_write_rate_map_ , if it is:
@@ -102,14 +165,26 @@ void WriteController::HandleNewDelayReq(void* client_id,
 // 4. if total_delayed_ == 0, reset next_refill_time_ and credit_in_bytes_
 void WriteController::HandleRemoveDelayReq(void* client_id) {
   assert(is_dynamic_delay());
+  std::unique_lock<std::mutex> lock(map_mu_);
+  if (!IsInRateMap(client_id)) {
+    return;
+  }
+  bool was_min = RemoveDelayReq(client_id);
+  uint64_t min_rate = 0;
+  if (was_min) {
+    min_rate = GetMapMinRate();
+    set_delayed_write_rate(min_rate);
+  }
+  lock.unlock();
+
   {
-    std::lock_guard<std::mutex> lock(map_mu_);
-    if (!IsInRateMap(client_id)) {
-      return;
-    }
-    bool was_min = RemoveDelayReq(client_id);
-    if (was_min) {
-      set_delayed_write_rate(GetMapMinRate());
+    std::string if_min_str =
+        was_min ? "WC setting delay of " + std::to_string(min_rate) : "";
+    std::lock_guard<std::mutex> logger_lock(loggers_map_mu_);
+    for (auto& logger_and_clients : loggers_to_client_ids_map_) {
+      ROCKS_LOG_WARN(logger_and_clients.first.get(),
+                     "WC removed client_id: %p . %s", client_id,
+                     if_min_str.c_str());
     }
   }
   MaybeResetCounters();
@@ -124,11 +199,22 @@ bool WriteController::RemoveDelayReq(void* client_id) {
 }
 
 void WriteController::MaybeResetCounters() {
-  std::lock_guard<std::mutex> lock(metrics_mu_);
-  if (total_delayed_ == 0) {
-    // reset counters.
-    next_refill_time_ = 0;
-    credit_in_bytes_ = 0;
+  bool zero_delayed = false;
+  {
+    std::lock_guard<std::mutex> lock(metrics_mu_);
+    if (total_delayed_ == 0) {
+      // reset counters.
+      next_refill_time_ = 0;
+      credit_in_bytes_ = 0;
+      zero_delayed = true;
+    }
+  }
+  if (zero_delayed) {
+    std::lock_guard<std::mutex> logger_lock(loggers_map_mu_);
+    for (auto& logger_and_clients : loggers_to_client_ids_map_) {
+      ROCKS_LOG_WARN(logger_and_clients.first.get(),
+                     "WC no longer enforcing delay");
+    }
   }
 }
 
@@ -221,7 +307,14 @@ void WriteController::NotifyCV() {
     std::lock_guard<std::mutex> lock(stop_mu_);
     --total_stopped_;
   }
-  stop_cv_.notify_all();
+  if (total_stopped_ == 0) {
+    stop_cv_.notify_all();
+    std::lock_guard<std::mutex> lock(loggers_map_mu_);
+    for (auto& logger_and_clients : loggers_to_client_ids_map_) {
+      ROCKS_LOG_WARN(logger_and_clients.first.get(),
+                     "WC no longer enforcing stop writes");
+    }
+  }
 }
 
 StopWriteToken::~StopWriteToken() { controller_->NotifyCV(); }

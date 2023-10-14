@@ -55,9 +55,8 @@ ConfigOptions::ConfigOptions(const DBOptions& db_opts) : env(db_opts.env) {
   registry = ObjectRegistry::NewInstance();
 }
 
-std::string ConfigOptions::ToString(
-    const std::string& prefix,
-    const std::unordered_map<std::string, std::string>& options) const {
+std::string ConfigOptions::ToString(const std::string& prefix,
+                                    const Properties& props) const {
   if (formatter) {
     return formatter->ToString(prefix, options);
   } else {
@@ -1009,10 +1008,9 @@ Status OptionTypeInfo::Serialize(const ConfigOptions& config_options,
 }
 
 Status OptionTypeInfo::SerializeType(
-    const ConfigOptions& config_options,
+    const ConfigOptions& config_options, const std::string& prefix,
     const std::unordered_map<std::string, OptionTypeInfo>& type_map,
-    const void* opt_addr,
-    std::unordered_map<std::string, std::string>* options) {
+    const void* opt_addr, Properties* props) {
   Status status;
   for (const auto& iter : type_map) {
     std::string single;
@@ -1020,26 +1018,27 @@ Status OptionTypeInfo::SerializeType(
     const auto& opt_info = iter.second;
     if (opt_info.ShouldSerialize()) {
       if (!config_options.mutable_options_only) {
-        status =
-            opt_info.Serialize(config_options, opt_name, opt_addr, &single);
+        status = opt_info.Serialize(
+            config_options, MakePrefix(prefix, opt_name), opt_addr, &single);
       } else if (opt_info.IsMutable()) {
         ConfigOptions copy = config_options;
         copy.mutable_options_only = false;
-        status = opt_info.Serialize(copy, opt_name, opt_addr, &single);
+        status = opt_info.Serialize(copy, MakePrefix(prefix, opt_name),
+                                    opt_addr, &single);
       } else if (opt_info.IsConfigurable()) {
         // If it is a Configurable and we are either printing all of the
         // details or not printing only the name, this option should be
         // included in the list
         if (config_options.IsDetailed() ||
             !opt_info.IsEnabled(OptionTypeFlags::kStringNameOnly)) {
-          status =
-              opt_info.Serialize(config_options, opt_name, opt_addr, &single);
+          status = opt_info.Serialize(
+              config_options, MakePrefix(prefix, opt_name), opt_addr, &single);
         }
       }
       if (!status.ok()) {
         return status;
       } else if (!single.empty()) {
-        options->insert_or_assign(iter.first, single);
+        props->insert_or_assign(iter.first, single);
       }
     }
   }
@@ -1087,10 +1086,10 @@ Status OptionTypeInfo::TypeToString(
     const std::unordered_map<std::string, OptionTypeInfo>& type_map,
     const void* opt_addr, std::string* result) {
   assert(result);
-  std::unordered_map<std::string, std::string> options;
-  Status s = SerializeType(config_options, type_map, opt_addr, &options);
+  Properties props;
+  Status s = SerializeType(config_options, prefix, type_map, opt_addr, &props);
   if (s.ok()) {
-    *result = config_options.ToString(prefix, options);
+    *result = config_options.ToString(prefix, props);
   }
   return s;
 }

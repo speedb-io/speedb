@@ -243,14 +243,17 @@ Status FileSystemWrapper::PrepareOptions(const ConfigOptions& options) {
   return FileSystem::PrepareOptions(options);
 }
 
-Status FileSystemWrapper::SerializeOptions(
-    const ConfigOptions& config_options,
-    std::unordered_map<std::string, std::string>* options) const {
+Status FileSystemWrapper::SerializeOptions(const ConfigOptions& config_options,
+                                           const std::string& prefix,
+                                           Properties* props) const {
   if (!config_options.IsShallow() && target_ != nullptr &&
       !target_->IsInstanceOf(FileSystem::kDefaultName())) {
-    options->insert({kTargetPropName(), target_->ToString(config_options)});
+    props->insert(
+        {kTargetPropName(),
+         target_->ToString(config_options, OptionTypeInfo::MakePrefix(
+                                               prefix, kTargetPropName()))});
   }
-  return FileSystem::SerializeOptions(config_options, options);
+  return FileSystem::SerializeOptions(config_options, prefix, props);
 }
 
 DirFsyncOptions::DirFsyncOptions() { reason = kDefault; }

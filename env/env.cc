@@ -93,10 +93,9 @@ class LegacySystemClock : public SystemClock {
     return env_->TimeToString(time);
   }
 
-  Status SerializeOptions(
-      const ConfigOptions& /*config_options*/,
-      std::unordered_map<std::string, std::string>* /*options*/)
-      const override {
+  Status SerializeOptions(const ConfigOptions& /*config_options*/,
+                          const std::string& /*prefix*/,
+                          Properties* /*options*/) const override {
     // We do not want the LegacySystemClock to appear in the serialized output.
     // This clock is an internal class for those who do not implement one and
     // would be part of the Env.  As such, do not serialize it here.
@@ -602,10 +601,9 @@ class LegacyFileSystemWrapper : public FileSystem {
     return status_to_io_status(target_->IsDirectory(path, is_dir));
   }
 
-  Status SerializeOptions(
-      const ConfigOptions& /*config_options*/,
-      std::unordered_map<std::string, std::string>* /*options*/)
-      const override {
+  Status SerializeOptions(const ConfigOptions& /*config_options*/,
+                          const std::string& /*prefix*/,
+                          Properties* /*options*/) const override {
     // We do not want the LegacyFileSystem to appear in the serialized output.
     // This clock is an internal class for those who do not implement one and
     // would be part of the Env.  As such, do not serialize it here.
@@ -1188,14 +1186,17 @@ Status SystemClockWrapper::PrepareOptions(const ConfigOptions& options) {
   return SystemClock::PrepareOptions(options);
 }
 
-Status SystemClockWrapper::SerializeOptions(
-    const ConfigOptions& config_options,
-    std::unordered_map<std::string, std::string>* options) const {
+Status SystemClockWrapper::SerializeOptions(const ConfigOptions& config_options,
+                                            const std::string& prefix,
+                                            Properties* props) const {
   if (!config_options.IsShallow() && target_ != nullptr &&
       !target_->IsInstanceOf(SystemClock::kDefaultName())) {
-    options->insert({kTargetPropName(), target_->ToString(config_options)});
+    props->insert(
+        {kTargetPropName(),
+         target_->ToString(config_options, OptionTypeInfo::MakePrefix(
+                                               prefix, kTargetPropName()))});
   }
-  return SystemClock::SerializeOptions(config_options, options);
+  return SystemClock::SerializeOptions(config_options, prefix, props);
 }
 
 static int RegisterBuiltinSystemClocks(ObjectLibrary& library,

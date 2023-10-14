@@ -47,15 +47,15 @@ Status Customizable::GetOption(const ConfigOptions& config_options,
   }
 }
 
-Status Customizable::SerializeOptions(
-    const ConfigOptions& config_options,
-    std::unordered_map<std::string, std::string>* options) const {
+Status Customizable::SerializeOptions(const ConfigOptions& config_options,
+                                      const std::string& prefix,
+                                      Properties* props) const {
   Status s;
   auto id = GetId();
-  options->insert({OptionTypeInfo::kIdPropName(), id});
+  props->insert({OptionTypeInfo::kIdPropName(), id});
 
   if (!config_options.IsShallow() && !id.empty()) {
-    s = Configurable::SerializeOptions(config_options, options);
+    s = Configurable::SerializeOptions(config_options, prefix, props);
   }
   return s;
 }
@@ -95,11 +95,11 @@ Status Customizable::GetOptionsMap(
     if (status.ok() && customizable->IsInstanceOf(*id)) {
       // The new ID and the old ID match, so the objects are the same type.
       // Try to get the existing options, ignoring any errors
-      std::unordered_map<std::string, std::string> curr_opts;
+      Properties current;
       if (ConfigurableHelper::SerializeOptions(config_options, *customizable,
-                                               &curr_opts)
+                                               "", &current)
               .ok()) {
-        props->insert(curr_opts.begin(), curr_opts.end());
+        props->insert(current.begin(), current.end());
       }
     }
   } else {

@@ -483,12 +483,15 @@ Status CompositeEnvWrapper::PrepareOptions(const ConfigOptions& options) {
 }
 
 Status CompositeEnvWrapper::SerializeOptions(
-    const ConfigOptions& config_options,
-    std::unordered_map<std::string, std::string>* options) const {
+    const ConfigOptions& config_options, const std::string& prefix,
+    Properties* props) const {
   if (target_.env != nullptr && target_.env != Env::Default()) {
-    options->insert({kTargetPropName(), target_.env->ToString(config_options)});
+    props->insert({kTargetPropName(),
+                   target_.env->ToString(
+                       config_options,
+                       OptionTypeInfo::MakePrefix(prefix, kTargetPropName()))});
   }
-  return CompositeEnv::SerializeOptions(config_options, options);
+  return CompositeEnv::SerializeOptions(config_options, prefix, props);
 }
 
 EnvWrapper::EnvWrapper(Env* t) : target_(t) {
@@ -510,14 +513,17 @@ Status EnvWrapper::PrepareOptions(const ConfigOptions& options) {
   return Env::PrepareOptions(options);
 }
 
-Status EnvWrapper::SerializeOptions(
-    const ConfigOptions& config_options,
-    std::unordered_map<std::string, std::string>* options) const {
+Status EnvWrapper::SerializeOptions(const ConfigOptions& config_options,
+                                    const std::string& prefix,
+                                    Properties* props) const {
   if (!config_options.IsShallow() && target_.env != nullptr &&
       target_.env != Env::Default()) {
-    options->insert({kTargetPropName(), target_.env->ToString(config_options)});
+    props->insert({kTargetPropName(),
+                   target_.env->ToString(
+                       config_options,
+                       OptionTypeInfo::MakePrefix(prefix, kTargetPropName()))});
   }
-  return Env::SerializeOptions(config_options, options);
+  return Env::SerializeOptions(config_options, prefix, props);
 }
 
 }  // namespace ROCKSDB_NAMESPACE

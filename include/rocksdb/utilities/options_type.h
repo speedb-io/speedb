@@ -855,10 +855,9 @@ class OptionTypeInfo {
   // Returns the serialized form in result.
   // Returns OK on success or non-OK if some option could not be serialized.
   static Status SerializeType(
-      const ConfigOptions& config_options,
+      const ConfigOptions& config_options, const std::string& prefix,
       const std::unordered_map<std::string, OptionTypeInfo>& type_map,
-      const void* opt_addr,
-      std::unordered_map<std::string, std::string>* options);
+      const void* opt_addr, Properties* props);
   static Status TypeToString(
       const ConfigOptions& config_options, const std::string& opt_name,
       const std::unordered_map<std::string, OptionTypeInfo>& type_map,
@@ -909,6 +908,15 @@ class OptionTypeInfo {
 
   constexpr static const char* kIdPropName() { return "id"; }
   constexpr static const char* kIdPropSuffix() { return ".id"; }
+
+  static std::string MakePrefix(const std::string& prefix,
+                                const std::string& name) {
+    if (prefix.empty()) {
+      return name;
+    } else {
+      return prefix + "." + name;
+    }
+  }
 
  private:
   int offset_;

@@ -770,11 +770,11 @@ Status CompactionServiceInput::Write(std::string* output) {
   output->append(buf, sizeof(BinaryFormatVersion));
   ConfigOptions cf;
   cf.invoke_prepare_options = false;
-  std::unordered_map<std::string, std::string> options;
+  Properties props;
   Status s =
-      OptionTypeInfo::SerializeType(cf, cs_input_type_info, this, &options);
+      OptionTypeInfo::SerializeType(cf, "", cs_input_type_info, this, &props);
   if (s.ok()) {
-    output->append(cf.ToString("", options));
+    output->append(cf.ToString("", props) + cf.delimiter);
   }
   return s;
 }
@@ -805,11 +805,11 @@ Status CompactionServiceResult::Write(std::string* output) {
   output->append(buf, sizeof(BinaryFormatVersion));
   ConfigOptions cf;
   cf.invoke_prepare_options = false;
-  std::unordered_map<std::string, std::string> options;
+  Properties props;
   Status s =
-      OptionTypeInfo::SerializeType(cf, cs_result_type_info, this, &options);
+      OptionTypeInfo::SerializeType(cf, "", cs_result_type_info, this, &props);
   if (s.ok()) {
-    output->append(cf.ToString("", options));
+    output->append(cf.ToString("", props) + cf.delimiter);
   }
   return s;
 }

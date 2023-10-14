@@ -289,9 +289,9 @@ class CompositeEnvWrapper : public CompositeEnv {
   const Customizable* Inner() const override { return target_.env; }
 
   Status PrepareOptions(const ConfigOptions& options) override;
-  Status SerializeOptions(
-      const ConfigOptions& config_options,
-      std::unordered_map<std::string, std::string>* options) const override;
+  Status SerializeOptions(const ConfigOptions& config_options,
+                          const std::string& prefix,
+                          Properties* props) const override;
 
   // Return the target to which this Env forwards all calls
   Env* env_target() const { return target_.env; }

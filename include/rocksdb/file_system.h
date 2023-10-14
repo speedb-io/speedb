@@ -1528,9 +1528,9 @@ class FileSystemWrapper : public FileSystem {
 
   const Customizable* Inner() const override { return target_.get(); }
   Status PrepareOptions(const ConfigOptions& options) override;
-  Status SerializeOptions(
-      const ConfigOptions& config_options,
-      std::unordered_map<std::string, std::string>* options) const override;
+  Status SerializeOptions(const ConfigOptions& config_options,
+                          const std::string& prefix,
+                          Properties* props) const override;
 
   virtual IOStatus Poll(std::vector<void*>& io_handles,
                         size_t min_completions) override {

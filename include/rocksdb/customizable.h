@@ -224,9 +224,9 @@ class Customizable : public Configurable {
   virtual const char* NickName() const { return ""; }
   //  Given a name (e.g. rocksdb.my.type.opt), returns the short name (opt)
   std::string GetOptionName(const std::string& long_name) const override;
-  Status SerializeOptions(
-      const ConfigOptions& config_options,
-      std::unordered_map<std::string, std::string>* options) const override;
+  Status SerializeOptions(const ConfigOptions& config_options,
+                          const std::string& prefix,
+                          Properties* props) const override;
 };
 
 }  // namespace ROCKSDB_NAMESPACE

@@ -133,9 +133,9 @@ class ConfigurableHelper {
   // @return OK If the options for this object wer successfully serialized.
   // @return InvalidArgument If one or more of the options could not be
   // serialized.
-  static Status SerializeOptions(
-      const ConfigOptions& config_options, const Configurable& configurable,
-      std::unordered_map<std::string, std::string>* options);
+  static Status SerializeOptions(const ConfigOptions& config_options,
+                                 const Configurable& configurable,
+                                 const std::string& prefix, Properties* props);
 
   // Internal method to list the option names for this object.
   // Classes may override this value to change its behavior.

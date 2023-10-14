@@ -140,13 +140,13 @@ Status GetPlainTableOptionsFromString(const ConfigOptions& config_options,
                                       const PlainTableOptions& table_options,
                                       const std::string& opts_str,
                                       PlainTableOptions* new_table_options) {
-  std::unordered_map<std::string, std::string> opts_map;
-  Status s = config_options.ToMap(opts_str, &opts_map);
+  Properties props;
+  Status s = config_options.ToProps(opts_str, &props);
   if (!s.ok()) {
     return s;
   }
 
-  s = GetPlainTableOptionsFromMap(config_options, table_options, opts_map,
+  s = GetPlainTableOptionsFromMap(config_options, table_options, props,
                                   new_table_options);
   // Translate any errors (NotFound, NotSupported, to InvalidArgument
   if (s.ok() || s.IsInvalidArgument()) {

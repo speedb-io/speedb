@@ -58,19 +58,18 @@ ConfigOptions::ConfigOptions(const DBOptions& db_opts) : env(db_opts.env) {
 std::string ConfigOptions::ToString(const std::string& prefix,
                                     const Properties& props) const {
   if (formatter) {
-    return formatter->ToString(prefix, options);
+    return formatter->ToString(prefix, props);
   } else {
-    return OptionsFormatter::Default()->ToString(prefix, options);
+    return OptionsFormatter::Default()->ToString(prefix, props);
   }
 }
 
-Status ConfigOptions::ToMap(
-    const std::string& opts_str,
-    std::unordered_map<std::string, std::string>* opts_map) const {
+Status ConfigOptions::ToProps(const std::string& opts_str,
+                              Properties* props) const {
   if (formatter) {
-    return formatter->ToMap(opts_str, opts_map);
+    return formatter->ToProps(opts_str, props);
   } else {
-    return OptionsFormatter::Default()->ToMap(opts_str, opts_map);
+    return OptionsFormatter::Default()->ToProps(opts_str, props);
   }
 }
 
@@ -693,13 +692,13 @@ Status GetColumnFamilyOptionsFromString(const ConfigOptions& config_options,
                                         const ColumnFamilyOptions& base_options,
                                         const std::string& opts_str,
                                         ColumnFamilyOptions* new_options) {
-  std::unordered_map<std::string, std::string> opts_map;
-  Status s = config_options.ToMap(opts_str, &opts_map);
+  Properties props;
+  Status s = config_options.ToProps(opts_str, &props);
   if (!s.ok()) {
     *new_options = base_options;
     return s;
   }
-  return GetColumnFamilyOptionsFromMap(config_options, base_options, opts_map,
+  return GetColumnFamilyOptionsFromMap(config_options, base_options, props,
                                        new_options);
 }
 
@@ -725,14 +724,13 @@ Status GetDBOptionsFromString(const ConfigOptions& config_options,
                               const DBOptions& base_options,
                               const std::string& opts_str,
                               DBOptions* new_options) {
-  std::unordered_map<std::string, std::string> opts_map;
-  Status s = config_options.ToMap(opts_str, &opts_map);
+  Properties props;
+  Status s = config_options.ToProps(opts_str, &props);
   if (!s.ok()) {
     *new_options = base_options;
     return s;
   }
-  return GetDBOptionsFromMap(config_options, base_options, opts_map,
-                             new_options);
+  return GetDBOptionsFromMap(config_options, base_options, props, new_options);
 }
 
 Status GetOptionsFromString(const Options& base_options,
@@ -750,16 +748,16 @@ Status GetOptionsFromString(const ConfigOptions& config_options,
                             const std::string& opts_str, Options* new_options) {
   ColumnFamilyOptions new_cf_options;
   std::unordered_map<std::string, std::string> unused_opts;
-  std::unordered_map<std::string, std::string> opts_map;
+  Properties props;
 
   assert(new_options);
   *new_options = base_options;
-  Status s = config_options.ToMap(opts_str, &opts_map);
+  Status s = config_options.ToProps(opts_str, &props);
   if (!s.ok()) {
     return s;
   }
   auto config = DBOptionsAsConfigurable(base_options);
-  s = config->ConfigureFromMap(config_options, opts_map, &unused_opts);
+  s = config->ConfigureFromMap(config_options, props, &unused_opts);
 
   if (s.ok()) {
     DBOptions* new_db_options =
@@ -871,12 +869,12 @@ Status OptionTypeInfo::ParseType(
     const ConfigOptions& config_options, const std::string& opts_str,
     const std::unordered_map<std::string, OptionTypeInfo>& type_map,
     void* opt_addr, std::unordered_map<std::string, std::string>* unused) {
-  std::unordered_map<std::string, std::string> opts_map;
-  Status status = config_options.ToMap(opts_str, &opts_map);
+  Properties props;
+  Status status = config_options.ToProps(opts_str, &props);
   if (!status.ok()) {
     return status;
   } else {
-    return ParseType(config_options, opts_map, type_map, opt_addr, unused);
+    return ParseType(config_options, props, type_map, opt_addr, unused);
   }
 }
 

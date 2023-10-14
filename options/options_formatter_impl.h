@@ -24,13 +24,11 @@ class LogOptionsFormatter : public OptionsFormatter {
   static const char* kNickName() { return "Log"; }
   const char* NickName() const override { return kNickName(); }
   std::string ToString(const std::string& prefix,
-                       const std::unordered_map<std::string, std::string>&
-                           options) const override;
+                       const Properties& props) const override;
   std::string ToString(const std::string& prefix, char separator,
                        const std::vector<std::string>& elems) const override;
-  Status ToMap(const std::string& /*opts_str*/,
-               std::unordered_map<std::string, std::string>* /*opts_map*/)
-      const override {
+  Status ToProps(const std::string& /*opts_str*/,
+                 Properties* /*props*/) const override {
     return Status::NotSupported();
   }
 
@@ -52,11 +50,8 @@ class DefaultOptionsFormatter : public OptionsFormatter {
   const char* NickName() const override { return kNickName(); }
 
   std::string ToString(const std::string& prefix,
-                       const std::unordered_map<std::string, std::string>&
-                           options) const override;
-  Status ToMap(
-      const std::string& opts_str,
-      std::unordered_map<std::string, std::string>* opts_map) const override;
+                       const Properties& props) const override;
+  Status ToProps(const std::string& opts_str, Properties* props) const override;
   std::string ToString(const std::string& prefix, char separator,
                        const std::vector<std::string>& elems) const override;
   Status ToVector(const std::string& opts_str, char delim,
@@ -94,11 +89,9 @@ class PropertiesOptionsFormatter : public DefaultOptionsFormatter {
   static const char* kNickName() { return "Properties"; }
   const char* NickName() const override { return kNickName(); }
   std::string ToString(const std::string& prefix,
-                       const std::unordered_map<std::string, std::string>&
-                           options) const override;
-  Status ToMap(const std::string& /*opts_str*/,
-               std::unordered_map<std::string, std::string>* /*opts_map*/)
-      const override;
+                       const Properties& props) const override;
+  Status ToProps(const std::string& /*opts_str*/,
+                 Properties* /*props*/) const override;
 };
 
 }  // namespace ROCKSDB_NAMESPACE

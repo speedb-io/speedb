@@ -37,12 +37,11 @@ void DefaultOptionsFormatter::AppendElem(const std::string& name,
   }
 }
 
-std::string DefaultOptionsFormatter::ToString(
-    const std::string& /*prefix*/,
-    const std::unordered_map<std::string, std::string>& options) const {
+std::string DefaultOptionsFormatter::ToString(const std::string& /*prefix*/,
+                                              const Properties& props) const {
   std::string result;
   std::string id;
-  for (const auto& it : options) {
+  for (const auto& it : props) {
     if (it.first == OptionTypeInfo::kIdPropName()) {
       id = it.second;
     } else {
@@ -118,11 +117,10 @@ Status DefaultOptionsFormatter::NextToken(const std::string& opts,
   return Status::OK();
 }
 
-Status DefaultOptionsFormatter::ToMap(
-    const std::string& opts_str,
-    std::unordered_map<std::string, std::string>* opts_map) const {
+Status DefaultOptionsFormatter::ToProps(const std::string& opts_str,
+                                        Properties* props) const {
   static const char kDelim = ';';
-  assert(opts_map);
+  assert(props);
   // Example:
   //   opts_str = "write_buffer_size=1024;max_write_buffer_number=2;"
   //              "nested_opt={opt1=1;opt2=2};max_bytes_for_level_base=100"
@@ -151,7 +149,7 @@ Status DefaultOptionsFormatter::ToMap(
     if (!s.ok()) {
       return s;
     } else {
-      (*opts_map)[key] = value;
+      (*props)[key] = value;
       if (pos == std::string::npos) {
         break;
       } else {
@@ -209,12 +207,11 @@ Status DefaultOptionsFormatter::ToVector(
 }
 
 std::string PropertiesOptionsFormatter::ToString(
-    const std::string& prefix,
-    const std::unordered_map<std::string, std::string>& options) const {
+    const std::string& prefix, const Properties& props) const {
   std::string result;
   std::string id;
   const char* separator = prefix.empty() ? "\n  " : "; ";
-  for (const auto& it : options) {
+  for (const auto& it : props) {
     if (it.first == OptionTypeInfo::kIdPropName()) {
       id = it.second;
     } else {
@@ -235,34 +232,33 @@ std::string PropertiesOptionsFormatter::ToString(
   }
 }
 
-Status PropertiesOptionsFormatter::ToMap(
-    const std::string& props,
-    std::unordered_map<std::string, std::string>* map) const {
-  if (props.find('\n') != std::string::npos) {
+Status PropertiesOptionsFormatter::ToProps(const std::string& props_str,
+                                           Properties* props) const {
+  if (props_str.find('\n') != std::string::npos) {
     size_t pos = 0;
     int line_num = 0;
     Status s;
-    while (s.ok() && pos < props.size()) {
-      size_t nl_pos = props.find('\n', pos);
+    while (s.ok() && pos < props_str.size()) {
+      size_t nl_pos = props_str.find('\n', pos);
       std::string name;
       std::string value;
       if (nl_pos == std::string::npos) {
-        s = RocksDBOptionsParser::ParseStatement(&name, &value,
-                                                 props.substr(pos), line_num);
-        pos = props.size();
+        s = RocksDBOptionsParser::ParseStatement(
+            &name, &value, props_str.substr(pos), line_num);
+        pos = props_str.size();
       } else {
         s = RocksDBOptionsParser::ParseStatement(
-            &name, &value, props.substr(pos, nl_pos - pos), line_num);
+            &name, &value, props_str.substr(pos, nl_pos - pos), line_num);
         pos = nl_pos + 1;
       }
       if (s.ok()) {
-        (*map)[name] = value;
+        (*props)[name] = value;
         line_num++;
       }
     }
     return s;
   } else {
-    return DefaultOptionsFormatter::ToMap(props, map);
+    return DefaultOptionsFormatter::ToProps(props_str, props);
   }
 }
 void LogOptionsFormatter::AppendElem(const std::string& prefix,
@@ -278,13 +274,12 @@ void LogOptionsFormatter::AppendElem(const std::string& prefix,
   result->append(value);
 }
 
-std::string LogOptionsFormatter::ToString(
-    const std::string& prefix,
-    const std::unordered_map<std::string, std::string>& options) const {
+std::string LogOptionsFormatter::ToString(const std::string& prefix,
+                                          const Properties& props) const {
   std::string result;
-  if (!options.empty()) {
-    const auto& id = options.find(OptionTypeInfo::kIdPropName());
-    if (options.size() > 1) {
+  if (!props.empty()) {
+    const auto& id = props.find(OptionTypeInfo::kIdPropName());
+    if (props.size() > 1) {
       std::string spaces = "  ";
       if (!prefix.empty()) {
         // Indent by the number of "." in the prefix
@@ -294,18 +289,18 @@ std::string LogOptionsFormatter::ToString(
           spaces.append("  ");
         }
       }
-      if (id != options.end()) {
+      if (id != props.end()) {
         AppendElem(spaces, id->first, id->second, &result);
       }
-      for (const auto& it : options) {
+      for (const auto& it : props) {
         if (it.first != OptionTypeInfo::kIdPropName()) {
           AppendElem(spaces, it.first, it.second, &result);
         }
       }
-    } else if (id != options.end()) {
+    } else if (id != props.end()) {
       result = id->second;
     } else {
-      const auto& it = options.begin();
+      const auto& it = props.begin();
       AppendElem(prefix, it->first, it->second, &result);
     }
   }

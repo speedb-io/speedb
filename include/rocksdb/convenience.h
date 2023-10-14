@@ -111,9 +111,8 @@ struct ConfigOptions {
     return (level > SanityLevel::kSanityLevelNone && level <= sanity_level);
   }
 
-  // Converts the string representation into a map of name/value options
-  Status ToMap(const std::string& opts_str,
-               std::unordered_map<std::string, std::string>* opts_map) const;
+  // Converts the string representation into name/value properties
+  Status ToProps(const std::string& opts_str, Properties* props) const;
 
   // Converts the properties to a single string representation
   std::string ToString(const std::string& prefix,

@@ -43,17 +43,15 @@ class OptionsFormatter : public Customizable {
                                  std::shared_ptr<OptionsFormatter>* result);
 
   static const char* Type() { return "OptionsFormatter"; }
-  // Converts the map of options to a single string representation
-  virtual std::string ToString(
-      const std::string& prefix,
-      const std::unordered_map<std::string, std::string>& options) const = 0;
+  // Converts the map of properties to a single string representation
+  virtual std::string ToString(const std::string& prefix,
+                               const Properties& props) const = 0;
 
-  // Converts the string representation into a map of name/value options
-  virtual Status ToMap(
-      const std::string& opts_str,
-      std::unordered_map<std::string, std::string>* opts_map) const = 0;
+  // Converts the string representation into a name/value properties
+  virtual Status ToProps(const std::string& opts_str,
+                         Properties* props) const = 0;
 
-  // Converts the vector options to a single string representation
+  // Converts the vector to a single string representation
   virtual std::string ToString(const std::string& prefix, char separator,
                                const std::vector<std::string>& elems) const = 0;
 

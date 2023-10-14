@@ -175,10 +175,10 @@ Status Configurable::ConfigureFromString(const ConfigOptions& config_options,
   Status s;
   if (!opts_str.empty()) {
     if (opts_str.find('=') != std::string::npos) {
-      std::unordered_map<std::string, std::string> opt_map;
-      s = config_options.ToMap(opts_str, &opt_map);
+      Properties props;
+      s = config_options.ToProps(opts_str, &props);
       if (s.ok()) {
-        s = ConfigureFromMap(config_options, opt_map, nullptr);
+        s = ConfigureFromMap(config_options, props, nullptr);
       }
     } else {
       s = ParseStringOptions(config_options, opts_str);
@@ -662,7 +662,7 @@ Status Configurable::GetOptionsMap(
   } else if (value.find('=') == std::string::npos) {
     *id = value;
   } else {
-    status = config_options.ToMap(value, props);
+    status = config_options.ToProps(value, props);
     if (!status.ok()) {       // There was an error creating the map.
       *id = value;            // Treat the value as id
       props->clear();         // Clear the properties

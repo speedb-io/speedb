@@ -11,6 +11,7 @@ Fix RepeatableThread to work properly with on thread start callback feature (htt
 * Unit Testing: Expose the disallow_trivial_move flag in the MoveFilesToLevel testing utility (#677).
 * Static Pinning: Report pinning policy name and parameters to the log (#691).
 * LOG Reporting: add reporting capabilities to the WriteController and the WriteBufferManager by saving the Loggers of the dbs which are using them internally and issuing WARN msgs to these Loggers whenever the state of the WC and WBM changes in regards to delaying (#556).
+* sst_dump: display metaindex_handle and the index_handle's offset and size in footer information (#404).
 
 ### Bug Fixes
 * db_bench: fix SeekRandomWriteRandom valid check. Use key and value only after checking iterator is valid.

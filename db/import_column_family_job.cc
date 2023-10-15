@@ -117,6 +117,8 @@ Status ImportColumnFamilyJob::Prepare(uint64_t next_file_number,
     }
   }
 
+  Status status;
+
   // Copy/Move external files into DB
   auto hardlink_files = import_options_.move_files;
 

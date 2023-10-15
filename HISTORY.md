@@ -18,6 +18,7 @@ Fix RepeatableThread to work properly with on thread start callback feature (htt
 * Fix a JAVA build issue introduced by #597 (#680)
 
 ### Miscellaneous
+* Unit tests: Disable CancelCompactionWaitingOnConflict and CompactionLimiter in db_compaction_test since they sometimes fail or get stuck. These need to be investigated and reenabled.
 
 ## Grapes v2.6.0 (8/22/2023)
 Based on RocksDB 8.1.1

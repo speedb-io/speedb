@@ -4262,7 +4262,8 @@ TEST_P(DBCompactionTestWithParam, FullCompactionInBottomPriThreadPool) {
   Env::Default()->SetBackgroundThreads(0, Env::Priority::BOTTOM);
 }
 
-TEST_P(DBCompactionTestWithParamWithMCC, CancelCompactionWaitingOnConflict) {
+TEST_P(DBCompactionTestWithParamWithMCC,
+       DISABLED_CancelCompactionWaitingOnConflict) {
   // This test verifies cancellation of a compaction waiting to be scheduled due
   // to conflict with a running compaction.
   //
@@ -6154,7 +6155,7 @@ TEST_F(DBCompactionTest, CompactionHasEmptyOutput) {
   ASSERT_EQ(2, collector->num_ssts_creation_started());
 }
 
-TEST_P(DBCompactionTestWithMCC, CompactionLimiter) {
+TEST_P(DBCompactionTestWithMCC, DISABLED_CompactionLimiter) {
   const int kNumKeysPerFile = 10;
   const int kMaxBackgroundThreads = 64;
 

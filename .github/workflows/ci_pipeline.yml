@@ -129,7 +129,7 @@ jobs:
 
   Build-macos-test:
     with:
-      verSion: ""
+      verSion: " "
     secrets:
       AWS_ACCESS_KEY_ID: ""
       AWS_SECRET_ACCESS_KEY: ""
@@ -139,6 +139,6 @@ jobs:
 
   Build-ubuntu-arm-test:
     with:
-      verSion: ""
+      verSion: " "
     needs: [Build]
     uses: ./.github/workflows/build_ubuntu_arm.yml

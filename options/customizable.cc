@@ -52,8 +52,16 @@ Status Customizable::SerializeOptions(const ConfigOptions& config_options,
                                       Properties* props) const {
   Status s;
   auto id = GetId();
+  if (config_options.IsPrintable() && !id.empty() &&
+      id.find('@') == std::string::npos) {
+    // We are doing printable options and this ID does not have an address in
+    // it.  Add it
+    const int kBufferSize = 200;
+    char buffer[kBufferSize];
+    snprintf(buffer, kBufferSize, " (%p)", this);
+    id.append(buffer);
+  }
   props->insert({OptionTypeInfo::kIdPropName(), id});
-
   if (!config_options.IsShallow() && !id.empty()) {
     s = Configurable::SerializeOptions(config_options, prefix, props);
   }

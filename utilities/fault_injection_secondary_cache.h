@@ -53,8 +53,10 @@ class FaultInjectionSecondaryCache : public SecondaryCache {
     return base_->GetCapacity(capacity);
   }
 
-  std::string GetPrintableOptions() const override {
-    return base_->GetPrintableOptions();
+  Status SerializePrintableOptions(const ConfigOptions& config_options,
+                                   const std::string& prefix,
+                                   Properties* props) const override {
+    return base_->SerializePrintableOptions(config_options, prefix, props);
   }
 
  private:

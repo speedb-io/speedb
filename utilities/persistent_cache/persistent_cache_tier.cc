@@ -10,48 +10,81 @@
 #include <sstream>
 #include <string>
 
+#include "rocksdb/utilities/options_type.h"
+
 namespace ROCKSDB_NAMESPACE {
+// OptionTypeInfo map for PersistentCacheConfig
+static std::unordered_map<std::string, OptionTypeInfo>
+    persistent_cache_config_options_type_info = {
+        {"path",
+         {offsetof(struct PersistentCacheConfig, path), OptionType::kString}},
+        {"enable_direct_reads",
+         {offsetof(struct PersistentCacheConfig, enable_direct_reads),
+          OptionType::kBoolean}},
+        {"enable_direct_writes",
+         {offsetof(struct PersistentCacheConfig, enable_direct_writes),
+          OptionType::kBoolean}},
+        {"cache_size",
+         {offsetof(struct PersistentCacheConfig, cache_size),
+          OptionType::kUInt64T}},
+        {"cache_file_size",
+         {offsetof(struct PersistentCacheConfig, cache_file_size),
+          OptionType::kUInt32T}},
+        {"writer_qdepth",
+         {offsetof(struct PersistentCacheConfig, writer_qdepth),
+          OptionType::kUInt32T}},
+        {"pipeline_writes",
+         {offsetof(struct PersistentCacheConfig, pipeline_writes),
+          OptionType::kBoolean}},
+        {"max_write_pipeline_backlog_size",
+         {offsetof(struct PersistentCacheConfig,
+                   max_write_pipeline_backlog_size),
+          OptionType::kUInt64T}},
+        {"write_buffer_size",
+         {offsetof(struct PersistentCacheConfig, write_buffer_size),
+          OptionType::kUInt32T}},
+        {"writer_dispatch_size",
+         {offsetof(struct PersistentCacheConfig, writer_dispatch_size),
+          OptionType::kUInt64T}},
+        {"is_compressed",
+         {offsetof(struct PersistentCacheConfig, is_compressed),
+          OptionType::kBoolean}},
+};
 
-std::string PersistentCacheConfig::ToString() const {
-  std::string ret;
-  ret.reserve(20000);
-  const int kBufferSize = 200;
-  char buffer[kBufferSize];
-
-  snprintf(buffer, kBufferSize, "    path: %s\n", path.c_str());
-  ret.append(buffer);
-  snprintf(buffer, kBufferSize, "    enable_direct_reads: %d\n",
-           enable_direct_reads);
-  ret.append(buffer);
-  snprintf(buffer, kBufferSize, "    enable_direct_writes: %d\n",
-           enable_direct_writes);
-  ret.append(buffer);
-  snprintf(buffer, kBufferSize, "    cache_size: %" PRIu64 "\n", cache_size);
-  ret.append(buffer);
-  snprintf(buffer, kBufferSize, "    cache_file_size: %" PRIu32 "\n",
-           cache_file_size);
-  ret.append(buffer);
-  snprintf(buffer, kBufferSize, "    writer_qdepth: %" PRIu32 "\n",
-           writer_qdepth);
-  ret.append(buffer);
-  snprintf(buffer, kBufferSize, "    pipeline_writes: %d\n", pipeline_writes);
-  ret.append(buffer);
-  snprintf(buffer, kBufferSize,
-           "    max_write_pipeline_backlog_size: %" PRIu64 "\n",
-           max_write_pipeline_backlog_size);
-  ret.append(buffer);
-  snprintf(buffer, kBufferSize, "    write_buffer_size: %" PRIu32 "\n",
-           write_buffer_size);
-  ret.append(buffer);
-  snprintf(buffer, kBufferSize, "    writer_dispatch_size: %" PRIu64 "\n",
-           writer_dispatch_size);
-  ret.append(buffer);
-  snprintf(buffer, kBufferSize, "    is_compressed: %d\n", is_compressed);
-  ret.append(buffer);
-
-  return ret;
+Status PersistentCacheConfig::SerializeOptions(
+    const ConfigOptions& config_options,
+    std::unordered_map<std::string, std::string>* options) const {
+  return OptionTypeInfo::SerializeType(
+      config_options, "", persistent_cache_config_options_type_info, this,
+      options);
 }
 
+std::string PersistentCacheConfig::ToString(
+    const ConfigOptions& config_options) const {
+  std::unordered_map<std::string, std::string> options_map;
+  auto status = SerializeOptions(config_options, &options_map);
+  assert(status.ok());
+  if (status.ok()) {
+    return config_options.ToString("", options_map);
+  } else {
+    return "";
+  }
+}
+
+std::string PersistentCache::ToString(
+    const ConfigOptions& config_options) const {
+  //**TODO: This method is needed until PersistentCache is Customizable
+  std::unordered_map<std::string, std::string> options;
+  std::string id = Name();
+  options.insert({OptionTypeInfo::kIdPropName(), id});
+  Status s = SerializePrintableOptions(config_options, &options);
+  assert(s.ok());
+  if (s.ok()) {
+    return config_options.ToString("", options);
+  } else {
+    return id;
+  }
+}
 //
 // PersistentCacheTier implementation
 //
@@ -162,4 +195,3 @@ bool PersistentTieredCache::IsCompressed() {
 }
 
 }  // namespace ROCKSDB_NAMESPACE
-

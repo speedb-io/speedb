@@ -1035,7 +1035,7 @@ Status OptionTypeInfo::SerializeType(
       }
       if (!status.ok()) {
         return status;
-      } else if (!single.empty()) {
+      } else if (!single.empty() || config_options.IsPrintable()) {
         props->insert_or_assign(iter.first, single);
       }
     }

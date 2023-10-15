@@ -31,6 +31,8 @@
 #include "db/db_impl/db_impl.h"
 #include "logging/logging.h"
 #include "monitoring/instrumented_mutex.h"
+#include "options/options_formatter_impl.h"
+#include "rocksdb/convenience.h"
 #include "rocksdb/status.h"
 #include "rocksdb/write_controller.h"
 #include "test_util/sync_point.h"
@@ -296,18 +298,10 @@ void WriteBufferManager::RemoveDBFromQueue(StallInterface* wbm_stall) {
   wbm_stall->Signal();
 }
 
-std::string WriteBufferManager::GetPrintableOptions() const {
-  std::string ret;
-  const int kBufferSize = 200;
-  char buffer[kBufferSize];
-
-  // The assumed width of the callers display code
-  int field_width = 85;
-
-  snprintf(buffer, kBufferSize, "%*s: %" ROCKSDB_PRIszt "\n", field_width,
-           "wbm.size", buffer_size());
-  ret.append(buffer);
-
+Status WriteBufferManager::SerializePrintableOptions(
+    const ConfigOptions& /*config_options*/, const std::string& /*prefix*/,
+    Properties* props) const {
+  props->insert({"size", std::to_string(buffer_size())});
   const Cache* cache = nullptr;
   if (cache_res_mgr_ != nullptr) {
     cache =
@@ -315,22 +309,34 @@ std::string WriteBufferManager::GetPrintableOptions() const {
             cache_res_mgr_.get())
             ->TEST_GetCache();
   }
-  snprintf(buffer, kBufferSize, "%*s: %p\n", field_width, "wbm.cache", cache);
-  ret.append(buffer);
 
-  snprintf(buffer, kBufferSize, "%*s: %d\n", field_width, "wbm.allow_stall",
-           allow_stall_);
-  ret.append(buffer);
+  if (cache != nullptr) {
+    props->insert({"cache", cache->GetId()});
+  } else {
+    props->insert({"cache", kNullptrString});
+  }
+  props->insert({"size", allow_stall_ ? "true" : "false"});
+  props->insert({"initiate_flushes", IsInitiatingFlushes() ? "true" : "false"});
+  return Status::OK();
+}
 
-  snprintf(buffer, kBufferSize, "%*s: %d\n", field_width,
-           "wbm.start_delay_percent", start_delay_percent_);
-  ret.append(buffer);
+std::string WriteBufferManager::GetPrintableOptions() const {
+  ConfigOptions config_options;
 
-  snprintf(buffer, kBufferSize, "%*s: %d\n", field_width,
-           "wbm.initiate_flushes", IsInitiatingFlushes());
-  ret.append(buffer);
+  config_options.formatter = std::make_shared<LogOptionsFormatter>();
+  return ToString(config_options);
+}
 
-  return ret;
+std::string WriteBufferManager::ToString(const ConfigOptions& config_options,
+                                         const std::string& prefix) const {
+  Properties props;
+  Status s = SerializePrintableOptions(config_options, prefix, &props);
+  assert(s.ok());
+  if (s.ok()) {
+    return config_options.ToString(prefix, props);
+  } else {
+    return "";
+  }
 }
 
 WriteBufferManager::WBMClientId WriteBufferManager::RegisterWCAndLogger(

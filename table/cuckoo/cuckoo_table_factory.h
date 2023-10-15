@@ -71,8 +71,6 @@ class CuckooTableFactory : public TableFactory {
       const TableBuilderOptions& table_builder_options,
       WritableFileWriter* file) const override;
 
-  std::string GetPrintableOptions() const override;
-
  private:
   CuckooTableOptions table_options_;
 };

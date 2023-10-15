@@ -24,6 +24,7 @@
 #include "rocksdb/cache.h"
 
 #include "cache/lru_cache.h"
+#include "port/port.h"
 #include "rocksdb/secondary_cache.h"
 #include "rocksdb/utilities/customizable_util.h"
 #include "rocksdb/utilities/options_type.h"
@@ -127,6 +128,18 @@ Status Cache::CreateFromString(const ConfigOptions& config_options,
     result->swap(cache);
   }
   return status;
+}
+
+std::string Cache::GetId() const {
+  //**TODO: When Cache is Customizable, use GenerateIndividualId
+  std::ostringstream ostr;
+  ostr << Name() << "@" << static_cast<const void*>(this) << "#"
+       << port::GetProcessID();
+  return ostr.str();
+}
+std::string Cache::ToString(const ConfigOptions& /*opts*/,
+                            const std::string& /*prefix*/) const {
+  return GetPrintableOptions();
 }
 
 bool Cache::AsyncLookupHandle::IsReady() {

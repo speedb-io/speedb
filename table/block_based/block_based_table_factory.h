@@ -72,7 +72,9 @@ class BlockBasedTableFactory : public TableFactory {
                          const ColumnFamilyOptions& cf_opts) const override;
   Status PrepareOptions(const ConfigOptions& opts) override;
 
-  std::string GetPrintableOptions() const override;
+  Status SerializePrintableOptions(const ConfigOptions& config_options,
+                                   const std::string& prefix,
+                                   Properties* props) const override;
 
   bool IsDeleteRangeSupported() const override { return true; }
 

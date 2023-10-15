@@ -29,6 +29,9 @@ class PersistentCache {
 
   virtual ~PersistentCache() {}
 
+  virtual const char* Name() const = 0;
+  std::string GetId() const;
+
   // Insert to page cache
   //
   // page_key   Identifier to identify a page uniquely across restarts
@@ -56,13 +59,19 @@ class PersistentCache {
   // tire top-down
   virtual StatsType Stats() = 0;
 
-  virtual std::string GetPrintableOptions() const = 0;
-
+  std::string ToString(const ConfigOptions& config_opts) const;
   // Return a new numeric id.  May be used by multiple clients who are
   // sharding the same persistent cache to partition the key space.  Typically
   // the client will allocate a new id at startup and prepend the id to its
   // cache keys.
   virtual uint64_t NewId() = 0;
+
+ protected:
+  virtual Status SerializePrintableOptions(
+      const ConfigOptions& /*config_options*/,
+      std::unordered_map<std::string, std::string>* /*opts*/) const {
+    return Status::OK();
+  }
 };
 
 // Factor method to create a new persistent cache

@@ -1249,8 +1249,6 @@ class TestSecondaryCache : public SecondaryCache {
 
   // Wait for a collection of handles to become ready
   void WaitAll(std::vector<SecondaryCacheResultHandle*> /*handles*/) override {}
-
-  std::string GetPrintableOptions() const override { return ""; }
 };
 
 class TestStatistics : public StatisticsImpl {

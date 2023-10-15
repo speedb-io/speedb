@@ -23,6 +23,7 @@
 
 #include "logging/logging.h"
 #include "options/configurable_helper.h"
+#include "options/options_formatter_impl.h"
 #include "options/options_helper.h"
 #include "options/options_parser.h"
 #include "port/port.h"
@@ -637,6 +638,14 @@ class MutableDBConfigurable : public Configurable {
   }
 
  protected:
+  Status SerializePrintableOptions(const ConfigOptions& config_options,
+                                   const std::string& prefix,
+                                   Properties* props) const override {
+    return Configurable::SerializePrintableOptions(config_options, prefix,
+                                                   props);
+  }
+
+ protected:
   MutableDBOptions mutable_;
   const std::unordered_map<std::string, std::string>* opt_map_;
 };
@@ -678,6 +687,46 @@ class DBOptionsConfigurable : public MutableDBConfigurable {
     } else {
       return MutableDBConfigurable::GetOptionsPtr(name);
     }
+  }
+
+ protected:
+  // Serializes the immutable printable options
+  Status SerializePrintableOptions(const ConfigOptions& config_options,
+                                   const std::string& prefix,
+                                   Properties* props) const override {
+    const int kBufferSize = 200;
+    char buffer[kBufferSize];
+    if (immutable_.row_cache) {
+      props->insert(
+          {"row_cache", immutable_.row_cache->ToString(config_options)});
+    } else {
+      props->insert({"row_cache", kNullptrString});
+    }
+    if (immutable_.statistics) {
+      props->insert(
+          {"statistics", immutable_.statistics->ToString(config_options)});
+    } else {
+      props->insert({"statistics", kNullptrString});
+    }
+    if (immutable_.env) {
+      props->insert({"env", immutable_.env->ToString(config_options)});
+    } else {
+      props->insert({"env", kNullptrString});
+    }
+    snprintf(buffer, kBufferSize, "(%p)", immutable_.rate_limiter.get());
+    props->insert({"rate_limiter", buffer});
+    snprintf(buffer, kBufferSize, "(%p)", immutable_.info_log.get());
+    props->insert({"info_log", buffer});
+    snprintf(buffer, kBufferSize, " (%p)", immutable_.sst_file_manager.get());
+    props->insert({"sst_file_manager", buffer});
+    if (immutable_.sst_file_manager) {
+      props->insert(
+          {"sst_file_manager.rate_bytes_per_sec",
+           std::to_string(
+               immutable_.sst_file_manager->GetDeleteRateBytesPerSecond())});
+    }
+    return MutableDBConfigurable::SerializePrintableOptions(config_options,
+                                                            prefix, props);
   }
 
  private:
@@ -792,182 +841,6 @@ ImmutableDBOptions::ImmutableDBOptions(const DBOptions& options)
   stats = statistics.get();
 }
 
-void ImmutableDBOptions::Dump(Logger* log) const {
-  ROCKS_LOG_HEADER(log, "                        Options.error_if_exists: %d",
-                   error_if_exists);
-  ROCKS_LOG_HEADER(log, "                      Options.create_if_missing: %d",
-                   create_if_missing);
-  ROCKS_LOG_HEADER(log, "                        Options.paranoid_checks: %d",
-                   paranoid_checks);
-  ROCKS_LOG_HEADER(log, "            Options.flush_verify_memtable_count: %d",
-                   flush_verify_memtable_count);
-  ROCKS_LOG_HEADER(log,
-                   "                              "
-                   "Options.track_and_verify_wals_in_manifest: %d",
-                   track_and_verify_wals_in_manifest);
-  ROCKS_LOG_HEADER(log, "       Options.verify_sst_unique_id_in_manifest: %d",
-                   verify_sst_unique_id_in_manifest);
-  ROCKS_LOG_HEADER(log, "                                    Options.env: %p",
-                   env);
-  ROCKS_LOG_HEADER(log, "                                     Options.fs: %s",
-                   fs->Name());
-  ROCKS_LOG_HEADER(log, "                               Options.info_log: %p",
-                   info_log.get());
-  ROCKS_LOG_HEADER(log, "               Options.max_file_opening_threads: %d",
-                   max_file_opening_threads);
-  ROCKS_LOG_HEADER(log, "                             Options.statistics: %p",
-                   stats);
-  ROCKS_LOG_HEADER(log, "                              Options.use_fsync: %d",
-                   use_fsync);
-  ROCKS_LOG_HEADER(
-      log, "                      Options.max_log_file_size: %" ROCKSDB_PRIszt,
-      max_log_file_size);
-  ROCKS_LOG_HEADER(log,
-                   "                 Options.max_manifest_file_size: %" PRIu64,
-                   max_manifest_file_size);
-  ROCKS_LOG_HEADER(
-      log, "                  Options.log_file_time_to_roll: %" ROCKSDB_PRIszt,
-      log_file_time_to_roll);
-  ROCKS_LOG_HEADER(
-      log, "                      Options.keep_log_file_num: %" ROCKSDB_PRIszt,
-      keep_log_file_num);
-  ROCKS_LOG_HEADER(
-      log, "                   Options.recycle_log_file_num: %" ROCKSDB_PRIszt,
-      recycle_log_file_num);
-  ROCKS_LOG_HEADER(log, "                        Options.allow_fallocate: %d",
-                   allow_fallocate);
-  ROCKS_LOG_HEADER(log, "                       Options.allow_mmap_reads: %d",
-                   allow_mmap_reads);
-  ROCKS_LOG_HEADER(log, "                      Options.allow_mmap_writes: %d",
-                   allow_mmap_writes);
-  ROCKS_LOG_HEADER(log, "                       Options.use_direct_reads: %d",
-                   use_direct_reads);
-  ROCKS_LOG_HEADER(log,
-                   "                       "
-                   "Options.use_direct_io_for_flush_and_compaction: %d",
-                   use_direct_io_for_flush_and_compaction);
-  ROCKS_LOG_HEADER(log, "         Options.create_missing_column_families: %d",
-                   create_missing_column_families);
-  ROCKS_LOG_HEADER(log, "                             Options.db_log_dir: %s",
-                   db_log_dir.c_str());
-  ROCKS_LOG_HEADER(log, "                                Options.wal_dir: %s",
-                   wal_dir.c_str());
-  ROCKS_LOG_HEADER(log, "               Options.table_cache_numshardbits: %d",
-                   table_cache_numshardbits);
-  ROCKS_LOG_HEADER(log,
-                   "                        Options.WAL_ttl_seconds: %" PRIu64,
-                   WAL_ttl_seconds);
-  ROCKS_LOG_HEADER(log,
-                   "                      Options.WAL_size_limit_MB: %" PRIu64,
-                   WAL_size_limit_MB);
-  ROCKS_LOG_HEADER(log,
-                   "                       "
-                   "Options.max_write_batch_group_size_bytes: %" PRIu64,
-                   max_write_batch_group_size_bytes);
-  ROCKS_LOG_HEADER(
-      log, "            Options.manifest_preallocation_size: %" ROCKSDB_PRIszt,
-      manifest_preallocation_size);
-  ROCKS_LOG_HEADER(log, "                    Options.is_fd_close_on_exec: %d",
-                   is_fd_close_on_exec);
-  ROCKS_LOG_HEADER(log, "                  Options.advise_random_on_open: %d",
-                   advise_random_on_open);
-  ROCKS_LOG_HEADER(log, "                      Options.use_dynamic_delay: %d",
-                   use_dynamic_delay);
-  ROCKS_LOG_HEADER(log, "                   Options.write_controller: %p",
-                   write_controller.get());
-  ROCKS_LOG_HEADER(
-      log, "                   Options.db_write_buffer_size: %" ROCKSDB_PRIszt,
-      db_write_buffer_size);
-  ROCKS_LOG_HEADER(
-      log, "                   Options.write_buffer_manager: %p%s%s",
-      write_buffer_manager.get(), (write_buffer_manager.get() ? "\n" : ""),
-      (write_buffer_manager.get()
-           ? write_buffer_manager->GetPrintableOptions().c_str()
-           : ""));
-  ROCKS_LOG_HEADER(log, "        Options.access_hint_on_compaction_start: %d",
-                   static_cast<int>(access_hint_on_compaction_start));
-  ROCKS_LOG_HEADER(
-      log, "          Options.random_access_max_buffer_size: %" ROCKSDB_PRIszt,
-      random_access_max_buffer_size);
-  ROCKS_LOG_HEADER(log, "                     Options.use_adaptive_mutex: %d",
-                   use_adaptive_mutex);
-  ROCKS_LOG_HEADER(log, "                           Options.rate_limiter: %p",
-                   rate_limiter.get());
-  Header(
-      log, "    Options.sst_file_manager.rate_bytes_per_sec: %" PRIi64,
-      sst_file_manager ? sst_file_manager->GetDeleteRateBytesPerSecond() : 0);
-  ROCKS_LOG_HEADER(log, "                      Options.wal_recovery_mode: %d",
-                   static_cast<int>(wal_recovery_mode));
-  ROCKS_LOG_HEADER(log, "                 Options.enable_thread_tracking: %d",
-                   enable_thread_tracking);
-  ROCKS_LOG_HEADER(log, "                 Options.enable_pipelined_write: %d",
-                   enable_pipelined_write);
-  ROCKS_LOG_HEADER(log, "                 Options.unordered_write: %d",
-                   unordered_write);
-  ROCKS_LOG_HEADER(log, "        Options.allow_concurrent_memtable_write: %d",
-                   allow_concurrent_memtable_write);
-  ROCKS_LOG_HEADER(log, "        Options.use_spdb_writes: %d", use_spdb_writes);
-  ROCKS_LOG_HEADER(log, "     Options.enable_write_thread_adaptive_yield: %d",
-                   enable_write_thread_adaptive_yield);
-  ROCKS_LOG_HEADER(log,
-                   "            Options.write_thread_max_yield_usec: %" PRIu64,
-                   write_thread_max_yield_usec);
-  ROCKS_LOG_HEADER(log,
-                   "           Options.write_thread_slow_yield_usec: %" PRIu64,
-                   write_thread_slow_yield_usec);
-  if (row_cache) {
-    ROCKS_LOG_HEADER(
-        log,
-        "                              Options.row_cache: %" ROCKSDB_PRIszt,
-        row_cache->GetCapacity());
-  } else {
-    ROCKS_LOG_HEADER(log,
-                     "                              Options.row_cache: None");
-  }
-  ROCKS_LOG_HEADER(log, "                             Options.wal_filter: %s",
-                   wal_filter ? wal_filter->Name() : "None");
-
-  ROCKS_LOG_HEADER(log, "            Options.avoid_flush_during_recovery: %d",
-                   avoid_flush_during_recovery);
-  ROCKS_LOG_HEADER(log, "            Options.allow_ingest_behind: %d",
-                   allow_ingest_behind);
-  ROCKS_LOG_HEADER(log, "            Options.two_write_queues: %d",
-                   two_write_queues);
-  ROCKS_LOG_HEADER(log, "            Options.manual_wal_flush: %d",
-                   manual_wal_flush);
-  ROCKS_LOG_HEADER(log, "            Options.wal_compression: %d",
-                   wal_compression);
-  ROCKS_LOG_HEADER(log, "            Options.atomic_flush: %d", atomic_flush);
-  ROCKS_LOG_HEADER(log,
-                   "            Options.avoid_unnecessary_blocking_io: %d",
-                   avoid_unnecessary_blocking_io);
-  ROCKS_LOG_HEADER(log, "                Options.persist_stats_to_disk: %u",
-                   persist_stats_to_disk);
-  ROCKS_LOG_HEADER(log, "                Options.write_dbid_to_manifest: %d",
-                   write_dbid_to_manifest);
-  ROCKS_LOG_HEADER(
-      log, "                Options.log_readahead_size: %" ROCKSDB_PRIszt,
-      log_readahead_size);
-  ROCKS_LOG_HEADER(log, "                Options.file_checksum_gen_factory: %s",
-                   file_checksum_gen_factory ? file_checksum_gen_factory->Name()
-                                             : kUnknownFileChecksumFuncName);
-  ROCKS_LOG_HEADER(log, "                Options.best_efforts_recovery: %d",
-                   static_cast<int>(best_efforts_recovery));
-  ROCKS_LOG_HEADER(log, "               Options.max_bgerror_resume_count: %d",
-                   max_bgerror_resume_count);
-  ROCKS_LOG_HEADER(log,
-                   "           Options.bgerror_resume_retry_interval: %" PRIu64,
-                   bgerror_resume_retry_interval);
-  ROCKS_LOG_HEADER(log, "            Options.allow_data_in_errors: %d",
-                   allow_data_in_errors);
-  ROCKS_LOG_HEADER(log, "            Options.db_host_id: %s",
-                   db_host_id.c_str());
-  ROCKS_LOG_HEADER(log, "            Options.enforce_single_del_contracts: %s",
-                   enforce_single_del_contracts ? "true" : "false");
-  ROCKS_LOG_HEADER(log, "            Options.use_clean_delete_during_flush: %s",
-                   use_clean_delete_during_flush ? "true" : "false");
-}
-
 bool ImmutableDBOptions::IsWalDirSameAsDBPath() const {
   assert(!db_paths.empty());
   return IsWalDirSameAsDBPath(db_paths[0].path);
@@ -1046,54 +919,12 @@ MutableDBOptions::MutableDBOptions(const DBOptions& options)
       max_background_flushes(options.max_background_flushes) {}
 
 void MutableDBOptions::Dump(Logger* log) const {
-  ROCKS_LOG_HEADER(log, "            Options.max_background_jobs: %d",
-                   max_background_jobs);
-  ROCKS_LOG_HEADER(log, "            Options.max_background_compactions: %d",
-                   max_background_compactions);
-  ROCKS_LOG_HEADER(log, "            Options.max_subcompactions: %" PRIu32,
-                   max_subcompactions);
-  ROCKS_LOG_HEADER(log, "            Options.avoid_flush_during_shutdown: %d",
-                   avoid_flush_during_shutdown);
-  ROCKS_LOG_HEADER(
-      log, "          Options.writable_file_max_buffer_size: %" ROCKSDB_PRIszt,
-      writable_file_max_buffer_size);
-  ROCKS_LOG_HEADER(log, "            Options.delayed_write_rate : %" PRIu64,
-                   delayed_write_rate);
-  ROCKS_LOG_HEADER(log, "            Options.max_total_wal_size: %" PRIu64,
-                   max_total_wal_size);
-  ROCKS_LOG_HEADER(
-      log, "            Options.delete_obsolete_files_period_micros: %" PRIu64,
-      delete_obsolete_files_period_micros);
-  ROCKS_LOG_HEADER(log, "                  Options.stats_dump_period_sec: %u",
-                   stats_dump_period_sec);
-  ROCKS_LOG_HEADER(log, "                Options.stats_persist_period_sec: %d",
-                   stats_persist_period_sec);
-  ROCKS_LOG_HEADER(log, "                Options.refresh_options_sec: %d",
-                   refresh_options_sec);
-  if (refresh_options_sec > 0 && !refresh_options_file.empty()) {
-    ROCKS_LOG_HEADER(log, "                Options.refresh_options_file: %s",
-                     refresh_options_file.c_str());
-  }
-  ROCKS_LOG_HEADER(
-      log,
-      "                Options.stats_history_buffer_size: %" ROCKSDB_PRIszt,
-      stats_history_buffer_size);
-  ROCKS_LOG_HEADER(log, "                         Options.max_open_files: %d",
-                   max_open_files);
-  ROCKS_LOG_HEADER(log,
-                   "                         Options.bytes_per_sync: %" PRIu64,
-                   bytes_per_sync);
-  ROCKS_LOG_HEADER(log,
-                   "                     Options.wal_bytes_per_sync: %" PRIu64,
-                   wal_bytes_per_sync);
-  ROCKS_LOG_HEADER(log,
-                   "                  Options.strict_bytes_per_sync: %d",
-                   strict_bytes_per_sync);
-  ROCKS_LOG_HEADER(log,
-                   "      Options.compaction_readahead_size: %" ROCKSDB_PRIszt,
-                   compaction_readahead_size);
-  ROCKS_LOG_HEADER(log, "                 Options.max_background_flushes: %d",
-                          max_background_flushes);
+  ConfigOptions config_options;
+  config_options.depth = ConfigOptions::kDepthPrintable;
+  config_options.formatter.reset(new LogOptionsFormatter());
+  auto db_cfg = DBOptionsAsConfigurable(*this);
+  auto db_str = db_cfg->ToString(config_options, "Options");
+  ROCKS_LOG_HEADER(log, "%s", db_str.c_str());
 }
 
 Status GetMutableDBOptionsFromStrings(

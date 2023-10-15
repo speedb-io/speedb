@@ -265,12 +265,17 @@ void LogOptionsFormatter::AppendElem(const std::string& prefix,
                                      const std::string& name,
                                      const std::string& value,
                                      std::string* result) const {
-  if (!result->empty()) {
+  if (!result->empty() && !EndsWith(*result, "\n")) {
     result->append("\n");
   }
   result->append(prefix);
   result->append(name);
   result->append(": ");
+  if (value.find('\n') != std::string::npos &&
+      value.find(':') != std::string::npos) {
+    // The value looks like a complex/embedded value.
+    result->append("\n");
+  }
   result->append(value);
 }
 

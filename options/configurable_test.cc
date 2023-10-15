@@ -19,6 +19,7 @@
 #include "options/options_helper.h"
 #include "options/options_parser.h"
 #include "rocksdb/configurable.h"
+#include "rocksdb/persistent_cache.h"
 #include "test_util/testharness.h"
 #include "test_util/testutil.h"
 
@@ -666,35 +667,34 @@ TEST_F(ConfigurableTest, NullOptionMapTest) {
 }
 
 TEST_F(ConfigurableTest, LoggerTest) {
-  StringLogger logger;
+  BlockBasedTableOptions bbto;
+
+  LRUCacheOptions lruo(64 * 1024 * 1024, -1, false, 0.5);
+  lruo.secondary_cache = NewCompressedSecondaryCache(1024 * 1024);
+
+  DBOptions db_opts;
+  ColumnFamilyOptions cf_opts;
+
+  bbto.block_cache = NewLRUCache(lruo);
+  cf_opts.table_factory.reset(NewBlockBasedTableFactory(bbto));
+  ASSERT_OK(NewPersistentCache(db_opts.env, "/tmp", 1024 * 1024 * 1024,
+                               db_opts.info_log, false,
+                               &bbto.persistent_cache));
+  db_opts.write_buffer_manager.reset(
+      new WriteBufferManager(32 * 1024, bbto.block_cache));
 
   ConfigOptions cfg;
   cfg.formatter = std::make_shared<LogOptionsFormatter>();
 
-  ColumnFamilyOptions cf_opts;
   printf("MJR: TF Opts Orig=[\n%s\n]\n",
          cf_opts.table_factory->GetPrintableOptions().c_str());
   printf("MJR:+++++++++++\n");
-  cf_opts.Dump(&logger);
-  printf("MJR: CF Opts Orig=[\n%s\n]\n", logger.str().c_str());
-  logger.clear();
-  printf("MJR:+++++++++++\n");
-  printf("MJR:+++++++++++\n");
-  DBOptions db_opts;
-  db_opts.Dump(&logger);
-  printf("MJR: DB Opts Orig=[\n%s\n]\n", logger.str().c_str());
-  logger.clear();
 
-  printf("MJR:***********\n");
-  printf("MJR: TF Opts Log=[\n%s\n]\n",
-         cf_opts.table_factory->ToString(cfg).c_str());
-  printf("MJR:+++++++++++\n");
   auto cf_cfg = CFOptionsAsConfigurable(cf_opts);
-  printf("MJR: CF Opts Log=[\n%s\n]\n", cf_cfg->ToString(cfg).c_str());
-
+  printf("MJR: CF Opts Orig=[\n%s\n]\n", cf_cfg->GetPrintableOptions().c_str());
   printf("MJR:+++++++++++\n");
   auto db_cfg = DBOptionsAsConfigurable(db_opts);
-  printf("MJR: DB Opts Log=[\n%s\n]\n", db_cfg->ToString(cfg).c_str());
+  printf("MJR: DB Opts Orig=[\n%s\n]\n", db_cfg->GetPrintableOptions().c_str());
 }
 
 static std::unordered_map<std::string, ConfigTestFactoryFunc> TestFactories = {

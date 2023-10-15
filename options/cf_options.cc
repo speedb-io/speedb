@@ -13,6 +13,7 @@
 #include "logging/logging.h"
 #include "options/configurable_helper.h"
 #include "options/db_options.h"
+#include "options/options_formatter_impl.h"
 #include "options/options_helper.h"
 #include "options/options_parser.h"
 #include "port/port.h"
@@ -998,140 +999,12 @@ void MutableCFOptions::RefreshDerivedOptions(int num_levels,
 }
 
 void MutableCFOptions::Dump(Logger* log) const {
-  // Memtable related options
-  ROCKS_LOG_INFO(log,
-                 "                        write_buffer_size: %" ROCKSDB_PRIszt,
-                 write_buffer_size);
-  ROCKS_LOG_INFO(log, "                  max_write_buffer_number: %d",
-                 max_write_buffer_number);
-  ROCKS_LOG_INFO(log,
-                 "                         arena_block_size: %" ROCKSDB_PRIszt,
-                 arena_block_size);
-  ROCKS_LOG_INFO(log, "              memtable_prefix_bloom_ratio: %f",
-                 memtable_prefix_bloom_size_ratio);
-  ROCKS_LOG_INFO(log, "              memtable_whole_key_filtering: %d",
-                 memtable_whole_key_filtering);
-  ROCKS_LOG_INFO(log,
-                 "                  memtable_huge_page_size: %" ROCKSDB_PRIszt,
-                 memtable_huge_page_size);
-  ROCKS_LOG_INFO(log,
-                 "                    max_successive_merges: %" ROCKSDB_PRIszt,
-                 max_successive_merges);
-  ROCKS_LOG_INFO(log,
-                 "                 inplace_update_num_locks: %" ROCKSDB_PRIszt,
-                 inplace_update_num_locks);
-  ROCKS_LOG_INFO(log, "                         prefix_extractor: %s",
-                 prefix_extractor == nullptr
-                     ? "nullptr"
-                     : prefix_extractor->GetId().c_str());
-  ROCKS_LOG_INFO(log, "                 disable_auto_compactions: %d",
-                 disable_auto_compactions);
-  ROCKS_LOG_INFO(log, "      soft_pending_compaction_bytes_limit: %" PRIu64,
-                 soft_pending_compaction_bytes_limit);
-  ROCKS_LOG_INFO(log, "      hard_pending_compaction_bytes_limit: %" PRIu64,
-                 hard_pending_compaction_bytes_limit);
-  ROCKS_LOG_INFO(log, "       level0_file_num_compaction_trigger: %d",
-                 level0_file_num_compaction_trigger);
-  ROCKS_LOG_INFO(log, "           level0_slowdown_writes_trigger: %d",
-                 level0_slowdown_writes_trigger);
-  ROCKS_LOG_INFO(log, "               level0_stop_writes_trigger: %d",
-                 level0_stop_writes_trigger);
-  ROCKS_LOG_INFO(log, "                     max_compaction_bytes: %" PRIu64,
-                 max_compaction_bytes);
-  ROCKS_LOG_INFO(log, "    ignore_max_compaction_bytes_for_input: %s",
-                 ignore_max_compaction_bytes_for_input ? "true" : "false");
-  ROCKS_LOG_INFO(log, "                    target_file_size_base: %" PRIu64,
-                 target_file_size_base);
-  ROCKS_LOG_INFO(log, "              target_file_size_multiplier: %d",
-                 target_file_size_multiplier);
-  ROCKS_LOG_INFO(log, "                 max_bytes_for_level_base: %" PRIu64,
-                 max_bytes_for_level_base);
-  ROCKS_LOG_INFO(log, "           max_bytes_for_level_multiplier: %f",
-                 max_bytes_for_level_multiplier);
-  ROCKS_LOG_INFO(log, "                                      ttl: %" PRIu64,
-                 ttl);
-  ROCKS_LOG_INFO(log, "              periodic_compaction_seconds: %" PRIu64,
-                 periodic_compaction_seconds);
-  std::string result;
-  char buf[10];
-  for (const auto m : max_bytes_for_level_multiplier_additional) {
-    snprintf(buf, sizeof(buf), "%d, ", m);
-    result += buf;
-  }
-  if (result.size() >= 2) {
-    result.resize(result.size() - 2);
-  } else {
-    result = "";
-  }
-
-  ROCKS_LOG_INFO(log, "max_bytes_for_level_multiplier_additional: %s",
-                 result.c_str());
-  ROCKS_LOG_INFO(log, "        max_sequential_skip_in_iterations: %" PRIu64,
-                 max_sequential_skip_in_iterations);
-  ROCKS_LOG_INFO(log, "         check_flush_compaction_key_order: %d",
-                 check_flush_compaction_key_order);
-  ROCKS_LOG_INFO(log, "                     paranoid_file_checks: %d",
-                 paranoid_file_checks);
-  ROCKS_LOG_INFO(log, "                       report_bg_io_stats: %d",
-                 report_bg_io_stats);
-  ROCKS_LOG_INFO(log, "                              compression: %d",
-                 static_cast<int>(compression));
-  ROCKS_LOG_INFO(log,
-                 "                       experimental_mempurge_threshold: %f",
-                 experimental_mempurge_threshold);
-
-  // Universal Compaction Options
-  ROCKS_LOG_INFO(log, "compaction_options_universal.size_ratio : %d",
-                 compaction_options_universal.size_ratio);
-  ROCKS_LOG_INFO(log, "compaction_options_universal.min_merge_width : %d",
-                 compaction_options_universal.min_merge_width);
-  ROCKS_LOG_INFO(log, "compaction_options_universal.max_merge_width : %d",
-                 compaction_options_universal.max_merge_width);
-  ROCKS_LOG_INFO(
-      log, "compaction_options_universal.max_size_amplification_percent : %d",
-      compaction_options_universal.max_size_amplification_percent);
-  ROCKS_LOG_INFO(log,
-                 "compaction_options_universal.compression_size_percent : %d",
-                 compaction_options_universal.compression_size_percent);
-  ROCKS_LOG_INFO(log, "compaction_options_universal.stop_style : %d",
-                 compaction_options_universal.stop_style);
-  ROCKS_LOG_INFO(
-      log, "compaction_options_universal.allow_trivial_move : %d",
-      static_cast<int>(compaction_options_universal.allow_trivial_move));
-  ROCKS_LOG_INFO(log, "compaction_options_universal.incremental        : %d",
-                 static_cast<int>(compaction_options_universal.incremental));
-
-  // FIFO Compaction Options
-  ROCKS_LOG_INFO(log, "compaction_options_fifo.max_table_files_size : %" PRIu64,
-                 compaction_options_fifo.max_table_files_size);
-  ROCKS_LOG_INFO(log, "compaction_options_fifo.allow_compaction : %d",
-                 compaction_options_fifo.allow_compaction);
-
-  // Blob file related options
-  ROCKS_LOG_INFO(log, "                        enable_blob_files: %s",
-                 enable_blob_files ? "true" : "false");
-  ROCKS_LOG_INFO(log, "                            min_blob_size: %" PRIu64,
-                 min_blob_size);
-  ROCKS_LOG_INFO(log, "                           blob_file_size: %" PRIu64,
-                 blob_file_size);
-  ROCKS_LOG_INFO(log, "                    blob_compression_type: %s",
-                 CompressionTypeToString(blob_compression_type).c_str());
-  ROCKS_LOG_INFO(log, "           enable_blob_garbage_collection: %s",
-                 enable_blob_garbage_collection ? "true" : "false");
-  ROCKS_LOG_INFO(log, "       blob_garbage_collection_age_cutoff: %f",
-                 blob_garbage_collection_age_cutoff);
-  ROCKS_LOG_INFO(log, "  blob_garbage_collection_force_threshold: %f",
-                 blob_garbage_collection_force_threshold);
-  ROCKS_LOG_INFO(log, "           blob_compaction_readahead_size: %" PRIu64,
-                 blob_compaction_readahead_size);
-  ROCKS_LOG_INFO(log, "                 blob_file_starting_level: %d",
-                 blob_file_starting_level);
-  ROCKS_LOG_INFO(log, "                   prepopulate_blob_cache: %s",
-                 prepopulate_blob_cache == PrepopulateBlobCache::kFlushOnly
-                     ? "flush only"
-                     : "disable");
-  ROCKS_LOG_INFO(log, "                   last_level_temperature: %d",
-                 static_cast<int>(last_level_temperature));
+  ConfigOptions config_options;
+  config_options.depth = ConfigOptions::kDepthPrintable;
+  config_options.formatter.reset(new LogOptionsFormatter());
+  auto cf_cfg = CFOptionsAsConfigurable(*this);
+  auto cf_str = cf_cfg->ToString(config_options, "Options");
+  ROCKS_LOG_HEADER(log, "%s", cf_str.c_str());
 }
 
 MutableCFOptions::MutableCFOptions(const Options& options)

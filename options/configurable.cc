@@ -7,6 +7,7 @@
 
 #include "logging/logging.h"
 #include "options/configurable_helper.h"
+#include "options/options_formatter_impl.h"
 #include "options/options_helper.h"
 #include "rocksdb/customizable.h"
 #include "rocksdb/status.h"
@@ -470,6 +471,9 @@ std::string Configurable::ToString(const ConfigOptions& config_options,
                                    const std::string& prefix) const {
   Properties props;
   Status s = SerializeOptions(config_options, prefix, &props);
+  if (s.ok() && config_options.IsPrintable()) {
+    s = SerializePrintableOptions(config_options, prefix, &props);
+  }
   assert(s.ok());
   if (s.ok()) {
     return config_options.ToString(prefix, props);
@@ -535,6 +539,14 @@ Status ConfigurableHelper::SerializeOptions(const ConfigOptions& config_options,
     }
   }
   return Status::OK();
+}
+
+std::string Configurable::GetPrintableOptions() const {
+  ConfigOptions config_options;
+  Properties props;
+  config_options.formatter = std::make_shared<LogOptionsFormatter>();
+  config_options.depth = ConfigOptions::kDepthPrintable;
+  return ToString(config_options);
 }
 
 //********************************************************************************

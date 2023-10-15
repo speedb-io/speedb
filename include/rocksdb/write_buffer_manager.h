@@ -42,6 +42,7 @@
 #include "rocksdb/port_defs.h"
 
 namespace ROCKSDB_NAMESPACE {
+struct ConfigOptions;
 struct Options;
 class CacheReservationManager;
 class InstrumentedMutex;
@@ -268,6 +269,8 @@ class WriteBufferManager final {
   void RemoveDBFromQueue(StallInterface* wbm_stall);
 
   std::string GetPrintableOptions() const;
+  std::string ToString(const ConfigOptions& config_options,
+                       const std::string& prefix = "wbm") const;
 
  public:
   bool IsInitiatingFlushes() const { return initiate_flushes_; }
@@ -314,6 +317,11 @@ class WriteBufferManager final {
   void DeregisterWCAndLogger(std::shared_ptr<WriteController> wc,
                              std::shared_ptr<Logger> logger,
                              WBMClientId wbm_client_id);
+
+ protected:
+  Status SerializePrintableOptions(
+      const ConfigOptions& config_options, const std::string& prefix,
+      std::unordered_map<std::string, std::string>* opts) const;
 
  private:
   // The usage + delay factor are coded in a single (atomic) uint64_t value as

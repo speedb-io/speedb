@@ -68,6 +68,8 @@ class BlockCacheTier : public PersistentCacheTier {
     Close().PermitUncheckedError();
     assert(!insert_th_.joinable());
   }
+  static const char* kClassName() { return "BlockTieredCache"; }
+  const char* Name() const override { return kClassName(); }
 
   Status Insert(const Slice& key, const char* data, const size_t size) override;
   Status Lookup(const Slice& key, std::unique_ptr<char[]>* data,
@@ -79,8 +81,6 @@ class BlockCacheTier : public PersistentCacheTier {
 
   bool IsCompressed() override { return opt_.is_compressed; }
 
-  std::string GetPrintableOptions() const override { return opt_.ToString(); }
-
   PersistentCache::StatsType Stats() override;
 
   void TEST_Flush() override {
@@ -89,6 +89,11 @@ class BlockCacheTier : public PersistentCacheTier {
       SystemClock::Default()->SleepForMicroseconds(1000000);
     }
   }
+
+ protected:
+  Status SerializePrintableOptions(
+      const ConfigOptions& config_options,
+      std::unordered_map<std::string, std::string>* opts) const override;
 
  private:
   // Percentage of cache to be evicted when the cache is full

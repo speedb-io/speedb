@@ -53,10 +53,12 @@ struct ConfigOptions {
   };
 
   enum Depth {
-    kDepthDefault,  // Traverse nested options that are not flagged as "shallow"
-    kDepthShallow,  // Do not traverse into any nested options
-    kDepthDetailed,  // Traverse nested options, overriding the options shallow
-                     // setting
+    kDepthDefault =
+        0x0,  // Traverse nested options that are not flagged as "shallow"
+    kDepthShallow = 0x1,  // Do not traverse into any nested options
+    kDepthDetailed =
+        0x2,  // Traverse nested options, overriding the shallow  setting
+    kDepthPrintable = 0x6,  // Detailed, plus options that are marked printable
   };
 
   // When true, any unused options will be ignored and OK will be returned
@@ -101,7 +103,10 @@ struct ConfigOptions {
   std::shared_ptr<OptionsFormatter> formatter;
 
   bool IsShallow() const { return depth == Depth::kDepthShallow; }
-  bool IsDetailed() const { return depth == Depth::kDepthDetailed; }
+  bool IsDetailed() const {
+    return (depth & Depth::kDepthDetailed) == Depth::kDepthDetailed;
+  }
+  bool IsPrintable() const { return depth == Depth::kDepthPrintable; }
 
   bool IsCheckDisabled() const {
     return sanity_level == SanityLevel::kSanityLevelNone;

@@ -74,6 +74,11 @@ Status BlockCacheTier::Open() {
   return Status::OK();
 }
 
+Status BlockCacheTier::SerializePrintableOptions(
+    const ConfigOptions& config_options,
+    std::unordered_map<std::string, std::string>* opts) const {
+  return opt_.SerializeOptions(config_options, opts);
+}
 bool IsCacheFile(const std::string& file) {
   // check if the file has .rc suffix
   // Unfortunately regex support across compilers is not even, so we use simple

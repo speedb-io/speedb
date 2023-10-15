@@ -6,7 +6,6 @@
 #include "table/adaptive/adaptive_table_factory.h"
 
 #include "port/port.h"
-#include "rocksdb/utilities/options_type.h"
 #include "table/format.h"
 #include "table/table_builder.h"
 
@@ -78,25 +77,26 @@ TableBuilder* AdaptiveTableFactory::NewTableBuilder(
 }
 
 Status AdaptiveTableFactory::SerializePrintableOptions(
-    const ConfigOptions& config_options, const std::string& prefix,
-    Properties* props) const {
+    const ConfigOptions& config_options,
+    const std::string& prefix,
+    std::unordered_map<std::string, std::string>* opts) const {
   if (table_factory_to_write_) {
-    props->insert(
-        {"write_factory", table_factory_to_write_->ToString(config_options)});
+    opts->insert(Customizable::ToPair(config_options, prefix, "write_factory", table_factory_to_write.get());
   }
   if (plain_table_factory_) {
-    props->insert({"plain_table_factory",
-                   plain_table_factory_->ToString(config_options)});
+    opts->insert(Customizable::ToPair(config_options
+		 {"plain_table_factory", 
+	plain_table_factory_->ToString(config_options, OptionTypeInfo::MakePrefix(prefix, "plain_table_factory"))});
   }
   if (block_based_table_factory_) {
-    props->insert({"block_based_table_factory",
-                   block_based_table_factory_->ToString(config_options)});
+    opts->insert({OptionTypeInfo::MakePrefix(prefix, "block_based_table_factory"),
+                  block_based_table_factory_->ToString(config_options)});
   }
   if (cuckoo_table_factory_) {
-    props->insert({"cuckoo_table_factory",
-                   cuckoo_table_factory_->ToString(config_options)});
+    opts->insert({OptionTypeInfo::MakePrefix(prefix, "cuckoo_table_factory"),
+                  cuckoo_table_factory_->ToString(config_options)});
   }
-  return TableFactory::SerializePrintableOptions(config_options, prefix, props);
+  return Status::OK();
 }
 
 extern TableFactory* NewAdaptiveTableFactory(

@@ -116,3 +116,29 @@ jobs:
   Check-Licence-And-History:
     if: ${{  github.event_name == 'pull_request_review' }}
     uses: ./.github/workflows/check_license_and_history.yml
+
+  Build-windows-test:
+    with:
+      verSion: ""
+    secrets:
+      AWS_ACCESS_KEY_ID: ""
+      AWS_SECRET_ACCESS_KEY: ""
+      AWS_BUCKET: ""
+    needs: [Build]
+    uses: ./.github/workflows/build_windows.yml  
+
+  Build-macos-test:
+    with:
+      verSion: ""
+    secrets:
+      AWS_ACCESS_KEY_ID: ""
+      AWS_SECRET_ACCESS_KEY: ""
+      AWS_BUCKET: ""
+    needs: [Build]
+    uses: ./.github/workflows/build_macos.yml
+
+  Build-ubuntu-arm-test:
+    with:
+      verSion: ""
+    needs: [Build]
+    uses: ./.github/workflows/build_ubuntu_arm.yml

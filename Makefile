@@ -387,6 +387,7 @@ ifdef COMPILE_WITH_ASAN
 	EXEC_LDFLAGS += -fsanitize=address
 	PLATFORM_CCFLAGS += -fsanitize=address
 	PLATFORM_CXXFLAGS += -fsanitize=address
+	PLATFORM_LDFLAGS += -fsanitize=address
 ifeq ($(LIB_MODE),shared)
 ifdef USE_CLANG
 # Fix false ODR violation; see https://github.com/google/sanitizers/issues/1017
@@ -1993,8 +1994,8 @@ LIB_JAVADOCS_JAR = $(PROJECT_NAME)jni-$(LIB_JAVA_VERSION)-javadoc.jar
 LIB_SOURCES_JAR = $(PROJECT_NAME)jni-$(LIB_JAVA_VERSION)-sources.jar
 SHA256_CMD = sha256sum
 
-ZLIB_VER ?= 1.2.13
-ZLIB_SHA256 ?= b3a24de97a8fdbc835b9833169501030b8977031bcb54b3b3ac13740f846ab30
+ZLIB_VER ?= 1.3
+ZLIB_SHA256 ?= ff0ba4c292013dbc27530b3a81e1f9a813cd39de01ca5e0f8bf355702efa593e
 ZLIB_DOWNLOAD_BASE ?= http://zlib.net
 BZIP2_VER ?= 1.0.8
 BZIP2_SHA256 ?= ab5a03176ee106d3f0fa90e381da478ddae405918153cca248e682cd0c4a2269

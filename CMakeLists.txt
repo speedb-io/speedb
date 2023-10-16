@@ -743,6 +743,7 @@ set(SOURCES
         db/db_impl/db_impl_experimental.cc
         db/db_impl/db_impl_readonly.cc
         db/db_impl/db_impl_secondary.cc
+        db/db_impl/compact_range_threads_mngr.cc
         db/db_info_dumper.cc
         db/db_iter.cc
         db/dbformat.cc
@@ -818,6 +819,7 @@ set(SOURCES
         memory/memory_allocator.cc
         memtable/alloc_tracker.cc
         memtable/hash_linklist_rep.cc
+        memtable/hash_spdb_rep.cc
         memtable/hash_skiplist_rep.cc
         memtable/skiplistrep.cc
         memtable/vectorrep.cc

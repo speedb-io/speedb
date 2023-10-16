@@ -1,3 +1,17 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -174,11 +188,19 @@ class ShardedCache : public ShardedCacheBase {
   Status Insert(const Slice& key, ObjectPtr obj, const CacheItemHelper* helper,
                 size_t charge, Handle** handle = nullptr,
                 Priority priority = Priority::LOW) override {
+    return InsertWithOwnerId(key, obj, helper, charge, kUnknownItemOwnerId,
+                             handle, priority);
+  }
+
+  Status InsertWithOwnerId(const Slice& key, ObjectPtr obj,
+                           const CacheItemHelper* helper, size_t charge,
+                           ItemOwnerId item_owner_id, Handle** handle = nullptr,
+                           Priority priority = Priority::LOW) override {
     assert(helper);
     HashVal hash = CacheShard::ComputeHash(key);
     auto h_out = reinterpret_cast<HandleImpl**>(handle);
-    return GetShard(hash).Insert(key, hash, obj, helper, charge, h_out,
-                                 priority);
+    return GetShard(hash).InsertWithOwnerId(key, hash, obj, helper, charge,
+                                            item_owner_id, h_out, priority);
   }
 
   Handle* CreateStandalone(const Slice& key, ObjectPtr obj,
@@ -235,6 +257,22 @@ class ShardedCache : public ShardedCacheBase {
       const std::function<void(const Slice& key, ObjectPtr value, size_t charge,
                                const CacheItemHelper* helper)>& callback,
       const ApplyToAllEntriesOptions& opts) override {
+    auto callback_with_owner_id =
+        [&callback](const Slice& key, ObjectPtr obj, size_t charge,
+                    const CacheItemHelper* helper,
+                    Cache::ItemOwnerId /* item_owner_id */) {
+          callback(key, obj, charge, helper);
+        };
+
+    ApplyToAllEntriesWithOwnerId(callback_with_owner_id, opts);
+  }
+
+  void ApplyToAllEntriesWithOwnerId(
+      const std::function<void(const Slice& key, ObjectPtr obj, size_t charge,
+                               const CacheItemHelper* helper,
+                               Cache::ItemOwnerId item_owner_id)>&
+          callback_with_owner_id,
+      const ApplyToAllEntriesOptions& opts) override {
     uint32_t num_shards = GetNumShards();
     // Iterate over part of each shard, rotating between shards, to
     // minimize impact on latency of concurrent operations.
@@ -248,7 +286,8 @@ class ShardedCache : public ShardedCacheBase {
       remaining_work = false;
       for (uint32_t i = 0; i < num_shards; i++) {
         if (states[i] != SIZE_MAX) {
-          shards_[i].ApplyToSomeEntries(callback, aepl, &states[i]);
+          shards_[i].ApplyToSomeEntriesWithOwnerId(callback_with_owner_id, aepl,
+                                                   &states[i]);
           remaining_work |= states[i] != SIZE_MAX;
         }
       }

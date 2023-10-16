@@ -3332,8 +3332,15 @@ int main(int argc, char** argv) {
     rocksdb_close(db);
     rocksdb_destroy_db(options, dbname, &err);
     CheckNoError(err);
-
     rocksdb_options_set_hash_skip_list_rep(options, 5000, 4, 4);
+    db = rocksdb_open(options, dbname, &err);
+    CheckNoError(err);
+
+    // Create database with hash spdb memtable.
+    rocksdb_close(db);
+    rocksdb_destroy_db(options, dbname, &err);
+    CheckNoError(err);
+    rocksdb_options_set_hash_spdb_rep(options, 500000);
     db = rocksdb_open(options, dbname, &err);
     CheckNoError(err);
   }

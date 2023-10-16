@@ -1,3 +1,17 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //  Copyright (c) Meta Platforms, Inc. and affiliates.
 //
 //  This source code is licensed under both the GPLv2 (found in the
@@ -27,16 +41,14 @@ namespace ROCKSDB_NAMESPACE {
 
 Status ImportColumnFamilyJob::Prepare(uint64_t next_file_number,
                                       SuperVersion* sv) {
-  Status status;
-
   // Read the information of files we are importing
   for (const auto& file_metadata : metadata_) {
     const auto file_path = file_metadata.db_path + "/" + file_metadata.name;
     IngestedFileInfo file_to_import;
-    status = GetIngestedFileInfo(file_path, next_file_number++, sv,
-                                 file_metadata, &file_to_import);
-    if (!status.ok()) {
-      return status;
+    Status s = GetIngestedFileInfo(file_path, next_file_number++, sv,
+                                   file_metadata, &file_to_import);
+    if (!s.ok()) {
+      return s;
     }
     files_to_import_.push_back(file_to_import);
   }
@@ -55,6 +67,8 @@ Status ImportColumnFamilyJob::Prepare(uint64_t next_file_number,
       return Status::Corruption("File has corrupted keys");
     }
   }
+
+  Status status;
 
   // Copy/Move external files into DB
   auto hardlink_files = import_options_.move_files;

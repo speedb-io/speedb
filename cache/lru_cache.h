@@ -1,3 +1,17 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -59,6 +73,7 @@ struct LRUHandle {
   uint32_t hash;
   // The number of external refs to this entry. The cache itself is not counted.
   uint32_t refs;
+  Cache::ItemOwnerId item_owner_id = Cache::kUnknownItemOwnerId;
 
   // Mutable flags - access controlled by mutex
   // The m_ and M_ prefixes (and im_ and IM_ later) are to hopefully avoid
@@ -302,6 +317,12 @@ class ALIGN_AS(CACHE_LINE_SIZE) LRUCacheShard final : public CacheShardBase {
                 const Cache::CacheItemHelper* helper, size_t charge,
                 LRUHandle** handle, Cache::Priority priority);
 
+  Status InsertWithOwnerId(const Slice& key, uint32_t hash,
+                           Cache::ObjectPtr value,
+                           const Cache::CacheItemHelper* helper, size_t charge,
+                           Cache::ItemOwnerId /* item_owner_id */,
+                           LRUHandle** handle, Cache::Priority priority);
+
   LRUHandle* CreateStandalone(const Slice& key, uint32_t hash,
                               Cache::ObjectPtr obj,
                               const Cache::CacheItemHelper* helper,
@@ -325,10 +346,11 @@ class ALIGN_AS(CACHE_LINE_SIZE) LRUCacheShard final : public CacheShardBase {
   size_t GetOccupancyCount() const;
   size_t GetTableAddressCount() const;
 
-  void ApplyToSomeEntries(
+  void ApplyToSomeEntriesWithOwnerId(
       const std::function<void(const Slice& key, Cache::ObjectPtr value,
                                size_t charge,
-                               const Cache::CacheItemHelper* helper)>& callback,
+                               const Cache::CacheItemHelper* helper,
+                               Cache::ItemOwnerId item_owner_id)>& callback,
       size_t average_entries_per_lock, size_t* state);
 
   void EraseUnRefEntries();
@@ -373,7 +395,8 @@ class ALIGN_AS(CACHE_LINE_SIZE) LRUCacheShard final : public CacheShardBase {
 
   LRUHandle* CreateHandle(const Slice& key, uint32_t hash,
                           Cache::ObjectPtr value,
-                          const Cache::CacheItemHelper* helper, size_t charge);
+                          const Cache::CacheItemHelper* helper, size_t charge,
+                          Cache::ItemOwnerId item_owner_id);
 
   // Initialized before use.
   size_t capacity_;

@@ -1,3 +1,17 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -137,15 +151,18 @@ Status TableCache::GetTableReader(
     } else {
       expected_unique_id = kNullUniqueId64x2;  // null ID == no verification
     }
+
+    TableReaderOptions table_reader_options(
+        ioptions_, prefix_extractor, file_options, internal_comparator,
+        skip_filters, immortal_tables_, false /* force_direct_prefetch */,
+        level, is_bottom, block_cache_tracer_, max_file_size_for_l0_meta_pin,
+        db_session_id_, file_meta.fd.GetNumber(), expected_unique_id,
+        file_meta.fd.largest_seqno);
+    table_reader_options.cache_owner_id = cache_owner_id_;
+
     s = ioptions_.table_factory->NewTableReader(
-        ro,
-        TableReaderOptions(ioptions_, prefix_extractor, file_options,
-                           internal_comparator, skip_filters, immortal_tables_,
-                           false /* force_direct_prefetch */, level, is_bottom,
-                           block_cache_tracer_, max_file_size_for_l0_meta_pin,
-                           db_session_id_, file_meta.fd.GetNumber(),
-                           expected_unique_id, file_meta.fd.largest_seqno),
-        std::move(file_reader), file_meta.fd.GetFileSize(), table_reader,
+        ro, table_reader_options, std::move(file_reader),
+        file_meta.fd.GetFileSize(), table_reader,
         prefetch_index_and_filter_in_cache);
     TEST_SYNC_POINT("TableCache::GetTableReader:0");
   }

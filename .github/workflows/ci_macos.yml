@@ -1,33 +1,50 @@
-# This workflow will build Speedb on a Mac OS server
-#
-# This workflow assumes the self hosted runner on a Mac machine is ready.
-# The Mac OS server must have all the tools and software required for Speedb building to be installed
+name: Build on Mac
 
-
-name: Build on Mac 
-
-on:
+on: 
   workflow_call:
     inputs:
       verSion:
         required: true
         type: string
+    secrets:
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
+      AWS_BUCKET:
+        required: true
   workflow_dispatch:
 
 jobs:
-  build-and-deploy:
-    runs-on: macOSi86 # a test self hosted runner on a vm with MacOS
+  build-mac:
+    runs-on: macos-11
+
     steps:
     - name: 'Checkout GitHub Action'
       uses: actions/checkout@v3
-
-    - name: 'build'
+    - name: Set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        distribution: 'temurin' # See 'Supported distributions' for available options.
+        java-version: '8'
+    - name: build jar
       run: |
-        export JAVA_HOME=/usr/local/opt/openjdk@11
-        export CPPFLAGS="-I/usr/local/opt/openjdk@11/include"
-        export CXXFLAGS="-I/usr/local/opt/openjdk@11/include"
-        ROCKSDB_DISABLE_JEMALLOC=1 PORTABLE=1 DEBUG_LEVEL=0 make -j 4 rocksdbjavastatic
-    
-    - name: 'upload artifacts'    #This step executed only when this workflow is called by another and a version is provided
+        echo $JAVA_HOME
+        export CPPFLAGS="-I$JAVA_HOME/include"
+        export CXXFLAGS="-I$JAVA_HOME/include"
+        brew install zlib
+        brew install bzip2 lz4 snappy
+        ROCKSDB_DISABLE_JEMALLOC=1 PORTABLE=1 DEBUG_LEVEL=0 make -j 2 rocksdbjavastatic #more CPU cores makes shared github runner to overload cpu and stop
+
+    - name: Upload artifacts to S3
       if: inputs.verSion != ' '
-      run: aws s3 cp java/target/libspeedbjni-osx-x86_64.jnilib s3://spdb-builder/jar_test/v${{ inputs.verSion }}/libspeedbjni-osx-x86_64.jnilib
+      uses: NotCoffee418/s3-zip-upload@v1
+      env:
+        AWS_SECRET_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_BUCKET: ${{ secrets.AWS_BUCKET }}
+        BUCKET_NAME: spdb-builder
+        AWS_REGION:  us-east-1
+        SOURCE_MODE: FILE
+        SOURCE_PATH: java/target/libspeedbjni-osx-x86_64.jnilib
+        DEST_FILE: jar_test/v${{ inputs.verSion }}/libspeedbjni-osx-x86_64.jnilib

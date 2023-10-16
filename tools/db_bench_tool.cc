@@ -1,3 +1,17 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -120,6 +134,10 @@ namespace {
 // The benchmark needs to be created before running the first group, retained
 // between groups, and destroyed after running the last group
 std::unique_ptr<ROCKSDB_NAMESPACE::Benchmark> benchmark;
+// // The shared options needs to be created before running the first group,
+// retained
+// // between groups, and destroyed after running the last group
+// std::unique_ptr<ROCKSDB_NAMESPACE::SharedOptions> shared_options;
 
 int ErrorExit(const char* format, ...) {
   std::string extended_format = std::string("\nERROR: ") + format + "\n";
@@ -299,8 +317,6 @@ DEFINE_string(
     "\twaitforcompaction - pause until compaction is (probably) done\n"
     "\tflush - flush the memtable\n"
     "\tstats       -- Print DB stats\n"
-    "\ttable-readers-mem    -- Print table readers memory. excluding memory "
-    "used in block cache\n"
     "\tresetstats  -- Reset DB stats\n"
     "\tlevelstats  -- Print the number of files and bytes per level\n"
     "\tmemstats  -- Print memtable stats\n"
@@ -1859,12 +1875,10 @@ DEFINE_int64(multiread_stride, 0,
              "Stride length for the keys in a MultiGet batch");
 DEFINE_bool(multiread_batched, false, "Use the new MultiGet API");
 
-DEFINE_string(memtablerep, "speedb.HashSpdRepFactory", "");
-
+DEFINE_string(memtablerep, "hash_spdb", "");
 DEFINE_int64(hash_bucket_count, 1000000, "hash bucket count");
-DEFINE_bool(use_seek_parallel_threshold, true,
-            "if use seek parallel threshold .");
-
+DEFINE_bool(use_seek_parralel_threshold, true,
+            "if use seek parralel threshold .");
 DEFINE_bool(use_plain_table, false,
             "if use plain table instead of block-based table format");
 DEFINE_bool(use_cuckoo_table, false, "if use cuckoo table format");
@@ -1949,10 +1963,17 @@ namespace {
 std::vector<uint64_t> db_idxs_to_use;
 }  // namespace
 
+DEFINE_bool(enable_speedb_features, false,
+            "If true, Speedb features will be enabled "
+            "You must provide total_ram_size in bytes ,"
+            " and max_background_jobs. "
+            "delayed_write_rate is recommended. ");
+
+DEFINE_uint64(total_ram_size, 512 * 1024 * 1024ul,
+              "SharedOptions total ram size bytes. ");
 namespace ROCKSDB_NAMESPACE {
 namespace {
 static Status CreateMemTableRepFactory(
-    const ConfigOptions& config_options,
     std::shared_ptr<MemTableRepFactory>* factory) {
   Status s;
   if (!strcasecmp(FLAGS_memtablerep.c_str(), SkipListFactory::kNickName())) {
@@ -1961,15 +1982,8 @@ static Status CreateMemTableRepFactory(
     factory->reset(NewHashSkipListRepFactory(FLAGS_hash_bucket_count));
   } else if (!strcasecmp(FLAGS_memtablerep.c_str(), "hash_linkedlist")) {
     factory->reset(NewHashLinkListRepFactory(FLAGS_hash_bucket_count));
-  } else {
-    std::unique_ptr<MemTableRepFactory> unique;
-    std::string memtable_opt;
-    memtable_opt = ":" + std::to_string(0);
-    s = MemTableRepFactory::CreateFromString(
-        config_options, FLAGS_memtablerep + memtable_opt, &unique);
-    if (s.ok()) {
-      factory->reset(unique.release());
-    }
+  } else if (!strcasecmp(FLAGS_memtablerep.c_str(), "hash_spdb")) {
+    factory->reset(NewHashSpdbRepFactory(0));
   }
   return s;
 }
@@ -3659,15 +3673,9 @@ class Benchmark {
     std::unique_ptr<ExpiredTimeFilter> filter;
     while (std::getline(benchmark_stream, name, ',')) {
       if (open_options_.write_buffer_manager) {
-        fprintf(stderr,
-                "\nWBM's Usage Info [BEFORE Benchmark (%s)]: %s OF %s\n\n",
-                name.c_str(),
-                BytesToHumanString(
-                    open_options_.write_buffer_manager->memory_usage())
-                    .c_str(),
-                BytesToHumanString(
-                    open_options_.write_buffer_manager->buffer_size())
-                    .c_str());
+        fprintf(stderr, "\nBEFORE Benchmark (%s): %lu OF %lu\n\n", name.c_str(),
+                open_options_.write_buffer_manager->memory_usage(),
+                open_options_.write_buffer_manager->buffer_size());
       }
 
       // Sanitize parameters
@@ -3970,9 +3978,6 @@ class Benchmark {
         PrintStats("rocksdb.block-cache-entry-stats");
       } else if (name == "stats") {
         PrintStats("rocksdb.stats");
-      } else if (name == "table-readers-mem") {
-        fprintf(stdout, "table-readers-mem");
-        PrintStats("rocksdb.estimate-table-readers-mem");
       } else if (name == "resetstats") {
         ResetStats();
       } else if (name == "verify") {
@@ -4129,15 +4134,9 @@ class Benchmark {
       }
 
       if (open_options_.write_buffer_manager) {
-        fprintf(stderr,
-                "\nWBM's Usage Info [AFTER Benchmark (%s)]: %s OF %s\n\n",
-                name.c_str(),
-                BytesToHumanString(
-                    open_options_.write_buffer_manager->memory_usage())
-                    .c_str(),
-                BytesToHumanString(
-                    open_options_.write_buffer_manager->buffer_size())
-                    .c_str());
+        fprintf(stderr, "\nAFTER Benchmark (%s): %lu OF %lu\n", name.c_str(),
+                open_options_.write_buffer_manager->memory_usage(),
+                open_options_.write_buffer_manager->buffer_size());
       }
     }
 
@@ -4550,8 +4549,7 @@ class Benchmark {
         FLAGS_level_compaction_dynamic_level_bytes;
     options.max_bytes_for_level_multiplier =
         FLAGS_max_bytes_for_level_multiplier;
-    Status s =
-        CreateMemTableRepFactory(config_options, &options.memtable_factory);
+    Status s = CreateMemTableRepFactory(&options.memtable_factory);
     if (!s.ok()) {
       ErrorExit("Could not create memtable factory: %s", s.ToString().c_str());
     } else if ((FLAGS_prefix_size == 0) &&
@@ -4981,12 +4979,14 @@ class Benchmark {
       }
     }
 
-    if (FLAGS_use_dynamic_delay && FLAGS_num_multi_db > 1) {
-      if (options.delayed_write_rate <= 0) {
-        options.delayed_write_rate = 16 * 1024 * 1024;
+    if (options.write_controller == nullptr) {
+      if (FLAGS_use_dynamic_delay && FLAGS_num_multi_db > 1) {
+        if (options.delayed_write_rate <= 0) {
+          options.delayed_write_rate = 16 * 1024 * 1024;
+        }
+        options.write_controller.reset(new WriteController(
+            options.use_dynamic_delay, options.delayed_write_rate));
       }
-      options.write_controller.reset(new WriteController(
-          options.use_dynamic_delay, options.delayed_write_rate));
     }
 
     // Integrated BlobDB
@@ -5170,6 +5170,11 @@ class Benchmark {
 
   void OpenDb(Options options, const std::string& db_name,
               DBWithColumnFamilies* db) {
+    SharedOptions so(FLAGS_total_ram_size, options.max_background_jobs,
+                     options.delayed_write_rate);
+    if (FLAGS_enable_speedb_features) {
+      options.EnableSpeedbFeatures(so);
+    }
     uint64_t open_start = FLAGS_report_open_timing ? FLAGS_env->NowNanos() : 0;
     Status s;
     // Open with column families if necessary.
@@ -5183,8 +5188,14 @@ class Benchmark {
       }
       std::vector<ColumnFamilyDescriptor> column_families;
       for (size_t i = 0; i < num_hot; i++) {
-        column_families.push_back(ColumnFamilyDescriptor(
-            ColumnFamilyName(i), ColumnFamilyOptions(options)));
+        if (FLAGS_enable_speedb_features) {
+          column_families.push_back(ColumnFamilyDescriptor(
+              ColumnFamilyName(i),
+              *ColumnFamilyOptions(options).EnableSpeedbFeaturesCF(so)));
+        } else {
+          column_families.push_back(ColumnFamilyDescriptor(
+              ColumnFamilyName(i), ColumnFamilyOptions(options)));
+        }
       }
       std::vector<int> cfh_idx_to_prob;
       if (!FLAGS_column_family_distribution.empty()) {
@@ -5331,8 +5342,14 @@ class Benchmark {
       }
     } else if (FLAGS_ttl > 0) {
       std::vector<ColumnFamilyDescriptor> column_families;
-      column_families.push_back(ColumnFamilyDescriptor(
-          kDefaultColumnFamilyName, ColumnFamilyOptions(options)));
+      if (FLAGS_enable_speedb_features) {
+        column_families.push_back(ColumnFamilyDescriptor(
+            kDefaultColumnFamilyName,
+            *ColumnFamilyOptions(options).EnableSpeedbFeaturesCF(so)));
+      } else {
+        column_families.push_back(ColumnFamilyDescriptor(
+            kDefaultColumnFamilyName, ColumnFamilyOptions(options)));
+      }
       DBWithTTL* db_with_ttl;
       std::vector<int32_t> ttls(column_families.size(), FLAGS_ttl);
       s = DBWithTTL::Open(options, db_name, column_families, &db->cfh,
@@ -5345,8 +5362,14 @@ class Benchmark {
       }
     } else {
       std::vector<ColumnFamilyDescriptor> column_families;
-      column_families.push_back(ColumnFamilyDescriptor(
-          kDefaultColumnFamilyName, ColumnFamilyOptions(options)));
+      if (FLAGS_enable_speedb_features) {
+        column_families.push_back(ColumnFamilyDescriptor(
+            kDefaultColumnFamilyName,
+            *ColumnFamilyOptions(options).EnableSpeedbFeaturesCF(so)));
+      } else {
+        column_families.push_back(ColumnFamilyDescriptor(
+            kDefaultColumnFamilyName, ColumnFamilyOptions(options)));
+      }
       s = DB::Open(options, db_name, column_families, &db->cfh, &db->db);
       db->cfh.resize(1);
       db->num_created = 1;
@@ -7683,17 +7706,13 @@ class Benchmark {
 
     fprintf(stderr, "num reads to do %" PRIu64 "\n", reads_);
     Duration duration(FLAGS_duration, reads_);
-    uint64_t num_seek_to_first = 0;
-    uint64_t num_next = 0;
     while (!duration.Done(1)) {
       if (!iter->Valid()) {
         iter->SeekToFirst();
-        num_seek_to_first++;
       } else if (!iter->status().ok()) {
         ErrorExit("Iterator error: %s", iter->status().ToString().c_str());
       } else {
         iter->Next();
-        num_next++;
       }
 
       thread->stats.FinishedOps(&single_db, single_db.db, 1, kSeek);
@@ -8076,13 +8095,14 @@ class Benchmark {
         }
 
         for (int j = 0; j < FLAGS_seek_nexts && iter_to_use->Valid(); ++j) {
+          bytes += iter_to_use->key().size() + iter_to_use->value().size();
+
           if (!FLAGS_reverse_iterator) {
             iter_to_use->Next();
           } else {
             iter_to_use->Prev();
           }
           assert(iter_to_use->status().ok());
-          bytes += iter_to_use->key().size() + iter_to_use->value().size();
         }
 
         if (seeks % 256 == 255) {
@@ -9514,6 +9534,15 @@ int db_bench_tool_run_group(int group_num, int num_groups, int argc,
     ErrorExit(
         "`-use_existing_db` must be true for `-use_existing_keys` to be "
         "settable");
+  }
+
+  if (FLAGS_enable_speedb_features) {
+    if (gflags::GetCommandLineFlagInfoOrDie("max_background_jobs").is_default ||
+        gflags::GetCommandLineFlagInfoOrDie("total_ram_size").is_default) {
+      ErrorExit(
+          "enable_speedb_features - Please provide explicitly total_ram_size "
+          "in bytes and max_background_jobs ");
+    }
   }
 
   if (!strcasecmp(FLAGS_compaction_fadvice.c_str(), "NONE"))

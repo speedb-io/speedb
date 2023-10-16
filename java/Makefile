@@ -27,6 +27,8 @@ NATIVE_JAVA_CLASSES = \
 	org.rocksdb.CompactionOptionsFIFO\
 	org.rocksdb.CompactionOptionsUniversal\
 	org.rocksdb.CompactRangeOptions\
+	org.rocksdb.AbstractCompactRangeCompletedCb\
+	org.rocksdb.CompactRangeCompletedCb\
 	org.rocksdb.ComparatorOptions\
 	org.rocksdb.CompressionOptions\
 	org.rocksdb.ConfigOptions\
@@ -39,6 +41,7 @@ NATIVE_JAVA_CLASSES = \
 	org.rocksdb.IngestExternalFileOptions\
 	org.rocksdb.HashLinkedListMemTableConfig\
 	org.rocksdb.HashSkipListMemTableConfig\
+	org.rocksdb.HashSpdbMemTableConfig\
 	org.rocksdb.ConcurrentTaskLimiter\
 	org.rocksdb.ConcurrentTaskLimiterImpl\
 	org.rocksdb.KeyMayExist\

@@ -222,7 +222,7 @@ default_params = {
     "sync_wal_one_in": 100000,
     "customopspercent": 0,
     # "filter_uri": lambda: random.choice(["speedb.PairedBloomFilter", ""]),
-    "memtablerep": lambda: random.choice(["skip_list", "speedb.HashSpdRepFactory"]),
+    "memtablerep": lambda: random.choice(["skip_list", "hash_spdb"]),
     "pinning_policy": lambda: random.choice(["", "speedb_scoped_pinning_policy"]),
     "use_dynamic_delay": lambda: random.choice([0, 1, 1, 1]),
     "allow_wbm_stalls": lambda: random.randint(0, 1),
@@ -685,9 +685,9 @@ def finalize_and_sanitize(src_params, counter):
         dest_params["allow_concurrent_memtable_write"] = 1
     if dest_params.get("allow_concurrent_memtable_write", 0) == 1:
         if (dest_params.get("memtablerep") != "skip_list" and 
-            dest_params.get("memtablerep") != "speedb.HashSpdRepFactory"):
+            dest_params.get("memtablerep") != "hash_spdb"):
                 dest_params["memtablerep"] = random.choice(
-                    ["skip_list", "speedb.HashSpdRepFactory"]
+                    ["skip_list", "hash_spdb"]
                 )
     if dest_params.get("disable_wal", 0) == 1:
         dest_params["atomic_flush"] = 1

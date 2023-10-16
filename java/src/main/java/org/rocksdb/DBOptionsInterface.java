@@ -18,6 +18,14 @@ public interface DBOptionsInterface<T extends DBOptionsInterface<T>> {
   T optimizeForSmallDb();
 
   /**
+   * Use this to set the options for Speedb optimization
+   *
+   * @param sharedOptions Options shared between options
+   * @return the instance of the current object.
+   */
+  T enableSpeedbFeatures(final SharedOptions sharedOptions);
+
+  /**
    * Use the specified object to interact with the environment,
    * e.g. to read/write files, schedule background work, etc.
    * Default: {@link Env#getDefault()}

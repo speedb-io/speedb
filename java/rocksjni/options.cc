@@ -21,6 +21,7 @@
 #include "include/org_rocksdb_FlushOptions.h"
 #include "include/org_rocksdb_Options.h"
 #include "include/org_rocksdb_ReadOptions.h"
+#include "include/org_rocksdb_SharedOptions.h"
 #include "include/org_rocksdb_WriteOptions.h"
 #include "rocksdb/comparator.h"
 #include "rocksdb/convenience.h"
@@ -3266,6 +3267,19 @@ void Java_org_rocksdb_Options_optimizeForPointLookup(
 
 /*
  * Class:     org_rocksdb_Options
+ * Method:    enableSpeedbFeatures
+ * Signature: (JJ)V
+ */
+JNIEXPORT void JNICALL Java_org_rocksdb_Options_enableSpeedbFeatures(
+    JNIEnv*, jobject, jlong jhandle, jlong shared_handle) {
+  auto shared_opts =
+      reinterpret_cast<ROCKSDB_NAMESPACE::SharedOptions*>(shared_handle);
+  auto opts = reinterpret_cast<ROCKSDB_NAMESPACE::Options*>(jhandle);
+  opts->EnableSpeedbFeatures(*shared_opts);
+}
+
+/*
+ * Class:     org_rocksdb_Options
  * Method:    optimizeLevelStyleCompaction
  * Signature: (JJ)V
  */
@@ -4074,6 +4088,21 @@ void Java_org_rocksdb_ColumnFamilyOptions_optimizeForPointLookup(
       ->OptimizeForPointLookup(block_cache_size_mb);
 }
 
+/*
+ * Class:     org_rocksdb_ColumnFamilyOptions
+ * Method:    enableSpeedbFeatures
+ * Signature: (JJ)V
+ */
+JNIEXPORT void JNICALL
+Java_org_rocksdb_ColumnFamilyOptions_enableSpeedbFeatures(JNIEnv*, jobject,
+                                                          jlong jhandle,
+                                                          jlong shared_handle) {
+  auto shared_opts =
+      reinterpret_cast<ROCKSDB_NAMESPACE::SharedOptions*>(shared_handle);
+  auto opts =
+      reinterpret_cast<ROCKSDB_NAMESPACE::ColumnFamilyOptions*>(jhandle);
+  opts->EnableSpeedbFeaturesCF(*shared_opts);
+}
 /*
  * Class:     org_rocksdb_ColumnFamilyOptions
  * Method:    optimizeLevelStyleCompaction
@@ -5895,6 +5924,19 @@ void Java_org_rocksdb_DBOptions_optimizeForSmallDb(JNIEnv*, jobject,
                                                    jlong jhandle) {
   reinterpret_cast<ROCKSDB_NAMESPACE::DBOptions*>(jhandle)
       ->OptimizeForSmallDb();
+}
+
+/*
+ * Class:     org_rocksdb_DBOptions
+ * Method:    enableSpeedbFeatures
+ * Signature: (JJ)V
+ */
+JNIEXPORT void JNICALL Java_org_rocksdb_DBOptions_enableSpeedbFeatures(
+    JNIEnv*, jobject, jlong jhandle, jlong shared_handle) {
+  auto shared_opts =
+      reinterpret_cast<ROCKSDB_NAMESPACE::SharedOptions*>(shared_handle);
+  auto opts = reinterpret_cast<ROCKSDB_NAMESPACE::DBOptions*>(jhandle);
+  opts->EnableSpeedbFeaturesDB(*shared_opts);
 }
 
 /*
@@ -8692,4 +8734,180 @@ void Java_org_rocksdb_FlushOptions_disposeInternal(JNIEnv*, jobject,
   auto* flush_opt = reinterpret_cast<ROCKSDB_NAMESPACE::FlushOptions*>(jhandle);
   assert(flush_opt != nullptr);
   delete flush_opt;
+}
+
+/////////////////////////////////////////////////////////////////////
+// ROCKSDB_NAMESPACE::SharedOptions
+
+/*
+ * Class:     org_rocksdb_SharedOptions
+ * Method:    newSharedOptions
+ * Signature: (JJJ)J
+ */
+JNIEXPORT jlong JNICALL Java_org_rocksdb_SharedOptions_newSharedOptions(
+    JNIEnv*, jclass, jlong capacity, jlong total_threads,
+    jlong delayed_write_rate) {
+  auto opts = new ROCKSDB_NAMESPACE::SharedOptions(capacity, total_threads,
+                                                   delayed_write_rate);
+  return GET_CPLUSPLUS_POINTER(opts);
+}
+
+/*
+ * Class:     org_rocksdb_SharedOptions
+ * Method:    disposeInternal
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_org_rocksdb_SharedOptions_disposeInternal(
+    JNIEnv*, jobject, jlong jhandle) {
+  auto* opts = reinterpret_cast<ROCKSDB_NAMESPACE::SharedOptions*>(jhandle);
+  assert(opts != nullptr);
+  delete opts;
+}
+
+/*
+ * Class:     org_rocksdb_SharedOptions
+ * Method:    getTotalThreads
+ * Signature: (J)J
+ */
+JNIEXPORT jlong JNICALL
+Java_org_rocksdb_SharedOptions_getTotalThreads(JNIEnv*, jclass, jlong jhandle) {
+  auto* opts = reinterpret_cast<ROCKSDB_NAMESPACE::SharedOptions*>(jhandle);
+  assert(opts != nullptr);
+  return opts->GetTotalThreads();
+}
+
+/*
+ * Class:     org_rocksdb_SharedOptions
+ * Method:    getTotalRamSizeBytes
+ * Signature: (J)J
+ */
+JNIEXPORT jlong JNICALL Java_org_rocksdb_SharedOptions_getTotalRamSizeBytes(
+    JNIEnv*, jclass, jlong jhandle) {
+  auto* opts = reinterpret_cast<ROCKSDB_NAMESPACE::SharedOptions*>(jhandle);
+  assert(opts != nullptr);
+  return opts->GetTotalRamSizeBytes();
+}
+
+/*
+ * Class:     org_rocksdb_SharedOptions
+ * Method:    getDelayedWriteRate
+ * Signature: (J)J
+ */
+JNIEXPORT jlong JNICALL Java_org_rocksdb_SharedOptions_getDelayedWriteRate(
+    JNIEnv*, jclass, jlong jhandle) {
+  auto* opts = reinterpret_cast<ROCKSDB_NAMESPACE::SharedOptions*>(jhandle);
+  assert(opts != nullptr);
+  return opts->GetDelayedWriteRate();
+}
+
+/*
+ * Class:     org_rocksdb_SharedOptions
+ * Method:    increaseWriteBufferSize
+ * Signature: (JJ)V
+ */
+JNIEXPORT void JNICALL Java_org_rocksdb_SharedOptions_increaseWriteBufferSize(
+    JNIEnv*, jclass, jlong jhandle, jlong increase_by) {
+  auto opts = reinterpret_cast<ROCKSDB_NAMESPACE::SharedOptions*>(jhandle);
+  assert(opts != nullptr);
+  opts->IncreaseWriteBufferSize(increase_by);
+}
+
+/*
+ * Class:     org_rocksdb_SharedOptions
+ * Method:    setCache
+ * Signature: (JJ)V
+ */
+JNIEXPORT void JNICALL Java_org_rocksdb_SharedOptions_setCache(JNIEnv*, jobject,
+                                                               jlong jhandle,
+                                                               jlong chandle) {
+  auto opts = reinterpret_cast<ROCKSDB_NAMESPACE::SharedOptions*>(jhandle);
+  auto cache =
+      reinterpret_cast<std::shared_ptr<ROCKSDB_NAMESPACE::Cache>*>(chandle);
+  assert(opts != nullptr);
+  opts->cache = *cache;
+}
+
+/*
+ * Class:     org_rocksdb_SharedOptions
+ * Method:    setWriteBufferManager
+ * Signature: (JJ)V
+ */
+JNIEXPORT void JNICALL Java_org_rocksdb_SharedOptions_setWriteBufferManager(
+    JNIEnv*, jobject, jlong jhandle, jlong whandle) {
+  auto opts = reinterpret_cast<ROCKSDB_NAMESPACE::SharedOptions*>(jhandle);
+  auto wbm =
+      reinterpret_cast<std::shared_ptr<ROCKSDB_NAMESPACE::WriteBufferManager>*>(
+          whandle);
+  assert(opts != nullptr);
+  opts->write_buffer_manager = *wbm;
+}
+
+/*
+ * Class:     org_rocksdb_SharedOptions
+ * Method:    setEnv
+ * Signature: (JJ)V
+ */
+JNIEXPORT void JNICALL Java_org_rocksdb_SharedOptions_setEnv(JNIEnv*, jobject,
+                                                             jlong jhandle,
+                                                             jlong ehandle) {
+  auto opts = reinterpret_cast<ROCKSDB_NAMESPACE::SharedOptions*>(jhandle);
+  auto env = reinterpret_cast<ROCKSDB_NAMESPACE::Env*>(ehandle);
+  assert(opts != nullptr);
+  opts->env = env;
+}
+
+/*
+ * Class:     org_rocksdb_SharedOptions
+ * Method:    setRateLimiter
+ * Signature: (JJ)V
+ */
+JNIEXPORT void JNICALL Java_org_rocksdb_SharedOptions_setRateLimiter(
+    JNIEnv*, jobject, jlong jhandle, jlong rhandle) {
+  auto opts = reinterpret_cast<ROCKSDB_NAMESPACE::SharedOptions*>(jhandle);
+  auto rl = reinterpret_cast<std::shared_ptr<ROCKSDB_NAMESPACE::RateLimiter>*>(
+      rhandle);
+  assert(opts != nullptr);
+  opts->rate_limiter = *rl;
+}
+
+/*
+ * Class:     org_rocksdb_SharedOptions
+ * Method:    setSstFileManager
+ * Signature: (JJ)V
+ */
+JNIEXPORT void JNICALL Java_org_rocksdb_SharedOptions_setSstFileManager(
+    JNIEnv*, jobject, jlong jhandle, jlong shandle) {
+  auto opts = reinterpret_cast<ROCKSDB_NAMESPACE::SharedOptions*>(jhandle);
+  auto sfm =
+      reinterpret_cast<std::shared_ptr<ROCKSDB_NAMESPACE::SstFileManager>*>(
+          shandle);
+  assert(opts != nullptr);
+  opts->sst_file_manager = *sfm;
+}
+
+/*
+ * Class:     org_rocksdb_SharedOptions
+ * Method:    setLogger
+ * Signature: (JJ)V
+ */
+JNIEXPORT void JNICALL Java_org_rocksdb_SharedOptions_setLogger(JNIEnv*,
+                                                                jobject,
+                                                                jlong jhandle,
+                                                                jlong lhandle) {
+  auto opts = reinterpret_cast<ROCKSDB_NAMESPACE::SharedOptions*>(jhandle);
+  auto log =
+      reinterpret_cast<std::shared_ptr<ROCKSDB_NAMESPACE::Logger>*>(lhandle);
+  assert(opts != nullptr);
+  opts->info_log = *log;
+}
+
+/*
+ * Class:     org_rocksdb_SharedOptions
+ * Method:    setEventListeners
+ * Signature: (J[J)V
+ */
+JNIEXPORT void JNICALL Java_org_rocksdb_SharedOptions_setEventListeners(
+    JNIEnv* env, jclass, jlong jhandle, jlongArray jlistener_array) {
+  auto opts = reinterpret_cast<ROCKSDB_NAMESPACE::SharedOptions*>(jhandle);
+  rocksdb_set_event_listeners_helper(env, jlistener_array, opts->listeners);
 }

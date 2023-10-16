@@ -48,6 +48,14 @@ public interface ColumnFamilyOptionsInterface<T extends ColumnFamilyOptionsInter
   T optimizeForPointLookup(long blockCacheSizeMb);
 
   /**
+   * Use this to set the options for Speedb optimization
+   *
+   * @param sharedOptions Options shared between options
+   * @return the instance of the current object.
+   */
+  T enableSpeedbFeatures(final SharedOptions sharedOptions);
+
+  /**
    * <p>Default values for some parameters in ColumnFamilyOptions are not
    * optimized for heavy workloads and big datasets, which means you might
    * observe write stalls under some conditions. As a starting point for tuning

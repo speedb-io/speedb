@@ -128,6 +128,12 @@ public class DBOptions extends RocksObject
   }
 
   @Override
+  public DBOptions enableSpeedbFeatures(final SharedOptions sharedOptions) {
+    enableSpeedbFeatures(nativeHandle_, sharedOptions.nativeHandle_);
+    return this;
+  }
+
+  @Override
   public DBOptions setIncreaseParallelism(
       final int totalThreads) {
     assert(isOwningHandle());
@@ -1257,6 +1263,7 @@ public class DBOptions extends RocksObject
   @Override protected final native void disposeInternal(final long handle);
 
   private native void optimizeForSmallDb(final long handle);
+  private native void enableSpeedbFeatures(final long handle, final long sharedHandle);
   private native void setIncreaseParallelism(long handle, int totalThreads);
   private native void setCreateIfMissing(long handle, boolean flag);
   private native boolean createIfMissing(long handle);

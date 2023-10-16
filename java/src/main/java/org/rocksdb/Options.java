@@ -187,6 +187,12 @@ public class Options extends RocksObject
   }
 
   @Override
+  public Options enableSpeedbFeatures(final SharedOptions sharedOptions) {
+    enableSpeedbFeatures(nativeHandle_, sharedOptions.nativeHandle_);
+    return this;
+  }
+
+  @Override
   public Options optimizeLevelStyleCompaction() {
     optimizeLevelStyleCompaction(nativeHandle_,
         DEFAULT_COMPACTION_MEMTABLE_MEMORY_BUDGET);
@@ -2343,6 +2349,7 @@ public class Options extends RocksObject
   private static native void optimizeForSmallDb(final long handle, final long cacheHandle);
   private native void optimizeForPointLookup(long handle,
       long blockCacheSizeMb);
+  private native void enableSpeedbFeatures(final long handle, final long sharedHandle);
   private native void optimizeLevelStyleCompaction(long handle,
       long memtableMemoryBudget);
   private native void optimizeUniversalStyleCompaction(long handle,

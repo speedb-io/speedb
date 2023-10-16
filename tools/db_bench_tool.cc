@@ -9462,9 +9462,11 @@ void ValidateMetadataCacheOptions() {
 
 void ValidatePinningPolicyRelatedFlags() {
   if (!FLAGS_pinning_policy.empty() && FLAGS_enable_speedb_features) {
-    ErrorExit("--pinning_policy should not be set when --unpartitioned_pinning is set.");
+    ErrorExit(
+        "--pinning_policy should not be set when --unpartitioned_pinning is "
+        "set.");
   }
-  
+
   if (FLAGS_enable_speedb_features) {
     if (gflags::GetCommandLineFlagInfoOrDie("max_background_jobs").is_default ||
         gflags::GetCommandLineFlagInfoOrDie("total_ram_size").is_default) {
@@ -9473,7 +9475,6 @@ void ValidatePinningPolicyRelatedFlags() {
           "in bytes and max_background_jobs ");
     }
   }
-
 }
 
 // The actual running of a group of benchmarks that share configuration

@@ -1008,7 +1008,7 @@ TEST_F(TtlTest, SkipExpiredReadOnlyTtlMultiGetTest) {
   ASSERT_OK(DBWithTTL::Open(options, dbname_, &db_ttl_, ttl_));
   ASSERT_OK(db_ttl_->Put(WriteOptions(), key_1, put_value));
   ASSERT_OK(db_ttl_->Put(WriteOptions(), key_2, put_value));
-  db_ttl_->Close();
+  ASSERT_OK(db_ttl_->Close());
   ASSERT_OK(DBWithTTL::Open(options, dbname_, &db_ttl_, ttl_, true));
   env_->Sleep(ttl_ + 1);
   auto statuses = db_ttl_->MultiGet(ropts, {key_1, key_2}, &values);
@@ -1030,7 +1030,7 @@ TEST_F(TtlTest, GetNotExpiredReadOnlyTtlGetTest) {
   std::string put_value = "val";
   ASSERT_OK(DBWithTTL::Open(options, dbname_, &db_ttl_, ttl_));
   ASSERT_OK(db_ttl_->Put(WriteOptions(), key, put_value));
-  db_ttl_->Close();
+  ASSERT_OK(db_ttl_->Close());
   // open ttl as read only
   ASSERT_OK(DBWithTTL::Open(options, dbname_, &db_ttl_, ttl_, true));
   env_->Sleep(ttl_ + 1);

@@ -117,7 +117,7 @@ jobs:
     if: ${{  github.event_name == 'pull_request_review' }}
     uses: ./.github/workflows/check_license_and_history.yml
 
-  Windows-test:
+  Windows-build-test:
     needs: [Build]
     runs-on: windows-2022
     env: 
@@ -254,7 +254,7 @@ jobs:
           build_tools\run_ci_db_test.ps1 -SuiteRun db_basic_test,db_test,db_test2,db_merge_operand_test,bloom_test,c_test,coding_test,crc32c_test,dynamic_bloom_test,env_basic_test,env_test,hash_test,random_test -Concurrency 16
     
 
-  Macos-test:
+  Macos-build:
     needs: [Build]
     runs-on: macos-11
     steps:
@@ -274,7 +274,7 @@ jobs:
           ROCKSDB_DISABLE_JEMALLOC=1 PORTABLE=1 DEBUG_LEVEL=0 make -j 4 rocksdbjavastatic
 
 
-  build-linux:
+  Linux-build:
     needs: [Build]
     runs-on: ubuntu-latest
 
@@ -325,7 +325,7 @@ jobs:
           make -j$(nproc) db_bench
 
 
-  Linux-arm-test:
+  Linux-Arm-build:
     needs: [Build]
     runs-on: ubuArm64G 
     steps:

@@ -2586,6 +2586,59 @@ int main(int argc, char** argv) {
     rocksdb_options_destroy(o);
   }
 
+  StartPhase("shared_options");
+  {
+    size_t total_ram_size = 100 * 1024 * 1024 * 1024ul;
+    size_t total_threads = 8;
+    size_t delayed_write_rate = 256 * 1024 * 1024ul;
+    size_t bucket_size = 50000;
+    rocksdb_shared_options_t* so;
+    so = rocksdb_shared_options_create(total_ram_size, total_threads);
+    CheckCondition(total_threads ==
+                   rocksdb_shared_options_get_total_threads(so));
+    CheckCondition(total_ram_size ==
+                   rocksdb_shared_options_get_total_ram_size_bytes(so));
+    rocksdb_shared_options_destroy(so);
+
+    so = rocksdb_shared_options_create_from(total_ram_size, total_threads,
+                                            delayed_write_rate, bucket_size, 1);
+    CheckCondition(total_threads ==
+                   rocksdb_shared_options_get_total_threads(so));
+    CheckCondition(total_ram_size ==
+                   rocksdb_shared_options_get_total_ram_size_bytes(so));
+    CheckCondition(delayed_write_rate ==
+                   rocksdb_shared_options_get_delayed_write_rate(so));
+    CheckCondition(bucket_size == rocksdb_shared_options_get_bucket_size(so));
+    CheckCondition(
+        total_ram_size / 4 ==
+        rocksdb_shared_options_get_max_write_buffer_manager_size(so));
+    CheckCondition(1 == rocksdb_shared_options_is_merge_memtable_supported(so));
+    rocksdb_options_t* opts1 = rocksdb_options_create();
+    rocksdb_options_enable_speedb_features(opts1, so);
+
+    CheckCondition((int)total_threads ==
+                   rocksdb_options_get_max_background_jobs(opts1));
+    CheckCondition(1 << 20 == rocksdb_options_get_bytes_per_sync(opts1));
+    CheckCondition(4 == rocksdb_options_get_max_write_buffer_number(opts1));
+
+    rocksdb_options_t* opts2 = rocksdb_options_create();
+    size_t orig_total_threads = rocksdb_options_get_max_background_jobs(opts2);
+    CheckCondition(total_threads != orig_total_threads);
+    rocksdb_options_enable_speedb_features_db(opts2, so);
+    CheckCondition((int)total_threads ==
+                   rocksdb_options_get_max_background_jobs(opts2));
+
+    rocksdb_options_t* opts3 = rocksdb_options_create();
+    rocksdb_options_enable_speedb_features_cf(opts3, so);
+    CheckCondition((int)orig_total_threads ==
+                   rocksdb_options_get_max_background_jobs(opts3));
+
+    rocksdb_options_destroy(opts3);
+    rocksdb_options_destroy(opts2);
+    rocksdb_options_destroy(opts1);
+    rocksdb_shared_options_destroy(so);
+  }
+
   StartPhase("read_options");
   {
     rocksdb_readoptions_t* ro;

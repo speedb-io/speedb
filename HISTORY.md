@@ -7,6 +7,7 @@
 
 ### Enhancements
 * Added a kUseBaseAddress flag and GetBaseOffset flag to OptionTypeInfo.  If this flag is set and a function is used for processing options, the function is passed the base address of the struct rather than the specific field (#397)
+* Enabled speedb features in C and Java (#722)
 
 ### Bug Fixes
 * Stall deadlock consists small cfs (#637).

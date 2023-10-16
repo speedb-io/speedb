@@ -120,6 +120,7 @@ using ROCKSDB_NAMESPACE::RateLimiter;
 using ROCKSDB_NAMESPACE::ReadOptions;
 using ROCKSDB_NAMESPACE::RestoreOptions;
 using ROCKSDB_NAMESPACE::SequentialFile;
+using ROCKSDB_NAMESPACE::SharedOptions;
 using ROCKSDB_NAMESPACE::Slice;
 using ROCKSDB_NAMESPACE::SliceParts;
 using ROCKSDB_NAMESPACE::SliceTransform;
@@ -187,6 +188,9 @@ struct rocksdb_writeoptions_t {
 };
 struct rocksdb_options_t {
   Options rep;
+};
+struct rocksdb_shared_options_t {
+  SharedOptions rep;
 };
 struct rocksdb_compactoptions_t {
   CompactRangeOptions rep;
@@ -2792,6 +2796,11 @@ void rocksdb_options_optimize_universal_style_compaction(
   opt->rep.OptimizeUniversalStyleCompaction(memtable_memory_budget);
 }
 
+void rocksdb_options_enable_speedb(rocksdb_options_t* opt,
+                                   rocksdb_shared_options_t* shared) {
+  opt->rep.EnableSpeedbFeatures(shared->rep);
+}
+
 void rocksdb_options_set_allow_ingest_behind(rocksdb_options_t* opt,
                                              unsigned char v) {
   opt->rep.allow_ingest_behind = v;
@@ -3879,6 +3888,59 @@ void rocksdb_options_set_wal_compression(rocksdb_options_t* opt, int val) {
 
 int rocksdb_options_get_wal_compression(rocksdb_options_t* opt) {
   return opt->rep.wal_compression;
+}
+
+rocksdb_shared_options_t* rocksdb_shared_options_create(void) {
+  return new rocksdb_shared_options_t;
+}
+rocksdb_shared_options_t* rocksdb_shared_options_create_from(
+    size_t total_ram_size_bytes, size_t total_threads,
+    size_t delayed_write_rate) {
+  return new rocksdb_shared_options_t{
+      SharedOptions(total_ram_size_bytes, total_threads, delayed_write_rate)};
+}
+
+void rocksdb_shared_options_destroy(rocksdb_shared_options_t* opt) {
+  delete opt;
+}
+
+size_t rocksdb_shared_options_get_total_threads(rocksdb_shared_options_t* opt) {
+  return opt->rep.GetTotalThreads();
+}
+
+size_t rocksdb_shared_options_get_total_ram_size_bytes(
+    rocksdb_shared_options_t* opt) {
+  return opt->rep.GetTotalRamSizeBytes();
+}
+
+size_t rocksdb_shared_options_get_delayed_write_rate(
+    rocksdb_shared_options_t* opt) {
+  return opt->rep.GetDelayedWriteRate();
+}
+
+void rocksdb_shared_options_increase_write_buffer_size(
+    rocksdb_shared_options_t* opt, size_t increase_by) {
+  opt->rep.IncreaseWriteBufferSize(increase_by);
+}
+
+void rocksdb_shared_options_set_cache(rocksdb_shared_options_t* opt,
+                                      rocksdb_cache_t* cache) {
+  opt->rep.cache = cache->rep;
+}
+
+void rocksdb_shared_options_set_env(rocksdb_shared_options_t* opt,
+                                    rocksdb_env_t* env) {
+  opt->rep.env = env->rep;
+}
+
+void rocksdb_shared_options_set_rate_limiter(rocksdb_shared_options_t* opt,
+                                             rocksdb_ratelimiter_t* limiter) {
+  opt->rep.rate_limiter = limiter->rep;
+}
+
+void rocksdb_shared_options_set_info_log(rocksdb_shared_options_t* opt,
+                                         rocksdb_logger_t* log) {
+  opt->rep.info_log = log->rep;
 }
 
 rocksdb_ratelimiter_t* rocksdb_ratelimiter_create(int64_t rate_bytes_per_sec,

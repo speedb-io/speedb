@@ -642,8 +642,9 @@ class SpecialMemTableRep : public MemTableRep {
     return memtable_->ApproximateNumEntries(start_ikey, end_ikey);
   }
 
-  virtual MemTableRep::Iterator* GetIterator(Arena* arena = nullptr) override {
-    return memtable_->GetIterator(arena);
+  virtual MemTableRep::Iterator* GetIterator(
+      Arena* arena = nullptr, bool part_of_flush = false) override {
+    return memtable_->GetIterator(arena, part_of_flush);
   }
 
   virtual ~SpecialMemTableRep() override {}

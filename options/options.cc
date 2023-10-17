@@ -575,10 +575,13 @@ Options* Options::EnableSpeedbFeatures(SharedOptions& shared_options) {
 }
 
 SharedOptions::SharedOptions(size_t total_ram_size_bytes, size_t total_threads,
-                             size_t delayed_write_rate) {
+                             size_t delayed_write_rate, size_t bucket_size,
+                             bool use_merge) {
   total_threads_ = total_threads;
   total_ram_size_bytes_ = total_ram_size_bytes;
   delayed_write_rate_ = delayed_write_rate;
+  bucket_size_ = bucket_size;
+  use_merge_ = use_merge;
   // initial_write_buffer_size_ is initialized to 1 to avoid from empty memory
   // which might cause some problems
   int initial_write_buffer_size_ = 1;
@@ -706,9 +709,12 @@ ColumnFamilyOptions* ColumnFamilyOptions::EnableSpeedbFeaturesCF(
     table_factory.reset(NewBlockBasedTableFactory(block_based_table_options));
   }
   if (prefix_extractor) {
-    memtable_factory.reset(NewHashSkipListRepFactory());
+    memtable_factory.reset(
+        NewHashSkipListRepFactory(shared_options.GetBucketSize()));
   } else {
-    memtable_factory.reset(NewHashSpdbRepFactory());
+    memtable_factory.reset(
+        NewHashSpdbRepFactory(shared_options.GetBucketSize(),
+                              shared_options.IsMergeMemtableSupported()));
   }
   return this;
 }

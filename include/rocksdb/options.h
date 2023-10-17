@@ -1813,13 +1813,14 @@ struct ReadOptions {
   // ** For RocksDB internal use only **
   Env::IOActivity io_activity = Env::IOActivity::kUnknown;
 
-  ReadOptions() {}
-  ReadOptions(bool _verify_checksums, bool _fill_cache);
-  explicit ReadOptions(Env::IOActivity _io_activity);
-
   // If true, DB with TTL will not Get keys that reached their timeout
   // Default: false
   bool skip_expired_data = false;
+  bool part_of_flush = false;
+
+  ReadOptions() {}
+  ReadOptions(bool _verify_checksums, bool _fill_cache);
+  explicit ReadOptions(Env::IOActivity _io_activity);
 };
 
 // Options that control write operations
@@ -2291,10 +2292,13 @@ class SharedOptions {
  public:
   SharedOptions();
   SharedOptions(size_t total_ram_size_bytes, size_t total_threads,
-                size_t delayed_write_rate = 256 * 1024 * 1024ul);
+                size_t delayed_write_rate = 256 * 1024 * 1024ul,
+                size_t bucket_size = 1000000, bool use_merge = true);
   size_t GetTotalThreads() { return total_threads_; }
   size_t GetTotalRamSizeBytes() { return total_ram_size_bytes_; }
   size_t GetDelayedWriteRate() { return delayed_write_rate_; }
+  size_t GetBucketSize() { return bucket_size_; }
+  size_t IsMergeMemtableSupported() { return use_merge_; }
   // this function will increase write buffer manager by increased_by amount
   // as long as the result is not bigger than the maximum size of
   // total_ram_size_ /4
@@ -2317,6 +2321,8 @@ class SharedOptions {
   size_t total_threads_ = 0;
   size_t total_ram_size_bytes_ = 0;
   size_t delayed_write_rate_ = 0;
+  size_t bucket_size_ = 1000000;
+  bool use_merge_ = true;
 };
 
 }  // namespace ROCKSDB_NAMESPACE

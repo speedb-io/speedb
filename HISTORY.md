@@ -2,22 +2,28 @@
 
 ## Unreleased
 
-Fix RepeatableThread to work properly with on thread start callback feature (https://github.com/speedb-io/speedb/pull/667).
+* Fix RepeatableThread to work properly with on thread start callback feature (https://github.com/speedb-io/speedb/pull/667).
 
 ### New Features
 * Non-Blocking Manual Compaction (CompactRange()) - Support non-blocking manual compactions by setting a new CompactRangeOptions option (async_completion_cb). When set, the CompactRange() call will return control to the caller immediately. The manual compaction iteslf will be performed in an internally created thread. The manual compaction will ALWAYS call the specified callback upon completion and provide the completion status (#597).
 * Change the internal Configurable API SerializeOptions to return UserProperties (instead of the final string representation).  Added ToString methods to the ConfigurableOptions class to complete the serialization of Options properties.
 
+
 ### Enhancements
 * Unit Testing: Expose the disallow_trivial_move flag in the MoveFilesToLevel testing utility (#677).
 * Static Pinning: Report pinning policy name and parameters to the log (#691).
 * LOG Reporting: add reporting capabilities to the WriteController and the WriteBufferManager by saving the Loggers of the dbs which are using them internally and issuing WARN msgs to these Loggers whenever the state of the WC and WBM changes in regards to delaying (#556).
+* Enable speedb features: Use Scoped Pinning Policy in Enable speedb feature (#459).
+* sst_dump: display metaindex_handle and the index_handle's offset and size in footer information (#404).
 
 ### Bug Fixes
-* db_bench: fix SeekRandomWriteRandom valid check. Use key and value only after checking iterator is valid.
+* db_bench: Fix SeekRandomWriteRandom valid check. Use key and value only after checking iterator is valid.
 * Fix a JAVA build issue introduced by #597 (#680)
+* support hash spdb as part of enable speedb features  (#653)
+* Static Pinning: Make static pinning decisions based on the table's level relative to the currently known last level with data (rather than bottommost level) at the time a table reader is created and added to the table cache (#662).
 
 ### Miscellaneous
+* Unit tests: Disable CancelCompactionWaitingOnConflict and CompactionLimiter in db_compaction_test since they sometimes fail or get stuck. These need to be investigated and reenabled.
 
 ## Grapes v2.6.0 (8/22/2023)
 Based on RocksDB 8.1.1

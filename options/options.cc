@@ -43,6 +43,7 @@
 #include "rocksdb/sst_file_manager.h"
 #include "rocksdb/sst_partitioner.h"
 #include "rocksdb/table.h"
+#include "rocksdb/table_pinning_policy.h"
 #include "rocksdb/table_properties.h"
 #include "rocksdb/wal_filter.h"
 #include "rocksdb/write_buffer_manager.h"
@@ -586,11 +587,13 @@ SharedOptions::SharedOptions(size_t total_ram_size_bytes, size_t total_threads,
       new WriteController(true /*dynamic_delay*/, delayed_write_rate_));
   write_buffer_manager.reset(new WriteBufferManager(
       initial_write_buffer_size_, cache, true /*allow_stall*/));
+
+  CreatePinningPolicy();
 }
 
 void SharedOptions::IncreaseWriteBufferSize(size_t increase_by) {
   // Max write_buffer_manager->buffer_size()
-  size_t wbm_max_buf_size = total_ram_size_bytes_ / 4;
+  size_t wbm_max_buf_size = GetMaxWriteBufferManagerSize();
   size_t current_buffer_size = write_buffer_manager->buffer_size();
   size_t set_buf_res = 0;
 
@@ -607,6 +610,41 @@ void SharedOptions::IncreaseWriteBufferSize(size_t increase_by) {
   if (set_buf_res != 0) {
     write_buffer_manager->SetBufferSize(set_buf_res);
   }
+}
+
+void SharedOptions::CreatePinningPolicy() {
+  // Calculate the size of the clean memory
+  auto clean_memory_capacity = cache->GetCapacity();
+  if (write_buffer_manager->cost_to_cache()) {
+    // The WBM's size is increased on every call to EnableSpeedbFeaturesCF()
+    // up to a max size. For simplicity, calculate the space for pinning
+    // as if wbm is at its max size. Otherwise we would have to update the
+    // pinning capacity dynamically as wbm's buffer size grows.
+    auto wbm_max_size = GetMaxWriteBufferManagerSize();
+
+    if (clean_memory_capacity >= wbm_max_size) {
+      clean_memory_capacity -= wbm_max_size;
+    } else {
+      assert(clean_memory_capacity >= wbm_max_size);
+      clean_memory_capacity = 0U;
+    }
+  }
+
+  size_t pinning_capacity = 0.8 * clean_memory_capacity;
+
+  ConfigOptions config_options;
+  config_options.ignore_unknown_options = false;
+  config_options.ignore_unsupported_options = false;
+
+  std::ostringstream oss;
+  oss << "id=speedb_scoped_pinning_policy; capacity=" << pinning_capacity;
+  auto s = TablePinningPolicy::CreateFromString(config_options, oss.str(),
+                                                &pinning_policy);
+  assert(s.ok());
+}
+
+size_t SharedOptions::GetMaxWriteBufferManagerSize() const {
+  return total_ram_size_bytes_ / 4;
 }
 
 DBOptions* DBOptions::EnableSpeedbFeaturesDB(SharedOptions& shared_options) {
@@ -661,25 +699,10 @@ ColumnFamilyOptions* ColumnFamilyOptions::EnableSpeedbFeaturesCF(
         &block_based_table_options.filter_policy);
     assert(s.ok());
     block_based_table_options.cache_index_and_filter_blocks = true;
+    block_based_table_options.block_cache = shared_options.cache;
     block_based_table_options.cache_index_and_filter_blocks_with_high_priority =
         true;
-    block_based_table_options.pin_l0_filter_and_index_blocks_in_cache = false;
-    block_based_table_options.metadata_cache_options.unpartitioned_pinning =
-        PinningTier::kAll;
-    block_based_table_options.metadata_cache_options.partition_pinning =
-        PinningTier::kAll;
-    block_based_table_options.block_cache = shared_options.cache;
-    auto& cache_usage_options = block_based_table_options.cache_usage_options;
-    CacheEntryRoleOptions role_options;
-    role_options.charged = CacheEntryRoleOptions::Decision::kEnabled;
-    cache_usage_options.options_overrides.insert(
-        {CacheEntryRole::kFilterConstruction, role_options});
-    cache_usage_options.options_overrides.insert(
-        {CacheEntryRole::kBlockBasedTableReader, role_options});
-    cache_usage_options.options_overrides.insert(
-        {CacheEntryRole::kCompressionDictionaryBuildingBuffer, role_options});
-    cache_usage_options.options_overrides.insert(
-        {CacheEntryRole::kFileMetadata, role_options});
+    block_based_table_options.pinning_policy = shared_options.pinning_policy;
     table_factory.reset(NewBlockBasedTableFactory(block_based_table_options));
   }
   if (prefix_extractor) {

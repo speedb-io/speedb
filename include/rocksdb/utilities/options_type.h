@@ -852,13 +852,17 @@ class OptionTypeInfo {
       const std::unordered_map<std::string, OptionTypeInfo>* map,
       const std::string& opt_name, const std::string& value, void* opt_addr);
 
-  // Serializes the values from opt_addr using the rules in type_map.
-  // Returns the serialized form in result.
+  // Converts the values from opt_addr using the rules in type_map into their
+  // UserProperties (name-value) representatio.
   // Returns OK on success or non-OK if some option could not be serialized.
   static Status SerializeType(
       const ConfigOptions& config_options, const std::string& prefix,
       const std::unordered_map<std::string, OptionTypeInfo>& type_map,
       const void* opt_addr, OptionProperties* props);
+  
+  // Serializes the values from opt_addr using the rules in type_map.
+  // Returns the serialized form in result.
+  // Returns OK on success or non-OK if some option could not be serialized.
   static Status TypeToString(
       const ConfigOptions& config_options, const std::string& opt_name,
       const std::unordered_map<std::string, OptionTypeInfo>& type_map,

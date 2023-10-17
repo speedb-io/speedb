@@ -323,21 +323,24 @@ class SkipListRep : public MemTableRep {
     InlineSkipList<const MemTableRep::KeyComparator&>::Iterator prev_;
   };
 
-  MemTableRep::Iterator* GetIterator(Arena* arena = nullptr) override {
-    if (lookahead_ > 0) {
-      void* mem =
-          arena ? arena->AllocateAligned(sizeof(SkipListRep::LookaheadIterator))
-                :
-                operator new(sizeof(SkipListRep::LookaheadIterator));
-      return new (mem) SkipListRep::LookaheadIterator(*this);
-    } else {
-      void* mem = arena ? arena->AllocateAligned(sizeof(SkipListRep::Iterator))
-                        :
-                        operator new(sizeof(SkipListRep::Iterator));
-      return new (mem) SkipListRep::Iterator(&skip_list_);
-    }
-  }
+  MemTableRep::Iterator* GetIterator(Arena* arena = nullptr,
+                                     bool part_of_flush = false) override;
 };
+
+MemTableRep::Iterator* SkipListRep::GetIterator(Arena* arena,
+                                                bool /*part_of_flush*/) {
+  if (lookahead_ > 0) {
+    void* mem =
+        arena ? arena->AllocateAligned(sizeof(SkipListRep::LookaheadIterator)) :
+              operator new(sizeof(SkipListRep::LookaheadIterator));
+    return new (mem) SkipListRep::LookaheadIterator(*this);
+  } else {
+    void* mem = arena ? arena->AllocateAligned(sizeof(SkipListRep::Iterator)) :
+                      operator new(sizeof(SkipListRep::Iterator));
+    return new (mem) SkipListRep::Iterator(&skip_list_);
+  }
+}
+
 }  // namespace
 
 static std::unordered_map<std::string, OptionTypeInfo> skiplist_factory_info = {

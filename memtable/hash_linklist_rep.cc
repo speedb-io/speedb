@@ -179,7 +179,8 @@ class HashLinkListRep : public MemTableRep {
 
   ~HashLinkListRep() override;
 
-  MemTableRep::Iterator* GetIterator(Arena* arena = nullptr) override;
+  MemTableRep::Iterator* GetIterator(Arena* arena = nullptr,
+                                     bool part_of_flush = false) override;
 
   MemTableRep::Iterator* GetDynamicPrefixIterator(
       Arena* arena = nullptr) override;
@@ -757,7 +758,8 @@ void HashLinkListRep::Get(const LookupKey& k, void* callback_args,
   }
 }
 
-MemTableRep::Iterator* HashLinkListRep::GetIterator(Arena* alloc_arena) {
+MemTableRep::Iterator* HashLinkListRep::GetIterator(Arena* alloc_arena,
+                                                    bool /*part_of_flush*/) {
   // allocate a new arena of similar size to the one currently in use
   Arena* new_arena = new Arena(allocator_->BlockSize());
   auto list = new MemtableSkipList(compare_, new_arena);

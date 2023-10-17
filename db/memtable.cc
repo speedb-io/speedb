@@ -396,7 +396,7 @@ class MemTableIterator : public InternalIterator {
       bloom_ = mem.bloom_filter_.get();
       iter_ = mem.table_->GetDynamicPrefixIterator(arena);
     } else {
-      iter_ = mem.table_->GetIterator(arena);
+      iter_ = mem.table_->GetIterator(arena, read_options.part_of_flush);
       /*if (iter_->IsEmpty()) {
         is_empty_ = true;
       }*/

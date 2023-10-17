@@ -1887,8 +1887,6 @@ DEFINE_bool(multiread_batched, false, "Use the new MultiGet API");
 
 DEFINE_string(memtablerep, "hash_spdb", "");
 DEFINE_int64(hash_bucket_count, 1000000, "hash bucket count");
-DEFINE_bool(use_seek_parralel_threshold, true,
-            "if use seek parralel threshold .");
 DEFINE_bool(use_plain_table, false,
             "if use plain table instead of block-based table format");
 DEFINE_bool(use_cuckoo_table, false, "if use cuckoo table format");
@@ -1997,7 +1995,7 @@ static Status CreateMemTableRepFactory(
   } else if (!strcasecmp(FLAGS_memtablerep.c_str(), "hash_linkedlist")) {
     factory->reset(NewHashLinkListRepFactory(FLAGS_hash_bucket_count));
   } else if (!strcasecmp(FLAGS_memtablerep.c_str(), "hash_spdb")) {
-    factory->reset(NewHashSpdbRepFactory(0));
+    factory->reset(NewHashSpdbRepFactory(FLAGS_hash_bucket_count, false));
   }
   return s;
 }
@@ -5234,7 +5232,8 @@ class Benchmark {
   void OpenDb(Options options, const std::string& db_name,
               DBWithColumnFamilies* db) {
     SharedOptions so(FLAGS_total_ram_size, options.max_background_jobs,
-                     options.delayed_write_rate);
+                     options.delayed_write_rate, FLAGS_hash_bucket_count,
+                     false);
     if (FLAGS_enable_speedb_features) {
       options.EnableSpeedbFeatures(so);
     }

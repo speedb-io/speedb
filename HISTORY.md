@@ -18,6 +18,7 @@
 ### Bug Fixes
 * db_bench: Fix SeekRandomWriteRandom valid check. Use key and value only after checking iterator is valid.
 * Fix a JAVA build issue introduced by #597 (#680)
+* support hash spdb as part of enable speedb features  (#653)
 * Static Pinning: Make static pinning decisions based on the table's level relative to the currently known last level with data (rather than bottommost level) at the time a table reader is created and added to the table cache (#662).
 
 ### Miscellaneous

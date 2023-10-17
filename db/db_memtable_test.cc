@@ -50,8 +50,8 @@ class MockMemTableRep : public MemTableRep {
     return rep_->ApproximateMemoryUsage();
   }
 
-  Iterator* GetIterator(Arena* arena) override {
-    return rep_->GetIterator(arena);
+  Iterator* GetIterator(Arena* arena, bool part_of_flush = false) override {
+    return rep_->GetIterator(arena, part_of_flush);
   }
 
   void* last_hint_in() { return last_hint_in_; }

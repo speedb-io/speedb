@@ -887,6 +887,8 @@ Status FlushJob::WriteLevel0Table() {
     ReadOptions ro;
     ro.total_order_seek = true;
     ro.io_activity = Env::IOActivity::kFlush;
+    ro.part_of_flush = true;
+
     Arena arena;
     uint64_t total_num_entries = 0, total_num_deletes = 0;
     uint64_t total_data_size = 0;

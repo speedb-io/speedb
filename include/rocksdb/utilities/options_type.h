@@ -236,6 +236,7 @@ using ValidateFunc = std::function<Status(
     const DBOptions& /*db_opts*/, const ColumnFamilyOptions& /*cf_opts*/,
     const std::string& /*name*/, const void* /*addr*/)>;
 
+class OptionProperties : public std::unordered_map<std::string, std::string> {};
 // A struct for storing constant option information such as option name,
 // option type, and offset.
 class OptionTypeInfo {
@@ -857,7 +858,7 @@ class OptionTypeInfo {
   static Status SerializeType(
       const ConfigOptions& config_options, const std::string& prefix,
       const std::unordered_map<std::string, OptionTypeInfo>& type_map,
-      const void* opt_addr, Properties* props);
+      const void* opt_addr, OptionProperties* props);
   static Status TypeToString(
       const ConfigOptions& config_options, const std::string& opt_name,
       const std::unordered_map<std::string, OptionTypeInfo>& type_map,

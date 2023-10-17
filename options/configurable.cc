@@ -132,7 +132,7 @@ Status Configurable::ConfigureOptions(
     const ConfigOptions& config_options,
     const std::unordered_map<std::string, std::string>& opts_map,
     std::unordered_map<std::string, std::string>* unused) {
-  Properties current;
+  OptionProperties current;
   Status s;
   if (!opts_map.empty()) {
     // There are options in the map.
@@ -456,7 +456,7 @@ Status ConfigurableHelper::ConfigureOption(
 
 Status Configurable::GetOptionString(const ConfigOptions& config_options,
                                      std::string* result) const {
-  Properties props;
+  OptionProperties props;
   assert(result);
   result->clear();
   Status s =
@@ -469,7 +469,7 @@ Status Configurable::GetOptionString(const ConfigOptions& config_options,
 
 std::string Configurable::ToString(const ConfigOptions& config_options,
                                    const std::string& prefix) const {
-  Properties props;
+  OptionProperties props;
   Status s = SerializeOptions(config_options, prefix, &props);
   assert(s.ok());
   if (s.ok()) {
@@ -481,7 +481,7 @@ std::string Configurable::ToString(const ConfigOptions& config_options,
 
 Status Configurable::SerializeOptions(const ConfigOptions& config_options,
                                       const std::string& prefix,
-                                      Properties* props) const {
+                                      OptionProperties* props) const {
   return ConfigurableHelper::SerializeOptions(config_options, *this, prefix,
                                               props);
 }
@@ -525,7 +525,7 @@ Status ConfigurableHelper::GetOption(const ConfigOptions& config_options,
 Status ConfigurableHelper::SerializeOptions(const ConfigOptions& config_options,
                                             const Configurable& configurable,
                                             const std::string& prefix,
-                                            Properties* props) {
+                                            OptionProperties* props) {
   assert(props);
   for (auto const& opt_iter : configurable.options_) {
     if (opt_iter.type_map != nullptr) {

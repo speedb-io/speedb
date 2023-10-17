@@ -770,7 +770,7 @@ Status CompactionServiceInput::Write(std::string* output) {
   output->append(buf, sizeof(BinaryFormatVersion));
   ConfigOptions cf;
   cf.invoke_prepare_options = false;
-  Properties props;
+  OptionProperties props;
   Status s =
       OptionTypeInfo::SerializeType(cf, "", cs_input_type_info, this, &props);
   if (s.ok()) {
@@ -805,7 +805,7 @@ Status CompactionServiceResult::Write(std::string* output) {
   output->append(buf, sizeof(BinaryFormatVersion));
   ConfigOptions cf;
   cf.invoke_prepare_options = false;
-  Properties props;
+  OptionProperties props;
   Status s =
       OptionTypeInfo::SerializeType(cf, "", cs_result_type_info, this, &props);
   if (s.ok()) {

@@ -49,7 +49,7 @@ Status Customizable::GetOption(const ConfigOptions& config_options,
 
 Status Customizable::SerializeOptions(const ConfigOptions& config_options,
                                       const std::string& prefix,
-                                      Properties* props) const {
+                                      OptionProperties* props) const {
   Status s;
   auto id = GetId();
   props->insert({OptionTypeInfo::kIdPropName(), id});
@@ -95,7 +95,7 @@ Status Customizable::GetOptionsMap(
     if (status.ok() && customizable->IsInstanceOf(*id)) {
       // The new ID and the old ID match, so the objects are the same type.
       // Try to get the existing options, ignoring any errors
-      Properties current;
+      OptionProperties current;
       if (ConfigurableHelper::SerializeOptions(config_options, *customizable,
                                                "", &current)
               .ok()) {

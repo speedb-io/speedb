@@ -95,7 +95,7 @@ class LegacySystemClock : public SystemClock {
 
   Status SerializeOptions(const ConfigOptions& /*config_options*/,
                           const std::string& /*prefix*/,
-                          Properties* /*options*/) const override {
+                          OptionProperties* /*options*/) const override {
     // We do not want the LegacySystemClock to appear in the serialized output.
     // This clock is an internal class for those who do not implement one and
     // would be part of the Env.  As such, do not serialize it here.
@@ -603,7 +603,7 @@ class LegacyFileSystemWrapper : public FileSystem {
 
   Status SerializeOptions(const ConfigOptions& /*config_options*/,
                           const std::string& /*prefix*/,
-                          Properties* /*options*/) const override {
+                          OptionProperties* /*options*/) const override {
     // We do not want the LegacyFileSystem to appear in the serialized output.
     // This clock is an internal class for those who do not implement one and
     // would be part of the Env.  As such, do not serialize it here.
@@ -1188,7 +1188,7 @@ Status SystemClockWrapper::PrepareOptions(const ConfigOptions& options) {
 
 Status SystemClockWrapper::SerializeOptions(const ConfigOptions& config_options,
                                             const std::string& prefix,
-                                            Properties* props) const {
+                                            OptionProperties* props) const {
   if (!config_options.IsShallow() && target_ != nullptr &&
       !target_->IsInstanceOf(SystemClock::kDefaultName())) {
     props->insert(

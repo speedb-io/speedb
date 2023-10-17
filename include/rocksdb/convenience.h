@@ -18,12 +18,10 @@ namespace ROCKSDB_NAMESPACE {
 class Env;
 class Logger;
 class ObjectRegistry;
-
+class OptionProperties;
 struct ColumnFamilyOptions;
 struct DBOptions;
 struct Options;
-
-using Properties = std::unordered_map<std::string, std::string>;
 
 // ConfigOptions containing the parameters/controls for
 // comparing objects and converting to/from strings.
@@ -105,9 +103,11 @@ struct ConfigOptions {
   bool IsCheckEnabled(SanityLevel level) const {
     return (level > SanityLevel::kSanityLevelNone && level <= sanity_level);
   }
+
   // Converts the properties to a single string representation
   std::string ToString(const std::string& prefix,
-                       const Properties& props) const;
+                       const OptionProperties& props) const;
+
   // Converts the vector options to a single string representation
   std::string ToString(char separator,
                        const std::vector<std::string>& elems) const;

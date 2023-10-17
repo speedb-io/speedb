@@ -105,7 +105,7 @@ class SystemClockWrapper : public SystemClock {
   Status PrepareOptions(const ConfigOptions& options) override;
   Status SerializeOptions(const ConfigOptions& config_options,
                           const std::string& prefix,
-                          Properties* props) const override;
+                          OptionProperties* props) const override;
   const Customizable* Inner() const override { return target_.get(); }
 
  protected:

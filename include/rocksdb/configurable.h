@@ -20,12 +20,12 @@
 namespace ROCKSDB_NAMESPACE {
 class Logger;
 class ObjectRegistry;
+class OptionProperties;
 class OptionTypeInfo;
+
 struct ColumnFamilyOptions;
 struct ConfigOptions;
 struct DBOptions;
-
-using Properties = std::unordered_map<std::string, std::string>;
 
 // Configurable is a base class used by the rocksdb that describes a
 // standard way of configuring objects.  A Configurable object can:
@@ -345,9 +345,14 @@ class Configurable {
                                std::string* bad_name) const;
   // Internal method to serialize options (ToString)
   // Classes may override this value to change its behavior.
+  // @param config_options Controls how the options are being matched
+  // @param prefix A string that may be prepended to every option.
+  // @param props Filled with the serialized name-value pairs of the options
+  //
+  // Returns OK on success or an error status if serialized failed.
   virtual Status SerializeOptions(const ConfigOptions& config_options,
                                   const std::string& prefix,
-                                  Properties* props) const;
+                                  OptionProperties* props) const;
 
   //  Given a name (e.g. rocksdb.my.type.opt), returns the short name (opt)
   virtual std::string GetOptionName(const std::string& long_name) const;

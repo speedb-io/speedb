@@ -484,7 +484,7 @@ Status CompositeEnvWrapper::PrepareOptions(const ConfigOptions& options) {
 
 Status CompositeEnvWrapper::SerializeOptions(
     const ConfigOptions& config_options, const std::string& prefix,
-    Properties* props) const {
+    OptionProperties* props) const {
   if (target_.env != nullptr && target_.env != Env::Default()) {
     props->insert({kTargetPropName(),
                    target_.env->ToString(
@@ -515,7 +515,7 @@ Status EnvWrapper::PrepareOptions(const ConfigOptions& options) {
 
 Status EnvWrapper::SerializeOptions(const ConfigOptions& config_options,
                                     const std::string& prefix,
-                                    Properties* props) const {
+                                    OptionProperties* props) const {
   if (!config_options.IsShallow() && target_.env != nullptr &&
       target_.env != Env::Default()) {
     props->insert({kTargetPropName(),

@@ -226,7 +226,7 @@ class Customizable : public Configurable {
   std::string GetOptionName(const std::string& long_name) const override;
   Status SerializeOptions(const ConfigOptions& config_options,
                           const std::string& prefix,
-                          Properties* props) const override;
+                          OptionProperties* props) const override;
 };
 
 }  // namespace ROCKSDB_NAMESPACE

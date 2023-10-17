@@ -1157,7 +1157,7 @@ Status GetStringFromMutableCFOptions(const ConfigOptions& config_options,
                                      std::string* opt_string) {
   assert(opt_string);
   opt_string->clear();
-  return OptionTypeInfo::TypeToString(config_options, "",
+  return OptionTypeInfo::TypeToString(config_options, "" /*prefix*/,
                                       cf_mutable_options_type_info,
                                       &mutable_opts, opt_string);
 }

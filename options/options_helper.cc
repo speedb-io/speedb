@@ -55,7 +55,7 @@ ConfigOptions::ConfigOptions(const DBOptions& db_opts) : env(db_opts.env) {
 }
 
 std::string ConfigOptions::ToString(const std::string& /*prefix*/,
-                                    const Properties& props) const {
+                                    const OptionProperties& props) const {
   std::string result;
   std::string id;
   for (const auto& it : props) {
@@ -65,9 +65,6 @@ std::string ConfigOptions::ToString(const std::string& /*prefix*/,
       if (!result.empty()) {
         result.append(delimiter);
       }
-      // if (!prefix.empty()) {
-      // result.append(prefix);
-      // }
       result.append(it.first);
       result.append("=");
       if (it.second.find('=') != std::string::npos && it.second[0] != '{') {
@@ -1138,7 +1135,7 @@ Status OptionTypeInfo::Serialize(const ConfigOptions& config_options,
 Status OptionTypeInfo::SerializeType(
     const ConfigOptions& config_options, const std::string& prefix,
     const std::unordered_map<std::string, OptionTypeInfo>& type_map,
-    const void* opt_addr, Properties* props) {
+    const void* opt_addr, OptionProperties* props) {
   Status status;
   for (const auto& iter : type_map) {
     std::string single;
@@ -1218,7 +1215,7 @@ Status OptionTypeInfo::TypeToString(
     const std::unordered_map<std::string, OptionTypeInfo>& type_map,
     const void* opt_addr, std::string* result) {
   assert(result);
-  Properties props;
+  OptionProperties props;
   Status s = SerializeType(config_options, prefix, type_map, opt_addr, &props);
   if (s.ok()) {
     *result = config_options.ToString(prefix, props);

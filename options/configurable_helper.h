@@ -135,7 +135,8 @@ class ConfigurableHelper {
   // serialized.
   static Status SerializeOptions(const ConfigOptions& config_options,
                                  const Configurable& configurable,
-                                 const std::string& prefix, Properties* props);
+                                 const std::string& prefix,
+                                 OptionProperties* props);
 
   // Internal method to list the option names for this object.
   // Classes may override this value to change its behavior.

@@ -245,7 +245,7 @@ Status FileSystemWrapper::PrepareOptions(const ConfigOptions& options) {
 
 Status FileSystemWrapper::SerializeOptions(const ConfigOptions& config_options,
                                            const std::string& prefix,
-                                           Properties* props) const {
+                                           OptionProperties* props) const {
   if (!config_options.IsShallow() && target_ != nullptr &&
       !target_->IsInstanceOf(FileSystem::kDefaultName())) {
     props->insert(

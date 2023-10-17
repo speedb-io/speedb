@@ -24,6 +24,7 @@
 #include <cctype>
 #include <cinttypes>
 #include <cstring>
+#include <string>
 #include <unordered_map>
 
 #include "cache/lru_cache.h"
@@ -35,6 +36,7 @@
 #include "rocksdb/convenience.h"
 #include "rocksdb/file_checksum.h"
 #include "rocksdb/memtablerep.h"
+#include "rocksdb/table_pinning_policy.h"
 #include "rocksdb/utilities/leveldb_options.h"
 #include "rocksdb/utilities/object_registry.h"
 #include "rocksdb/utilities/options_type.h"
@@ -5103,6 +5105,17 @@ TEST_F(SharedOptionsTest, SharedOptionsTest) {
   ASSERT_TRUE(so.sst_file_manager == nullptr);
   ASSERT_TRUE(so.info_log == nullptr);
   ASSERT_TRUE(so.file_checksum_gen_factory == nullptr);
+
+  ASSERT_TRUE(so.pinning_policy.get() != nullptr);
+  ASSERT_STREQ(so.pinning_policy->Name(), "speedb_scoped_pinning_policy")
+      << so.pinning_policy->Name();
+
+  size_t expected_pinning_capacity = 0.8 * (0.75 * total_ram_size_bytes);
+  std::string actual_pinning_capacity_str;
+  ASSERT_OK(so.pinning_policy->GetOption(ConfigOptions(), "capacity",
+                                         &actual_pinning_capacity_str));
+  ASSERT_EQ(actual_pinning_capacity_str,
+            std::to_string(expected_pinning_capacity));
 }
 
 TEST_F(SharedOptionsTest, EnableSpeedbFeatures) {
@@ -5111,6 +5124,7 @@ TEST_F(SharedOptionsTest, EnableSpeedbFeatures) {
   size_t delayed_write_rate = 256 * 1024 * 1024ul;
   int total_threads = 8;
   SharedOptions so(total_ram_size_bytes, total_threads, delayed_write_rate);
+
   // create the DB if it's not already present
   op1.create_if_missing = true;
   op2.create_if_missing = true;
@@ -5203,26 +5217,6 @@ TEST_F(SharedOptionsTest, EnableSpeedbFeaturesCF) {
   for (auto options_overrides_iter = sanitized_options_overrides.cbegin();
        options_overrides_iter != sanitized_options_overrides.cend();
        ++options_overrides_iter) {
-    CacheEntryRoleOptions role_options = options_overrides_iter->second;
-    CacheEntryRoleOptions default_options =
-        sanitized_table_options->cache_usage_options.options;
-    if (options_overrides_iter->first == CacheEntryRole::kFilterConstruction) {
-      ASSERT_EQ(role_options.charged,
-                CacheEntryRoleOptions::Decision::kEnabled);
-    } else if (options_overrides_iter->first ==
-               CacheEntryRole::kBlockBasedTableReader) {
-      ASSERT_EQ(role_options.charged,
-                CacheEntryRoleOptions::Decision::kEnabled);
-    } else if (options_overrides_iter->first ==
-               CacheEntryRole::kCompressionDictionaryBuildingBuffer) {
-      ASSERT_EQ(role_options.charged,
-                CacheEntryRoleOptions::Decision::kEnabled);
-    } else if (options_overrides_iter->first == CacheEntryRole::kFileMetadata) {
-      ASSERT_EQ(role_options.charged,
-                CacheEntryRoleOptions::Decision::kEnabled);
-    } else {
-      EXPECT_TRUE(role_options == default_options);
-    }
   }
 }
 

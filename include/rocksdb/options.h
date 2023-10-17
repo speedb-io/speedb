@@ -74,6 +74,7 @@ class WriteBufferManager;
 class WriteController;
 class FileSystem;
 class SharedOptions;
+class TablePinningPolicy;
 
 struct Options;
 struct DbPath;
@@ -2338,6 +2339,8 @@ class SharedOptions {
   // as long as the result is not bigger than the maximum size of
   // total_ram_size_ /4
   void IncreaseWriteBufferSize(size_t increase_by);
+  void CreatePinningPolicy();
+  size_t GetMaxWriteBufferManagerSize() const;
 
   std::shared_ptr<Cache> cache = nullptr;
   std::shared_ptr<WriteController> write_controller = nullptr;
@@ -2348,6 +2351,7 @@ class SharedOptions {
   std::shared_ptr<Logger> info_log = nullptr;
   std::vector<std::shared_ptr<EventListener>> listeners;
   std::shared_ptr<FileChecksumGenFactory> file_checksum_gen_factory = nullptr;
+  std::shared_ptr<TablePinningPolicy> pinning_policy = nullptr;
 
  private:
   size_t total_threads_ = 0;

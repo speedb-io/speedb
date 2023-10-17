@@ -9498,6 +9498,23 @@ void ValidateMetadataCacheOptions() {
   }
 }
 
+void ValidatePinningPolicyRelatedFlags() {
+  if (!FLAGS_pinning_policy.empty() && FLAGS_enable_speedb_features) {
+    ErrorExit(
+        "--pinning_policy should not be set when --unpartitioned_pinning is "
+        "set.");
+  }
+
+  if (FLAGS_enable_speedb_features) {
+    if (gflags::GetCommandLineFlagInfoOrDie("max_background_jobs").is_default ||
+        gflags::GetCommandLineFlagInfoOrDie("total_ram_size").is_default) {
+      ErrorExit(
+          "enable_speedb_features - Please provide explicitly total_ram_size "
+          "in bytes and max_background_jobs ");
+    }
+  }
+}
+
 // The actual running of a group of benchmarks that share configuration
 // Some entities need to be created once and used for running all of the groups.
 // So, they are created only when running the first group
@@ -9515,6 +9532,7 @@ int db_bench_tool_run_group(int group_num, int num_groups, int argc,
   parsing_cmd_line_args = false;
 
   ValidateAndProcessStatisticsFlags(first_group, config_options);
+  ValidatePinningPolicyRelatedFlags();
 
   FLAGS_compaction_style_e =
       (ROCKSDB_NAMESPACE::CompactionStyle)FLAGS_compaction_style;
@@ -9572,15 +9590,6 @@ int db_bench_tool_run_group(int group_num, int num_groups, int argc,
     ErrorExit(
         "`-use_existing_db` must be true for `-use_existing_keys` to be "
         "settable");
-  }
-
-  if (FLAGS_enable_speedb_features) {
-    if (gflags::GetCommandLineFlagInfoOrDie("max_background_jobs").is_default ||
-        gflags::GetCommandLineFlagInfoOrDie("total_ram_size").is_default) {
-      ErrorExit(
-          "enable_speedb_features - Please provide explicitly total_ram_size "
-          "in bytes and max_background_jobs ");
-    }
   }
 
   if (!strcasecmp(FLAGS_compaction_fadvice.c_str(), "NONE"))

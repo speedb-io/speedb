@@ -83,7 +83,8 @@ TableCache::TableCache(const ImmutableOptions& ioptions,
                        const FileOptions* file_options, Cache* const cache,
                        BlockCacheTracer* const block_cache_tracer,
                        const std::shared_ptr<IOTracer>& io_tracer,
-                       const std::string& db_session_id)
+                       const std::string& db_session_id,
+                       IsLastLevelWithDataFunc is_last_level_with_data_func)
     : ioptions_(ioptions),
       file_options_(*file_options),
       cache_(cache),
@@ -91,7 +92,8 @@ TableCache::TableCache(const ImmutableOptions& ioptions,
       block_cache_tracer_(block_cache_tracer),
       loader_mutex_(kLoadConcurency),
       io_tracer_(io_tracer),
-      db_session_id_(db_session_id) {
+      db_session_id_(db_session_id),
+      is_last_level_with_data_func_(is_last_level_with_data_func) {
   if (ioptions_.row_cache) {
     // If the same cache is shared by multiple instances, we need to
     // disambiguate its entries.
@@ -161,14 +163,20 @@ Status TableCache::GetTableReader(
       expected_unique_id = kNullUniqueId64x2;  // null ID == no verification
     }
 
+    auto is_last_level_with_data = is_bottom;
+    if (is_last_level_with_data_func_) {
+      is_last_level_with_data = is_last_level_with_data_func_(level);
+    }
+
     TableReaderOptions table_reader_options(
         ioptions_, prefix_extractor, file_options, internal_comparator,
         block_protection_bytes_per_key, skip_filters, immortal_tables_,
-        false /* force_direct_prefetch */, level, is_bottom, block_cache_tracer_,
+        false /* force_direct_prefetch */, level, is_bottom, is_last_level_with_data, block_cache_tracer_,
         max_file_size_for_l0_meta_pin, db_session_id_,
         file_meta.fd.GetNumber(), expected_unique_id,
         file_meta.fd.largest_seqno, file_meta.tail_size,
         file_meta.user_defined_timestamps_persisted);
+
     table_reader_options.cache_owner_id = cache_owner_id_;
 
     s = ioptions_.table_factory->NewTableReader(

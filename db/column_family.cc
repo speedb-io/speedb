@@ -25,6 +25,7 @@
 
 #include <algorithm>
 #include <cinttypes>
+#include <functional>
 #include <limits>
 #include <memory>
 #include <sstream>
@@ -595,9 +596,11 @@ ColumnFamilyData::ColumnFamilyData(
   if (_dummy_versions != nullptr) {
     internal_stats_.reset(
         new InternalStats(ioptions_.num_levels, ioptions_.clock, this));
-    table_cache_.reset(new TableCache(ioptions_, file_options, _table_cache,
-                                      block_cache_tracer, io_tracer,
-                                      db_session_id));
+    auto is_last_level_with_data_func = std::bind(
+        &ColumnFamilyData::IsLastLevelWithData, this, std::placeholders::_1);
+    table_cache_.reset(new TableCache(
+        ioptions_, file_options, _table_cache, block_cache_tracer, io_tracer,
+        db_session_id, is_last_level_with_data_func));
     blob_file_cache_.reset(
         new BlobFileCache(_table_cache, ioptions(), soptions(), id_,
                           internal_stats_->GetBlobFileReadHist(), io_tracer));
@@ -1735,6 +1738,24 @@ void ColumnFamilyData::RecoverEpochNumbers() {
   auto* vstorage = current_->storage_info();
   assert(vstorage);
   vstorage->RecoverEpochNumbers(this);
+}
+
+VersionStorageInfo* ColumnFamilyData::TEST_GetCurrentStorageInfo() {
+  return current_->storage_info();
+}
+
+bool ColumnFamilyData::IsLastLevelWithData(int level) const {
+  auto* vstorage = current_->storage_info();
+  assert(vstorage);
+
+  int last_level_with_data = vstorage->num_non_empty_levels() - 1;
+
+  auto is_last_level_with_data = false;
+  if ((level > 0) && (level == last_level_with_data)) {
+    is_last_level_with_data = true;
+  }
+
+  return is_last_level_with_data;
 }
 
 ColumnFamilySet::ColumnFamilySet(

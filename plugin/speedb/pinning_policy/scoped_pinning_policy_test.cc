@@ -64,16 +64,19 @@ TEST_F(ScopedPinningPolicyTest, GetOptions) {
   auto opts = policy->GetOptions<ScopedPinningOptions>();
   ASSERT_NE(opts, nullptr);
   ASSERT_EQ(opts->capacity, ScopedPinningOptions().capacity);
-  ASSERT_EQ(opts->bottom_percent, ScopedPinningOptions().bottom_percent);
+  ASSERT_EQ(opts->last_level_with_data_percent,
+            ScopedPinningOptions().last_level_with_data_percent);
   ASSERT_EQ(opts->mid_percent, ScopedPinningOptions().mid_percent);
   ASSERT_TRUE(policy->IsInstanceOf(ScopedPinningPolicy::kClassName()));
 
   ASSERT_OK(TablePinningPolicy::CreateFromString(
-      cfg, id + "; capacity=2048; bottom_percent=22; mid_percent=33", &policy));
+      cfg,
+      id + "; capacity=2048; last_level_with_data_percent=22; mid_percent=33",
+      &policy));
   opts = policy->GetOptions<ScopedPinningOptions>();
   ASSERT_NE(opts, nullptr);
   ASSERT_EQ(opts->capacity, 2048);
-  ASSERT_EQ(opts->bottom_percent, 22);
+  ASSERT_EQ(opts->last_level_with_data_percent, 22);
   ASSERT_EQ(opts->mid_percent, 33);
   ASSERT_TRUE(policy->IsInstanceOf(ScopedPinningPolicy::kClassName()));
 }
@@ -85,11 +88,13 @@ TEST_F(ScopedPinningPolicyTest, GetManaged) {
 
   std::string id = std::string("id=") + ScopedPinningPolicy::kClassName();
   ASSERT_OK(TablePinningPolicy::CreateFromString(
-      cfg, id + "; capacity=2048; bottom_percent=22; mid_percent=33", &policy));
+      cfg,
+      id + "; capacity=2048; last_level_with_data_percent=22; mid_percent=33",
+      &policy));
   auto opts = policy->GetOptions<ScopedPinningOptions>();
   ASSERT_NE(opts, nullptr);
   ASSERT_EQ(opts->capacity, 2048);
-  ASSERT_EQ(opts->bottom_percent, 22);
+  ASSERT_EQ(opts->last_level_with_data_percent, 22);
   ASSERT_EQ(opts->mid_percent, 33);
   ASSERT_TRUE(policy->IsInstanceOf(ScopedPinningPolicy::kClassName()));
   std::shared_ptr<TablePinningPolicy> copy;
@@ -99,13 +104,13 @@ TEST_F(ScopedPinningPolicyTest, GetManaged) {
   ASSERT_OK(TablePinningPolicy::CreateFromString(
       cfg,
       "id= " + policy->GetId() +
-          "; capacity=4096; bottom_percent=11; mid_percent=44",
+          "; capacity=4096; last_level_with_data_percent=11; mid_percent=44",
       &copy));
   ASSERT_EQ(copy, policy);
   opts = policy->GetOptions<ScopedPinningOptions>();
   ASSERT_NE(opts, nullptr);
   ASSERT_EQ(opts->capacity, 2048);
-  ASSERT_EQ(opts->bottom_percent, 22);
+  ASSERT_EQ(opts->last_level_with_data_percent, 22);
   ASSERT_EQ(opts->mid_percent, 33);
 }
 
@@ -114,7 +119,7 @@ TEST_F(ScopedPinningPolicyTest, TestLimits) {
   auto opts = policy->GetOptions<ScopedPinningOptions>();
   ASSERT_NE(opts, nullptr);
   auto capacity = opts->capacity;
-  size_t bottom = capacity * opts->bottom_percent / 100;
+  size_t bottom = capacity * opts->last_level_with_data_percent / 100;
   size_t mid = capacity * opts->mid_percent / 100;
 
   TablePinningOptions l0(0, false, 0, 0);  // Level 0

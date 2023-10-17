@@ -35,14 +35,14 @@ struct ConfigOptions;
 struct TablePinningOptions {
   TablePinningOptions() = default;
 
-  TablePinningOptions(int _level, bool _is_bottom, size_t _file_size,
-                      size_t _max_file_size_for_l0_meta_pin)
+  TablePinningOptions(int _level, bool _is_last_level_with_data,
+                      size_t _file_size, size_t _max_file_size_for_l0_meta_pin)
       : level(_level),
-        is_bottom(_is_bottom),
+        is_last_level_with_data(_is_last_level_with_data),
         file_size(_file_size),
         max_file_size_for_l0_meta_pin(_max_file_size_for_l0_meta_pin) {}
   int level = -1;
-  bool is_bottom = false;
+  bool is_last_level_with_data = false;
   size_t file_size = 0;
   size_t max_file_size_for_l0_meta_pin = 0;
 };
@@ -50,12 +50,17 @@ struct TablePinningOptions {
 // Struct containing information about an entry that has been pinned
 struct PinnedEntry {
   PinnedEntry() {}
-  PinnedEntry(int _level, uint8_t _type, size_t _size)
-      : level(_level), type(_type), size(_size) {}
+  PinnedEntry(int _level, uint8_t _type, size_t _size,
+              bool _is_last_level_with_data)
+      : level(_level),
+        type(_type),
+        size(_size),
+        is_last_level_with_data(_is_last_level_with_data) {}
 
   int level = -1;
   uint8_t type = 0;
   size_t size = 0;
+  bool is_last_level_with_data = false;
 };
 
 // TablePinningPolicy provides a configurable way to determine when blocks

@@ -168,6 +168,7 @@ CompactionJob::CompactionJob(
       output_directory_(output_directory),
       stats_(stats),
       bottommost_level_(false),
+      last_level_with_data_(false),
       write_hint_(Env::WLTH_NOT_SET),
       compaction_job_stats_(compaction_job_stats),
       job_id_(job_id),
@@ -269,6 +270,7 @@ void CompactionJob::Prepare() {
 
   write_hint_ = cfd->CalculateSSTWriteHint(c->output_level());
   bottommost_level_ = c->bottommost_level();
+  last_level_with_data_ = cfd->IsLastLevelWithData(c->output_level());
 
   if (c->ShouldFormSubcompactions()) {
     StopWatch sw(db_options_.clock, stats_, SUBCOMPACTION_SETUP_TIME);
@@ -1970,8 +1972,9 @@ Status CompactionJob::OpenCompactionOutputFile(SubcompactionState* sub_compact,
       sub_compact->compaction->output_compression(),
       sub_compact->compaction->output_compression_opts(), cfd->GetID(),
       cfd->GetName(), sub_compact->compaction->output_level(),
-      bottommost_level_, TableFileCreationReason::kCompaction,
-      0 /* oldest_key_time */, current_time, db_id_, db_session_id_,
+      bottommost_level_, last_level_with_data_,
+      TableFileCreationReason::kCompaction, 0 /* oldest_key_time */,
+      current_time, db_id_, db_session_id_,
       sub_compact->compaction->max_output_file_size(), file_number);
 
   outputs.NewBuilder(tboptions);

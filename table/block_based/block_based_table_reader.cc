@@ -590,7 +590,7 @@ Status BlockBasedTable::Open(
     std::shared_ptr<CacheReservationManager> table_reader_cache_res_mgr,
     const std::shared_ptr<const SliceTransform>& prefix_extractor,
     const bool prefetch_index_and_filter_in_cache, const bool skip_filters,
-    const int level, bool is_bottom, const bool immortal_table,
+    const int level, bool is_last_level_with_data, const bool immortal_table,
     const SequenceNumber largest_seqno, const bool force_direct_prefetch,
     TailPrefetchStats* tail_prefetch_stats,
     BlockCacheTracer* const block_cache_tracer,
@@ -798,7 +798,7 @@ Status BlockBasedTable::Open(
     return s;
   }
   rep->verify_checksum_set_on_open = ro.verify_checksums;
-  TablePinningOptions tpo(level, is_bottom, file_size,
+  TablePinningOptions tpo(level, is_last_level_with_data, file_size,
                           max_file_size_for_l0_meta_pin);
   s = new_table->PrefetchIndexAndFilterBlocks(
       ro, prefetch_buffer.get(), metaindex_iter.get(), new_table.get(),

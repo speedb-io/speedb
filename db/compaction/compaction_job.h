@@ -241,7 +241,8 @@ class CompactionJob {
   Statistics* stats_;
   // Is this compaction creating a file in the bottom most level?
   bool bottommost_level_;
-
+  // Is this compaction creating a file in the last level with data?
+  bool last_level_with_data_ = false;
   Env::WriteLifeTimeHint write_hint_;
 
   IOStatus io_status_;

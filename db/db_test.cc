@@ -27,6 +27,7 @@
 #include <fcntl.h>
 
 #include <algorithm>
+#include <atomic>
 #include <set>
 #include <thread>
 #include <unordered_set>
@@ -66,6 +67,7 @@
 #include "rocksdb/slice_transform.h"
 #include "rocksdb/snapshot.h"
 #include "rocksdb/table.h"
+#include "rocksdb/table_pinning_policy.h"
 #include "rocksdb/table_properties.h"
 #include "rocksdb/thread_status.h"
 #include "rocksdb/types.h"
@@ -7577,6 +7579,130 @@ TEST_F(DBTest, ShuttingDownNotBlockStalledWrites) {
   ResetWriteControllerTokens(dbfull());
 
   thd.join();
+}
+
+class MyPinningPolicy : public TablePinningPolicy {
+ public:
+  bool MayPin(const TablePinningOptions& /*tpo*/, uint8_t /*type*/,
+              size_t /*size*/) const override {
+    return true;
+  }
+
+  ~MyPinningPolicy() { ValidateAtDestruction(); }
+
+  void ValidateAtDestruction() {
+    ASSERT_EQ(0U, usage_);
+    ASSERT_EQ(0U, total_num_pinned_);
+    ASSERT_EQ(0U, num_pinned_last_level_with_data_);
+  }
+
+  bool PinData(const TablePinningOptions& tpo, uint8_t type, size_t size,
+               std::unique_ptr<PinnedEntry>* pinned) override {
+    pinned->reset(
+        new PinnedEntry(tpo.level, type, size, tpo.is_last_level_with_data));
+    ++total_num_pinned_;
+    usage_ += size;
+    if (tpo.is_last_level_with_data) {
+      ++num_pinned_last_level_with_data_;
+    }
+
+    return true;
+  }
+
+  void UnPinData(std::unique_ptr<PinnedEntry>&& pinned) override {
+    ASSERT_GT(total_num_pinned_, 0U);
+    --total_num_pinned_;
+
+    ASSERT_GE(usage_, pinned->size);
+    usage_ -= pinned->size;
+
+    if (pinned->is_last_level_with_data) {
+      ASSERT_GT(num_pinned_last_level_with_data_, 0U);
+      --num_pinned_last_level_with_data_;
+    }
+
+    pinned.reset();
+  }
+
+  size_t GetPinnedUsage() const override { return usage_; }
+
+  std::string ToString() const override {
+    std::string result;
+    result.append("Pinned Memory=")
+        .append(std::to_string(usage_.load()))
+        .append("\n");
+    result.append("Total Num Pinned=")
+        .append(std::to_string(total_num_pinned_.load()))
+        .append("\n");
+    result.append("Total Num Pinned Last Level With Data=")
+        .append(std::to_string(num_pinned_last_level_with_data_.load()))
+        .append("\n");
+    return result;
+  }
+
+  static const char* kClassName() { return "speedb_test_pinning_policy"; }
+  static const char* kNickName() { return "speedb.TestPinningPolicy"; }
+  const char* Name() const override { return kClassName(); }
+  const char* NickName() const override { return kNickName(); }
+
+ public:
+  std::atomic<size_t> usage_ = 0U;
+  std::atomic<uint64_t> total_num_pinned_ = 0U;
+  std::atomic<uint64_t> num_pinned_last_level_with_data_ = 0U;
+};
+
+TEST_F(DBTest, StaticPinningLastLevelWithData) {
+  Options options = CurrentOptions();
+  BlockBasedTableOptions block_based_options;
+  auto pinning_policy = std::make_shared<MyPinningPolicy>();
+  block_based_options.pinning_policy = pinning_policy;
+  options.table_factory.reset(NewBlockBasedTableFactory(block_based_options));
+  DestroyAndReopen(options);
+
+  ColumnFamilyData* cfd =
+      static_cast<ColumnFamilyHandleImpl*>(db_->DefaultColumnFamily())->cfd();
+
+  auto AssertNumNonEmptyLevels = [&cfd](size_t expected_num_non_empty_levels) {
+    ASSERT_EQ(expected_num_non_empty_levels,
+              cfd->TEST_GetCurrentStorageInfo()->num_non_empty_levels());
+  };
+
+  const std::string key1 = "key1";
+  const std::string value1 = "value1";
+  const std::string key2 = "key2";
+  const std::string value2 = "value2";
+  const std::string value3 = "value3";
+
+  // Create a file and place it in level-1
+  // However, we still expect all pinning to be with last_level_with_data ==
+  // false
+  ASSERT_OK(Put(key1, value1));
+  ASSERT_OK(Flush());
+  ASSERT_OK(Put(key2, value2));
+  ASSERT_OK(Flush());
+
+  db_->CompactRange(CompactRangeOptions(), nullptr, nullptr);
+
+  ASSERT_EQ(NumTableFilesAtLevel(0, 0), 0);
+  ASSERT_EQ(NumTableFilesAtLevel(1, 0), 2);
+  AssertNumNonEmptyLevels(2);
+
+  ASSERT_EQ(2U, pinning_policy->total_num_pinned_);
+  ASSERT_EQ(0U, pinning_policy->num_pinned_last_level_with_data_);
+
+  // Create a file and place it in level-1
+  // However, we still expect all pinning to be with last_level_with_data ==
+  // false
+  ASSERT_OK(Put(key1, value3));
+  ASSERT_OK(Flush());
+
+  // This will create a file at level-1 that is currently known to be the last
+  // with data
+  db_->CompactRange(CompactRangeOptions(), nullptr, nullptr);
+
+  ASSERT_EQ(NumTableFilesAtLevel(1, 0), 2);
+  ASSERT_EQ(2U, pinning_policy->total_num_pinned_);
+  ASSERT_EQ(1U, pinning_policy->num_pinned_last_level_with_data_);
 }
 
 }  // namespace ROCKSDB_NAMESPACE

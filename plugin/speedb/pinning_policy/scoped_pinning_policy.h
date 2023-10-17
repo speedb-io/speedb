@@ -25,8 +25,8 @@ struct ScopedPinningOptions {
   // Limit to how much data should be pinned
   size_t capacity = 1024 * 1024 * 1024;  // 1GB
 
-  // Percent of capacity at which not to pin bottom-most data
-  uint32_t bottom_percent = 10;
+  // Percent of capacity at which not to pin last-leve-with-data data
+  uint32_t last_level_with_data_percent = 10;
   // Percent of capacity at which not to pin non-L0 data
   uint32_t mid_percent = 80;
 };

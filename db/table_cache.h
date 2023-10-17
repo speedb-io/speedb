@@ -25,6 +25,7 @@
 
 #pragma once
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -64,11 +65,15 @@ class HistogramImpl;
 // ioptions.row_cache
 class TableCache {
  public:
+  using IsLastLevelWithDataFunc = std::function<bool(int level)>;
+
+ public:
   TableCache(const ImmutableOptions& ioptions,
              const FileOptions* storage_options, Cache* cache,
              BlockCacheTracer* const block_cache_tracer,
              const std::shared_ptr<IOTracer>& io_tracer,
-             const std::string& db_session_id);
+             const std::string& db_session_id,
+             IsLastLevelWithDataFunc is_last_level_with_data_func = nullptr);
   ~TableCache();
 
   // Cache interface for table cache
@@ -303,6 +308,7 @@ class TableCache {
   std::shared_ptr<IOTracer> io_tracer_;
   std::string db_session_id_;
   Cache::ItemOwnerId cache_owner_id_ = Cache::kUnknownItemOwnerId;
+  IsLastLevelWithDataFunc is_last_level_with_data_func_;
 };
 
 }  // namespace ROCKSDB_NAMESPACE

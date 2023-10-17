@@ -138,7 +138,8 @@ bool RecordingPinningPolicy::PinData(const TablePinningOptions& tpo,
   auto limit = usage_.fetch_add(size);
   if (CheckPin(tpo, type, size, limit)) {
     pinned_counter_++;
-    pinned->reset(new PinnedEntry(tpo.level, type, size));
+    pinned->reset(
+        new PinnedEntry(tpo.level, type, size, tpo.is_last_level_with_data));
     RecordPinned(tpo.level, type, size, true);
     return true;
   } else {

@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-Fix RepeatableThread to work properly with on thread start callback feature (https://github.com/speedb-io/speedb/pull/667).
+* Fix RepeatableThread to work properly with on thread start callback feature (https://github.com/speedb-io/speedb/pull/667).
 
 ### New Features
 * Non-Blocking Manual Compaction (CompactRange()) - Support non-blocking manual compactions by setting a new CompactRangeOptions option (async_completion_cb). When set, the CompactRange() call will return control to the caller immediately. The manual compaction iteslf will be performed in an internally created thread. The manual compaction will ALWAYS call the specified callback upon completion and provide the completion status (#597).
@@ -16,8 +16,9 @@ Fix RepeatableThread to work properly with on thread start callback feature (htt
 * sst_dump: display metaindex_handle and the index_handle's offset and size in footer information (#404).
 
 ### Bug Fixes
-* db_bench: fix SeekRandomWriteRandom valid check. Use key and value only after checking iterator is valid.
+* db_bench: Fix SeekRandomWriteRandom valid check. Use key and value only after checking iterator is valid.
 * Fix a JAVA build issue introduced by #597 (#680)
+* Static Pinning: Make static pinning decisions based on the table's level relative to the currently known last level with data (rather than bottommost level) at the time a table reader is created and added to the table cache (#662).
 
 ### Miscellaneous
 * Unit tests: Disable CancelCompactionWaitingOnConflict and CompactionLimiter in db_compaction_test since they sometimes fail or get stuck. These need to be investigated and reenabled.

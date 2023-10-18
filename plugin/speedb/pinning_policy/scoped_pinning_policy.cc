@@ -86,7 +86,7 @@ std::string ScopedPinningPolicy::GetPrintableOptions() const {
 
   snprintf(buffer, kBufferSize,
            "    pinning_policy.last_level_with_data_percent: %" PRIu32 "\n",
-           options_.bottom_percent);
+           options_.last_level_with_data_percent);
   ret.append(buffer);
 
   snprintf(buffer, kBufferSize, "    pinning_policy.mid_percent: %" PRIu32 "\n",

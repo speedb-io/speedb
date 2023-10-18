@@ -819,27 +819,30 @@ DEFINE_bool(
     " Note `cache_index_and_filter_blocks` must be true for this option to have"
     " any effect.");
 
-DEFINE_bool(scoped_pinning_policy, false, "Use Speedb's Scoped Pinning Policy");
+DEFINE_string(pinning_policy, "Default",
+              "The pinning policy to user. The options are: "
+              "'default': Default RocksDB's pinning polcy, "
+              "'scoped': Speedb's Scoped pinning policy");
 
 DEFINE_int32(scoped_pinning_capacity, -1,
              "Pinning policy capacity. The default (-1) results in the "
              "capacity being calculated "
              "automatically. If the capacity is >= 0, the specified value will "
-             "be the capacity.");
+             "be the capacity. Applicable only when pinning_policy==scoped.");
 
 DEFINE_int32(
     scoped_pinning_last_level_with_data_percent,
     ROCKSDB_NAMESPACE::ScopedPinningOptions::kDefaultLastLevelWithDataPercent,
     "Max percent of the pinning capacity to pin entites that are at "
     "the bottom-most possible level."
-    "Applicable only when scoped_pinning_policy is true");
+    "Applicable only when pinning_policy==scoped.");
 
 DEFINE_int32(scoped_pinning_mid_percent,
              ROCKSDB_NAMESPACE::ScopedPinningOptions::kDefaultMidPercent,
              "Max percent of the pinning capacity to pin entites that are "
-             "above the bottom-most level,but at a >0 level"
-             "Must be >= scoped_pinning_last_level_with_data_percent."
-             "Applicable only when scoped_pinning_policy is true");
+             "above the bottom-most level,but at a >0 level. "
+             "Must be >= scoped_pinning_last_level_with_data_percent. "
+             "Applicable only when pinning_policy==scoped.");
 
 DEFINE_int32(block_size,
              static_cast<int32_t>(
@@ -4841,7 +4844,7 @@ class Benchmark {
         fprintf(stdout, "Integrated BlobDB: blob cache disabled\n");
       }
 
-      if (FLAGS_scoped_pinning_policy) {
+      if (FLAGS_pinning_policy == "scoped") {
         ScopedPinningOptions pinning_options;
 
         size_t pinning_capacity = 0U;
@@ -9315,11 +9318,11 @@ void ValidateMetadataCacheOptions() {
 }
 
 void ValidatePinningRelatedOptions() {
-  if (FLAGS_scoped_pinning_policy) {
+  if (FLAGS_pinning_policy == "scoped") {
     if (FLAGS_cache_index_and_filter_blocks == false) {
       ErrorExit(
-          "--cache_index_and_filter_blocks must be set for "
-          "--scoped_pinning_policy to have any affect.");
+          "--cache_index_and_filter_blocks must be set when "
+          "--pinning_policy=='scoped' to have any affect.");
     }
 
     if (FLAGS_scoped_pinning_capacity < -1) {

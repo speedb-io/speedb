@@ -819,8 +819,8 @@ DEFINE_bool(
     " Note `cache_index_and_filter_blocks` must be true for this option to have"
     " any effect.");
 
-DEFINE_string(pinning_policy, "Default",
-              "The pinning policy to user. The options are: "
+DEFINE_string(pinning_policy, "default",
+              "The pinning policy to use. The options are: "
               "'default': Default RocksDB's pinning polcy, "
               "'scoped': Speedb's Scoped pinning policy");
 

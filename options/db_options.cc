@@ -566,22 +566,14 @@ static std::unordered_map<std::string, OptionTypeInfo>
                     addr);
             ConfigOptions embedded = opts;
             embedded.delimiter = ";";
-            int printed = 0;
+            std::vector<std::string> vec;
             for (const auto& listener : *listeners) {
               auto id = listener->GetId();
               if (!id.empty()) {
-                std::string elem_str = listener->ToString(embedded, "");
-                if (printed++ == 0) {
-                  value->append("{");
-                } else {
-                  value->append(":");
-                }
-                value->append(elem_str);
+                vec.push_back(listener->ToString(embedded, ""));
               }
             }
-            if (printed > 0) {
-              value->append("}");
-            }
+            *value = opts.ToString(':', vec);
             return Status::OK();
           },
           nullptr}},
@@ -1177,7 +1169,8 @@ bool MutableDBOptionsAreEqual(const MutableDBOptions& this_options,
 Status GetStringFromMutableDBOptions(const ConfigOptions& config_options,
                                      const MutableDBOptions& mutable_opts,
                                      std::string* opt_string) {
-  return OptionTypeInfo::SerializeType(
-      config_options, db_mutable_options_type_info, &mutable_opts, opt_string);
+  return OptionTypeInfo::TypeToString(config_options, "",
+                                      db_mutable_options_type_info,
+                                      &mutable_opts, opt_string);
 }
 }  // namespace ROCKSDB_NAMESPACE

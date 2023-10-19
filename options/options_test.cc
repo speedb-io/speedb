@@ -4932,7 +4932,7 @@ TEST_F(OptionTypeInfoTest, TestStaticType) {
   std::string str, mismatch;
 
   ASSERT_OK(
-      OptionTypeInfo::SerializeType(config_options, type_map, &opts, &str));
+      OptionTypeInfo::TypeToString(config_options, "", type_map, &opts, &str));
   ASSERT_FALSE(OptionTypeInfo::TypesAreEqual(config_options, type_map, &opts,
                                              &copy, &mismatch));
   ASSERT_OK(OptionTypeInfo::ParseType(config_options, str, type_map, &copy));

@@ -27,6 +27,7 @@
 #include <vector>
 
 #include "options/cf_options.h"
+#include "options/configurable_helper.h"
 #include "options/db_options.h"
 #include "rocksdb/cache.h"
 #include "rocksdb/compaction_filter.h"
@@ -52,6 +53,65 @@ ConfigOptions::ConfigOptions()
 
 ConfigOptions::ConfigOptions(const DBOptions& db_opts) : env(db_opts.env) {
   registry = ObjectRegistry::NewInstance();
+}
+
+std::string ConfigOptions::ToString(const std::string& /*prefix*/,
+                                    const OptionProperties& props) const {
+  std::string result;
+  std::string id;
+  for (const auto& it : props) {
+    if (it.first == OptionTypeInfo::kIdPropName()) {
+      id = it.second;
+    } else {
+      if (!result.empty()) {
+        result.append(delimiter);
+      }
+      result.append(it.first);
+      result.append("=");
+      if (it.second.find('=') != std::string::npos && it.second[0] != '{') {
+        result.append("{" + it.second + "}");
+      } else {
+        result.append(it.second);
+      }
+    }
+  }
+  if (id.empty()) {
+    return result;
+  } else if (result.empty()) {
+    return id;
+  } else {
+    std::string id_string = /*prefix + */ OptionTypeInfo::kIdPropName();
+    id_string.append("=");
+    id_string.append(id);
+    return id_string + delimiter + result;
+  }
+}
+
+std::string ConfigOptions::ToString(
+    char separator, const std::vector<std::string>& elems) const {
+  std::string result;
+  int printed = 0;
+  for (const auto& elem : elems) {
+    if (printed++ > 0) {
+      result += separator;
+    }
+    if (elem.find(separator) != std::string::npos) {
+      // If the element contains embedded separators, put it inside of brackets
+      result.append("{" + elem + "}");
+    } else if (elem.find("=") != std::string::npos) {
+      // If the element contains embedded options, put it inside of brackets
+      result.append("{" + elem + "}");
+    } else {
+      result += elem;
+    }
+  }
+  if (result.find("=") != std::string::npos) {
+    return "{" + result + "}";
+  } else if (printed > 1 && result.at(0) == '{') {
+    return "{" + result + "}";
+  } else {
+    return result;
+  }
 }
 
 Status ValidateOptions(const DBOptions& db_opts,
@@ -1091,20 +1151,37 @@ Status OptionTypeInfo::Serialize(const ConfigOptions& config_options,
 }
 
 Status OptionTypeInfo::SerializeType(
-    const ConfigOptions& config_options,
+    const ConfigOptions& config_options, const std::string& prefix,
     const std::unordered_map<std::string, OptionTypeInfo>& type_map,
-    const void* opt_addr, std::string* result) {
+    const void* opt_addr, OptionProperties* props) {
   Status status;
   for (const auto& iter : type_map) {
     std::string single;
+    const auto& opt_name = iter.first;
     const auto& opt_info = iter.second;
     if (opt_info.ShouldSerialize()) {
-      status =
-          opt_info.Serialize(config_options, iter.first, opt_addr, &single);
+      if (!config_options.mutable_options_only) {
+        status = opt_info.Serialize(
+            config_options, MakePrefix(prefix, opt_name), opt_addr, &single);
+      } else if (opt_info.IsMutable()) {
+        ConfigOptions copy = config_options;
+        copy.mutable_options_only = false;
+        status = opt_info.Serialize(copy, MakePrefix(prefix, opt_name),
+                                    opt_addr, &single);
+      } else if (opt_info.IsConfigurable()) {
+        // If it is a Configurable and we are either printing all of the
+        // details or not printing only the name, this option should be
+        // included in the list
+        if (config_options.IsDetailed() ||
+            !opt_info.IsEnabled(OptionTypeFlags::kStringNameOnly)) {
+          status = opt_info.Serialize(
+              config_options, MakePrefix(prefix, opt_name), opt_addr, &single);
+        }
+      }
       if (!status.ok()) {
         return status;
-      } else {
-        result->append(iter.first + "=" + single + config_options.delimiter);
+      } else if (!single.empty()) {
+        props->insert_or_assign(iter.first, single);
       }
     }
   }
@@ -1123,13 +1200,9 @@ Status OptionTypeInfo::SerializeStruct(
     ConfigOptions embedded = config_options;
     embedded.delimiter = ";";
 
-    // This option represents the entire struct
-    std::string result;
-    status = SerializeType(embedded, *struct_map, opt_addr, &result);
+    status = TypeToString(embedded, opt_name, *struct_map, opt_addr, value);
     if (!status.ok()) {
       return status;
-    } else {
-      *value = "{" + result + "}";
     }
   } else if (StartsWith(opt_name, struct_name + ".")) {
     // This option represents a nested field in the struct (e.g, struct.field)
@@ -1153,6 +1226,19 @@ Status OptionTypeInfo::SerializeStruct(
     }
   }
   return status;
+}
+
+Status OptionTypeInfo::TypeToString(
+    const ConfigOptions& config_options, const std::string& prefix,
+    const std::unordered_map<std::string, OptionTypeInfo>& type_map,
+    const void* opt_addr, std::string* result) {
+  assert(result);
+  OptionProperties props;
+  Status s = SerializeType(config_options, prefix, type_map, opt_addr, &props);
+  if (s.ok()) {
+    *result = config_options.ToString(prefix, props);
+  }
+  return s;
 }
 
 template <typename T>

@@ -1,3 +1,17 @@
+// Copyright (C) 2022 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
 // Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -237,6 +251,7 @@ using ValidateFunc = std::function<Status(
     const DBOptions& /*db_opts*/, const ColumnFamilyOptions& /*cf_opts*/,
     const std::string& /*name*/, const void* /*addr*/)>;
 
+class OptionProperties : public std::unordered_map<std::string, std::string> {};
 // A struct for storing constant option information such as option name,
 // option type, and offset.
 class OptionTypeInfo {
@@ -852,13 +867,21 @@ class OptionTypeInfo {
       const std::unordered_map<std::string, OptionTypeInfo>* map,
       const std::string& opt_name, const std::string& value, void* opt_addr);
 
+  // Converts the values from opt_addr using the rules in type_map into their
+  // UserProperties (name-value) representatio.
+  // Returns OK on success or non-OK if some option could not be serialized.
+  static Status SerializeType(
+      const ConfigOptions& config_options, const std::string& prefix,
+      const std::unordered_map<std::string, OptionTypeInfo>& type_map,
+      const void* opt_addr, OptionProperties* props);
+
   // Serializes the values from opt_addr using the rules in type_map.
   // Returns the serialized form in result.
   // Returns OK on success or non-OK if some option could not be serialized.
-  static Status SerializeType(
-      const ConfigOptions& config_options,
+  static Status TypeToString(
+      const ConfigOptions& config_options, const std::string& opt_name,
       const std::unordered_map<std::string, OptionTypeInfo>& type_map,
-      const void* opt_addr, std::string* value);
+      const void* opt_addr, std::string* result);
 
   // Serializes the input addr according to the map for the struct to value.
   // struct_name is the name of the struct option as registered
@@ -925,6 +948,15 @@ class OptionTypeInfo {
 
   constexpr static const char* kIdPropName() { return "id"; }
   constexpr static const char* kIdPropSuffix() { return ".id"; }
+
+  static std::string MakePrefix(const std::string& prefix,
+                                const std::string& name) {
+    if (prefix.empty()) {
+      return name;
+    } else {
+      return prefix + "." + name;
+    }
+  }
 
  private:
   int offset_;
@@ -1157,33 +1189,22 @@ Status SerializeVector(const ConfigOptions& config_options,
                        const OptionTypeInfo& elem_info, char separator,
                        const std::string& name, const std::vector<T>& vec,
                        std::string* value) {
-  std::string result;
-  ConfigOptions embedded = config_options;
-  embedded.delimiter = ";";
-  int printed = 0;
-  for (const auto& elem : vec) {
-    std::string elem_str;
-    Status s = elem_info.Serialize(embedded, name, &elem, &elem_str);
-    if (!s.ok()) {
-      return s;
-    } else if (!elem_str.empty()) {
-      if (printed++ > 0) {
-        result += separator;
-      }
-      // If the element contains embedded separators, put it inside of brackets
-      if (elem_str.find(separator) != std::string::npos) {
-        result += "{" + elem_str + "}";
-      } else {
-        result += elem_str;
+  if (vec.empty()) {
+    value->clear();
+  } else {
+    std::vector<std::string> opt_vec;
+    ConfigOptions embedded = config_options;
+    embedded.delimiter = ";";
+    for (const auto& elem : vec) {
+      std::string elem_str;
+      Status s = elem_info.Serialize(embedded, name, &elem, &elem_str);
+      if (!s.ok()) {
+        return s;
+      } else if (!elem_str.empty()) {
+        opt_vec.emplace_back(elem_str);
       }
     }
-  }
-  if (result.find("=") != std::string::npos) {
-    *value = "{" + result + "}";
-  } else if (printed > 1 && result.at(0) == '{') {
-    *value = "{" + result + "}";
-  } else {
-    *value = result;
+    *value = config_options.ToString(separator, opt_vec);
   }
   return Status::OK();
 }

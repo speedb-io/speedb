@@ -1,3 +1,17 @@
+// Copyright (C) 2022 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
 //  Copyright (c) Meta Platforms, Inc. and affiliates.
 //
 //  This source code is licensed under both the GPLv2 (found in the
@@ -693,8 +707,8 @@ static std::unordered_map<std::string, OptionTypeInfo> cs_result_type_info = {
         const auto status_obj = static_cast<const Status*>(addr);
         StatusSerializationAdapter adapter(*status_obj);
         std::string result;
-        Status s = OptionTypeInfo::SerializeType(opts, status_adapter_type_info,
-                                                 &adapter, &result);
+        Status s = OptionTypeInfo::TypeToString(
+            opts, "", status_adapter_type_info, &adapter, &result);
         *value = "{" + result + "}";
         return s;
       },
@@ -770,7 +784,13 @@ Status CompactionServiceInput::Write(std::string* output) {
   output->append(buf, sizeof(BinaryFormatVersion));
   ConfigOptions cf;
   cf.invoke_prepare_options = false;
-  return OptionTypeInfo::SerializeType(cf, cs_input_type_info, this, output);
+  OptionProperties props;
+  Status s =
+      OptionTypeInfo::SerializeType(cf, "", cs_input_type_info, this, &props);
+  if (s.ok()) {
+    output->append(cf.ToString("", props) + cf.delimiter);
+  }
+  return s;
 }
 
 Status CompactionServiceResult::Read(const std::string& data_str,
@@ -799,7 +819,13 @@ Status CompactionServiceResult::Write(std::string* output) {
   output->append(buf, sizeof(BinaryFormatVersion));
   ConfigOptions cf;
   cf.invoke_prepare_options = false;
-  return OptionTypeInfo::SerializeType(cf, cs_result_type_info, this, output);
+  OptionProperties props;
+  Status s =
+      OptionTypeInfo::SerializeType(cf, "", cs_result_type_info, this, &props);
+  if (s.ok()) {
+    output->append(cf.ToString("", props) + cf.delimiter);
+  }
+  return s;
 }
 
 #ifndef NDEBUG

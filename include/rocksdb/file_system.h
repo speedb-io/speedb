@@ -1606,8 +1606,9 @@ class FileSystemWrapper : public FileSystem {
 
   const Customizable* Inner() const override { return target_.get(); }
   Status PrepareOptions(const ConfigOptions& options) override;
-  std::string SerializeOptions(const ConfigOptions& config_options,
-                               const std::string& header) const override;
+  Status SerializeOptions(const ConfigOptions& config_options,
+                          const std::string& prefix,
+                          OptionProperties* props) const override;
 
   virtual IOStatus Poll(std::vector<void*>& io_handles,
                         size_t min_completions) override {

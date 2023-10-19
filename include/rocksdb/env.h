@@ -1660,7 +1660,7 @@ class EnvWrapper : public Env {
   Status PrepareOptions(const ConfigOptions& options) override;
   Status SerializeOptions(const ConfigOptions& config_options,
                           const std::string& prefix,
-                          Properties* props) const override;
+                          OptionProperties* props) const override;
 
  private:
   Target target_;

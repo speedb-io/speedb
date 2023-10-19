@@ -1530,7 +1530,7 @@ class FileSystemWrapper : public FileSystem {
   Status PrepareOptions(const ConfigOptions& options) override;
   Status SerializeOptions(const ConfigOptions& config_options,
                           const std::string& prefix,
-                          Properties* props) const override;
+                          OptionProperties* props) const override;
 
   virtual IOStatus Poll(std::vector<void*>& io_handles,
                         size_t min_completions) override {

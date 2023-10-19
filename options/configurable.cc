@@ -1,3 +1,17 @@
+// Copyright (C) 2022 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
 // Copyright (c) 2011-present, Facebook, Inc. All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -132,7 +146,7 @@ Status Configurable::ConfigureOptions(
     const ConfigOptions& config_options,
     const std::unordered_map<std::string, std::string>& opts_map,
     std::unordered_map<std::string, std::string>* unused) {
-  Properties current;
+  OptionProperties current;
   Status s;
   if (!opts_map.empty()) {
     // There are options in the map.
@@ -455,7 +469,7 @@ Status ConfigurableHelper::ConfigureOption(
 
 Status Configurable::GetOptionString(const ConfigOptions& config_options,
                                      std::string* result) const {
-  Properties props;
+  OptionProperties props;
   assert(result);
   result->clear();
   Status s =
@@ -468,7 +482,7 @@ Status Configurable::GetOptionString(const ConfigOptions& config_options,
 
 std::string Configurable::ToString(const ConfigOptions& config_options,
                                    const std::string& prefix) const {
-  Properties props;
+  OptionProperties props;
   Status s = SerializeOptions(config_options, prefix, &props);
   assert(s.ok());
   if (s.ok()) {
@@ -480,7 +494,7 @@ std::string Configurable::ToString(const ConfigOptions& config_options,
 
 Status Configurable::SerializeOptions(const ConfigOptions& config_options,
                                       const std::string& prefix,
-                                      Properties* props) const {
+                                      OptionProperties* props) const {
   return ConfigurableHelper::SerializeOptions(config_options, *this, prefix,
                                               props);
 }
@@ -522,7 +536,7 @@ Status ConfigurableHelper::GetOption(const ConfigOptions& config_options,
 Status ConfigurableHelper::SerializeOptions(const ConfigOptions& config_options,
                                             const Configurable& configurable,
                                             const std::string& prefix,
-                                            Properties* props) {
+                                            OptionProperties* props) {
   assert(props);
   for (auto const& opt_iter : configurable.options_) {
     if (opt_iter.type_map != nullptr) {

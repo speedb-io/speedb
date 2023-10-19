@@ -1008,7 +1008,7 @@ Status OptionTypeInfo::Serialize(const ConfigOptions& config_options,
 Status OptionTypeInfo::SerializeType(
     const ConfigOptions& config_options, const std::string& prefix,
     const std::unordered_map<std::string, OptionTypeInfo>& type_map,
-    const void* opt_addr, Properties* props) {
+    const void* opt_addr, OptionProperties* props) {
   Status status;
   for (const auto& iter : type_map) {
     std::string single;
@@ -1084,7 +1084,7 @@ Status OptionTypeInfo::TypeToString(
     const std::unordered_map<std::string, OptionTypeInfo>& type_map,
     const void* opt_addr, std::string* result) {
   assert(result);
-  Properties props;
+  OptionProperties props;
   Status s = SerializeType(config_options, prefix, type_map, opt_addr, &props);
   if (s.ok()) {
     *result = config_options.ToString(prefix, props);

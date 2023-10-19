@@ -23,6 +23,7 @@
 
 #ifdef GFLAGS
 #include "db_stress_tool/db_stress_common.h"
+#include "table/block_based/default_pinning_policy.h"
 
 static bool ValidateUint32Range(const char* flagname, uint64_t value) {
   if (value > std::numeric_limits<uint32_t>::max()) {
@@ -919,7 +920,12 @@ DEFINE_string(fs_uri, "",
               " with --env_uri."
               " Creates a default environment with the specified filesystem.");
 
-DEFINE_string(pinning_policy, "", "URI for registry TablePinningPolicy");
+DEFINE_string(pinning_policy,
+              ROCKSDB_NAMESPACE::DefaultPinningPolicy::kNickName(),
+              "The pinning policy to use. "
+              "The options are: "
+              "'DefaultPinning': Default RocksDB's pinning polcy. "
+              "'ScopedPinning': Speedb's Scoped pinning policy.");
 
 DEFINE_uint64(ops_per_thread, 1200000, "Number of operations per thread.");
 static const bool FLAGS_ops_per_thread_dummy __attribute__((__unused__)) =

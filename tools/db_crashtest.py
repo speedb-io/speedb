@@ -242,7 +242,7 @@ default_params = {
     "customopspercent": 0,
     # "filter_uri": lambda: random.choice(["speedb.PairedBloomFilter", ""]),
     "memtablerep": lambda: random.choice(["skip_list", "hash_spdb"]),
-    "pinning_policy": lambda: random.choice(["", "speedb_scoped_pinning_policy"]),
+    "pinning_policy": lambda: random.choice(["DefaultPinning", "ScopedPinning"]),
     "use_dynamic_delay": lambda: random.choice([0, 1, 1, 1]),
     "allow_wbm_stalls": lambda: random.randint(0, 1),
     "start_delay_percent": lambda: random.randint(0, 99),
@@ -855,6 +855,10 @@ def finalize_and_sanitize(src_params, counter):
         dest_params["bloom_bits"] = random.choice([random.randint(1,19),
                                          random.lognormvariate(2.3, 1.3)])
 
+    # db_bench will abort if using ScopedPinningPolicy and not setting cache_index_and_filter_blocks
+    if dest_params.get("pinning_policy") == "ScopedPinning":
+        dest_params["cache_index_and_filter_blocks"]
+        
     return dest_params
 
 

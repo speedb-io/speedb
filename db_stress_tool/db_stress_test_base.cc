@@ -34,6 +34,7 @@
 #include "db_stress_tool/db_stress_driver.h"
 #include "db_stress_tool/db_stress_table_properties_collector.h"
 #include "db_stress_tool/db_stress_wide_merge_operator.h"
+#include "plugin/speedb/pinning_policy/scoped_pinning_policy.h"
 #include "rocksdb/convenience.h"
 #include "rocksdb/filter_policy.h"
 #include "rocksdb/options.h"
@@ -44,6 +45,7 @@
 #include "rocksdb/utilities/object_registry.h"
 #include "rocksdb/utilities/write_batch_with_index.h"
 #include "speedb/version.h"
+#include "table/block_based/default_pinning_policy.h"
 #include "test_util/testutil.h"
 #include "util/cast_util.h"
 #include "utilities/backup/backup_engine_impl.h"
@@ -3351,11 +3353,16 @@ void InitializeOptionsFromFlags(
   block_based_options.num_file_reads_for_auto_readahead =
       FLAGS_num_file_reads_for_auto_readahead;
   if (!FLAGS_pinning_policy.empty()) {
+    auto pinning_policy_uri = DefaultPinningPolicy::kClassName();
+    if (FLAGS_pinning_policy == DefaultPinningPolicy::kNickName()) {
+      pinning_policy_uri = ScopedPinningPolicy::kClassName();
+    }
+
     ConfigOptions config_options;
     config_options.ignore_unknown_options = false;
     config_options.ignore_unsupported_options = false;
     Status s = TablePinningPolicy::CreateFromString(
-        config_options, FLAGS_pinning_policy,
+        config_options, pinning_policy_uri,
         &block_based_options.pinning_policy);
     if (!s.ok()) {
       fprintf(stderr, "Failed to create PinningPolicy: %s\n",

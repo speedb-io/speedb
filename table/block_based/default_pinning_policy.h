@@ -37,7 +37,9 @@ class DefaultPinningPolicy : public RecordingPinningPolicy {
                        bool pin_l0);
 
   static const char* kClassName() { return "DefaultPinningPolicy"; }
+  static const char* kNickName() { return "default"; }
   const char* Name() const override { return kClassName(); }
+  const char* NickName() const override { return kNickName(); }
 
  protected:
   bool CheckPin(const TablePinningOptions& tpo, uint8_t type, size_t /*size*/,

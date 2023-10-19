@@ -1010,24 +1010,24 @@ class OptionTypeInfo {
     }
   }
 
-   private:
-    int offset_;
+ private:
+  int offset_;
 
-    // The optional function to convert a string to its representation
-    ParseFunc parse_func_;
+  // The optional function to convert a string to its representation
+  ParseFunc parse_func_;
 
-    // The optional function to convert a value to its string representation
-    SerializeFunc serialize_func_;
+  // The optional function to convert a value to its string representation
+  SerializeFunc serialize_func_;
 
-    // The optional function to match two option values
-    EqualsFunc equals_func_;
+  // The optional function to match two option values
+  EqualsFunc equals_func_;
 
-    PrepareFunc prepare_func_;
-    ValidateFunc validate_func_;
-    OptionType type_;
-    OptionVerificationType verification_;
-    OptionTypeFlags flags_;
-  };
+  PrepareFunc prepare_func_;
+  ValidateFunc validate_func_;
+  OptionType type_;
+  OptionVerificationType verification_;
+  OptionTypeFlags flags_;
+};
 
 // Parses the input value into elements of the result array, which has fixed
 // array size. For example, if the value=1:2:3 and elem_info parses integers,

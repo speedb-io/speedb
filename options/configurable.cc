@@ -1,3 +1,17 @@
+// Copyright (C) 2022 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
 // Copyright (c) 2011-present, Facebook, Inc. All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -132,7 +146,7 @@ Status Configurable::ConfigureOptions(
     const ConfigOptions& config_options,
     const std::unordered_map<std::string, std::string>& opts_map,
     std::unordered_map<std::string, std::string>* unused) {
-  std::string curr_opts;
+  OptionProperties current;
   Status s;
   if (!opts_map.empty()) {
     // There are options in the map.
@@ -145,8 +159,8 @@ Status Configurable::ConfigureOptions(
       // If we are not ignoring unused, get the defaults in case we need to
       // reset
       copy.depth = ConfigOptions::kDepthDetailed;
-      copy.delimiter = "; ";
-      GetOptionString(copy, &curr_opts).PermitUncheckedError();
+      ConfigurableHelper::SerializeOptions(copy, *this, "", &current)
+          .PermitUncheckedError();
     }
 
     s = ConfigurableHelper::ConfigureOptions(copy, *this, opts_map, unused);
@@ -154,13 +168,13 @@ Status Configurable::ConfigureOptions(
   if (config_options.invoke_prepare_options && s.ok()) {
     s = PrepareOptions(config_options);
   }
-  if (!s.ok() && !curr_opts.empty()) {
+  if (!s.ok() && !current.empty()) {
     ConfigOptions reset = config_options;
     reset.ignore_unknown_options = true;
     reset.invoke_prepare_options = true;
     reset.ignore_unsupported_options = true;
     // There are some options to reset from this current error
-    ConfigureFromString(reset, curr_opts).PermitUncheckedError();
+    ConfigureFromMap(reset, current).PermitUncheckedError();
   }
   return s;
 }
@@ -456,29 +470,34 @@ Status ConfigurableHelper::ConfigureOption(
 
 Status Configurable::GetOptionString(const ConfigOptions& config_options,
                                      std::string* result) const {
+  OptionProperties props;
   assert(result);
   result->clear();
-  return ConfigurableHelper::SerializeOptions(config_options, *this, "",
-                                              result);
+  Status s =
+      ConfigurableHelper::SerializeOptions(config_options, *this, "", &props);
+  if (s.ok()) {
+    *result = config_options.ToString("", props);
+  }
+  return s;
 }
 
 std::string Configurable::ToString(const ConfigOptions& config_options,
                                    const std::string& prefix) const {
-  std::string result = SerializeOptions(config_options, prefix);
-  if (result.empty() || result.find('=') == std::string::npos) {
-    return result;
+  OptionProperties props;
+  Status s = SerializeOptions(config_options, prefix, &props);
+  assert(s.ok());
+  if (s.ok()) {
+    return config_options.ToString(prefix, props);
   } else {
-    return "{" + result + "}";
+    return "";
   }
 }
 
-std::string Configurable::SerializeOptions(const ConfigOptions& config_options,
-                                           const std::string& header) const {
-  std::string result;
-  Status s = ConfigurableHelper::SerializeOptions(config_options, *this, header,
-                                                  &result);
-  assert(s.ok());
-  return result;
+Status Configurable::SerializeOptions(const ConfigOptions& config_options,
+                                      const std::string& prefix,
+                                      OptionProperties* props) const {
+  return ConfigurableHelper::SerializeOptions(config_options, *this, prefix,
+                                              props);
 }
 
 Status Configurable::GetOption(const ConfigOptions& config_options,
@@ -520,42 +539,15 @@ Status ConfigurableHelper::GetOption(const ConfigOptions& config_options,
 Status ConfigurableHelper::SerializeOptions(const ConfigOptions& config_options,
                                             const Configurable& configurable,
                                             const std::string& prefix,
-                                            std::string* result) {
-  assert(result);
+                                            OptionProperties* props) {
+  assert(props);
   for (auto const& opt_iter : configurable.options_) {
     if (opt_iter.type_map != nullptr) {
-      for (const auto& map_iter : *(opt_iter.type_map)) {
-        const auto& opt_name = map_iter.first;
-        const auto& opt_info = map_iter.second;
-        if (opt_info.ShouldSerialize()) {
-          std::string value;
-          Status s;
-          if (!config_options.mutable_options_only) {
-            s = opt_info.Serialize(config_options, prefix + opt_name,
-                                   opt_iter.opt_ptr, &value);
-          } else if (opt_info.IsMutable()) {
-            ConfigOptions copy = config_options;
-            copy.mutable_options_only = false;
-            s = opt_info.Serialize(copy, prefix + opt_name, opt_iter.opt_ptr,
-                                   &value);
-          } else if (opt_info.IsConfigurable()) {
-            // If it is a Configurable and we are either printing all of the
-            // details or not printing only the name, this option should be
-            // included in the list
-            if (config_options.IsDetailed() ||
-                !opt_info.IsEnabled(OptionTypeFlags::kStringNameOnly)) {
-              s = opt_info.Serialize(config_options, prefix + opt_name,
-                                     opt_iter.opt_ptr, &value);
-            }
-          }
-          if (!s.ok()) {
-            return s;
-          } else if (!value.empty()) {
-            // <prefix><opt_name>=<value><delimiter>
-            result->append(prefix + opt_name + "=" + value +
-                           config_options.delimiter);
-          }
-        }
+      Status s = OptionTypeInfo::SerializeType(config_options, prefix,
+                                               *(opt_iter.type_map),
+                                               opt_iter.opt_ptr, props);
+      if (!s.ok()) {
+        return s;
       }
     }
   }

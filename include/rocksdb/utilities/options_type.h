@@ -873,7 +873,7 @@ class OptionTypeInfo {
       const ConfigOptions& config_options, const std::string& prefix,
       const std::unordered_map<std::string, OptionTypeInfo>& type_map,
       const void* opt_addr, OptionProperties* props);
-  
+
   // Serializes the values from opt_addr using the rules in type_map.
   // Returns the serialized form in result.
   // Returns OK on success or non-OK if some option could not be serialized.

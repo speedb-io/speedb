@@ -1,3 +1,17 @@
+// Copyright (C) 2022 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
 //  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -93,10 +107,9 @@ class LegacySystemClock : public SystemClock {
     return env_->TimeToString(time);
   }
 
-  Status SerializeOptions(
-      const ConfigOptions& /*config_options*/,
-      std::unordered_map<std::string, std::string>* /*options*/)
-      const override {
+  Status SerializeOptions(const ConfigOptions& /*config_options*/,
+                          const std::string& /*prefix*/,
+                          OptionProperties* /*options*/) const override {
     // We do not want the LegacySystemClock to appear in the serialized output.
     // This clock is an internal class for those who do not implement one and
     // would be part of the Env.  As such, do not serialize it here.
@@ -602,10 +615,9 @@ class LegacyFileSystemWrapper : public FileSystem {
     return status_to_io_status(target_->IsDirectory(path, is_dir));
   }
 
-  Status SerializeOptions(
-      const ConfigOptions& /*config_options*/,
-      std::unordered_map<std::string, std::string>* /*options*/)
-      const override {
+  Status SerializeOptions(const ConfigOptions& /*config_options*/,
+                          const std::string& /*prefix*/,
+                          OptionProperties* /*options*/) const override {
     // We do not want the LegacyFileSystem to appear in the serialized output.
     // This clock is an internal class for those who do not implement one and
     // would be part of the Env.  As such, do not serialize it here.
@@ -1188,14 +1200,17 @@ Status SystemClockWrapper::PrepareOptions(const ConfigOptions& options) {
   return SystemClock::PrepareOptions(options);
 }
 
-Status SystemClockWrapper::SerializeOptions(
-    const ConfigOptions& config_options,
-    std::unordered_map<std::string, std::string>* options) const {
+Status SystemClockWrapper::SerializeOptions(const ConfigOptions& config_options,
+                                            const std::string& prefix,
+                                            OptionProperties* props) const {
   if (!config_options.IsShallow() && target_ != nullptr &&
       !target_->IsInstanceOf(SystemClock::kDefaultName())) {
-    options->insert({kTargetPropName(), target_->ToString(config_options)});
+    props->insert(
+        {kTargetPropName(),
+         target_->ToString(config_options, OptionTypeInfo::MakePrefix(
+                                               prefix, kTargetPropName()))});
   }
-  return SystemClock::SerializeOptions(config_options, options);
+  return SystemClock::SerializeOptions(config_options, prefix, props);
 }
 
 static int RegisterBuiltinSystemClocks(ObjectLibrary& library,

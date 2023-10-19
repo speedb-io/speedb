@@ -1877,8 +1877,6 @@ DEFINE_bool(multiread_batched, false, "Use the new MultiGet API");
 
 DEFINE_string(memtablerep, "hash_spdb", "");
 DEFINE_int64(hash_bucket_count, 1000000, "hash bucket count");
-DEFINE_bool(use_seek_parralel_threshold, true,
-            "if use seek parralel threshold .");
 DEFINE_bool(use_plain_table, false,
             "if use plain table instead of block-based table format");
 DEFINE_bool(use_cuckoo_table, false, "if use cuckoo table format");
@@ -1983,7 +1981,7 @@ static Status CreateMemTableRepFactory(
   } else if (!strcasecmp(FLAGS_memtablerep.c_str(), "hash_linkedlist")) {
     factory->reset(NewHashLinkListRepFactory(FLAGS_hash_bucket_count));
   } else if (!strcasecmp(FLAGS_memtablerep.c_str(), "hash_spdb")) {
-    factory->reset(NewHashSpdbRepFactory(0));
+    factory->reset(NewHashSpdbRepFactory(FLAGS_hash_bucket_count, false));
   }
   return s;
 }
@@ -5171,7 +5169,8 @@ class Benchmark {
   void OpenDb(Options options, const std::string& db_name,
               DBWithColumnFamilies* db) {
     SharedOptions so(FLAGS_total_ram_size, options.max_background_jobs,
-                     options.delayed_write_rate);
+                     options.delayed_write_rate, FLAGS_hash_bucket_count,
+                     false);
     if (FLAGS_enable_speedb_features) {
       options.EnableSpeedbFeatures(so);
     }
@@ -9460,6 +9459,23 @@ void ValidateMetadataCacheOptions() {
   }
 }
 
+void ValidatePinningPolicyRelatedFlags() {
+  if (!FLAGS_pinning_policy.empty() && FLAGS_enable_speedb_features) {
+    ErrorExit(
+        "--pinning_policy should not be set when --unpartitioned_pinning is "
+        "set.");
+  }
+
+  if (FLAGS_enable_speedb_features) {
+    if (gflags::GetCommandLineFlagInfoOrDie("max_background_jobs").is_default ||
+        gflags::GetCommandLineFlagInfoOrDie("total_ram_size").is_default) {
+      ErrorExit(
+          "enable_speedb_features - Please provide explicitly total_ram_size "
+          "in bytes and max_background_jobs ");
+    }
+  }
+}
+
 // The actual running of a group of benchmarks that share configuration
 // Some entities need to be created once and used for running all of the groups.
 // So, they are created only when running the first group
@@ -9477,6 +9493,7 @@ int db_bench_tool_run_group(int group_num, int num_groups, int argc,
   parsing_cmd_line_args = false;
 
   ValidateAndProcessStatisticsFlags(first_group, config_options);
+  ValidatePinningPolicyRelatedFlags();
 
   FLAGS_compaction_style_e =
       (ROCKSDB_NAMESPACE::CompactionStyle)FLAGS_compaction_style;
@@ -9534,15 +9551,6 @@ int db_bench_tool_run_group(int group_num, int num_groups, int argc,
     ErrorExit(
         "`-use_existing_db` must be true for `-use_existing_keys` to be "
         "settable");
-  }
-
-  if (FLAGS_enable_speedb_features) {
-    if (gflags::GetCommandLineFlagInfoOrDie("max_background_jobs").is_default ||
-        gflags::GetCommandLineFlagInfoOrDie("total_ram_size").is_default) {
-      ErrorExit(
-          "enable_speedb_features - Please provide explicitly total_ram_size "
-          "in bytes and max_background_jobs ");
-    }
   }
 
   if (!strcasecmp(FLAGS_compaction_fadvice.c_str(), "NONE"))

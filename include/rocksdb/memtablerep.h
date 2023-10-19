@@ -282,7 +282,8 @@ class MemTableRep {
   //        When destroying the iterator, the caller will not call "delete"
   //        but Iterator::~Iterator() directly. The destructor needs to destroy
   //        all the states but those allocated in arena.
-  virtual Iterator* GetIterator(Arena* arena = nullptr) = 0;
+  virtual Iterator* GetIterator(Arena* arena = nullptr,
+                                bool part_of_flush = false) = 0;
 
   // Return an iterator that has a special Seek semantics. The result of
   // a Seek might only include keys with the same prefix as the target key.
@@ -535,6 +536,7 @@ extern MemTableRepFactory* NewHashLinkListRepFactory(
     uint32_t threshold_use_skiplist = 256);
 
 // The factory is to create memtables based on a sorted hash table - spdb hash:
-extern MemTableRepFactory* NewHashSpdbRepFactory(size_t bucket_count = 1000000);
+extern MemTableRepFactory* NewHashSpdbRepFactory(size_t bucket_count = 1000000,
+                                                 bool use_merge = true);
 
 }  // namespace ROCKSDB_NAMESPACE

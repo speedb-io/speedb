@@ -28,7 +28,7 @@ struct ScopedPinningOptions {
   // Percent of capacity at which not to pin last-leve-with-data data
   uint32_t last_level_with_data_percent = 10;
   // Percent of capacity at which not to pin non-L0 data
-  uint32_t mid_percent = 80;
+  uint32_t mid_percent = 70;
 };
 
 // A table policy that limits the size of the data to be pinned

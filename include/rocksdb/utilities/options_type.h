@@ -123,8 +123,7 @@ enum class OptionTypeFlags : uint32_t {
   kDontSerialize = 0x02000,   // Don't serialize the option
   kDontPrepare = 0x04000,     // Don't prepare or sanitize this option
   kStringNameOnly = 0x08000,  // The option serializes to a name only
-  kUseBaseAddress =
-      0x10000,  // Pass the base (instead of offset) to option functions
+  kUseBaseAddress = 0x10000,  // Pass the base (instead of offset) to functions
 };
 
 inline OptionTypeFlags operator|(const OptionTypeFlags& a,
@@ -253,6 +252,7 @@ using ValidateFunc = std::function<Status(
     const std::string& /*name*/, const void* /*addr*/)>;
 
 class OptionProperties : public std::unordered_map<std::string, std::string> {};
+
 // A struct for storing constant option information such as option name,
 // option type, and offset.
 class OptionTypeInfo {
@@ -999,15 +999,16 @@ class OptionTypeInfo {
   static void ClipToRange(T* ptr, V minvalue, V maxvalue) {
     ClipToMin(ptr, minvalue);
     ClipToMax(ptr, maxvalue);
+  }
 
-    static std::string MakePrefix(const std::string& prefix,
-                                  const std::string& name) {
-      if (prefix.empty()) {
-        return name;
-      } else {
-        return prefix + "." + name;
-      }
+  static std::string MakePrefix(const std::string& prefix,
+                                const std::string& name) {
+    if (prefix.empty()) {
+      return name;
+    } else {
+      return prefix + "." + name;
     }
+  }
 
    private:
     int offset_;

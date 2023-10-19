@@ -54,13 +54,8 @@ class RecordingPinningPolicyTest : public testing::Test {
 };
 
 TEST_F(RecordingPinningPolicyTest, TestPinningUtils) {
-  ASSERT_TRUE(pinning::IsLevelCategoryOther(kUnknownLevel));
-  ASSERT_TRUE(pinning::IsLevelCategoryOther(0));
-  ASSERT_FALSE(pinning::IsLevelCategoryOther(1));
-  ASSERT_FALSE(pinning::IsLevelCategoryOther(100));
-
-  ASSERT_EQ(pinning::LevelCategory::OTHER, pinning::GetLevelCategory(kUnknownLevel, false));
-  ASSERT_EQ(pinning::LevelCategory::OTHER, pinning::GetLevelCategory(0, false));
+  ASSERT_EQ(pinning::LevelCategory::UNKNOWN_LEVEL, pinning::GetLevelCategory(kUnknownLevel, false));
+  ASSERT_EQ(pinning::LevelCategory::LEVEL_0, pinning::GetLevelCategory(0, false));
   ASSERT_EQ(pinning::LevelCategory::MIDDLE_LEVEL, pinning::GetLevelCategory(1, false));
   ASSERT_EQ(pinning::LevelCategory::LAST_LEVEL_WITH_DATA, pinning::GetLevelCategory(1, true));
 }
@@ -89,7 +84,7 @@ TEST_F(RecordingPinningPolicyTest, Dummy) {
   ASSERT_EQ(1000U, policy.GetOwnerIdTotalPinnedUsage(item_owner_id));
 
   auto pinned_counters = policy.GetOwnerIdPinnedUsageCounters(item_owner_id);
-  auto level_idx = static_cast<uint64_t>(pinning::LevelCategory::OTHER);
+  auto level_idx = static_cast<uint64_t>(pinning::LevelCategory::LEVEL_0);
   auto role_idx = static_cast<uint64_t>(role);
   ASSERT_EQ(1000U, pinned_counters[level_idx][role_idx]);
 

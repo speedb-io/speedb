@@ -2237,14 +2237,21 @@ void InternalStats::DumpCFStatsNoFileHistogram(bool is_periodic,
     auto cfd_pinning_counters = recording_policy->GetOwnerIdPinnedUsageCounters(cfd_->GetCacheOwnerId());
 
     printf("Pinning counter for CF:%s\n", cfd_->GetName().c_str());
+    bool all_zeros = true;
     for (auto level_category_idx = 0U; level_category_idx < cfd_pinning_counters.size(); ++level_category_idx) {
       const RecordingPinningPolicy::PerRolePinnedCountersForQuery& role_counters = cfd_pinning_counters[level_category_idx];
       for (auto role_idx = 0U; role_idx < role_counters.size(); ++role_idx) {
-        printf("Total-Pinned[%s][%s]=%d\n", 
-                pinning::GetLevelCategoryName(pinning::LevelCategory(level_category_idx)).c_str(), 
-                GetCacheEntryRoleName(CacheEntryRole(role_idx)).c_str(),
-                (int)role_counters[role_idx]);
+        if (role_counters[role_idx] > 0U) {
+          printf("Total-Pinned[%s][%s]=%d\n", 
+                  pinning::GetLevelCategoryName(pinning::LevelCategory(level_category_idx)).c_str(), 
+                  GetCacheEntryRoleName(CacheEntryRole(role_idx)).c_str(),
+                  (int)role_counters[role_idx]);
+          all_zeros = false;
+        }
       }
+    }
+    if (all_zeros) {
+      printf("ALL ZEROS\n");
     }
   }
 }

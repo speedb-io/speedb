@@ -47,22 +47,25 @@ std::string GetHierarchyCategoryName(HierarchyCategory category) {
   return kHierarchyCategoryToHyphenString[static_cast<size_t>(category)];
 }
 
+enum class LevelCategory { LEVEL_0, MIDDLE_LEVEL, LAST_LEVEL_WITH_DATA, UNKNOWN_LEVEL };
+
 std::array<std::string, kNumLevelCategories>
-    kLevelCategoryToHyphenString{{"last-level-with-data", "middle-level", "other"}};
+    kLevelCategoryToHyphenString{{"level-0", 
+                                  "middle-level", 
+                                  "last-level-with-data",
+                                  "unknown-level"}};
 
 std::string GetLevelCategoryName(LevelCategory category) {
   return kLevelCategoryToHyphenString[static_cast<size_t>(category)];
 }
 
-bool IsLevelCategoryOther(int level) {
-  return ((level == 0) || (level == kUnknownLevel));
-}
-
 LevelCategory GetLevelCategory(int level, bool is_last_level_with_data) {
   if (is_last_level_with_data) {
     return LevelCategory::LAST_LEVEL_WITH_DATA;
-  } else if (IsLevelCategoryOther(level)) {
-    return LevelCategory::OTHER;
+  } else if (level == 0) {
+    return LevelCategory::LEVEL_0;
+  } else if (level == kUnknownLevel) {
+    return LevelCategory::UNKNOWN_LEVEL;
   } else {
     return LevelCategory::MIDDLE_LEVEL;
   }
@@ -80,7 +83,7 @@ TablePinningInfo::TablePinningInfo(int _level, bool _is_last_level_with_data,
         max_file_size_for_l0_meta_pin(_max_file_size_for_l0_meta_pin) {
   // Validate / Sanitize the level + is_last_level_with_data combination
   if (is_last_level_with_data) {
-    assert(pinning::IsLevelCategoryOther(level) == false);
+    assert((level != 0) && (level != kUnknownLevel));
     is_last_level_with_data = false;
   }
 }

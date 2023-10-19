@@ -160,7 +160,9 @@ auto RecordingPinningPolicy::GetOwnerIdPinnedUsageCounters(Cache::ItemOwnerId it
   OwnerIdPinnedCountersForQuery query_counters;
 
   auto owner_id_pinned_counters_iter = pinned_counters_.find(item_owner_id);
-  assert(owner_id_pinned_counters_iter != pinned_counters_.end());
+  if (owner_id_pinned_counters_iter == pinned_counters_.end()) {
+    return OwnerIdPinnedCountersForQuery();
+  }
 
   // The counters are a two-dimensional array of std::atomic<int> which in non-copyable.
   // Deep copy to a consistent, non-atomic two-dimensional array.

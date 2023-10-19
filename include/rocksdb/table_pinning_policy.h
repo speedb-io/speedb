@@ -44,10 +44,10 @@ std::string GetHierarchyCategoryName(HierarchyCategory category);
 
 // The hierarchy category is 
 // OTHER is used for both level-0 and unknown levels (kUnknownLevel)
-enum class LevelCategory { LAST_LEVEL_WITH_DATA, MIDDLE_LEVEL, OTHER };
+enum class LevelCategory { LEVEL_0, MIDDLE_LEVEL, LAST_LEVEL_WITH_DATA, UNKNOWN_LEVEL };
 
 constexpr uint32_t kNumLevelCategories =
-    static_cast<uint32_t>(LevelCategory::OTHER) + 1;
+    static_cast<uint32_t>(LevelCategory::UNKNOWN_LEVEL) + 1;
 
 std::string GetLevelCategoryName(LevelCategory category);
 

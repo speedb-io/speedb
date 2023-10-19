@@ -73,6 +73,7 @@ class WriteBufferManager;
 class WriteController;
 class FileSystem;
 class SharedOptions;
+class TablePinningPolicy;
 
 struct Options;
 struct DbPath;
@@ -1796,6 +1797,7 @@ struct ReadOptions {
   // If true, DB with TTL will not Get keys that reached their timeout
   // Default: false
   bool skip_expired_data = false;
+  bool part_of_flush = false;
 
   ReadOptions();
   ReadOptions(bool cksum, bool cache);
@@ -2241,14 +2243,19 @@ class SharedOptions {
  public:
   SharedOptions();
   SharedOptions(size_t total_ram_size_bytes, size_t total_threads,
-                size_t delayed_write_rate = 256 * 1024 * 1024ul);
+                size_t delayed_write_rate = 256 * 1024 * 1024ul,
+                size_t bucket_size = 1000000, bool use_merge = true);
   size_t GetTotalThreads() { return total_threads_; }
   size_t GetTotalRamSizeBytes() { return total_ram_size_bytes_; }
   size_t GetDelayedWriteRate() { return delayed_write_rate_; }
+  size_t GetBucketSize() { return bucket_size_; }
+  size_t IsMergeMemtableSupported() { return use_merge_; }
   // this function will increase write buffer manager by increased_by amount
   // as long as the result is not bigger than the maximum size of
   // total_ram_size_ /4
   void IncreaseWriteBufferSize(size_t increase_by);
+  void CreatePinningPolicy();
+  size_t GetMaxWriteBufferManagerSize() const;
 
   std::shared_ptr<Cache> cache = nullptr;
   std::shared_ptr<WriteController> write_controller = nullptr;
@@ -2259,11 +2266,14 @@ class SharedOptions {
   std::shared_ptr<Logger> info_log = nullptr;
   std::vector<std::shared_ptr<EventListener>> listeners;
   std::shared_ptr<FileChecksumGenFactory> file_checksum_gen_factory = nullptr;
+  std::shared_ptr<TablePinningPolicy> pinning_policy = nullptr;
 
  private:
   size_t total_threads_ = 0;
   size_t total_ram_size_bytes_ = 0;
   size_t delayed_write_rate_ = 0;
+  size_t bucket_size_ = 1000000;
+  bool use_merge_ = true;
 };
 
 }  // namespace ROCKSDB_NAMESPACE

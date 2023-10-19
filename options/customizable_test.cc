@@ -798,10 +798,10 @@ TEST_F(CustomizableTest, TestStringDepth) {
   std::string opt_str;
   shallow.depth = ConfigOptions::Depth::kDepthShallow;
   ASSERT_OK(c->GetOptionString(shallow, &opt_str));
-  ASSERT_EQ(opt_str, "inner=a;");
+  ASSERT_EQ(opt_str, "inner=a");
   shallow.depth = ConfigOptions::Depth::kDepthDetailed;
   ASSERT_OK(c->GetOptionString(shallow, &opt_str));
-  ASSERT_NE(opt_str, "inner=a;");
+  ASSERT_NE(opt_str, "inner=a");
 }
 
 // Tests that we only get a new customizable when it changes

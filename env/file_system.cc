@@ -226,7 +226,7 @@ IOStatus ReadFileToString(FileSystem* fs, const std::string& fname,
 
 namespace {
 static std::unordered_map<std::string, OptionTypeInfo> fs_wrapper_type_info = {
-    {"target",
+    {Customizable::kTargetPropName(),
      OptionTypeInfo::AsCustomSharedPtr<FileSystem>(
          0, OptionVerificationType::kByName, OptionTypeFlags::kDontSerialize)},
 };
@@ -243,24 +243,17 @@ Status FileSystemWrapper::PrepareOptions(const ConfigOptions& options) {
   return FileSystem::PrepareOptions(options);
 }
 
-std::string FileSystemWrapper::SerializeOptions(
-    const ConfigOptions& config_options, const std::string& header) const {
-  auto parent = FileSystem::SerializeOptions(config_options, "");
-  if (config_options.IsShallow() || target_ == nullptr ||
-      target_->IsInstanceOf(FileSystem::kDefaultName())) {
-    return parent;
-  } else {
-    std::string result = header;
-    if (!StartsWith(parent, OptionTypeInfo::kIdPropName())) {
-      result.append(OptionTypeInfo::kIdPropName()).append("=");
-    }
-    result.append(parent);
-    if (!EndsWith(result, config_options.delimiter)) {
-      result.append(config_options.delimiter);
-    }
-    result.append("target=").append(target_->ToString(config_options));
-    return result;
+Status FileSystemWrapper::SerializeOptions(const ConfigOptions& config_options,
+                                           const std::string& prefix,
+                                           OptionProperties* props) const {
+  if (!config_options.IsShallow() && target_ != nullptr &&
+      !target_->IsInstanceOf(FileSystem::kDefaultName())) {
+    props->insert(
+        {kTargetPropName(),
+         target_->ToString(config_options, OptionTypeInfo::MakePrefix(
+                                               prefix, kTargetPropName()))});
   }
+  return FileSystem::SerializeOptions(config_options, prefix, props);
 }
 
 DirFsyncOptions::DirFsyncOptions() { reason = kDefault; }

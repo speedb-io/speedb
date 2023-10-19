@@ -42,7 +42,7 @@ class ScopedPinningPolicy : public RecordingPinningPolicy {
   ScopedPinningPolicy(const ScopedPinningOptions& options);
 
   static const char* kClassName() { return "speedb_scoped_pinning_policy"; }
-  static const char* kNickName() { return "ScopedPinning"; }
+  static const char* kNickName() { return "scoped"; }
   const char* Name() const override { return kClassName(); }
   const char* NickName() const override { return kNickName(); }
   std::string GetId() const override;

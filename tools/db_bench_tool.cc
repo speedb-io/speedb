@@ -824,29 +824,28 @@ DEFINE_string(pinning_policy,
               ROCKSDB_NAMESPACE::DefaultPinningPolicy::kNickName(),
               "The pinning policy to use. "
               "The options are: "
-              "'DefaultPinning': Default RocksDB's pinning polcy. "
-              "'ScopedPinning': Speedb's Scoped pinning policy.");
+              "'default': Default RocksDB's pinning polcy. "
+              "'scoped': Speedb's Scoped pinning policy.");
 
-DEFINE_int32(
-    scoped_pinning_capacity, -1,
-    "Pinning policy capacity. The default (-1) results in the "
-    "capacity being calculated "
-    "automatically. If the capacity is >= 0, the specified value will "
-    "be the capacity. Applicable only when pinning_policy=='ScopedPinning'.");
+DEFINE_int32(scoped_pinning_capacity, -1,
+             "Pinning policy capacity. The default (-1) results in the "
+             "capacity being calculated "
+             "automatically. If the capacity is >= 0, the specified value will "
+             "be the capacity. Applicable only when pinning_policy=='Scoped'.");
 
 DEFINE_int32(
     scoped_pinning_last_level_with_data_percent,
     ROCKSDB_NAMESPACE::ScopedPinningOptions::kDefaultLastLevelWithDataPercent,
     "Max percent of the pinning capacity to pin entites that are at "
     "the bottom-most possible level."
-    "Applicable only when pinning_policy=='ScopedPinning'.");
+    "Applicable only when pinning_policy=='Scoped'.");
 
 DEFINE_int32(scoped_pinning_mid_percent,
              ROCKSDB_NAMESPACE::ScopedPinningOptions::kDefaultMidPercent,
              "Max percent of the pinning capacity to pin entites that are "
              "above the bottom-most level,but at a >0 level. "
              "Must be >= scoped_pinning_last_level_with_data_percent. "
-             "Applicable only when pinning_policy=='ScopedPinning'.");
+             "Applicable only when pinning_policy=='Scoped'.");
 
 DEFINE_int32(block_size,
              static_cast<int32_t>(

@@ -1,3 +1,17 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -26,6 +40,9 @@
 #include "rocksdb/flush_block_policy.h"
 #include "rocksdb/rocksdb_namespace.h"
 #include "rocksdb/table.h"
+#include "rocksdb/table_pinning_policy.h"
+#include "rocksdb/utilities/customizable_util.h"
+#include "rocksdb/utilities/object_registry.h"
 #include "rocksdb/utilities/options_type.h"
 #include "table/block_based/block_based_table_builder.h"
 #include "table/block_based/block_based_table_reader.h"
@@ -438,6 +455,10 @@ void BlockBasedTableFactory::InitializeOptions() {
     table_options_.flush_block_policy_factory.reset(
         new FlushBlockBySizePolicyFactory());
   }
+  if (table_options_.pinning_policy == nullptr) {
+    table_options_.pinning_policy.reset(
+        NewDefaultPinningPolicy(table_options_));
+  }
   if (table_options_.no_block_cache) {
     table_options_.block_cache.reset();
   } else if (table_options_.block_cache == nullptr) {
@@ -572,12 +593,13 @@ Status BlockBasedTableFactory::NewTableReader(
       file_size, table_reader, table_reader_cache_res_mgr_,
       table_reader_options.prefix_extractor, prefetch_index_and_filter_in_cache,
       table_reader_options.skip_filters, table_reader_options.level,
+      table_reader_options.is_last_level_with_data,
       table_reader_options.immortal, table_reader_options.largest_seqno,
       table_reader_options.force_direct_prefetch, &tail_prefetch_stats_,
       table_reader_options.block_cache_tracer,
       table_reader_options.max_file_size_for_l0_meta_pin,
       table_reader_options.cur_db_session_id, table_reader_options.cur_file_num,
-      table_reader_options.unique_id);
+      table_reader_options.unique_id, table_reader_options.cache_owner_id);
 }
 
 TableBuilder* BlockBasedTableFactory::NewTableBuilder(
@@ -790,6 +812,20 @@ std::string BlockBasedTableFactory::GetPrintableOptions() const {
     snprintf(buffer, kBufferSize, "  persistent_cache_options:\n");
     ret.append(buffer);
     ret.append(table_options_.persistent_cache->GetPrintableOptions());
+  }
+  if (table_options_.pinning_policy) {
+    const char* pinning_policy_name = table_options_.pinning_policy->Name();
+    if (pinning_policy_name != nullptr) {
+      snprintf(buffer, kBufferSize, "  pinning_policy_name: %s\n",
+               pinning_policy_name);
+      ret.append(buffer);
+    }
+    auto pinning_printable_options =
+        table_options_.pinning_policy->GetPrintableOptions();
+    if (pinning_printable_options.empty() == false) {
+      ret.append("  pinning_policy_options:\n");
+      ret.append(pinning_printable_options);
+    }
   }
   snprintf(buffer, kBufferSize, "  block_size: %" PRIu64 "\n",
            table_options_.block_size);

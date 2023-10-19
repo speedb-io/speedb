@@ -1,3 +1,17 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -154,6 +168,7 @@ CompactionJob::CompactionJob(
       output_directory_(output_directory),
       stats_(stats),
       bottommost_level_(false),
+      last_level_with_data_(false),
       write_hint_(Env::WLTH_NOT_SET),
       compaction_job_stats_(compaction_job_stats),
       job_id_(job_id),
@@ -259,6 +274,7 @@ void CompactionJob::Prepare() {
 
   write_hint_ = cfd->CalculateSSTWriteHint(c->output_level());
   bottommost_level_ = c->bottommost_level();
+  last_level_with_data_ = cfd->IsLastLevelWithData(c->output_level());
 
   if (c->ShouldFormSubcompactions()) {
     StopWatch sw(db_options_.clock, stats_, SUBCOMPACTION_SETUP_TIME);
@@ -1879,8 +1895,9 @@ Status CompactionJob::OpenCompactionOutputFile(SubcompactionState* sub_compact,
       sub_compact->compaction->output_compression(),
       sub_compact->compaction->output_compression_opts(), cfd->GetID(),
       cfd->GetName(), sub_compact->compaction->output_level(),
-      bottommost_level_, TableFileCreationReason::kCompaction,
-      0 /* oldest_key_time */, current_time, db_id_, db_session_id_,
+      bottommost_level_, last_level_with_data_,
+      TableFileCreationReason::kCompaction, 0 /* oldest_key_time */,
+      current_time, db_id_, db_session_id_,
       sub_compact->compaction->max_output_file_size(), file_number);
 
   outputs.NewBuilder(tboptions);

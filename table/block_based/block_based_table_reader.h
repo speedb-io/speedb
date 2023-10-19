@@ -1,3 +1,17 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -51,6 +65,8 @@ struct BlockBasedTableOptions;
 struct EnvOptions;
 struct ReadOptions;
 class GetContext;
+struct PinnedEntry;
+struct TablePinningOptions;
 
 using KVPairBlock = std::vector<std::pair<std::string, std::string>>;
 
@@ -103,14 +119,15 @@ class BlockBasedTable : public TableReader {
           nullptr,
       const std::shared_ptr<const SliceTransform>& prefix_extractor = nullptr,
       bool prefetch_index_and_filter_in_cache = true, bool skip_filters = false,
-      int level = -1, const bool immortal_table = false,
-      const SequenceNumber largest_seqno = 0,
+      int level = -1, bool is_last_level_with_data = false,
+      const bool immortal_table = false, const SequenceNumber largest_seqno = 0,
       bool force_direct_prefetch = false,
       TailPrefetchStats* tail_prefetch_stats = nullptr,
       BlockCacheTracer* const block_cache_tracer = nullptr,
       size_t max_file_size_for_l0_meta_pin = 0,
       const std::string& cur_db_session_id = "", uint64_t cur_file_num = 0,
-      UniqueId64x2 expected_unique_id = {});
+      UniqueId64x2 expected_unique_id = {},
+      Cache::ItemOwnerId cache_owner_id = Cache::kUnknownItemOwnerId);
 
   bool PrefixRangeMayMatch(const Slice& internal_key,
                            const ReadOptions& read_options,
@@ -272,6 +289,10 @@ class BlockBasedTable : public TableReader {
   Rep* get_rep() { return rep_; }
   const Rep* get_rep() const { return rep_; }
 
+  TablePinningPolicy* GetPinningPolicy() const;
+  bool PinData(const TablePinningOptions& tpo, uint8_t type, size_t size,
+               std::unique_ptr<PinnedEntry>* pinned) const;
+  void UnPinData(std::unique_ptr<PinnedEntry>&& pinned) const;
   // input_iter: if it is not null, update this one and return it as Iterator
   template <typename TBlockIter>
   TBlockIter* NewDataBlockIterator(const ReadOptions& ro,
@@ -418,9 +439,10 @@ class BlockBasedTable : public TableReader {
   // need to access extra meta blocks for index construction. This parameter
   // helps avoid re-reading meta index block if caller already created one.
   Status CreateIndexReader(const ReadOptions& ro,
+                           const TablePinningOptions& tpo,
                            FilePrefetchBuffer* prefetch_buffer,
                            InternalIterator* preloaded_meta_index_iter,
-                           bool use_cache, bool prefetch, bool pin,
+                           bool use_cache, bool prefetch,
                            BlockCacheLookupContext* lookup_context,
                            std::unique_ptr<IndexReader>* index_reader);
 
@@ -461,7 +483,7 @@ class BlockBasedTable : public TableReader {
       const ReadOptions& ro, FilePrefetchBuffer* prefetch_buffer,
       InternalIterator* meta_iter, BlockBasedTable* new_table,
       bool prefetch_all, const BlockBasedTableOptions& table_options,
-      const int level, size_t file_size, size_t max_file_size_for_l0_meta_pin,
+      const TablePinningOptions& pinning_options,
       BlockCacheLookupContext* lookup_context);
 
   static BlockType GetBlockTypeForMetaBlockByName(const Slice& meta_block_name);
@@ -472,9 +494,9 @@ class BlockBasedTable : public TableReader {
 
   // Create the filter from the filter block.
   std::unique_ptr<FilterBlockReader> CreateFilterBlockReader(
-      const ReadOptions& ro, FilePrefetchBuffer* prefetch_buffer,
-      bool use_cache, bool prefetch, bool pin,
-      BlockCacheLookupContext* lookup_context);
+      const ReadOptions& ro, const TablePinningOptions& tpo,
+      FilePrefetchBuffer* prefetch_buffer, bool use_cache, bool prefetch,
+      bool pin, BlockCacheLookupContext* lookup_context);
 
   // Size of all data blocks, maybe approximate
   uint64_t GetApproximateDataSize();
@@ -525,7 +547,8 @@ struct BlockBasedTable::Rep {
   Rep(const ImmutableOptions& _ioptions, const EnvOptions& _env_options,
       const BlockBasedTableOptions& _table_opt,
       const InternalKeyComparator& _internal_comparator, bool skip_filters,
-      uint64_t _file_size, int _level, const bool _immortal_table)
+      uint64_t _file_size, int _level, const bool _immortal_table,
+      Cache::ItemOwnerId _cache_owner_id = Cache::kUnknownItemOwnerId)
       : ioptions(_ioptions),
         env_options(_env_options),
         table_options(_table_opt),
@@ -538,7 +561,8 @@ struct BlockBasedTable::Rep {
         global_seqno(kDisableGlobalSequenceNumber),
         file_size(_file_size),
         level(_level),
-        immortal_table(_immortal_table) {}
+        immortal_table(_immortal_table),
+        cache_owner_id(_cache_owner_id) {}
   ~Rep() { status.PermitUncheckedError(); }
   const ImmutableOptions& ioptions;
   const EnvOptions& env_options;
@@ -605,6 +629,8 @@ struct BlockBasedTable::Rep {
   bool index_value_is_full = true;
 
   const bool immortal_table;
+
+  Cache::ItemOwnerId cache_owner_id = Cache::kUnknownItemOwnerId;
 
   std::unique_ptr<CacheReservationManager::CacheReservationHandle>
       table_reader_cache_res_handle = nullptr;

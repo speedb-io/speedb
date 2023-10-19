@@ -1,3 +1,17 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -20,6 +34,7 @@
 #include "db/table_properties_collector.h"
 #include "file/writable_file_writer.h"
 #include "options/cf_options.h"
+#include "rocksdb/cache.h"
 #include "rocksdb/options.h"
 #include "rocksdb/table_properties.h"
 #include "table/unique_id_impl.h"
@@ -39,6 +54,7 @@ struct TableReaderOptions {
       const InternalKeyComparator& _internal_comparator,
       bool _skip_filters = false, bool _immortal = false,
       bool _force_direct_prefetch = false, int _level = -1,
+      bool _is_bottommost = false, bool _is_last_level_with_data = false,
       BlockCacheTracer* const _block_cache_tracer = nullptr,
       size_t _max_file_size_for_l0_meta_pin = 0,
       const std::string& _cur_db_session_id = "", uint64_t _cur_file_num = 0,
@@ -51,6 +67,8 @@ struct TableReaderOptions {
         immortal(_immortal),
         force_direct_prefetch(_force_direct_prefetch),
         level(_level),
+        is_bottommost(_is_bottommost),
+        is_last_level_with_data(_is_last_level_with_data),
         largest_seqno(_largest_seqno),
         block_cache_tracer(_block_cache_tracer),
         max_file_size_for_l0_meta_pin(_max_file_size_for_l0_meta_pin),
@@ -73,6 +91,10 @@ struct TableReaderOptions {
   // What level this table/file is on, -1 for "not set, don't know." Used
   // for level-specific statistics.
   int level;
+  // Whether or not this is the bottom most level
+  bool is_bottommost = false;
+  // Whether or not this is the last level with data.
+  bool is_last_level_with_data = false;
   // largest seqno in the table (or 0 means unknown???)
   SequenceNumber largest_seqno;
   BlockCacheTracer* const block_cache_tracer;
@@ -86,6 +108,8 @@ struct TableReaderOptions {
 
   // Known unique_id or {}, kNullUniqueId64x2 means unknown
   UniqueId64x2 unique_id;
+
+  Cache::ItemOwnerId cache_owner_id = Cache::kUnknownItemOwnerId;
 };
 
 struct TableBuilderOptions {
@@ -96,7 +120,7 @@ struct TableBuilderOptions {
       CompressionType _compression_type,
       const CompressionOptions& _compression_opts, uint32_t _column_family_id,
       const std::string& _column_family_name, int _level,
-      bool _is_bottommost = false,
+      bool _is_bottommost = false, bool _is_last_level_with_data = false,
       TableFileCreationReason _reason = TableFileCreationReason::kMisc,
       const int64_t _oldest_key_time = 0,
       const uint64_t _file_creation_time = 0, const std::string& _db_id = "",
@@ -117,6 +141,7 @@ struct TableBuilderOptions {
         db_session_id(_db_session_id),
         level_at_creation(_level),
         is_bottommost(_is_bottommost),
+        is_last_level_with_data(_is_last_level_with_data),
         reason(_reason),
         cur_file_num(_cur_file_num) {}
 
@@ -136,6 +161,12 @@ struct TableBuilderOptions {
   // BEGIN for FilterBuildingContext
   const int level_at_creation;
   const bool is_bottommost;
+  // This is set when the table is built and reflects the state of the LSM
+  // at this time.
+  // TODO: Consider updating the flag if the table's level is no longer the
+  // last level with data.
+  const bool is_last_level_with_data;
+
   const TableFileCreationReason reason;
   // END for FilterBuildingContext
 

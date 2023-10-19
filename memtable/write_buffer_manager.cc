@@ -1,3 +1,17 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -15,8 +29,10 @@
 #include "cache/cache_entry_roles.h"
 #include "cache/cache_reservation_manager.h"
 #include "db/db_impl/db_impl.h"
+#include "logging/logging.h"
 #include "monitoring/instrumented_mutex.h"
 #include "rocksdb/status.h"
+#include "rocksdb/write_controller.h"
 #include "test_util/sync_point.h"
 #include "util/coding.h"
 
@@ -64,8 +80,7 @@ WriteBufferManager::WriteBufferManager(
     InitFlushInitiationVars(buffer_size());
   }
   if (start_delay_percent_ >= 100) {
-    // unsuitable value, sanitizing to Dflt.
-    // TODO: add reporting
+    // unsuitable value, sanitizing to default value.
     start_delay_percent_ = kDfltStartDelayPercentThreshold;
   }
 }
@@ -318,35 +333,62 @@ std::string WriteBufferManager::GetPrintableOptions() const {
   return ret;
 }
 
-void WriteBufferManager::RegisterWriteController(
-    std::shared_ptr<WriteController> wc) {
-  std::lock_guard<std::mutex> lock(controllers_map_mutex_);
-  if (controllers_to_refcount_map_.count(wc)) {
-    ++controllers_to_refcount_map_[wc];
-  } else {
-    controllers_to_refcount_map_.insert({wc, 1});
+WriteBufferManager::WBMClientId WriteBufferManager::RegisterWCAndLogger(
+    std::shared_ptr<WriteController> wc, std::shared_ptr<Logger> logger) {
+  uint64_t client_id = 0;
+  {
+    std::lock_guard<std::mutex> lock(controllers_map_mutex_);
+    // make sure we haven`t wrapped around
+    assert(next_client_id_ != std::numeric_limits<uint64_t>::max());
+    client_id = next_client_id_++;
+    controllers_to_client_ids_map_[wc].insert(client_id);
+    controllers_to_loggers_map_[wc.get()].insert(logger.get());
   }
+  {
+    std::lock_guard<std::mutex> lock(loggers_map_mutex_);
+    loggers_to_client_ids_map_[logger].insert(client_id);
+  }
+  return client_id;
 }
 
-void WriteBufferManager::DeregisterWriteController(
-    std::shared_ptr<WriteController> wc) {
-  bool last_entry = RemoveFromControllersMap(wc);
-  if (last_entry && wc->is_dynamic_delay()) {
-    wc->HandleRemoveDelayReq(this);
-  }
-}
-
-bool WriteBufferManager::RemoveFromControllersMap(
-    std::shared_ptr<WriteController> wc) {
-  std::lock_guard<std::mutex> lock(controllers_map_mutex_);
-  assert(controllers_to_refcount_map_.count(wc));
-  assert(controllers_to_refcount_map_[wc] > 0);
-  --controllers_to_refcount_map_[wc];
-  if (controllers_to_refcount_map_[wc] == 0) {
-    controllers_to_refcount_map_.erase(wc);
+template <typename SharedPtrType>
+bool WriteBufferManager::RemoveFromMap(
+    const SharedPtrType& ptr, WBMClientId wbm_client_id, std::mutex& mutex,
+    std::unordered_map<SharedPtrType, WBMClientIds>& map) {
+  std::lock_guard<std::mutex> lock(mutex);
+  assert(map.count(ptr));
+  assert(map[ptr].empty() == false);
+  assert(map[ptr].count(wbm_client_id));
+  map[ptr].erase(wbm_client_id);
+  if (map[ptr].empty()) {
+    map.erase(ptr);
     return true;
   } else {
     return false;
+  }
+}
+
+void WriteBufferManager::DeregisterWCAndLogger(
+    std::shared_ptr<WriteController> wc, std::shared_ptr<Logger> logger,
+    WBMClientId wbm_client_id) {
+  // value of 0 means the wc and logger weren`t registered.
+  assert(wbm_client_id > 0);
+  bool last_logger = RemoveFromMap(logger, wbm_client_id, loggers_map_mutex_,
+                                   loggers_to_client_ids_map_);
+  bool last_controller =
+      RemoveFromMap(wc, wbm_client_id, controllers_map_mutex_,
+                    controllers_to_client_ids_map_);
+  std::lock_guard<std::mutex> lock(controllers_map_mutex_);
+  if (last_controller) {
+    // the db calling this should still have a ref to this wc
+    assert(wc.unique() == false);
+    if (wc->is_dynamic_delay()) {
+      wc->HandleRemoveDelayReq(this);
+    }
+    controllers_to_loggers_map_.erase(wc.get());
+  } else if (last_logger) {
+    assert(controllers_to_loggers_map_.count(wc.get()));
+    controllers_to_loggers_map_[wc.get()].erase(logger.get());
   }
 }
 
@@ -389,50 +431,60 @@ uint64_t CalcDelayFromFactor(uint64_t max_write_rate, uint64_t delay_factor) {
 
 }  // Unnamed Namespace
 
-void WriteBufferManager::WBMSetupDelay(uint64_t delay_factor) {
-  std::lock_guard<std::mutex> lock(controllers_map_mutex_);
-  for (auto& wc_and_ref_count : controllers_to_refcount_map_) {
-    // make sure that controllers_to_refcount_map_ does not hold
-    // the last ref to the WC.
-    assert(wc_and_ref_count.first.unique() == false);
-    // the final rate depends on the write controllers max rate so
-    // each wc can receive a different delay requirement.
-    WriteController* wc = wc_and_ref_count.first.get();
-    if (wc->is_dynamic_delay()) {
-      uint64_t wbm_write_rate =
-          CalcDelayFromFactor(wc->max_delayed_write_rate(), delay_factor);
-      wc->HandleNewDelayReq(this, wbm_write_rate);
-    }
+void WriteBufferManager::WBMSetupDelay(
+    uint64_t delay_factor, WriteController* wc,
+    const std::unordered_set<Logger*>& loggers) {
+  // the final rate depends on the WC max rate so each WC can receive a
+  // different delay requirement.
+  const uint64_t wbm_write_rate =
+      CalcDelayFromFactor(wc->max_delayed_write_rate(), delay_factor);
+
+  for (auto logger : loggers) {
+    ROCKS_LOG_WARN(logger,
+                   "WBM (%p) sets a delay requirement of %" PRIu64
+                   " using WC - %p",
+                   this, wbm_write_rate, wc);
   }
+
+  wc->HandleNewDelayReq(this, wbm_write_rate);
 }
 
-void WriteBufferManager::ResetDelay() {
-  std::lock_guard<std::mutex> lock(controllers_map_mutex_);
-  for (auto& wc_and_ref_count : controllers_to_refcount_map_) {
-    // make sure that controllers_to_refcount_map_ does not hold the last ref to
-    // the WC since holding the last ref means that the last DB that was using
-    // this WC has destructed and using this WC is no longer valid.
-    assert(wc_and_ref_count.first.unique() == false);
-    WriteController* wc = wc_and_ref_count.first.get();
-    if (wc->is_dynamic_delay()) {
-      wc->HandleRemoveDelayReq(this);
-    }
+void WriteBufferManager::ResetDelay(
+    UsageState usage_state, WriteController* wc,
+    const std::unordered_set<Logger*>& loggers) {
+  auto usage_state_str = "No Delay";
+  if (usage_state == UsageState::kStop) {
+    usage_state_str = "Max memory reached";
   }
+
+  for (auto logger : loggers) {
+    ROCKS_LOG_WARN(logger,
+                   "WBM (%p) resets its delay requirement using WC - %p. "
+                   "UsageState is: %s",
+                   this, wc, usage_state_str);
+  }
+
+  wc->HandleRemoveDelayReq(this);
 }
 
 void WriteBufferManager::UpdateControllerDelayState() {
-  auto [usage_state, delay_factor] = GetUsageStateInfo();
-
-  if (usage_state == UsageState::kDelay) {
-    WBMSetupDelay(delay_factor);
-  } else {
-    // check if this WMB has an active delay request.
-    // if yes, remove it and maybe set a different rate.
-    ResetDelay();
+  const auto [usage_state, delay_factor] = GetUsageStateInfo();
+  std::lock_guard<std::mutex> lock(controllers_map_mutex_);
+  for (auto& wc_and_client_ids : controllers_to_client_ids_map_) {
+    // make sure that controllers_to_client_ids_map_ does not hold the last ref
+    // to the WC since holding the last ref means that the last DB that was
+    // using this WC has destructed and using this WC is no longer valid.
+    assert(wc_and_client_ids.first.unique() == false);
+    WriteController* wc = wc_and_client_ids.first.get();
+    if (wc && wc->is_dynamic_delay()) {
+      const auto& loggers = controllers_to_loggers_map_[wc];
+      if (usage_state == UsageState::kDelay) {
+        WBMSetupDelay(delay_factor, wc, loggers);
+      } else {
+        ResetDelay(usage_state, wc, loggers);
+      }
+    }
   }
-  // TODO: things to report:
-  //   1. that WBM initiated reset/delay.
-  //   2. list all connected WCs and their write rate.
 }
 
 uint64_t WriteBufferManager::CalcNewCodedUsageState(
@@ -608,7 +660,7 @@ void WriteBufferManager::InitFlushInitiationVars(size_t quota) {
 
   if (flushes_thread_.joinable() == false) {
     flushes_thread_ =
-        std::thread(&WriteBufferManager::InitiateFlushesThread, this);
+        port::Thread(&WriteBufferManager::InitiateFlushesThread, this);
   }
 }
 
@@ -661,6 +713,16 @@ void WriteBufferManager::InitiateFlushesThread() {
       while (num_flushes_to_initiate_ > 0U) {
         bool was_flush_initiated = false;
         {
+          // Below an initiator is requested to initate a flush. The initiator
+          // may call another WBM method that relies on these counters. The
+          // counters are updated here, while under the flushes_mu_ lock
+          // (released below) to ensure num_flushes_to_initiate_ can't become
+          // negative Not recalculating flush initiation size since the
+          // increment & decrement cancel each other with respect to the recalc.
+          ++num_running_flushes_;
+          assert(num_flushes_to_initiate_ > 0U);
+          --num_flushes_to_initiate_;
+
           // Unlocking the flushed_mu_ since flushing (via the initiator cb) may
           // call a WBM service (e.g., ReserveMem()), that, in turn, needs to
           // flushes_mu_lock the same mutex => will get stuck
@@ -672,18 +734,15 @@ void WriteBufferManager::InitiateFlushesThread() {
           // 2. Have all existing initiators failed to initiate a flush?
           if (flush_initiators_.empty() ||
               (num_repeated_failures_to_initiate >= flush_initiators_.size())) {
+            // No flush was initiated => undo the counters update
+            assert(num_running_flushes_ > 0U);
+            --num_running_flushes_;
+            ++num_flushes_to_initiate_;
             break;
           }
           assert(IsInitiatorIdxValid(next_candidate_initiator_idx_));
           auto& initiator = flush_initiators_[next_candidate_initiator_idx_];
           UpdateNextCandidateInitiatorIdx();
-
-          // Assuming initiator would flush (flushes_mu_lock is unlocked and
-          // called initiator may call another method that relies on these
-          // counters) Not recalculating flush initiation size since the
-          // increment & decrement cancel each other with respect to the recalc
-          ++num_running_flushes_;
-          --num_flushes_to_initiate_;
 
           // TODO: Use a weak-pointer for the registered initiators. That would
           // allow us to release the flushes_initiators_mu_ mutex before calling
@@ -693,6 +752,7 @@ void WriteBufferManager::InitiateFlushesThread() {
 
         if (!was_flush_initiated) {
           // No flush was initiated => undo the counters update
+          assert(num_running_flushes_ > 0U);
           --num_running_flushes_;
           ++num_flushes_to_initiate_;
           ++num_repeated_failures_to_initiate;
@@ -731,6 +791,12 @@ void WriteBufferManager::FlushStarted(bool wbm_initiated) {
   flushes_mu_->Lock();
 
   ++num_running_flushes_;
+  // Any number of non-wbm-initiated flushes may be initiated, so, we must not
+  // underflow num_flushes_to_initiate_
+  if (num_flushes_to_initiate_ > 0U) {
+    --num_flushes_to_initiate_;
+  }
+
   size_t curr_memory_used = memory_usage();
   RecalcFlushInitiationSize();
   ReevaluateNeedForMoreFlushesLockHeld(curr_memory_used);

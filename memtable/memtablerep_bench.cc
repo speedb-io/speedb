@@ -1,3 +1,17 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -63,11 +77,12 @@ DEFINE_string(memtablerep, "skiplist",
               "\tvector              -- backed by an std::vector\n"
               "\thashskiplist        -- backed by a hash skip list\n"
               "\thashlinklist        -- backed by a hash linked list\n"
+              "\thashspdb            -- backed by a hash spdb\n"
               "\tcuckoo              -- backed by a cuckoo hash table");
 
 DEFINE_int64(bucket_count, 1000000,
              "bucket_count parameter to pass into NewHashSkiplistRepFactory or "
-             "NewHashLinkListRepFactory");
+             "NewHashLinkListRepFactory NewHashSpdbRepFactory");
 
 DEFINE_int32(
     hashskiplist_height, 4,
@@ -595,6 +610,8 @@ int main(int argc, char** argv) {
         FLAGS_if_log_bucket_dist_when_flash, FLAGS_threshold_use_skiplist));
     options.prefix_extractor.reset(
         ROCKSDB_NAMESPACE::NewFixedPrefixTransform(FLAGS_prefix_length));
+  } else if (FLAGS_memtablerep == "hashspdb") {
+    factory.reset(ROCKSDB_NAMESPACE::NewHashSpdbRepFactory(FLAGS_bucket_count));
   } else {
     ROCKSDB_NAMESPACE::ConfigOptions config_options;
     config_options.ignore_unsupported_options = false;

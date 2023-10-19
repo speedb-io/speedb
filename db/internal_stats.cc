@@ -1,3 +1,17 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
 //  (found in the LICENSE.Apache file in the root directory).
@@ -255,6 +269,9 @@ static const std::string levelstats = "levelstats";
 static const std::string block_cache_entry_stats = "block-cache-entry-stats";
 static const std::string fast_block_cache_entry_stats =
     "fast-block-cache-entry-stats";
+static const std::string block_cache_cf_stats = "block-cache-cf-stats";
+static const std::string fast_block_cache_cf_stats =
+    "fast-block-cache-cf-stats";
 static const std::string num_immutable_mem_table = "num-immutable-mem-table";
 static const std::string num_immutable_mem_table_flushed =
     "num-immutable-mem-table-flushed";
@@ -340,6 +357,10 @@ const std::string DB::Properties::kBlockCacheEntryStats =
     rocksdb_prefix + block_cache_entry_stats;
 const std::string DB::Properties::kFastBlockCacheEntryStats =
     rocksdb_prefix + fast_block_cache_entry_stats;
+const std::string DB::Properties::kBlockCacheCfStats =
+    rocksdb_prefix + block_cache_cf_stats;
+const std::string DB::Properties::kFastBlockCacheCfStats =
+    rocksdb_prefix + fast_block_cache_cf_stats;
 const std::string DB::Properties::kNumImmutableMemTable =
     rocksdb_prefix + num_immutable_mem_table;
 const std::string DB::Properties::kNumImmutableMemTableFlushed =
@@ -476,6 +497,12 @@ const UnorderedMap<std::string, DBPropertyInfo>
         {DB::Properties::kFastBlockCacheEntryStats,
          {true, &InternalStats::HandleFastBlockCacheEntryStats, nullptr,
           &InternalStats::HandleFastBlockCacheEntryStatsMap, nullptr}},
+        {DB::Properties::kBlockCacheCfStats,
+         {true, &InternalStats::HandleBlockCacheCfStats, nullptr,
+          &InternalStats::HandleBlockCacheCfStatsMap, nullptr}},
+        {DB::Properties::kFastBlockCacheCfStats,
+         {true, &InternalStats::HandleFastBlockCacheCfStats, nullptr,
+          &InternalStats::HandleFastBlockCacheCfStatsMap, nullptr}},
         {DB::Properties::kSSTables,
          {false, &InternalStats::HandleSsTables, nullptr, nullptr, nullptr}},
         {DB::Properties::kAggregatedTableProperties,
@@ -676,14 +703,17 @@ void InternalStats::CollectCacheEntryStats(bool foreground) {
 }
 
 std::function<void(const Slice& key, Cache::ObjectPtr value, size_t charge,
-                   const Cache::CacheItemHelper* helper)>
+                   const Cache::CacheItemHelper* helper,
+                   Cache::ItemOwnerId item_owner_id)>
 InternalStats::CacheEntryRoleStats::GetEntryCallback() {
   return [&](const Slice& /*key*/, Cache::ObjectPtr /*value*/, size_t charge,
-             const Cache::CacheItemHelper* helper) -> void {
+             const Cache::CacheItemHelper* helper,
+             Cache::ItemOwnerId item_owner_id) -> void {
     size_t role_idx =
         static_cast<size_t>(helper ? helper->role : CacheEntryRole::kMisc);
     entry_counts[role_idx]++;
     total_charges[role_idx] += charge;
+    charge_per_item_owner[item_owner_id][role_idx] += charge;
   };
 }
 
@@ -744,6 +774,33 @@ std::string InternalStats::CacheEntryRoleStats::ToString(
   return str.str();
 }
 
+std::string InternalStats::CacheEntryRoleStats::CacheOwnerStatsToString(
+    const std::string& cf_name, Cache::ItemOwnerId cache_owner_id) {
+  std::ostringstream str;
+
+  const auto& cf_charges_per_role_pos =
+      charge_per_item_owner.find(cache_owner_id);
+
+  std::vector<CacheEntryRole> roles{CacheEntryRole::kDataBlock,
+                                    CacheEntryRole::kFilterBlock,
+                                    CacheEntryRole::kIndexBlock};
+
+  str << "Block cache [" << cf_name << "] ";
+
+  for (auto role : roles) {
+    auto role_idx = static_cast<unsigned int>(role);
+    uint64_t role_total_charge = 0U;
+    if (cf_charges_per_role_pos != charge_per_item_owner.end()) {
+      role_total_charge = cf_charges_per_role_pos->second[role_idx];
+    }
+
+    str << " " << kCacheEntryRoleToCamelString[role_idx] << "("
+        << BytesToHumanString(role_total_charge) << ")";
+  }
+  str << '\n';
+  return str.str();
+}
+
 void InternalStats::CacheEntryRoleStats::ToMap(
     std::map<std::string, std::string>* values, SystemClock* clock) const {
   values->clear();
@@ -763,6 +820,25 @@ void InternalStats::CacheEntryRoleStats::ToMap(
         std::to_string(total_charges[i]);
     v[BlockCacheEntryStatsMapKeys::UsedPercent(role)] =
         std::to_string(100.0 * total_charges[i] / cache_capacity);
+  }
+}
+
+void InternalStats::CacheEntryRoleStats::CacheOwnerStatsToMap(
+    const std::string& cf_name, Cache::ItemOwnerId cache_owner_id,
+    std::map<std::string, std::string>* values) const {
+  values->clear();
+  auto& v = *values;
+  v[BlockCacheCfStatsMapKeys::CfName()] = cf_name;
+  v[BlockCacheCfStatsMapKeys::CacheId()] = cache_id;
+  const auto& cache_owner_charges = charge_per_item_owner.find(cache_owner_id);
+  for (size_t i = 0; i < kNumCacheEntryRoles; ++i) {
+    auto role = static_cast<CacheEntryRole>(i);
+    if (cache_owner_charges != charge_per_item_owner.end()) {
+      v[BlockCacheCfStatsMapKeys::UsedBytes(role)] =
+          std::to_string(charge_per_item_owner.at(cache_owner_id)[i]);
+    } else {
+      v[BlockCacheCfStatsMapKeys::UsedBytes(role)] = "0";
+    }
   }
 }
 
@@ -808,6 +884,51 @@ bool InternalStats::HandleFastBlockCacheEntryStats(std::string* value,
 bool InternalStats::HandleFastBlockCacheEntryStatsMap(
     std::map<std::string, std::string>* values, Slice /*suffix*/) {
   return HandleBlockCacheEntryStatsMapInternal(values, true /* fast */);
+}
+
+bool InternalStats::HandleBlockCacheCfStatsInternal(std::string* value,
+                                                    bool fast) {
+  if (!cache_entry_stats_collector_) {
+    return false;
+  }
+  CollectCacheEntryStats(!fast /* foreground */);
+  CacheEntryRoleStats stats;
+  cache_entry_stats_collector_->GetStats(&stats);
+  *value =
+      stats.CacheOwnerStatsToString(cfd_->GetName(), cfd_->GetCacheOwnerId());
+  return true;
+}
+
+bool InternalStats::HandleBlockCacheCfStatsMapInternal(
+    std::map<std::string, std::string>* values, bool fast) {
+  if (!cache_entry_stats_collector_) {
+    return false;
+  }
+  CollectCacheEntryStats(!fast /* foreground */);
+  CacheEntryRoleStats stats;
+  cache_entry_stats_collector_->GetStats(&stats);
+  stats.CacheOwnerStatsToMap(cfd_->GetName(), cfd_->GetCacheOwnerId(), values);
+  return true;
+}
+
+bool InternalStats::HandleBlockCacheCfStats(std::string* value,
+                                            Slice /*suffix*/) {
+  return HandleBlockCacheCfStatsInternal(value, false /* fast */);
+}
+
+bool InternalStats::HandleBlockCacheCfStatsMap(
+    std::map<std::string, std::string>* values, Slice /*suffix*/) {
+  return HandleBlockCacheCfStatsMapInternal(values, false /* fast */);
+}
+
+bool InternalStats::HandleFastBlockCacheCfStats(std::string* value,
+                                                Slice /*suffix*/) {
+  return HandleBlockCacheCfStatsInternal(value, true /* fast */);
+}
+
+bool InternalStats::HandleFastBlockCacheCfStatsMap(
+    std::map<std::string, std::string>* values, Slice /*suffix*/) {
+  return HandleBlockCacheCfStatsMapInternal(values, true /* fast */);
 }
 
 bool InternalStats::HandleLiveSstFilesSizeAtTemperature(std::string* value,
@@ -2061,6 +2182,8 @@ void InternalStats::DumpCFStatsNoFileHistogram(bool is_periodic,
     // Skip if stats are extremely old (> 1 day, incl not yet populated)
     if (now_micros - stats.last_end_time_micros_ < kDayInMicros) {
       value->append(stats.ToString(clock_));
+      value->append(stats.CacheOwnerStatsToString(cfd_->GetName(),
+                                                  cfd_->GetCacheOwnerId()));
     }
   }
 }

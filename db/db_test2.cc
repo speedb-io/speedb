@@ -1,3 +1,17 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -2047,6 +2061,46 @@ TEST_F(DBTest2, DuplicateSnapshot) {
     db_->ReleaseSnapshot(s);
   }
 }
+
+#ifdef SPEEDB_SNAP_OPTIMIZATION
+// This test should run only if there is snapshot optimization enabled
+TEST_F(DBTest2, RefSnapshot) {
+  Options options;
+  options = CurrentOptions(options);
+  std::vector<const Snapshot*> snapshots;
+  DBImpl* dbi = static_cast_with_check<DBImpl>(db_);
+  SequenceNumber oldest_ww_snap, first_ww_snap;
+
+  ASSERT_OK(Put("k", "v"));  // inc seq
+  snapshots.push_back(db_->GetSnapshot());
+  snapshots.push_back(db_->GetSnapshot());
+  ASSERT_OK(Put("k", "v"));  // inc seq
+  snapshots.push_back(db_->GetSnapshot());
+  snapshots.push_back(dbi->GetSnapshotForWriteConflictBoundary());
+  first_ww_snap = snapshots.back()->GetSequenceNumber();
+  ASSERT_OK(Put("k", "v"));  // inc seq
+  snapshots.push_back(dbi->GetSnapshotForWriteConflictBoundary());
+  snapshots.push_back(db_->GetSnapshot());
+  ASSERT_OK(Put("k", "v"));  // inc seq
+  snapshots.push_back(db_->GetSnapshot());
+  snapshots.push_back(db_->GetSnapshot());  // this should create a reference
+
+  {
+    InstrumentedMutexLock l(dbi->mutex());
+    auto seqs = dbi->snapshots().GetAll(&oldest_ww_snap);
+    ASSERT_EQ(seqs.size(), 4);  // duplicates are not counted
+    ASSERT_EQ(oldest_ww_snap, first_ww_snap);
+    ASSERT_EQ(dbi->snapshots().count(),
+              6);  // how many snapshots stored in SnapshotList
+    ASSERT_EQ(dbi->snapshots().logical_count(),
+              8);  // how many snapshots in the system
+  }
+
+  for (auto s : snapshots) {
+    db_->ReleaseSnapshot(s);
+  }
+}
+#endif
 
 class PinL0IndexAndFilterBlocksTest
     : public DBTestBase,

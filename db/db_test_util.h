@@ -1,3 +1,17 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 // Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -12,6 +26,7 @@
 #include <fcntl.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cinttypes>
 #include <map>
 #include <memory>
@@ -1097,6 +1112,9 @@ class DBTestBase : public testing::Test {
 
   DBImpl* dbfull() { return static_cast_with_check<DBImpl>(db_); }
 
+  std::atomic<bool>& dbfull_shutting_down() { return dbfull()->shutting_down_; }
+  ErrorHandler& dbfull_error_handler() { return dbfull()->error_handler_; }
+
   void CreateColumnFamilies(const std::vector<std::string>& cfs,
                             const Options& options);
 
@@ -1240,7 +1258,8 @@ class DBTestBase : public testing::Test {
   void FillLevels(const std::string& smallest, const std::string& largest,
                   int cf);
 
-  void MoveFilesToLevel(int level, int cf = 0);
+  void MoveFilesToLevel(int level, int cf = 0,
+                        bool disallow_trivial_move = false);
 
   void DumpFileCounts(const char* label);
 

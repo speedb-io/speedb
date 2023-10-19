@@ -1,3 +1,17 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -19,12 +33,12 @@
 #include "db/table_cache.h"
 #include "db/table_properties_collector.h"
 #include "db/write_batch_internal.h"
-#include "db/write_controller.h"
 #include "options/cf_options.h"
 #include "rocksdb/compaction_job_stats.h"
 #include "rocksdb/db.h"
 #include "rocksdb/env.h"
 #include "rocksdb/options.h"
+#include "rocksdb/write_controller.h"
 #include "trace_replay/block_cache_tracer.h"
 #include "util/hash_containers.h"
 #include "util/thread_local.h"
@@ -481,6 +495,8 @@ class ColumnFamilyData {
   WriteStallCondition RecalculateWriteStallConditions(
       const MutableCFOptions& mutable_cf_options);
 
+  bool IsLastLevelWithData(int level) const;
+
   // REQUIREMENT: db mutex must be held
   double TEST_CalculateWriteDelayDivider(
       uint64_t compaction_needed_bytes,
@@ -488,6 +504,8 @@ class ColumnFamilyData {
       WriteStallCause& write_stall_cause);
 
   void TEST_ResetWriteControllerToken() { write_controller_token_.reset(); }
+
+  VersionStorageInfo* TEST_GetCurrentStorageInfo();
 
  private:
   void UpdateCFRate(void* client_id, uint64_t write_rate);
@@ -562,6 +580,8 @@ class ColumnFamilyData {
   // TODO - Make it a CF option
   static constexpr uint64_t kLaggingFlushesThreshold = 10U;
   void SetNumTimedQueuedForFlush(uint64_t num) { num_queued_for_flush_ = num; }
+
+  Cache::ItemOwnerId GetCacheOwnerId() const { return cache_owner_id_; }
 
   // Allocate and return a new epoch number
   uint64_t NewEpochNumber() { return next_epoch_number_.fetch_add(1); }
@@ -688,6 +708,8 @@ class ColumnFamilyData {
   uint64_t num_queued_for_flush_ = 0U;
 
   std::atomic<uint64_t> next_epoch_number_;
+
+  Cache::ItemOwnerId cache_owner_id_ = Cache::kUnknownItemOwnerId;
 };
 
 // ColumnFamilySet has interesting thread-safety requirements
@@ -805,6 +827,8 @@ class ColumnFamilySet {
   std::shared_ptr<IOTracer> io_tracer_;
   const std::string& db_id_;
   std::string db_session_id_;
+  uint64_t wbm_client_id_ = 0;
+  uint64_t wc_client_id_ = 0;
 };
 
 // A wrapper for ColumnFamilySet that supports releasing DB mutex during each

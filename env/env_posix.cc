@@ -1,3 +1,17 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -215,8 +229,8 @@ class PosixEnv : public CompositeEnv {
 
   ~PosixEnv() override {
     if (this == Env::Default()) {
-      for (const auto tid : threads_to_join_) {
-        pthread_join(tid, nullptr);
+      for (auto& tid : threads_to_join_) {
+        if (tid.joinable()) tid.join();
       }
       for (int pool_id = 0; pool_id < Env::Priority::TOTAL; ++pool_id) {
         thread_pools_[pool_id].JoinAllThreads();
@@ -397,12 +411,12 @@ class PosixEnv : public CompositeEnv {
   // members in te default instance
   std::vector<ThreadPoolImpl> thread_pools_storage_;
   pthread_mutex_t mu_storage_;
-  std::vector<pthread_t> threads_to_join_storage_;
+  std::vector<port::Thread> threads_to_join_storage_;
   bool allow_non_owner_access_storage_;
 
   std::vector<ThreadPoolImpl>& thread_pools_;
   pthread_mutex_t& mu_;
-  std::vector<pthread_t>& threads_to_join_;
+  std::vector<port::Thread>& threads_to_join_;
   // If true, allow non owner read access for db files. Otherwise, non-owner
   //  has no access to db files.
   bool& allow_non_owner_access_;
@@ -451,33 +465,18 @@ int PosixEnv::ReleaseThreads(int threads_to_released, Priority pri) {
   return thread_pools_[pri].ReleaseThreads(threads_to_released);
 }
 
-struct StartThreadState {
-  void (*user_function)(void*);
-  void* arg;
-};
-
-static void* StartThreadWrapper(void* arg) {
-  StartThreadState* state = reinterpret_cast<StartThreadState*>(arg);
-  state->user_function(state->arg);
-  delete state;
-  return nullptr;
-}
-
 void PosixEnv::StartThread(void (*function)(void* arg), void* arg) {
-  pthread_t t;
-  StartThreadState* state = new StartThreadState;
-  state->user_function = function;
-  state->arg = arg;
-  ThreadPoolImpl::PthreadCall(
-      "start thread", pthread_create(&t, nullptr, &StartThreadWrapper, state));
-  ThreadPoolImpl::PthreadCall("lock", pthread_mutex_lock(&mu_));
-  threads_to_join_.push_back(t);
-  ThreadPoolImpl::PthreadCall("unlock", pthread_mutex_unlock(&mu_));
+  auto thr = port::Thread(function, arg);
+  pthread_mutex_lock(&mu_);
+  threads_to_join_.push_back(std::move(thr));
+  pthread_mutex_unlock(&mu_);
 }
 
 void PosixEnv::WaitForJoin() {
-  for (const auto tid : threads_to_join_) {
-    pthread_join(tid, nullptr);
+  for (auto& thr : threads_to_join_) {
+    if (thr.joinable()) {
+      thr.join();
+    }
   }
   threads_to_join_.clear();
 }

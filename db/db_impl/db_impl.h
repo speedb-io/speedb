@@ -1,3 +1,17 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -23,6 +37,7 @@
 #include "db/column_family.h"
 #include "db/compaction/compaction_iterator.h"
 #include "db/compaction/compaction_job.h"
+#include "db/db_impl/compact_range_threads_mngr.h"
 #include "db/db_impl/db_spdb_impl_write.h"
 #include "db/error_handler.h"
 #include "db/event_helpers.h"
@@ -45,7 +60,6 @@
 #include "db/trim_history_scheduler.h"
 #include "db/version_edit.h"
 #include "db/wal_manager.h"
-#include "db/write_controller.h"
 #include "db/write_thread.h"
 #include "logging/event_logger.h"
 #include "monitoring/instrumented_mutex.h"
@@ -59,6 +73,7 @@
 #include "rocksdb/transaction_log.h"
 #include "rocksdb/utilities/replayer.h"
 #include "rocksdb/write_buffer_manager.h"
+#include "rocksdb/write_controller.h"
 #include "table/merging_iterator.h"
 #include "table/scoped_arena_iterator.h"
 #include "util/autovector.h"
@@ -345,6 +360,11 @@ class DBImpl : public DB {
       std::vector<Iterator*>* iterators) override;
 
   virtual const Snapshot* GetSnapshot() override;
+  // Will unref a snapshot copy
+  // Returns true if the snapshot has not been deleted from SnapshotList
+  bool UnRefSnapshot(const SnapshotImpl* snapshot, bool& is_cached_snapshot);
+  // true if the snapshot provided has been referenced, otherwise false
+  bool RefSnapshot(bool is_write_conflict_boundary, SnapshotImpl* snapshot);
   virtual void ReleaseSnapshot(const Snapshot* snapshot) override;
   // Create a timestamped snapshot. This snapshot can be shared by multiple
   // readers. If any of them uses it for write conflict checking, then
@@ -1599,6 +1619,11 @@ class DBImpl : public DB {
   friend class DBCompactionTest_CompactionDuringShutdown_Test;
   friend class StatsHistoryTest_PersistentStatsCreateColumnFamilies_Test;
 #ifndef NDEBUG
+  // Since all of the ut-s inherit from DBTestBase, this should be the only
+  // friend. Methods should be added (as applicable) to DBTestBase to allow
+  // access to the internals of DBImpl to ut-s
+  friend class DBTestBase;
+
   friend class DBTest2_ReadCallbackTest_Test;
   friend class WriteCallbackPTest_WriteWithCallbackTest_Test;
   friend class XFTransactionWriteHandler;
@@ -2339,6 +2364,17 @@ class DBImpl : public DB {
 
   bool ShouldReferenceSuperVersion(const MergeContext& merge_context);
 
+  void CompactRangeNonBlockingThread(const CompactRangeOptions options,
+                                     ColumnFamilyData* cfd, std::string begin,
+                                     std::string end,
+                                     const std::string trim_ts);
+
+  Status CompactRangeInternalBlocking(const CompactRangeOptions& options,
+                                      ColumnFamilyData* cfd, const Slice* begin,
+                                      const Slice* end,
+                                      const std::string& trim_ts);
+
+ private:
   // Lock over the persistent DB state.  Non-nullptr iff successfully acquired.
   FileLock* db_lock_;
 
@@ -2751,6 +2787,10 @@ class DBImpl : public DB {
   // The number of LockWAL called without matching UnlockWAL call.
   // See also lock_wal_write_token_
   uint32_t lock_wal_count_;
+
+  // Tracks threads created internally to handle non-blocking
+  // CompactRange() requests.
+  CompactRangeThreadsMngr compact_range_threads_mngr_;
 };
 
 class GetWithTimestampReadCallback : public ReadCallback {

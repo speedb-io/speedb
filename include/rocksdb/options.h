@@ -1,3 +1,17 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 // Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -11,6 +25,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <atomic>
 #include <limits>
 #include <memory>
 #include <string>
@@ -55,8 +70,10 @@ class Statistics;
 class InternalKeyComparator;
 class WalFilter;
 class WriteBufferManager;
-class FileSystem;
 class WriteController;
+class FileSystem;
+class SharedOptions;
+class TablePinningPolicy;
 
 struct Options;
 struct DbPath;
@@ -104,6 +121,18 @@ struct ColumnFamilyOptions : public AdvancedColumnFamilyOptions {
   ColumnFamilyOptions* OptimizeUniversalStyleCompaction(
       uint64_t memtable_memory_budget = 512 * 1024 * 1024);
 
+  // Default values for some parameters in ColumnFamilyOptions are not
+  // optimized for Speedb features, As a starting point for configuring
+  // Speedb Features.
+  // please avoid changing:
+  // write_buffer_size, cache, write_controller, write_buffer_manager,
+  // table_factory, memtable_factory.
+  // the function might override any of those major options, some more options
+  // might be overridden please read the code.
+  // use example can be found in  enable_speedb_features_example.cc
+  // bucket count is initialized to 0; max_write_buffer_number is initialized to
+  // 32
+  ColumnFamilyOptions* EnableSpeedbFeaturesCF(SharedOptions& shared_options);
   // -------------------
   // Parameters that affect behavior
 
@@ -468,6 +497,19 @@ struct DBOptions {
   // cores. You almost definitely want to call this function if your system is
   // bottlenecked by RocksDB.
   DBOptions* IncreaseParallelism(int total_threads = 16);
+
+  // Enable Speedb features function for DBOptions
+  //
+  // please avoid changing:
+  // write_buffer_size cache, write_controller, delayed_write_rate
+  // bytes_per_sync, write_buffer_manager, use_dynamic_delay table_factory and
+  // memtable_factory we will initialize and configure those.
+  // the function might override any of those major options, some more options
+  // might be overridden please read the code.
+  // use example can be fuond in  enable_speedb_features_example.cc
+  DBOptions* EnableSpeedbFeaturesDB(SharedOptions& shared_options);
+
+  // #endif  // ROCKSDB_LITE
 
   // If true, the database will be created if it is missing.
   // Default: false
@@ -1436,6 +1478,8 @@ struct DBOptions {
   // Defaults to check once per hour.  Set to 0 to disable the task.
   unsigned int refresh_options_sec = 60 * 60;
   std::string refresh_options_file;
+  std::shared_ptr<std::function<void(std::thread::native_handle_type)>>
+      on_thread_start_callback = nullptr;
 };
 
 // Options to control the behavior of a database (passed to DB::Open)
@@ -1474,6 +1518,17 @@ struct Options : public DBOptions, public ColumnFamilyOptions {
   // Use this if your DB is very small (like under 1GB) and you don't want to
   // spend lots of memory for memtables.
   Options* OptimizeForSmallDb();
+  // Default values for some parameters in Options are not
+  // optimized for Speedb features, As a starting point for configuring
+  // Speedb Features.
+  // if you choose to use it you should not change:
+  // total_ram_size_bytes, max_background_jobs, delayed_write_rate,
+  // write_buffer_size cache, write_controller,
+  // write_buffer_manager,bytes_per_sync, use_dynamic_delay table_factory and
+  // memtable_factory we will initialize and configure those.
+  // the function might overide any of those.
+  // use example can be found in  enable_speedb_features_example.cc
+  Options* EnableSpeedbFeatures(SharedOptions& shared_options);
 
   // Disable some checks that should not be necessary in the absence of
   // software logic errors or CPU+memory hardware errors. This can improve
@@ -1742,6 +1797,7 @@ struct ReadOptions {
   // If true, DB with TTL will not Get keys that reached their timeout
   // Default: false
   bool skip_expired_data = false;
+  bool part_of_flush = false;
 
   ReadOptions();
   ReadOptions(bool cksum, bool cache);
@@ -1902,6 +1958,39 @@ enum class BlobGarbageCollectionPolicy {
   kUseDefault,
 };
 
+// An abstract base class for non-blocking (asynchronous) manual compaction
+// See async_completion_cb below and the CompactRange() API call for more
+// details
+class CompactRangeCompletedCbIf {
+ public:
+  virtual ~CompactRangeCompletedCbIf() = default;
+
+  // Non-Blocking Manual Compaction Completion callback to be overridden
+  // by the user's derived class
+  virtual void CompletedCb(Status completion_status) = 0;
+
+  bool WasCbCalled() const { return was_cb_called_; }
+
+ private:
+  // This is the actual callback called from the internal manual compaction
+  // thread when manual compaction completes.
+  void InternalCompletedCb(Status completion_status) {
+    // Call the user's callback
+    CompletedCb(completion_status);
+    was_cb_called_ = true;
+  }
+
+ private:
+  // Once the callback is called the internal thread has completed
+  // and may safely be joined
+  std::atomic<bool> was_cb_called_ = false;
+
+ private:
+  // Needed to allow the internal thread (a member of DBImpl) to call
+  // the private InternalCompletedCb().
+  friend class DBImpl;
+};
+
 // CompactRangeOptions is used by CompactRange() call.
 struct CompactRangeOptions {
   // If true, no other compaction will run at the same time as this
@@ -1957,6 +2046,10 @@ struct CompactRangeOptions {
   // user-provided setting. This enables customers to selectively override the
   // age cutoff.
   double blob_garbage_collection_age_cutoff = -1;
+
+  // An optional completion callback to allow for non-blocking (async) operation
+  // Default: Empty (Blocking)
+  std::shared_ptr<CompactRangeCompletedCbIf> async_completion_cb;
 };
 
 // IngestExternalFileOptions is used by IngestExternalFile()
@@ -2140,6 +2233,47 @@ struct LiveFilesStorageInfoOptions {
   // number (and DB is not read-only).
   // Default: always force a flush without checking sizes.
   uint64_t wal_size_for_flush = 0;
+};
+
+// use this class to arrange multiple db shared options as a group
+// this class includes all the shared_ptrs from DBOptions.
+// it is also includes initialization for Speedb features
+// more info and use example can be found in  enable_speedb_features_example.cc
+class SharedOptions {
+ public:
+  SharedOptions();
+  SharedOptions(size_t total_ram_size_bytes, size_t total_threads,
+                size_t delayed_write_rate = 256 * 1024 * 1024ul,
+                size_t bucket_size = 1000000, bool use_merge = true);
+  size_t GetTotalThreads() { return total_threads_; }
+  size_t GetTotalRamSizeBytes() { return total_ram_size_bytes_; }
+  size_t GetDelayedWriteRate() { return delayed_write_rate_; }
+  size_t GetBucketSize() { return bucket_size_; }
+  size_t IsMergeMemtableSupported() { return use_merge_; }
+  // this function will increase write buffer manager by increased_by amount
+  // as long as the result is not bigger than the maximum size of
+  // total_ram_size_ /4
+  void IncreaseWriteBufferSize(size_t increase_by);
+  void CreatePinningPolicy();
+  size_t GetMaxWriteBufferManagerSize() const;
+
+  std::shared_ptr<Cache> cache = nullptr;
+  std::shared_ptr<WriteController> write_controller = nullptr;
+  std::shared_ptr<WriteBufferManager> write_buffer_manager = nullptr;
+  Env* env = Env::Default();
+  std::shared_ptr<RateLimiter> rate_limiter = nullptr;
+  std::shared_ptr<SstFileManager> sst_file_manager = nullptr;
+  std::shared_ptr<Logger> info_log = nullptr;
+  std::vector<std::shared_ptr<EventListener>> listeners;
+  std::shared_ptr<FileChecksumGenFactory> file_checksum_gen_factory = nullptr;
+  std::shared_ptr<TablePinningPolicy> pinning_policy = nullptr;
+
+ private:
+  size_t total_threads_ = 0;
+  size_t total_ram_size_bytes_ = 0;
+  size_t delayed_write_rate_ = 0;
+  size_t bucket_size_ = 1000000;
+  bool use_merge_ = true;
 };
 
 }  // namespace ROCKSDB_NAMESPACE

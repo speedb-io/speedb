@@ -53,3 +53,13 @@ add_executable(speedb_is_awesome_example
   speedb_is_awesome_example.cc)
   target_link_libraries(speedb_is_awesome_example
     ${ROCKSDB_LIB})
+
+add_executable(on_thread_start_callback_example
+on_thread_start_callback_example.cc)
+    target_link_libraries(on_thread_start_callback_example
+      ${ROCKSDB_LIB})
+
+add_executable(speedb_non_blocking_compact_range_example
+speedb_non_blocking_compact_range_example.cc)
+    target_link_libraries(speedb_non_blocking_compact_range_example
+      ${ROCKSDB_LIB})

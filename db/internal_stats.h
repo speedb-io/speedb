@@ -1,3 +1,17 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -479,6 +493,10 @@ class InternalStats {
     uint64_t last_start_time_micros_ = 0;
     uint64_t last_end_time_micros_ = 0;
 
+    std::unordered_map<Cache::ItemOwnerId,
+                       std::array<size_t, kNumCacheEntryRoles>>
+        charge_per_item_owner;
+
     void Clear() {
       // Wipe everything except collection_count
       uint32_t saved_collection_count = collection_count;
@@ -488,7 +506,8 @@ class InternalStats {
 
     void BeginCollection(Cache*, SystemClock*, uint64_t start_time_micros);
     std::function<void(const Slice& key, Cache::ObjectPtr value, size_t charge,
-                       const Cache::CacheItemHelper* helper)>
+                       const Cache::CacheItemHelper* helper,
+                       Cache::ItemOwnerId item_owner_id)>
     GetEntryCallback();
     void EndCollection(Cache*, SystemClock*, uint64_t end_time_micros);
     void SkippedCollection();
@@ -496,6 +515,12 @@ class InternalStats {
     std::string ToString(SystemClock* clock) const;
     void ToMap(std::map<std::string, std::string>* values,
                SystemClock* clock) const;
+
+    std::string CacheOwnerStatsToString(const std::string& cf_name,
+                                        Cache::ItemOwnerId cache_owner_id);
+    void CacheOwnerStatsToMap(const std::string& cf_name,
+                              Cache::ItemOwnerId cache_owner_id,
+                              std::map<std::string, std::string>* values) const;
 
    private:
     uint64_t GetLastDurationMicros() const;
@@ -844,6 +869,15 @@ class InternalStats {
                                      Slice suffix);
   bool HandleFastBlockCacheEntryStats(std::string* value, Slice suffix);
   bool HandleFastBlockCacheEntryStatsMap(
+      std::map<std::string, std::string>* values, Slice suffix);
+  bool HandleBlockCacheCfStatsInternal(std::string* value, bool fast);
+  bool HandleBlockCacheCfStatsMapInternal(
+      std::map<std::string, std::string>* values, bool fast);
+  bool HandleBlockCacheCfStats(std::string* value, Slice suffix);
+  bool HandleBlockCacheCfStatsMap(std::map<std::string, std::string>* values,
+                                  Slice suffix);
+  bool HandleFastBlockCacheCfStats(std::string* value, Slice suffix);
+  bool HandleFastBlockCacheCfStatsMap(
       std::map<std::string, std::string>* values, Slice suffix);
   bool HandleLiveSstFilesSizeAtTemperature(std::string* value, Slice suffix);
   bool HandleNumBlobFiles(uint64_t* value, DBImpl* db, Version* version);

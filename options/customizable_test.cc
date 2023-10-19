@@ -1,3 +1,17 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -31,6 +45,7 @@
 #include "rocksdb/slice_transform.h"
 #include "rocksdb/sst_partitioner.h"
 #include "rocksdb/statistics.h"
+#include "rocksdb/table_pinning_policy.h"
 #include "rocksdb/utilities/customizable_util.h"
 #include "rocksdb/utilities/object_registry.h"
 #include "rocksdb/utilities/options_type.h"
@@ -1392,6 +1407,22 @@ class MockFilterPolicy : public FilterPolicy {
   }
 };
 
+class MockTablePinningPolicy : public TablePinningPolicy {
+ public:
+  static const char* kClassName() { return "Mock"; }
+  const char* Name() const override { return kClassName(); }
+  bool MayPin(const TablePinningOptions&, uint8_t, size_t) const override {
+    return false;
+  }
+  bool PinData(const TablePinningOptions&, uint8_t, size_t,
+               std::unique_ptr<PinnedEntry>*) override {
+    return false;
+  }
+  void UnPinData(std::unique_ptr<PinnedEntry>&&) override {}
+  size_t GetPinnedUsage() const override { return 0; }
+  std::string ToString() const override { return ""; }
+};
+
 static int RegisterLocalObjects(ObjectLibrary& library,
                                 const std::string& /*arg*/) {
   size_t num_types;
@@ -1506,12 +1537,18 @@ static int RegisterLocalObjects(ObjectLibrary& library,
         guard->reset(new MockTablePropertiesCollectorFactory());
         return guard->get();
       });
-
   library.AddFactory<const FilterPolicy>(
       MockFilterPolicy::kClassName(),
       [](const std::string& /*uri*/, std::unique_ptr<const FilterPolicy>* guard,
          std::string* /* errmsg */) {
         guard->reset(new MockFilterPolicy());
+        return guard->get();
+      });
+  library.AddFactory<TablePinningPolicy>(
+      MockTablePinningPolicy::kClassName(),
+      [](const std::string& /*uri*/, std::unique_ptr<TablePinningPolicy>* guard,
+         std::string* /* errmsg */) {
+        guard->reset(new MockTablePinningPolicy());
         return guard->get();
       });
 
@@ -2105,6 +2142,13 @@ TEST_F(LoadCustomizableTest, LoadFlushBlockPolicyFactoryTest) {
     ASSERT_NE(bbto->flush_block_policy_factory.get(), nullptr);
     ASSERT_STREQ(bbto->flush_block_policy_factory->Name(),
                  TestFlushBlockPolicyFactory::kClassName());
+  }
+}
+
+TEST_F(LoadCustomizableTest, LoadTablePiningPolicyTest) {
+  ASSERT_OK(TestSharedBuiltins<TablePinningPolicy>("Mock", ""));
+  if (RegisterTests("Test")) {
+    ExpectCreateShared<TablePinningPolicy>("Mock");
   }
 }
 

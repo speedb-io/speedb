@@ -1,3 +1,17 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -11,6 +25,7 @@
 
 #include <algorithm>
 #include <cinttypes>
+#include <functional>
 #include <limits>
 #include <memory>
 #include <sstream>
@@ -29,7 +44,6 @@
 #include "db/range_del_aggregator.h"
 #include "db/table_properties_collector.h"
 #include "db/version_set.h"
-#include "db/write_controller.h"
 #include "file/sst_file_manager_impl.h"
 #include "logging/logging.h"
 #include "monitoring/thread_status_util.h"
@@ -37,6 +51,7 @@
 #include "port/port.h"
 #include "rocksdb/convenience.h"
 #include "rocksdb/table.h"
+#include "rocksdb/write_controller.h"
 #include "table/merging_iterator.h"
 #include "util/autovector.h"
 #include "util/cast_util.h"
@@ -584,9 +599,11 @@ ColumnFamilyData::ColumnFamilyData(
   if (_dummy_versions != nullptr) {
     internal_stats_.reset(
         new InternalStats(ioptions_.num_levels, ioptions_.clock, this));
-    table_cache_.reset(new TableCache(ioptions_, file_options, _table_cache,
-                                      block_cache_tracer, io_tracer,
-                                      db_session_id));
+    auto is_last_level_with_data_func = std::bind(
+        &ColumnFamilyData::IsLastLevelWithData, this, std::placeholders::_1);
+    table_cache_.reset(new TableCache(
+        ioptions_, file_options, _table_cache, block_cache_tracer, io_tracer,
+        db_session_id, is_last_level_with_data_func));
     blob_file_cache_.reset(
         new BlobFileCache(_table_cache, ioptions(), soptions(), id_,
                           internal_stats_->GetBlobFileReadHist(), io_tracer));
@@ -649,6 +666,11 @@ ColumnFamilyData::ColumnFamilyData(
               CacheReservationManagerImpl<CacheEntryRole::kFileMetadata>>(
               bbto->block_cache)));
     }
+
+    if (bbto->block_cache && table_cache_) {
+      cache_owner_id_ = bbto->block_cache->GetNextItemOwnerId();
+      table_cache_->SetBlockCacheOwnerId(cache_owner_id_);
+    }
   }
 }
 
@@ -661,6 +683,12 @@ ColumnFamilyData::~ColumnFamilyData() {
   auto next = next_;
   prev->next_ = next;
   next->prev_ = prev;
+
+  const BlockBasedTableOptions* bbto =
+      ioptions_.table_factory->GetOptions<BlockBasedTableOptions>();
+  if (bbto && bbto->block_cache) {
+    bbto->block_cache->DiscardItemOwnerId(&cache_owner_id_);
+  }
 
   if (!dropped_ && column_family_set_ != nullptr) {
     // If it's dropped, it's already removed from column family set
@@ -1647,6 +1675,24 @@ void ColumnFamilyData::RecoverEpochNumbers() {
   vstorage->RecoverEpochNumbers(this);
 }
 
+VersionStorageInfo* ColumnFamilyData::TEST_GetCurrentStorageInfo() {
+  return current_->storage_info();
+}
+
+bool ColumnFamilyData::IsLastLevelWithData(int level) const {
+  auto* vstorage = current_->storage_info();
+  assert(vstorage);
+
+  int last_level_with_data = vstorage->num_non_empty_levels() - 1;
+
+  auto is_last_level_with_data = false;
+  if ((level > 0) && (level == last_level_with_data)) {
+    is_last_level_with_data = true;
+  }
+
+  return is_last_level_with_data;
+}
+
 ColumnFamilySet::ColumnFamilySet(
     const std::string& dbname, const ImmutableDBOptions* db_options,
     const FileOptions& file_options, Cache* table_cache,
@@ -1674,11 +1720,15 @@ ColumnFamilySet::ColumnFamilySet(
   // initialize linked list
   dummy_cfd_->prev_ = dummy_cfd_;
   dummy_cfd_->next_ = dummy_cfd_;
-  write_buffer_manager_->RegisterWriteController(write_controller_);
+  wbm_client_id_ = write_buffer_manager_->RegisterWCAndLogger(
+      write_controller_, db_options_->info_log);
+  wc_client_id_ = write_controller_->RegisterLogger(db_options_->info_log);
 }
 
 ColumnFamilySet::~ColumnFamilySet() {
-  write_buffer_manager_->DeregisterWriteController(write_controller_);
+  write_buffer_manager_->DeregisterWCAndLogger(
+      write_controller_, db_options_->info_log, wbm_client_id_);
+  write_controller_->DeregisterLogger(db_options_->info_log, wc_client_id_);
   while (column_family_data_.size() > 0) {
     // cfd destructor will delete itself from column_family_data_
     auto cfd = column_family_data_.begin()->second;

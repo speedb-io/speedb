@@ -1,3 +1,17 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 // Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -219,6 +233,21 @@ public class CompactRangeOptions extends RocksObject {
     return this;
   }
 
+  /**
+   * Calling this method makes the call to compaction range using these options
+   * non-blocking.
+   *
+   * @return This CompactRangeOptions
+   * @param completionCb Callback that will be called when the non-blocking manual
+   * compaction completes.
+   */
+  public CompactRangeOptions setAsyncCompletionCb(
+      final AbstractCompactRangeCompletedCb completionCb) {
+    assert (isOwningHandle());
+    setAsyncCompletionCb(nativeHandle_, completionCb.nativeHandle_);
+    return this;
+  }
+
   private native static long newCompactRangeOptions();
   @Override protected final native void disposeInternal(final long handle);
 
@@ -243,4 +272,6 @@ public class CompactRangeOptions extends RocksObject {
   private native void setMaxSubcompactions(final long handle,
       final int maxSubcompactions);
   private native int maxSubcompactions(final long handle);
+
+  private native void setAsyncCompletionCb(final long nativeHandle_, final long completeCbHandle);
 }

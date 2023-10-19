@@ -1,3 +1,17 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -839,6 +853,8 @@ Status FlushJob::WriteLevel0Table() {
         range_del_iters;
     ReadOptions ro;
     ro.total_order_seek = true;
+    ro.part_of_flush = true;
+
     Arena arena;
     uint64_t total_num_entries = 0, total_num_deletes = 0;
     uint64_t total_data_size = 0;
@@ -923,9 +939,9 @@ Status FlushJob::WriteLevel0Table() {
           cfd_->int_tbl_prop_collector_factories(), output_compression_,
           mutable_cf_options_.compression_opts, cfd_->GetID(), cfd_->GetName(),
           0 /* level */, false /* is_bottommost */,
-          TableFileCreationReason::kFlush, oldest_key_time, current_time,
-          db_id_, db_session_id_, 0 /* target_file_size */,
-          meta_.fd.GetNumber());
+          false /* is_last_level_with_data */, TableFileCreationReason::kFlush,
+          oldest_key_time, current_time, db_id_, db_session_id_,
+          0 /* target_file_size */, meta_.fd.GetNumber());
       const SequenceNumber job_snapshot_seq =
           job_context_->GetJobSnapshotSequence();
       s = BuildTable(

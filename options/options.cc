@@ -1,3 +1,17 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -19,6 +33,7 @@
 #include "rocksdb/cache.h"
 #include "rocksdb/compaction_filter.h"
 #include "rocksdb/comparator.h"
+#include "rocksdb/convenience.h"
 #include "rocksdb/env.h"
 #include "rocksdb/filter_policy.h"
 #include "rocksdb/memtablerep.h"
@@ -28,9 +43,11 @@
 #include "rocksdb/sst_file_manager.h"
 #include "rocksdb/sst_partitioner.h"
 #include "rocksdb/table.h"
+#include "rocksdb/table_pinning_policy.h"
 #include "rocksdb/table_properties.h"
 #include "rocksdb/wal_filter.h"
 #include "rocksdb/write_buffer_manager.h"
+#include "rocksdb/write_controller.h"
 #include "table/block_based/block_based_table_factory.h"
 #include "util/compression.h"
 
@@ -531,6 +548,99 @@ Options* Options::OldDefaults(int rocksdb_major_version,
   return this;
 }
 
+Options* Options::EnableSpeedbFeatures(SharedOptions& shared_options) {
+  EnableSpeedbFeaturesDB(shared_options);
+  EnableSpeedbFeaturesCF(shared_options);
+  return this;
+}
+
+SharedOptions::SharedOptions(size_t total_ram_size_bytes, size_t total_threads,
+                             size_t delayed_write_rate, size_t bucket_size,
+                             bool use_merge) {
+  total_threads_ = total_threads;
+  total_ram_size_bytes_ = total_ram_size_bytes;
+  delayed_write_rate_ = delayed_write_rate;
+  bucket_size_ = bucket_size;
+  use_merge_ = use_merge;
+  // initial_write_buffer_size_ is initialized to 1 to avoid from empty memory
+  // which might cause some problems
+  int initial_write_buffer_size_ = 1;
+  cache = NewLRUCache(total_ram_size_bytes_);
+  write_controller.reset(
+      new WriteController(true /*dynamic_delay*/, delayed_write_rate_));
+  write_buffer_manager.reset(new WriteBufferManager(
+      initial_write_buffer_size_, cache, true /*allow_stall*/));
+
+  CreatePinningPolicy();
+}
+
+void SharedOptions::IncreaseWriteBufferSize(size_t increase_by) {
+  // Max write_buffer_manager->buffer_size()
+  size_t wbm_max_buf_size = GetMaxWriteBufferManagerSize();
+  size_t current_buffer_size = write_buffer_manager->buffer_size();
+  size_t set_buf_res = 0;
+
+  if (current_buffer_size == 1 && increase_by > 1) {
+    set_buf_res = increase_by;
+    if (wbm_max_buf_size < increase_by) {
+      set_buf_res = wbm_max_buf_size;
+    }
+  } else if (wbm_max_buf_size > current_buffer_size + increase_by) {
+    set_buf_res = current_buffer_size + increase_by;
+  } else if (wbm_max_buf_size <= current_buffer_size + increase_by) {
+    set_buf_res = wbm_max_buf_size;
+  }
+  if (set_buf_res != 0) {
+    write_buffer_manager->SetBufferSize(set_buf_res);
+  }
+}
+
+void SharedOptions::CreatePinningPolicy() {
+  // Calculate the size of the clean memory
+  auto clean_memory_capacity = cache->GetCapacity();
+  if (write_buffer_manager->cost_to_cache()) {
+    // The WBM's size is increased on every call to EnableSpeedbFeaturesCF()
+    // up to a max size. For simplicity, calculate the space for pinning
+    // as if wbm is at its max size. Otherwise we would have to update the
+    // pinning capacity dynamically as wbm's buffer size grows.
+    auto wbm_max_size = GetMaxWriteBufferManagerSize();
+
+    if (clean_memory_capacity >= wbm_max_size) {
+      clean_memory_capacity -= wbm_max_size;
+    } else {
+      assert(clean_memory_capacity >= wbm_max_size);
+      clean_memory_capacity = 0U;
+    }
+  }
+
+  size_t pinning_capacity = 0.8 * clean_memory_capacity;
+
+  ConfigOptions config_options;
+  config_options.ignore_unknown_options = false;
+  config_options.ignore_unsupported_options = false;
+
+  std::ostringstream oss;
+  oss << "id=speedb_scoped_pinning_policy; capacity=" << pinning_capacity;
+  auto s = TablePinningPolicy::CreateFromString(config_options, oss.str(),
+                                                &pinning_policy);
+  assert(s.ok());
+}
+
+size_t SharedOptions::GetMaxWriteBufferManagerSize() const {
+  return total_ram_size_bytes_ / 4;
+}
+
+DBOptions* DBOptions::EnableSpeedbFeaturesDB(SharedOptions& shared_options) {
+  env = shared_options.env;
+  IncreaseParallelism((int)shared_options.GetTotalThreads());
+  delayed_write_rate = shared_options.GetDelayedWriteRate();
+  bytes_per_sync = 1ul << 20;
+  use_dynamic_delay = true;
+  write_buffer_manager = shared_options.write_buffer_manager;
+  write_controller = shared_options.write_controller;
+  return this;
+}
+
 DBOptions* DBOptions::OldDefaults(int rocksdb_major_version,
                                   int rocksdb_minor_version) {
   if (rocksdb_major_version < 4 ||
@@ -547,6 +657,45 @@ DBOptions* DBOptions::OldDefaults(int rocksdb_major_version,
   }
   max_open_files = 5000;
   wal_recovery_mode = WALRecoveryMode::kTolerateCorruptedTailRecords;
+  return this;
+}
+
+ColumnFamilyOptions* ColumnFamilyOptions::EnableSpeedbFeaturesCF(
+    SharedOptions& shared_options) {
+  // to disable flush due to write buffer full
+  // each new column family will ask the write buffer manager to increase the
+  // write buffer size by 512 * 1024 * 1024ul
+  shared_options.IncreaseWriteBufferSize(512 * 1024 * 1024ul);
+  auto db_wbf_size = shared_options.write_buffer_manager->buffer_size();
+  // cf write_buffer_size
+  write_buffer_size = std::min<size_t>(db_wbf_size / 4, 64ul << 20);
+  max_write_buffer_number = 4;
+  min_write_buffer_number_to_merge = 1;
+  // set the pinning option for indexes and filters
+  {
+    ConfigOptions config_options;
+    config_options.ignore_unknown_options = false;
+    config_options.ignore_unsupported_options = false;
+    BlockBasedTableOptions block_based_table_options;
+    Status s = FilterPolicy::CreateFromString(
+        config_options, "speedb.PairedBloomFilter:10",
+        &block_based_table_options.filter_policy);
+    assert(s.ok());
+    block_based_table_options.cache_index_and_filter_blocks = true;
+    block_based_table_options.block_cache = shared_options.cache;
+    block_based_table_options.cache_index_and_filter_blocks_with_high_priority =
+        true;
+    block_based_table_options.pinning_policy = shared_options.pinning_policy;
+    table_factory.reset(NewBlockBasedTableFactory(block_based_table_options));
+  }
+  if (prefix_extractor) {
+    memtable_factory.reset(
+        NewHashSkipListRepFactory(shared_options.GetBucketSize()));
+  } else {
+    memtable_factory.reset(
+        NewHashSpdbRepFactory(shared_options.GetBucketSize(),
+                              shared_options.IsMergeMemtableSupported()));
+  }
   return this;
 }
 

@@ -1,3 +1,17 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 // Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -46,6 +60,7 @@
 #include <unordered_set>
 
 #include "rocksdb/customizable.h"
+#include "rocksdb/port_defs.h"
 #include "rocksdb/slice.h"
 
 namespace ROCKSDB_NAMESPACE {
@@ -267,7 +282,8 @@ class MemTableRep {
   //        When destroying the iterator, the caller will not call "delete"
   //        but Iterator::~Iterator() directly. The destructor needs to destroy
   //        all the states but those allocated in arena.
-  virtual Iterator* GetIterator(Arena* arena = nullptr) = 0;
+  virtual Iterator* GetIterator(Arena* arena = nullptr,
+                                bool part_of_flush = false) = 0;
 
   // Return an iterator that has a special Seek semantics. The result of
   // a Seek might only include keys with the same prefix as the target key.
@@ -319,7 +335,7 @@ class MemTableRepFactory : public Customizable {
 
   void Init() {
     switch_memtable_thread_ =
-        std::thread(&MemTableRepFactory::PrepareSwitchMemTable, this);
+        port::Thread(&MemTableRepFactory::PrepareSwitchMemTable, this);
     // need to verify the thread was executed
     {
       std::unique_lock<std::mutex> lck(switch_memtable_thread_mutex_);
@@ -420,7 +436,7 @@ class MemTableRepFactory : public Customizable {
   bool enable_switch_memtable_ = false;
 
  private:
-  std::thread switch_memtable_thread_;
+  port::Thread switch_memtable_thread_;
   std::mutex switch_memtable_thread_mutex_;
   std::condition_variable switch_memtable_thread_cv_;
   std::atomic<bool> terminate_switch_memtable_ = false;
@@ -518,5 +534,9 @@ extern MemTableRepFactory* NewHashLinkListRepFactory(
     int bucket_entries_logging_threshold = 4096,
     bool if_log_bucket_dist_when_flash = true,
     uint32_t threshold_use_skiplist = 256);
+
+// The factory is to create memtables based on a sorted hash table - spdb hash:
+extern MemTableRepFactory* NewHashSpdbRepFactory(size_t bucket_count = 1000000,
+                                                 bool use_merge = true);
 
 }  // namespace ROCKSDB_NAMESPACE

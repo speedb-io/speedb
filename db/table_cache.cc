@@ -1,3 +1,17 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -68,7 +82,8 @@ TableCache::TableCache(const ImmutableOptions& ioptions,
                        const FileOptions* file_options, Cache* const cache,
                        BlockCacheTracer* const block_cache_tracer,
                        const std::shared_ptr<IOTracer>& io_tracer,
-                       const std::string& db_session_id)
+                       const std::string& db_session_id,
+                       IsLastLevelWithDataFunc is_last_level_with_data_func)
     : ioptions_(ioptions),
       file_options_(*file_options),
       cache_(cache),
@@ -76,7 +91,8 @@ TableCache::TableCache(const ImmutableOptions& ioptions,
       block_cache_tracer_(block_cache_tracer),
       loader_mutex_(kLoadConcurency, kGetSliceNPHash64UnseededFnPtr),
       io_tracer_(io_tracer),
-      db_session_id_(db_session_id) {
+      db_session_id_(db_session_id),
+      is_last_level_with_data_func_(is_last_level_with_data_func) {
   if (ioptions_.row_cache) {
     // If the same cache is shared by multiple instances, we need to
     // disambiguate its entries.
@@ -124,27 +140,36 @@ Status TableCache::GetTableReader(
       file->Hint(FSRandomAccessFile::kRandom);
     }
     StopWatch sw(ioptions_.clock, ioptions_.stats, TABLE_OPEN_IO_MICROS);
+    bool is_bottom = (level == ioptions_.num_levels - 1);
     std::unique_ptr<RandomAccessFileReader> file_reader(
         new RandomAccessFileReader(
             std::move(file), fname, ioptions_.clock, io_tracer_,
             record_read_stats ? ioptions_.stats : nullptr, SST_READ_MICROS,
             file_read_hist, ioptions_.rate_limiter.get(), ioptions_.listeners,
-            file_temperature, level == ioptions_.num_levels - 1));
+            file_temperature, is_bottom));
     UniqueId64x2 expected_unique_id;
     if (ioptions_.verify_sst_unique_id_in_manifest) {
       expected_unique_id = file_meta.unique_id;
     } else {
       expected_unique_id = kNullUniqueId64x2;  // null ID == no verification
     }
+
+    auto is_last_level_with_data = is_bottom;
+    if (is_last_level_with_data_func_) {
+      is_last_level_with_data = is_last_level_with_data_func_(level);
+    }
+
+    TableReaderOptions table_reader_options(
+        ioptions_, prefix_extractor, file_options, internal_comparator,
+        skip_filters, immortal_tables_, false /* force_direct_prefetch */,
+        level, is_bottom, is_last_level_with_data, block_cache_tracer_,
+        max_file_size_for_l0_meta_pin, db_session_id_, file_meta.fd.GetNumber(),
+        expected_unique_id, file_meta.fd.largest_seqno);
+    table_reader_options.cache_owner_id = cache_owner_id_;
+
     s = ioptions_.table_factory->NewTableReader(
-        ro,
-        TableReaderOptions(ioptions_, prefix_extractor, file_options,
-                           internal_comparator, skip_filters, immortal_tables_,
-                           false /* force_direct_prefetch */, level,
-                           block_cache_tracer_, max_file_size_for_l0_meta_pin,
-                           db_session_id_, file_meta.fd.GetNumber(),
-                           expected_unique_id, file_meta.fd.largest_seqno),
-        std::move(file_reader), file_meta.fd.GetFileSize(), table_reader,
+        ro, table_reader_options, std::move(file_reader),
+        file_meta.fd.GetFileSize(), table_reader,
         prefetch_index_and_filter_in_cache);
     TEST_SYNC_POINT("TableCache::GetTableReader:0");
   }

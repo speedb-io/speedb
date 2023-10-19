@@ -15,7 +15,7 @@
 * LOG Reporting: add reporting capabilities to the WriteController and the WriteBufferManager by saving the Loggers of the dbs which are using them internally and issuing WARN msgs to these Loggers whenever the state of the WC and WBM changes in regards to delaying (#556).
 * Enable speedb features: Use Scoped Pinning Policy in Enable speedb feature (#459).
 * sst_dump: display metaindex_handle and the index_handle's offset and size in footer information (#404).
-
+* Added a kUseBaseAddress flag and GetBaseOffset flag to OptionTypeInfo.  If this flag is set and a function is used for processing options, the function is passed the base address of the struct rather than the specific field (#397)
 ### Bug Fixes
 * db_bench: Fix SeekRandomWriteRandom valid check. Use key and value only after checking iterator is valid.
 * Fix a JAVA build issue introduced by #597 (#680)

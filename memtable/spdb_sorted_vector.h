@@ -185,11 +185,13 @@ using IterAnchors = std::list<SortHeapItem*>;
 
 class SpdbVectorContainer {
  public:
-  SpdbVectorContainer(const MemTableRep::KeyComparator& comparator)
+  SpdbVectorContainer(const MemTableRep::KeyComparator& comparator,
+                      bool use_merge)
       : comparator_(comparator),
         switch_spdb_vector_limit_(10000),
         immutable_(false),
-        num_elements_(0) {
+        num_elements_(0),
+        use_merge_(use_merge) {
     SpdbVectorPtr spdb_vector(new SpdbVector(switch_spdb_vector_limit_));
     spdb_vectors_.push_front(spdb_vector);
     spdb_vector->SetVectorListIter(std::prev(spdb_vectors_.end()));
@@ -206,12 +208,16 @@ class SpdbVectorContainer {
 
   void Insert(const char* key);
 
-  bool IsEmpty() const;
+  bool IsEmpty() const { return num_elements_.load() == 0; };
+
+  bool IsEmpty(bool part_of_flush) const {
+    return num_elements_.load() == 0 || (!use_merge_ && !part_of_flush);
+  }
 
   bool IsReadOnly() const { return immutable_.load(); }
 
   // create a list of current vectors
-  bool InitIterator(IterAnchors& iter_anchor);
+  bool InitIterator(IterAnchors& iter_anchor, bool part_of_flush);
 
   void InitIterator(IterAnchors& iter_anchor,
                     std::list<SpdbVectorPtr>::iterator start,
@@ -246,6 +252,7 @@ class SpdbVectorContainer {
   std::atomic<bool> immutable_;
   // sort thread info
   std::atomic<size_t> num_elements_;
+  bool use_merge_;
   port::Thread sort_thread_;
   std::mutex sort_thread_mutex_;
   std::condition_variable sort_thread_cv_;
@@ -256,12 +263,13 @@ class SpdbVectorIterator : public MemTableRep::Iterator {
   // Initialize an iterator over the specified list.
   // The returned iterator is not valid.
   SpdbVectorIterator(std::shared_ptr<SpdbVectorContainer> spdb_vectors_cont,
-                     const MemTableRep::KeyComparator& comparator)
+                     const MemTableRep::KeyComparator& comparator,
+                     bool part_of_flush)
       : spdb_vectors_cont_holder_(spdb_vectors_cont),
         spdb_vectors_cont_(spdb_vectors_cont.get()),
         iter_heap_info_(comparator),
         up_iter_direction_(true) {
-    spdb_vectors_cont_->InitIterator(iter_anchor_);
+    is_empty_ = !spdb_vectors_cont_->InitIterator(iter_anchor_, part_of_flush);
   }
 
   SpdbVectorIterator(SpdbVectorContainer* spdb_vectors_cont,
@@ -283,80 +291,106 @@ class SpdbVectorIterator : public MemTableRep::Iterator {
   }
 
   // Returns true if the iterator is positioned at a valid node.
-  bool Valid() const override { return iter_heap_info_.Valid(); }
+  bool Valid() const override {
+    return (is_empty_) ? false : iter_heap_info_.Valid();
+  }
+  bool IsEmpty() override { return is_empty_; }
 
   // Returns the key at the current position.
-  const char* key() const override { return iter_heap_info_.Key(); }
+  const char* key() const override {
+    return (is_empty_) ? nullptr : iter_heap_info_.Key();
+  }
 
   void InternalSeek(const Slice* seek_key) {
-    return spdb_vectors_cont_->SeekIter(iter_anchor_, &iter_heap_info_,
-                                        seek_key, up_iter_direction_);
+    if (!is_empty_) {
+      spdb_vectors_cont_->SeekIter(iter_anchor_, &iter_heap_info_, seek_key,
+                                   up_iter_direction_);
+    }
+    return;
   }
 
   void Reset(bool up_iter_direction) {
-    up_iter_direction_ = up_iter_direction;
-    iter_heap_info_.Reset(up_iter_direction_);
+    if (!is_empty_) {
+      up_iter_direction_ = up_iter_direction;
+      iter_heap_info_.Reset(up_iter_direction_);
+    }
   }
 
   void ReverseDirection(bool up_iter_direction) {
-    const Slice seek_key =
-        iter_heap_info_.Comparator().decode_key(iter_heap_info_.Key());
-    Reset(up_iter_direction);
-    InternalSeek(&seek_key);
+    if (!is_empty_) {
+      const Slice seek_key =
+          iter_heap_info_.Comparator().decode_key(iter_heap_info_.Key());
+      Reset(up_iter_direction);
+      InternalSeek(&seek_key);
+    }
   }
 
   void Advance() {
-    SortHeapItem* sort_item = iter_heap_info_.Get();
-    if (up_iter_direction_) {
-      sort_item->Next();
-    } else {
-      sort_item->Prev();
+    if (!is_empty_) {
+      SortHeapItem* sort_item = iter_heap_info_.Get();
+      if (up_iter_direction_) {
+        sort_item->Next();
+      } else {
+        sort_item->Prev();
+      }
+      iter_heap_info_.Update(sort_item);
     }
-    iter_heap_info_.Update(sort_item);
   }
 
   // Advances to the next position.
   void Next() override {
-    if (!up_iter_direction_) {
-      ReverseDirection(true);
+    if (!is_empty_) {
+      if (!up_iter_direction_) {
+        ReverseDirection(true);
+      }
+      Advance();
     }
-    Advance();
   }
 
   // Advances to the previous position.
   void Prev() override {
-    if (up_iter_direction_) {
-      ReverseDirection(false);
+    if (!is_empty_) {
+      if (up_iter_direction_) {
+        ReverseDirection(false);
+      }
+      Advance();
     }
-    Advance();
   }
 
   // Advance to the first entry with a key >= target
   void Seek(const Slice& internal_key,
             const char* /* memtable_key */) override {
-    Reset(true);
-    InternalSeek(&internal_key);
+    if (!is_empty_) {
+      Reset(true);
+      InternalSeek(&internal_key);
+    }
   }
 
   // Retreat to the last entry with a key <= target
   void SeekForPrev(const Slice& internal_key,
                    const char* /* memtable_key */) override {
-    Reset(false);
-    InternalSeek(&internal_key);
+    if (!is_empty_) {
+      Reset(false);
+      InternalSeek(&internal_key);
+    }
   }
 
   // Position at the first entry in list.
   // Final state of iterator is Valid() if list is not empty.
   void SeekToFirst() override {
-    Reset(true);
-    InternalSeek(nullptr);
+    if (!is_empty_) {
+      Reset(true);
+      InternalSeek(nullptr);
+    }
   }
 
   // Position at the last entry in list.
   // Final state of iterator is Valid() if list is not empty.
   void SeekToLast() override {
-    Reset(false);
-    InternalSeek(nullptr);
+    if (!is_empty_) {
+      Reset(false);
+      InternalSeek(nullptr);
+    }
   }
 
  private:
@@ -365,49 +399,9 @@ class SpdbVectorIterator : public MemTableRep::Iterator {
   IterAnchors iter_anchor_;
   IterHeapInfo iter_heap_info_;
   bool up_iter_direction_;
+  bool is_empty_;
 };
-class SpdbVectorIteratorEmpty : public MemTableRep::Iterator {
- public:
-  SpdbVectorIteratorEmpty() {}
 
-  ~SpdbVectorIteratorEmpty() override {}
-
-  // Returns true if the iterator is positioned at a valid node.
-  bool Valid() const override { return false; }
-
-  bool IsEmpty() override { return true; }
-
-  // Returns the key at the current position.
-  const char* key() const override { return nullptr; }
-
-  // Advances to the next position.
-  void Next() override { return; }
-
-  // Advances to the previous position.
-  void Prev() override { return; }
-
-  // Advance to the first entry with a key >= target
-  void Seek(const Slice& /* internal_key */,
-            const char* /* memtable_key */) override {
-    return;
-  }
-
-  // Retreat to the last entry with a key <= target
-  void SeekForPrev(const Slice& /* internal_key */,
-                   const char* /* memtable_key */) override {
-    return;
-  }
-
-  // Position at the first entry in list.
-  // Final state of iterator is Valid() if list is not empty.
-  void SeekToFirst() override { return; }
-
-  // Position at the last entry in list.
-  // Final state of iterator is Valid() if list is not empty.
-  void SeekToLast() override { return; }
-
- private:
-};
 }  // namespace
 
 }  // namespace ROCKSDB_NAMESPACE

@@ -4861,7 +4861,7 @@ class Benchmark {
           pinning_capacity = (80 * cache_capacity) / 100;
         }
         pinning_options.capacity = pinning_capacity;
-        pinning_options.bottom_percent =
+        pinning_options.last_level_with_data_percent =
             FLAGS_scoped_pinning_last_level_with_data_percent;
         pinning_options.mid_percent = FLAGS_scoped_pinning_mid_percent;
         block_based_options.pinning_policy =

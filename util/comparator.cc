@@ -344,7 +344,7 @@ Status Comparator::CreateFromString(const ConfigOptions& config_options,
     RegisterBuiltinComparators(*(ObjectLibrary::Default().get()), "");
   });
   std::string id;
-  std::unordered_map<std::string, std::string> opt_map;
+  OptionProperties opt_map;
   Status status = Customizable::GetOptionsMap(config_options, *result, value,
                                               &id, &opt_map);
   if (!status.ok()) {  // GetOptionsMap failed

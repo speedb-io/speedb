@@ -1413,11 +1413,12 @@ class MockOptionsFormatter : public OptionsFormatter {
  public:
   static const char* kClassName() { return "Mock"; }
   const char* Name() const override { return kClassName(); }
-  std::string ToString(const std::string&, const Properties&) const override {
+  std::string ToString(const std::string&,
+                       const OptionProperties&) const override {
     return "";
   }
 
-  Status ToProps(const std::string&, Properties*) const override {
+  Status ToProps(const std::string&, OptionProperties*) const override {
     return Status::OK();
   }
 

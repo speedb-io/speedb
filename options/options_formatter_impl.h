@@ -24,11 +24,11 @@ class LogOptionsFormatter : public OptionsFormatter {
   static const char* kNickName() { return "Log"; }
   const char* NickName() const override { return kNickName(); }
   std::string ToString(const std::string& prefix,
-                       const Properties& props) const override;
+                       const OptionProperties& props) const override;
   std::string ToString(const std::string& prefix, char separator,
                        const std::vector<std::string>& elems) const override;
   Status ToProps(const std::string& /*opts_str*/,
-                 Properties* /*props*/) const override {
+                 OptionProperties* /*props*/) const override {
     return Status::NotSupported();
   }
 
@@ -50,8 +50,9 @@ class DefaultOptionsFormatter : public OptionsFormatter {
   const char* NickName() const override { return kNickName(); }
 
   std::string ToString(const std::string& prefix,
-                       const Properties& props) const override;
-  Status ToProps(const std::string& opts_str, Properties* props) const override;
+                       const OptionProperties& props) const override;
+  Status ToProps(const std::string& opts_str,
+                 OptionProperties* props) const override;
   std::string ToString(const std::string& prefix, char separator,
                        const std::vector<std::string>& elems) const override;
   Status ToVector(const std::string& opts_str, char delim,
@@ -86,12 +87,12 @@ class PropertiesOptionsFormatter : public DefaultOptionsFormatter {
  public:
   static const char* kClassName() { return "PropertiesOptionsFormatter"; }
   const char* Name() const override { return kClassName(); }
-  static const char* kNickName() { return "Properties"; }
+  static const char* kNickName() { return "OptionProperties"; }
   const char* NickName() const override { return kNickName(); }
   std::string ToString(const std::string& prefix,
-                       const Properties& props) const override;
+                       const OptionProperties& props) const override;
   Status ToProps(const std::string& /*opts_str*/,
-                 Properties* /*props*/) const override;
+                 OptionProperties* /*props*/) const override;
 };
 
 }  // namespace ROCKSDB_NAMESPACE

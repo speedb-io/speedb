@@ -433,13 +433,11 @@ TEST_F(OptionsTest, GetColumnFamilyOptionsFromStringTest) {
          std::unique_ptr<const Comparator>* /*guard*/,
          std::string* /* errmsg */) { return ReverseBytewiseComparator(); });
 
-  ASSERT_OK(GetColumnFamilyOptionsFromString(
-      config_options, base_cf_opt,
-      config_options.ToString("", {{
-                                      "comparator",
-                                      kCompName,
-                                  }}),
-      &new_cf_opt));
+  OptionProperties props;
+  props.insert({"comparator", kCompName});
+  ASSERT_OK(GetColumnFamilyOptionsFromString(config_options, base_cf_opt,
+                                             config_options.ToString("", props),
+                                             &new_cf_opt));
   ASSERT_EQ(new_cf_opt.comparator, ReverseBytewiseComparator());
 
   // MergeOperator from object registry
@@ -1530,7 +1528,7 @@ TEST_F(OptionsTest, GetMutableDBOptions) {
   Random rnd(228);
   DBOptions base_opts;
   std::string opts_str;
-  std::unordered_map<std::string, std::string> opts_map;
+  OptionProperties opts_map;
   ConfigOptions config_options;
 
   test::RandomInitDBOptions(&base_opts, &rnd);
@@ -1565,7 +1563,7 @@ TEST_F(OptionsTest, GetMutableCFOptions) {
   Random rnd(228);
   ColumnFamilyOptions base, copy;
   std::string opts_str;
-  std::unordered_map<std::string, std::string> opts_map;
+  OptionProperties opts_map;
   ConfigOptions config_options;
   DBOptions dummy;  // Needed to create ImmutableCFOptions
 
@@ -1756,7 +1754,7 @@ TEST_F(OptionsTest, MutableCFOptions) {
 TEST_F(OptionsTest, StringToMapTest) {
   DefaultOptionsFormatter formatter;
 
-  Properties opts_map;
+  OptionProperties opts_map;
   // Regular options
   ASSERT_OK(formatter.ToProps("k1=v1;k2=v2;k3=v3", &opts_map));
   ASSERT_EQ(opts_map["k1"], "v1");
@@ -1875,7 +1873,7 @@ TEST_F(OptionsTest, StringToMapTest) {
 
 TEST_F(OptionsTest, StringToMapRandomTest) {
   DefaultOptionsFormatter formatter;
-  std::unordered_map<std::string, std::string> opts_map;
+  OptionProperties opts_map;
   // Make sure segfault is not hit by semi-random strings
 
   std::vector<std::string> bases = {
@@ -3067,7 +3065,7 @@ TEST_F(OptionsOldApiTest, GetPlainTableOptionsFromString) {
   ASSERT_TRUE(new_opt.full_scan_mode);
   ASSERT_TRUE(new_opt.store_index_in_file);
 
-  std::unordered_map<std::string, std::string> opt_map;
+  OptionProperties opt_map;
   ASSERT_OK(config_options_from_string.ToProps(
       "user_key_len=55;bloom_bits_per_key=10;huge_page_tlb_size=8;", &opt_map));
   ConfigOptions config_options_from_map;

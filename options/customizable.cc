@@ -95,10 +95,10 @@ bool Customizable::AreEquivalent(const ConfigOptions& config_options,
   return true;
 }
 
-Status Customizable::GetOptionsMap(
-    const ConfigOptions& config_options, const Customizable* customizable,
-    const std::string& value, std::string* id,
-    std::unordered_map<std::string, std::string>* props) {
+Status Customizable::GetOptionsMap(const ConfigOptions& config_options,
+                                   const Customizable* customizable,
+                                   const std::string& value, std::string* id,
+                                   OptionProperties* props) {
   Status status;
   if (value.empty() || value == kNullptrString) {
     *id = "";

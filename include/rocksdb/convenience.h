@@ -39,8 +39,6 @@ struct ColumnFamilyOptions;
 struct DBOptions;
 struct Options;
 
-using Properties = std::unordered_map<std::string, std::string>;
-
 // ConfigOptions containing the parameters/controls for
 // comparing objects and converting to/from strings.
 // These settings control how the methods
@@ -131,7 +129,7 @@ struct ConfigOptions {
                        const OptionProperties& props) const;
 
   // Converts the string representation into name/value properties
-  Status ToProps(const std::string& opts_str, Properties* props) const;
+  Status ToProps(const std::string& opts_str, OptionProperties* props) const;
 
   // Converts the vector options to a single string representation
   std::string ToString(const std::string& prefix, char separator,

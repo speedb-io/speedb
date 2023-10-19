@@ -37,8 +37,8 @@ void DefaultOptionsFormatter::AppendElem(const std::string& name,
   }
 }
 
-std::string DefaultOptionsFormatter::ToString(const std::string& /*prefix*/,
-                                              const Properties& props) const {
+std::string DefaultOptionsFormatter::ToString(
+    const std::string& /*prefix*/, const OptionProperties& props) const {
   std::string result;
   std::string id;
   for (const auto& it : props) {
@@ -118,7 +118,7 @@ Status DefaultOptionsFormatter::NextToken(const std::string& opts,
 }
 
 Status DefaultOptionsFormatter::ToProps(const std::string& opts_str,
-                                        Properties* props) const {
+                                        OptionProperties* props) const {
   static const char kDelim = ';';
   assert(props);
   // Example:
@@ -207,7 +207,7 @@ Status DefaultOptionsFormatter::ToVector(
 }
 
 std::string PropertiesOptionsFormatter::ToString(
-    const std::string& prefix, const Properties& props) const {
+    const std::string& prefix, const OptionProperties& props) const {
   std::string result;
   std::string id;
   const char* separator = prefix.empty() ? "\n  " : "; ";
@@ -233,7 +233,7 @@ std::string PropertiesOptionsFormatter::ToString(
 }
 
 Status PropertiesOptionsFormatter::ToProps(const std::string& props_str,
-                                           Properties* props) const {
+                                           OptionProperties* props) const {
   if (props_str.find('\n') != std::string::npos) {
     size_t pos = 0;
     int line_num = 0;
@@ -275,7 +275,7 @@ void LogOptionsFormatter::AppendElem(const std::string& prefix,
 }
 
 std::string LogOptionsFormatter::ToString(const std::string& prefix,
-                                          const Properties& props) const {
+                                          const OptionProperties& props) const {
   std::string result;
   if (!props.empty()) {
     const auto& id = props.find(OptionTypeInfo::kIdPropName());

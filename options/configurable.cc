@@ -189,7 +189,7 @@ Status Configurable::ConfigureFromString(const ConfigOptions& config_options,
   Status s;
   if (!opts_str.empty()) {
     if (opts_str.find('=') != std::string::npos) {
-      Properties props;
+      OptionProperties props;
       s = config_options.ToProps(opts_str, &props);
       if (s.ok()) {
         s = ConfigureFromMap(config_options, props, nullptr);
@@ -422,7 +422,7 @@ Status ConfigurableHelper::ConfigureCustomizableOption(
       // If the ID does not match that of the current customizable, return an
       // error. Otherwise, update the current customizable via the properties
       // map
-      std::unordered_map<std::string, std::string> props;
+      OptionProperties props;
       std::string id;
       Status s = Configurable::GetOptionsMap(copy, value, custom->GetId(), &id,
                                              &props);
@@ -664,10 +664,10 @@ bool ConfigurableHelper::AreEquivalent(const ConfigOptions& config_options,
   return true;
 }
 
-Status Configurable::GetOptionsMap(
-    const ConfigOptions& config_options, const std::string& value,
-    const std::string& default_id, std::string* id,
-    std::unordered_map<std::string, std::string>* props) {
+Status Configurable::GetOptionsMap(const ConfigOptions& config_options,
+                                   const std::string& value,
+                                   const std::string& default_id,
+                                   std::string* id, OptionProperties* props) {
   assert(id);
   assert(props);
   Status status;

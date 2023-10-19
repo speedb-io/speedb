@@ -964,7 +964,7 @@ Status GetBlockBasedTableOptionsFromString(
     const ConfigOptions& config_options,
     const BlockBasedTableOptions& table_options, const std::string& opts_str,
     BlockBasedTableOptions* new_table_options) {
-  Properties props;
+  OptionProperties props;
   Status s = config_options.ToProps(opts_str, &props);
   if (!s.ok()) {
     return s;

@@ -56,7 +56,7 @@ ConfigOptions::ConfigOptions(const DBOptions& db_opts) : env(db_opts.env) {
 }
 
 std::string ConfigOptions::ToString(const std::string& prefix,
-                                    const Properties& props) const {
+                                    const OptionProperties& props) const {
   if (formatter) {
     return formatter->ToString(prefix, props);
   } else {
@@ -65,7 +65,7 @@ std::string ConfigOptions::ToString(const std::string& prefix,
 }
 
 Status ConfigOptions::ToProps(const std::string& opts_str,
-                              Properties* props) const {
+                              OptionProperties* props) const {
   if (formatter) {
     return formatter->ToProps(opts_str, props);
   } else {
@@ -692,7 +692,7 @@ Status GetColumnFamilyOptionsFromString(const ConfigOptions& config_options,
                                         const ColumnFamilyOptions& base_options,
                                         const std::string& opts_str,
                                         ColumnFamilyOptions* new_options) {
-  Properties props;
+  OptionProperties props;
   Status s = config_options.ToProps(opts_str, &props);
   if (!s.ok()) {
     *new_options = base_options;
@@ -724,7 +724,7 @@ Status GetDBOptionsFromString(const ConfigOptions& config_options,
                               const DBOptions& base_options,
                               const std::string& opts_str,
                               DBOptions* new_options) {
-  Properties props;
+  OptionProperties props;
   Status s = config_options.ToProps(opts_str, &props);
   if (!s.ok()) {
     *new_options = base_options;
@@ -748,7 +748,7 @@ Status GetOptionsFromString(const ConfigOptions& config_options,
                             const std::string& opts_str, Options* new_options) {
   ColumnFamilyOptions new_cf_options;
   std::unordered_map<std::string, std::string> unused_opts;
-  Properties props;
+  OptionProperties props;
 
   assert(new_options);
   *new_options = base_options;
@@ -869,7 +869,7 @@ Status OptionTypeInfo::ParseType(
     const ConfigOptions& config_options, const std::string& opts_str,
     const std::unordered_map<std::string, OptionTypeInfo>& type_map,
     void* opt_addr, std::unordered_map<std::string, std::string>* unused) {
-  Properties props;
+  OptionProperties props;
   Status status = config_options.ToProps(opts_str, &props);
   if (!status.ok()) {
     return status;

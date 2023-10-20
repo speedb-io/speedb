@@ -22,16 +22,20 @@ namespace ROCKSDB_NAMESPACE {
 struct TablePinningOptions;
 struct ScopedPinningOptions {
   static const char* kName() { return "ScopedPinningOptions"; }
+
+  static constexpr uint32_t kDefaultLastLevelWithDataPercent = 10;
+  static constexpr uint32_t kDefaultMidPercent = 80;
+
   // Limit to how much data should be pinned
   size_t capacity = 1024 * 1024 * 1024;  // 1GB
 
   // Percent of capacity at which not to pin last-leve-with-data data
-  uint32_t last_level_with_data_percent = 10;
+  uint32_t last_level_with_data_percent = kDefaultLastLevelWithDataPercent;
+
   // Percent of capacity at which not to pin non-L0 data
-  uint32_t mid_percent = 80;
+  uint32_t mid_percent = kDefaultMidPercent;
 };
 
-// A table policy that limits the size of the data to be pinned
 //
 class ScopedPinningPolicy : public RecordingPinningPolicy {
  public:
@@ -39,7 +43,7 @@ class ScopedPinningPolicy : public RecordingPinningPolicy {
   ScopedPinningPolicy(const ScopedPinningOptions& options);
 
   static const char* kClassName() { return "speedb_scoped_pinning_policy"; }
-  static const char* kNickName() { return "speedb.ScopedPinningPolicy"; }
+  static const char* kNickName() { return "scoped"; }
   const char* Name() const override { return kClassName(); }
   const char* NickName() const override { return kNickName(); }
   std::string GetId() const override;

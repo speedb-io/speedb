@@ -9550,9 +9550,11 @@ void ValidateMetadataCacheOptions() {
 }
 
 void ValidatePinningPolicyRelatedFlags() {
-  if (!FLAGS_pinning_policy.empty() && FLAGS_enable_speedb_features) {
+  if ((FLAGS_pinning_policy ==
+       ROCKSDB_NAMESPACE::ScopedPinningPolicy::kNickName()) &&
+      FLAGS_enable_speedb_features) {
     ErrorExit(
-        "--pinning_policy should not be set when --unpartitioned_pinning is "
+        "--pinning_policy should not be set when --_enable_speedb_features is "
         "set.");
   }
 

@@ -223,7 +223,7 @@ default_params = {
     "customopspercent": 0,
     # "filter_uri": lambda: random.choice(["speedb.PairedBloomFilter", ""]),
     "memtablerep": lambda: random.choice(["skip_list", "hash_spdb"]),
-    "pinning_policy": lambda: random.choice(["DefaultPinning", "ScopedPinning"]),
+    "pinning_policy": lambda: random.choice(["default", "scoped"]),
     "use_dynamic_delay": lambda: random.choice([0, 1, 1, 1]),
     "allow_wbm_stalls": lambda: random.randint(0, 1),
     "start_delay_percent": lambda: random.randint(0, 99),

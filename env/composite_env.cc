@@ -1,3 +1,17 @@
+// Copyright (C) 2022 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
 // Copyright (c) 2019-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -391,7 +405,7 @@ Status CompositeEnv::NewDirectory(const std::string& name,
 
 namespace {
 static std::unordered_map<std::string, OptionTypeInfo> env_wrapper_type_info = {
-    {"target",
+    {Customizable::kTargetPropName(),
      OptionTypeInfo(0, OptionType::kUnknown, OptionVerificationType::kByName,
                     OptionTypeFlags::kDontSerialize)
          .SetParseFunc([](const ConfigOptions& opts,
@@ -482,14 +496,16 @@ Status CompositeEnvWrapper::PrepareOptions(const ConfigOptions& options) {
   return Env::PrepareOptions(options);
 }
 
-std::string CompositeEnvWrapper::SerializeOptions(
-    const ConfigOptions& config_options, const std::string& header) const {
-  auto options = CompositeEnv::SerializeOptions(config_options, header);
+Status CompositeEnvWrapper::SerializeOptions(
+    const ConfigOptions& config_options, const std::string& prefix,
+    OptionProperties* props) const {
   if (target_.env != nullptr && target_.env != Env::Default()) {
-    options.append("target=");
-    options.append(target_.env->ToString(config_options));
+    props->insert({kTargetPropName(),
+                   target_.env->ToString(
+                       config_options,
+                       OptionTypeInfo::MakePrefix(prefix, kTargetPropName()))});
   }
-  return options;
+  return CompositeEnv::SerializeOptions(config_options, prefix, props);
 }
 
 EnvWrapper::EnvWrapper(Env* t) : target_(t) {
@@ -511,24 +527,17 @@ Status EnvWrapper::PrepareOptions(const ConfigOptions& options) {
   return Env::PrepareOptions(options);
 }
 
-std::string EnvWrapper::SerializeOptions(const ConfigOptions& config_options,
-                                         const std::string& header) const {
-  auto parent = Env::SerializeOptions(config_options, "");
-  if (config_options.IsShallow() || target_.env == nullptr ||
-      target_.env == Env::Default()) {
-    return parent;
-  } else {
-    std::string result = header;
-    if (!StartsWith(parent, OptionTypeInfo::kIdPropName())) {
-      result.append(OptionTypeInfo::kIdPropName()).append("=");
-    }
-    result.append(parent);
-    if (!EndsWith(result, config_options.delimiter)) {
-      result.append(config_options.delimiter);
-    }
-    result.append("target=").append(target_.env->ToString(config_options));
-    return result;
+Status EnvWrapper::SerializeOptions(const ConfigOptions& config_options,
+                                    const std::string& prefix,
+                                    OptionProperties* props) const {
+  if (!config_options.IsShallow() && target_.env != nullptr &&
+      target_.env != Env::Default()) {
+    props->insert({kTargetPropName(),
+                   target_.env->ToString(
+                       config_options,
+                       OptionTypeInfo::MakePrefix(prefix, kTargetPropName()))});
   }
+  return Env::SerializeOptions(config_options, prefix, props);
 }
 
 }  // namespace ROCKSDB_NAMESPACE

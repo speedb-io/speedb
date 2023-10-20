@@ -51,7 +51,9 @@ class DefaultPinningPolicy : public RecordingPinningPolicy {
     //**TODO: Register options?
   }
   static const char* kClassName() { return "DefaultPinningPolicy"; }
+  static const char* kNickName() { return "DefaultPinning"; }
   const char* Name() const override { return kClassName(); }
+  const char* NickName() const override { return kNickName(); }
 
  protected:
   bool CheckPin(const TablePinningOptions& tpo, uint8_t type, size_t /*size*/,
@@ -138,7 +140,8 @@ bool RecordingPinningPolicy::PinData(const TablePinningOptions& tpo,
   auto limit = usage_.fetch_add(size);
   if (CheckPin(tpo, type, size, limit)) {
     pinned_counter_++;
-    pinned->reset(new PinnedEntry(tpo.level, type, size));
+    pinned->reset(
+        new PinnedEntry(tpo.level, type, size, tpo.is_last_level_with_data));
     RecordPinned(tpo.level, type, size, true);
     return true;
   } else {

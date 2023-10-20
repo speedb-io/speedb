@@ -30,8 +30,8 @@ static std::unordered_map<std::string, OptionTypeInfo>
         {"capacity",
          {offsetof(struct ScopedPinningOptions, capacity), OptionType::kSizeT,
           OptionVerificationType::kNormal, OptionTypeFlags::kNone}},
-        {"bottom_percent",
-         {offsetof(struct ScopedPinningOptions, bottom_percent),
+        {"last_level_with_data_percent",
+         {offsetof(struct ScopedPinningOptions, last_level_with_data_percent),
           OptionType::kUInt32T, OptionVerificationType::kNormal,
           OptionTypeFlags::kNone}},
         {"mid_percent",
@@ -57,8 +57,10 @@ bool ScopedPinningPolicy::CheckPin(const TablePinningOptions& tpo,
                                    uint8_t /* type */, size_t size,
                                    size_t usage) const {
   auto proposed = usage + size;
-  if (tpo.is_bottom && options_.bottom_percent > 0) {
-    if (proposed > (options_.capacity * options_.bottom_percent / 100)) {
+  if (tpo.is_last_level_with_data &&
+      options_.last_level_with_data_percent > 0) {
+    if (proposed >
+        (options_.capacity * options_.last_level_with_data_percent / 100)) {
       return false;
     }
   } else if (tpo.level > 0 && options_.mid_percent > 0) {
@@ -84,7 +86,7 @@ std::string ScopedPinningPolicy::GetPrintableOptions() const {
 
   snprintf(buffer, kBufferSize,
            "    pinning_policy.last_level_with_data_percent: %" PRIu32 "\n",
-           options_.bottom_percent);
+           options_.last_level_with_data_percent);
   ret.append(buffer);
 
   snprintf(buffer, kBufferSize, "    pinning_policy.mid_percent: %" PRIu32 "\n",

@@ -24,7 +24,7 @@ struct ScopedPinningOptions {
   static const char* kName() { return "ScopedPinningOptions"; }
 
   static constexpr uint32_t kDefaultLastLevelWithDataPercent = 10;
-  static constexpr uint32_t kDefaultMidPercent = 80;
+  static constexpr uint32_t kDefaultMidPercent = 70;
 
   // Limit to how much data should be pinned
   size_t capacity = 1024 * 1024 * 1024;  // 1GB

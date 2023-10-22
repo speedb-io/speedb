@@ -395,6 +395,8 @@ static std::unordered_map<std::string, OptionTypeInfo> stats_type_info = {
 StatisticsImpl::StatisticsImpl(std::shared_ptr<Statistics> stats)
     : stats_(std::move(stats)) {
   RegisterOptions("StatisticsOptions", &stats_, &stats_type_info);
+  printf("StatisticsData.size=%d\n", (int)sizeof(StatisticsData));
+  printf("per_core_stats_.size=%d\n", (int)sizeof(per_core_stats_));
 }
 
 StatisticsImpl::~StatisticsImpl() {}

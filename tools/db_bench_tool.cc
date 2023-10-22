@@ -11,7 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
+//
 //  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -9588,12 +9588,6 @@ void ValidateMetadataCacheOptions() {
 }
 
 void ValidatePinningPolicyRelatedFlags() {
-  if (!FLAGS_pinning_policy.empty() && FLAGS_enable_speedb_features) {
-    ErrorExit(
-        "--pinning_policy should not be set when --unpartitioned_pinning is "
-        "set.");
-  }
-
   if (FLAGS_enable_speedb_features) {
     if (gflags::GetCommandLineFlagInfoOrDie("max_background_jobs").is_default ||
         gflags::GetCommandLineFlagInfoOrDie("total_ram_size").is_default) {
@@ -9815,6 +9809,8 @@ int db_bench_tool_run_group(int group_num, int num_groups, int argc,
 // runner of the failed group (subsequent groups will NOT be run).
 //
 int db_bench_tool(int argc, char** argv) {
+  printf("StatisticsImpl.size=%d\n", (int)sizeof(StatisticsImpl));
+
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   static bool initialized = false;
   if (!initialized) {

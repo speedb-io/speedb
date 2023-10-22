@@ -3352,24 +3352,13 @@ void InitializeOptionsFromFlags(
   block_based_options.max_auto_readahead_size = FLAGS_max_auto_readahead_size;
   block_based_options.num_file_reads_for_auto_readahead =
       FLAGS_num_file_reads_for_auto_readahead;
-  if (!FLAGS_pinning_policy.empty()) {
-    auto pinning_policy_uri = DefaultPinningPolicy::kClassName();
-    if (FLAGS_pinning_policy == DefaultPinningPolicy::kNickName()) {
-      pinning_policy_uri = ScopedPinningPolicy::kClassName();
-    }
 
-    ConfigOptions config_options;
-    config_options.ignore_unknown_options = false;
-    config_options.ignore_unsupported_options = false;
-    Status s = TablePinningPolicy::CreateFromString(
-        config_options, pinning_policy_uri,
-        &block_based_options.pinning_policy);
-    if (!s.ok()) {
-      fprintf(stderr, "Failed to create PinningPolicy: %s\n",
-              s.ToString().c_str());
-      exit(1);
-    }
+  if (FLAGS_pinning_policy ==
+      ROCKSDB_NAMESPACE::ScopedPinningPolicy::kNickName()) {
+    block_based_options.pinning_policy =
+        std::make_shared<ScopedPinningPolicy>(ScopedPinningOptions());
   }
+
   options.table_factory.reset(NewBlockBasedTableFactory(block_based_options));
 
   // Write-Buffer-Manager

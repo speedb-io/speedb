@@ -9550,14 +9550,6 @@ void ValidateMetadataCacheOptions() {
 }
 
 void ValidatePinningPolicyRelatedFlags() {
-  if ((FLAGS_pinning_policy ==
-       ROCKSDB_NAMESPACE::ScopedPinningPolicy::kNickName()) &&
-      FLAGS_enable_speedb_features) {
-    ErrorExit(
-        "--pinning_policy should not be set when --_enable_speedb_features is "
-        "set.");
-  }
-
   if (FLAGS_enable_speedb_features) {
     if (gflags::GetCommandLineFlagInfoOrDie("max_background_jobs").is_default ||
         gflags::GetCommandLineFlagInfoOrDie("total_ram_size").is_default) {
@@ -9779,6 +9771,8 @@ int db_bench_tool_run_group(int group_num, int num_groups, int argc,
 // runner of the failed group (subsequent groups will NOT be run).
 //
 int db_bench_tool(int argc, char** argv) {
+  printf("StatisticsImpl.size=%d\n", (int)sizeof(StatisticsImpl));
+
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   static bool initialized = false;
   if (!initialized) {

@@ -4,7 +4,7 @@
 
 * Fix RepeatableThread to work properly with on thread start callback feature (https://github.com/speedb-io/speedb/pull/667).
 
-### New Features
+### New Features 
 * Non-Blocking Manual Compaction (CompactRange()) - Support non-blocking manual compactions by setting a new CompactRangeOptions option (async_completion_cb). When set, the CompactRange() call will return control to the caller immediately. The manual compaction iteslf will be performed in an internally created thread. The manual compaction will ALWAYS call the specified callback upon completion and provide the completion status (#597).
 * Change the internal Configurable API SerializeOptions to return UserProperties (instead of the final string representation).  Added ToString methods to the ConfigurableOptions class to complete the serialization of Options properties.
 
@@ -16,6 +16,7 @@
 * Enable speedb features: Use Scoped Pinning Policy in Enable speedb feature (#459).
 * sst_dump: display metaindex_handle and the index_handle's offset and size in footer information (#404).
 * Added a kUseBaseAddress flag and GetBaseOffset flag to OptionTypeInfo.  If this flag is set and a function is used for processing options, the function is passed the base address of the struct rather than the specific field (#397)
+* Static Pinning: Set the default for mid-percent capacity threshold in scoped pinning policy to 70 (#689).
 * db_bench: Add support for individual scoped pinning policy parameters (#687).
 
 ### Bug Fixes

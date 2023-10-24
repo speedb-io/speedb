@@ -33,6 +33,7 @@
 #include "db_stress_tool/db_stress_compaction_filter.h"
 #include "db_stress_tool/db_stress_driver.h"
 #include "db_stress_tool/db_stress_table_properties_collector.h"
+#include "plugin/speedb/pinning_policy/scoped_pinning_policy.h"
 #include "rocksdb/convenience.h"
 #include "rocksdb/filter_policy.h"
 #include "rocksdb/options.h"
@@ -43,6 +44,7 @@
 #include "rocksdb/utilities/object_registry.h"
 #include "rocksdb/utilities/write_batch_with_index.h"
 #include "speedb/version.h"
+#include "table/block_based/default_pinning_policy.h"
 #include "test_util/testutil.h"
 #include "util/cast_util.h"
 #include "utilities/backup/backup_engine_impl.h"
@@ -3166,19 +3168,13 @@ void InitializeOptionsFromFlags(
   block_based_options.max_auto_readahead_size = FLAGS_max_auto_readahead_size;
   block_based_options.num_file_reads_for_auto_readahead =
       FLAGS_num_file_reads_for_auto_readahead;
-  if (!FLAGS_pinning_policy.empty()) {
-    ConfigOptions config_options;
-    config_options.ignore_unknown_options = false;
-    config_options.ignore_unsupported_options = false;
-    Status s = TablePinningPolicy::CreateFromString(
-        config_options, FLAGS_pinning_policy,
-        &block_based_options.pinning_policy);
-    if (!s.ok()) {
-      fprintf(stderr, "Failed to create PinningPolicy: %s\n",
-              s.ToString().c_str());
-      exit(1);
-    }
+
+  if (FLAGS_pinning_policy ==
+      ROCKSDB_NAMESPACE::ScopedPinningPolicy::kNickName()) {
+    block_based_options.pinning_policy =
+        std::make_shared<ScopedPinningPolicy>(ScopedPinningOptions());
   }
+
   options.table_factory.reset(NewBlockBasedTableFactory(block_based_options));
 
   // Write-Buffer-Manager

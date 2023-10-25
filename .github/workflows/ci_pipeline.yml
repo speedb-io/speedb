@@ -108,16 +108,17 @@ jobs:
     #uses: speedb-io/speedb/.github/workflows/perf-test.yml@main
   
   QA-Tests:
-    if: ${{ github.event.review.state == 'approved' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/release') }}
+    if: ${{ (always() && !failure() && !cancelled()) && (github.event.review.state == 'approved' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/release')) }}
     needs: [Build]
     uses: speedb-io/speedb/.github/workflows/qa-tests.yml@main
   
   Fuzz:
-    if: ${{ github.event.review.state == 'approved' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/release') }}
+    if: ${{ (always() && !failure() && !cancelled()) && (github.event.review.state == 'approved' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/release')) }}
     needs: [Build]
     uses: ./.github/workflows/test_fuzz.yml
 
   Windows-build-test:
+    if: ${{ (always() && !failure() && !cancelled()) && (github.event.review.state == 'approved' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/release')) }}
     needs: [Build]
     runs-on: windows-2022
     env: 
@@ -257,6 +258,7 @@ jobs:
     
 
   Macos-build:
+    if: ${{ (always() && !failure() && !cancelled()) && (github.event.review.state == 'approved' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/release')) }}
     needs: [Build]
     runs-on: macos-11
     steps:
@@ -277,6 +279,7 @@ jobs:
 
 
   Linux-build:
+    if: ${{ (always() && !failure() && !cancelled()) && (github.event.review.state == 'approved' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/release')) }}
     needs: [Build]
     runs-on: ubuntu-latest
 
@@ -328,6 +331,7 @@ jobs:
 
 
   Linux-Arm-build:
+    if: ${{ (always() && !failure() && !cancelled()) && (github.event.review.state == 'approved' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/release')) }}
     needs: [Build]
     runs-on: ubuArm64G 
     steps:

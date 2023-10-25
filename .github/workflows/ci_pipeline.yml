@@ -339,12 +339,12 @@ jobs:
         export SPDB_LIB_DIR=~/spdb_lib &&  mkdir -p $SPDB_LIB_DIR
         docker run --rm -v $(readlink -f ${SPDB_LIB_DIR}):/out -i speedb-centos-builder ${{ github.ref_name }}
      
-        CI-all:
-          if: ${{ github.event.review.state == 'approved' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/release') }}
-          needs: [Check-Licence-And-History, Build, QA-Tests, Fuzz, Linux-Arm-build, Linux-build, Macos-build, Windows-build-test]
-          runs-on: ubuntu-latest
-          steps:
-          - name: Summary
-            run: |
-              echo "All tests passed"
-              exit 0
+  CI-all:
+    if: ${{ github.event.review.state == 'approved' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/release') }}
+    needs: [Check-Licence-And-History, Build, QA-Tests, Fuzz, Linux-Arm-build, Linux-build, Macos-build, Windows-build-test]
+    runs-on: ubuntu-latest
+    steps:
+    - name: Summary
+      run: |
+        echo "All tests passed"
+        exit 0

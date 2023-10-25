@@ -731,6 +731,7 @@ set(SOURCES
         db/compaction/sst_partitioner.cc
         db/compaction/subcompaction_state.cc
         db/convenience.cc
+        db/db_crashtest_use_case.cc
         db/db_filesnapshot.cc
         db/db_impl/compacted_db_impl.cc
         db/db_impl/db_impl.cc
@@ -1004,6 +1005,7 @@ set(SOURCES
         utilities/transactions/write_unprepared_txn.cc
         utilities/transactions/write_unprepared_txn_db.cc
         utilities/ttl/db_ttl_impl.cc
+        utilities/use_cases.cc
         utilities/wal_filter.cc
         utilities/write_batch_with_index/write_batch_with_index.cc
         utilities/write_batch_with_index/write_batch_with_index_internal.cc)
@@ -1406,6 +1408,7 @@ if(WITH_TESTS)
         db/compaction/compaction_service_test.cc
         db/compaction/tiered_compaction_test.cc
         db/comparator_db_test.cc
+        db/configuration_validation_test.cc
         db/corruption_test.cc
         db/cuckoo_table_db_test.cc
         db/db_readonly_with_timestamp_test.cc

@@ -701,4 +701,67 @@ Status Configurable::GetOptionsMap(
   }
   return status;
 }
+
+int ConfigurableHelper::CheckSomeUseCases(
+    const ConfigOptions& config_options, const Configurable& configurable,
+    const std::unordered_map<std::string, OptionTypeInfo>& type_map,
+    const void* opt_ptr,
+    std::vector<std::pair<std::string, UseCaseConfig>>& uses,
+    std::set<std::string>& valid, std::set<std::string>& invalid) {
+  int found = 1;
+  std::string elem_name;
+  while (found > 0 && !uses.empty()) {
+    found = 0;
+    for (size_t idx = 0; idx < uses.size();) {
+      const auto& it = uses[idx];
+      const std::string& opt_name = configurable.GetOptionName(it.first);
+      const auto opt_info =
+          OptionTypeInfo::Find(opt_name, type_map, &elem_name);
+      if (opt_info == nullptr) {  // Did not find the option.  Skip it
+        ++idx;
+      } else {
+        const void* addr = opt_info->GetOffset(opt_ptr);
+        if (it.second.IsValid(addr)) {
+          printf("MJR: Option[%s] is valid\n", opt_name.c_str());
+          valid.insert(it.first);
+        } else {
+          printf("MJR: Option[%s] is invalid\n", opt_name.c_str());
+          invalid.insert(it.first);
+        }
+        // Remove it from the list.  Swap it with the last one
+        // and remove the last one
+        uses[idx] = uses.back();
+        uses.pop_back();
+        found++;
+      }
+    }
+  }
+  return static_cast<int>(invalid.size());
+}
+
+bool ConfigurableHelper::CheckUseCases(
+    const ConfigOptions& config_options, const Configurable& configurable,
+    const std::vector<std::unordered_map<std::string, UseCaseConfig>*>& uses,
+    std::set<std::string>& valid, std::set<std::string>& invalid,
+    std::unordered_map<std::string, UseCaseConfig>* unused) {
+  std::vector<std::pair<std::string, UseCaseConfig>> remaining;
+  if (!uses.empty()) {
+    for (const auto& uc_map : uses) {
+      remaining.assign(uc_map->begin(), uc_map->end());
+    }
+    for (const auto& iter : configurable.options_) {
+      if (iter.type_map != nullptr) {
+        CheckSomeUseCases(config_options, configurable, *(iter.type_map),
+                          iter.opt_ptr, remaining, valid, invalid);
+        if (remaining.empty()) {  // Are there more options left?
+          break;
+        }
+      }
+    }
+  }
+  if (unused != nullptr && !remaining.empty()) {
+    unused->insert(remaining.begin(), remaining.end());
+  }
+  return static_cast<int>(invalid.size());
+}
 }  // namespace ROCKSDB_NAMESPACE

@@ -13,9 +13,13 @@ permissions: write-all
 jobs:
   #Sanity:
     #uses: speedb-io/speedb/.github/workflows/sanity_check.yml@main
+
+  Check-Licence-And-History:
+    if: ${{  github.event_name == 'pull_request_review' }}
+    uses: ./.github/workflows/check_license_and_history.yml
   
   Build:
-    #needs: [Sanity]
+    needs: [Check-Licence-And-History]
     if: ${{ github.event.review.state == 'approved' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/release') }}
     #runs-on: [self-hosted, ubuntu, asrunner]
     runs-on: ubuntu-20.04
@@ -112,10 +116,6 @@ jobs:
     if: ${{ github.event.review.state == 'approved' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/release') }}
     needs: [Build]
     uses: ./.github/workflows/test_fuzz.yml
-
-  Check-Licence-And-History:
-    if: ${{  github.event_name == 'pull_request_review' }}
-    uses: ./.github/workflows/check_license_and_history.yml
 
   Windows-build-test:
     needs: [Build]
@@ -339,4 +339,12 @@ jobs:
         export SPDB_LIB_DIR=~/spdb_lib &&  mkdir -p $SPDB_LIB_DIR
         docker run --rm -v $(readlink -f ${SPDB_LIB_DIR}):/out -i speedb-centos-builder ${{ github.ref_name }}
      
- 
+        CI-all:
+          if: ${{ github.event.review.state == 'approved' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/release') }}
+          needs: [Check-Licence-And-History, Build, QA-Tests, Fuzz, Linux-Arm-build, Linux-build, Macos-build, Windows-build-test]
+          runs-on: ubuntu-latest
+          steps:
+          - name: Summary
+            run: |
+              echo "All tests passed"
+              exit 0

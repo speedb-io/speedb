@@ -30,7 +30,8 @@ jobs:
       run: |
         major=$(grep '_MAJOR\s\+[0-9]\+' "$VERSION_FILE" | sed 's/[^0-9]\+//') && echo $major
         minor=$(grep '_MINOR\s\+[0-9]\+' "$VERSION_FILE" | sed 's/[^0-9]\+//') && echo $minor
-        patch=$(( $(grep '_PATCH\s\+[0-9]\+' "$VERSION_FILE" | sed 's/[^0-9]\+//') + 1 )) && echo $patch
+        #patch=$(( $(grep '_PATCH\s\+[0-9]\+' "$VERSION_FILE" | sed 's/[^0-9]\+//') + 1 )) && echo $patch
+        patch=$(( $(grep '_PATCH\s\+[0-9]\+' "$VERSION_FILE" | sed 's/[^0-9]\+//'))) && echo $patch
         echo "verSion=$major.$minor.$patch"  >> $GITHUB_OUTPUT
        
   Mac_i86:

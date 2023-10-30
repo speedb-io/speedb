@@ -29,6 +29,7 @@ Status PromoteL0(DB* db, ColumnFamilyHandle* column_family, int target_level) {
   return db->PromoteL0(column_family, target_level);
 }
 
+
 Status SuggestCompactRange(DB* db, const Slice* begin, const Slice* end) {
   return SuggestCompactRange(db, db->DefaultColumnFamily(), begin, end);
 }

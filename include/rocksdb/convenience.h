@@ -113,6 +113,9 @@ struct ConfigOptions {
   // Helper class for printing and parsing options to/from strings.
   std::shared_ptr<OptionsFormatter> formatter;
 
+  // If set, only changes from this reference version will be serialized.
+  Configurable* compare_to = nullptr;
+
   bool IsShallow() const { return depth == Depth::kDepthShallow; }
   bool IsDetailed() const { return depth == Depth::kDepthDetailed; }
 

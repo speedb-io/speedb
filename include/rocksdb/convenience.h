@@ -107,6 +107,9 @@ struct ConfigOptions {
   // The object registry to use for this options
   std::shared_ptr<ObjectRegistry> registry;
 
+  // If set, only changes from this reference version will be serialized.
+  Configurable* compare_to = nullptr;
+
   bool IsShallow() const { return depth == Depth::kDepthShallow; }
   bool IsDetailed() const { return depth == Depth::kDepthDetailed; }
 

@@ -47,6 +47,7 @@
 #include "util/random.h"
 #include "util/stderr_logger.h"
 #include "util/string_util.h"
+#include "utilities/merge_operators.h"
 #include "utilities/merge_operators/bytesxor.h"
 #include "utilities/merge_operators/sortlist.h"
 #include "utilities/merge_operators/string_append/stringappend.h"
@@ -2273,6 +2274,215 @@ TEST_F(OptionsTest, OptionsListenerTest) {
       copy.listeners.size(),
       2);  // The Test{Config}1 Listeners could be loaded but not the others
   ASSERT_OK(RocksDBOptionsParser::VerifyDBOptions(config_opts, orig, copy));
+}
+
+static void TestDBOptionsChanged(const std::string& base_opts,
+                                 const std::string& changed_opts,
+                                 size_t changed) {
+  DBOptions base, copy;
+  ConfigOptions config;
+  std::string opts_str;
+  std::unordered_map<std::string, std::string> opts_map;
+
+  std::string trace_message;
+  if (!base_opts.empty()) {
+    trace_message = base_opts + "||" + changed_opts;
+  } else {
+    trace_message = changed_opts;
+  }
+  SCOPED_TRACE(trace_message.c_str());
+
+  if (!base_opts.empty()) {
+    ASSERT_OK(GetDBOptionsFromString(config, base, base_opts, &base));
+  }
+  ASSERT_OK(GetDBOptionsFromString(config, base, changed_opts, &copy));
+
+  auto dbcfg = DBOptionsAsConfigurable(base);
+  config.compare_to = dbcfg.get();
+  config.sanity_level = ConfigOptions::kSanityLevelExactMatch;
+  config.depth = ConfigOptions::kDepthDetailed;
+  config.ignore_unknown_options = false;
+  config.ignore_unsupported_options = false;
+
+  ASSERT_OK(GetStringFromDBOptions(config, copy, &opts_str));
+  if (changed > 0) {
+    ASSERT_OK(StringToMap(opts_str, &opts_map));
+    ASSERT_EQ(opts_map.size(), changed);
+    ASSERT_OK(GetDBOptionsFromMap(config, base, opts_map, &base));
+    ASSERT_OK(RocksDBOptionsParser::VerifyDBOptions(config, base, copy));
+
+    dbcfg = DBOptionsAsConfigurable(base);
+    config.compare_to = dbcfg.get();
+    ASSERT_OK(GetStringFromDBOptions(config, copy, &opts_str));
+  }
+  ASSERT_EQ(opts_str, "");
+}
+
+TEST_F(OptionsTest, DBOptionsSerializeChangedOptions) {
+  TestDBOptionsChanged("", "", 0UL);  // No changes
+  TestDBOptionsChanged("", "max_background_compactions=10", 1UL);
+  TestDBOptionsChanged(
+      "", "paranoid_checks=false; max_background_compactions=10", 2UL);
+  TestDBOptionsChanged(
+      "", "file_checksum_gen_factory=FileChecksumGenCrc32cFactory", 1UL);
+  TestDBOptionsChanged("file_checksum_gen_factory=FileChecksumGenCrc32cFactory",
+                       "file_checksum_gen_factory=nullptr", 1UL);
+  TestDBOptionsChanged("file_checksum_gen_factory=FileChecksumGenCrc32cFactory",
+                       "file_checksum_gen_factory=FileChecksumGenCrc32cFactory",
+                       0UL);
+}
+
+static void TestCFOptionsChanged(const std::string& base_opts,
+                                 const std::string& changed_opts,
+                                 size_t changed) {
+  ColumnFamilyOptions base, copy;
+  ConfigOptions config;
+  std::string opts_str;
+  std::unordered_map<std::string, std::string> opts_map;
+
+  std::string trace_message;
+  if (!base_opts.empty()) {
+    trace_message = base_opts + "||" + changed_opts;
+  } else {
+    trace_message = changed_opts;
+  }
+  SCOPED_TRACE(trace_message.c_str());
+
+  if (!base_opts.empty()) {
+    ASSERT_OK(GetColumnFamilyOptionsFromString(config, base, base_opts, &base));
+  }
+  ASSERT_OK(
+      GetColumnFamilyOptionsFromString(config, base, changed_opts, &copy));
+
+  auto cfcfg = CFOptionsAsConfigurable(base);
+  config.compare_to = cfcfg.get();
+  config.sanity_level = ConfigOptions::kSanityLevelExactMatch;
+  config.depth = ConfigOptions::kDepthDetailed;
+  config.ignore_unknown_options = false;
+  config.ignore_unsupported_options = false;
+
+  ASSERT_OK(GetStringFromColumnFamilyOptions(config, copy, &opts_str));
+  printf("MJR:[%s]=[%s]\n", trace_message.c_str(), opts_str.c_str());
+  if (changed > 0) {
+    ASSERT_OK(StringToMap(opts_str, &opts_map));
+    ASSERT_EQ(opts_map.size(), changed);
+    ASSERT_OK(GetColumnFamilyOptionsFromMap(config, base, opts_map, &base));
+    ASSERT_OK(RocksDBOptionsParser::VerifyCFOptions(config, base, copy));
+
+    cfcfg = CFOptionsAsConfigurable(base);
+    config.compare_to = cfcfg.get();
+    ASSERT_OK(GetStringFromColumnFamilyOptions(config, copy, &opts_str));
+  }
+  ASSERT_EQ(opts_str, "");
+}
+
+TEST_F(OptionsTest, CFOptionsSerializeChangedOptions) {
+  TestCFOptionsChanged("", "", 0UL);  // No changes
+  TestCFOptionsChanged("", "compression=kXpressCompression", 1UL);
+  TestCFOptionsChanged("compression=kXpressCompression",
+                       "compression=kSnappyCompression", 1UL);
+  TestCFOptionsChanged("", "comparator=rocksdb.ReverseBytewiseComparator", 1UL);
+  TestCFOptionsChanged("comparator=rocksdb.ReverseBytewiseComparator",
+                       "comparator=leveldb.BytewiseComparator", 1UL);
+  TestCFOptionsChanged(
+      "", "merge_operator={id=StringAppendOperator;delimiter=|}", 1UL);
+  TestCFOptionsChanged("merge_operator={id=StringAppendOperator;delimiter=|}",
+                       "merge_operator=nullptr", 1UL);
+  TestCFOptionsChanged("merge_operator={id=StringAppendOperator;delimiter=|}",
+                       "merge_operator={id=StringAppendOperator;delimiter=%}",
+                       1UL);
+  TestCFOptionsChanged("", "block_based_table_factory={block_size=8192}", 1UL);
+  TestCFOptionsChanged("", "table_factory=PlainTable", 1UL);
+}
+
+TEST_F(OptionsTest, SerializeChangedOptionsNameOnly) {
+  ColumnFamilyOptions base, copy;
+  ConfigOptions config;
+  std::string opts_str;
+  std::unordered_map<std::string, std::string> opts_map;
+
+  config.ignore_unknown_options = false;
+  config.ignore_unsupported_options = false;
+  config.depth = ConfigOptions::kDepthDefault;
+
+  // Compare the table factories directly
+  copy.table_factory.reset(NewPlainTableFactory());
+  opts_str = copy.table_factory->ToString(config);
+
+  config.compare_to = base.table_factory.get();
+  ASSERT_EQ(opts_str, copy.table_factory->ToString(config));
+
+  copy.table_factory.reset(NewBlockBasedTableFactory());
+  auto bbto = copy.table_factory->GetOptions<BlockBasedTableOptions>();
+  ASSERT_NE(bbto, nullptr);
+  bbto->block_size = 123456;
+  auto tf_str = copy.table_factory->ToString(config);
+  ASSERT_OK(StringToMap(tf_str, &opts_map));
+  ASSERT_EQ(opts_map.size(), 2);  // block_size+id
+  opts_map.clear();
+
+  auto cfcfg = CFOptionsAsConfigurable(base);
+  config.compare_to = cfcfg.get();
+  ASSERT_OK(GetStringFromColumnFamilyOptions(config, copy, &opts_str));
+  ASSERT_EQ(opts_str, "");
+
+  // When not doing detailed, table factories do not compare sub-options
+  // so the options match
+
+  config.depth = ConfigOptions::kDepthDetailed;
+  ASSERT_OK(GetStringFromColumnFamilyOptions(config, copy, &opts_str));
+  ASSERT_OK(StringToMap(opts_str, &opts_map));
+  ASSERT_EQ(opts_map.size(), 1);  // table factory
+  ASSERT_EQ(tf_str, opts_map.begin()->second.c_str());
+}
+
+TEST_F(OptionsTest, SerializeChangedOptionsCompareLoosely) {
+  ColumnFamilyOptions base, copy;
+  ConfigOptions config;
+  std::string opts_str;
+
+  config.ignore_unknown_options = false;
+  config.ignore_unsupported_options = false;
+  config.sanity_level = ConfigOptions::kSanityLevelLooselyCompatible;
+
+  ASSERT_OK(MergeOperator::CreateFromString(
+      config, "id=StringAppendOperator;delimiter=|", &base.merge_operator));
+  ASSERT_OK(MergeOperator::CreateFromString(
+      config, "{id=StringAppendOperator;delimiter=|}", &copy.merge_operator));
+
+  auto copy_str = copy.merge_operator->ToString(config);
+  auto cfcfg = CFOptionsAsConfigurable(base);
+
+  // Compare the merge operators directly
+  ASSERT_EQ(copy_str, base.merge_operator->ToString(config));
+  config.compare_to = base.merge_operator.get();
+  ASSERT_OK(copy.merge_operator->GetOptionString(config, &opts_str));
+  ASSERT_EQ(opts_str, "");
+
+  config.compare_to = cfcfg.get();
+  ASSERT_OK(GetStringFromColumnFamilyOptions(config, copy, &opts_str));
+  ASSERT_EQ(opts_str, "");
+
+  ASSERT_OK(MergeOperator::CreateFromString(
+      config, "{id=StringAppendOperator;delimiter=%}", &copy.merge_operator));
+  copy_str = copy.merge_operator->ToString(config);
+
+  config.compare_to = base.merge_operator.get();
+  ASSERT_OK(copy.merge_operator->GetOptionString(config, &opts_str));
+  ASSERT_EQ(opts_str, "delimiter=%");
+
+  ASSERT_OK(GetStringFromColumnFamilyOptions(config, base, &opts_str));
+
+  config.compare_to = cfcfg.get();
+  ASSERT_OK(GetStringFromColumnFamilyOptions(config, base, &opts_str));
+  ASSERT_EQ(opts_str, "");
+
+  std::unordered_map<std::string, std::string> opts_map;
+  config.sanity_level = ConfigOptions::kSanityLevelExactMatch;
+  ASSERT_OK(GetStringFromColumnFamilyOptions(config, copy, &opts_str));
+  ASSERT_OK(StringToMap(opts_str, &opts_map));
+  ASSERT_EQ(opts_map.size(), 1UL);
+  ASSERT_EQ(copy_str, opts_map.begin()->second.c_str());
 }
 
 const static std::string kCustomEnvName = "Custom";

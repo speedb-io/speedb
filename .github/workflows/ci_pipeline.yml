@@ -62,7 +62,7 @@ jobs:
         
         
     - name: ccache cache files
-      uses: actions/cache@v2
+      uses: actions/cache@v3.3.2
       with:
         path: ~/.ccache
         key: ${{runner.os}}-ccache-${{steps.ccache_cache_timestamp.outputs.timestamp}}

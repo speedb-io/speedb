@@ -541,16 +541,90 @@ Status ConfigurableHelper::SerializeOptions(const ConfigOptions& config_options,
                                             const std::string& prefix,
                                             OptionProperties* props) {
   assert(props);
-  for (auto const& opt_iter : configurable.options_) {
-    if (opt_iter.type_map != nullptr) {
-      Status s = OptionTypeInfo::SerializeType(config_options, prefix,
-                                               *(opt_iter.type_map),
-                                               opt_iter.opt_ptr, props);
-      if (!s.ok()) {
-        return s;
+  ConfigOptions copy = config_options;
+  auto compare_to = config_options.compare_to;
+  if (compare_to != nullptr && !MayBeEquivalent(configurable, *compare_to)) {
+    // If we are comparing this type to another, first see if the types
+    // are the same.  If not, forget it
+    compare_to = nullptr;
+  }
+
+  Status s;
+  for (size_t i = 0; i < configurable.options_.size(); i++) {
+    const auto& opt = configurable.options_[i];
+    if (opt.type_map != nullptr) {
+      const auto opt_addr = opt.opt_ptr;
+      for (const auto& opt_iter : *(opt.type_map)) {
+        std::string single;
+        const auto& opt_name = opt_iter.first;
+        const auto& opt_info = opt_iter.second;
+        bool should_serialize = opt_info.ShouldSerialize();
+        if (should_serialize && compare_to != nullptr) {
+          // This option should be serialized but there is a possiblity that it
+          // matches the default. Check to see if we really should serialize it
+          std::string mismatch;
+          if (opt_info.IsConfigurable() &&
+              opt_info.IsEnabled(OptionTypeFlags::kStringNameOnly) &&
+              !config_options.IsDetailed()) {
+            // If it is a Configurable name-only and we are not printing the
+            // details, then compare loosely
+            copy.sanity_level = ConfigOptions::kSanityLevelLooselyCompatible;
+            if (opt_info.AreEqual(copy, opt_name, opt_addr,
+                                  compare_to->options_[i].opt_ptr, &mismatch)) {
+              should_serialize = false;
+            }
+            copy.sanity_level = config_options.sanity_level;
+          } else if (opt_info.AreEqual(config_options, opt_name, opt_addr,
+                                       compare_to->options_[i].opt_ptr,
+                                       &mismatch)) {
+            should_serialize = false;
+          }
+        }
+        if (should_serialize) {
+          if (compare_to != nullptr && opt_info.IsCustomizable()) {
+            copy.compare_to = opt_info.AsRawPointer<Customizable>(
+                compare_to->options_[i].opt_ptr);
+          } else {
+            copy.compare_to = compare_to;
+          }
+          s = SerializeOption(copy,
+                              OptionTypeInfo::MakePrefix(prefix, opt_name),
+                              opt_info, opt_addr, &single);
+          if (!s.ok()) {
+            return s;
+          } else if (!single.empty()) {
+            props->insert_or_assign(opt_name, single);
+          }
+        }
       }
     }
   }
+  return s;
+}
+
+Status ConfigurableHelper::SerializeOption(const ConfigOptions& config_options,
+                                           const std::string& opt_name,
+                                           const OptionTypeInfo& opt_info,
+                                           const void* opt_addr,
+                                           std::string* value) {
+  if (opt_info.ShouldSerialize()) {
+    if (!config_options.mutable_options_only) {
+      return opt_info.Serialize(config_options, opt_name, opt_addr, value);
+    } else if (opt_info.IsMutable()) {
+      ConfigOptions copy = config_options;
+      copy.mutable_options_only = false;
+      return opt_info.Serialize(copy, opt_name, opt_addr, value);
+    } else if (opt_info.IsConfigurable()) {
+      // If it is a Configurable and we are either printing all of the
+      // details or not printing only the name, this option should be
+      // included in the list
+      if (config_options.IsDetailed() ||
+          !opt_info.IsEnabled(OptionTypeFlags::kStringNameOnly)) {
+        return opt_info.Serialize(config_options, opt_name, opt_addr, value);
+      }
+    }
+  }
+  value->clear();
   return Status::OK();
 }
 
@@ -595,6 +669,25 @@ Status ConfigurableHelper::ListOptions(
 //       Methods for Comparing Configurables
 //
 //*******************************************************************************
+
+bool ConfigurableHelper::MayBeEquivalent(const Configurable& this_one,
+                                         const Configurable& that_one) {
+  if (this_one.options_.size() != that_one.options_.size()) {
+    // The two types do not have the same number of registered options,
+    // therefore they cannot be the same.
+    return false;
+  }
+
+  for (size_t i = 0; i < this_one.options_.size(); i++) {
+    const auto& this_opt = this_one.options_[i];
+    const auto& that_opt = that_one.options_[i];
+    if (this_opt.name != that_opt.name ||
+        this_opt.type_map != that_opt.type_map) {
+      return false;
+    }
+  }
+  return true;
+}
 
 bool Configurable::AreEquivalent(const ConfigOptions& config_options,
                                  const Configurable* other,

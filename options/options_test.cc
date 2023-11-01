@@ -2260,7 +2260,6 @@ static void TestDBOptionsChanged(const std::string& base_opts,
   DBOptions base, copy;
   ConfigOptions config;
   std::string opts_str;
-  std::unordered_map<std::string, std::string> opts_map;
 
   std::string trace_message;
   if (!base_opts.empty()) {
@@ -2284,9 +2283,10 @@ static void TestDBOptionsChanged(const std::string& base_opts,
 
   ASSERT_OK(GetStringFromDBOptions(config, copy, &opts_str));
   if (changed > 0) {
-    ASSERT_OK(StringToMap(opts_str, &opts_map));
-    ASSERT_EQ(opts_map.size(), changed);
-    ASSERT_OK(GetDBOptionsFromMap(config, base, opts_map, &base));
+    OptionProperties props;
+    ASSERT_OK(config.ToProps(opts_str, &props));
+    ASSERT_EQ(props.size(), changed);
+    ASSERT_OK(GetDBOptionsFromMap(config, base, props, &base));
     ASSERT_OK(RocksDBOptionsParser::VerifyDBOptions(config, base, copy));
 
     dbcfg = DBOptionsAsConfigurable(base);
@@ -2316,7 +2316,7 @@ static void TestCFOptionsChanged(const std::string& base_opts,
   ColumnFamilyOptions base, copy;
   ConfigOptions config;
   std::string opts_str;
-  std::unordered_map<std::string, std::string> opts_map;
+  OptionProperties props;
 
   std::string trace_message;
   if (!base_opts.empty()) {
@@ -2342,9 +2342,9 @@ static void TestCFOptionsChanged(const std::string& base_opts,
   ASSERT_OK(GetStringFromColumnFamilyOptions(config, copy, &opts_str));
   printf("MJR:[%s]=[%s]\n", trace_message.c_str(), opts_str.c_str());
   if (changed > 0) {
-    ASSERT_OK(StringToMap(opts_str, &opts_map));
-    ASSERT_EQ(opts_map.size(), changed);
-    ASSERT_OK(GetColumnFamilyOptionsFromMap(config, base, opts_map, &base));
+    ASSERT_OK(config.ToProps(opts_str, &props));
+    ASSERT_EQ(props.size(), changed);
+    ASSERT_OK(GetColumnFamilyOptionsFromMap(config, base, props, &base));
     ASSERT_OK(RocksDBOptionsParser::VerifyCFOptions(config, base, copy));
 
     cfcfg = CFOptionsAsConfigurable(base);
@@ -2377,7 +2377,7 @@ TEST_F(OptionsTest, SerializeChangedOptionsNameOnly) {
   ColumnFamilyOptions base, copy;
   ConfigOptions config;
   std::string opts_str;
-  std::unordered_map<std::string, std::string> opts_map;
+  OptionProperties props;
 
   config.ignore_unknown_options = false;
   config.ignore_unsupported_options = false;
@@ -2395,9 +2395,9 @@ TEST_F(OptionsTest, SerializeChangedOptionsNameOnly) {
   ASSERT_NE(bbto, nullptr);
   bbto->block_size = 123456;
   auto tf_str = copy.table_factory->ToString(config);
-  ASSERT_OK(StringToMap(tf_str, &opts_map));
-  ASSERT_EQ(opts_map.size(), 2);  // block_size+id
-  opts_map.clear();
+  ASSERT_OK(config.ToProps(tf_str, &props));
+  ASSERT_EQ(props.size(), 2);  // block_size+id
+  props.clear();
 
   auto cfcfg = CFOptionsAsConfigurable(base);
   config.compare_to = cfcfg.get();
@@ -2409,9 +2409,9 @@ TEST_F(OptionsTest, SerializeChangedOptionsNameOnly) {
 
   config.depth = ConfigOptions::kDepthDetailed;
   ASSERT_OK(GetStringFromColumnFamilyOptions(config, copy, &opts_str));
-  ASSERT_OK(StringToMap(opts_str, &opts_map));
-  ASSERT_EQ(opts_map.size(), 1);  // table factory
-  ASSERT_EQ(tf_str, opts_map.begin()->second.c_str());
+  ASSERT_OK(config.ToProps(opts_str, &props));
+  ASSERT_EQ(props.size(), 1);  // table factory
+  ASSERT_EQ(tf_str, props.begin()->second.c_str());
 }
 
 TEST_F(OptionsTest, SerializeChangedOptionsCompareLoosely) {
@@ -2455,12 +2455,12 @@ TEST_F(OptionsTest, SerializeChangedOptionsCompareLoosely) {
   ASSERT_OK(GetStringFromColumnFamilyOptions(config, base, &opts_str));
   ASSERT_EQ(opts_str, "");
 
-  std::unordered_map<std::string, std::string> opts_map;
+  OptionProperties props;
   config.sanity_level = ConfigOptions::kSanityLevelExactMatch;
   ASSERT_OK(GetStringFromColumnFamilyOptions(config, copy, &opts_str));
-  ASSERT_OK(StringToMap(opts_str, &opts_map));
-  ASSERT_EQ(opts_map.size(), 1UL);
-  ASSERT_EQ(copy_str, opts_map.begin()->second.c_str());
+  ASSERT_OK(config.ToProps(opts_str, &props));
+  ASSERT_EQ(props.size(), 1UL);
+  ASSERT_EQ(copy_str, props.begin()->second.c_str());
 }
 
 const static std::string kCustomEnvName = "Custom";

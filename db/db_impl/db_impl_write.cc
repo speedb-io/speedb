@@ -1246,6 +1246,11 @@ Status DBImpl::PreprocessWrite(const WriteOptions& write_options,
       status = Status::Incomplete("Write stall");
     } else {
       InstrumentedMutexLock l(&mutex_);
+      // must make sure we create a flush work to release memory in case there
+      // are several cf that each doesnt cross the write buffer limit but sum of
+      // all exceed the threshold
+      WaitForPendingWrites();
+      status = HandleWriteBufferManagerFlush(write_context);
       WriteBufferManagerStallWrites();
     }
   }

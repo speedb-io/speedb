@@ -1,7 +1,17 @@
-//  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
-//  This source code is licensed under both the GPLv2 (found in the
-//  COPYING file in the root directory) and Apache 2.0 License
-//  (found in the LICENSE.Apache file in the root directory).
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http:#www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+// Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 
 #include "db/write_thread.h"
 
@@ -223,6 +233,20 @@ void WriteThread::SetState(Writer* w, uint8_t new_state) {
   }
 }
 
+// The DB mutex is held!!!
+void WriteThread::SetStall(Writer* w, std::atomic<Writer*>* newest_writer) {
+  assert(newest_writer != nullptr);
+  assert(w->state == STATE_INIT);
+  Writer* writers = newest_writer->load(std::memory_order_relaxed);
+  while (true) {
+    assert(writers != w);
+    w->link_older = writers;
+    if (newest_writer->compare_exchange_weak(writers, w)) {
+      return;
+    }
+  }
+}
+
 bool WriteThread::LinkOne(Writer* w, std::atomic<Writer*>* newest_writer) {
   assert(newest_writer != nullptr);
   assert(w->state == STATE_INIT);
@@ -325,9 +349,10 @@ void WriteThread::CompleteFollower(Writer* w, WriteGroup& write_group) {
   SetState(w, STATE_COMPLETED);
 }
 
+// DB mutex is held!
 void WriteThread::BeginWriteStall() {
   ++stall_begun_count_;
-  LinkOne(&write_stall_dummy_, &newest_writer_);
+  SetStall(&write_stall_dummy_, &newest_writer_);
 
   // Walk writer list until w->write_group != nullptr. The current write group
   // will not have a mix of slowdown/no_slowdown, so its ok to stop at that

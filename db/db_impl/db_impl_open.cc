@@ -35,6 +35,7 @@
 #include "monitoring/persistent_stats_history.h"
 #include "options/options_helper.h"
 #include "rocksdb/table.h"
+#include "rocksdb/utilities/options_type.h"
 #include "rocksdb/wal_filter.h"
 #include "test_util/sync_point.h"
 #include "util/rate_limiter.h"
@@ -64,7 +65,7 @@ DBOptions SanitizeOptions(const std::string& dbname, const DBOptions& src,
     if (max_max_open_files == -1) {
       max_max_open_files = 0x400000;
     }
-    ClipToRange(&result.max_open_files, 20, max_max_open_files);
+    OptionTypeInfo::ClipToRange(&result.max_open_files, 20, max_max_open_files);
     TEST_SYNC_POINT_CALLBACK("SanitizeOptions::AfterChangeMaxOpenFiles",
                              &result.max_open_files);
   }

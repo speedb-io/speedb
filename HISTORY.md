@@ -15,6 +15,7 @@
 * LOG Reporting: add reporting capabilities to the WriteController and the WriteBufferManager by saving the Loggers of the dbs which are using them internally and issuing WARN msgs to these Loggers whenever the state of the WC and WBM changes in regards to delaying (#556).
 * Enable speedb features: Use Scoped Pinning Policy in Enable speedb feature (#459).
 * sst_dump: display metaindex_handle and the index_handle's offset and size in footer information (#404).
+* Added a kUseBaseAddress flag and GetBaseOffset flag to OptionTypeInfo.  If this flag is set and a function is used for processing options, the function is passed the base address of the struct rather than the specific field (#397)
 * Static Pinning: Set the default for mid-percent capacity threshold in scoped pinning policy to 70 (#689).
 * db_bench: Add support for individual scoped pinning policy parameters (#687).
 
@@ -630,6 +631,10 @@ For Leveled Compaction users, `CompactRange()` with `bottommost_level_compaction
 * Fix a bug in key range overlap checking with concurrent compactions when user-defined timestamp is enabled. User-defined timestamps should be EXCLUDED when checking if two ranges overlap.
 * Fixed a bug where the blob cache prepopulating logic did not consider the secondary cache (see #10603).
 * Fixed the rocksdb.num.sst.read.per.level, rocksdb.num.index.and.filter.blocks.read.per.level and rocksdb.num.level.read.per.multiget stats in the MultiGet coroutines
+* Fix a bug in io_uring_prep_cancel in AbortIO API for posix which expects sqe->addr to match with read request submitted and wrong paramter was being passed.
+* Fixed a regression in iterator performance when the entire DB is a single memtable introduced in #10449. The fix is in #10705 and #10716.
+* Fix a bug in io_uring_prep_cancel in AbortIO API for posix which expects sqe->addr to match with read request submitted and wrong paramter was being passed.
+* Fixed a regression in iterator performance when the entire DB is a single memtable introduced in #10449. The fix is in #10705 and #10716.
 
 ### Public API changes
 * Add `rocksdb_column_family_handle_get_id`, `rocksdb_column_family_handle_get_name` to get name, id of column family in C API

@@ -975,7 +975,7 @@ Status OptionTypeInfo::Parse(const ConfigOptions& config_options,
     } else if (parse_func_ != nullptr) {
       ConfigOptions copy = config_options;
       copy.invoke_prepare_options = false;
-      void* opt_addr = GetOffset(opt_ptr);
+      auto opt_addr = GetBaseOffset(opt_ptr, parse_func_);
       return parse_func_(copy, opt_name, opt_value, opt_addr);
     } else if (ParseOptionHelper(GetOffset(opt_ptr), type_, opt_value)) {
       return Status::OK();
@@ -1094,7 +1094,7 @@ Status OptionTypeInfo::Serialize(const ConfigOptions& config_options,
   } else if (IsEnabled(OptionTypeFlags::kDontSerialize)) {
     return Status::NotSupported("Cannot serialize option: ", opt_name);
   } else if (serialize_func_ != nullptr) {
-    const void* opt_addr = GetOffset(opt_ptr);
+    const auto opt_addr = GetBaseOffset(opt_ptr, serialize_func_);
     return serialize_func_(config_options, opt_name, opt_addr, opt_value);
   } else if (IsCustomizable()) {
     const Customizable* custom = AsRawPointer<Customizable>(opt_ptr);
@@ -1310,8 +1310,8 @@ bool OptionTypeInfo::AreEqual(const ConfigOptions& config_options,
       return true;
     }
   } else if (equals_func_ != nullptr) {
-    const void* this_addr = GetOffset(this_ptr);
-    const void* that_addr = GetOffset(that_ptr);
+    const auto this_addr = GetBaseOffset(this_ptr, equals_func_);
+    const auto that_addr = GetBaseOffset(that_ptr, equals_func_);
     if (equals_func_(config_options, opt_name, this_addr, that_addr,
                      mismatch)) {
       return true;
@@ -1450,7 +1450,7 @@ Status OptionTypeInfo::Prepare(const ConfigOptions& config_options,
                                const std::string& name, void* opt_ptr) const {
   if (ShouldPrepare()) {
     if (prepare_func_ != nullptr) {
-      void* opt_addr = GetOffset(opt_ptr);
+      auto opt_addr = GetBaseOffset(opt_ptr, prepare_func_);
       return prepare_func_(config_options, name, opt_addr);
     } else if (IsConfigurable()) {
       Configurable* config = AsRawPointer<Configurable>(opt_ptr);
@@ -1470,7 +1470,7 @@ Status OptionTypeInfo::Validate(const DBOptions& db_opts,
                                 const void* opt_ptr) const {
   if (ShouldValidate()) {
     if (validate_func_ != nullptr) {
-      const void* opt_addr = GetOffset(opt_ptr);
+      const auto opt_addr = GetBaseOffset(opt_ptr, validate_func_);
       return validate_func_(db_opts, cf_opts, name, opt_addr);
     } else if (IsConfigurable()) {
       const Configurable* config = AsRawPointer<Configurable>(opt_ptr);

@@ -18,6 +18,7 @@
 * Added a kUseBaseAddress flag and GetBaseOffset flag to OptionTypeInfo.  If this flag is set and a function is used for processing options, the function is passed the base address of the struct rather than the specific field (#397)
 * Static Pinning: Set the default for mid-percent capacity threshold in scoped pinning policy to 70 (#689).
 * db_bench: Add support for individual scoped pinning policy parameters (#687).
+* Enable speedb features: Constrain the interface of SharedOptions (make immutable) (#740).
 
 ### Bug Fixes
 * db_bench: Fix SeekRandomWriteRandom valid check. Use key and value only after checking iterator is valid.

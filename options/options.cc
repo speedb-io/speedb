@@ -552,6 +552,7 @@ Options* Options::EnableSpeedbFeatures(SharedOptions& shared_options) {
   EnableSpeedbFeaturesDB(shared_options);
   EnableSpeedbFeaturesCF(shared_options);
   if (memtable_factory->IsInsertConcurrentlySupported() == false) {
+    assert(allow_concurrent_memtable_write == false);
     allow_concurrent_memtable_write = false;
   }
   return this;

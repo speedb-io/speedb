@@ -56,7 +56,7 @@ int main() {
   // as listed in the definition of SpeedbSharedOptiopns in options.h
   op1.create_if_missing = true;
   op1.compression = rocksdb::kNoCompression;
-  // NOT Having a prefix-extractor (the deafult) will result in the
+  // NOT having a prefix-extractor (the deafult) will result in the
   // memtable_factory==HashSpdbRepFactory
   //...
   op1.EnableSpeedbFeatures(so1);

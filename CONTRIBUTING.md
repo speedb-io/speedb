@@ -187,7 +187,7 @@ Replace `<year>` in the copyright notice above with the current year.
 #### RocksDB Source Files
 
 When modifying files that exist in RocksDB that already have a Facebook or LevelDB license header 
-Add the following header at the top, preceding the Facebook or LevelDB license header as follows:
+Add the following header at the top, **preceding the Facebook or LevelDB license header** as follows:
 
 ```
 Copyright (C) <year> Speedb Ltd. All rights reserved.

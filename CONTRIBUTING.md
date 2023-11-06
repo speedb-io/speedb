@@ -187,7 +187,7 @@ Replace `<year>` in the copyright notice above with the current year.
 #### RocksDB Source Files
 
 When modifying files that exist in RocksDB that already have a Facebook or LevelDB license header 
-Add the following header at the top, **preceding the Facebook or LevelDB license header** as follows:
+Add the following header at the top, **preceding the Facebook and/or LevelDB license header** as follows:
 
 ```
 Copyright (C) <year> Speedb Ltd. All rights reserved.
@@ -204,7 +204,13 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 
-<Existing License Header>
+Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
+ This source code is licensed under both the GPLv2 (found in the
+ COPYING file in the root directory) and Apache 2.0 License
+ (found in the LICENSE.Apache file in the root directory).
+Copyright (c) 2011 The LevelDB Authors. All rights reserved.
+Use of this source code is governed by a BSD-style license that can be
+found in the LICENSE file. See the AUTHORS file for names of contributors.
 ```
 
 Replace `<year>` in the copyright notice above with the current year.

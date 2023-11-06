@@ -28,6 +28,7 @@
 
 ### Miscellaneous
 * Unit tests: Disable CancelCompactionWaitingOnConflict and CompactionLimiter in db_compaction_test since they sometimes fail or get stuck. These need to be investigated and reenabled.
+* Documentation: Update CONTRIBUTING.md guide to request contributors to add Speedb's license when modifying existing Rocksdb Files (#713).
 
 ## Grapes v2.6.0 (8/22/2023)
 Based on RocksDB 8.1.1

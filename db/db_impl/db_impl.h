@@ -359,6 +359,16 @@ class DBImpl : public DB {
       const std::vector<ColumnFamilyHandle*>& column_families,
       std::vector<Iterator*>* iterators) override;
 
+  virtual Status GetSmallest(
+      const ReadOptions& options,
+      const std::vector<ColumnFamilyHandle*>& column_families,
+      std::vector<Iterator*>* iterators) override;
+
+  virtual Status NewIterators(
+      const ReadOptions& options,
+      const std::vector<ColumnFamilyHandle*>& column_families,
+      std::vector<Iterator*>* iterators) override;
+
   virtual const Snapshot* GetSnapshot() override;
   // Will unref a snapshot copy
   // Returns true if the snapshot has not been deleted from SnapshotList

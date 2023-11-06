@@ -1,8 +1,8 @@
-name: test check lic
+name: Check License and History
 
 on:  # this workflow is planned to be called by the ci_pipeline and it will compare the PR files with the main
   workflow_call:
-  #workflow_dispatch:
+  workflow_dispatch:
   #pull_request_review:
   #  types: [submitted]
 
@@ -19,9 +19,13 @@ jobs:
       - name: Get changed files
         id: changes       
         run: |
+          echo "files added or changed in a PR: "
           git diff --name-only --diff-filter=ACMRT ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }}  -- . ':!.github' ':!*.md'
+          echo "added or changed files: "
+          git diff --name-only --diff-filter=ACMRT remotes/origin/main HEAD  -- . ':!.github' ':!*.md'
           echo "diff_list<<EOF" >> $GITHUB_OUTPUT
           git diff --name-only --diff-filter=ACMRT ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }}  -- . ':!.github' ':!*.md' >> $GITHUB_OUTPUT
+          git diff --name-only --diff-filter=ACMRT remotes/origin/main HEAD  -- . ':!.github' ':!*.md' >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
           
       - name: list new files
@@ -47,12 +51,11 @@ jobs:
             fi
           done
           exit $exit_code
-      - name: Check HISTORY
+      - name: Check HISTORY PR
         run: |  
           set +e
           git diff --name-only --diff-filter=ACMRT ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }}|grep -v "\.github" |grep -q [a-z,A-Z]
           if [ $? -eq "0" ]; then
-          #echo "New files were added, we need to make sure the history.md file was updated" 
             history_not_in=1
             git diff --name-only --diff-filter=M ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }}|grep -v "\.github" |grep -q "HISTORY.md"
             if [ $? -ne "0" ]; then
@@ -64,3 +67,20 @@ jobs:
           fi
           echo "No files were added"
           exit 0
+
+      - name: Check HISTORY WD
+        run: |  
+          set +e
+          git diff --name-only --diff-filter=ACMRT remotes/origin/main HEAD  -- . ':!.github' ':!*.md' |grep -q [a-z,A-Z]
+          if [ $? -eq "0" ]; then
+            history_not_in=1
+            git diff --name-only --diff-filter=ACMRT remotes/origin/main HEAD  -- . ':!.github' ':!*.md' |grep -q "HISTORY.md"
+            if [ $? -ne "0" ]; then
+              echo "New files were added in this PR but the HISTORY.md file was not updated"
+              else 
+              history_not_in=0
+            fi
+            exit $history_not_in 
+          fi
+          echo "No files were added"
+          exit 0    

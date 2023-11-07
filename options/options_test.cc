@@ -5297,137 +5297,227 @@ class SharedOptionsTest : public testing::Test {};
 
 TEST_F(SharedOptionsTest, SharedOptionsTest) {
   size_t total_ram_size_bytes = 100 * 1024 * 1024 * 1024ul;
-  size_t delayed_write_rate = 256 * 1024 * 1024ul;
   size_t total_threads = 8;
-  SharedOptions so(total_ram_size_bytes, total_threads, delayed_write_rate);
+  size_t delayed_write_rate = 256 * 1024 * 1024ul;
+  size_t bucket_size = 50000;
+  bool use_merge = false;
 
-  ASSERT_TRUE(so.GetTotalThreads() == total_threads);
-  ASSERT_TRUE(so.GetDelayedWriteRate() == delayed_write_rate);
-  ASSERT_TRUE(so.GetTotalRamSizeBytes() == total_ram_size_bytes);
+  //
+  // Test default values for SharedOptions's ctor
+  //
 
-  ASSERT_TRUE(so.write_buffer_manager->buffer_size() == 1);
-  ASSERT_TRUE(so.cache->GetCapacity() == total_ram_size_bytes);
-  ASSERT_TRUE(so.write_buffer_manager->IsInitiatingFlushes() == true);
-  ASSERT_TRUE(so.write_controller->max_delayed_write_rate() ==
-              delayed_write_rate);
-  ASSERT_TRUE(so.write_controller->is_dynamic_delay());
-  ASSERT_TRUE(so.rate_limiter == nullptr);
-  ASSERT_TRUE(so.sst_file_manager == nullptr);
-  ASSERT_TRUE(so.info_log == nullptr);
-  ASSERT_TRUE(so.file_checksum_gen_factory == nullptr);
+  SharedOptions so_with_dflts(total_ram_size_bytes, total_threads);
 
-  ASSERT_TRUE(so.pinning_policy.get() != nullptr);
-  ASSERT_STREQ(so.pinning_policy->Name(), "speedb_scoped_pinning_policy")
-      << so.pinning_policy->Name();
+  ASSERT_EQ(so_with_dflts.GetMaxWriteBufferManagerSize(),
+            total_ram_size_bytes / 4);
+  ASSERT_EQ(so_with_dflts.GetTotalRamSizeBytes(), total_ram_size_bytes);
+  ASSERT_EQ(so_with_dflts.GetTotalThreads(), total_threads);
+  ASSERT_EQ(so_with_dflts.GetDelayedWriteRate(),
+            SharedOptions::kDefaultDelayedWriteRate);
+  ASSERT_EQ(so_with_dflts.GetBucketSize(), SharedOptions::kDefaultBucketSize);
+  ASSERT_EQ(so_with_dflts.IsMergeMemtableSupported(),
+            SharedOptions::kDeafultUseMerge);
 
-  size_t expected_pinning_capacity = 0.8 * (0.75 * total_ram_size_bytes);
-  std::string actual_pinning_capacity_str;
-  ASSERT_OK(so.pinning_policy->GetOption(ConfigOptions(), "capacity",
-                                         &actual_pinning_capacity_str));
-  ASSERT_EQ(actual_pinning_capacity_str,
-            std::to_string(expected_pinning_capacity));
+  auto so_with_dflts_cache = so_with_dflts.GetCache();
+  ASSERT_TRUE(so_with_dflts_cache != nullptr);
+  ASSERT_STREQ(so_with_dflts_cache->Name(), "LRUCache");
+  ASSERT_EQ(so_with_dflts_cache->GetCapacity(), total_ram_size_bytes);
+
+  auto so_with_dflts_wc = so_with_dflts.GetWriteController();
+  ASSERT_TRUE(so_with_dflts_wc != nullptr);
+  ASSERT_EQ(so_with_dflts_wc->max_delayed_write_rate(),
+            SharedOptions::kDefaultDelayedWriteRate);
+  ASSERT_TRUE(so_with_dflts_wc->is_dynamic_delay());
+
+  auto so_with_dflts_wbm = so_with_dflts.GetWriteBufferManager();
+  ASSERT_TRUE(so_with_dflts_wbm != nullptr);
+  ASSERT_EQ(so_with_dflts_wbm->buffer_size(), 1U);
+  ASSERT_TRUE(so_with_dflts_wbm->IsInitiatingFlushes());
+
+  auto so_with_dflts_pp = so_with_dflts.GetPinningPolicy();
+  ASSERT_TRUE(so_with_dflts_pp != nullptr);
+  ASSERT_STREQ(so_with_dflts_pp->Name(), "speedb_scoped_pinning_policy");
+
+  std::string so_dflts_capacity_str;
+  so_with_dflts_pp->GetOption(ConfigOptions(), "capacity",
+                              &so_dflts_capacity_str);
+  auto so_dflts_expected_pinning_capacity =
+      80U *
+      (total_ram_size_bytes - so_with_dflts.GetMaxWriteBufferManagerSize()) /
+      100U;
+  ASSERT_EQ(so_dflts_capacity_str,
+            std::to_string(so_dflts_expected_pinning_capacity));
+
+  //
+  // Test construction with all values specified
+  //
+
+  SharedOptions so_no_dflts(total_ram_size_bytes, total_threads,
+                            delayed_write_rate, bucket_size, use_merge);
+
+  ASSERT_EQ(so_no_dflts.GetTotalRamSizeBytes(), total_ram_size_bytes);
+  ASSERT_EQ(so_no_dflts.GetTotalThreads(), total_threads);
+  ASSERT_EQ(so_no_dflts.GetDelayedWriteRate(), delayed_write_rate);
+  ASSERT_EQ(so_no_dflts.GetBucketSize(), bucket_size);
+  ASSERT_EQ(so_no_dflts.IsMergeMemtableSupported(), use_merge);
+
+  auto so_no_dflts_cache = so_no_dflts.GetCache();
+  ASSERT_TRUE(so_no_dflts_cache != nullptr);
+  ASSERT_STREQ(so_no_dflts_cache->Name(), "LRUCache");
+  ASSERT_EQ(so_no_dflts_cache->GetCapacity(), total_ram_size_bytes);
+
+  auto so_no_dflts_wc = so_no_dflts.GetWriteController();
+  ASSERT_TRUE(so_no_dflts_wc != nullptr);
+  ASSERT_EQ(so_no_dflts_wc->max_delayed_write_rate(), delayed_write_rate);
+  ASSERT_TRUE(so_no_dflts_wc->is_dynamic_delay());
+
+  auto so_no_dflts_wbm = so_no_dflts.GetWriteBufferManager();
+  ASSERT_TRUE(so_no_dflts_wbm != nullptr);
+  ASSERT_EQ(so_no_dflts_wbm->buffer_size(), 1U);
+  ASSERT_TRUE(so_no_dflts_wbm->IsInitiatingFlushes());
+
+  auto so_no_dflts_pp = so_no_dflts.GetPinningPolicy();
+  ASSERT_TRUE(so_no_dflts_pp != nullptr);
+  ASSERT_STREQ(so_with_dflts_pp->Name(), "speedb_scoped_pinning_policy");
+
+  std::string so_no_dflts_capacity_str;
+  so_with_dflts_pp->GetOption(ConfigOptions(), "capacity",
+                              &so_no_dflts_capacity_str);
+  auto so_no_dflts_expected_pinning_capacity =
+      80U *
+      (total_ram_size_bytes - so_no_dflts.GetMaxWriteBufferManagerSize()) /
+      100U;
+  ASSERT_EQ(so_no_dflts_capacity_str,
+            std::to_string(so_no_dflts_expected_pinning_capacity));
 }
 
+namespace test_enable_speedb {
+
+void ValidateDBOptionsPart(const SharedOptions& so, const DBOptions& op,
+                           size_t total_num_cfs) {
+  ASSERT_EQ(op.max_background_jobs, static_cast<int>(so.GetTotalThreads()));
+  ASSERT_EQ(op.bytes_per_sync, 1 << 20);
+  ASSERT_TRUE(op.use_dynamic_delay);
+  ASSERT_EQ(op.delayed_write_rate, so.GetDelayedWriteRate());
+
+  ASSERT_EQ(op.write_controller.get(), so.GetWriteController());
+
+  ASSERT_EQ(op.write_buffer_manager.get(), so.GetWriteBufferManager());
+  if (total_num_cfs > 0U) {
+    auto expected_wbm_size =
+        std::min(total_num_cfs * SharedOptions::kWbmPerCfSizeIncrease,
+                 so.GetMaxWriteBufferManagerSize());
+    ASSERT_EQ(op.write_buffer_manager->buffer_size(), expected_wbm_size);
+  } else {
+    ASSERT_EQ(op.write_buffer_manager->buffer_size(), 1U);
+  }
+}
+
+void ValidateCFOptionsPart(const SharedOptions& so,
+                           const ColumnFamilyOptions& op) {
+  ASSERT_EQ(op.max_write_buffer_number, 4);
+  ASSERT_EQ(op.min_write_buffer_number_to_merge, 1);
+
+  ASSERT_TRUE(op.table_factory != nullptr);
+  auto* table_options = op.table_factory->GetOptions<BlockBasedTableOptions>();
+
+  ASSERT_TRUE(table_options->block_cache != nullptr);
+  ASSERT_EQ(table_options->block_cache.get(), so.GetCache());
+
+  ASSERT_TRUE(table_options->filter_policy != nullptr);
+  ASSERT_STREQ(table_options->filter_policy->Name(),
+               "speedb_paired_bloom_filter");
+
+  ASSERT_TRUE(table_options->pinning_policy != nullptr);
+  ASSERT_EQ(table_options->pinning_policy.get(), so.GetPinningPolicy());
+
+  ASSERT_TRUE(op.memtable_factory != nullptr);
+  if (op.prefix_extractor != nullptr) {
+    ASSERT_STREQ(op.memtable_factory->Name(), "SkipListFactory");
+  } else {
+    ASSERT_STREQ(op.memtable_factory->Name(), "HashSpdbRepFactory");
+  }
+}
+
+}  // namespace test_enable_speedb
+
 TEST_F(SharedOptionsTest, EnableSpeedbFeatures) {
-  Options op1, op2, op3;
   size_t total_ram_size_bytes = 100 * 1024 * 1024 * 1024ul;
   size_t delayed_write_rate = 256 * 1024 * 1024ul;
   int total_threads = 8;
+
   SharedOptions so(total_ram_size_bytes, total_threads, delayed_write_rate);
 
-  // create the DB if it's not already present
-  op1.create_if_missing = true;
-  op2.create_if_missing = true;
-  op3.create_if_missing = true;
+  size_t num_cfs = 0U;
 
+  Options op1;
   op1.EnableSpeedbFeatures(so);
-  ASSERT_TRUE(op1.write_buffer_manager->buffer_size() ==
-              1 * 512 * 1024 * 1024ul);
+  ++num_cfs;
+  test_enable_speedb::ValidateDBOptionsPart(so, op1, num_cfs);
+  test_enable_speedb::ValidateCFOptionsPart(so, op1);
+
+  Options op2;
+  op2.prefix_extractor.reset(NewFixedPrefixTransform(1));
+  op2.allow_concurrent_memtable_write = false;
   op2.EnableSpeedbFeatures(so);
-  ASSERT_TRUE(op2.write_buffer_manager->buffer_size() ==
-              2 * 512 * 1024 * 1024ul);
+  ++num_cfs;
+  test_enable_speedb::ValidateDBOptionsPart(so, op2, num_cfs);
+  test_enable_speedb::ValidateCFOptionsPart(so, op2);
+  ASSERT_FALSE(op2.allow_concurrent_memtable_write);
+
+  Options op3;
   op3.EnableSpeedbFeatures(so);
-  ASSERT_TRUE(op3.write_buffer_manager->buffer_size() ==
-              3 * 512 * 1024 * 1024ul);
-
-  ASSERT_EQ(op1.env, so.env);
-  ASSERT_EQ(op2.env, so.env);
-  ASSERT_EQ(op3.env, so.env);
-
-  ASSERT_EQ(op1.max_background_jobs, (int)so.GetTotalThreads());
-  ASSERT_EQ(op2.max_background_jobs, (int)so.GetTotalThreads());
-  ASSERT_EQ(op3.max_background_jobs, (int)so.GetTotalThreads());
-
-  ASSERT_EQ(op1.delayed_write_rate, so.GetDelayedWriteRate());
-  ASSERT_EQ(op2.delayed_write_rate, so.GetDelayedWriteRate());
-  ASSERT_EQ(op3.delayed_write_rate, so.GetDelayedWriteRate());
-
-  ASSERT_EQ(op1.write_buffer_manager, so.write_buffer_manager);
-  ASSERT_EQ(op2.write_buffer_manager, so.write_buffer_manager);
-  ASSERT_EQ(op3.write_buffer_manager, so.write_buffer_manager);
-
-  ASSERT_EQ(op1.write_buffer_manager->buffer_size(), 3 * 512 * 1024 * 1024ul);
-  ASSERT_EQ(op2.write_buffer_manager->buffer_size(), 3 * 512 * 1024 * 1024ul);
-  ASSERT_EQ(op3.write_buffer_manager->buffer_size(), 3 * 512 * 1024 * 1024ul);
-
-  const auto* sanitized_table_options =
-      op1.table_factory->GetOptions<BlockBasedTableOptions>();
-  ASSERT_EQ(sanitized_table_options->block_cache, so.cache);
+  ++num_cfs;
+  test_enable_speedb::ValidateDBOptionsPart(so, op3, num_cfs);
+  test_enable_speedb::ValidateCFOptionsPart(so, op3);
 }
 
 TEST_F(SharedOptionsTest, EnableSpeedbFeaturesDB) {
-  DBOptions op;
   size_t total_ram_size_bytes = 100 * 1024 * 1024 * 1024ul;
-  size_t delayed_write_rate = 256 * 1024 * 1024ul;
   int total_threads = 8;
+  size_t delayed_write_rate = 256 * 1024 * 1024ul;
   SharedOptions so(total_ram_size_bytes, total_threads, delayed_write_rate);
 
+  DBOptions op;
   op.EnableSpeedbFeaturesDB(so);
-
-  ASSERT_EQ(op.env, so.env);
-
-  ASSERT_EQ(op.max_background_jobs, (int)so.GetTotalThreads());
-
-  ASSERT_EQ(op.delayed_write_rate, so.GetDelayedWriteRate());
-
-  ASSERT_EQ(op.write_buffer_manager, so.write_buffer_manager);
-
-  ASSERT_EQ(op.write_buffer_manager->buffer_size(), 1);
+  test_enable_speedb::ValidateDBOptionsPart(so, op, 0 /* num_cfs */);
 }
 
 TEST_F(SharedOptionsTest, EnableSpeedbFeaturesCF) {
-  Options op;
-  ColumnFamilyOptions cfo;
-
-  size_t total_ram_size_bytes = 100 * 1024 * 1024 * 1024ul;
+  size_t total_ram_size_bytes =
+      4 * SharedOptions::kWbmPerCfSizeIncrease * 4 + 1;
   size_t delayed_write_rate = 256 * 1024 * 1024;
   int total_threads = 8;
 
   SharedOptions so(total_ram_size_bytes, total_threads, delayed_write_rate);
 
-  // create the DB if it's not already present
-  op.create_if_missing = true;
-  op.EnableSpeedbFeatures(so);
-  ASSERT_EQ(op.write_buffer_manager->buffer_size(), 1 * 512 * 1024 * 1024ul);
-  cfo.EnableSpeedbFeaturesCF(so);
-  ASSERT_EQ(op.write_buffer_manager->buffer_size(), 2 * 512 * 1024 * 1024ul);
-  ASSERT_EQ(
-      op.write_buffer_size,
-      std::min<size_t>(op.write_buffer_manager->buffer_size() / 4, 64ul << 20));
-  ASSERT_EQ(op.max_write_buffer_number, 4);
-  ASSERT_EQ(op.min_write_buffer_number_to_merge, 1);
-  ASSERT_EQ(op.env, so.env);
-  const auto* sanitized_table_options =
-      op.table_factory->GetOptions<BlockBasedTableOptions>();
-  ASSERT_EQ(sanitized_table_options->block_cache, so.cache);
+  ColumnFamilyOptions cfo1;
+  cfo1.EnableSpeedbFeaturesCF(so);
+  test_enable_speedb::ValidateCFOptionsPart(so, cfo1);
 
-  const auto sanitized_options_overrides =
-      sanitized_table_options->cache_usage_options.options_overrides;
-  EXPECT_EQ(sanitized_options_overrides.size(), kNumCacheEntryRoles);
-  for (auto options_overrides_iter = sanitized_options_overrides.cbegin();
-       options_overrides_iter != sanitized_options_overrides.cend();
-       ++options_overrides_iter) {
-  }
+  ColumnFamilyOptions cfo2;
+  cfo2.EnableSpeedbFeaturesCF(so);
+  test_enable_speedb::ValidateCFOptionsPart(so, cfo2);
+
+  // create the DB if it's not already present
+  Options op1;
+  op1.EnableSpeedbFeatures(so);
+  test_enable_speedb::ValidateDBOptionsPart(so, op1, 3 /* num_cfs */);
+  test_enable_speedb::ValidateCFOptionsPart(so, op1);
+
+  // create the DB if it's not already present
+  Options op2;
+  op2.EnableSpeedbFeatures(so);
+  ASSERT_EQ(op2.write_buffer_manager->buffer_size(),
+            so.GetMaxWriteBufferManagerSize());
+  test_enable_speedb::ValidateDBOptionsPart(so, op2, 4 /* num_cfs */);
+
+  // create the DB if it's not already present
+  Options op3;
+  op3.EnableSpeedbFeatures(so);
+  ASSERT_EQ(op3.write_buffer_manager->buffer_size(),
+            so.GetMaxWriteBufferManagerSize());
+  test_enable_speedb::ValidateDBOptionsPart(so, op3, 5 /* num_cfs */);
 }
 
 }  // namespace ROCKSDB_NAMESPACE

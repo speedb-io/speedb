@@ -2330,39 +2330,72 @@ struct WaitForCompactOptions {
 // more info and use example can be found in  enable_speedb_features_example.cc
 class SharedOptions {
  public:
-  SharedOptions();
+  static constexpr size_t kDefaultDelayedWriteRate = 256 * 1024 * 1024ul;
+  static constexpr size_t kDefaultBucketSize = 1000000;
+  static constexpr bool kDeafultUseMerge = true;
+
+  static constexpr size_t kWbmPerCfSizeIncrease = 512 * 1024 * 1024ul;
+
+ public:
   SharedOptions(size_t total_ram_size_bytes, size_t total_threads,
-                size_t delayed_write_rate = 256 * 1024 * 1024ul,
-                size_t bucket_size = 1000000, bool use_merge = true);
-  size_t GetTotalThreads() { return total_threads_; }
-  size_t GetTotalRamSizeBytes() { return total_ram_size_bytes_; }
-  size_t GetDelayedWriteRate() { return delayed_write_rate_; }
-  size_t GetBucketSize() { return bucket_size_; }
-  size_t IsMergeMemtableSupported() { return use_merge_; }
+                size_t delayed_write_rate = kDefaultDelayedWriteRate,
+                size_t bucket_size = kDefaultBucketSize,
+                bool use_merge = kDeafultUseMerge);
+
+ public:
+  size_t GetMaxWriteBufferManagerSize() const;
+
+  size_t GetTotalThreads() const { return total_threads_; }
+  size_t GetTotalRamSizeBytes() const { return total_ram_size_bytes_; }
+  size_t GetDelayedWriteRate() const { return delayed_write_rate_; }
+  size_t GetBucketSize() const { return bucket_size_; }
+  size_t IsMergeMemtableSupported() const { return use_merge_; }
+
+  const Cache* GetCache() const { return cache_.get(); }
+  const WriteController* GetWriteController() const {
+    return write_controller_.get();
+  };
+  const WriteBufferManager* GetWriteBufferManager() const {
+    return write_buffer_manager_.get();
+  }
+  const TablePinningPolicy* GetPinningPolicy() const {
+    return pinning_policy_.get();
+  }
+
+ private:
+  void CreateWriteBufferManager();
+  void CreatePinningPolicy();
+
   // this function will increase write buffer manager by increased_by amount
   // as long as the result is not bigger than the maximum size of
   // total_ram_size_ /4
   void IncreaseWriteBufferSize(size_t increase_by);
-  void CreatePinningPolicy();
-  size_t GetMaxWriteBufferManagerSize() const;
 
-  std::shared_ptr<Cache> cache = nullptr;
-  std::shared_ptr<WriteController> write_controller = nullptr;
-  std::shared_ptr<WriteBufferManager> write_buffer_manager = nullptr;
+ private:
+  std::shared_ptr<Cache> cache_ = nullptr;
+  std::shared_ptr<WriteController> write_controller_ = nullptr;
+  std::shared_ptr<WriteBufferManager> write_buffer_manager_ = nullptr;
+  std::shared_ptr<TablePinningPolicy> pinning_policy_ = nullptr;
+
+ private:
+  size_t total_ram_size_bytes_ = 0;
+  size_t total_threads_ = 0;
+  size_t delayed_write_rate_ = kDefaultBucketSize;
+  size_t bucket_size_ = kDefaultBucketSize;
+  bool use_merge_ = kDeafultUseMerge;
+
+ private:
+  // For Future Use
   Env* env = Env::Default();
   std::shared_ptr<RateLimiter> rate_limiter = nullptr;
   std::shared_ptr<SstFileManager> sst_file_manager = nullptr;
   std::shared_ptr<Logger> info_log = nullptr;
   std::vector<std::shared_ptr<EventListener>> listeners;
   std::shared_ptr<FileChecksumGenFactory> file_checksum_gen_factory = nullptr;
-  std::shared_ptr<TablePinningPolicy> pinning_policy = nullptr;
 
  private:
-  size_t total_threads_ = 0;
-  size_t total_ram_size_bytes_ = 0;
-  size_t delayed_write_rate_ = 0;
-  size_t bucket_size_ = 1000000;
-  bool use_merge_ = true;
+  friend struct DBOptions;
+  friend struct ColumnFamilyOptions;
 };
 
 }  // namespace ROCKSDB_NAMESPACE

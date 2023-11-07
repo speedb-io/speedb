@@ -5272,9 +5272,9 @@ class Benchmark {
 
   void OpenDb(Options options, const std::string& db_name,
               DBWithColumnFamilies* db) {
-    SharedOptions so(FLAGS_total_ram_size, options.max_background_jobs,
-                     options.delayed_write_rate, FLAGS_hash_bucket_count,
-                     false);
+    SharedOptions so(FLAGS_total_ram_size, FLAGS_max_background_jobs,
+                     FLAGS_delayed_write_rate, FLAGS_hash_bucket_count,
+                     false /* use_merge */);
     if (FLAGS_enable_speedb_features) {
       options.EnableSpeedbFeatures(so);
     }

@@ -571,33 +571,33 @@ Options* Options::OldDefaults(int rocksdb_major_version,
 Options* Options::EnableSpeedbFeatures(SharedOptions& shared_options) {
   EnableSpeedbFeaturesDB(shared_options);
   EnableSpeedbFeaturesCF(shared_options);
+  if (memtable_factory->IsInsertConcurrentlySupported() == false) {
+    assert(allow_concurrent_memtable_write == false);
+    allow_concurrent_memtable_write = false;
+  }
   return this;
 }
 
 SharedOptions::SharedOptions(size_t total_ram_size_bytes, size_t total_threads,
                              size_t delayed_write_rate, size_t bucket_size,
-                             bool use_merge) {
-  total_threads_ = total_threads;
-  total_ram_size_bytes_ = total_ram_size_bytes;
-  delayed_write_rate_ = delayed_write_rate;
-  bucket_size_ = bucket_size;
-  use_merge_ = use_merge;
-  // initial_write_buffer_size_ is initialized to 1 to avoid from empty memory
-  // which might cause some problems
-  int initial_write_buffer_size_ = 1;
-  cache = NewLRUCache(total_ram_size_bytes_);
-  write_controller.reset(
+                             bool use_merge)
+    : total_ram_size_bytes_(total_ram_size_bytes),
+      total_threads_(total_threads),
+      delayed_write_rate_(delayed_write_rate),
+      bucket_size_(bucket_size),
+      use_merge_(use_merge) {
+  cache_ = NewLRUCache(total_ram_size_bytes_);
+  write_controller_.reset(
       new WriteController(true /*dynamic_delay*/, delayed_write_rate_));
-  write_buffer_manager.reset(new WriteBufferManager(
-      initial_write_buffer_size_, cache, true /*allow_stall*/));
 
+  CreateWriteBufferManager();
   CreatePinningPolicy();
 }
 
 void SharedOptions::IncreaseWriteBufferSize(size_t increase_by) {
   // Max write_buffer_manager->buffer_size()
   size_t wbm_max_buf_size = GetMaxWriteBufferManagerSize();
-  size_t current_buffer_size = write_buffer_manager->buffer_size();
+  size_t current_buffer_size = write_buffer_manager_->buffer_size();
   size_t set_buf_res = 0;
 
   if (current_buffer_size == 1 && increase_by > 1) {
@@ -611,14 +611,25 @@ void SharedOptions::IncreaseWriteBufferSize(size_t increase_by) {
     set_buf_res = wbm_max_buf_size;
   }
   if (set_buf_res != 0) {
-    write_buffer_manager->SetBufferSize(set_buf_res);
+    write_buffer_manager_->SetBufferSize(set_buf_res);
   }
+}
+
+void SharedOptions::CreateWriteBufferManager() {
+  // initial_write_buffer_size_ is initialized to 1 to avoid from empty memory
+  // which might cause some problems
+  size_t initial_write_buffer_size_ = 1U;
+
+  write_buffer_manager_.reset(new WriteBufferManager(
+      initial_write_buffer_size_, cache_, true /*allow_stall*/,
+      true /* initiate_fluses */, WriteBufferManager::FlushInitiationOptions(),
+      WriteBufferManager::kDfltStartDelayPercentThreshold));
 }
 
 void SharedOptions::CreatePinningPolicy() {
   // Calculate the size of the clean memory
-  auto clean_memory_capacity = cache->GetCapacity();
-  if (write_buffer_manager->cost_to_cache()) {
+  auto clean_memory_capacity = cache_->GetCapacity();
+  if (write_buffer_manager_->cost_to_cache()) {
     // The WBM's size is increased on every call to EnableSpeedbFeaturesCF()
     // up to a max size. For simplicity, calculate the space for pinning
     // as if wbm is at its max size. Otherwise we would have to update the
@@ -642,7 +653,7 @@ void SharedOptions::CreatePinningPolicy() {
   std::ostringstream oss;
   oss << "id=speedb_scoped_pinning_policy; capacity=" << pinning_capacity;
   auto s = TablePinningPolicy::CreateFromString(config_options, oss.str(),
-                                                &pinning_policy);
+                                                &pinning_policy_);
   assert(s.ok());
 }
 
@@ -651,13 +662,12 @@ size_t SharedOptions::GetMaxWriteBufferManagerSize() const {
 }
 
 DBOptions* DBOptions::EnableSpeedbFeaturesDB(SharedOptions& shared_options) {
-  env = shared_options.env;
   IncreaseParallelism((int)shared_options.GetTotalThreads());
   delayed_write_rate = shared_options.GetDelayedWriteRate();
   bytes_per_sync = 1ul << 20;
   use_dynamic_delay = true;
-  write_buffer_manager = shared_options.write_buffer_manager;
-  write_controller = shared_options.write_controller;
+  write_buffer_manager = shared_options.write_buffer_manager_;
+  write_controller = shared_options.write_controller_;
   return this;
 }
 
@@ -685,8 +695,8 @@ ColumnFamilyOptions* ColumnFamilyOptions::EnableSpeedbFeaturesCF(
   // to disable flush due to write buffer full
   // each new column family will ask the write buffer manager to increase the
   // write buffer size by 512 * 1024 * 1024ul
-  shared_options.IncreaseWriteBufferSize(512 * 1024 * 1024ul);
-  auto db_wbf_size = shared_options.write_buffer_manager->buffer_size();
+  shared_options.IncreaseWriteBufferSize(SharedOptions::kWbmPerCfSizeIncrease);
+  auto db_wbf_size = shared_options.write_buffer_manager_->buffer_size();
   // cf write_buffer_size
   write_buffer_size = std::min<size_t>(db_wbf_size / 4, 64ul << 20);
   max_write_buffer_number = 4;
@@ -702,15 +712,14 @@ ColumnFamilyOptions* ColumnFamilyOptions::EnableSpeedbFeaturesCF(
         &block_based_table_options.filter_policy);
     assert(s.ok());
     block_based_table_options.cache_index_and_filter_blocks = true;
-    block_based_table_options.block_cache = shared_options.cache;
+    block_based_table_options.block_cache = shared_options.cache_;
     block_based_table_options.cache_index_and_filter_blocks_with_high_priority =
         true;
-    block_based_table_options.pinning_policy = shared_options.pinning_policy;
+    block_based_table_options.pinning_policy = shared_options.pinning_policy_;
     table_factory.reset(NewBlockBasedTableFactory(block_based_table_options));
   }
   if (prefix_extractor) {
-    memtable_factory.reset(
-        NewHashSkipListRepFactory(shared_options.GetBucketSize()));
+    memtable_factory.reset(new SkipListFactory());
   } else {
     memtable_factory.reset(
         NewHashSpdbRepFactory(shared_options.GetBucketSize(),

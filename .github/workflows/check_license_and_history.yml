@@ -74,7 +74,7 @@ jobs:
           git diff --name-only --diff-filter=ACMRT remotes/origin/main HEAD  -- . ':!.github' ':!*.md' |grep -q [a-z,A-Z]
           if [ $? -eq "0" ]; then
             history_not_in=1
-            git diff --name-only --diff-filter=ACMRT remotes/origin/main HEAD  -- . ':!.github' ':!*.md' |grep -q "HISTORY.md"
+            git diff --name-only --diff-filter=ACMRT remotes/origin/main HEAD  -- . ':!.github' |grep -q "HISTORY.md"
             if [ $? -ne "0" ]; then
               echo "New files were added in this PR but the HISTORY.md file was not updated"
               else 

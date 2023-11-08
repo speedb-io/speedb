@@ -25,6 +25,7 @@
 #include "options/configurable_helper.h"
 #include "options/options_helper.h"
 #include "options/options_parser.h"
+#include "port/stack_trace.h"
 #include "rocksdb/configurable.h"
 #include "test_util/testharness.h"
 #include "test_util/testutil.h"
@@ -671,6 +672,193 @@ TEST_F(ConfigurableTest, NullOptionMapTest) {
   ASSERT_TRUE(base->AreEquivalent(config_options_, copy.get(), &str));
 }
 
+TEST_F(ConfigurableTest, OptionsAddrOffsetTest) {
+  // Tests the kUseBaseAddress.  The options work as follows:
+  // If X is a valid enum, then B is set to false and U is not used
+  // If X is not a valid enum, then B is set to true and U stores the value
+  // If X is a valid enum, S is a valid option.  If X is not a valid enum, S is
+  // ignored
+
+  static std::unordered_map<std::string, OptionTypeInfo> offset_option_info = {
+      {"x", OptionTypeInfo(offsetof(struct TestOptions, i), OptionType::kInt,
+                           OptionVerificationType::kNormal,
+                           OptionTypeFlags::kUseBaseAddress)
+                .SetParseFunc([](const ConfigOptions&, const std::string&,
+                                 const std::string& value, void* addr) {
+                  auto to = static_cast<TestOptions*>(addr);
+                  if (ParseEnum<TestEnum>(test_enum_map, value, &to->e)) {
+                    to->b = false;
+                  } else {
+                    to->b = true;
+                    to->u = value;
+                  }
+                  return Status::OK();
+                })
+                .SetSerializeFunc([](const ConfigOptions&, const std::string&,
+                                     const void* addr, std::string* value) {
+                  auto to = static_cast<const TestOptions*>(addr);
+                  Status s;
+                  if (to->b) {
+                    *value = to->u;
+                  } else if (!SerializeEnum<TestEnum>(test_enum_map, to->e,
+                                                      value)) {
+                    s = Status::InvalidArgument("Bad Value ");
+                  }
+                  return s;
+                })
+                .SetEqualsFunc([](const ConfigOptions&, const std::string&,
+                                  const void* addr1, const void* addr2,
+                                  std::string*) {
+                  auto to1 = static_cast<const TestOptions*>(addr1);
+                  auto to2 = static_cast<const TestOptions*>(addr2);
+                  if (to1->b != to2->b) {
+                    return false;
+                  } else if (to1->b) {
+                    return to1->u == to2->u;
+                  } else {
+                    return to1->e == to2->e;
+                  }
+                })},
+      {"s", OptionTypeInfo(offsetof(struct TestOptions, s), OptionType::kString,
+                           OptionVerificationType::kNormal,
+                           OptionTypeFlags::kUseBaseAddress)
+                .SetSerializeFunc([](const ConfigOptions&, const std::string&,
+                                     const void* addr, std::string* value) {
+                  auto to = static_cast<const TestOptions*>(addr);
+                  if (to->b) {
+                    value->clear();
+                  } else {
+                    *value = to->s;
+                  }
+                  return Status::OK();
+                })
+                .SetEqualsFunc([](const ConfigOptions&, const std::string& name,
+                                  const void* addr1, const void* addr2,
+                                  std::string* mismatch) {
+                  auto to1 = static_cast<const TestOptions*>(addr1);
+                  auto to2 = static_cast<const TestOptions*>(addr2);
+                  if (to1->b && to2->b) {
+                    if (to1->s != to2->s) {
+                      *mismatch = name;
+                      return false;
+                    }
+                  }
+                  return true;
+                })},
+      {"u",
+       OptionTypeInfo(offsetof(struct TestOptions, u), OptionType::kString,
+                      OptionVerificationType::kNormal,
+                      OptionTypeFlags::kUseBaseAddress |
+                          OptionTypeFlags::kDontSerialize |
+                          OptionTypeFlags::kCompareNever)
+           .SetPrepareFunc(
+               [](const ConfigOptions&, const std::string&, void* addr) {
+                 auto to = static_cast<TestOptions*>(addr);
+                 if (!to->b) {
+                   to->u.clear();
+                 }
+                 return Status::OK();
+               })
+           .SetValidateFunc([](const DBOptions&, const ColumnFamilyOptions&,
+                               const std::string&, const void* addr) {
+             auto to = static_cast<const TestOptions*>(addr);
+             if (!to->b && !to->u.empty()) {
+               return Status::InvalidArgument("U must be empty if B is false");
+             } else {
+               return Status::OK();
+             }
+           })},
+  };
+
+  std::unique_ptr<Configurable> base(new SimpleConfigurable(
+      TestOptions::kName(), TestConfigMode::kDefaultMode, &offset_option_info));
+  std::unique_ptr<Configurable> copy(new SimpleConfigurable(
+      TestOptions::kName(), TestConfigMode::kDefaultMode, &offset_option_info));
+  auto bto = base->GetOptions<TestOptions>();
+  auto cto = copy->GetOptions<TestOptions>();
+  ASSERT_NE(bto, nullptr);
+  ASSERT_NE(cto, nullptr);
+
+  Options options;  // For validation
+  ConfigOptions cfg_opts;
+  cfg_opts.invoke_prepare_options = false;
+  std::string value;
+
+  // Based on the map, this will set b=false and e=B.  U and S will be untouched
+  ASSERT_OK(base->ConfigureFromString(cfg_opts, "x=B"));
+  ASSERT_FALSE(bto->b);
+  ASSERT_EQ(bto->e, TestEnum::kTestB);
+
+  ASSERT_OK(base->GetOption(cfg_opts, "x", &value));
+  ASSERT_EQ(value, "B");
+  ASSERT_OK(base->GetOption(cfg_opts, "s", &value));
+  ASSERT_EQ(value, "");
+
+  // This will update B and ER in the copy to match the base values
+  cto->b = true;
+  ASSERT_OK(copy->ConfigureFromString(cfg_opts, base->ToString(cfg_opts)));
+  ASSERT_FALSE(cto->b);
+  ASSERT_EQ(cto->e, TestEnum::kTestB);
+
+  // Based on the map, this will set b, e, and s.  U will be untouched
+  ASSERT_OK(base->ConfigureFromString(cfg_opts, "x=A; s=S"));
+  ASSERT_FALSE(bto->b);
+  ASSERT_EQ(bto->s, "S");
+  ASSERT_EQ(bto->e, TestEnum::kTestA);
+  ASSERT_OK(base->GetOption(cfg_opts, "x", &value));
+  ASSERT_EQ(value, "A");
+  ASSERT_OK(base->GetOption(cfg_opts, "s", &value));
+  ASSERT_EQ(value, "S");
+
+  // This will update B, E, and S in the copy
+  ASSERT_OK(copy->ConfigureFromString(cfg_opts, base->ToString(cfg_opts)));
+  ASSERT_FALSE(cto->b);
+  ASSERT_EQ(cto->e, TestEnum::kTestA);
+  ASSERT_EQ(cto->s, "S");
+  ASSERT_TRUE(base->AreEquivalent(cfg_opts, copy.get(), &value));
+
+  // This will update B, E, S, and U in the base
+  ASSERT_OK(base->ConfigureFromString(cfg_opts, "x=B; s=T; u=U"));
+  ASSERT_FALSE(bto->b);
+  ASSERT_EQ(bto->s, "T");
+  ASSERT_EQ(bto->u, "U");
+  ASSERT_EQ(bto->e, TestEnum::kTestB);
+  ASSERT_OK(base->GetOption(cfg_opts, "x", &value));
+  ASSERT_EQ(value, "B");
+  ASSERT_OK(base->GetOption(cfg_opts, "s", &value));
+  ASSERT_EQ(value, "T");
+
+  // This will update B, E, and S in the copy
+  cto->s = "copy";
+  cto->e = TestEnum::kTestA;
+  ASSERT_OK(copy->ConfigureFromString(cfg_opts, base->ToString(cfg_opts)));
+  ASSERT_FALSE(cto->b);
+  ASSERT_EQ(cto->e, TestEnum::kTestB);
+  ASSERT_EQ(cto->s, "T");
+  ASSERT_EQ(cto->u, "");
+  ASSERT_TRUE(base->AreEquivalent(cfg_opts, copy.get(), &value));
+
+  ASSERT_NOK(base->ValidateOptions(options, options));
+  ASSERT_OK(base->PrepareOptions(cfg_opts));
+  ASSERT_EQ(bto->u, "");
+
+  // This will update B, S, and U in the base
+  ASSERT_OK(base->ConfigureFromString(cfg_opts, "x=X; s=S"));
+  ASSERT_TRUE(bto->b);
+  ASSERT_EQ(bto->s, "S");
+  ASSERT_EQ(bto->u, "X");
+  ASSERT_OK(base->GetOption(cfg_opts, "x", &value));
+  ASSERT_EQ(value, "X");
+  ASSERT_OK(base->GetOption(cfg_opts, "s", &value));
+  ASSERT_EQ(value, "");
+
+  // This will update U and B in the copy
+  ASSERT_OK(copy->ConfigureFromString(cfg_opts, base->ToString(cfg_opts)));
+  ASSERT_TRUE(cto->b);
+  ASSERT_EQ(cto->s, "T");
+  ASSERT_EQ(cto->u, "X");
+}
+
 static std::unordered_map<std::string, ConfigTestFactoryFunc> TestFactories = {
     {"Simple", []() { return SimpleConfigurable::Create("simple"); }},
     {"Struct", []() { return SimpleStructFactory(); }},
@@ -784,8 +972,9 @@ void ConfigurableParamTest::TestConfigureOptions(
   while (found_one && !unused.empty()) {
     found_one = false;
     for (auto iter = unused.begin(); iter != unused.end();) {
-      if (copy->ConfigureOption(config_options, iter->first, iter->second)
-              .ok()) {
+      Status s =
+          copy->ConfigureOption(config_options, iter->first, iter->second);
+      if (s.ok()) {
         found_one = true;
         iter = unused.erase(iter);
       } else {

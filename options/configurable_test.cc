@@ -674,38 +674,6 @@ TEST_F(ConfigurableTest, NullOptionMapTest) {
   ASSERT_TRUE(base->AreEquivalent(config_options_, copy.get(), &str));
 }
 
-TEST_F(ConfigurableTest, LoggerTest) {
-  StringLogger logger;
-
-  ConfigOptions cfg;
-  cfg.formatter = std::make_shared<LogOptionsFormatter>();
-
-  ColumnFamilyOptions cf_opts;
-  printf("MJR: TF Opts Orig=[\n%s\n]\n",
-         cf_opts.table_factory->GetPrintableOptions().c_str());
-  printf("MJR:+++++++++++\n");
-  cf_opts.Dump(&logger);
-  printf("MJR: CF Opts Orig=[\n%s\n]\n", logger.str().c_str());
-  logger.clear();
-  printf("MJR:+++++++++++\n");
-  printf("MJR:+++++++++++\n");
-  DBOptions db_opts;
-  db_opts.Dump(&logger);
-  printf("MJR: DB Opts Orig=[\n%s\n]\n", logger.str().c_str());
-  logger.clear();
-
-  printf("MJR:***********\n");
-  printf("MJR: TF Opts Log=[\n%s\n]\n",
-         cf_opts.table_factory->ToString(cfg).c_str());
-  printf("MJR:+++++++++++\n");
-  auto cf_cfg = CFOptionsAsConfigurable(cf_opts);
-  printf("MJR: CF Opts Log=[\n%s\n]\n", cf_cfg->ToString(cfg).c_str());
-
-  printf("MJR:+++++++++++\n");
-  auto db_cfg = DBOptionsAsConfigurable(db_opts);
-  printf("MJR: DB Opts Log=[\n%s\n]\n", db_cfg->ToString(cfg).c_str());
-}
-    
 TEST_F(ConfigurableTest, OptionsAddrOffsetTest) {
   // Tests the kUseBaseAddress.  The options work as follows:
   // If X is a valid enum, then B is set to false and U is not used

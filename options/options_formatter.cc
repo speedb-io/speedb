@@ -283,8 +283,7 @@ std::string LogOptionsFormatter::ToString(const std::string& prefix,
       std::string spaces = "  ";
       if (!prefix.empty()) {
         // Indent by the number of "." in the prefix
-        for (int count = static_cast<int>(
-                 std::count(prefix.begin(), prefix.end(), '.'));
+        for (auto count = std::count(prefix.begin(), prefix.end(), '.');
              count >= 0; count--) {
           spaces.append("  ");
         }

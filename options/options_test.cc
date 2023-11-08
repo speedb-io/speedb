@@ -2340,7 +2340,6 @@ static void TestCFOptionsChanged(const std::string& base_opts,
   config.ignore_unsupported_options = false;
 
   ASSERT_OK(GetStringFromColumnFamilyOptions(config, copy, &opts_str));
-  printf("MJR:[%s]=[%s]\n", trace_message.c_str(), opts_str.c_str());
   if (changed > 0) {
     ASSERT_OK(config.ToProps(opts_str, &props));
     ASSERT_EQ(props.size(), changed);

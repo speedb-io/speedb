@@ -29,6 +29,7 @@ Based on RocksDB 8.1.1
 * Static Pinning: Set the default for mid-percent capacity threshold in scoped pinning policy to 70 (#689).
 * db_bench: Add support for individual scoped pinning policy parameters (#687).
 * Enable speedb features: Constrain the interface of SharedOptions (make immutable) (#740).
+* Expose Options::periodic_compaction_seconds via C API (#741).
 
 ### Bug Fixes
 * Fix RepeatableThread to work properly with on thread start callback feature (https://github.com/speedb-io/speedb/pull/667).

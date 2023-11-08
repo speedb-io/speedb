@@ -1297,6 +1297,10 @@ rocksdb_options_set_skip_checking_sst_file_sizes_on_db_open(
 extern ROCKSDB_LIBRARY_API unsigned char
 rocksdb_options_get_skip_checking_sst_file_sizes_on_db_open(
     rocksdb_options_t* opt);
+extern ROCKSDB_LIBRARY_API void rocksdb_options_set_periodic_compaction_seconds(
+    rocksdb_options_t*, uint64_t);
+extern ROCKSDB_LIBRARY_API uint64_t
+rocksdb_options_get_periodic_compaction_seconds(rocksdb_options_t*);
 
 /* Blob Options Settings */
 extern ROCKSDB_LIBRARY_API void rocksdb_options_set_enable_blob_files(

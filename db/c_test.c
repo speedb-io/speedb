@@ -1,3 +1,17 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 /* Copyright (c) 2011 The LevelDB Authors. All rights reserved.
    Use of this source code is governed by a BSD-style license that can be
    found in the LICENSE file. See the AUTHORS file for names of contributors. */
@@ -1873,6 +1887,10 @@ int main(int argc, char** argv) {
     CheckCondition(2.0 ==
                    rocksdb_options_get_max_bytes_for_level_multiplier(o));
 
+    rocksdb_options_set_periodic_compaction_seconds(o, 100000);
+    CheckCondition(100000 ==
+                   rocksdb_options_get_periodic_compaction_seconds(o));
+
     rocksdb_options_set_skip_stats_update_on_db_open(o, 1);
     CheckCondition(1 == rocksdb_options_get_skip_stats_update_on_db_open(o));
 
@@ -2302,6 +2320,12 @@ int main(int argc, char** argv) {
                    rocksdb_options_get_max_bytes_for_level_multiplier(copy));
     CheckCondition(2.0 ==
                    rocksdb_options_get_max_bytes_for_level_multiplier(o));
+
+    rocksdb_options_set_periodic_compaction_seconds(copy, 8000);
+    CheckCondition(8000 ==
+                   rocksdb_options_get_periodic_compaction_seconds(copy));
+    CheckCondition(100000 ==
+                   rocksdb_options_get_periodic_compaction_seconds(o));
 
     rocksdb_options_set_skip_stats_update_on_db_open(copy, 0);
     CheckCondition(0 == rocksdb_options_get_skip_stats_update_on_db_open(copy));

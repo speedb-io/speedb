@@ -20,6 +20,7 @@
 #include "rocksdb/db.h"
 #include "rocksdb/options.h"
 #include "rocksdb/slice.h"
+#include "rocksdb/slice_transform.h"
 
 using namespace ROCKSDB_NAMESPACE;
 
@@ -55,11 +56,17 @@ int main() {
   // as listed in the definition of SpeedbSharedOptiopns in options.h
   op1.create_if_missing = true;
   op1.compression = rocksdb::kNoCompression;
+  // NOT having a prefix-extractor (the deafult) will result in the
+  // memtable_factory==HashSpdbRepFactory
   //...
   op1.EnableSpeedbFeatures(so1);
 
   op2.create_if_missing = true;
   op2.compression = rocksdb::kZlibCompression;
+  // Having a prefix-extractor will result in the
+  // memtable_factory==SkipListRepFactory
+  op2.prefix_extractor.reset(NewFixedPrefixTransform(4));
+
   //...
   op2.EnableSpeedbFeatures(so1);
 
@@ -123,6 +130,8 @@ int main() {
     return 1;
   }
   std::cout << "new_cf was created in db3" << std::endl;
+
+  // Cleanup
 
   s = db3->DropColumnFamily(cf);
   if (!s.ok()) {

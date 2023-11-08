@@ -1647,30 +1647,25 @@ extern ROCKSDB_LIBRARY_API int rocksdb_options_get_wal_compression(
 
 /* SharedOptions */
 extern ROCKSDB_LIBRARY_API rocksdb_shared_options_t*
-rocksdb_shared_options_create(void);
+rocksdb_shared_options_create(size_t total_ram_size_bytes,
+                              size_t total_threads);
 extern ROCKSDB_LIBRARY_API rocksdb_shared_options_t*
 rocksdb_shared_options_create_from(size_t total_ram_size_bytes,
                                    size_t total_threads,
-                                   size_t delayed_write_rate);
+                                   size_t delayed_write_rate, int use_merge);
 extern ROCKSDB_LIBRARY_API void rocksdb_shared_options_destroy(
     rocksdb_shared_options_t* options);
+extern ROCKSDB_LIBRARY_API size_t
+rocksdb_shared_options_get_max_write_buffer_manager_size(
+    rocksdb_shared_options_t* opt);
 extern ROCKSDB_LIBRARY_API size_t
 rocksdb_shared_options_get_total_threads(rocksdb_shared_options_t* opt);
 extern ROCKSDB_LIBRARY_API size_t
 rocksdb_shared_options_get_total_ram_size_bytes(rocksdb_shared_options_t* opt);
 extern ROCKSDB_LIBRARY_API size_t
 rocksdb_shared_options_get_delayed_write_rate(rocksdb_shared_options_t* opt);
-extern ROCKSDB_LIBRARY_API void
-rocksdb_shared_options_increase_write_buffer_size(
-    rocksdb_shared_options_t* options, size_t increase_by);
-extern ROCKSDB_LIBRARY_API void rocksdb_shared_options_set_cache(
-    rocksdb_shared_options_t* options, rocksdb_cache_t* cache);
-extern ROCKSDB_LIBRARY_API void rocksdb_shared_options_set_env(
-    rocksdb_shared_options_t* options, rocksdb_env_t* env);
-extern ROCKSDB_LIBRARY_API void rocksdb_shared_options_set_rate_limiter(
-    rocksdb_shared_options_t* options, rocksdb_ratelimiter_t* limiter);
-extern ROCKSDB_LIBRARY_API void rocksdb_shared_options_set_info_log(
-    rocksdb_shared_options_t*, rocksdb_logger_t*);
+extern ROCKSDB_LIBRARY_API size_t
+rocksdb_shared_options_get_bucket_size(rocksdb_shared_options_t* options);
 
 /* RateLimiter */
 extern ROCKSDB_LIBRARY_API rocksdb_ratelimiter_t* rocksdb_ratelimiter_create(

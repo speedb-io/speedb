@@ -3890,18 +3890,25 @@ int rocksdb_options_get_wal_compression(rocksdb_options_t* opt) {
   return opt->rep.wal_compression;
 }
 
-rocksdb_shared_options_t* rocksdb_shared_options_create(void) {
-  return new rocksdb_shared_options_t;
+rocksdb_shared_options_t* rocksdb_shared_options_create(
+    size_t total_ram_size_bytes, size_t total_threads) {
+  return new rocksdb_shared_options_t{
+      SharedOptions(total_ram_size_bytes, total_threads)};
 }
 rocksdb_shared_options_t* rocksdb_shared_options_create_from(
     size_t total_ram_size_bytes, size_t total_threads,
-    size_t delayed_write_rate) {
-  return new rocksdb_shared_options_t{
-      SharedOptions(total_ram_size_bytes, total_threads, delayed_write_rate)};
+    size_t delayed_write_rate, int use_merge) {
+  return new rocksdb_shared_options_t{SharedOptions(
+      total_ram_size_bytes, total_threads, delayed_write_rate, use_merge)};
 }
 
 void rocksdb_shared_options_destroy(rocksdb_shared_options_t* opt) {
   delete opt;
+}
+
+size_t rocksdb_shared_options_get_max_write_buffer_manager_size(
+    rocksdb_shared_options_t* opt) {
+  return opt->rep.GetMaxWriteBufferManagerSize();
 }
 
 size_t rocksdb_shared_options_get_total_threads(rocksdb_shared_options_t* opt) {
@@ -3918,29 +3925,8 @@ size_t rocksdb_shared_options_get_delayed_write_rate(
   return opt->rep.GetDelayedWriteRate();
 }
 
-void rocksdb_shared_options_increase_write_buffer_size(
-    rocksdb_shared_options_t* opt, size_t increase_by) {
-  opt->rep.IncreaseWriteBufferSize(increase_by);
-}
-
-void rocksdb_shared_options_set_cache(rocksdb_shared_options_t* opt,
-                                      rocksdb_cache_t* cache) {
-  opt->rep.cache = cache->rep;
-}
-
-void rocksdb_shared_options_set_env(rocksdb_shared_options_t* opt,
-                                    rocksdb_env_t* env) {
-  opt->rep.env = env->rep;
-}
-
-void rocksdb_shared_options_set_rate_limiter(rocksdb_shared_options_t* opt,
-                                             rocksdb_ratelimiter_t* limiter) {
-  opt->rep.rate_limiter = limiter->rep;
-}
-
-void rocksdb_shared_options_set_info_log(rocksdb_shared_options_t* opt,
-                                         rocksdb_logger_t* log) {
-  opt->rep.info_log = log->rep;
+size_t rocksdb_shared_options_get_bucket_size(rocksdb_shared_options_t* opt) {
+  return opt->rep.GetBucketSize();
 }
 
 rocksdb_ratelimiter_t* rocksdb_ratelimiter_create(int64_t rate_bytes_per_sec,

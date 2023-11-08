@@ -17,9 +17,13 @@ package org.rocksdb;
 import java.util.List;
 
 public class SharedOptions extends RocksObject {
-  public SharedOptions(
-      final long capacity, final long total_threads, final long delayed_write_rate) {
-    super(newSharedOptions(capacity, total_threads, delayed_write_rate));
+  public SharedOptions(final long capacity, final long total_threads) {
+    super(newSharedOptions(capacity, total_threads));
+  }
+
+  public SharedOptions(final long capacity, final long total_threads, final long delayed_write_rate,
+      final boolean use_merge) {
+    super(newSharedOptions(capacity, total_threads, delayed_write_rate, use_merge));
   }
 
   public long getTotalThreads() {
@@ -32,72 +36,34 @@ public class SharedOptions extends RocksObject {
     return getTotalRamSizeBytes(nativeHandle_);
   }
 
+  public long getMaxWriteBufferManagerSize() {
+    assert (isOwningHandle());
+    return getMaxWriteBufferManagerSize(nativeHandle_);
+  }
+
+  public long getBucketSize() {
+    assert (isOwningHandle());
+    return getBucketSize(nativeHandle_);
+  }
+
   public long getDelayedWriteRate() {
     assert (isOwningHandle());
     return getDelayedWriteRate(nativeHandle_);
   }
 
-  public void increaseWriteBufferSize(long increase_by) {
+  public long isMergeMemtableSupported() {
     assert (isOwningHandle());
-    increaseWriteBufferSize(nativeHandle_, increase_by);
+    return isMergeMemtableSupported(nativeHandle_);
   }
 
-  public SharedOptions setCache(final Cache cache) {
-    assert (isOwningHandle());
-    setCache(nativeHandle_, cache.nativeHandle_);
-    return this;
-  }
-
-  public SharedOptions setWriteBufferManager(final WriteBufferManager writeBufferManager) {
-    assert (isOwningHandle());
-    setWriteBufferManager(nativeHandle_, writeBufferManager.nativeHandle_);
-    return this;
-  }
-
-  public SharedOptions setEnv(final Env env) {
-    assert (isOwningHandle());
-    setEnv(nativeHandle_, env.nativeHandle_);
-    return this;
-  }
-
-  public SharedOptions setRateLimiter(final RateLimiter rateLimiter) {
-    assert (isOwningHandle());
-    setRateLimiter(nativeHandle_, rateLimiter.nativeHandle_);
-    return this;
-  }
-
-  public SharedOptions setSstFileManager(final SstFileManager sstFileManager) {
-    assert (isOwningHandle());
-    setSstFileManager(nativeHandle_, sstFileManager.nativeHandle_);
-    return this;
-  }
-
-  public SharedOptions setLogger(final Logger logger) {
-    assert (isOwningHandle());
-    setLogger(nativeHandle_, logger.nativeHandle_);
-    return this;
-  }
-
-  public SharedOptions setListeners(final List<AbstractEventListener> listeners) {
-    assert (isOwningHandle());
-    setEventListeners(nativeHandle_, RocksCallbackObject.toNativeHandleList(listeners));
-    return this;
-  }
-
-  private native static long newSharedOptions(
-      final long capacity, final long total_threads, final long delayed_write_rate);
+  private native static long newSharedOptions(final long capacity, final long total_threads,
+      final long delayed_write_rate, final boolean use_merge);
+  private native static long newSharedOptions(final long capacity, final long total_threads);
   @Override protected final native void disposeInternal(final long handle);
   private native static long getTotalThreads(final long handle);
   private native static long getTotalRamSizeBytes(final long handle);
   private native static long getDelayedWriteRate(final long handle);
-  private native static void increaseWriteBufferSize(final long handle, final long increase_by);
-
-  private native void setCache(final long handle, final long cacheHandle);
-  private native void setWriteBufferManager(final long handle, final long wbmHandle);
-  private native void setEnv(final long handle, final long envHandle);
-  private native void setRateLimiter(long handle, long rateLimiterHandle);
-  private native void setSstFileManager(final long handle, final long sstFileManagerHandle);
-  private native void setLogger(long handle, long loggerHandle);
-  private static native void setEventListeners(
-      final long handle, final long[] eventListenerHandles);
+  private native static long getMaxWriteBufferManagerSize(final long handle);
+  private native static long getBucketSize(final long handle);
+  private native static long isMergeMemtableSupported(final long handle);
 }

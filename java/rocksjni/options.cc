@@ -8760,11 +8760,22 @@ void Java_org_rocksdb_FlushOptions_disposeInternal(JNIEnv*, jobject,
  * Method:    newSharedOptions
  * Signature: (JJJ)J
  */
-JNIEXPORT jlong JNICALL Java_org_rocksdb_SharedOptions_newSharedOptions(
+JNIEXPORT jlong JNICALL Java_org_rocksdb_SharedOptions_newSharedOptions__JJJZ(
     JNIEnv*, jclass, jlong capacity, jlong total_threads,
-    jlong delayed_write_rate) {
-  auto opts = new ROCKSDB_NAMESPACE::SharedOptions(capacity, total_threads,
-                                                   delayed_write_rate);
+    jlong delayed_write_rate, jboolean use_merge) {
+  auto opts = new ROCKSDB_NAMESPACE::SharedOptions(
+      capacity, total_threads, delayed_write_rate, use_merge);
+  return GET_CPLUSPLUS_POINTER(opts);
+}
+
+/*
+ * Class:     org_rocksdb_SharedOptions
+ * Method:    newSharedOptions
+ * Signature: (JJJ)J
+ */
+JNIEXPORT jlong JNICALL Java_org_rocksdb_SharedOptions_newSharedOptions__JJ(
+    JNIEnv*, jclass, jlong capacity, jlong total_threads) {
+  auto opts = new ROCKSDB_NAMESPACE::SharedOptions(capacity, total_threads);
   return GET_CPLUSPLUS_POINTER(opts);
 }
 
@@ -8818,112 +8829,37 @@ JNIEXPORT jlong JNICALL Java_org_rocksdb_SharedOptions_getDelayedWriteRate(
 
 /*
  * Class:     org_rocksdb_SharedOptions
- * Method:    increaseWriteBufferSize
- * Signature: (JJ)V
+ * Method:    getMaxWriteBufferManagerSize
+ * Signature: (J)J
  */
-JNIEXPORT void JNICALL Java_org_rocksdb_SharedOptions_increaseWriteBufferSize(
-    JNIEnv*, jclass, jlong jhandle, jlong increase_by) {
-  auto opts = reinterpret_cast<ROCKSDB_NAMESPACE::SharedOptions*>(jhandle);
+JNIEXPORT jlong JNICALL
+Java_org_rocksdb_SharedOptions_getMaxWriteBufferManagerSize(JNIEnv*, jclass,
+                                                            jlong jhandle) {
+  auto* opts = reinterpret_cast<ROCKSDB_NAMESPACE::SharedOptions*>(jhandle);
   assert(opts != nullptr);
-  opts->IncreaseWriteBufferSize(increase_by);
+  return opts->GetMaxWriteBufferManagerSize();
 }
 
 /*
  * Class:     org_rocksdb_SharedOptions
- * Method:    setCache
- * Signature: (JJ)V
+ * Method:    getBucketSize
+ * Signature: (J)J
  */
-JNIEXPORT void JNICALL Java_org_rocksdb_SharedOptions_setCache(JNIEnv*, jobject,
-                                                               jlong jhandle,
-                                                               jlong chandle) {
-  auto opts = reinterpret_cast<ROCKSDB_NAMESPACE::SharedOptions*>(jhandle);
-  auto cache =
-      reinterpret_cast<std::shared_ptr<ROCKSDB_NAMESPACE::Cache>*>(chandle);
+JNIEXPORT jlong JNICALL
+Java_org_rocksdb_SharedOptions_getBucketize(JNIEnv*, jclass, jlong jhandle) {
+  auto* opts = reinterpret_cast<ROCKSDB_NAMESPACE::SharedOptions*>(jhandle);
   assert(opts != nullptr);
-  opts->cache = *cache;
+  return opts->GetBucketSize();
 }
 
 /*
  * Class:     org_rocksdb_SharedOptions
- * Method:    setWriteBufferManager
- * Signature: (JJ)V
+ * Method:    isMergeMemtableSupported
+ * Signature: (J)J
  */
-JNIEXPORT void JNICALL Java_org_rocksdb_SharedOptions_setWriteBufferManager(
-    JNIEnv*, jobject, jlong jhandle, jlong whandle) {
-  auto opts = reinterpret_cast<ROCKSDB_NAMESPACE::SharedOptions*>(jhandle);
-  auto wbm =
-      reinterpret_cast<std::shared_ptr<ROCKSDB_NAMESPACE::WriteBufferManager>*>(
-          whandle);
+JNIEXPORT jlong JNICALL Java_org_rocksdb_SharedOptions_isMergeMemtableSupported(
+    JNIEnv*, jclass, jlong jhandle) {
+  auto* opts = reinterpret_cast<ROCKSDB_NAMESPACE::SharedOptions*>(jhandle);
   assert(opts != nullptr);
-  opts->write_buffer_manager = *wbm;
-}
-
-/*
- * Class:     org_rocksdb_SharedOptions
- * Method:    setEnv
- * Signature: (JJ)V
- */
-JNIEXPORT void JNICALL Java_org_rocksdb_SharedOptions_setEnv(JNIEnv*, jobject,
-                                                             jlong jhandle,
-                                                             jlong ehandle) {
-  auto opts = reinterpret_cast<ROCKSDB_NAMESPACE::SharedOptions*>(jhandle);
-  auto env = reinterpret_cast<ROCKSDB_NAMESPACE::Env*>(ehandle);
-  assert(opts != nullptr);
-  opts->env = env;
-}
-
-/*
- * Class:     org_rocksdb_SharedOptions
- * Method:    setRateLimiter
- * Signature: (JJ)V
- */
-JNIEXPORT void JNICALL Java_org_rocksdb_SharedOptions_setRateLimiter(
-    JNIEnv*, jobject, jlong jhandle, jlong rhandle) {
-  auto opts = reinterpret_cast<ROCKSDB_NAMESPACE::SharedOptions*>(jhandle);
-  auto rl = reinterpret_cast<std::shared_ptr<ROCKSDB_NAMESPACE::RateLimiter>*>(
-      rhandle);
-  assert(opts != nullptr);
-  opts->rate_limiter = *rl;
-}
-
-/*
- * Class:     org_rocksdb_SharedOptions
- * Method:    setSstFileManager
- * Signature: (JJ)V
- */
-JNIEXPORT void JNICALL Java_org_rocksdb_SharedOptions_setSstFileManager(
-    JNIEnv*, jobject, jlong jhandle, jlong shandle) {
-  auto opts = reinterpret_cast<ROCKSDB_NAMESPACE::SharedOptions*>(jhandle);
-  auto sfm =
-      reinterpret_cast<std::shared_ptr<ROCKSDB_NAMESPACE::SstFileManager>*>(
-          shandle);
-  assert(opts != nullptr);
-  opts->sst_file_manager = *sfm;
-}
-
-/*
- * Class:     org_rocksdb_SharedOptions
- * Method:    setLogger
- * Signature: (JJ)V
- */
-JNIEXPORT void JNICALL Java_org_rocksdb_SharedOptions_setLogger(JNIEnv*,
-                                                                jobject,
-                                                                jlong jhandle,
-                                                                jlong lhandle) {
-  auto opts = reinterpret_cast<ROCKSDB_NAMESPACE::SharedOptions*>(jhandle);
-  auto log =
-      reinterpret_cast<std::shared_ptr<ROCKSDB_NAMESPACE::Logger>*>(lhandle);
-  assert(opts != nullptr);
-  opts->info_log = *log;
-}
-
-/*
- * Class:     org_rocksdb_SharedOptions
- * Method:    setEventListeners
- * Signature: (J[J)V
- */
-JNIEXPORT void JNICALL Java_org_rocksdb_SharedOptions_setEventListeners(
-    JNIEnv* env, jclass, jlong jhandle, jlongArray jlistener_array) {
-  auto opts = reinterpret_cast<ROCKSDB_NAMESPACE::SharedOptions*>(jhandle);
-  rocksdb_set_event_listeners_helper(env, jlistener_array, opts->listeners);
+  return opts->IsMergeMemtableSupported();
 }

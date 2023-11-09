@@ -1103,7 +1103,7 @@ extern ROCKSDB_LIBRARY_API void rocksdb_options_optimize_for_point_lookup(
     rocksdb_options_t* opt, uint64_t block_cache_size_mb);
 extern ROCKSDB_LIBRARY_API void rocksdb_options_optimize_level_style_compaction(
     rocksdb_options_t* opt, uint64_t memtable_memory_budget);
-extern ROCKSDB_LIBRARY_API void rocksdb_options_enable_speedb(
+extern ROCKSDB_LIBRARY_API void rocksdb_options_enable_speedb_features(
     rocksdb_options_t* opt, rocksdb_shared_options_t* shared);
 extern ROCKSDB_LIBRARY_API void
 rocksdb_options_optimize_universal_style_compaction(
@@ -1652,7 +1652,8 @@ rocksdb_shared_options_create(size_t total_ram_size_bytes,
 extern ROCKSDB_LIBRARY_API rocksdb_shared_options_t*
 rocksdb_shared_options_create_from(size_t total_ram_size_bytes,
                                    size_t total_threads,
-                                   size_t delayed_write_rate, int use_merge);
+                                   size_t delayed_write_rate,
+                                   size_t bucket_size, int use_merge);
 extern ROCKSDB_LIBRARY_API void rocksdb_shared_options_destroy(
     rocksdb_shared_options_t* options);
 extern ROCKSDB_LIBRARY_API size_t
@@ -1666,6 +1667,9 @@ extern ROCKSDB_LIBRARY_API size_t
 rocksdb_shared_options_get_delayed_write_rate(rocksdb_shared_options_t* opt);
 extern ROCKSDB_LIBRARY_API size_t
 rocksdb_shared_options_get_bucket_size(rocksdb_shared_options_t* options);
+extern ROCKSDB_LIBRARY_API unsigned char
+rocksdb_shared_options_is_merge_memtable_supported(
+    rocksdb_shared_options_t* options);
 
 /* RateLimiter */
 extern ROCKSDB_LIBRARY_API rocksdb_ratelimiter_t* rocksdb_ratelimiter_create(

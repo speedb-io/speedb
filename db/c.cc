@@ -2796,8 +2796,8 @@ void rocksdb_options_optimize_universal_style_compaction(
   opt->rep.OptimizeUniversalStyleCompaction(memtable_memory_budget);
 }
 
-void rocksdb_options_enable_speedb(rocksdb_options_t* opt,
-                                   rocksdb_shared_options_t* shared) {
+void rocksdb_options_enable_speedb_features(rocksdb_options_t* opt,
+                                            rocksdb_shared_options_t* shared) {
   opt->rep.EnableSpeedbFeatures(shared->rep);
 }
 
@@ -3897,9 +3897,10 @@ rocksdb_shared_options_t* rocksdb_shared_options_create(
 }
 rocksdb_shared_options_t* rocksdb_shared_options_create_from(
     size_t total_ram_size_bytes, size_t total_threads,
-    size_t delayed_write_rate, int use_merge) {
-  return new rocksdb_shared_options_t{SharedOptions(
-      total_ram_size_bytes, total_threads, delayed_write_rate, use_merge)};
+    size_t delayed_write_rate, size_t bucket_size, int use_merge) {
+  return new rocksdb_shared_options_t{
+      SharedOptions(total_ram_size_bytes, total_threads, delayed_write_rate,
+                    bucket_size, use_merge)};
 }
 
 void rocksdb_shared_options_destroy(rocksdb_shared_options_t* opt) {
@@ -3927,6 +3928,11 @@ size_t rocksdb_shared_options_get_delayed_write_rate(
 
 size_t rocksdb_shared_options_get_bucket_size(rocksdb_shared_options_t* opt) {
   return opt->rep.GetBucketSize();
+}
+
+unsigned char rocksdb_shared_options_is_merge_memtable_supported(
+    rocksdb_shared_options_t* opt) {
+  return opt->rep.IsMergeMemtableSupported();
 }
 
 rocksdb_ratelimiter_t* rocksdb_ratelimiter_create(int64_t rate_bytes_per_sec,

@@ -136,8 +136,6 @@ public class RocksDB extends RocksObject {
       UnsatisfiedLinkError err = null;
       for (final String path : paths) {
         try {
-          System.err.println("**MJR: JNI file=[" + path + "/"
-              + Environment.getJniLibraryFileName("speedbjni") + "]");
           System.load(path + "/" + Environment.getJniLibraryFileName("speedbjni"));
           success = true;
           break;

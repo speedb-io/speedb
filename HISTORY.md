@@ -1,6 +1,7 @@
 # Speedb Change Log 
 
 ## Unreleased
+* Enabled speedb features in C and Java (#722)
 
 ### New Features 
 * Added ConfigOptions::compare_to.  When set, this value causes only values that have been changed to be part of the serialized output (#648).
@@ -25,7 +26,6 @@ Based on RocksDB 8.1.1
 * Static Pinning: Report pinning policy name and parameters to the log (#691).
 * LOG Reporting: add reporting capabilities to the WriteController and the WriteBufferManager by saving the Loggers of the dbs which are using them internally and issuing WARN msgs to these Loggers whenever the state of the WC and WBM changes in regards to delaying (#556).
 * Enable speedb features: Use Scoped Pinning Policy in Enable speedb feature (#459).
-* Enabled speedb features in C and Java (#722)
 * sst_dump: display metaindex_handle and the index_handle's offset and size in footer information (#404).
 * Static Pinning: Set the default for mid-percent capacity threshold in scoped pinning policy to 70 (#689).
 * db_bench: Add support for individual scoped pinning policy parameters (#687).

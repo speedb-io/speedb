@@ -22,8 +22,8 @@ public class SharedOptions extends RocksObject {
   }
 
   public SharedOptions(final long capacity, final long total_threads, final long delayed_write_rate,
-      final boolean use_merge) {
-    super(newSharedOptions(capacity, total_threads, delayed_write_rate, use_merge));
+      final long bucket_size, final boolean use_merge) {
+    super(newSharedOptions(capacity, total_threads, delayed_write_rate, bucket_size, use_merge));
   }
 
   public long getTotalThreads() {
@@ -57,7 +57,7 @@ public class SharedOptions extends RocksObject {
   }
 
   private native static long newSharedOptions(final long capacity, final long total_threads,
-      final long delayed_write_rate, final boolean use_merge);
+      final long delayed_write_rate, final long bucket_size, final boolean use_merge);
   private native static long newSharedOptions(final long capacity, final long total_threads);
   @Override protected final native void disposeInternal(final long handle);
   private native static long getTotalThreads(final long handle);

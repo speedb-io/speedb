@@ -1,5 +1,4 @@
 // Copyright (C) 2023 Speedb Ltd. All rights reserved.
-
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,7 +13,6 @@
 // limitations under the License.
 //
 // Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
-//
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
 //  (found in the LICENSE.Apache file in the root directory).
@@ -8758,20 +8756,20 @@ void Java_org_rocksdb_FlushOptions_disposeInternal(JNIEnv*, jobject,
 /*
  * Class:     org_rocksdb_SharedOptions
  * Method:    newSharedOptions
- * Signature: (JJJ)J
+ * Signature: (JJJJZ)J
  */
-JNIEXPORT jlong JNICALL Java_org_rocksdb_SharedOptions_newSharedOptions__JJJZ(
+JNIEXPORT jlong JNICALL Java_org_rocksdb_SharedOptions_newSharedOptions__JJJJZ(
     JNIEnv*, jclass, jlong capacity, jlong total_threads,
-    jlong delayed_write_rate, jboolean use_merge) {
+    jlong delayed_write_rate, jlong bucket_size, jboolean use_merge) {
   auto opts = new ROCKSDB_NAMESPACE::SharedOptions(
-      capacity, total_threads, delayed_write_rate, use_merge);
+      capacity, total_threads, delayed_write_rate, bucket_size, use_merge);
   return GET_CPLUSPLUS_POINTER(opts);
 }
 
 /*
  * Class:     org_rocksdb_SharedOptions
  * Method:    newSharedOptions
- * Signature: (JJJ)J
+ * Signature: (JJ)J
  */
 JNIEXPORT jlong JNICALL Java_org_rocksdb_SharedOptions_newSharedOptions__JJ(
     JNIEnv*, jclass, jlong capacity, jlong total_threads) {
@@ -8846,7 +8844,7 @@ Java_org_rocksdb_SharedOptions_getMaxWriteBufferManagerSize(JNIEnv*, jclass,
  * Signature: (J)J
  */
 JNIEXPORT jlong JNICALL
-Java_org_rocksdb_SharedOptions_getBucketize(JNIEnv*, jclass, jlong jhandle) {
+Java_org_rocksdb_SharedOptions_getBucketSize(JNIEnv*, jclass, jlong jhandle) {
   auto* opts = reinterpret_cast<ROCKSDB_NAMESPACE::SharedOptions*>(jhandle);
   assert(opts != nullptr);
   return opts->GetBucketSize();

@@ -16,7 +16,7 @@
 #include "util/bloom_impl.h"
 #include "util/fastrange.h"
 
-#ifdef HAVE_AVX2
+#ifdef __AVX2__
 #include <immintrin.h>
 #endif
 
@@ -216,7 +216,7 @@ class ReadBlock {
                                size_t hash_set_size) const;
 
  private:
-#ifdef HAVE_AVX2
+#ifdef __AVX2__
   bool AreAllBlockBloomBitsSetAvx2(uint32_t hash, uint32_t set_idx,
                                    size_t hash_set_size) const;
 #endif
@@ -241,7 +241,7 @@ inline uint8_t ReadBlock::GetInBatchBlockIdxOfPair() const {
 
 bool ReadBlock::AreAllBlockBloomBitsSet(uint32_t hash, uint32_t set_idx,
                                         size_t hash_set_size) const {
-#ifdef HAVE_AVX2
+#ifdef __AVX2__
   // The AVX2 code currently supports only cache-line / block sizes of 64 bytes
   // (512 bits)
   if (kBlockSizeInBits == 512) {
@@ -254,7 +254,7 @@ bool ReadBlock::AreAllBlockBloomBitsSet(uint32_t hash, uint32_t set_idx,
 #endif
 }
 
-#ifdef HAVE_AVX2
+#ifdef __AVX2__
 const __m256i mask_vec = _mm256_set1_epi32(0x007FC000);
 const __m256i max_bitpos_vec = _mm256_set1_epi32(7);
 const __m256i fast_range_vec = _mm256_set1_epi32(KNumBitsInBlockBloom);
@@ -346,7 +346,7 @@ bool ReadBlock::AreAllBlockBloomBitsSetAvx2(uint32_t hash, uint32_t set_idx,
   }
 }
 
-#endif  // HAVE_AVX2
+#endif  // __AVX2__
 
 bool ReadBlock::AreAllBlockBloomBitsSetNonAvx2(uint32_t hash, uint32_t set_idx,
                                                size_t hash_set_size) const {

@@ -174,6 +174,7 @@ JAVA_TESTS = \
 	org.rocksdb.RocksMemEnvTest\
 	org.rocksdb.util.SizeUnitTest\
 	org.rocksdb.SecondaryDBTest\
+	org.rocksdb.SharedOptionsTest\
 	org.rocksdb.SliceTest\
 	org.rocksdb.SnapshotTest\
 	org.rocksdb.SstFileManagerTest\

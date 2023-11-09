@@ -1,3 +1,16 @@
+/* Copyright (C) 2022 Speedb Ltd. All rights reserved.
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+   http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
 /* Copyright (c) 2011 The LevelDB Authors. All rights reserved.
    Use of this source code is governed by a BSD-style license that can be
    found in the LICENSE file. See the AUTHORS file for names of contributors. */
@@ -2522,6 +2535,39 @@ int main(int argc, char** argv) {
 
     rocksdb_options_destroy(copy);
     rocksdb_options_destroy(o);
+  }
+
+  StartPhase("shared_options");
+  {
+    size_t total_bytes = 100 * 1024 * 1024 * 1024ul;
+    size_t total_threads = 8;
+    size_t delayed_write_rate = 256 * 1024 * 1024ul;
+    size_t bucket_size = 50000;
+    rocksdb_shared_options_t* so;
+    so = rocksdb_shared_options_create(total_bytes, total_threads);
+    CheckCondition(total_threads ==
+                   rocksdb_shared_options_get_total_threads(so));
+    CheckCondition(total_bytes ==
+                   rocksdb_shared_options_get_total_ram_size_bytes(so));
+    rocksdb_shared_options_destroy(so);
+
+    so = rocksdb_shared_options_create_from(total_bytes, total_threads,
+                                            delayed_write_rate, bucket_size, 1);
+    CheckCondition(total_threads ==
+                   rocksdb_shared_options_get_total_threads(so));
+    CheckCondition(total_bytes ==
+                   rocksdb_shared_options_get_total_ram_size_bytes(so));
+    CheckCondition(delayed_write_rate ==
+                   rocksdb_shared_options_get_delayed_write_rate(so));
+    CheckCondition(bucket_size == rocksdb_shared_options_get_bucket_size(so));
+    CheckCondition(
+        total_bytes / 4 ==
+        rocksdb_shared_options_get_max_write_buffer_manager_size(so));
+    CheckCondition(1 == rocksdb_shared_options_is_merge_memtable_supported(so));
+    rocksdb_options_t* opts = rocksdb_options_create();
+    rocksdb_options_enable_speedb_features(opts, so);
+    rocksdb_options_destroy(opts);
+    rocksdb_shared_options_destroy(so);
   }
 
   StartPhase("read_options");

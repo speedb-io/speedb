@@ -51,7 +51,7 @@ public class SharedOptions extends RocksObject {
     return getDelayedWriteRate(nativeHandle_);
   }
 
-  public long isMergeMemtableSupported() {
+  public boolean isMergeMemtableSupported() {
     assert (isOwningHandle());
     return isMergeMemtableSupported(nativeHandle_);
   }
@@ -65,5 +65,5 @@ public class SharedOptions extends RocksObject {
   private native static long getDelayedWriteRate(final long handle);
   private native static long getMaxWriteBufferManagerSize(final long handle);
   private native static long getBucketSize(final long handle);
-  private native static long isMergeMemtableSupported(final long handle);
+  private native static boolean isMergeMemtableSupported(final long handle);
 }

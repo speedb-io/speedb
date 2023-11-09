@@ -8853,10 +8853,11 @@ Java_org_rocksdb_SharedOptions_getBucketSize(JNIEnv*, jclass, jlong jhandle) {
 /*
  * Class:     org_rocksdb_SharedOptions
  * Method:    isMergeMemtableSupported
- * Signature: (J)J
+ * Signature: (J)Z
  */
-JNIEXPORT jlong JNICALL Java_org_rocksdb_SharedOptions_isMergeMemtableSupported(
-    JNIEnv*, jclass, jlong jhandle) {
+JNIEXPORT jboolean JNICALL
+Java_org_rocksdb_SharedOptions_isMergeMemtableSupported(JNIEnv*, jclass,
+                                                        jlong jhandle) {
   auto* opts = reinterpret_cast<ROCKSDB_NAMESPACE::SharedOptions*>(jhandle);
   assert(opts != nullptr);
   return opts->IsMergeMemtableSupported();

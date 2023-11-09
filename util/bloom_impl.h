@@ -241,7 +241,7 @@ class FastLocalBloomImpl {
     return HashMayMatchPrepared(h2, num_probes, data + bytes_to_cache_line);
   }
 
-#ifdef HAVE_AVX2
+#ifdef __AVX2__
   // Receives an intrinsic (__m256i) hash_vector comprised of num_probes (1-8)
   // 32-bits bit positions (0-511) to test within a 512 bits bloom block
   //
@@ -338,7 +338,7 @@ class FastLocalBloomImpl {
     }
     return {false, false};
   }
-#endif  // HAVE_AVX2
+#endif  // __AVX2__
 
   static inline bool HashMayMatchPrepared(uint32_t h2, int num_probes,
                                           const char *data_at_cache_line) {

@@ -44,6 +44,7 @@ class OptionsFormatter : public Customizable {
                                  std::shared_ptr<OptionsFormatter>* result);
 
   static const char* Type() { return "OptionsFormatter"; }
+  using Customizable::ToString;
   // Converts the map of properties to a single string representation
   virtual std::string ToString(const std::string& prefix,
                                const OptionProperties& props) const = 0;

@@ -450,8 +450,8 @@ class WriteBufferManager final {
   // flush ends, we wait until the total unflushed memory (curr_memory_used -
   // memory_being_freed_) exceeds a threshold.
   bool ShouldInitiateAnotherFlushMemOnly(size_t curr_memory_used) const {
-    return (curr_memory_used - memory_being_freed_ >=
-                additional_flush_step_size_ / 2 &&
+    return (curr_memory_used >=
+                (memory_being_freed_ + additional_flush_step_size_ / 2) &&
             curr_memory_used >= additional_flush_initiation_size_);
   }
 

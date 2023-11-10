@@ -15,7 +15,7 @@ jobs:
     #uses: speedb-io/speedb/.github/workflows/sanity_check.yml@main
 
   Check-Licence-And-History:
-    if: ${{  github.event_name == 'pull_request_review' }}
+    #if: ${{  github.event_name == 'pull_request_review' }}
     uses: ./.github/workflows/check_license_and_history.yml
   
   Build:

@@ -199,7 +199,6 @@ size_t RecordingPinningPolicy::GetPinnedUsageByType(uint8_t type) const {
   return usage_by_type_[type];
 }
 
-#ifndef ROCKSDB_LITE
 static int RegisterBuiltinPinningPolicies(ObjectLibrary& library,
                                           const std::string& /*arg*/) {
   library.AddFactory<TablePinningPolicy>(
@@ -212,17 +211,14 @@ static int RegisterBuiltinPinningPolicies(ObjectLibrary& library,
   size_t num_types;
   return static_cast<int>(library.GetFactoryCount(&num_types));
 }
-#endif  // ROCKSDB_LITE
 
 Status TablePinningPolicy::CreateFromString(
     const ConfigOptions& options, const std::string& value,
     std::shared_ptr<TablePinningPolicy>* policy) {
-#ifndef ROCKSDB_LITE
   static std::once_flag loaded;
   std::call_once(loaded, [&]() {
     RegisterBuiltinPinningPolicies(*(ObjectLibrary::Default().get()), "");
   });
-#endif  // ROCKSDB_LITE
   return LoadManagedObject<TablePinningPolicy>(options, value, policy);
 }
 

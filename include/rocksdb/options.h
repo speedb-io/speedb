@@ -522,8 +522,6 @@ struct DBOptions {
   // use example can be fuond in  enable_speedb_features_example.cc
   DBOptions* EnableSpeedbFeaturesDB(SharedOptions& shared_options);
 
-  // #endif  // ROCKSDB_LITE
-
   // If true, the database will be created if it is missing.
   // Default: false
   bool create_if_missing = false;

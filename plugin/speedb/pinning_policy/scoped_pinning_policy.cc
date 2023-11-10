@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef ROCKSDB_LITE
-
 #include "plugin/speedb/pinning_policy/scoped_pinning_policy.h"
 
 #include <inttypes.h>
@@ -97,5 +95,3 @@ std::string ScopedPinningPolicy::GetPrintableOptions() const {
 }
 
 }  // namespace ROCKSDB_NAMESPACE
-
-#endif  // ROCKSDB_LITE

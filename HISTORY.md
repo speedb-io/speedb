@@ -12,6 +12,7 @@
 * Stall deadlock consists small cfs (#637).
 
 ### Miscellaneous
+* Remove leftover references to ROCKSDB_LITE (#755).
 
 ## Hazlenut 2.7.0 (27/10/2023)
 Based on RocksDB 8.1.1

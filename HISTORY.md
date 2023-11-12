@@ -9,9 +9,11 @@
 * Added a kUseBaseAddress flag and GetBaseOffset flag to OptionTypeInfo.  If this flag is set and a function is used for processing options, the function is passed the base address of the struct rather than the specific field (#397)
 
 ### Bug Fixes
-* Stall deadlock consists small cfs (#637).
+* fix conflicts between db_bench flags and enable speedb features flag(#743).
 * Proactive Flushes: Fix a race in the ShouldInitiateAnotherFlushMemOnly that may cause the method to return an incorrect answer (#758).
+* Stall deadlock consists small cfs (#637).
 
+* fix conflicts between db_bench flags and enable speedb features flag
 ### Miscellaneous
 * Remove leftover references to ROCKSDB_LITE (#755).
 

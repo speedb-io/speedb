@@ -577,7 +577,7 @@ DEFINE_bool(initiate_wbm_flushes,
 DEFINE_uint32(max_num_parallel_flushes,
               ROCKSDB_NAMESPACE::WriteBufferManager::FlushInitiationOptions::
                   kDfltMaxNumParallelFlushes,
-              "In case FLAGGS_initiate_wbm_flushes is true, this flag will "
+              "In case FLAGS_initiate_wbm_flushes is true, this flag will "
               "overwrite the default "
               "max number of parallel flushes.");
 
@@ -2009,6 +2009,9 @@ DEFINE_uint64(total_ram_size, 512 * 1024 * 1024ul,
               "SharedOptions total ram size bytes. ");
 namespace ROCKSDB_NAMESPACE {
 namespace {
+bool is_default(const char* flag_name) {
+  return gflags::GetCommandLineFlagInfoOrDie(flag_name).is_default;
+}
 static Status CreateMemTableRepFactory(
     std::shared_ptr<MemTableRepFactory>* factory) {
   Status s;
@@ -9611,14 +9614,35 @@ void ValidateMetadataCacheOptions() {
   }
 }
 
-void ValidatePinningPolicyRelatedFlags() {
+void ValidateEnableSpeedbFlags() {
+  std::vector<std::string> confilct_flags = {
+      "num_high_pri_threads", "num_bottom_pri_threads",
+      "num_bottom_pri_threads", "num_low_pri_threads",
+      "max_background_compactions", "max_background_flushes", "cache_size",
+      "cache_type",
+      // Assume simcache_size default is disabled simcache
+      "simcache_size", "memtablerep", "pinning_policy",
+      "scoped_pinning_capacity", "use_ribbon_filter", "bloom_bits",
+      "allow_wbm_stalls", "db_write_buffer_size", "initiate_wbm_flushes",
+      "bytes_per_sync", "use_dynamic_delay", "memtable_bloom_size_ratio",
+      "whole_key_filtering", "optimize_filters_for_hits",
+      "max_num_parallel_flushes", "start_delay_percent",
+      "max_num_parallel_flushes", "use_blob_cache"};
   if (FLAGS_enable_speedb_features) {
-    if (gflags::GetCommandLineFlagInfoOrDie("max_background_jobs").is_default ||
-        gflags::GetCommandLineFlagInfoOrDie("total_ram_size").is_default) {
+    if (is_default("max_background_jobs") || is_default("total_ram_size")) {
       ErrorExit(
           "enable_speedb_features - Please provide explicitly total_ram_size "
           "in bytes and max_background_jobs ");
     }
+    for (const auto& flag : confilct_flags) {
+      if (!is_default(flag.c_str())) {
+        std::string msg = "enable_speedb_features and " + flag +
+                          " cannot be configured together";
+        ErrorExit(msg.c_str());
+      }
+    }
+  } else if (!is_default("total_ram_size")) {
+    ErrorExit("total_ram_size configured without enabling speedb features");
   }
 }
 
@@ -9639,7 +9663,7 @@ int db_bench_tool_run_group(int group_num, int num_groups, int argc,
   parsing_cmd_line_args = false;
 
   ValidateAndProcessStatisticsFlags(first_group, config_options);
-  ValidatePinningPolicyRelatedFlags();
+  ValidateEnableSpeedbFlags();
 
   FLAGS_compaction_style_e =
       (ROCKSDB_NAMESPACE::CompactionStyle)FLAGS_compaction_style;
@@ -9833,8 +9857,6 @@ int db_bench_tool_run_group(int group_num, int num_groups, int argc,
 // runner of the failed group (subsequent groups will NOT be run).
 //
 int db_bench_tool(int argc, char** argv) {
-  printf("StatisticsImpl.size=%d\n", (int)sizeof(StatisticsImpl));
-
   ROCKSDB_NAMESPACE::port::InstallStackTraceHandler();
   static bool initialized = false;
   if (!initialized) {

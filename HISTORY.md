@@ -11,9 +11,11 @@ Based on RocksDB 8.6.7
 * Added a kUseBaseAddress flag and GetBaseOffset flag to OptionTypeInfo.  If this flag is set and a function is used for processing options, the function is passed the base address of the struct rather than the specific field (#397)
 
 ### Bug Fixes
-* Stall deadlock consists small cfs (#637).
+* fix conflicts between db_bench flags and enable speedb features flag(#743).
 * Proactive Flushes: Fix a race in the ShouldInitiateAnotherFlushMemOnly that may cause the method to return an incorrect answer (#758).
+* Stall deadlock consists small cfs (#637).
 
+* fix conflicts between db_bench flags and enable speedb features flag
 ### Miscellaneous
 * Remove leftover references to ROCKSDB_LITE (#755).
 * Options: Set compaction_readahead_size default to 0. The current default of 2Mb is not optimal for most of our use cases. Having a value of 0 means that the FS will use its default size for prefetching (true only with https://github.com/speedb-io/speedb/pull/788).

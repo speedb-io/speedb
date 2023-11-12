@@ -1186,6 +1186,26 @@ DEFINE_uint64(stats_dump_period_sec,
 DEFINE_bool(use_dynamic_delay, ROCKSDB_NAMESPACE::Options().use_dynamic_delay,
             "Use dynamic delay");
 
+DEFINE_bool(crash_test, false,
+            "If true, speedb features validation will be skipped .");
+
+DEFINE_bool(enable_speedb_features, false,
+            "If true, Speedb features will be enabled "
+            "You must provide total_ram_size in bytes ,"
+            " and max_background_jobs. "
+            "delayed_write_rate is recommended. ");
+
+DEFINE_uint64(total_ram_size, 512 * 1024 * 1024ul,
+              "SharedOptions total ram size bytes. ");
+DEFINE_uint64(delayed_write_rate,
+              ROCKSDB_NAMESPACE::Options().delayed_write_rate,
+              "Limited bytes allowed to DB when soft_rate_limit or "
+              "level0_slowdown_writes_trigger triggers");
+DEFINE_int32(max_background_jobs,
+             ROCKSDB_NAMESPACE::Options().max_background_jobs,
+             "The maximum number of concurrent background jobs that can occur "
+             "in parallel.");
+             
 DEFINE_bool(use_io_uring, false, "Enable the use of IO uring on Posix");
 
 DEFINE_bool(verification_only, false,

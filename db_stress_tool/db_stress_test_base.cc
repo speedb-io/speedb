@@ -142,6 +142,52 @@ StressTest::~StressTest() {
   delete cmp_db_;
 }
 
+bool is_default(const char* flag_name) {
+  return gflags::GetCommandLineFlagInfoOrDie(flag_name).is_default;
+}
+
+void ValidateEnableSpeedbFlags() {
+  if (FLAGS_enable_speedb_features && !FLAGS_crash_test) {
+    if (is_default("max_background_jobs") || is_default("total_ram_size")) {
+      fprintf(
+          stderr,
+          "enable_speedb_features - Please provide explicitly total_ram_size "
+          "in bytes and max_background_jobs \n");
+      exit(1);
+    }
+    if (!is_default("max_background_compactions")) {
+      fprintf(stderr,
+              "enable_speedb_features and max_background_compactions cannot be "
+              "configured together \n");
+      exit(1);
+    }
+    if (!is_default("max_background_flushes")) {
+      fprintf(stderr,
+              "enable_speedb_features and max_background_flushes cannot be "
+              "configured together \n");
+      exit(1);
+    }
+    if (!FLAGS_use_dynamic_delay) {
+      fprintf(stderr,
+              "enable_speedb_features and use_dynamic_delay == false cannot be "
+              "configured together \n");
+      exit(1);
+    }
+    if (!is_default("cache_size")) {
+      fprintf(stderr,
+              "enable_speedb_features and cache_size cannot be "
+              "configured together \n");
+      exit(1);
+    }
+    if (FLAGS_cache_type != "lru_cache") {
+      fprintf(stderr,
+              "enable_speedb_features and cache_type != lru_cache cannot be "
+              "configured together \n");
+      exit(1);
+    }
+  }
+}
+
 std::shared_ptr<Cache> StressTest::NewCache(size_t capacity,
                                             int32_t num_shard_bits) {
   ConfigOptions config_options;
@@ -2727,6 +2773,7 @@ void StressTest::Open(SharedState* shared, bool reopen) {
     InitializeOptionsFromFlags(cache_, filter_policy_, options_);
   }
   InitializeOptionsGeneral(cache_, filter_policy_, options_);
+  ValidateEnableSpeedbFlags();
 
   if (strcasecmp(FLAGS_memtablerep.c_str(), "prefix_hash") == 0) {
     // Needed to use a different default (10K vs 1M)
@@ -2800,7 +2847,11 @@ void StressTest::Open(SharedState* shared, bool reopen) {
   fprintf(stdout, "DB path: [%s]\n", FLAGS_db.c_str());
 
   Status s;
-
+  SharedOptions so(FLAGS_total_ram_size, FLAGS_max_background_jobs,
+                   FLAGS_delayed_write_rate, 1000000, true);
+  if (FLAGS_enable_speedb_features) {
+    options_.EnableSpeedbFeatures(so);
+  }
     std::vector<std::string> existing_column_families;
     s = DB::ListColumnFamilies(DBOptions(options_), FLAGS_db,
                                &existing_column_families);  // ignore errors
@@ -2840,13 +2891,23 @@ void StressTest::Open(SharedState* shared, bool reopen) {
         new_column_family_name_ =
             std::max(new_column_family_name_.load(), std::stoi(name) + 1);
       }
-      cf_descriptors.emplace_back(name, ColumnFamilyOptions(options_));
+      if (FLAGS_enable_speedb_features) {
+        cf_descriptors.emplace_back(
+            name, *ColumnFamilyOptions(options_).EnableSpeedbFeaturesCF(so));
+      } else {
+        cf_descriptors.emplace_back(name, ColumnFamilyOptions(options_));
+      }
     }
     while (cf_descriptors.size() < (size_t)FLAGS_column_families) {
       std::string name = std::to_string(new_column_family_name_.load());
       new_column_family_name_++;
-      cf_descriptors.emplace_back(name, ColumnFamilyOptions(options_));
       column_family_names_.push_back(name);
+      if (FLAGS_enable_speedb_features) {
+        cf_descriptors.emplace_back(
+            name, *ColumnFamilyOptions(options_).EnableSpeedbFeaturesCF(so));
+      } else {
+        cf_descriptors.emplace_back(name, ColumnFamilyOptions(options_));
+      }
     }
 
     options_.listeners.clear();
@@ -3397,6 +3458,8 @@ void InitializeOptionsFromFlags(
   options.disable_auto_compactions = FLAGS_disable_auto_compactions;
   options.max_background_compactions = FLAGS_max_background_compactions;
   options.max_background_flushes = FLAGS_max_background_flushes;
+  options.max_background_jobs = FLAGS_max_background_jobs;
+  options.delayed_write_rate = FLAGS_delayed_write_rate;
   options.compaction_style =
       static_cast<ROCKSDB_NAMESPACE::CompactionStyle>(FLAGS_compaction_style);
   if (options.compaction_style ==

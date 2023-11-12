@@ -300,6 +300,12 @@ DECLARE_uint64(occ_validation_policy);
 DECLARE_bool(share_occ_lock_buckets);
 DECLARE_uint32(occ_lock_bucket_count);
 
+DECLARE_bool(crash_test);
+DECLARE_bool(enable_speedb_features);
+DECLARE_uint64(total_ram_size);
+DECLARE_uint64(delayed_write_rate);
+DECLARE_int32(max_background_jobs);
+
 // Options for StackableDB-based BlobDB
 DECLARE_bool(use_blob_db);
 DECLARE_uint64(blob_db_min_blob_size);

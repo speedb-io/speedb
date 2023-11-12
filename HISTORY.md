@@ -32,6 +32,7 @@ Based on RocksDB 8.1.1
 * db_bench: Add support for individual scoped pinning policy parameters (#687).
 * Enable speedb features: Constrain the interface of SharedOptions (make immutable) (#740).
 * Expose Options::periodic_compaction_seconds via C API (#741).
+* Enable speedb features:: Support enable speedb features in db_stress (#723).
 
 ### Bug Fixes
 * Fix RepeatableThread to work properly with on thread start callback feature (https://github.com/speedb-io/speedb/pull/667).

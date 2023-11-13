@@ -53,6 +53,7 @@ class DefaultOptionsFormatter : public OptionsFormatter {
                        const OptionProperties& props) const override;
   Status ToProps(const std::string& opts_str,
                  OptionProperties* props) const override;
+  using OptionsFormatter::ToString;
   std::string ToString(const std::string& prefix, char separator,
                        const std::vector<std::string>& elems) const override;
   Status ToVector(const std::string& opts_str, char delim,
@@ -89,6 +90,7 @@ class PropertiesOptionsFormatter : public DefaultOptionsFormatter {
   const char* Name() const override { return kClassName(); }
   static const char* kNickName() { return "OptionProperties"; }
   const char* NickName() const override { return kNickName(); }
+  using OptionsFormatter::ToString;
   std::string ToString(const std::string& prefix,
                        const OptionProperties& props) const override;
   Status ToProps(const std::string& /*opts_str*/,

@@ -1322,6 +1322,7 @@ Status DBImpl::SetCFOptionsImpl(
     ColumnFamilyData* cfd,
     const std::unordered_map<std::string, std::string>& options_map) {
   const ReadOptions read_options;
+
   InstrumentedMutexLock ol(&options_mutex_);
   MutableCFOptions new_options;
   Status s;

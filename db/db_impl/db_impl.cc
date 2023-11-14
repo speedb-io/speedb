@@ -75,6 +75,7 @@
 #include "port/port.h"
 #include "rocksdb/cache.h"
 #include "rocksdb/compaction_filter.h"
+#include "rocksdb/convenience.h"
 #include "rocksdb/db.h"
 #include "rocksdb/env.h"
 #include "rocksdb/merge_operator.h"
@@ -1275,8 +1276,6 @@ FSDirectory* DBImpl::GetDataDir(ColumnFamilyData* cfd, size_t path_id) const {
 Status DBImpl::SetOptions(
     ColumnFamilyHandle* column_family,
     const std::unordered_map<std::string, std::string>& options_map) {
-  // TODO: plumb Env::IOActivity
-  const ReadOptions read_options;
   auto* cfd =
       static_cast_with_check<ColumnFamilyHandleImpl>(column_family)->cfd();
   if (options_map.empty()) {
@@ -1291,6 +1290,8 @@ Status DBImpl::SetOptions(
 Status DBImpl::SetCFOptionsImpl(
     ColumnFamilyData* cfd,
     const std::unordered_map<std::string, std::string>& options_map) {
+  // TODO: plumb Env::IOActivity
+  const ReadOptions read_options;
   MutableCFOptions new_options;
   Status s;
   Status persist_options_status;

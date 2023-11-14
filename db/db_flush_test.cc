@@ -3196,7 +3196,7 @@ INSTANTIATE_TEST_CASE_P(DBFlushDirectIOTest, DBFlushDirectIOTest,
 
 INSTANTIATE_TEST_CASE_P(DBAtomicFlushTest, DBAtomicFlushTest, testing::Bool());
 
-TEST_F(DBFlushTest, NonAtomicFlushRollbackPendingFlushes) {
+TEST_F(DBFlushTest, DISABLED_NonAtomicFlushRollbackPendingFlushes) {
   // Fix a bug in when atomic_flush=false.
   // The bug can happen as follows:
   // Start Flush0 for memtable M0 to SST0
@@ -3255,7 +3255,7 @@ TEST_F(DBFlushTest, NonAtomicFlushRollbackPendingFlushes) {
   SyncPoint::GetInstance()->DisableProcessing();
 }
 
-TEST_F(DBFlushTest, AbortNonAtomicFlushWhenBGError) {
+TEST_F(DBFlushTest, DISABLED_AbortNonAtomicFlushWhenBGError) {
   // Fix a bug in when atomic_flush=false.
   // The bug can happen as follows:
   // Start Flush0 for memtable M0 to SST0

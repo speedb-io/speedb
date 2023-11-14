@@ -623,11 +623,11 @@ TEST_F(MemTableListTest, FlushPendingTest) {
 
     auto factory = std::make_shared<SkipListFactory>();
     options.memtable_factory = factory;
-      options.db_write_buffer_size = wbm_enabled ? (1024 * 1024 * 1024) : 0U;
+    options.db_write_buffer_size = wbm_enabled ? (1024 * 1024 * 1024) : 0U;
     ImmutableOptions ioptions(options);
     InternalKeyComparator cmp(BytewiseComparator());
     WriteBufferManager wb(options.db_write_buffer_size);
-      ASSERT_EQ(wb.enabled(), wbm_enabled);
+    ASSERT_EQ(wb.enabled(), wbm_enabled);
     autovector<MemTable*> to_delete;
 
     // Create MemTableList
@@ -643,35 +643,36 @@ TEST_F(MemTableListTest, FlushPendingTest) {
     uint64_t memtable_id = 0;
     std::vector<MemTable*> tables;
     MutableCFOptions mutable_cf_options(options);
-      std::vector<size_t> tables_reserved_mem;
-      size_t total_reserved_mem = 0U;
+    std::vector<size_t> tables_reserved_mem;
+    size_t total_reserved_mem = 0U;
     for (int i = 0; i < num_tables; i++) {
-      MemTable* mem = new MemTable(cmp, ioptions, mutable_cf_options, &wb,
-                                  kMaxSequenceNumber, 0 /* column_family_id */);
+      MemTable* mem =
+          new MemTable(cmp, ioptions, mutable_cf_options, &wb,
+                       kMaxSequenceNumber, 0 /* column_family_id */);
       mem->SetID(memtable_id++);
       mem->Ref();
 
-        auto new_total_reserved_mem = wb.mutable_memtable_memory_usage();
-        if (wbm_enabled) {
-          ASSERT_GT(new_total_reserved_mem, total_reserved_mem);
-        }
-        tables_reserved_mem.push_back(new_total_reserved_mem -
-                                      total_reserved_mem);
-        total_reserved_mem = new_total_reserved_mem;
+      auto new_total_reserved_mem = wb.mutable_memtable_memory_usage();
+      if (wbm_enabled) {
+        ASSERT_GT(new_total_reserved_mem, total_reserved_mem);
+      }
+      tables_reserved_mem.push_back(new_total_reserved_mem -
+                                    total_reserved_mem);
+      total_reserved_mem = new_total_reserved_mem;
 
       std::string value;
       MergeContext merge_context;
 
       ASSERT_OK(mem->Add(++seq, kTypeValue, "key1", std::to_string(i),
-                        nullptr /* kv_prot_info */));
-      ASSERT_OK(mem->Add(++seq, kTypeValue, "keyN" + std::to_string(i), "valueN",
-                        nullptr /* kv_prot_info */));
+                         nullptr /* kv_prot_info */));
+      ASSERT_OK(mem->Add(++seq, kTypeValue, "keyN" + std::to_string(i),
+                         "valueN", nullptr /* kv_prot_info */));
       ASSERT_OK(mem->Add(++seq, kTypeValue, "keyX" + std::to_string(i), "value",
-                        nullptr /* kv_prot_info */));
-      ASSERT_OK(mem->Add(++seq, kTypeValue, "keyM" + std::to_string(i), "valueM",
-                        nullptr /* kv_prot_info */));
+                         nullptr /* kv_prot_info */));
+      ASSERT_OK(mem->Add(++seq, kTypeValue, "keyM" + std::to_string(i),
+                         "valueM", nullptr /* kv_prot_info */));
       ASSERT_OK(mem->Add(++seq, kTypeDeletion, "keyX" + std::to_string(i), "",
-                        nullptr /* kv_prot_info */));
+                         nullptr /* kv_prot_info */));
 
       tables.push_back(mem);
     }
@@ -707,9 +708,9 @@ TEST_F(MemTableListTest, FlushPendingTest) {
     list.Add(tables[1], &to_delete);
     ASSERT_EQ(2, list.NumNotFlushed());
     ASSERT_EQ(0, to_delete.size());
-      auto expected_mutable_memory_usage =
-          tables_reserved_mem[0] + tables_reserved_mem[1];
-      auto expected_being_freed = 0U;
+    auto expected_mutable_memory_usage =
+        tables_reserved_mem[0] + tables_reserved_mem[1];
+    auto expected_being_freed = 0U;
     ValidateWbmUsedCounters(
         wb, total_reserved_mem - expected_mutable_memory_usage,
         expected_mutable_memory_usage, expected_being_freed);
@@ -727,7 +728,7 @@ TEST_F(MemTableListTest, FlushPendingTest) {
     ASSERT_EQ(2, list.NumNotFlushed());
     ASSERT_FALSE(list.IsFlushPending());
     ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
-      expected_being_freed += tables_reserved_mem[0] + tables_reserved_mem[1];
+    expected_being_freed += tables_reserved_mem[0] + tables_reserved_mem[1];
     ValidateWbmUsedCounters(
         wb, total_reserved_mem - expected_mutable_memory_usage,
         expected_mutable_memory_usage, expected_being_freed);
@@ -736,7 +737,7 @@ TEST_F(MemTableListTest, FlushPendingTest) {
     list.RollbackMemtableFlush(to_flush, false);
     ASSERT_FALSE(list.IsFlushPending());
     ASSERT_TRUE(list.imm_flush_needed.load(std::memory_order_acquire));
-      expected_being_freed -= tables_reserved_mem[0] + tables_reserved_mem[1];
+    expected_being_freed -= tables_reserved_mem[0] + tables_reserved_mem[1];
     ValidateWbmUsedCounters(
         wb, total_reserved_mem - expected_mutable_memory_usage,
         expected_mutable_memory_usage, expected_being_freed);
@@ -749,7 +750,7 @@ TEST_F(MemTableListTest, FlushPendingTest) {
     ASSERT_TRUE(list.IsFlushPending());
     ASSERT_TRUE(list.imm_flush_needed.load(std::memory_order_acquire));
     ASSERT_EQ(0, to_delete.size());
-      expected_mutable_memory_usage += tables_reserved_mem[2];
+    expected_mutable_memory_usage += tables_reserved_mem[2];
     ValidateWbmUsedCounters(
         wb, total_reserved_mem - expected_mutable_memory_usage,
         expected_mutable_memory_usage, expected_being_freed);
@@ -761,8 +762,8 @@ TEST_F(MemTableListTest, FlushPendingTest) {
     ASSERT_EQ(3, list.NumNotFlushed());
     ASSERT_FALSE(list.IsFlushPending());
     ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
-      expected_being_freed += tables_reserved_mem[0] + tables_reserved_mem[1] +
-                              tables_reserved_mem[2];
+    expected_being_freed += tables_reserved_mem[0] + tables_reserved_mem[1] +
+                            tables_reserved_mem[2];
     ValidateWbmUsedCounters(
         wb, total_reserved_mem - expected_mutable_memory_usage,
         expected_mutable_memory_usage, expected_being_freed);
@@ -784,7 +785,7 @@ TEST_F(MemTableListTest, FlushPendingTest) {
     ASSERT_FALSE(list.IsFlushPending());
     ASSERT_TRUE(list.imm_flush_needed.load(std::memory_order_acquire));
     ASSERT_EQ(0, to_delete.size());
-      expected_mutable_memory_usage += tables_reserved_mem[3];
+    expected_mutable_memory_usage += tables_reserved_mem[3];
     ValidateWbmUsedCounters(
         wb, total_reserved_mem - expected_mutable_memory_usage,
         expected_mutable_memory_usage, expected_being_freed);
@@ -801,7 +802,7 @@ TEST_F(MemTableListTest, FlushPendingTest) {
     ASSERT_EQ(4, list.NumNotFlushed());
     ASSERT_FALSE(list.IsFlushPending());
     ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
-      expected_being_freed += tables_reserved_mem[3];
+    expected_being_freed += tables_reserved_mem[3];
     ValidateWbmUsedCounters(
         wb, total_reserved_mem - expected_mutable_memory_usage,
         expected_mutable_memory_usage, expected_being_freed);
@@ -810,10 +811,10 @@ TEST_F(MemTableListTest, FlushPendingTest) {
     list.RollbackMemtableFlush(to_flush, false);
     ASSERT_TRUE(list.IsFlushPending());
     ASSERT_TRUE(list.imm_flush_needed.load(std::memory_order_acquire));
-      // table3 was NOT rolled back (to_flush (tables 0, 1, 2) was rolled back,
-      // to_flush2 contains table 3)
-      expected_being_freed -= tables_reserved_mem[0] + tables_reserved_mem[1] +
-                              tables_reserved_mem[2];
+    // table3 was NOT rolled back (to_flush (tables 0, 1, 2) was rolled back,
+    // to_flush2 contains table 3)
+    expected_being_freed -= tables_reserved_mem[0] + tables_reserved_mem[1] +
+                            tables_reserved_mem[2];
     ValidateWbmUsedCounters(
         wb, total_reserved_mem - expected_mutable_memory_usage,
         expected_mutable_memory_usage, expected_being_freed);
@@ -826,7 +827,7 @@ TEST_F(MemTableListTest, FlushPendingTest) {
     ASSERT_TRUE(list.IsFlushPending());
     ASSERT_TRUE(list.imm_flush_needed.load(std::memory_order_acquire));
     ASSERT_EQ(0, to_delete.size());
-      expected_mutable_memory_usage += tables_reserved_mem[4];
+    expected_mutable_memory_usage += tables_reserved_mem[4];
     ValidateWbmUsedCounters(
         wb, total_reserved_mem - expected_mutable_memory_usage,
         expected_mutable_memory_usage, tables_reserved_mem[3]);
@@ -834,16 +835,16 @@ TEST_F(MemTableListTest, FlushPendingTest) {
     // Pick tables to flush
     list.PickMemtablesToFlush(
         std::numeric_limits<uint64_t>::max() /* memtable_id */, &to_flush);
-    // Picks three oldest memtables. The fourth oldest is picked in `to_flush2` so
-    // must be excluded. The newest (fifth oldest) is non-consecutive with the
-    // three oldest due to omitting the fourth oldest so must not be picked.
+    // Picks three oldest memtables. The fourth oldest is picked in `to_flush2`
+    // so must be excluded. The newest (fifth oldest) is non-consecutive with
+    // the three oldest due to omitting the fourth oldest so must not be picked.
     ASSERT_EQ(3, to_flush.size());
     ASSERT_EQ(5, list.NumNotFlushed());
     ASSERT_FALSE(list.IsFlushPending());
     ASSERT_TRUE(list.imm_flush_needed.load(std::memory_order_acquire));
-      // Now all of the immutables tables are being freed (undergoing flush)
-      expected_being_freed += tables_reserved_mem[0] + tables_reserved_mem[1] +
-                              tables_reserved_mem[2];
+    // Now all of the immutables tables are being freed (undergoing flush)
+    expected_being_freed += tables_reserved_mem[0] + tables_reserved_mem[1] +
+                            tables_reserved_mem[2];
     ValidateWbmUsedCounters(
         wb, total_reserved_mem - expected_mutable_memory_usage,
         expected_mutable_memory_usage, expected_being_freed);
@@ -857,7 +858,7 @@ TEST_F(MemTableListTest, FlushPendingTest) {
     ASSERT_EQ(5, list.NumNotFlushed());
     ASSERT_FALSE(list.IsFlushPending());
     ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
-      expected_being_freed += tables_reserved_mem[4];
+    expected_being_freed += tables_reserved_mem[4];
     ValidateWbmUsedCounters(
         wb, total_reserved_mem - expected_mutable_memory_usage,
         expected_mutable_memory_usage, expected_being_freed);
@@ -873,21 +874,21 @@ TEST_F(MemTableListTest, FlushPendingTest) {
 
     // Flush the 3 memtables that were picked in to_flush
     s = Mock_InstallMemtableFlushResults(&list, mutable_cf_options, to_flush,
-                                        &to_delete);
+                                         &to_delete);
     ASSERT_OK(s);
 
     // Note:  now to_flush contains tables[0,1,2].  to_flush2 contains
     // tables[3]. to_flush3 contains tables[4].
     // Current implementation will only commit memtables in the order they were
-    // created. So TryInstallMemtableFlushResults will install the first 3 tables
-    // in to_flush and stop when it encounters a table not yet flushed.
+    // created. So TryInstallMemtableFlushResults will install the first 3
+    // tables in to_flush and stop when it encounters a table not yet flushed.
     ASSERT_EQ(2, list.NumNotFlushed());
     int num_in_history =
         std::min(3, static_cast<int>(max_write_buffer_size_to_maintain) /
                         static_cast<int>(options.write_buffer_size));
     ASSERT_EQ(num_in_history, list.NumFlushed());
     ASSERT_EQ(5 - list.NumNotFlushed() - num_in_history, to_delete.size());
-      // None of the 5 tables has been freed => no change in the counters
+    // None of the 5 tables has been freed => no change in the counters
     ValidateWbmUsedCounters(
         wb, total_reserved_mem - expected_mutable_memory_usage,
         expected_mutable_memory_usage, expected_being_freed);
@@ -902,8 +903,8 @@ TEST_F(MemTableListTest, FlushPendingTest) {
         &list, mutable_cf_options, to_flush3, &to_delete);
     ASSERT_OK(s);
 
-    // This will install 0 tables since tables[4] flushed while tables[3] has not
-    // yet flushed.
+    // This will install 0 tables since tables[4] flushed while tables[3] has
+    // not yet flushed.
     ASSERT_EQ(2, list.NumNotFlushed());
     ASSERT_EQ(0, to_delete.size());
 
@@ -920,13 +921,13 @@ TEST_F(MemTableListTest, FlushPendingTest) {
                         static_cast<int>(options.write_buffer_size));
     ASSERT_EQ(num_in_history, list.NumFlushed());
     ASSERT_EQ(5 - list.NumNotFlushed() - num_in_history, to_delete.size());
-      // None of the 5 tables has been freed => no change in the counters
+    // None of the 5 tables has been freed => no change in the counters
     ValidateWbmUsedCounters(
         wb, total_reserved_mem - expected_mutable_memory_usage,
         expected_mutable_memory_usage, expected_being_freed);
 
-      // This loop will actually do nothing since to_delete is empty
-      ASSERT_TRUE(to_delete.empty());
+    // This loop will actually do nothing since to_delete is empty
+    ASSERT_TRUE(to_delete.empty());
     for (const auto& m : to_delete) {
       // Refcount should be 0 after calling TryInstallMemtableFlushResults.
       // Verify this, by Ref'ing then UnRef'ing:
@@ -938,7 +939,7 @@ TEST_F(MemTableListTest, FlushPendingTest) {
 
     // Add another table
     list.Add(tables[5], &to_delete);
-      expected_mutable_memory_usage += tables_reserved_mem[5];
+    expected_mutable_memory_usage += tables_reserved_mem[5];
     ASSERT_EQ(1, list.NumNotFlushed());
     ASSERT_EQ(5, list.GetLatestMemTableID());
     ValidateWbmUsedCounters(
@@ -957,7 +958,7 @@ TEST_F(MemTableListTest, FlushPendingTest) {
     ASSERT_TRUE(list.imm_flush_needed.load(std::memory_order_acquire));
     ASSERT_FALSE(list.IsFlushPending());
     ASSERT_FALSE(list.HasFlushRequested());
-      // No change
+    // No change
     ValidateWbmUsedCounters(
         wb, total_reserved_mem - expected_mutable_memory_usage,
         expected_mutable_memory_usage, expected_being_freed);
@@ -971,17 +972,17 @@ TEST_F(MemTableListTest, FlushPendingTest) {
     ASSERT_EQ(1, list.NumNotFlushed());
     ASSERT_FALSE(list.imm_flush_needed.load(std::memory_order_acquire));
     ASSERT_FALSE(list.IsFlushPending());
-      // All tables are now flushed or being flushed, but none was deleted
-      expected_being_freed += tables_reserved_mem[5];
+    // All tables are now flushed or being flushed, but none was deleted
+    expected_being_freed += tables_reserved_mem[5];
     ValidateWbmUsedCounters(
         wb, total_reserved_mem - expected_mutable_memory_usage,
         expected_mutable_memory_usage, expected_being_freed);
     to_delete.clear();
 
     list.current()->Unref(&to_delete);
-    int to_delete_size =
-        std::min(num_tables, static_cast<int>(max_write_buffer_size_to_maintain) /
-                                static_cast<int>(options.write_buffer_size));
+    int to_delete_size = std::min(
+        num_tables, static_cast<int>(max_write_buffer_size_to_maintain) /
+                        static_cast<int>(options.write_buffer_size));
     ASSERT_EQ(to_delete_size, to_delete.size());
 
     for (const auto& m : to_delete) {
@@ -1045,11 +1046,11 @@ TEST_F(MemTableListTest, AtomicFlushTest) {
     for (auto& elem : tables) {
       mutable_cf_options_list.emplace_back(new MutableCFOptions(options));
       uint64_t memtable_id = 0;
-        tables_reserved_mem[cf_id].resize(num_tables_per_cf);
+      tables_reserved_mem[cf_id].resize(num_tables_per_cf);
       for (int i = 0; i != num_tables_per_cf; ++i) {
         MemTable* mem =
             new MemTable(cmp, ioptions, *(mutable_cf_options_list.back()), &wb,
-                        kMaxSequenceNumber, cf_id);
+                         kMaxSequenceNumber, cf_id);
         mem->SetID(memtable_id++);
         mem->Ref();
 
@@ -1067,15 +1068,15 @@ TEST_F(MemTableListTest, AtomicFlushTest) {
         std::string value;
 
         ASSERT_OK(mem->Add(++seq, kTypeValue, "key1", std::to_string(i),
-                          nullptr /* kv_prot_info */));
+                           nullptr /* kv_prot_info */));
         ASSERT_OK(mem->Add(++seq, kTypeValue, "keyN" + std::to_string(i),
-                          "valueN", nullptr /* kv_prot_info */));
-        ASSERT_OK(mem->Add(++seq, kTypeValue, "keyX" + std::to_string(i), "value",
-                          nullptr /* kv_prot_info */));
+                           "valueN", nullptr /* kv_prot_info */));
+        ASSERT_OK(mem->Add(++seq, kTypeValue, "keyX" + std::to_string(i),
+                           "value", nullptr /* kv_prot_info */));
         ASSERT_OK(mem->Add(++seq, kTypeValue, "keyM" + std::to_string(i),
-                          "valueM", nullptr /* kv_prot_info */));
+                           "valueM", nullptr /* kv_prot_info */));
         ASSERT_OK(mem->Add(++seq, kTypeDeletion, "keyX" + std::to_string(i), "",
-                          nullptr /* kv_prot_info */));
+                           nullptr /* kv_prot_info */));
 
         elem.push_back(mem);
       }
@@ -1105,7 +1106,8 @@ TEST_F(MemTableListTest, AtomicFlushTest) {
     ValidateWbmUsedCounters(wb, total_reserved_mem, 0U, 0U);
 
     autovector<MemTable*> to_delete;
-    // Add tables to the immutable memtalbe lists associated with column families
+    // Add tables to the immutable memtalbe lists associated with column
+    // families
     for (auto i = 0; i != num_cfs; ++i) {
       for (auto j = 0; j != num_tables_per_cf; ++j) {
         lists[i]->Add(tables[i][j], &to_delete);
@@ -1125,15 +1127,16 @@ TEST_F(MemTableListTest, AtomicFlushTest) {
     // list[2]: |0| 1
     //          +-+
     // Pick memtables to flush
-      auto expected_total_size_being_freed = 0U;
+    auto expected_total_size_being_freed = 0U;
     for (auto i = 0; i != num_cfs; ++i) {
       flush_candidates[i].clear();
-      lists[i]->PickMemtablesToFlush(flush_memtable_ids[i], &flush_candidates[i]);
+      lists[i]->PickMemtablesToFlush(flush_memtable_ids[i],
+                                     &flush_candidates[i]);
       ASSERT_EQ(flush_memtable_ids[i] - 0 + 1,
                 static_cast<uint64_t>(flush_candidates[i].size()));
 
       for (auto cf_table_idx = 0U; cf_table_idx < flush_candidates[i].size();
-          ++cf_table_idx) {
+           ++cf_table_idx) {
         expected_total_size_being_freed += tables_reserved_mem[i][cf_table_idx];
       }
     }

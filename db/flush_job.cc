@@ -330,7 +330,7 @@ Status FlushJob::Run(LogsWithPrepTracker* prep_tracker, FileMetaData* file_meta,
       }
     }
   }
-  
+
   if (s.ok() && file_meta != nullptr) {
     *file_meta = meta_;
   }

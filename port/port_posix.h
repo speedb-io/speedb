@@ -145,7 +145,7 @@ class RWMutex {
   void AssertHeld() {}
 
  protected:
-  pthread_rwlock_t mu_; // the underlying platform mutex
+  pthread_rwlock_t mu_;  // the underlying platform mutex
 };
 
 // RWLock with write preference

@@ -276,7 +276,7 @@ std::string WriteBufferManager::GetPrintableOptions() const {
   ret.append(buffer);
 
   snprintf(buffer, kBufferSize, "%*s: %d\n", field_width, "wbm.allow_stalls",
-           allow_stall_);
+           allow_stall_.load());
   ret.append(buffer);
 
   snprintf(buffer, kBufferSize, "%*s: %d\n", field_width,

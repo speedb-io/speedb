@@ -846,7 +846,7 @@ TEST_P(DBWriteBufferManagerTest, StopSwitchingMemTablesOnceFlushing) {
   delete shared_wbm_db;
 }
 
-TEST_F(DBWriteBufferManagerTest, RuntimeChangeableAllowStall) {
+TEST_P(DBWriteBufferManagerTest, RuntimeChangeableAllowStall) {
   constexpr int kBigValue = 10000;
 
   Options options = CurrentOptions();

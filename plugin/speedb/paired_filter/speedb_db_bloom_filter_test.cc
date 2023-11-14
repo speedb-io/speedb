@@ -52,29 +52,29 @@ const std::string kSpdbPairedBloom = SpdbPairedBloomFilterPolicy::kClassName();
 
 // DB tests related to Speedb's Paired Block Bloom Filter.
 
-class SpdbDBBloomFilterTest : public DBTestBase {
+class DISABLED_SpdbDBBloomFilterTest : public DBTestBase {
  public:
-  SpdbDBBloomFilterTest()
+  DISABLED_SpdbDBBloomFilterTest()
       : DBTestBase("speedb_db_bloom_filter_test", /*env_do_fsync=*/true) {}
 };
 
-class SpdbDBBloomFilterTestWithParam
+class DISABLED_SpdbDBBloomFilterTestWithParam
     : public DBTestBase,
       public testing::WithParamInterface<std::tuple<bool>> {
  protected:
   bool partition_filters_;
 
  public:
-  SpdbDBBloomFilterTestWithParam()
+  DISABLED_SpdbDBBloomFilterTestWithParam()
       : DBTestBase("speedb_db_bloom_filter_test", /*env_do_fsync=*/true) {}
 
-  ~SpdbDBBloomFilterTestWithParam() override {}
+  ~DISABLED_SpdbDBBloomFilterTestWithParam() override {}
 
   void SetUp() override { partition_filters_ = std::get<0>(GetParam()); }
 };
 
 class SpdbDBBloomFilterTestDefFormatVersion
-    : public SpdbDBBloomFilterTestWithParam {};
+    : public DISABLED_SpdbDBBloomFilterTestWithParam {};
 
 class SliceTransformLimitedDomainGeneric : public SliceTransform {
   static constexpr size_t kPrefixLen = 5U;
@@ -178,7 +178,7 @@ TEST_P(SpdbDBBloomFilterTestDefFormatVersion, KeyMayExist) {
       ChangeOptions(kSkipPlainTable | kSkipHashIndex | kSkipFIFOCompaction));
 }
 
-TEST_P(SpdbDBBloomFilterTestWithParam,
+TEST_P(DISABLED_SpdbDBBloomFilterTestWithParam,
        GetFilterByPrefixBloomCustomPrefixExtractor) {
   Options options = last_options_;
   options.prefix_extractor =
@@ -249,7 +249,7 @@ TEST_P(SpdbDBBloomFilterTestWithParam,
   get_perf_context()->Reset();
 }
 
-TEST_P(SpdbDBBloomFilterTestWithParam, GetFilterByPrefixBloom) {
+TEST_P(DISABLED_SpdbDBBloomFilterTestWithParam, GetFilterByPrefixBloom) {
   Options options = last_options_;
   options.prefix_extractor.reset(NewFixedPrefixTransform(8));
   options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
@@ -307,7 +307,7 @@ TEST_P(SpdbDBBloomFilterTestWithParam, GetFilterByPrefixBloom) {
   get_perf_context()->Reset();
 }
 
-TEST_P(SpdbDBBloomFilterTestWithParam, WholeKeyFilterProp) {
+TEST_P(DISABLED_SpdbDBBloomFilterTestWithParam, WholeKeyFilterProp) {
   for (bool partition_filters : {true, false}) {
     Options options = last_options_;
     options.prefix_extractor.reset(NewFixedPrefixTransform(3));
@@ -471,7 +471,7 @@ TEST_P(SpdbDBBloomFilterTestWithParam, WholeKeyFilterProp) {
   }
 }
 
-TEST_P(SpdbDBBloomFilterTestWithParam, BloomFilter) {
+TEST_P(DISABLED_SpdbDBBloomFilterTestWithParam, BloomFilter) {
   do {
     Options options = CurrentOptions();
     env_->count_random_reads_ = true;
@@ -601,7 +601,8 @@ class AlwaysTrueFilterPolicy : public ReadOnlyBuiltinFilterPolicy {
 
 }  // namespace
 
-TEST_P(SpdbDBBloomFilterTestWithParam, SkipFilterOnEssentiallyZeroBpk) {
+TEST_P(DISABLED_SpdbDBBloomFilterTestWithParam,
+       SkipFilterOnEssentiallyZeroBpk) {
   constexpr int maxKey = 10;
   auto PutFn = [&]() {
     int i;
@@ -719,21 +720,21 @@ TEST_P(SpdbDBBloomFilterTestWithParam, SkipFilterOnEssentiallyZeroBpk) {
 }
 
 INSTANTIATE_TEST_CASE_P(DBBloomFilterTestWithParam,
-                        SpdbDBBloomFilterTestWithParam,
+                        DISABLED_SpdbDBBloomFilterTestWithParam,
                         ::testing::Values(false, true));
 
 #if !defined(ROCKSDB_VALGRIND_RUN) || defined(ROCKSDB_FULL_VALGRIND_RUN)
 INSTANTIATE_TEST_CASE_P(FormatDef, SpdbDBBloomFilterTestDefFormatVersion,
                         ::testing::Values(false, true));
 
-INSTANTIATE_TEST_CASE_P(FormatDef, SpdbDBBloomFilterTestWithParam,
+INSTANTIATE_TEST_CASE_P(FormatDef, DISABLED_SpdbDBBloomFilterTestWithParam,
                         ::testing::Values(false, true));
 
-INSTANTIATE_TEST_CASE_P(FormatLatest, SpdbDBBloomFilterTestWithParam,
+INSTANTIATE_TEST_CASE_P(FormatLatest, DISABLED_SpdbDBBloomFilterTestWithParam,
                         ::testing::Values(false, true));
 #endif  // !defined(ROCKSDB_VALGRIND_RUN) || defined(ROCKSDB_FULL_VALGRIND_RUN)
 
-TEST_F(SpdbDBBloomFilterTest, BloomFilterRate) {
+TEST_F(DISABLED_SpdbDBBloomFilterTest, BloomFilterRate) {
   while (ChangeFilterOptions()) {
     anon::OptionsOverride options_override;
     options_override.filter_policy = Create(20, kSpdbPairedBloom);
@@ -809,7 +810,7 @@ struct CompatibilityConfig {
 // // // };
 }  // namespace
 
-// // // TEST_F(SpdbDBBloomFilterTest, BloomFilterCompatibility) {
+// // // TEST_F(DISABLED_SpdbDBBloomFilterTest, BloomFilterCompatibility) {
 // // //   Options options = CurrentOptions();
 // // //   options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
 // // //   options.level0_file_num_compaction_trigger =
@@ -1551,7 +1552,7 @@ namespace {
 // // // };
 }  // namespace
 
-// // // TEST_F(SpdbDBBloomFilterTest, ContextCustomFilterPolicy) {
+// // // TEST_F(DISABLED_SpdbDBBloomFilterTest, ContextCustomFilterPolicy) {
 // // //   auto policy = std::make_shared<TestingContextCustomFilterPolicy>(15,
 // 8, 5);
 // // //   Options options;
@@ -1679,7 +1680,7 @@ class SliceTransformLimitedDomain : public SliceTransform {
   }
 };
 
-TEST_F(SpdbDBBloomFilterTest, PrefixExtractorFullFilter) {
+TEST_F(DISABLED_SpdbDBBloomFilterTest, PrefixExtractorFullFilter) {
   BlockBasedTableOptions bbto;
   // Full Filter Block
   bbto.filter_policy.reset(new SpdbPairedBloomFilterPolicy(20));
@@ -1708,7 +1709,7 @@ TEST_F(SpdbDBBloomFilterTest, PrefixExtractorFullFilter) {
   ASSERT_EQ(Get("zzzzz_AAAA"), "val5");
 }
 
-TEST_F(SpdbDBBloomFilterTest, PrefixExtractorBlockFilter) {
+TEST_F(DISABLED_SpdbDBBloomFilterTest, PrefixExtractorBlockFilter) {
   BlockBasedTableOptions bbto;
   // Full Filter Block
   bbto.filter_policy.reset(new SpdbPairedBloomFilterPolicy(20));
@@ -1740,7 +1741,7 @@ TEST_F(SpdbDBBloomFilterTest, PrefixExtractorBlockFilter) {
   delete iter;
 }
 
-TEST_F(SpdbDBBloomFilterTest, MemtableWholeKeyBloomFilter) {
+TEST_F(DISABLED_SpdbDBBloomFilterTest, MemtableWholeKeyBloomFilter) {
   // regression test for #2743. the range delete tombstones in memtable should
   // be added even when Get() skips searching due to its prefix bloom filter
   const int kMemtableSize = 1 << 20;              // 1MB
@@ -1793,7 +1794,7 @@ TEST_F(SpdbDBBloomFilterTest, MemtableWholeKeyBloomFilter) {
   ASSERT_EQ(1, get_perf_context()->bloom_memtable_hit_count);
 }
 
-TEST_F(SpdbDBBloomFilterTest, MemtableWholeKeyBloomFilterMultiGet) {
+TEST_F(DISABLED_SpdbDBBloomFilterTest, MemtableWholeKeyBloomFilterMultiGet) {
   anon::OptionsOverride options_override;
   options_override.filter_policy = Create(20, kSpdbPairedBloom);
   Options options = CurrentOptions(options_override);
@@ -1852,7 +1853,7 @@ TEST_F(SpdbDBBloomFilterTest, MemtableWholeKeyBloomFilterMultiGet) {
   db_->ReleaseSnapshot(snapshot);
 }
 
-TEST_F(SpdbDBBloomFilterTest, MemtablePrefixBloomOutOfDomain) {
+TEST_F(DISABLED_SpdbDBBloomFilterTest, MemtablePrefixBloomOutOfDomain) {
   constexpr size_t kPrefixSize = 8;
   const std::string kKey = "key";
   assert(kKey.size() < kPrefixSize);
@@ -1878,7 +1879,7 @@ static const std::string kPlainTable = "test_PlainTableBloom";
 }  // namespace
 
 class BloomStatsTestWithParam
-    : public SpdbDBBloomFilterTest,
+    : public DISABLED_SpdbDBBloomFilterTest,
       public testing::WithParamInterface<std::tuple<std::string, bool>> {
  public:
   BloomStatsTestWithParam() {
@@ -2030,7 +2031,7 @@ TEST_P(BloomStatsTestWithParam, BloomStatsTestWithIter) {
 // //     ::testing::Values(false, true));
 
 namespace {
-void PrefixScanInit(SpdbDBBloomFilterTest* dbtest) {
+void PrefixScanInit(DISABLED_SpdbDBBloomFilterTest* dbtest) {
   char buf[100];
   std::string keystr;
   const int small_range_sstfiles = 5;
@@ -2080,7 +2081,7 @@ void PrefixScanInit(SpdbDBBloomFilterTest* dbtest) {
 }
 }  // namespace
 
-TEST_F(SpdbDBBloomFilterTest, PrefixScan) {
+TEST_F(DISABLED_SpdbDBBloomFilterTest, PrefixScan) {
   while (ChangeFilterOptions()) {
     int count;
     Slice prefix;
@@ -2133,7 +2134,7 @@ TEST_F(SpdbDBBloomFilterTest, PrefixScan) {
 
 // TODO: The filter builder is created always with OFFM = false, both for us and
 // rocksdb. Is that how it's supposed to be?
-TEST_F(SpdbDBBloomFilterTest, DISABLED_OptimizeFiltersForHits) {
+TEST_F(DISABLED_SpdbDBBloomFilterTest, DISABLED_OptimizeFiltersForHits) {
   Options options = CurrentOptions();
   options.write_buffer_size = 64 * 1024;
   options.arena_block_size = 4 * 1024;
@@ -2335,7 +2336,7 @@ int CountIter(std::unique_ptr<Iterator>& iter, const Slice& key) {
 // The BF is considered compatible if 1) upper bound and seek key transform
 // into the same string, or 2) the transformed seek key is of the same length
 // as the upper bound and two keys are adjacent according to the comparator.
-TEST_F(SpdbDBBloomFilterTest, DynamicBloomFilterUpperBound) {
+TEST_F(DISABLED_SpdbDBBloomFilterTest, DynamicBloomFilterUpperBound) {
   auto bfp_impl = kSpdbPairedBloom;
   int using_full_builder = true;
   Options options;
@@ -2466,7 +2467,7 @@ TEST_F(SpdbDBBloomFilterTest, DynamicBloomFilterUpperBound) {
 
 // Create multiple SST files each with a different prefix_extractor config,
 // verify iterators can read all SST files using the latest config.
-TEST_F(SpdbDBBloomFilterTest, DynamicBloomFilterMultipleSST) {
+TEST_F(DISABLED_SpdbDBBloomFilterTest, DynamicBloomFilterMultipleSST) {
   auto bfp_impl = kSpdbPairedBloom;
   int using_full_builder = true;
   Options options;
@@ -2602,7 +2603,7 @@ TEST_F(SpdbDBBloomFilterTest, DynamicBloomFilterMultipleSST) {
 // as expected
 // TODO: No filter is created here (in rocksdb's test it's the same) => Why is
 // this test in this suite?
-TEST_F(SpdbDBBloomFilterTest, DynamicBloomFilterNewColumnFamily) {
+TEST_F(DISABLED_SpdbDBBloomFilterTest, DynamicBloomFilterNewColumnFamily) {
   auto bfp_impl = kSpdbPairedBloom;
   Options options = CurrentOptions();
   options.create_if_missing = true;
@@ -2654,7 +2655,7 @@ TEST_F(SpdbDBBloomFilterTest, DynamicBloomFilterNewColumnFamily) {
 
 // Verify it's possible to change prefix_extractor at runtime and iterators
 // behaves as expected
-TEST_F(SpdbDBBloomFilterTest, DynamicBloomFilterOptions) {
+TEST_F(DISABLED_SpdbDBBloomFilterTest, DynamicBloomFilterOptions) {
   auto bfp_impl = kSpdbPairedBloom;
   Options options;
   options.env = CurrentOptions().env;

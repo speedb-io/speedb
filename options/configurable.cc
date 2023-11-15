@@ -188,12 +188,11 @@ Status Configurable::ConfigureFromString(const ConfigOptions& config_options,
                                          const std::string& opts_str) {
   Status s;
   if (!opts_str.empty()) {
-    if (opts_str.find(';') != std::string::npos ||
-        opts_str.find('=') != std::string::npos) {
-      std::unordered_map<std::string, std::string> opt_map;
-      s = StringToMap(opts_str, &opt_map);
+    if (opts_str.find('=') != std::string::npos) {
+      OptionProperties props;
+      s = config_options.ToProps(opts_str, &props);
       if (s.ok()) {
-        s = ConfigureFromMap(config_options, opt_map, nullptr);
+        s = ConfigureFromMap(config_options, props, nullptr);
       }
     } else {
       s = ParseStringOptions(config_options, opts_str);
@@ -423,10 +422,10 @@ Status ConfigurableHelper::ConfigureCustomizableOption(
       // If the ID does not match that of the current customizable, return an
       // error. Otherwise, update the current customizable via the properties
       // map
-      std::unordered_map<std::string, std::string> props;
+      OptionProperties props;
       std::string id;
-      Status s =
-          Configurable::GetOptionsMap(value, custom->GetId(), &id, &props);
+      Status s = Configurable::GetOptionsMap(copy, value, custom->GetId(), &id,
+                                             &props);
       if (!s.ok()) {
         return s;
       } else if (custom->GetId() != id) {
@@ -520,16 +519,14 @@ Status ConfigurableHelper::GetOption(const ConfigOptions& config_options,
   const auto opt_info =
       FindOption(configurable.options_, short_name, &opt_name, &opt_ptr);
   if (opt_info != nullptr) {
-    ConfigOptions embedded = config_options;
-    embedded.delimiter = ";";
     if (short_name == opt_name) {
-      return opt_info->Serialize(embedded, opt_name, opt_ptr, value);
+      return opt_info->Serialize(config_options, opt_name, opt_ptr, value);
     } else if (opt_info->IsStruct()) {
-      return opt_info->Serialize(embedded, opt_name, opt_ptr, value);
+      return opt_info->Serialize(config_options, opt_name, opt_ptr, value);
     } else if (opt_info->IsConfigurable()) {
       auto const* config = opt_info->AsRawPointer<Configurable>(opt_ptr);
       if (config != nullptr) {
-        return config->GetOption(embedded, opt_name, value);
+        return config->GetOption(config_options, opt_name, value);
       }
     }
   }
@@ -760,9 +757,10 @@ bool ConfigurableHelper::AreEquivalent(const ConfigOptions& config_options,
   return true;
 }
 
-Status Configurable::GetOptionsMap(
-    const std::string& value, const std::string& default_id, std::string* id,
-    std::unordered_map<std::string, std::string>* props) {
+Status Configurable::GetOptionsMap(const ConfigOptions& config_options,
+                                   const std::string& value,
+                                   const std::string& default_id,
+                                   std::string* id, OptionProperties* props) {
   assert(id);
   assert(props);
   Status status;
@@ -771,7 +769,7 @@ Status Configurable::GetOptionsMap(
   } else if (value.find('=') == std::string::npos) {
     *id = value;
   } else {
-    status = StringToMap(value, props);
+    status = config_options.ToProps(value, props);
     if (!status.ok()) {       // There was an error creating the map.
       *id = value;            // Treat the value as id
       props->clear();         // Clear the properties

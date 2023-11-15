@@ -341,7 +341,8 @@ jobs:
     - name: 'build'
       run: |
         export SPDB_LIB_DIR=~/spdb_lib &&  mkdir -p $SPDB_LIB_DIR
-        docker run --rm -v $(readlink -f ${SPDB_LIB_DIR}):/out -i speedb-centos-builder ${{ github.ref_name }}
+        #docker run --rm -v $(readlink -f ${SPDB_LIB_DIR}):/out -i speedb-centos-builder ${{ github.ref_name }}
+        docker run --rm -v $(readlink -f ${SPDB_LIB_DIR}):/out -i speedb-centos-builder ${{ github.ref }}
      
   CI-all:
     if: ${{ github.event.review.state == 'approved' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/release') }}

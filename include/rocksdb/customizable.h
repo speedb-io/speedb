@@ -181,7 +181,7 @@ class Customizable : public Configurable {
   // options for use in potentially creating a new Customizable object (this
   // method is primarily a support method for LoadSharedObject et al for new
   // Customizable objects). The opt_value may be either name-value pairs
-  // separated by ";" (a=b; c=d), or a simple name (a). In order to create a new
+  // or a simple name (a). In order to create a new
   // Customizable, the ID is determined by:
   // - If the value is a simple name (e.g. "BlockBasedTable"), the id is this
   // name;
@@ -196,10 +196,10 @@ class Customizable : public Configurable {
   //
   // This method returns non-OK if the ID could not be found, or if the
   // opt_value could not be parsed into name-value pairs.
-  static Status GetOptionsMap(
-      const ConfigOptions& config_options, const Customizable* custom,
-      const std::string& opt_value, std::string* id,
-      std::unordered_map<std::string, std::string>* options);
+  static Status GetOptionsMap(const ConfigOptions& config_options,
+                              const Customizable* custom,
+                              const std::string& opt_value, std::string* id,
+                              OptionProperties* options);
 
   // Helper method to configure a new object with the supplied options.
   // If the object is not null and invoke_prepare_options=true, the object

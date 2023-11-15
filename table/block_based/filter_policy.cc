@@ -36,6 +36,7 @@
 #include "rocksdb/rocksdb_namespace.h"
 #include "rocksdb/slice.h"
 #include "rocksdb/utilities/object_registry.h"
+#include "rocksdb/utilities/options_type.h"
 #include "table/block_based/block_based_table_reader.h"
 #include "table/block_based/filter_policy_internal.h"
 #include "table/block_based/full_filter_block.h"
@@ -1868,9 +1869,9 @@ Status FilterPolicy::CreateFromString(
   }
 
   std::string id;
-  std::unordered_map<std::string, std::string> opt_map;
+  OptionProperties props;
   Status status =
-      Customizable::GetOptionsMap(options, policy->get(), value, &id, &opt_map);
+      Customizable::GetOptionsMap(options, policy->get(), value, &id, &props);
   if (!status.ok()) {  // GetOptionsMap failed
     return status;
   } else if (id.empty()) {  // We have no Id but have options.  Not good
@@ -1886,7 +1887,7 @@ Status FilterPolicy::CreateFromString(
     return Status::OK();
   } else if (status.ok()) {
     status = Customizable::ConfigureNewObject(
-        options, const_cast<FilterPolicy*>(policy->get()), opt_map);
+        options, const_cast<FilterPolicy*>(policy->get()), props);
   }
   return status;
 }

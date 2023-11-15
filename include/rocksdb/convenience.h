@@ -32,7 +32,9 @@ namespace ROCKSDB_NAMESPACE {
 class Env;
 class Logger;
 class ObjectRegistry;
+class OptionsFormatter;
 class OptionProperties;
+
 struct ColumnFamilyOptions;
 struct DBOptions;
 struct Options;
@@ -90,6 +92,7 @@ struct ConfigOptions {
   bool mutable_options_only = false;
 
   // The separator between options when converting to a string
+  // This option is now deprecated and replaced by the formatter field
   std::string delimiter = ";";
 
   // Controls how to traverse options during print/match stages
@@ -106,6 +109,9 @@ struct ConfigOptions {
 
   // The object registry to use for this options
   std::shared_ptr<ObjectRegistry> registry;
+
+  // Helper class for printing and parsing options to/from strings.
+  std::shared_ptr<OptionsFormatter> formatter;
 
   // If set, only changes from this reference version will be serialized.
   Configurable* compare_to = nullptr;
@@ -125,9 +131,17 @@ struct ConfigOptions {
   std::string ToString(const std::string& prefix,
                        const OptionProperties& props) const;
 
+  // Converts the string representation into name/value properties
+  Status ToProps(const std::string& opts_str, OptionProperties* props) const;
+
   // Converts the vector options to a single string representation
-  std::string ToString(char separator,
+  std::string ToString(const std::string& prefix, char separator,
                        const std::vector<std::string>& elems) const;
+
+  // Converts the string representation into vector of elements based on the
+  // separator
+  Status ToVector(const std::string& opts_str, char separator,
+                  std::vector<std::string>* elems) const;
 };
 
 
@@ -420,15 +434,13 @@ Status GetStringFromDBOptions(const ConfigOptions& config_options,
                               std::string* opts_str);
 
 Status GetStringFromDBOptions(std::string* opts_str,
-                              const DBOptions& db_options,
-                              const std::string& delimiter = ";  ");
+                              const DBOptions& db_options);
 
 Status GetStringFromColumnFamilyOptions(const ConfigOptions& config_options,
                                         const ColumnFamilyOptions& cf_options,
                                         std::string* opts_str);
 Status GetStringFromColumnFamilyOptions(std::string* opts_str,
-                                        const ColumnFamilyOptions& cf_options,
-                                        const std::string& delimiter = ";  ");
+                                        const ColumnFamilyOptions& cf_options);
 Status GetStringFromCompressionType(std::string* compression_str,
                                     CompressionType compression_type);
 
@@ -453,9 +465,6 @@ Status GetOptionsFromString(const Options& base_options,
 Status GetOptionsFromString(const ConfigOptions& config_options,
                             const Options& base_options,
                             const std::string& opts_str, Options* new_options);
-
-Status StringToMap(const std::string& opts_str,
-                   std::unordered_map<std::string, std::string>* opts_map);
 
 // Request stopping background work, if wait is true wait until it's done
 void CancelAllBackgroundWork(DB* db, bool wait = false);

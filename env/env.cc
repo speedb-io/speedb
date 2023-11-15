@@ -675,10 +675,10 @@ Status Env::CreateFromString(const ConfigOptions& config_options,
 
   Env* env = *result;
   std::string id;
-  std::unordered_map<std::string, std::string> opt_map;
+  OptionProperties props;
 
   Status status =
-      Customizable::GetOptionsMap(config_options, env, value, &id, &opt_map);
+      Customizable::GetOptionsMap(config_options, env, value, &id, &props);
   if (!status.ok()) {  // GetOptionsMap failed
     return status;
   }
@@ -694,7 +694,7 @@ Status Env::CreateFromString(const ConfigOptions& config_options,
   if (config_options.ignore_unsupported_options && status.IsNotSupported()) {
     status = Status::OK();
   } else if (status.ok()) {
-    status = Customizable::ConfigureNewObject(config_options, env, opt_map);
+    status = Customizable::ConfigureNewObject(config_options, env, props);
   }
   if (status.ok()) {
     guard->reset(uniq.release());

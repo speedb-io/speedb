@@ -1,8 +1,15 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
 //  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
 //  (found in the LICENSE.Apache file in the root directory).
-
 
 #include "rocksdb/utilities/options_util.h"
 
@@ -536,7 +543,6 @@ TEST_F(OptionsUtilTest, BadLatestOptions) {
   options.env = env_.get();
   config_opts.env = env_.get();
   config_opts.ignore_unknown_options = false;
-  config_opts.delimiter = "\n";
 
   ConfigOptions ignore_opts = config_opts;
   ignore_opts.ignore_unknown_options = true;

@@ -1,3 +1,11 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
 //  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -388,7 +396,7 @@ Status Comparator::CreateFromString(const ConfigOptions& config_options,
     RegisterBuiltinComparators(*(ObjectLibrary::Default().get()), "");
   });
   std::string id;
-  std::unordered_map<std::string, std::string> opt_map;
+  OptionProperties opt_map;
   Status status = Customizable::GetOptionsMap(config_options, *result, value,
                                               &id, &opt_map);
   if (!status.ok()) {  // GetOptionsMap failed

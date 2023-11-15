@@ -41,6 +41,7 @@
 #include "rocksdb/slice_transform.h"
 #include "rocksdb/table.h"
 #include "rocksdb/utilities/object_registry.h"
+#include "rocksdb/utilities/options_formatter.h"
 #include "rocksdb/utilities/options_type.h"
 #include "util/string_util.h"
 
@@ -55,62 +56,40 @@ ConfigOptions::ConfigOptions(const DBOptions& db_opts) : env(db_opts.env) {
   registry = ObjectRegistry::NewInstance();
 }
 
-std::string ConfigOptions::ToString(const std::string& /*prefix*/,
+std::string ConfigOptions::ToString(const std::string& prefix,
                                     const OptionProperties& props) const {
-  std::string result;
-  std::string id;
-  for (const auto& it : props) {
-    if (it.first == OptionTypeInfo::kIdPropName()) {
-      id = it.second;
-    } else {
-      if (!result.empty()) {
-        result.append(delimiter);
-      }
-      result.append(it.first);
-      result.append("=");
-      if (it.second.find('=') != std::string::npos && it.second[0] != '{') {
-        result.append("{" + it.second + "}");
-      } else {
-        result.append(it.second);
-      }
-    }
-  }
-  if (id.empty()) {
-    return result;
-  } else if (result.empty()) {
-    return id;
+  if (formatter) {
+    return formatter->ToString(prefix, props);
   } else {
-    std::string id_string = /*prefix + */ OptionTypeInfo::kIdPropName();
-    id_string.append("=");
-    id_string.append(id);
-    return id_string + delimiter + result;
+    return OptionsFormatter::Default()->ToString(prefix, props);
+  }
+}
+
+Status ConfigOptions::ToProps(const std::string& opts_str,
+                              OptionProperties* props) const {
+  if (formatter) {
+    return formatter->ToProps(opts_str, props);
+  } else {
+    return OptionsFormatter::Default()->ToProps(opts_str, props);
   }
 }
 
 std::string ConfigOptions::ToString(
-    char separator, const std::vector<std::string>& elems) const {
-  std::string result;
-  int printed = 0;
-  for (const auto& elem : elems) {
-    if (printed++ > 0) {
-      result += separator;
-    }
-    if (elem.find(separator) != std::string::npos) {
-      // If the element contains embedded separators, put it inside of brackets
-      result.append("{" + elem + "}");
-    } else if (elem.find("=") != std::string::npos) {
-      // If the element contains embedded options, put it inside of brackets
-      result.append("{" + elem + "}");
-    } else {
-      result += elem;
-    }
-  }
-  if (result.find("=") != std::string::npos) {
-    return "{" + result + "}";
-  } else if (printed > 1 && result.at(0) == '{') {
-    return "{" + result + "}";
+    const std::string& prefix, char separator,
+    const std::vector<std::string>& elems) const {
+  if (formatter) {
+    return formatter->ToString(prefix, separator, elems);
   } else {
-    return result;
+    return OptionsFormatter::Default()->ToString(prefix, separator, elems);
+  }
+}
+
+Status ConfigOptions::ToVector(const std::string& opts_str, char delim,
+                               std::vector<std::string>* elems) const {
+  if (formatter) {
+    return formatter->ToVector(opts_str, delim, elems);
+  } else {
+    return OptionsFormatter::Default()->ToVector(opts_str, delim, elems);
   }
 }
 
@@ -666,56 +645,9 @@ Status ConfigureFromMap(
   return s;
 }
 
-
-Status StringToMap(const std::string& opts_str,
-                   std::unordered_map<std::string, std::string>* opts_map) {
-  assert(opts_map);
-  // Example:
-  //   opts_str = "write_buffer_size=1024;max_write_buffer_number=2;"
-  //              "nested_opt={opt1=1;opt2=2};max_bytes_for_level_base=100"
-  size_t pos = 0;
-  std::string opts = trim(opts_str);
-  // If the input string starts and ends with "{...}", strip off the brackets
-  while (opts.size() > 2 && opts[0] == '{' && opts[opts.size() - 1] == '}') {
-    opts = trim(opts.substr(1, opts.size() - 2));
-  }
-
-  while (pos < opts.size()) {
-    size_t eq_pos = opts.find_first_of("={};", pos);
-    if (eq_pos == std::string::npos) {
-      return Status::InvalidArgument("Mismatched key value pair, '=' expected");
-    } else if (opts[eq_pos] != '=') {
-      return Status::InvalidArgument("Unexpected char in key");
-    }
-
-    std::string key = trim(opts.substr(pos, eq_pos - pos));
-    if (key.empty()) {
-      return Status::InvalidArgument("Empty key found");
-    }
-
-    std::string value;
-    Status s = OptionTypeInfo::NextToken(opts, ';', eq_pos + 1, &pos, &value);
-    if (!s.ok()) {
-      return s;
-    } else {
-      (*opts_map)[key] = value;
-      if (pos == std::string::npos) {
-        break;
-      } else {
-        pos++;
-      }
-    }
-  }
-
-  return Status::OK();
-}
-
-
 Status GetStringFromDBOptions(std::string* opt_string,
-                              const DBOptions& db_options,
-                              const std::string& delimiter) {
+                              const DBOptions& db_options) {
   ConfigOptions config_options(db_options);
-  config_options.delimiter = delimiter;
   return GetStringFromDBOptions(config_options, db_options, opt_string);
 }
 
@@ -728,12 +660,9 @@ Status GetStringFromDBOptions(const ConfigOptions& config_options,
   return config->GetOptionString(config_options, opt_string);
 }
 
-
 Status GetStringFromColumnFamilyOptions(std::string* opt_string,
-                                        const ColumnFamilyOptions& cf_options,
-                                        const std::string& delimiter) {
+                                        const ColumnFamilyOptions& cf_options) {
   ConfigOptions config_options;
-  config_options.delimiter = delimiter;
   return GetStringFromColumnFamilyOptions(config_options, cf_options,
                                           opt_string);
 }
@@ -781,13 +710,13 @@ Status GetColumnFamilyOptionsFromString(const ConfigOptions& config_options,
                                         const ColumnFamilyOptions& base_options,
                                         const std::string& opts_str,
                                         ColumnFamilyOptions* new_options) {
-  std::unordered_map<std::string, std::string> opts_map;
-  Status s = StringToMap(opts_str, &opts_map);
+  OptionProperties props;
+  Status s = config_options.ToProps(opts_str, &props);
   if (!s.ok()) {
     *new_options = base_options;
     return s;
   }
-  return GetColumnFamilyOptionsFromMap(config_options, base_options, opts_map,
+  return GetColumnFamilyOptionsFromMap(config_options, base_options, props,
                                        new_options);
 }
 
@@ -813,14 +742,13 @@ Status GetDBOptionsFromString(const ConfigOptions& config_options,
                               const DBOptions& base_options,
                               const std::string& opts_str,
                               DBOptions* new_options) {
-  std::unordered_map<std::string, std::string> opts_map;
-  Status s = StringToMap(opts_str, &opts_map);
+  OptionProperties props;
+  Status s = config_options.ToProps(opts_str, &props);
   if (!s.ok()) {
     *new_options = base_options;
     return s;
   }
-  return GetDBOptionsFromMap(config_options, base_options, opts_map,
-                             new_options);
+  return GetDBOptionsFromMap(config_options, base_options, props, new_options);
 }
 
 Status GetOptionsFromString(const Options& base_options,
@@ -838,16 +766,16 @@ Status GetOptionsFromString(const ConfigOptions& config_options,
                             const std::string& opts_str, Options* new_options) {
   ColumnFamilyOptions new_cf_options;
   std::unordered_map<std::string, std::string> unused_opts;
-  std::unordered_map<std::string, std::string> opts_map;
+  OptionProperties props;
 
   assert(new_options);
   *new_options = base_options;
-  Status s = StringToMap(opts_str, &opts_map);
+  Status s = config_options.ToProps(opts_str, &props);
   if (!s.ok()) {
     return s;
   }
   auto config = DBOptionsAsConfigurable(base_options);
-  s = config->ConfigureFromMap(config_options, opts_map, &unused_opts);
+  s = config->ConfigureFromMap(config_options, props, &unused_opts);
 
   if (s.ok()) {
     DBOptions* new_db_options =
@@ -906,59 +834,6 @@ std::unordered_map<std::string, PrepopulateBlobCache>
         {"kDisable", PrepopulateBlobCache::kDisable},
         {"kFlushOnly", PrepopulateBlobCache::kFlushOnly}};
 
-Status OptionTypeInfo::NextToken(const std::string& opts, char delimiter,
-                                 size_t pos, size_t* end, std::string* token) {
-  while (pos < opts.size() && isspace(opts[pos])) {
-    ++pos;
-  }
-  // Empty value at the end
-  if (pos >= opts.size()) {
-    *token = "";
-    *end = std::string::npos;
-    return Status::OK();
-  } else if (opts[pos] == '{') {
-    int count = 1;
-    size_t brace_pos = pos + 1;
-    while (brace_pos < opts.size()) {
-      if (opts[brace_pos] == '{') {
-        ++count;
-      } else if (opts[brace_pos] == '}') {
-        --count;
-        if (count == 0) {
-          break;
-        }
-      }
-      ++brace_pos;
-    }
-    // found the matching closing brace
-    if (count == 0) {
-      *token = trim(opts.substr(pos + 1, brace_pos - pos - 1));
-      // skip all whitespace and move to the next delimiter
-      // brace_pos points to the next position after the matching '}'
-      pos = brace_pos + 1;
-      while (pos < opts.size() && isspace(opts[pos])) {
-        ++pos;
-      }
-      if (pos < opts.size() && opts[pos] != delimiter) {
-        return Status::InvalidArgument("Unexpected chars after nested options");
-      }
-      *end = pos;
-    } else {
-      return Status::InvalidArgument(
-          "Mismatched curly braces for nested options");
-    }
-  } else {
-    *end = opts.find(delimiter, pos);
-    if (*end == std::string::npos) {
-      // It either ends with a trailing semi-colon or the last key-value pair
-      *token = trim(opts.substr(pos));
-    } else {
-      *token = trim(opts.substr(pos, *end - pos));
-    }
-  }
-  return Status::OK();
-}
-
 Status OptionTypeInfo::Parse(const ConfigOptions& config_options,
                              const std::string& opt_name,
                              const std::string& value, void* opt_ptr) const {
@@ -1012,12 +887,12 @@ Status OptionTypeInfo::ParseType(
     const ConfigOptions& config_options, const std::string& opts_str,
     const std::unordered_map<std::string, OptionTypeInfo>& type_map,
     void* opt_addr, std::unordered_map<std::string, std::string>* unused) {
-  std::unordered_map<std::string, std::string> opts_map;
-  Status status = StringToMap(opts_str, &opts_map);
+  OptionProperties props;
+  Status status = config_options.ToProps(opts_str, &props);
   if (!status.ok()) {
     return status;
   } else {
-    return ParseType(config_options, opts_map, type_map, opt_addr, unused);
+    return ParseType(config_options, props, type_map, opt_addr, unused);
   }
 }
 
@@ -1117,13 +992,12 @@ Status OptionTypeInfo::Serialize(const ConfigOptions& config_options,
       }
     } else {
       ConfigOptions embedded = config_options;
-      embedded.delimiter = ";";
       // If this option is mutable, everything inside it should be considered
       // mutable
       if (IsMutable()) {
         embedded.mutable_options_only = false;
       }
-      std::string value = custom->ToString(embedded);
+      std::string value = custom->ToString(embedded, opt_name);
       if (!embedded.mutable_options_only ||
           value.find("=") != std::string::npos) {
         *opt_value = value;
@@ -1136,8 +1010,7 @@ Status OptionTypeInfo::Serialize(const ConfigOptions& config_options,
     const Configurable* config = AsRawPointer<Configurable>(opt_ptr);
     if (config != nullptr) {
       ConfigOptions embedded = config_options;
-      embedded.delimiter = ";";
-      *opt_value = config->ToString(embedded);
+      *opt_value = config->ToString(embedded, opt_name);
     }
     return Status::OK();
   } else if (config_options.mutable_options_only && !IsMutable()) {
@@ -1179,12 +1052,8 @@ Status OptionTypeInfo::SerializeStruct(
   assert(struct_map);
   Status status;
   if (EndsWith(opt_name, struct_name)) {
-    // We are going to write the struct as "{ prop1=value1; prop2=value2;}.
-    // Set the delimiter to ";" so that the everything will be on one line.
-    ConfigOptions embedded = config_options;
-    embedded.delimiter = ";";
-
-    status = TypeToString(embedded, opt_name, *struct_map, opt_addr, value);
+    status =
+        TypeToString(config_options, opt_name, *struct_map, opt_addr, value);
     if (!status.ok()) {
       return status;
     }

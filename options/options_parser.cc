@@ -30,6 +30,7 @@
 #include "file/writable_file_writer.h"
 #include "options/cf_options.h"
 #include "options/db_options.h"
+#include "options/options_formatter_impl.h"
 #include "options/options_helper.h"
 #include "port/port.h"
 #include "rocksdb/convenience.h"
@@ -40,7 +41,6 @@
 #include "util/string_util.h"
 
 namespace ROCKSDB_NAMESPACE {
-
 static const std::string option_file_header =
     "# This is a Speedb option file.\n"
     "#\n"
@@ -55,7 +55,7 @@ Status PersistRocksDBOptions(const DBOptions& db_opt,
                              const std::string& file_name, FileSystem* fs) {
   ConfigOptions
       config_options;  // Use default for escaped(true) and check (exact)
-  config_options.delimiter = "\n  ";
+  config_options.formatter = std::make_shared<PropertiesOptionsFormatter>();
   // Do not invoke PrepareOptions when we are doing validation.
   config_options.invoke_prepare_options = false;
   // If a readahead size was set in the input options, use it
@@ -72,7 +72,7 @@ Status PersistRocksDBOptions(const ConfigOptions& config_options_in,
                              const std::vector<ColumnFamilyOptions>& cf_opts,
                              const std::string& file_name, FileSystem* fs) {
   ConfigOptions config_options = config_options_in;
-  config_options.delimiter = "\n  ";  // Override the default to nl
+  config_options.formatter = std::make_shared<PropertiesOptionsFormatter>();
 
   TEST_SYNC_POINT("PersistRocksDBOptions:start");
   if (cf_names.size() != cf_opts.size()) {
@@ -575,6 +575,11 @@ Status RocksDBOptionsParser::VerifyRocksDBOptionsFromFile(
     // (if the ObjectRegistry is not initialized)
     config_options.ignore_unsupported_options = true;
   }
+  if (!config_options.formatter ||
+      !config_options.formatter->IsInstanceOf(
+          PropertiesOptionsFormatter::kClassName())) {
+    config_options.formatter = std::make_shared<PropertiesOptionsFormatter>();
+  }
   Status s = parser.Parse(config_options, file_name, fs);
   if (!s.ok()) {
     return s;
@@ -747,4 +752,3 @@ Status RocksDBOptionsParser::VerifyTableFactory(
   return Status::OK();
 }
 }  // namespace ROCKSDB_NAMESPACE
-

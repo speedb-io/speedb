@@ -905,16 +905,13 @@ class OptionTypeInfo {
       const std::string& opt_name, const std::string& value, void* opt_addr);
 
   // Converts the values from opt_addr using the rules in type_map into their
-  // UserProperties (name-value) representatio.
+  // UserProperties (name-value) representation.
   // Returns OK on success or non-OK if some option could not be serialized.
   static Status SerializeType(
       const ConfigOptions& config_options, const std::string& prefix,
       const std::unordered_map<std::string, OptionTypeInfo>& type_map,
       const void* opt_addr, OptionProperties* props);
 
-  // Serializes the values from opt_addr using the rules in type_map.
-  // Returns the serialized form in result.
-  // Returns OK on success or non-OK if some option could not be serialized.
   static Status TypeToString(
       const ConfigOptions& config_options, const std::string& opt_name,
       const std::unordered_map<std::string, OptionTypeInfo>& type_map,
@@ -962,26 +959,6 @@ class OptionTypeInfo {
       const std::string& opt_name,
       const std::unordered_map<std::string, OptionTypeInfo>& opt_map,
       std::string* elem_name);
-
-  // Returns the next token marked by the delimiter from "opts" after start in
-  // token and updates end to point to where that token stops. Delimiters inside
-  // of braces are ignored. Returns OK if a token is found and an error if the
-  // input opts string is mis-formatted.
-  // Given "a=AA;b=BB;" start=2 and delimiter=";", token is "AA" and end points
-  // to "b" Given "{a=A;b=B}", the token would be "a=A;b=B"
-  //
-  // @param opts The string in which to find the next token
-  // @param delimiter The delimiter between tokens
-  // @param start     The position in opts to start looking for the token
-  // @param ed        Returns the end position in opts of the token
-  // @param token     Returns the token
-  // @returns OK if a token was found
-  // @return InvalidArgument if the braces mismatch
-  //          (e.g. "{a={b=c;}" ) -- missing closing brace
-  // @return InvalidArgument if an expected delimiter is not found
-  //        e.g. "{a=b}c=d;" -- missing delimiter before "c"
-  static Status NextToken(const std::string& opts, char delimiter, size_t start,
-                          size_t* end, std::string* token);
 
   constexpr static const char* kIdPropName() { return "id"; }
   constexpr static const char* kIdPropSuffix() { return ".id"; }
@@ -1052,18 +1029,26 @@ Status ParseArray(const ConfigOptions& config_options,
                   const OptionTypeInfo& elem_info, char separator,
                   const std::string& name, const std::string& value,
                   std::array<T, kSize>* result) {
-  Status status;
-
-  ConfigOptions copy = config_options;
-  copy.ignore_unsupported_options = false;
-  size_t i = 0, start = 0, end = 0;
-  for (; status.ok() && i < kSize && start < value.size() &&
-         end != std::string::npos;
-       i++, start = end + 1) {
-    std::string token;
-    status = OptionTypeInfo::NextToken(value, separator, start, &end, &token);
-    if (status.ok()) {
-      status = elem_info.Parse(copy, name, token, &((*result)[i]));
+  std::vector<std::string> tokens;
+  Status status = config_options.ToVector(value, separator, &tokens);
+  if (!status.ok()) {
+    return status;
+  } else if (tokens.size() != kSize) {
+    // make sure the element number matches the array size
+    if (tokens.size() < kSize) {
+      return Status::InvalidArgument(
+          "Serialized value has less elements than array size", name);
+    } else {
+      return Status::InvalidArgument(
+          "Serialized value has more elements than array size", name);
+    }
+  } else {
+    // Turn off ignore_unknown_objects so we can tell if the returned
+    // object is valid or not.
+    ConfigOptions copy = config_options;
+    copy.ignore_unsupported_options = false;
+    for (size_t i = 0; status.ok() && i < tokens.size(); ++i) {
+      status = elem_info.Parse(copy, name, tokens[i], &((*result)[i]));
       if (config_options.ignore_unsupported_options &&
           status.IsNotSupported()) {
         // If we were ignoring unsupported options and this one should be
@@ -1071,18 +1056,6 @@ Status ParseArray(const ConfigOptions& config_options,
         status = Status::OK();
       }
     }
-  }
-  if (!status.ok()) {
-    return status;
-  }
-  // make sure the element number matches the array size
-  if (i < kSize) {
-    return Status::InvalidArgument(
-        "Serialized value has less elements than array size", name);
-  }
-  if (start < value.size() && end != std::string::npos) {
-    return Status::InvalidArgument(
-        "Serialized value has more elements than array size", name);
   }
   return status;
 }
@@ -1110,34 +1083,17 @@ Status SerializeArray(const ConfigOptions& config_options,
                       const OptionTypeInfo& elem_info, char separator,
                       const std::string& name,
                       const std::array<T, kSize>& array, std::string* value) {
-  std::string result;
-  ConfigOptions embedded = config_options;
-  embedded.delimiter = ";";
-  int printed = 0;
+  std::vector<std::string> opt_vec;
   for (const auto& elem : array) {
     std::string elem_str;
-    Status s = elem_info.Serialize(embedded, name, &elem, &elem_str);
+    Status s = elem_info.Serialize(config_options, name, &elem, &elem_str);
     if (!s.ok()) {
       return s;
     } else if (!elem_str.empty()) {
-      if (printed++ > 0) {
-        result += separator;
-      }
-      // If the element contains embedded separators, put it inside of brackets
-      if (elem_str.find(separator) != std::string::npos) {
-        result += "{" + elem_str + "}";
-      } else {
-        result += elem_str;
-      }
+      opt_vec.emplace_back(elem_str);
     }
   }
-  if (result.find("=") != std::string::npos) {
-    *value = "{" + result + "}";
-  } else if (printed > 1 && result.at(0) == '{') {
-    *value = "{" + result + "}";
-  } else {
-    *value = result;
-  }
+  *value = config_options.ToString(name, separator, opt_vec);
   return Status::OK();
 }
 
@@ -1192,18 +1148,14 @@ Status ParseVector(const ConfigOptions& config_options,
                    const std::string& name, const std::string& value,
                    std::vector<T>* result) {
   result->clear();
-  Status status;
-
-  // Turn off ignore_unknown_objects so we can tell if the returned
-  // object is valid or not.
-  ConfigOptions copy = config_options;
-  copy.ignore_unsupported_options = false;
-  for (size_t start = 0, end = 0;
-       status.ok() && start < value.size() && end != std::string::npos;
-       start = end + 1) {
-    std::string token;
-    status = OptionTypeInfo::NextToken(value, separator, start, &end, &token);
-    if (status.ok()) {
+  std::vector<std::string> tokens;
+  Status status = config_options.ToVector(value, separator, &tokens);
+  if (status.ok()) {
+    // Turn off ignore_unknown_objects so we can tell if the returned
+    // object is valid or not.
+    ConfigOptions copy = config_options;
+    copy.ignore_unsupported_options = false;
+    for (const auto& token : tokens) {
       T elem;
       status = elem_info.Parse(copy, name, token, &elem);
       if (status.ok()) {
@@ -1213,6 +1165,8 @@ Status ParseVector(const ConfigOptions& config_options,
         // If we were ignoring unsupported options and this one should be
         // ignored, ignore it by setting the status to OK
         status = Status::OK();
+      } else {
+        return status;
       }
     }
   }
@@ -1246,18 +1200,16 @@ Status SerializeVector(const ConfigOptions& config_options,
     value->clear();
   } else {
     std::vector<std::string> opt_vec;
-    ConfigOptions embedded = config_options;
-    embedded.delimiter = ";";
     for (const auto& elem : vec) {
       std::string elem_str;
-      Status s = elem_info.Serialize(embedded, name, &elem, &elem_str);
+      Status s = elem_info.Serialize(config_options, name, &elem, &elem_str);
       if (!s.ok()) {
         return s;
       } else if (!elem_str.empty()) {
         opt_vec.emplace_back(elem_str);
       }
     }
-    *value = config_options.ToString(separator, opt_vec);
+    *value = config_options.ToString(name, separator, opt_vec);
   }
   return Status::OK();
 }

@@ -285,9 +285,10 @@ class Configurable {
   // found.
   // @return InvalidArgument if the value could not be converted to a map or
   // there was or there is no id property in the map.
-  static Status GetOptionsMap(
-      const std::string& opt_value, const std::string& default_id,
-      std::string* id, std::unordered_map<std::string, std::string>* options);
+  static Status GetOptionsMap(const ConfigOptions& config_options,
+                              const std::string& opt_value,
+                              const std::string& default_id, std::string* id,
+                              OptionProperties* options);
 
  protected:
   // Returns the raw pointer for the associated named option.

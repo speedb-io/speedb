@@ -1886,9 +1886,9 @@ Status FilterPolicy::CreateFromString(
   }
 
   std::string id;
-  std::unordered_map<std::string, std::string> opt_map;
+  OptionProperties props;
   Status status =
-      Customizable::GetOptionsMap(options, policy->get(), value, &id, &opt_map);
+      Customizable::GetOptionsMap(options, policy->get(), value, &id, &props);
   if (!status.ok()) {  // GetOptionsMap failed
     return status;
   } else if (id.empty()) {  // We have no Id but have options.  Not good
@@ -1904,7 +1904,7 @@ Status FilterPolicy::CreateFromString(
     return Status::OK();
   } else if (status.ok()) {
     status = Customizable::ConfigureNewObject(
-        options, const_cast<FilterPolicy*>(policy->get()), opt_map);
+        options, const_cast<FilterPolicy*>(policy->get()), props);
   }
   return status;
 }

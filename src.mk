@@ -160,6 +160,7 @@ LIB_SOURCES =                                                   \
   options/customizable.cc                                       \
   options/db_options.cc                                         \
   options/options.cc                                            \
+  options/options_formatter.cc                                  \
   options/options_helper.cc                                     \
   options/options_parser.cc                                     \
   port/mmap.cc                                                  \

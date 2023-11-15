@@ -32,6 +32,7 @@
 #include "db/db_test_util.h"
 #include "memory/jemalloc_nodump_allocator.h"
 #include "memory/memkind_kmem_allocator.h"
+#include "options/options_formatter_impl.h"
 #include "options/options_helper.h"
 #include "options/options_parser.h"
 #include "port/stack_trace.h"
@@ -242,21 +243,6 @@ class SimpleConfigurable : public Configurable {
   }
 };
 
-static void GetMapFromProperties(
-    const std::string& props,
-    std::unordered_map<std::string, std::string>* map) {
-  std::istringstream iss(props);
-  std::unordered_map<std::string, std::string> copy_map;
-  std::string line;
-  map->clear();
-  for (int line_num = 0; std::getline(iss, line); line_num++) {
-    std::string name;
-    std::string value;
-    ASSERT_OK(
-        RocksDBOptionsParser::ParseStatement(&name, &value, line, line_num));
-    (*map)[name] = value;
-  }
-}
 }  // namespace
 
 Status TestCustomizable::CreateFromString(
@@ -355,12 +341,11 @@ TEST_F(CustomizableTest, ConfigureFromPropsTest) {
   ASSERT_EQ(simple->cu->GetId(), "A");
   std::string opt_str;
   std::string mismatch;
-  config_options_.delimiter = "\n";
-  std::unordered_map<std::string, std::string> props;
+  config_options_.formatter = std::make_shared<PropertiesOptionsFormatter>();
   ASSERT_OK(configurable->GetOptionString(config_options_, &opt_str));
-  GetMapFromProperties(opt_str, &props);
+
   std::unique_ptr<Configurable> copy(new SimpleConfigurable());
-  ASSERT_OK(copy->ConfigureFromMap(config_options_, props));
+  ASSERT_OK(copy->ConfigureFromString(config_options_, opt_str));
   ASSERT_TRUE(
       configurable->AreEquivalent(config_options_, copy.get(), &mismatch));
 }
@@ -1349,7 +1334,8 @@ class MockEncryptionProvider : public EncryptionProvider {
 
 class MockCipher : public BlockCipher {
  public:
-  const char* Name() const override { return "Mock"; }
+  const char* Name() const override { return kClassName(); }
+  static const char* kClassName() { return "Mock"; }
   size_t BlockSize() override { return 0; }
   Status Encrypt(char* /*data*/) override { return Status::NotSupported(); }
   Status Decrypt(char* data) override { return Encrypt(data); }
@@ -1428,47 +1414,44 @@ class MockTablePinningPolicy : public TablePinningPolicy {
   std::string ToString() const override { return ""; }
 };
 
+class MockOptionsFormatter : public OptionsFormatter {
+ public:
+  static const char* kClassName() { return "Mock"; }
+  const char* Name() const override { return kClassName(); }
+  std::string ToString(const std::string&,
+                       const OptionProperties&) const override {
+    return "";
+  }
+
+  Status ToProps(const std::string&, OptionProperties*) const override {
+    return Status::OK();
+  }
+
+  std::string ToString(const std::string&, char,
+                       const std::vector<std::string>&) const override {
+    return "";
+  }
+
+  Status ToVector(const std::string&, char,
+                  std::vector<std::string>*) const override {
+    return Status::OK();
+  }
+};
+
+template <typename BASE, typename DERIVED>
+void RegisterMockClass(ObjectLibrary& library) {
+  library.AddFactory<BASE>(
+      DERIVED::kClassName(),
+      [](const std::string& /*uri*/, std::unique_ptr<BASE>* guard,
+         std::string* /* errmsg */) {
+        guard->reset(new DERIVED());
+        return guard->get();
+      });
+}
+
 static int RegisterLocalObjects(ObjectLibrary& library,
                                 const std::string& /*arg*/) {
   size_t num_types;
-  library.AddFactory<TableFactory>(
-      mock::MockTableFactory::kClassName(),
-      [](const std::string& /*uri*/, std::unique_ptr<TableFactory>* guard,
-         std::string* /* errmsg */) {
-        guard->reset(new mock::MockTableFactory());
-        return guard->get();
-      });
-  library.AddFactory<EventListener>(
-      OnFileDeletionListener::kClassName(),
-      [](const std::string& /*uri*/, std::unique_ptr<EventListener>* guard,
-         std::string* /* errmsg */) {
-        guard->reset(new OnFileDeletionListener());
-        return guard->get();
-      });
-  library.AddFactory<EventListener>(
-      FlushCounterListener::kClassName(),
-      [](const std::string& /*uri*/, std::unique_ptr<EventListener>* guard,
-         std::string* /* errmsg */) {
-        guard->reset(new FlushCounterListener());
-        return guard->get();
-      });
-  // Load any locally defined objects here
-  library.AddFactory<const SliceTransform>(
-      MockSliceTransform::kClassName(),
-      [](const std::string& /*uri*/,
-         std::unique_ptr<const SliceTransform>* guard,
-         std::string* /* errmsg */) {
-        guard->reset(new MockSliceTransform());
-        return guard->get();
-      });
-  library.AddFactory<Statistics>(
-      TestStatistics::kClassName(),
-      [](const std::string& /*uri*/, std::unique_ptr<Statistics>* guard,
-         std::string* /* errmsg */) {
-        guard->reset(new TestStatistics());
-        return guard->get();
-      });
-
   library.AddFactory<EncryptionProvider>(
       ObjectLibrary::PatternEntry(MockEncryptionProvider::kClassName(), true)
           .AddSuffix("://test"),
@@ -1477,37 +1460,6 @@ static int RegisterLocalObjects(ObjectLibrary& library,
         guard->reset(new MockEncryptionProvider(uri));
         return guard->get();
       });
-  library.AddFactory<BlockCipher>(
-      "Mock",
-      [](const std::string& /*uri*/, std::unique_ptr<BlockCipher>* guard,
-         std::string* /* errmsg */) {
-        guard->reset(new MockCipher());
-        return guard->get();
-      });
-  library.AddFactory<MemoryAllocator>(
-      MockMemoryAllocator::kClassName(),
-      [](const std::string& /*uri*/, std::unique_ptr<MemoryAllocator>* guard,
-         std::string* /* errmsg */) {
-        guard->reset(new MockMemoryAllocator());
-        return guard->get();
-      });
-  library.AddFactory<FlushBlockPolicyFactory>(
-      TestFlushBlockPolicyFactory::kClassName(),
-      [](const std::string& /*uri*/,
-         std::unique_ptr<FlushBlockPolicyFactory>* guard,
-         std::string* /* errmsg */) {
-        guard->reset(new TestFlushBlockPolicyFactory());
-        return guard->get();
-      });
-
-  library.AddFactory<SecondaryCache>(
-      TestSecondaryCache::kClassName(),
-      [](const std::string& /*uri*/, std::unique_ptr<SecondaryCache>* guard,
-         std::string* /* errmsg */) {
-        guard->reset(new TestSecondaryCache());
-        return guard->get();
-      });
-
   library.AddFactory<FileSystem>(
       DummyFileSystem::kClassName(),
       [](const std::string& /*uri*/, std::unique_ptr<FileSystem>* guard,
@@ -1516,46 +1468,24 @@ static int RegisterLocalObjects(ObjectLibrary& library,
         return guard->get();
       });
 
-  library.AddFactory<SstPartitionerFactory>(
-      MockSstPartitionerFactory::kClassName(),
-      [](const std::string& /*uri*/,
-         std::unique_ptr<SstPartitionerFactory>* guard,
-         std::string* /* errmsg */) {
-        guard->reset(new MockSstPartitionerFactory());
-        return guard->get();
-      });
-
-  library.AddFactory<FileChecksumGenFactory>(
-      MockFileChecksumGenFactory::kClassName(),
-      [](const std::string& /*uri*/,
-         std::unique_ptr<FileChecksumGenFactory>* guard,
-         std::string* /* errmsg */) {
-        guard->reset(new MockFileChecksumGenFactory());
-        return guard->get();
-      });
-
-  library.AddFactory<TablePropertiesCollectorFactory>(
-      MockTablePropertiesCollectorFactory::kClassName(),
-      [](const std::string& /*uri*/,
-         std::unique_ptr<TablePropertiesCollectorFactory>* guard,
-         std::string* /* errmsg */) {
-        guard->reset(new MockTablePropertiesCollectorFactory());
-        return guard->get();
-      });
-  library.AddFactory<const FilterPolicy>(
-      MockFilterPolicy::kClassName(),
-      [](const std::string& /*uri*/, std::unique_ptr<const FilterPolicy>* guard,
-         std::string* /* errmsg */) {
-        guard->reset(new MockFilterPolicy());
-        return guard->get();
-      });
-  library.AddFactory<TablePinningPolicy>(
-      MockTablePinningPolicy::kClassName(),
-      [](const std::string& /*uri*/, std::unique_ptr<TablePinningPolicy>* guard,
-         std::string* /* errmsg */) {
-        guard->reset(new MockTablePinningPolicy());
-        return guard->get();
-      });
+  RegisterMockClass<TableFactory, mock::MockTableFactory>(library);
+  RegisterMockClass<EventListener, OnFileDeletionListener>(library);
+  RegisterMockClass<EventListener, FlushCounterListener>(library);
+  RegisterMockClass<const SliceTransform, MockSliceTransform>(library);
+  RegisterMockClass<const FilterPolicy, MockFilterPolicy>(library);
+  RegisterMockClass<Statistics, TestStatistics>(library);
+  RegisterMockClass<BlockCipher, MockCipher>(library);
+  RegisterMockClass<MemoryAllocator, MockMemoryAllocator>(library);
+  RegisterMockClass<FlushBlockPolicyFactory, TestFlushBlockPolicyFactory>(
+      library);
+  RegisterMockClass<SecondaryCache, TestSecondaryCache>(library);
+  RegisterMockClass<SstPartitionerFactory, MockSstPartitionerFactory>(library);
+  RegisterMockClass<FileChecksumGenFactory, MockFileChecksumGenFactory>(
+      library);
+  RegisterMockClass<TablePropertiesCollectorFactory,
+                    MockTablePropertiesCollectorFactory>(library);
+  RegisterMockClass<TablePinningPolicy, MockTablePinningPolicy>(library);
+  RegisterMockClass<OptionsFormatter, MockOptionsFormatter>(library);
 
   return static_cast<int>(library.GetFactoryCount(&num_types));
 }
@@ -2154,6 +2084,13 @@ TEST_F(LoadCustomizableTest, LoadTablePiningPolicyTest) {
   ASSERT_OK(TestSharedBuiltins<TablePinningPolicy>("Mock", ""));
   if (RegisterTests("Test")) {
     ExpectCreateShared<TablePinningPolicy>("Mock");
+  }
+}
+
+TEST_F(LoadCustomizableTest, LoadOptionsFormatterTest) {
+  ASSERT_OK(TestSharedBuiltins<OptionsFormatter>("Mock", ""));
+  if (RegisterTests("Test")) {
+    ExpectCreateShared<OptionsFormatter>("Mock");
   }
 }
 

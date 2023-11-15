@@ -536,44 +536,43 @@ static std::unordered_map<std::string, OptionTypeInfo>
           OptionTypeFlags::kCompareNever,
           [](const ConfigOptions& opts, const std::string& /*name*/,
              const std::string& value, void* addr) {
-            ConfigOptions embedded = opts;
-            embedded.ignore_unsupported_options = true;
-            std::vector<std::shared_ptr<EventListener>> listeners;
-            Status s;
-            for (size_t start = 0, end = 0;
-                 s.ok() && start < value.size() && end != std::string::npos;
-                 start = end + 1) {
-              std::string token;
-              s = OptionTypeInfo::NextToken(value, ':', start, &end, &token);
-              if (s.ok() && !token.empty()) {
-                std::shared_ptr<EventListener> listener;
-                s = EventListener::CreateFromString(embedded, token, &listener);
-                if (s.ok() && listener != nullptr) {
-                  listeners.push_back(listener);
+            std::vector<std::string> tokens;
+            Status s = opts.ToVector(value, ':', &tokens);
+            if (s.ok()) {
+              ConfigOptions embedded = opts;
+              embedded.ignore_unsupported_options = true;
+              std::vector<std::shared_ptr<EventListener>> listeners;
+              for (const auto& token : tokens) {
+                if (!token.empty()) {
+                  std::shared_ptr<EventListener> listener;
+                  s = EventListener::CreateFromString(embedded, token,
+                                                      &listener);
+                  if (!s.ok()) {
+                    return s;
+                  } else if (listener != nullptr) {
+                    listeners.push_back(listener);
+                  }
                 }
               }
-            }
-            if (s.ok()) {  // It worked
+              // It worked
               *(static_cast<std::vector<std::shared_ptr<EventListener>>*>(
                   addr)) = listeners;
             }
             return s;
           },
-          [](const ConfigOptions& opts, const std::string& /*name*/,
+          [](const ConfigOptions& opts, const std::string& name,
              const void* addr, std::string* value) {
             const auto listeners =
                 static_cast<const std::vector<std::shared_ptr<EventListener>>*>(
                     addr);
-            ConfigOptions embedded = opts;
-            embedded.delimiter = ";";
             std::vector<std::string> vec;
             for (const auto& listener : *listeners) {
               auto id = listener->GetId();
               if (!id.empty()) {
-                vec.push_back(listener->ToString(embedded, ""));
+                vec.push_back(listener->ToString(opts, ""));
               }
             }
-            *value = opts.ToString(':', vec);
+            *value = opts.ToString(name, ':', vec);
             return Status::OK();
           },
           nullptr}},

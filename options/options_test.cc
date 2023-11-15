@@ -29,6 +29,7 @@
 
 #include "cache/lru_cache.h"
 #include "cache/sharded_cache.h"
+#include "options/options_formatter_impl.h"
 #include "options/options_helper.h"
 #include "options/options_parser.h"
 #include "port/port.h"
@@ -454,8 +455,10 @@ TEST_F(OptionsTest, GetColumnFamilyOptionsFromStringTest) {
          std::unique_ptr<const Comparator>* /*guard*/,
          std::string* /* errmsg */) { return ReverseBytewiseComparator(); });
 
+  OptionProperties props;
+  props.insert({"comparator", kCompName});
   ASSERT_OK(GetColumnFamilyOptionsFromString(config_options, base_cf_opt,
-                                             "comparator=" + kCompName + ";",
+                                             config_options.ToString("", props),
                                              &new_cf_opt));
   ASSERT_EQ(new_cf_opt.comparator, ReverseBytewiseComparator());
 
@@ -1550,7 +1553,7 @@ TEST_F(OptionsTest, GetMutableDBOptions) {
   Random rnd(228);
   DBOptions base_opts;
   std::string opts_str;
-  std::unordered_map<std::string, std::string> opts_map;
+  OptionProperties opts_map;
   ConfigOptions config_options;
 
   test::RandomInitDBOptions(&base_opts, &rnd);
@@ -1558,7 +1561,7 @@ TEST_F(OptionsTest, GetMutableDBOptions) {
   MutableDBOptions m_opts(base_opts);
   MutableDBOptions new_opts;
   ASSERT_OK(GetStringFromMutableDBOptions(config_options, m_opts, &opts_str));
-  ASSERT_OK(StringToMap(opts_str, &opts_map));
+  ASSERT_OK(config_options.ToProps(opts_str, &opts_map));
   ASSERT_OK(GetMutableDBOptionsFromStrings(m_opts, opts_map, &new_opts));
   ASSERT_OK(RocksDBOptionsParser::VerifyDBOptions(
       config_options, base_opts, BuildDBOptions(i_opts, new_opts)));
@@ -1585,7 +1588,7 @@ TEST_F(OptionsTest, GetMutableCFOptions) {
   Random rnd(228);
   ColumnFamilyOptions base, copy;
   std::string opts_str;
-  std::unordered_map<std::string, std::string> opts_map;
+  OptionProperties opts_map;
   ConfigOptions config_options;
   DBOptions dummy;  // Needed to create ImmutableCFOptions
 
@@ -1594,7 +1597,7 @@ TEST_F(OptionsTest, GetMutableCFOptions) {
   MutableCFOptions m_opts(base), new_opts;
 
   ASSERT_OK(GetStringFromMutableCFOptions(config_options, m_opts, &opts_str));
-  ASSERT_OK(StringToMap(opts_str, &opts_map));
+  ASSERT_OK(config_options.ToProps(opts_str, &opts_map));
   ASSERT_OK(GetMutableOptionsFromStrings(m_opts, opts_map, nullptr, &new_opts));
   UpdateColumnFamilyOptions(ImmutableCFOptions(base), &copy);
   UpdateColumnFamilyOptions(new_opts, &copy);
@@ -1773,31 +1776,28 @@ TEST_F(OptionsTest, MutableCFOptions) {
   ASSERT_EQ(bbto->block_size, 32768);
 }
 
-
-Status StringToMap(
-    const std::string& opts_str,
-    std::unordered_map<std::string, std::string>* opts_map);
-
 TEST_F(OptionsTest, StringToMapTest) {
-  std::unordered_map<std::string, std::string> opts_map;
+  DefaultOptionsFormatter formatter;
+
+  OptionProperties opts_map;
   // Regular options
-  ASSERT_OK(StringToMap("k1=v1;k2=v2;k3=v3", &opts_map));
+  ASSERT_OK(formatter.ToProps("k1=v1;k2=v2;k3=v3", &opts_map));
   ASSERT_EQ(opts_map["k1"], "v1");
   ASSERT_EQ(opts_map["k2"], "v2");
   ASSERT_EQ(opts_map["k3"], "v3");
   // Value with '='
   opts_map.clear();
-  ASSERT_OK(StringToMap("k1==v1;k2=v2=;", &opts_map));
+  ASSERT_OK(formatter.ToProps("k1==v1;k2=v2=;", &opts_map));
   ASSERT_EQ(opts_map["k1"], "=v1");
   ASSERT_EQ(opts_map["k2"], "v2=");
   // Overwrriten option
   opts_map.clear();
-  ASSERT_OK(StringToMap("k1=v1;k1=v2;k3=v3", &opts_map));
+  ASSERT_OK(formatter.ToProps("k1=v1;k1=v2;k3=v3", &opts_map));
   ASSERT_EQ(opts_map["k1"], "v2");
   ASSERT_EQ(opts_map["k3"], "v3");
   // Empty value
   opts_map.clear();
-  ASSERT_OK(StringToMap("k1=v1;k2=;k3=v3;k4=", &opts_map));
+  ASSERT_OK(formatter.ToProps("k1=v1;k2=;k3=v3;k4=", &opts_map));
   ASSERT_EQ(opts_map["k1"], "v1");
   ASSERT_TRUE(opts_map.find("k2") != opts_map.end());
   ASSERT_EQ(opts_map["k2"], "");
@@ -1805,7 +1805,7 @@ TEST_F(OptionsTest, StringToMapTest) {
   ASSERT_TRUE(opts_map.find("k4") != opts_map.end());
   ASSERT_EQ(opts_map["k4"], "");
   opts_map.clear();
-  ASSERT_OK(StringToMap("k1=v1;k2=;k3=v3;k4=   ", &opts_map));
+  ASSERT_OK(formatter.ToProps("k1=v1;k2=;k3=v3;k4=   ", &opts_map));
   ASSERT_EQ(opts_map["k1"], "v1");
   ASSERT_TRUE(opts_map.find("k2") != opts_map.end());
   ASSERT_EQ(opts_map["k2"], "");
@@ -1813,14 +1813,14 @@ TEST_F(OptionsTest, StringToMapTest) {
   ASSERT_TRUE(opts_map.find("k4") != opts_map.end());
   ASSERT_EQ(opts_map["k4"], "");
   opts_map.clear();
-  ASSERT_OK(StringToMap("k1=v1;k2=;k3=", &opts_map));
+  ASSERT_OK(formatter.ToProps("k1=v1;k2=;k3=", &opts_map));
   ASSERT_EQ(opts_map["k1"], "v1");
   ASSERT_TRUE(opts_map.find("k2") != opts_map.end());
   ASSERT_EQ(opts_map["k2"], "");
   ASSERT_TRUE(opts_map.find("k3") != opts_map.end());
   ASSERT_EQ(opts_map["k3"], "");
   opts_map.clear();
-  ASSERT_OK(StringToMap("k1=v1;k2=;k3=;", &opts_map));
+  ASSERT_OK(formatter.ToProps("k1=v1;k2=;k3=;", &opts_map));
   ASSERT_EQ(opts_map["k1"], "v1");
   ASSERT_TRUE(opts_map.find("k2") != opts_map.end());
   ASSERT_EQ(opts_map["k2"], "");
@@ -1828,13 +1828,14 @@ TEST_F(OptionsTest, StringToMapTest) {
   ASSERT_EQ(opts_map["k3"], "");
   // Regular nested options
   opts_map.clear();
-  ASSERT_OK(StringToMap("k1=v1;k2={nk1=nv1;nk2=nv2};k3=v3", &opts_map));
+  ASSERT_OK(formatter.ToProps("k1=v1;k2={nk1=nv1;nk2=nv2};k3=v3", &opts_map));
   ASSERT_EQ(opts_map["k1"], "v1");
   ASSERT_EQ(opts_map["k2"], "nk1=nv1;nk2=nv2");
   ASSERT_EQ(opts_map["k3"], "v3");
   // Multi-level nested options
   opts_map.clear();
-  ASSERT_OK(StringToMap("k1=v1;k2={nk1=nv1;nk2={nnk1=nnk2}};"
+  ASSERT_OK(
+      formatter.ToProps("k1=v1;k2={nk1=nv1;nk2={nnk1=nnk2}};"
                         "k3={nk1={nnk1={nnnk1=nnnv1;nnnk2;nnnv2}}};k4=v4",
                         &opts_map));
   ASSERT_EQ(opts_map["k1"], "v1");
@@ -1843,24 +1844,24 @@ TEST_F(OptionsTest, StringToMapTest) {
   ASSERT_EQ(opts_map["k4"], "v4");
   // Garbage inside curly braces
   opts_map.clear();
-  ASSERT_OK(StringToMap("k1=v1;k2={dfad=};k3={=};k4=v4",
-                        &opts_map));
+  ASSERT_OK(formatter.ToProps("k1=v1;k2={dfad=};k3={=};k4=v4", &opts_map));
   ASSERT_EQ(opts_map["k1"], "v1");
   ASSERT_EQ(opts_map["k2"], "dfad=");
   ASSERT_EQ(opts_map["k3"], "=");
   ASSERT_EQ(opts_map["k4"], "v4");
   // Empty nested options
   opts_map.clear();
-  ASSERT_OK(StringToMap("k1=v1;k2={};", &opts_map));
+  ASSERT_OK(formatter.ToProps("k1=v1;k2={};", &opts_map));
   ASSERT_EQ(opts_map["k1"], "v1");
   ASSERT_EQ(opts_map["k2"], "");
   opts_map.clear();
-  ASSERT_OK(StringToMap("k1=v1;k2={{{{}}}{}{}};", &opts_map));
+  ASSERT_OK(formatter.ToProps("k1=v1;k2={{{{}}}{}{}};", &opts_map));
   ASSERT_EQ(opts_map["k1"], "v1");
   ASSERT_EQ(opts_map["k2"], "{{{}}}{}{}");
   // With random spaces
   opts_map.clear();
-  ASSERT_OK(StringToMap("  k1 =  v1 ; k2= {nk1=nv1; nk2={nnk1=nnk2}}  ; "
+  ASSERT_OK(
+      formatter.ToProps("  k1 =  v1 ; k2= {nk1=nv1; nk2={nnk1=nnk2}}  ; "
                         "k3={  {   } }; k4= v4  ",
                         &opts_map));
   ASSERT_EQ(opts_map["k1"], "v1");
@@ -1869,34 +1870,35 @@ TEST_F(OptionsTest, StringToMapTest) {
   ASSERT_EQ(opts_map["k4"], "v4");
 
   // Empty key
-  ASSERT_NOK(StringToMap("k1=v1;k2=v2;=", &opts_map));
-  ASSERT_NOK(StringToMap("=v1;k2=v2", &opts_map));
-  ASSERT_NOK(StringToMap("k1=v1;k2v2;", &opts_map));
-  ASSERT_NOK(StringToMap("k1=v1;k2=v2;fadfa", &opts_map));
-  ASSERT_NOK(StringToMap("k1=v1;k2=v2;;", &opts_map));
+  ASSERT_NOK(formatter.ToProps("k1=v1;k2=v2;=", &opts_map));
+  ASSERT_NOK(formatter.ToProps("=v1;k2=v2", &opts_map));
+  ASSERT_NOK(formatter.ToProps("k1=v1;k2v2;", &opts_map));
+  ASSERT_NOK(formatter.ToProps("k1=v1;k2=v2;fadfa", &opts_map));
+  ASSERT_NOK(formatter.ToProps("k1=v1;k2=v2;;", &opts_map));
   // Mismatch curly braces
-  ASSERT_NOK(StringToMap("k1=v1;k2={;k3=v3", &opts_map));
-  ASSERT_NOK(StringToMap("k1=v1;k2={{};k3=v3", &opts_map));
-  ASSERT_NOK(StringToMap("k1=v1;k2={}};k3=v3", &opts_map));
-  ASSERT_NOK(StringToMap("k1=v1;k2={{}{}}};k3=v3", &opts_map));
+  ASSERT_NOK(formatter.ToProps("k1=v1;k2={;k3=v3", &opts_map));
+  ASSERT_NOK(formatter.ToProps("k1=v1;k2={{};k3=v3", &opts_map));
+  ASSERT_NOK(formatter.ToProps("k1=v1;k2={}};k3=v3", &opts_map));
+  ASSERT_NOK(formatter.ToProps("k1=v1;k2={{}{}}};k3=v3", &opts_map));
   // However this is valid!
   opts_map.clear();
-  ASSERT_OK(StringToMap("k1=v1;k2=};k3=v3", &opts_map));
+  ASSERT_OK(formatter.ToProps("k1=v1;k2=};k3=v3", &opts_map));
   ASSERT_EQ(opts_map["k1"], "v1");
   ASSERT_EQ(opts_map["k2"], "}");
   ASSERT_EQ(opts_map["k3"], "v3");
 
   // Invalid chars after closing curly brace
-  ASSERT_NOK(StringToMap("k1=v1;k2={{}}{};k3=v3", &opts_map));
-  ASSERT_NOK(StringToMap("k1=v1;k2={{}}cfda;k3=v3", &opts_map));
-  ASSERT_NOK(StringToMap("k1=v1;k2={{}}  cfda;k3=v3", &opts_map));
-  ASSERT_NOK(StringToMap("k1=v1;k2={{}}  cfda", &opts_map));
-  ASSERT_NOK(StringToMap("k1=v1;k2={{}}{}", &opts_map));
-  ASSERT_NOK(StringToMap("k1=v1;k2={{dfdl}adfa}{}", &opts_map));
+  ASSERT_NOK(formatter.ToProps("k1=v1;k2={{}}{};k3=v3", &opts_map));
+  ASSERT_NOK(formatter.ToProps("k1=v1;k2={{}}cfda;k3=v3", &opts_map));
+  ASSERT_NOK(formatter.ToProps("k1=v1;k2={{}}  cfda;k3=v3", &opts_map));
+  ASSERT_NOK(formatter.ToProps("k1=v1;k2={{}}  cfda", &opts_map));
+  ASSERT_NOK(formatter.ToProps("k1=v1;k2={{}}{}", &opts_map));
+  ASSERT_NOK(formatter.ToProps("k1=v1;k2={{dfdl}adfa}{}", &opts_map));
 }
 
 TEST_F(OptionsTest, StringToMapRandomTest) {
-  std::unordered_map<std::string, std::string> opts_map;
+  DefaultOptionsFormatter formatter;
+  OptionProperties opts_map;
   // Make sure segfault is not hit by semi-random strings
 
   std::vector<std::string> bases = {
@@ -1913,7 +1915,7 @@ TEST_F(OptionsTest, StringToMapRandomTest) {
         size_t pos = static_cast<size_t>(
             rnd.Uniform(static_cast<int>(base.size())));
         str[pos] = ' ';
-        Status s = StringToMap(str, &opts_map);
+        Status s = formatter.ToProps(str, &opts_map);
         ASSERT_TRUE(s.ok() || s.IsInvalidArgument());
         opts_map.clear();
       }
@@ -1932,9 +1934,9 @@ TEST_F(OptionsTest, StringToMapRandomTest) {
           rnd.Uniform(static_cast<int>(chars.size())));
       str.append(1, chars[pos]);
     }
-    Status s = StringToMap(str, &opts_map);
+    Status s = formatter.ToProps(str, &opts_map);
     ASSERT_TRUE(s.ok() || s.IsInvalidArgument());
-    s = StringToMap("name=" + str, &opts_map);
+    s = formatter.ToProps("name=" + str, &opts_map);
     ASSERT_TRUE(s.ok() || s.IsInvalidArgument());
     opts_map.clear();
   }
@@ -2282,7 +2284,6 @@ static void TestDBOptionsChanged(const std::string& base_opts,
   DBOptions base, copy;
   ConfigOptions config;
   std::string opts_str;
-  std::unordered_map<std::string, std::string> opts_map;
 
   std::string trace_message;
   if (!base_opts.empty()) {
@@ -2306,9 +2307,10 @@ static void TestDBOptionsChanged(const std::string& base_opts,
 
   ASSERT_OK(GetStringFromDBOptions(config, copy, &opts_str));
   if (changed > 0) {
-    ASSERT_OK(StringToMap(opts_str, &opts_map));
-    ASSERT_EQ(opts_map.size(), changed);
-    ASSERT_OK(GetDBOptionsFromMap(config, base, opts_map, &base));
+    OptionProperties props;
+    ASSERT_OK(config.ToProps(opts_str, &props));
+    ASSERT_EQ(props.size(), changed);
+    ASSERT_OK(GetDBOptionsFromMap(config, base, props, &base));
     ASSERT_OK(RocksDBOptionsParser::VerifyDBOptions(config, base, copy));
 
     dbcfg = DBOptionsAsConfigurable(base);
@@ -2338,7 +2340,7 @@ static void TestCFOptionsChanged(const std::string& base_opts,
   ColumnFamilyOptions base, copy;
   ConfigOptions config;
   std::string opts_str;
-  std::unordered_map<std::string, std::string> opts_map;
+  OptionProperties props;
 
   std::string trace_message;
   if (!base_opts.empty()) {
@@ -2362,11 +2364,10 @@ static void TestCFOptionsChanged(const std::string& base_opts,
   config.ignore_unsupported_options = false;
 
   ASSERT_OK(GetStringFromColumnFamilyOptions(config, copy, &opts_str));
-  printf("MJR:[%s]=[%s]\n", trace_message.c_str(), opts_str.c_str());
   if (changed > 0) {
-    ASSERT_OK(StringToMap(opts_str, &opts_map));
-    ASSERT_EQ(opts_map.size(), changed);
-    ASSERT_OK(GetColumnFamilyOptionsFromMap(config, base, opts_map, &base));
+    ASSERT_OK(config.ToProps(opts_str, &props));
+    ASSERT_EQ(props.size(), changed);
+    ASSERT_OK(GetColumnFamilyOptionsFromMap(config, base, props, &base));
     ASSERT_OK(RocksDBOptionsParser::VerifyCFOptions(config, base, copy));
 
     cfcfg = CFOptionsAsConfigurable(base);
@@ -2399,7 +2400,7 @@ TEST_F(OptionsTest, SerializeChangedOptionsNameOnly) {
   ColumnFamilyOptions base, copy;
   ConfigOptions config;
   std::string opts_str;
-  std::unordered_map<std::string, std::string> opts_map;
+  OptionProperties props;
 
   config.ignore_unknown_options = false;
   config.ignore_unsupported_options = false;
@@ -2417,9 +2418,9 @@ TEST_F(OptionsTest, SerializeChangedOptionsNameOnly) {
   ASSERT_NE(bbto, nullptr);
   bbto->block_size = 123456;
   auto tf_str = copy.table_factory->ToString(config);
-  ASSERT_OK(StringToMap(tf_str, &opts_map));
-  ASSERT_EQ(opts_map.size(), 2);  // block_size+id
-  opts_map.clear();
+  ASSERT_OK(config.ToProps(tf_str, &props));
+  ASSERT_EQ(props.size(), 2);  // block_size+id
+  props.clear();
 
   auto cfcfg = CFOptionsAsConfigurable(base);
   config.compare_to = cfcfg.get();
@@ -2431,9 +2432,9 @@ TEST_F(OptionsTest, SerializeChangedOptionsNameOnly) {
 
   config.depth = ConfigOptions::kDepthDetailed;
   ASSERT_OK(GetStringFromColumnFamilyOptions(config, copy, &opts_str));
-  ASSERT_OK(StringToMap(opts_str, &opts_map));
-  ASSERT_EQ(opts_map.size(), 1);  // table factory
-  ASSERT_EQ(tf_str, opts_map.begin()->second.c_str());
+  ASSERT_OK(config.ToProps(opts_str, &props));
+  ASSERT_EQ(props.size(), 1);  // table factory
+  ASSERT_EQ(tf_str, props.begin()->second.c_str());
 }
 
 TEST_F(OptionsTest, SerializeChangedOptionsCompareLoosely) {
@@ -2477,12 +2478,12 @@ TEST_F(OptionsTest, SerializeChangedOptionsCompareLoosely) {
   ASSERT_OK(GetStringFromColumnFamilyOptions(config, base, &opts_str));
   ASSERT_EQ(opts_str, "");
 
-  std::unordered_map<std::string, std::string> opts_map;
+  OptionProperties props;
   config.sanity_level = ConfigOptions::kSanityLevelExactMatch;
   ASSERT_OK(GetStringFromColumnFamilyOptions(config, copy, &opts_str));
-  ASSERT_OK(StringToMap(opts_str, &opts_map));
-  ASSERT_EQ(opts_map.size(), 1UL);
-  ASSERT_EQ(copy_str, opts_map.begin()->second.c_str());
+  ASSERT_OK(config.ToProps(opts_str, &props));
+  ASSERT_EQ(props.size(), 1UL);
+  ASSERT_EQ(copy_str, props.begin()->second.c_str());
 }
 
 const static std::string kCustomEnvName = "Custom";
@@ -3316,8 +3317,8 @@ TEST_F(OptionsOldApiTest, GetPlainTableOptionsFromString) {
   ASSERT_TRUE(new_opt.full_scan_mode);
   ASSERT_TRUE(new_opt.store_index_in_file);
 
-  std::unordered_map<std::string, std::string> opt_map;
-  ASSERT_OK(StringToMap(
+  OptionProperties opt_map;
+  ASSERT_OK(config_options_from_string.ToProps(
       "user_key_len=55;bloom_bits_per_key=10;huge_page_tlb_size=8;", &opt_map));
   ConfigOptions config_options_from_map;
   config_options_from_map.input_strings_escaped = false;

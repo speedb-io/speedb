@@ -95,17 +95,17 @@ bool Customizable::AreEquivalent(const ConfigOptions& config_options,
   return true;
 }
 
-Status Customizable::GetOptionsMap(
-    const ConfigOptions& config_options, const Customizable* customizable,
-    const std::string& value, std::string* id,
-    std::unordered_map<std::string, std::string>* props) {
+Status Customizable::GetOptionsMap(const ConfigOptions& config_options,
+                                   const Customizable* customizable,
+                                   const std::string& value, std::string* id,
+                                   OptionProperties* props) {
   Status status;
   if (value.empty() || value == kNullptrString) {
     *id = "";
     props->clear();
   } else if (customizable != nullptr) {
-    status =
-        Configurable::GetOptionsMap(value, customizable->GetId(), id, props);
+    status = Configurable::GetOptionsMap(config_options, value,
+                                         customizable->GetId(), id, props);
     if (status.ok() && customizable->IsInstanceOf(*id)) {
       // The new ID and the old ID match, so the objects are the same type.
       // Try to get the existing options, ignoring any errors
@@ -117,7 +117,7 @@ Status Customizable::GetOptionsMap(
       }
     }
   } else {
-    status = Configurable::GetOptionsMap(value, "", id, props);
+    status = Configurable::GetOptionsMap(config_options, value, "", id, props);
   }
   return status;
 }

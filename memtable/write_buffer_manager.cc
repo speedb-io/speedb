@@ -34,6 +34,7 @@
 #include "options/options_formatter_impl.h"
 #include "rocksdb/convenience.h"
 #include "rocksdb/status.h"
+#include "rocksdb/utilities/options_type.h"
 #include "rocksdb/write_controller.h"
 #include "test_util/sync_point.h"
 #include "util/coding.h"
@@ -300,7 +301,7 @@ void WriteBufferManager::RemoveDBFromQueue(StallInterface* wbm_stall) {
 
 Status WriteBufferManager::SerializePrintableOptions(
     const ConfigOptions& /*config_options*/, const std::string& /*prefix*/,
-    Properties* props) const {
+    OptionProperties* props) const {
   props->insert({"size", std::to_string(buffer_size())});
   const Cache* cache = nullptr;
   if (cache_res_mgr_ != nullptr) {
@@ -329,7 +330,7 @@ std::string WriteBufferManager::GetPrintableOptions() const {
 
 std::string WriteBufferManager::ToString(const ConfigOptions& config_options,
                                          const std::string& prefix) const {
-  Properties props;
+  OptionProperties props;
   Status s = SerializePrintableOptions(config_options, prefix, &props);
   assert(s.ok());
   if (s.ok()) {

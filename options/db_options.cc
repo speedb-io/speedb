@@ -640,7 +640,7 @@ class MutableDBConfigurable : public Configurable {
  protected:
   Status SerializePrintableOptions(const ConfigOptions& config_options,
                                    const std::string& prefix,
-                                   Properties* props) const override {
+                                   OptionProperties* props) const override {
     return Configurable::SerializePrintableOptions(config_options, prefix,
                                                    props);
   }
@@ -693,7 +693,7 @@ class DBOptionsConfigurable : public MutableDBConfigurable {
   // Serializes the immutable printable options
   Status SerializePrintableOptions(const ConfigOptions& config_options,
                                    const std::string& prefix,
-                                   Properties* props) const override {
+                                   OptionProperties* props) const override {
     const int kBufferSize = 200;
     char buffer[kBufferSize];
     if (immutable_.row_cache) {

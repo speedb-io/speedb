@@ -79,7 +79,7 @@ TableBuilder* AdaptiveTableFactory::NewTableBuilder(
 
 Status AdaptiveTableFactory::SerializePrintableOptions(
     const ConfigOptions& config_options, const std::string& prefix,
-    Properties* props) const {
+    OptionProperties* props) const {
   if (table_factory_to_write_) {
     props->insert(
         {"write_factory", table_factory_to_write_->ToString(config_options)});

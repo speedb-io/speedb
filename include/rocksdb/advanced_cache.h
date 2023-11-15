@@ -451,7 +451,7 @@ class Cache {
   virtual std::string GetPrintableOptions() const { return ""; }
   virtual Status SerializePrintableOptions(
       const ConfigOptions& /*config_options*/, const std::string& /*prefix*/,
-      std::unordered_map<std::string, std::string>* /*options*/) const {
+      OptionProperties* /*options*/) const {
     return Status::OK();
   }
 

@@ -44,9 +44,9 @@ class AdaptiveTableFactory : public TableFactory {
       const TableBuilderOptions& table_builder_options,
       WritableFileWriter* file) const override;
 
-  Status SerializePrintableOptions(
-      const ConfigOptions& config_options, const std::string& prefix,
-      std::unordered_map<std::string, std::string>* opts) const override;
+  Status SerializePrintableOptions(const ConfigOptions& config_options,
+                                   const std::string& prefix,
+                                   OptionProperties* props) const override;
 
  private:
   std::shared_ptr<TableFactory> table_factory_to_write_;

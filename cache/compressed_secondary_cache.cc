@@ -203,7 +203,7 @@ Status CompressedSecondaryCache::GetCapacity(size_t& capacity) {
 
 Status CompressedSecondaryCache::SerializePrintableOptions(
     const ConfigOptions& config_options, const std::string& prefix,
-    Properties* props) const {
+    OptionProperties* props) const {
   props->insert({OptionTypeInfo::MakePrefix(prefix, "cache"),
                  cache_->ToString(config_options)});
   props->insert({OptionTypeInfo::MakePrefix(prefix, "compression_type"),

@@ -873,7 +873,7 @@ Status BlockBasedTableFactory::ValidateOptions(
 
 Status BlockBasedTableFactory::SerializePrintableOptions(
     const ConfigOptions& config_options, const std::string& prefix,
-    Properties* props) const {
+    OptionProperties* props) const {
   if (table_options_.persistent_cache) {
     props->insert({OptionTypeInfo::MakePrefix(prefix, "persistent_cache"),
                    table_options_.persistent_cache->ToString(config_options)});

@@ -52,20 +52,20 @@ static std::unordered_map<std::string, OptionTypeInfo>
 };
 
 Status PersistentCacheConfig::SerializeOptions(
-    const ConfigOptions& config_options,
-    std::unordered_map<std::string, std::string>* options) const {
+    const ConfigOptions& config_options, const std::string& prefix,
+    OptionProperties* options) const {
   return OptionTypeInfo::SerializeType(
-      config_options, "", persistent_cache_config_options_type_info, this,
+      config_options, prefix, persistent_cache_config_options_type_info, this,
       options);
 }
 
 std::string PersistentCacheConfig::ToString(
     const ConfigOptions& config_options) const {
-  std::unordered_map<std::string, std::string> options_map;
-  auto status = SerializeOptions(config_options, &options_map);
+  OptionProperties props;
+  auto status = SerializeOptions(config_options, "", &props);
   assert(status.ok());
   if (status.ok()) {
-    return config_options.ToString("", options_map);
+    return config_options.ToString("", props);
   } else {
     return "";
   }
@@ -74,10 +74,10 @@ std::string PersistentCacheConfig::ToString(
 std::string PersistentCache::ToString(
     const ConfigOptions& config_options) const {
   //**TODO: This method is needed until PersistentCache is Customizable
-  std::unordered_map<std::string, std::string> options;
+  OptionProperties options;
   std::string id = Name();
   options.insert({OptionTypeInfo::kIdPropName(), id});
-  Status s = SerializePrintableOptions(config_options, &options);
+  Status s = SerializePrintableOptions(config_options, "", &options);
   assert(s.ok());
   if (s.ok()) {
     return config_options.ToString("", options);

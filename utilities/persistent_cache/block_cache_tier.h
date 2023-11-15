@@ -91,9 +91,9 @@ class BlockCacheTier : public PersistentCacheTier {
   }
 
  protected:
-  Status SerializePrintableOptions(
-      const ConfigOptions& config_options,
-      std::unordered_map<std::string, std::string>* opts) const override;
+  Status SerializePrintableOptions(const ConfigOptions& config_options,
+                                   const std::string& prefix,
+                                   OptionProperties* opts) const override;
 
  private:
   // Percentage of cache to be evicted when the cache is full

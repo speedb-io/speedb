@@ -75,9 +75,9 @@ Status BlockCacheTier::Open() {
 }
 
 Status BlockCacheTier::SerializePrintableOptions(
-    const ConfigOptions& config_options,
-    std::unordered_map<std::string, std::string>* opts) const {
-  return opt_.SerializeOptions(config_options, opts);
+    const ConfigOptions& config_options, const std::string& prefix,
+    OptionProperties* opts) const {
+  return opt_.SerializeOptions(config_options, prefix, opts);
 }
 bool IsCacheFile(const std::string& file) {
   // check if the file has .rc suffix

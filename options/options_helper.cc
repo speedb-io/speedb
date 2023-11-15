@@ -806,10 +806,10 @@ std::unordered_map<std::string, CompactionStopStyle>
 
 std::unordered_map<std::string, Temperature>
     OptionsHelper::temperature_string_map = {
-        {"kUnknown", Temperature::kUnknown},
-        {"kHot", Temperature::kHot},
-        {"kWarm", Temperature::kWarm},
-        {"kCold", Temperature::kCold}};
+        {"kUnknown", Temperature::kUnknown}, {"kHot", Temperature::kHot},
+        {"kWarm", Temperature::kWarm},       {"kCold", Temperature::kCold},
+        {"", Temperature::kLastTemperature},
+};
 
 std::unordered_map<std::string, PrepopulateBlobCache>
     OptionsHelper::prepopulate_blob_cache_string_map = {

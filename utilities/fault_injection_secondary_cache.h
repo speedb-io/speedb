@@ -55,7 +55,7 @@ class FaultInjectionSecondaryCache : public SecondaryCache {
 
   Status SerializePrintableOptions(const ConfigOptions& config_options,
                                    const std::string& prefix,
-                                   Properties* props) const override {
+                                   OptionProperties* props) const override {
     return base_->SerializePrintableOptions(config_options, prefix, props);
   }
 

@@ -41,8 +41,6 @@ struct ColumnFamilyOptions;
 struct ConfigOptions;
 struct DBOptions;
 
-using Properties = std::unordered_map<std::string, std::string>;
-
 // Configurable is a base class used by the rocksdb that describes a
 // standard way of configuring objects.  A Configurable object can:
 //   -> Populate itself given:
@@ -233,7 +231,7 @@ class Configurable {
   std::string GetPrintableOptions() const;
   virtual Status SerializePrintableOptions(
       const ConfigOptions& /*config_options*/, const std::string& /*prefix*/,
-      Properties* /*props*/) const {
+      OptionProperties* /*props*/) const {
     return Status::OK();
   }
 

@@ -149,7 +149,6 @@ class ConfigurableHelper {
   // serialized.
   static Status SerializeOptions(const ConfigOptions& config_options,
                                  const Configurable& configurable,
-                                 const std::string& prefix, Properties* props);
                                  const std::string& prefix,
                                  OptionProperties* props);
 

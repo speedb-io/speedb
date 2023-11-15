@@ -319,9 +319,9 @@ class WriteBufferManager final {
                              WBMClientId wbm_client_id);
 
  protected:
-  Status SerializePrintableOptions(
-      const ConfigOptions& config_options, const std::string& prefix,
-      std::unordered_map<std::string, std::string>* opts) const;
+  Status SerializePrintableOptions(const ConfigOptions& config_options,
+                                   const std::string& prefix,
+                                   OptionProperties* opts) const;
 
  private:
   // The usage + delay factor are coded in a single (atomic) uint64_t value as

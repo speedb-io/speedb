@@ -68,8 +68,8 @@ class PersistentCache {
 
  protected:
   virtual Status SerializePrintableOptions(
-      const ConfigOptions& /*config_options*/,
-      std::unordered_map<std::string, std::string>* /*opts*/) const {
+      const ConfigOptions& /*config_options*/, const std::string& /*prefix*/,
+      OptionProperties* /*opts*/) const {
     return Status::OK();
   }
 };

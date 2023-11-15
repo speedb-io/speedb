@@ -224,9 +224,9 @@ struct PersistentCacheConfig {
       const std::shared_ptr<Logger>& log);
 
   std::string ToString(const ConfigOptions& options) const;
-  Status SerializeOptions(
-      const ConfigOptions& config_options,
-      std::unordered_map<std::string, std::string>* options) const;
+  Status SerializeOptions(const ConfigOptions& config_options,
+                          const std::string& prefix,
+                          OptionProperties* options) const;
 };
 
 // Persistent Cache Tier

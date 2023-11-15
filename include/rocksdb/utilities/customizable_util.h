@@ -1,3 +1,11 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
 // Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -21,13 +29,14 @@
 #include "rocksdb/customizable.h"
 #include "rocksdb/status.h"
 #include "rocksdb/utilities/object_registry.h"
+#include "rocksdb/utilities/options_type.h"
 
 namespace ROCKSDB_NAMESPACE {
 // Creates a new shared customizable instance object based on the
 // input parameters using the object registry.
 //
 // The id parameter specifies the instance class of the object to create.
-// The opt_map parameter specifies the configuration of the new instance.
+// The props parameter specifies the configuration of the new instance.
 //
 // The config_options parameter controls the process and how errors are
 // returned. If ignore_unknown_options=true, unknown values are ignored during
@@ -40,14 +49,14 @@ namespace ROCKSDB_NAMESPACE {
 // @param id The identifier of the new object being created.  This string
 // will be used by the object registry to locate the appropriate object to
 // create.
-// @param opt_map Optional name-value pairs of properties to set for the newly
+// @param props Optional name-value pairs of properties to set for the newly
 // created object
 // @param result The newly created and configured instance.
 template <typename T>
-static Status NewSharedObject(
-    const ConfigOptions& config_options, const std::string& id,
-    const std::unordered_map<std::string, std::string>& opt_map,
-    std::shared_ptr<T>* result) {
+static Status NewSharedObject(const ConfigOptions& config_options,
+                              const std::string& id,
+                              const OptionProperties& props,
+                              std::shared_ptr<T>* result) {
   if (!id.empty()) {
     Status status;
     status = config_options.registry->NewSharedObject(id, result);
@@ -55,10 +64,10 @@ static Status NewSharedObject(
       status = Status::OK();
     } else if (status.ok()) {
       status = Customizable::ConfigureNewObject(config_options, result->get(),
-                                                opt_map);
+                                                props);
     }
     return status;
-  } else if (opt_map.empty()) {
+  } else if (props.empty()) {
     // There was no ID and no map (everything empty), so reset/clear the result
     result->reset();
     return Status::OK();
@@ -75,7 +84,7 @@ static Status NewSharedObject(
 // If an object with this id exists in the registry, the existing object
 // will be returned.  If the object does not exist, a new one will be created.
 //
-// The opt_map parameter specifies the configuration of the new instance.
+// The props parameter specifies the configuration of the new instance.
 // If the object already exists, the existing object is returned "as is" and
 // this parameter is ignored.
 //
@@ -90,19 +99,19 @@ static Status NewSharedObject(
 // @param id The identifier of the object.  This string
 // will be used by the object registry to locate the appropriate object to
 // create or return.
-// @param opt_map Optional name-value pairs of properties to set for the newly
+// @param props Optional name-value pairs of properties to set for the newly
 // created object
 // @param result The managed instance.
 template <typename T>
-static Status NewManagedObject(
-    const ConfigOptions& config_options, const std::string& id,
-    const std::unordered_map<std::string, std::string>& opt_map,
-    std::shared_ptr<T>* result) {
+static Status NewManagedObject(const ConfigOptions& config_options,
+                               const std::string& id,
+                               const OptionProperties& props,
+                               std::shared_ptr<T>* result) {
   Status status;
   if (!id.empty()) {
     status = config_options.registry->GetOrCreateManagedObject<T>(
-        id, result, [config_options, opt_map](T* object) {
-          return object->ConfigureFromMap(config_options, opt_map);
+        id, result, [config_options, props](T* object) {
+          return object->ConfigureFromMap(config_options, props);
         });
     if (config_options.ignore_unsupported_options && status.IsNotSupported()) {
       return Status::OK();
@@ -143,14 +152,14 @@ static Status LoadSharedObject(const ConfigOptions& config_options,
                                const std::string& value,
                                std::shared_ptr<T>* result) {
   std::string id;
-  std::unordered_map<std::string, std::string> opt_map;
+  OptionProperties props;
 
   Status status = Customizable::GetOptionsMap(config_options, result->get(),
-                                              value, &id, &opt_map);
+                                              value, &id, &props);
   if (!status.ok()) {  // GetOptionsMap failed
     return status;
   } else {
-    return NewSharedObject(config_options, id, opt_map, result);
+    return NewSharedObject(config_options, id, props, result);
   }
 }
 
@@ -185,16 +194,16 @@ static Status LoadManagedObject(const ConfigOptions& config_options,
                                 const std::string& value,
                                 std::shared_ptr<T>* result) {
   std::string id;
-  std::unordered_map<std::string, std::string> opt_map;
-  Status status = Customizable::GetOptionsMap(config_options, nullptr, value,
-                                              &id, &opt_map);
+  OptionProperties props;
+  Status status =
+      Customizable::GetOptionsMap(config_options, nullptr, value, &id, &props);
   if (!status.ok()) {  // GetOptionsMap failed
     return status;
   } else if (value.empty()) {  // No Id and no options.  Clear the object
     *result = nullptr;
     return Status::OK();
   } else {
-    return NewManagedObject(config_options, id, opt_map, result);
+    return NewManagedObject(config_options, id, props, result);
   }
 }
 
@@ -208,14 +217,14 @@ static Status LoadManagedObject(const ConfigOptions& config_options,
 // @param id The identifier of the new object being created.  This string
 // will be used by the object registry to locate the appropriate object to
 // create.
-// @param opt_map Optional name-value pairs of properties to set for the newly
+// @param props Optional name-value pairs of properties to set for the newly
 // created object
 // @param result The newly created and configured instance.
 template <typename T>
-static Status NewUniqueObject(
-    const ConfigOptions& config_options, const std::string& id,
-    const std::unordered_map<std::string, std::string>& opt_map,
-    std::unique_ptr<T>* result) {
+static Status NewUniqueObject(const ConfigOptions& config_options,
+                              const std::string& id,
+                              const OptionProperties& props,
+                              std::unique_ptr<T>* result) {
   if (!id.empty()) {
     Status status;
     status = config_options.registry->NewUniqueObject(id, result);
@@ -223,10 +232,10 @@ static Status NewUniqueObject(
       status = Status::OK();
     } else if (status.ok()) {
       status = Customizable::ConfigureNewObject(config_options, result->get(),
-                                                opt_map);
+                                                props);
     }
     return status;
-  } else if (opt_map.empty()) {
+  } else if (props.empty()) {
     // There was no ID and no map (everything empty), so reset/clear the result
     result->reset();
     return Status::OK();
@@ -250,13 +259,13 @@ static Status LoadUniqueObject(const ConfigOptions& config_options,
                                const std::string& value,
                                std::unique_ptr<T>* result) {
   std::string id;
-  std::unordered_map<std::string, std::string> opt_map;
+  OptionProperties props;
   Status status = Customizable::GetOptionsMap(config_options, result->get(),
-                                              value, &id, &opt_map);
+                                              value, &id, &props);
   if (!status.ok()) {  // GetOptionsMap failed
     return status;
   } else {
-    return NewUniqueObject(config_options, id, opt_map, result);
+    return NewUniqueObject(config_options, id, props, result);
   }
 }
 
@@ -270,24 +279,23 @@ static Status LoadUniqueObject(const ConfigOptions& config_options,
 // @param id The identifier of the new object being created.  This string
 // will be used by the object registry to locate the appropriate object to
 // create.
-// @param opt_map Optional name-value pairs of properties to set for the newly
+// @param props Optional name-value pairs of properties to set for the newly
 // created object
 // @param result The newly created and configured instance.
 template <typename T>
-static Status NewStaticObject(
-    const ConfigOptions& config_options, const std::string& id,
-    const std::unordered_map<std::string, std::string>& opt_map, T** result) {
+static Status NewStaticObject(const ConfigOptions& config_options,
+                              const std::string& id,
+                              const OptionProperties& props, T** result) {
   if (!id.empty()) {
     Status status;
     status = config_options.registry->NewStaticObject(id, result);
     if (config_options.ignore_unsupported_options && status.IsNotSupported()) {
       status = Status::OK();
     } else if (status.ok()) {
-      status =
-          Customizable::ConfigureNewObject(config_options, *result, opt_map);
+      status = Customizable::ConfigureNewObject(config_options, *result, props);
     }
     return status;
-  } else if (opt_map.empty()) {
+  } else if (props.empty()) {
     // There was no ID and no map (everything empty), so reset/clear the result
     *result = nullptr;
     return Status::OK();
@@ -310,13 +318,13 @@ template <typename T>
 static Status LoadStaticObject(const ConfigOptions& config_options,
                                const std::string& value, T** result) {
   std::string id;
-  std::unordered_map<std::string, std::string> opt_map;
-  Status status = Customizable::GetOptionsMap(config_options, *result, value,
-                                              &id, &opt_map);
+  OptionProperties props;
+  Status status =
+      Customizable::GetOptionsMap(config_options, *result, value, &id, &props);
   if (!status.ok()) {  // GetOptionsMap failed
     return status;
   } else {
-    return NewStaticObject(config_options, id, opt_map, result);
+    return NewStaticObject(config_options, id, props, result);
   }
 }
 }  // namespace ROCKSDB_NAMESPACE

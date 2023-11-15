@@ -23,6 +23,7 @@
 #include <unordered_map>
 
 #include "options/configurable_helper.h"
+#include "options/options_formatter_impl.h"
 #include "options/options_helper.h"
 #include "options/options_parser.h"
 #include "port/stack_trace.h"
@@ -47,6 +48,7 @@ class StringLogger : public Logger {
     char buffer[1000];
     vsnprintf(buffer, sizeof(buffer), format, ap);
     string_.append(buffer);
+    string_.append("\n");
   }
   const std::string& str() const { return string_; }
   void clear() { string_.clear(); }
@@ -996,7 +998,7 @@ TEST_P(ConfigurableParamTest, ConfigureFromPropsTest) {
   std::unique_ptr<Configurable> copy(CreateConfigurable());
 
   ASSERT_OK(object_->ConfigureFromString(config_options_, configuration_));
-  config_options_.delimiter = "\n";
+  config_options_.formatter = std::make_shared<PropertiesOptionsFormatter>();
   ASSERT_OK(object_->GetOptionString(config_options_, &opt_str));
   std::istringstream iss(opt_str);
   std::unordered_map<std::string, std::string> copy_map;

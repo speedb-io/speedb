@@ -35,6 +35,7 @@
 #include "rocksdb/convenience.h"
 #include "rocksdb/rate_limiter.h"
 #include "rocksdb/stats_history.h"
+#include "rocksdb/utilities/options_type.h"
 #include "test_util/sync_point.h"
 #include "test_util/testutil.h"
 #include "util/random.h"
@@ -51,35 +52,30 @@ class DBOptionsTest : public DBTestBase {
     SyncPoint::GetInstance()->ClearAllCallBacks();
   }
 
-  std::unordered_map<std::string, std::string> GetMutableDBOptionsMap(
-      const DBOptions& options) {
+  OptionProperties GetMutableDBOptionsMap(const DBOptions& options) {
     std::string options_str;
-    std::unordered_map<std::string, std::string> mutable_map;
+    OptionProperties mutable_map;
     ConfigOptions config_options(options);
-    config_options.delimiter = "; ";
 
     EXPECT_OK(GetStringFromMutableDBOptions(
         config_options, MutableDBOptions(options), &options_str));
-    EXPECT_OK(StringToMap(options_str, &mutable_map));
+    EXPECT_OK(config_options.ToProps(options_str, &mutable_map));
 
     return mutable_map;
   }
 
-  std::unordered_map<std::string, std::string> GetMutableCFOptionsMap(
-      const ColumnFamilyOptions& options) {
+  OptionProperties GetMutableCFOptionsMap(const ColumnFamilyOptions& options) {
     std::string options_str;
     ConfigOptions config_options;
-    config_options.delimiter = "; ";
 
-    std::unordered_map<std::string, std::string> mutable_map;
+    OptionProperties mutable_map;
     EXPECT_OK(GetStringFromMutableCFOptions(
         config_options, MutableCFOptions(options), &options_str));
-    EXPECT_OK(StringToMap(options_str, &mutable_map));
+    EXPECT_OK(config_options.ToProps(options_str, &mutable_map));
     return mutable_map;
   }
 
-  std::unordered_map<std::string, std::string> GetRandomizedMutableCFOptionsMap(
-      Random* rnd) {
+  OptionProperties GetRandomizedMutableCFOptionsMap(Random* rnd) {
     Options options = CurrentOptions();
     options.env = env_;
     ImmutableDBOptions db_options(options);
@@ -90,8 +86,7 @@ class DBOptionsTest : public DBTestBase {
     return opt_map;
   }
 
-  std::unordered_map<std::string, std::string> GetRandomizedMutableDBOptionsMap(
-      Random* rnd) {
+  OptionProperties GetRandomizedMutableDBOptionsMap(Random* rnd) {
     DBOptions db_options;
     test::RandomInitDBOptions(&db_options, rnd);
     auto sanitized_options = SanitizeOptions(dbname_, db_options);

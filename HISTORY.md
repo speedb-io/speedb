@@ -20,6 +20,9 @@ Based on RocksDB 8.1.1
 
 ### New Features 
 * Non-Blocking Manual Compaction (CompactRange()) - Support non-blocking manual compactions by setting a new CompactRangeOptions option (async_completion_cb). When set, the CompactRange() call will return control to the caller immediately. The manual compaction iteslf will be performed in an internally created thread. The manual compaction will ALWAYS call the specified callback upon completion and provide the completion status (#597).
+* Change the internal Configurable API SerializeOptions to return UserProperties (instead of the final string representation).  Added ToString methods to the ConfigurableOptions class to complete the serialization of Options properties.
+* Added ConfigOptions::compare_to.  When set, this value causes only values that have been changed to be part of the serialized output.
+* Add OptionsFormatter class.  This class allows options to be serialized and configured in different formats.
 * Change the internal Configurable API SerializeOptions to return UserProperties (instead of the final string representation).  Added ToString methods to the ConfigurableOptions class to complete the serialization of Options properties (#619).
 
 ### Enhancements

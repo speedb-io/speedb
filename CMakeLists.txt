@@ -1122,7 +1122,7 @@ string(TIMESTAMP TS "%Y-%m-%d %H:%M:%S" UTC)
 set(BUILD_DATE "${TS}" CACHE STRING "the time we first built Speedb")
 
 find_package(Git)
-LIBNAME=librocksdb
+
 if(GIT_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.git")
   execute_process(WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" OUTPUT_VARIABLE GIT_SHA COMMAND "${GIT_EXECUTABLE}" rev-parse HEAD )
   execute_process(WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" RESULT_VARIABLE GIT_MOD COMMAND "${GIT_EXECUTABLE}" diff-index HEAD --quiet)

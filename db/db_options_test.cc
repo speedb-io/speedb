@@ -51,8 +51,7 @@ class DBOptionsTest : public DBTestBase {
     SyncPoint::GetInstance()->ClearAllCallBacks();
   }
 
-  std::unordered_map<std::string, std::string> GetMutableDBOptionsMap(
-      const DBOptions& options) {
+  OptionProperties GetMutableDBOptionsMap(const DBOptions& options) {
     std::string options_str;
     OptionProperties mutable_map;
     ConfigOptions config_options(options);
@@ -64,8 +63,7 @@ class DBOptionsTest : public DBTestBase {
     return mutable_map;
   }
 
-  std::unordered_map<std::string, std::string> GetMutableCFOptionsMap(
-      const ColumnFamilyOptions& options) {
+  OptionProperties GetMutableCFOptionsMap(const ColumnFamilyOptions& options) {
     std::string options_str;
     ConfigOptions config_options;
 
@@ -76,8 +74,7 @@ class DBOptionsTest : public DBTestBase {
     return mutable_map;
   }
 
-  std::unordered_map<std::string, std::string> GetRandomizedMutableCFOptionsMap(
-      Random* rnd) {
+  OptionProperties GetRandomizedMutableCFOptionsMap(Random* rnd) {
     Options options = CurrentOptions();
     options.env = env_;
     ImmutableDBOptions db_options(options);
@@ -88,8 +85,7 @@ class DBOptionsTest : public DBTestBase {
     return opt_map;
   }
 
-  std::unordered_map<std::string, std::string> GetRandomizedMutableDBOptionsMap(
-      Random* rnd) {
+  OptionProperties GetRandomizedMutableDBOptionsMap(Random* rnd) {
     DBOptions db_options;
     test::RandomInitDBOptions(&db_options, rnd);
     auto sanitized_options = SanitizeOptions(dbname_, db_options);

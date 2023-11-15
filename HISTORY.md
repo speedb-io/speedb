@@ -2,23 +2,51 @@
 
 ## Unreleased
 
-Fix RepeatableThread to work properly with on thread start callback feature (https://github.com/speedb-io/speedb/pull/667).
+### New Features 
+* Added ConfigOptions::compare_to.  When set, this value causes only values that have been changed to be part of the serialized output (#648).
 
-### New Features
+### Enhancements
+* Added a kUseBaseAddress flag and GetBaseOffset flag to OptionTypeInfo.  If this flag is set and a function is used for processing options, the function is passed the base address of the struct rather than the specific field (#397)
+
+### Bug Fixes
+* Stall deadlock consists small cfs (#637).
+* Proactive Flushes: Fix a race in the ShouldInitiateAnotherFlushMemOnly that may cause the method to return an incorrect answer (#758).
+
+### Miscellaneous
+* Remove leftover references to ROCKSDB_LITE (#755).
+
+## Hazlenut 2.7.0 (27/10/2023)
+Based on RocksDB 8.1.1
+
+### New Features 
 * Non-Blocking Manual Compaction (CompactRange()) - Support non-blocking manual compactions by setting a new CompactRangeOptions option (async_completion_cb). When set, the CompactRange() call will return control to the caller immediately. The manual compaction iteslf will be performed in an internally created thread. The manual compaction will ALWAYS call the specified callback upon completion and provide the completion status (#597).
+* Change the internal Configurable API SerializeOptions to return UserProperties (instead of the final string representation).  Added ToString methods to the ConfigurableOptions class to complete the serialization of Options properties.
+* Added ConfigOptions::compare_to.  When set, this value causes only values that have been changed to be part of the serialized output.
+* Add OptionsFormatter class.  This class allows options to be serialized and configured in different formats.
+* Change the internal Configurable API SerializeOptions to return UserProperties (instead of the final string representation).  Added ToString methods to the ConfigurableOptions class to complete the serialization of Options properties (#619).
 
 ### Enhancements
 * Unit Testing: Expose the disallow_trivial_move flag in the MoveFilesToLevel testing utility (#677).
 * Static Pinning: Report pinning policy name and parameters to the log (#691).
 * LOG Reporting: add reporting capabilities to the WriteController and the WriteBufferManager by saving the Loggers of the dbs which are using them internally and issuing WARN msgs to these Loggers whenever the state of the WC and WBM changes in regards to delaying (#556).
+* Enable speedb features: Use Scoped Pinning Policy in Enable speedb feature (#459).
 * sst_dump: display metaindex_handle and the index_handle's offset and size in footer information (#404).
+* Static Pinning: Set the default for mid-percent capacity threshold in scoped pinning policy to 70 (#689).
+* db_bench: Add support for individual scoped pinning policy parameters (#687).
+* Enable speedb features: Constrain the interface of SharedOptions (make immutable) (#740).
+* Expose Options::periodic_compaction_seconds via C API (#741).
+* Enable speedb features:: Support enable speedb features in db_stress (#723).
 
 ### Bug Fixes
-* db_bench: fix SeekRandomWriteRandom valid check. Use key and value only after checking iterator is valid.
+* Fix RepeatableThread to work properly with on thread start callback feature (https://github.com/speedb-io/speedb/pull/667).
+* db_bench: Fix SeekRandomWriteRandom valid check. Use key and value only after checking iterator is valid.
 * Fix a JAVA build issue introduced by #597 (#680)
+* support hash spdb as part of enable speedb features  (#653)
+* Static Pinning: Make static pinning decisions based on the table's level relative to the currently known last level with data (rather than bottommost level) at the time a table reader is created and added to the table cache (#662).
 
 ### Miscellaneous
-* Unit tests: Disable CancelCompactionWaitingOnConflict and CompactionLimiter in db_compaction_test since they sometimes fail or get stuck. These need to be investigated and reenabled.
+* Unit tests: Disable CancelCompactionWaitingOnConflict and CompactionLimiter in db_compaction_test since they sometimes fail or get stuck. These need to be investigated and reenabled (#711).
+* Documentation: Update CONTRIBUTING.md guide to request contributors to add Speedb's license when modifying existing Rocksdb Files (#713).
 
 ## Grapes v2.6.0 (8/22/2023)
 Based on RocksDB 8.1.1
@@ -428,6 +456,10 @@ Based on RocksDB 7.2.2
 * Fix a bug in key range overlap checking with concurrent compactions when user-defined timestamp is enabled. User-defined timestamps should be EXCLUDED when checking if two ranges overlap.
 * Fixed a bug where the blob cache prepopulating logic did not consider the secondary cache (see #10603).
 * Fixed the rocksdb.num.sst.read.per.level, rocksdb.num.index.and.filter.blocks.read.per.level and rocksdb.num.level.read.per.multiget stats in the MultiGet coroutines
+* Fix a bug in io_uring_prep_cancel in AbortIO API for posix which expects sqe->addr to match with read request submitted and wrong paramter was being passed.
+* Fixed a regression in iterator performance when the entire DB is a single memtable introduced in #10449. The fix is in #10705 and #10716.
+* Fix a bug in io_uring_prep_cancel in AbortIO API for posix which expects sqe->addr to match with read request submitted and wrong paramter was being passed.
+* Fixed a regression in iterator performance when the entire DB is a single memtable introduced in #10449. The fix is in #10705 and #10716.
 
 ### Public API changes
 * Add `rocksdb_column_family_handle_get_id`, `rocksdb_column_family_handle_get_name` to get name, id of column family in C API

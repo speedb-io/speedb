@@ -56,7 +56,7 @@ ConfigOptions::ConfigOptions(const DBOptions& db_opts) : env(db_opts.env) {
 }
 
 std::string ConfigOptions::ToString(const std::string& prefix,
-                                    const Properties& props) const {
+                                    const OptionProperties& props) const {
   if (formatter) {
     return formatter->ToString(prefix, props);
   } else {
@@ -65,7 +65,7 @@ std::string ConfigOptions::ToString(const std::string& prefix,
 }
 
 Status ConfigOptions::ToProps(const std::string& opts_str,
-                              Properties* props) const {
+                              OptionProperties* props) const {
   if (formatter) {
     return formatter->ToProps(opts_str, props);
   } else {
@@ -692,7 +692,7 @@ Status GetColumnFamilyOptionsFromString(const ConfigOptions& config_options,
                                         const ColumnFamilyOptions& base_options,
                                         const std::string& opts_str,
                                         ColumnFamilyOptions* new_options) {
-  Properties props;
+  OptionProperties props;
   Status s = config_options.ToProps(opts_str, &props);
   if (!s.ok()) {
     *new_options = base_options;
@@ -724,7 +724,7 @@ Status GetDBOptionsFromString(const ConfigOptions& config_options,
                               const DBOptions& base_options,
                               const std::string& opts_str,
                               DBOptions* new_options) {
-  Properties props;
+  OptionProperties props;
   Status s = config_options.ToProps(opts_str, &props);
   if (!s.ok()) {
     *new_options = base_options;
@@ -748,7 +748,7 @@ Status GetOptionsFromString(const ConfigOptions& config_options,
                             const std::string& opts_str, Options* new_options) {
   ColumnFamilyOptions new_cf_options;
   std::unordered_map<std::string, std::string> unused_opts;
-  Properties props;
+  OptionProperties props;
 
   assert(new_options);
   *new_options = base_options;
@@ -832,7 +832,7 @@ Status OptionTypeInfo::Parse(const ConfigOptions& config_options,
     } else if (parse_func_ != nullptr) {
       ConfigOptions copy = config_options;
       copy.invoke_prepare_options = false;
-      void* opt_addr = GetOffset(opt_ptr);
+      auto opt_addr = GetBaseOffset(opt_ptr, parse_func_);
       return parse_func_(copy, opt_name, opt_value, opt_addr);
     } else if (ParseOptionHelper(GetOffset(opt_ptr), type_, opt_value)) {
       return Status::OK();
@@ -869,7 +869,7 @@ Status OptionTypeInfo::ParseType(
     const ConfigOptions& config_options, const std::string& opts_str,
     const std::unordered_map<std::string, OptionTypeInfo>& type_map,
     void* opt_addr, std::unordered_map<std::string, std::string>* unused) {
-  Properties props;
+  OptionProperties props;
   Status status = config_options.ToProps(opts_str, &props);
   if (!status.ok()) {
     return status;
@@ -951,7 +951,7 @@ Status OptionTypeInfo::Serialize(const ConfigOptions& config_options,
   } else if (IsEnabled(OptionTypeFlags::kDontSerialize)) {
     return Status::NotSupported("Cannot serialize option: ", opt_name);
   } else if (serialize_func_ != nullptr) {
-    const void* opt_addr = GetOffset(opt_ptr);
+    const auto opt_addr = GetBaseOffset(opt_ptr, serialize_func_);
     return serialize_func_(config_options, opt_name, opt_addr, opt_value);
   } else if (IsCustomizable()) {
     const Customizable* custom = AsRawPointer<Customizable>(opt_ptr);
@@ -1008,39 +1008,23 @@ Status OptionTypeInfo::Serialize(const ConfigOptions& config_options,
 Status OptionTypeInfo::SerializeType(
     const ConfigOptions& config_options, const std::string& prefix,
     const std::unordered_map<std::string, OptionTypeInfo>& type_map,
-    const void* opt_addr, Properties* props) {
-  Status status;
+    const void* opt_addr, OptionProperties* props) {
   for (const auto& iter : type_map) {
     std::string single;
     const auto& opt_name = iter.first;
     const auto& opt_info = iter.second;
     if (opt_info.ShouldSerialize()) {
-      if (!config_options.mutable_options_only) {
-        status = opt_info.Serialize(
-            config_options, MakePrefix(prefix, opt_name), opt_addr, &single);
-      } else if (opt_info.IsMutable()) {
-        ConfigOptions copy = config_options;
-        copy.mutable_options_only = false;
-        status = opt_info.Serialize(copy, MakePrefix(prefix, opt_name),
-                                    opt_addr, &single);
-      } else if (opt_info.IsConfigurable()) {
-        // If it is a Configurable and we are either printing all of the
-        // details or not printing only the name, this option should be
-        // included in the list
-        if (config_options.IsDetailed() ||
-            !opt_info.IsEnabled(OptionTypeFlags::kStringNameOnly)) {
-          status = opt_info.Serialize(
-              config_options, MakePrefix(prefix, opt_name), opt_addr, &single);
-        }
-      }
+      Status status = ConfigurableHelper::SerializeOption(
+          config_options, MakePrefix(prefix, opt_name), opt_info, opt_addr,
+          &single);
       if (!status.ok()) {
         return status;
-      } else if (!single.empty() || config_options.IsPrintable()) {
+      } else if (!single.empty()) {
         props->insert_or_assign(iter.first, single);
       }
     }
   }
-  return status;
+  return Status::OK();
 }
 
 Status OptionTypeInfo::SerializeStruct(
@@ -1084,7 +1068,7 @@ Status OptionTypeInfo::TypeToString(
     const std::unordered_map<std::string, OptionTypeInfo>& type_map,
     const void* opt_addr, std::string* result) {
   assert(result);
-  Properties props;
+  OptionProperties props;
   Status s = SerializeType(config_options, prefix, type_map, opt_addr, &props);
   if (s.ok()) {
     *result = config_options.ToString(prefix, props);
@@ -1166,7 +1150,8 @@ bool OptionTypeInfo::AreEqual(const ConfigOptions& config_options,
                               const void* const that_ptr,
                               std::string* mismatch) const {
   auto level = GetSanityLevel();
-  if (!config_options.IsCheckEnabled(level)) {
+  if (config_options.compare_to == nullptr &&
+      !config_options.IsCheckEnabled(level)) {
     return true;  // If the sanity level is not being checked, skip it
   }
   if (this_ptr == nullptr || that_ptr == nullptr) {
@@ -1174,8 +1159,8 @@ bool OptionTypeInfo::AreEqual(const ConfigOptions& config_options,
       return true;
     }
   } else if (equals_func_ != nullptr) {
-    const void* this_addr = GetOffset(this_ptr);
-    const void* that_addr = GetOffset(that_ptr);
+    const auto this_addr = GetBaseOffset(this_ptr, equals_func_);
+    const auto that_addr = GetBaseOffset(that_ptr, equals_func_);
     if (equals_func_(config_options, opt_name, this_addr, that_addr,
                      mismatch)) {
       return true;
@@ -1193,7 +1178,8 @@ bool OptionTypeInfo::AreEqual(const ConfigOptions& config_options,
       } else if (this_config != nullptr && that_config != nullptr) {
         std::string bad_name;
         bool matches;
-        if (level < config_options.sanity_level) {
+        if (config_options.compare_to == nullptr &&
+            level < config_options.sanity_level) {
           ConfigOptions copy = config_options;
           copy.sanity_level = level;
           matches = this_config->AreEquivalent(copy, that_config, &bad_name);
@@ -1275,26 +1261,6 @@ bool OptionTypeInfo::StructsAreEqual(
   return matches;
 }
 
-bool MatchesOptionsTypeFromMap(
-    const ConfigOptions& config_options,
-    const std::unordered_map<std::string, OptionTypeInfo>& type_map,
-    const void* const this_ptr, const void* const that_ptr,
-    std::string* mismatch) {
-  for (auto& pair : type_map) {
-    // We skip checking deprecated variables as they might
-    // contain random values since they might not be initialized
-    if (config_options.IsCheckEnabled(pair.second.GetSanityLevel())) {
-      if (!pair.second.AreEqual(config_options, pair.first, this_ptr, that_ptr,
-                                mismatch) &&
-          !pair.second.AreEqualByName(config_options, pair.first, this_ptr,
-                                      that_ptr)) {
-        return false;
-      }
-    }
-  }
-  return true;
-}
-
 bool OptionTypeInfo::AreEqualByName(const ConfigOptions& config_options,
                                     const std::string& opt_name,
                                     const void* const this_ptr,
@@ -1333,7 +1299,7 @@ Status OptionTypeInfo::Prepare(const ConfigOptions& config_options,
                                const std::string& name, void* opt_ptr) const {
   if (ShouldPrepare()) {
     if (prepare_func_ != nullptr) {
-      void* opt_addr = GetOffset(opt_ptr);
+      auto opt_addr = GetBaseOffset(opt_ptr, prepare_func_);
       return prepare_func_(config_options, name, opt_addr);
     } else if (IsConfigurable()) {
       Configurable* config = AsRawPointer<Configurable>(opt_ptr);
@@ -1353,7 +1319,7 @@ Status OptionTypeInfo::Validate(const DBOptions& db_opts,
                                 const void* opt_ptr) const {
   if (ShouldValidate()) {
     if (validate_func_ != nullptr) {
-      const void* opt_addr = GetOffset(opt_ptr);
+      const auto opt_addr = GetBaseOffset(opt_ptr, validate_func_);
       return validate_func_(db_opts, cf_opts, name, opt_addr);
     } else if (IsConfigurable()) {
       const Configurable* config = AsRawPointer<Configurable>(opt_ptr);

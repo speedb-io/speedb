@@ -107,7 +107,7 @@ Status GetPlainTableOptionsFromString(const ConfigOptions& config_options,
                                       const PlainTableOptions& table_options,
                                       const std::string& opts_str,
                                       PlainTableOptions* new_table_options) {
-  Properties props;
+  OptionProperties props;
   Status s = config_options.ToProps(opts_str, &props);
   if (!s.ok()) {
     return s;
@@ -229,7 +229,7 @@ Status MemTableRepFactory::CreateFromString(
     RegisterBuiltinMemTableRepFactory(*(ObjectLibrary::Default().get()), "");
   });
   std::string id;
-  std::unordered_map<std::string, std::string> opt_map;
+  OptionProperties opt_map;
   Status status = Customizable::GetOptionsMap(config_options, result->get(),
                                               value, &id, &opt_map);
   if (!status.ok()) {  // GetOptionsMap failed

@@ -1,3 +1,17 @@
+// Copyright (C) 2022 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
 // Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -136,6 +150,21 @@ class ConfigurableHelper {
   static Status SerializeOptions(const ConfigOptions& config_options,
                                  const Configurable& configurable,
                                  const std::string& prefix, Properties* props);
+                                 const std::string& prefix,
+                                 OptionProperties* props);
+
+  // Serializes a single option to its string representation
+  // @param opt_name The name of the option
+  // @param opt_info The type and related information of the option
+  // @param opt_addr The address of the option
+  // @param value The string representation of the option.
+  // @return OK If the options for this object wer successfully serialized.
+  // @return InvalidArgument If one or more of the options could not be
+  // serialized.
+  static Status SerializeOption(const ConfigOptions& config_options,
+                                const std::string& opt_name,
+                                const OptionTypeInfo& opt_info,
+                                const void* opt_addr, std::string* value);
 
   // Internal method to list the option names for this object.
   // Classes may override this value to change its behavior.
@@ -157,6 +186,10 @@ class ConfigurableHelper {
                             const Configurable& this_one,
                             const Configurable& that_one,
                             std::string* mismatch);
+
+  // Checks to see if the two Configurable classes may be equivalent
+  static bool MayBeEquivalent(const Configurable& this_one,
+                              const Configurable& that_one);
 
  private:
   // Looks for the option specified by name in the RegisteredOptions.

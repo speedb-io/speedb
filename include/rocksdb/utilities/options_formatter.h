@@ -20,6 +20,7 @@
 #include "rocksdb/customizable.h"
 
 namespace ROCKSDB_NAMESPACE {
+class OptionProperties;
 
 // EXPERIMENTAL
 // Class to create string representations of name/value pairs
@@ -43,13 +44,14 @@ class OptionsFormatter : public Customizable {
                                  std::shared_ptr<OptionsFormatter>* result);
 
   static const char* Type() { return "OptionsFormatter"; }
+  using Customizable::ToString;
   // Converts the map of properties to a single string representation
   virtual std::string ToString(const std::string& prefix,
-                               const Properties& props) const = 0;
+                               const OptionProperties& props) const = 0;
 
   // Converts the string representation into a name/value properties
   virtual Status ToProps(const std::string& opts_str,
-                         Properties* props) const = 0;
+                         OptionProperties* props) const = 0;
 
   // Converts the vector to a single string representation
   virtual std::string ToString(const std::string& prefix, char separator,

@@ -35,6 +35,7 @@
 #include "monitoring/persistent_stats_history.h"
 #include "options/options_helper.h"
 #include "rocksdb/table.h"
+#include "rocksdb/utilities/options_type.h"
 #include "rocksdb/wal_filter.h"
 #include "test_util/sync_point.h"
 #include "util/rate_limiter.h"
@@ -64,7 +65,7 @@ DBOptions SanitizeOptions(const std::string& dbname, const DBOptions& src,
     if (max_max_open_files == -1) {
       max_max_open_files = 0x400000;
     }
-    ClipToRange(&result.max_open_files, 20, max_max_open_files);
+    OptionTypeInfo::ClipToRange(&result.max_open_files, 20, max_max_open_files);
     TEST_SYNC_POINT_CALLBACK("SanitizeOptions::AfterChangeMaxOpenFiles",
                              &result.max_open_files);
   }
@@ -1558,6 +1559,7 @@ Status DBImpl::WriteLevel0TableForRecovery(int job_id, ColumnFamilyData* cfd,
           GetCompressionFlush(*cfd->ioptions(), mutable_cf_options),
           mutable_cf_options.compression_opts, cfd->GetID(), cfd->GetName(),
           0 /* level */, false /* is_bottommost */,
+          false /* is_last_level_with_data */,
           TableFileCreationReason::kRecovery, 0 /* oldest_key_time */,
           0 /* file_creation_time */, db_id_, db_session_id_,
           0 /* target_file_size */, meta.fd.GetNumber());

@@ -1,4 +1,17 @@
 #!/usr/bin/env python3
+# Copyright (C) 2023 Speedb Ltd. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http:#www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 from __future__ import absolute_import, division, print_function, unicode_literals
 
@@ -223,11 +236,15 @@ default_params = {
     "customopspercent": 0,
     # "filter_uri": lambda: random.choice(["speedb.PairedBloomFilter", ""]),
     "memtablerep": lambda: random.choice(["skip_list", "hash_spdb"]),
-    "pinning_policy": lambda: random.choice(["", "speedb_scoped_pinning_policy"]),
+    "pinning_policy": lambda: random.choice(["default", "scoped"]),
     "use_dynamic_delay": lambda: random.choice([0, 1, 1, 1]),
     "allow_wbm_stalls": lambda: random.randint(0, 1),
     "start_delay_percent": lambda: random.randint(0, 99),
     "use_clean_delete_during_flush": lambda: random.randint(0, 1),
+    "enable_speedb_features": lambda: random.randint(0, 1),
+    "total_ram_size": lambda: random.choice([512 * 1024 * 1024, 1024 * 1024 * 1024]),
+    "max_background_jobs": lambda: random.choice([4, 8]),
+    "crash_test": 1,
 }
 
 _TEST_DIR_ENV_VAR = "TEST_TMPDIR"
@@ -767,6 +784,10 @@ def finalize_and_sanitize(src_params, counter):
         dest_params["bloom_bits"] = random.choice([random.randint(1,19),
                                          random.lognormvariate(2.3, 1.3)])
 
+    # db_bench will abort if using ScopedPinningPolicy and not setting cache_index_and_filter_blocks
+    if dest_params.get("pinning_policy") == "ScopedPinning":
+        dest_params["cache_index_and_filter_blocks"]
+        
     return dest_params
 
 

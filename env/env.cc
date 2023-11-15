@@ -1,3 +1,17 @@
+// Copyright (C) 2022 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
 //  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -95,7 +109,7 @@ class LegacySystemClock : public SystemClock {
 
   Status SerializeOptions(const ConfigOptions& /*config_options*/,
                           const std::string& /*prefix*/,
-                          Properties* /*options*/) const override {
+                          OptionProperties* /*options*/) const override {
     // We do not want the LegacySystemClock to appear in the serialized output.
     // This clock is an internal class for those who do not implement one and
     // would be part of the Env.  As such, do not serialize it here.
@@ -603,7 +617,7 @@ class LegacyFileSystemWrapper : public FileSystem {
 
   Status SerializeOptions(const ConfigOptions& /*config_options*/,
                           const std::string& /*prefix*/,
-                          Properties* /*options*/) const override {
+                          OptionProperties* /*options*/) const override {
     // We do not want the LegacyFileSystem to appear in the serialized output.
     // This clock is an internal class for those who do not implement one and
     // would be part of the Env.  As such, do not serialize it here.
@@ -662,10 +676,10 @@ Status Env::CreateFromString(const ConfigOptions& config_options,
 
   Env* env = *result;
   std::string id;
-  std::unordered_map<std::string, std::string> opt_map;
+  OptionProperties props;
 
   Status status =
-      Customizable::GetOptionsMap(config_options, env, value, &id, &opt_map);
+      Customizable::GetOptionsMap(config_options, env, value, &id, &props);
   if (!status.ok()) {  // GetOptionsMap failed
     return status;
   }
@@ -681,7 +695,7 @@ Status Env::CreateFromString(const ConfigOptions& config_options,
   if (config_options.ignore_unsupported_options && status.IsNotSupported()) {
     status = Status::OK();
   } else if (status.ok()) {
-    status = Customizable::ConfigureNewObject(config_options, env, opt_map);
+    status = Customizable::ConfigureNewObject(config_options, env, props);
   }
   if (status.ok()) {
     guard->reset(uniq.release());
@@ -1188,7 +1202,7 @@ Status SystemClockWrapper::PrepareOptions(const ConfigOptions& options) {
 
 Status SystemClockWrapper::SerializeOptions(const ConfigOptions& config_options,
                                             const std::string& prefix,
-                                            Properties* props) const {
+                                            OptionProperties* props) const {
   if (!config_options.IsShallow() && target_ != nullptr &&
       !target_->IsInstanceOf(SystemClock::kDefaultName())) {
     props->insert(

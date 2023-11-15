@@ -23,6 +23,7 @@
 
 #ifdef GFLAGS
 #include "db_stress_tool/db_stress_common.h"
+#include "table/block_based/default_pinning_policy.h"
 
 static bool ValidateUint32Range(const char* flagname, uint64_t value) {
   if (value > std::numeric_limits<uint32_t>::max()) {
@@ -890,7 +891,12 @@ DEFINE_string(fs_uri, "",
               " with --env_uri."
               " Creates a default environment with the specified filesystem.");
 
-DEFINE_string(pinning_policy, "", "URI for registry TablePinningPolicy");
+DEFINE_string(pinning_policy,
+              ROCKSDB_NAMESPACE::DefaultPinningPolicy::kNickName(),
+              "The pinning policy to use. "
+              "The options are: "
+              "'DefaultPinning': Default RocksDB's pinning polcy. "
+              "'ScopedPinning': Speedb's Scoped pinning policy.");
 
 DEFINE_uint64(ops_per_thread, 1200000, "Number of operations per thread.");
 static const bool FLAGS_ops_per_thread_dummy __attribute__((__unused__)) =
@@ -1134,6 +1140,25 @@ DEFINE_bool(use_clean_delete_during_flush,
             ROCKSDB_NAMESPACE::Options().use_clean_delete_during_flush,
             "Use clean delete during flush");
 
+DEFINE_bool(crash_test, false,
+            "If true, speedb features validation will be skipped .");
+
+DEFINE_bool(enable_speedb_features, false,
+            "If true, Speedb features will be enabled "
+            "You must provide total_ram_size in bytes ,"
+            " and max_background_jobs. "
+            "delayed_write_rate is recommended. ");
+
+DEFINE_uint64(total_ram_size, 512 * 1024 * 1024ul,
+              "SharedOptions total ram size bytes. ");
+DEFINE_uint64(delayed_write_rate,
+              ROCKSDB_NAMESPACE::Options().delayed_write_rate,
+              "Limited bytes allowed to DB when soft_rate_limit or "
+              "level0_slowdown_writes_trigger triggers");
+DEFINE_int32(max_background_jobs,
+             ROCKSDB_NAMESPACE::Options().max_background_jobs,
+             "The maximum number of concurrent background jobs that can occur "
+             "in parallel.");
 DEFINE_bool(use_io_uring, false, "Enable the use of IO uring on Posix");
 extern "C" bool RocksDbIOUringEnable() { return FLAGS_use_io_uring; }
 

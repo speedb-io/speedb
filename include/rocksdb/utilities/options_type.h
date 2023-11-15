@@ -1,3 +1,17 @@
+// Copyright (C) 2022 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
 // Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -101,14 +115,15 @@ enum class OptionTypeFlags : uint32_t {
   kCompareLoose = ConfigOptions::kSanityLevelLooselyCompatible,
   kCompareExact = ConfigOptions::kSanityLevelExactMatch,
 
-  kMutable = 0x0100,         // Option is mutable
-  kRawPointer = 0x0200,      // The option is stored as a raw pointer
-  kShared = 0x0400,          // The option is stored as a shared_ptr
-  kUnique = 0x0800,          // The option is stored as a unique_ptr
-  kAllowNull = 0x1000,       // The option can be null
-  kDontSerialize = 0x2000,   // Don't serialize the option
-  kDontPrepare = 0x4000,     // Don't prepare or sanitize this option
-  kStringNameOnly = 0x8000,  // The option serializes to a name only
+  kMutable = 0x00100,         // Option is mutable
+  kRawPointer = 0x00200,      // The option is stored as a raw pointer
+  kShared = 0x00400,          // The option is stored as a shared_ptr
+  kUnique = 0x00800,          // The option is stored as a unique_ptr
+  kAllowNull = 0x01000,       // The option can be null
+  kDontSerialize = 0x02000,   // Don't serialize the option
+  kDontPrepare = 0x04000,     // Don't prepare or sanitize this option
+  kStringNameOnly = 0x08000,  // The option serializes to a name only
+  kUseBaseAddress = 0x10000,  // Pass the base (instead of offset) to functions
 };
 
 inline OptionTypeFlags operator|(const OptionTypeFlags& a,
@@ -236,6 +251,8 @@ using ValidateFunc = std::function<Status(
     const DBOptions& /*db_opts*/, const ColumnFamilyOptions& /*cf_opts*/,
     const std::string& /*name*/, const void* /*addr*/)>;
 
+class OptionProperties : public std::unordered_map<std::string, std::string> {};
+
 // A struct for storing constant option information such as option name,
 // option type, and offset.
 class OptionTypeInfo {
@@ -309,13 +326,7 @@ class OptionTypeInfo {
         // @return InvalidArgument if the value is not found in the map
         [map](const ConfigOptions&, const std::string& name,
               const std::string& value, void* addr) {
-          if (map == nullptr) {
-            return Status::NotSupported("No enum mapping ", name);
-          } else if (ParseEnum<T>(*map, value, static_cast<T*>(addr))) {
-            return Status::OK();
-          } else {
-            return Status::InvalidArgument("No mapping for enum ", name);
-          }
+          return StringToEnum<T>(name, map, value, static_cast<T*>(addr));
         });
     info.SetSerializeFunc(
         // Uses the map argument to convert the input enum into
@@ -325,14 +336,8 @@ class OptionTypeInfo {
         // @return InvalidArgument if the enum is not found in the map
         [map](const ConfigOptions&, const std::string& name, const void* addr,
               std::string* value) {
-          if (map == nullptr) {
-            return Status::NotSupported("No enum mapping ", name);
-          } else if (SerializeEnum<T>(*map, (*static_cast<const T*>(addr)),
-                                      value)) {
-            return Status::OK();
-          } else {
-            return Status::InvalidArgument("No mapping for enum ", name);
-          }
+          return EnumToString<T>(name, map, *static_cast<const T*>(addr),
+                                 value);
         });
     info.SetEqualsFunc(
         // Casts addr1 and addr2 to the enum type and returns true if
@@ -721,6 +726,26 @@ class OptionTypeInfo {
     return static_cast<char*>(base) + offset_;
   }
 
+  // Returns either the base or the base+offset address,
+  // depending on the kUseBaseAddress flag
+  template <typename T>
+  const void* GetBaseOffset(const void* base, const std::function<T>& f) const {
+    if (f != nullptr && IsEnabled(OptionTypeFlags::kUseBaseAddress)) {
+      return base;
+    } else {
+      return GetOffset(base);
+    }
+  }
+
+  template <typename T>
+  void* GetBaseOffset(void* base, const std::function<T>& f) const {
+    if (f != nullptr && IsEnabled(OptionTypeFlags::kUseBaseAddress)) {
+      return base;
+    } else {
+      return GetOffset(base);
+    }
+  }
+
   template <typename T>
   const T* GetOffsetAs(const void* base) const {
     const void* addr = GetOffset(base);
@@ -810,6 +835,33 @@ class OptionTypeInfo {
   Status Validate(const DBOptions& db_opts, const ColumnFamilyOptions& cf_opts,
                   const std::string& name, const void* opt_ptr) const;
 
+  template <typename E>
+  static Status StringToEnum(
+      const std::string& name,
+      const std::unordered_map<std::string, E>* const map,
+      const std::string& value, E* e) {
+    if (map == nullptr) {
+      return Status::NotSupported("No enum mapping ", name);
+    } else if (ParseEnum(*map, value, e)) {
+      return Status::OK();
+    } else {
+      return Status::InvalidArgument("No mapping for enum ", name);
+    }
+  }
+  template <typename E>
+  static Status EnumToString(
+      const std::string& name,
+      const std::unordered_map<std::string, E>* const map, E e,
+      std::string* value) {
+    if (map == nullptr) {
+      return Status::NotSupported("No enum mapping ", name);
+    } else if (SerializeEnum(*map, e, value)) {
+      return Status::OK();
+    } else {
+      return Status::InvalidArgument("No mapping for enum ", name);
+    }
+  }
+
   // Parses the input opts_map according to the type_map for the opt_addr
   // For each name-value pair in opts_map, find the corresponding name in
   // type_map If the name is found:
@@ -851,13 +903,14 @@ class OptionTypeInfo {
       const std::unordered_map<std::string, OptionTypeInfo>* map,
       const std::string& opt_name, const std::string& value, void* opt_addr);
 
-  // Serializes the values from opt_addr using the rules in type_map.
-  // Returns the serialized form in result.
+  // Converts the values from opt_addr using the rules in type_map into their
+  // UserProperties (name-value) representation.
   // Returns OK on success or non-OK if some option could not be serialized.
   static Status SerializeType(
       const ConfigOptions& config_options, const std::string& prefix,
       const std::unordered_map<std::string, OptionTypeInfo>& type_map,
-      const void* opt_addr, Properties* props);
+      const void* opt_addr, OptionProperties* props);
+
   static Status TypeToString(
       const ConfigOptions& config_options, const std::string& opt_name,
       const std::unordered_map<std::string, OptionTypeInfo>& type_map,
@@ -908,6 +961,22 @@ class OptionTypeInfo {
 
   constexpr static const char* kIdPropName() { return "id"; }
   constexpr static const char* kIdPropSuffix() { return ".id"; }
+
+  // Fix user-supplied options to be reasonable
+  template <class T, class V>
+  static void ClipToMin(T* ptr, V minvalue) {
+    if (static_cast<V>(*ptr) < minvalue) *ptr = minvalue;
+  }
+  template <class T, class V>
+  static void ClipToMax(T* ptr, V maxvalue) {
+    if (static_cast<V>(*ptr) > maxvalue) *ptr = maxvalue;
+  }
+
+  template <class T, class V>
+  static void ClipToRange(T* ptr, V minvalue, V maxvalue) {
+    ClipToMin(ptr, minvalue);
+    ClipToMax(ptr, maxvalue);
+  }
 
   static std::string MakePrefix(const std::string& prefix,
                                 const std::string& name) {

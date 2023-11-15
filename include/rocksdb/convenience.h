@@ -1,3 +1,17 @@
+// Copyright (C) 2022 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
 // Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -19,6 +33,7 @@ class Env;
 class Logger;
 class ObjectRegistry;
 class OptionsFormatter;
+class OptionProperties;
 
 struct ColumnFamilyOptions;
 struct DBOptions;
@@ -102,6 +117,9 @@ struct ConfigOptions {
   // Helper class for printing and parsing options to/from strings.
   std::shared_ptr<OptionsFormatter> formatter;
 
+  // If set, only changes from this reference version will be serialized.
+  Configurable* compare_to = nullptr;
+
   bool IsShallow() const { return depth == Depth::kDepthShallow; }
   bool IsDetailed() const {
     return (depth & Depth::kDepthDetailed) == Depth::kDepthDetailed;
@@ -116,12 +134,12 @@ struct ConfigOptions {
     return (level > SanityLevel::kSanityLevelNone && level <= sanity_level);
   }
 
-  // Converts the string representation into name/value properties
-  Status ToProps(const std::string& opts_str, Properties* props) const;
-
   // Converts the properties to a single string representation
   std::string ToString(const std::string& prefix,
-                       const Properties& props) const;
+                       const OptionProperties& props) const;
+
+  // Converts the string representation into name/value properties
+  Status ToProps(const std::string& opts_str, OptionProperties* props) const;
 
   // Converts the vector options to a single string representation
   std::string ToString(const std::string& prefix, char separator,
@@ -454,9 +472,6 @@ Status GetOptionsFromString(const Options& base_options,
 Status GetOptionsFromString(const ConfigOptions& config_options,
                             const Options& base_options,
                             const std::string& opts_str, Options* new_options);
-
-Status StringToMap(const std::string& opts_str,
-                   std::unordered_map<std::string, std::string>* opts_map);
 
 // Request stopping background work, if wait is true wait until it's done
 void CancelAllBackgroundWork(DB* db, bool wait = false);

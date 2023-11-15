@@ -51,7 +51,9 @@ class DefaultPinningPolicy : public RecordingPinningPolicy {
     //**TODO: Register options?
   }
   static const char* kClassName() { return "DefaultPinningPolicy"; }
+  static const char* kNickName() { return "DefaultPinning"; }
   const char* Name() const override { return kClassName(); }
+  const char* NickName() const override { return kNickName(); }
 
  protected:
   bool CheckPin(const TablePinningOptions& tpo, uint8_t type, size_t /*size*/,
@@ -138,7 +140,8 @@ bool RecordingPinningPolicy::PinData(const TablePinningOptions& tpo,
   auto limit = usage_.fetch_add(size);
   if (CheckPin(tpo, type, size, limit)) {
     pinned_counter_++;
-    pinned->reset(new PinnedEntry(tpo.level, type, size));
+    pinned->reset(
+        new PinnedEntry(tpo.level, type, size, tpo.is_last_level_with_data));
     RecordPinned(tpo.level, type, size, true);
     return true;
   } else {
@@ -196,7 +199,6 @@ size_t RecordingPinningPolicy::GetPinnedUsageByType(uint8_t type) const {
   return usage_by_type_[type];
 }
 
-#ifndef ROCKSDB_LITE
 static int RegisterBuiltinPinningPolicies(ObjectLibrary& library,
                                           const std::string& /*arg*/) {
   library.AddFactory<TablePinningPolicy>(
@@ -209,17 +211,14 @@ static int RegisterBuiltinPinningPolicies(ObjectLibrary& library,
   size_t num_types;
   return static_cast<int>(library.GetFactoryCount(&num_types));
 }
-#endif  // ROCKSDB_LITE
 
 Status TablePinningPolicy::CreateFromString(
     const ConfigOptions& options, const std::string& value,
     std::shared_ptr<TablePinningPolicy>* policy) {
-#ifndef ROCKSDB_LITE
   static std::once_flag loaded;
   std::call_once(loaded, [&]() {
     RegisterBuiltinPinningPolicies(*(ObjectLibrary::Default().get()), "");
   });
-#endif  // ROCKSDB_LITE
   return LoadManagedObject<TablePinningPolicy>(options, value, policy);
 }
 

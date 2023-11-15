@@ -279,6 +279,11 @@ DECLARE_int32(get_property_one_in);
 DECLARE_string(file_checksum_impl);
 DECLARE_bool(use_dynamic_delay);
 DECLARE_bool(use_clean_delete_during_flush);
+DECLARE_bool(crash_test);
+DECLARE_bool(enable_speedb_features);
+DECLARE_uint64(total_ram_size);
+DECLARE_uint64(delayed_write_rate);
+DECLARE_int32(max_background_jobs);
 
 // Options for StackableDB-based BlobDB
 DECLARE_bool(use_blob_db);

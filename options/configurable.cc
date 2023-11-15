@@ -1,3 +1,17 @@
+// Copyright (C) 2022 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
 // Copyright (c) 2011-present, Facebook, Inc. All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -133,7 +147,7 @@ Status Configurable::ConfigureOptions(
     const ConfigOptions& config_options,
     const std::unordered_map<std::string, std::string>& opts_map,
     std::unordered_map<std::string, std::string>* unused) {
-  Properties current;
+  OptionProperties current;
   Status s;
   if (!opts_map.empty()) {
     // There are options in the map.
@@ -176,7 +190,7 @@ Status Configurable::ConfigureFromString(const ConfigOptions& config_options,
   Status s;
   if (!opts_str.empty()) {
     if (opts_str.find('=') != std::string::npos) {
-      Properties props;
+      OptionProperties props;
       s = config_options.ToProps(opts_str, &props);
       if (s.ok()) {
         s = ConfigureFromMap(config_options, props, nullptr);
@@ -409,7 +423,7 @@ Status ConfigurableHelper::ConfigureCustomizableOption(
       // If the ID does not match that of the current customizable, return an
       // error. Otherwise, update the current customizable via the properties
       // map
-      std::unordered_map<std::string, std::string> props;
+      OptionProperties props;
       std::string id;
       Status s = Configurable::GetOptionsMap(copy, value, custom->GetId(), &id,
                                              &props);
@@ -456,7 +470,7 @@ Status ConfigurableHelper::ConfigureOption(
 
 Status Configurable::GetOptionString(const ConfigOptions& config_options,
                                      std::string* result) const {
-  Properties props;
+  OptionProperties props;
   assert(result);
   result->clear();
   Status s =
@@ -469,7 +483,7 @@ Status Configurable::GetOptionString(const ConfigOptions& config_options,
 
 std::string Configurable::ToString(const ConfigOptions& config_options,
                                    const std::string& prefix) const {
-  Properties props;
+  OptionProperties props;
   Status s = SerializeOptions(config_options, prefix, &props);
   if (s.ok() && config_options.IsPrintable()) {
     s = SerializePrintableOptions(config_options, prefix, &props);
@@ -484,7 +498,7 @@ std::string Configurable::ToString(const ConfigOptions& config_options,
 
 Status Configurable::SerializeOptions(const ConfigOptions& config_options,
                                       const std::string& prefix,
-                                      Properties* props) const {
+                                      OptionProperties* props) const {
   return ConfigurableHelper::SerializeOptions(config_options, *this, prefix,
                                               props);
 }
@@ -526,18 +540,92 @@ Status ConfigurableHelper::GetOption(const ConfigOptions& config_options,
 Status ConfigurableHelper::SerializeOptions(const ConfigOptions& config_options,
                                             const Configurable& configurable,
                                             const std::string& prefix,
-                                            Properties* props) {
+                                            OptionProperties* props) {
   assert(props);
-  for (auto const& opt_iter : configurable.options_) {
-    if (opt_iter.type_map != nullptr) {
-      Status s = OptionTypeInfo::SerializeType(config_options, prefix,
-                                               *(opt_iter.type_map),
-                                               opt_iter.opt_ptr, props);
-      if (!s.ok()) {
-        return s;
+  ConfigOptions copy = config_options;
+  auto compare_to = config_options.compare_to;
+  if (compare_to != nullptr && !MayBeEquivalent(configurable, *compare_to)) {
+    // If we are comparing this type to another, first see if the types
+    // are the same.  If not, forget it
+    compare_to = nullptr;
+  }
+
+  Status s;
+  for (size_t i = 0; i < configurable.options_.size(); i++) {
+    const auto& opt = configurable.options_[i];
+    if (opt.type_map != nullptr) {
+      const auto opt_addr = opt.opt_ptr;
+      for (const auto& opt_iter : *(opt.type_map)) {
+        std::string single;
+        const auto& opt_name = opt_iter.first;
+        const auto& opt_info = opt_iter.second;
+        bool should_serialize = opt_info.ShouldSerialize();
+        if (should_serialize && compare_to != nullptr) {
+          // This option should be serialized but there is a possiblity that it
+          // matches the default. Check to see if we really should serialize it
+          std::string mismatch;
+          if (opt_info.IsConfigurable() &&
+              opt_info.IsEnabled(OptionTypeFlags::kStringNameOnly) &&
+              !config_options.IsDetailed()) {
+            // If it is a Configurable name-only and we are not printing the
+            // details, then compare loosely
+            copy.sanity_level = ConfigOptions::kSanityLevelLooselyCompatible;
+            if (opt_info.AreEqual(copy, opt_name, opt_addr,
+                                  compare_to->options_[i].opt_ptr, &mismatch)) {
+              should_serialize = false;
+            }
+            copy.sanity_level = config_options.sanity_level;
+          } else if (opt_info.AreEqual(config_options, opt_name, opt_addr,
+                                       compare_to->options_[i].opt_ptr,
+                                       &mismatch)) {
+            should_serialize = false;
+          }
+        }
+        if (should_serialize) {
+          if (compare_to != nullptr && opt_info.IsCustomizable()) {
+            copy.compare_to = opt_info.AsRawPointer<Customizable>(
+                compare_to->options_[i].opt_ptr);
+          } else {
+            copy.compare_to = compare_to;
+          }
+          s = SerializeOption(copy,
+                              OptionTypeInfo::MakePrefix(prefix, opt_name),
+                              opt_info, opt_addr, &single);
+          if (!s.ok()) {
+            return s;
+          } else if (!single.empty()) {
+            props->insert_or_assign(opt_name, single);
+          }
+        }
       }
     }
   }
+  return s;
+}
+
+Status ConfigurableHelper::SerializeOption(const ConfigOptions& config_options,
+                                           const std::string& opt_name,
+                                           const OptionTypeInfo& opt_info,
+                                           const void* opt_addr,
+                                           std::string* value) {
+  if (opt_info.ShouldSerialize()) {
+    if (!config_options.mutable_options_only) {
+      return opt_info.Serialize(config_options, opt_name, opt_addr, value);
+    } else if (opt_info.IsMutable()) {
+      ConfigOptions copy = config_options;
+      copy.mutable_options_only = false;
+      return opt_info.Serialize(copy, opt_name, opt_addr, value);
+    } else if (opt_info.IsConfigurable()) {
+      // If it is a Configurable and we are either printing all of the
+      // details or not printing only the name, this option should be
+      // included in the list
+      if (config_options.IsDetailed() ||
+          !opt_info.IsEnabled(OptionTypeFlags::kStringNameOnly)) {
+        return opt_info.Serialize(config_options, opt_name, opt_addr, value);
+      }
+    }
+  }
+  value->clear();
   return Status::OK();
 }
 
@@ -590,6 +678,25 @@ Status ConfigurableHelper::ListOptions(
 //       Methods for Comparing Configurables
 //
 //*******************************************************************************
+
+bool ConfigurableHelper::MayBeEquivalent(const Configurable& this_one,
+                                         const Configurable& that_one) {
+  if (this_one.options_.size() != that_one.options_.size()) {
+    // The two types do not have the same number of registered options,
+    // therefore they cannot be the same.
+    return false;
+  }
+
+  for (size_t i = 0; i < this_one.options_.size(); i++) {
+    const auto& this_opt = this_one.options_[i];
+    const auto& that_opt = that_one.options_[i];
+    if (this_opt.name != that_opt.name ||
+        this_opt.type_map != that_opt.type_map) {
+      return false;
+    }
+  }
+  return true;
+}
 
 bool Configurable::AreEquivalent(const ConfigOptions& config_options,
                                  const Configurable* other,
@@ -662,10 +769,10 @@ bool ConfigurableHelper::AreEquivalent(const ConfigOptions& config_options,
   return true;
 }
 
-Status Configurable::GetOptionsMap(
-    const ConfigOptions& config_options, const std::string& value,
-    const std::string& default_id, std::string* id,
-    std::unordered_map<std::string, std::string>* props) {
+Status Configurable::GetOptionsMap(const ConfigOptions& config_options,
+                                   const std::string& value,
+                                   const std::string& default_id,
+                                   std::string* id, OptionProperties* props) {
   assert(id);
   assert(props);
   Status status;

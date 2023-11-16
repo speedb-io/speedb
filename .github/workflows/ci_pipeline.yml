@@ -335,6 +335,12 @@ jobs:
     needs: [Build]
     runs-on: ubuArm64G 
     steps:
+    - name: Dump GitHub context
+      env:
+        GITHUB_CONTEXT: ${{ toJson(github) }}
+      run: |
+        echo "$GITHUB_CONTEXT"  
+    
     - name: 'Checkout GitHub Action'
       uses: actions/checkout@v3
 

@@ -43,7 +43,7 @@ WriteBufferManager::WriteBufferManager(
       memory_inactive_(0),
       memory_being_freed_(0U),
       cache_res_mgr_(nullptr),
-      allow_delays_and_stalls_(allow_delays_and_stalls),
+      allow_stall_(allow_delays_and_stalls),
       start_delay_percent_(start_delay_percent),
       stall_active_(false),
       initiate_flushes_(initiate_flushes),
@@ -210,7 +210,7 @@ size_t WriteBufferManager::FreeMemWithCache(size_t mem) {
 
 void WriteBufferManager::BeginWriteStall(StallInterface* wbm_stall) {
   assert(wbm_stall != nullptr);
-  assert(allow_delays_and_stalls_);
+  assert(allow_stall_.load(std::memory_order_relaxed));
 
   // Allocate outside of the lock.
   std::list<StallInterface*> new_node = {wbm_stall};
@@ -516,7 +516,7 @@ void WriteBufferManager::UpdateUsageState(size_t new_memory_used,
                                           ssize_t memory_changed_size,
                                           size_t quota) {
   assert(enabled());
-  if (allow_delays_and_stalls_ == false ||
+  if (allow_stall_.load(std::memory_order_relaxed) == false ||
       controllers_to_refcount_map_.empty()) {
     return;
   }

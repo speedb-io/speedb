@@ -46,7 +46,7 @@ class StallInterface {
 
 class WriteBufferManager final {
  public:
-  // Delay Mechanism (allow_delays_and_stalls == true) definitions
+  // Delay Mechanism (allow_stalls_ == true) definitions
   static constexpr uint16_t kDfltStartDelayPercentThreshold = 70U;
   static constexpr uint64_t kNoDelayedWriteFactor = 0U;
   static constexpr uint64_t kMaxDelayedWriteFactor = 100U;

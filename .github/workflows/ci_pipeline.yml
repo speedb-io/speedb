@@ -350,7 +350,7 @@ jobs:
         case "$GITHUB_EVENT_NAME" in 
           "pull_request")  
             echo "this workflow was triggered by a pull request"
-            echo "the branch can not be used, it is $GITHUB_REF_NAME"
+            echo "the branch can not be used, it is $GITHUB_REF_NAME , instead ${{ github.head_ref }} will be used"
             docker run --rm -v $(readlink -f ${SPDB_LIB_DIR}):/out -i speedb-centos-builder ${{ github.head_ref }}
             ;;
           "workflow_dispatch") 
@@ -359,8 +359,8 @@ jobs:
             docker run --rm -v $(readlink -f ${SPDB_LIB_DIR}):/out -i speedb-centos-builder ${{ github.ref_name }}
             ;;
           "pull_request_review")  
-            echo "this workflow was triggered by a pull request"
-            echo "the branch can not be used, it is $GITHUB_REF_NAME"
+            echo "this workflow was triggered by a pull request review"
+            echo "the branch can not be used, it is $GITHUB_REF_NAME , instead  ${{ github.event.pull_request.head.ref }} will be used"
             docker run --rm -v $(readlink -f ${SPDB_LIB_DIR}):/out -i speedb-centos-builder ${{ github.event.pull_request.head.ref }}
             ;;
         esac   

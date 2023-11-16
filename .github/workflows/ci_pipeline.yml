@@ -338,12 +338,22 @@ jobs:
     - name: 'Checkout GitHub Action'
       uses: actions/checkout@v3
 
-    - name: 'build'
+    - name: 'Build_on_Arm_Centos'
       run: |
         export SPDB_LIB_DIR=~/spdb_lib &&  mkdir -p $SPDB_LIB_DIR
-        #docker run --rm -v $(readlink -f ${SPDB_LIB_DIR}):/out -i speedb-centos-builder ${{ github.ref_name }}
-        docker run --rm -v $(readlink -f ${SPDB_LIB_DIR}):/out -i speedb-centos-builder ${{ github.ref }}
-     
+        case "$GITHUB_EVENT_NAME" in 
+          "pull_request")  
+            echo "this workflow was triggered by a pull request"
+            echo "the branch can not be used, it is $GITHUB_REF_NAME"
+            docker run --rm -v $(readlink -f ${SPDB_LIB_DIR}):/out -i speedb-centos-builder ${{ github.head_ref }}
+            ;;
+          "workflow_dispatch") 
+            echo "this workflow was triggered by a workflow dispatch, we will use the ref_name instead of the merge branch"
+            echo " consider using github.ref, the branch that will be used here: " ${{ github.ref_name }}
+            docker run --rm -v $(readlink -f ${SPDB_LIB_DIR}):/out -i speedb-centos-builder ${{ github.ref_name }}
+            ;;
+        esac   
+   
   CI-all:
     if: ${{ github.event.review.state == 'approved' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/release') }}
     needs: [Check-Licence-And-History, Build, QA-Tests, Fuzz, Linux-Arm-build, Linux-build, Macos-build, Windows-build-test]

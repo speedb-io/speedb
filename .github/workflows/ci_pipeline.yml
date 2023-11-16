@@ -358,6 +358,12 @@ jobs:
             echo " consider using github.ref, the branch that will be used here: " ${{ github.ref_name }}
             docker run --rm -v $(readlink -f ${SPDB_LIB_DIR}):/out -i speedb-centos-builder ${{ github.ref_name }}
             ;;
+            ${{ github.event.pull_request.head.ref }}
+          "pull_request_review")  
+            echo "this workflow was triggered by a pull request"
+            echo "the branch can not be used, it is $GITHUB_REF_NAME"
+            docker run --rm -v $(readlink -f ${SPDB_LIB_DIR}):/out -i speedb-centos-builder ${{ github.event.pull_request.head.ref }}
+            ;;
         esac   
    
   CI-all:

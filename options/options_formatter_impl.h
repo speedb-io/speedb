@@ -36,10 +36,6 @@ class LogOptionsFormatter : public OptionsFormatter {
                   std::vector<std::string>* /*elems*/) const override {
     return Status::NotSupported();
   }
-
- protected:
-  void AppendElem(const std::string& prefix, const std::string& name,
-                  const std::string& value, std::string* result) const;
 };
 
 class DefaultOptionsFormatter : public OptionsFormatter {

@@ -588,9 +588,15 @@ Status ConfigurableHelper::SerializeOptions(const ConfigOptions& config_options,
           } else {
             copy.compare_to = compare_to;
           }
-          s = SerializeOption(copy,
-                              OptionTypeInfo::MakePrefix(prefix, opt_name),
-                              opt_info, opt_addr, &single);
+	  if (opt_info.IsConfigurable()) {
+	    s = SerializeOption(copy,
+				opt_name,
+				opt_info, opt_addr, &single);
+	  } else {
+	    s = SerializeOption(copy,
+				OptionTypeInfo::MakePrefix(prefix, opt_name),
+				opt_info, opt_addr, &single);
+	  }
           if (!s.ok()) {
             return s;
           } else if (!single.empty()) {

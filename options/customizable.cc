@@ -72,7 +72,7 @@ Status Customizable::SerializeOptions(const ConfigOptions& config_options,
     // it.  Add it
     const int kBufferSize = 200;
     char buffer[kBufferSize];
-    snprintf(buffer, kBufferSize, " (%p)", this);
+    snprintf(buffer, kBufferSize, " #@(%p)", this);
     id.append(buffer);
   }
   props->insert({OptionTypeInfo::kIdPropName(), id});
@@ -114,6 +114,14 @@ Status Customizable::GetOptionsMap(const ConfigOptions& config_options,
   } else if (customizable != nullptr) {
     status = Configurable::GetOptionsMap(config_options, value,
                                          customizable->GetId(), id, props);
+    if (!id->empty()) {
+      // If the id contains this string, it was likely there as a Printable
+      // and should be removed
+      auto pos = id->find(" #@");
+      if (pos != std::string::npos) {
+        id->erase(pos);
+      }
+    }
     if (status.ok() && customizable->IsInstanceOf(*id)) {
       // The new ID and the old ID match, so the objects are the same type.
       // Try to get the existing options, ignoring any errors

@@ -137,9 +137,21 @@ std::string Cache::GetId() const {
        << port::GetProcessID();
   return ostr.str();
 }
-std::string Cache::ToString(const ConfigOptions& /*opts*/,
-                            const std::string& /*prefix*/) const {
-  return GetPrintableOptions();
+  
+std::string Cache::ToString(const ConfigOptions& config_options,
+                            const std::string& prefix) const {
+  OptionProperties props;
+  props.insert({OptionTypeInfo::kIdPropName(), GetId()});
+  Status s = SerializeOptions(config_options, prefix, &props);
+  if (s.ok() && config_options.IsPrintable()) {
+    s = SerializePrintableOptions(config_options, prefix, &props);
+  }
+  assert(s.ok());
+  if (s.ok()) {
+    return config_options.ToString(prefix, props);
+  } else {
+    return "";
+  }
 }
 
 bool Cache::AsyncLookupHandle::IsReady() {

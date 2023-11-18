@@ -223,7 +223,7 @@ struct PersistentCacheConfig {
       const std::string& path, const uint64_t size,
       const std::shared_ptr<Logger>& log);
 
-  std::string ToString(const ConfigOptions& options) const;
+  std::string ToString(const ConfigOptions& options, const std::string& prefix) const;
   Status SerializeOptions(const ConfigOptions& config_options,
                           const std::string& prefix,
                           OptionProperties* options) const;

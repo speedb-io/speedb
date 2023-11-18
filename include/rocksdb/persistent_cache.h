@@ -59,7 +59,7 @@ class PersistentCache {
   // tire top-down
   virtual StatsType Stats() = 0;
 
-  std::string ToString(const ConfigOptions& config_opts) const;
+  std::string ToString(const ConfigOptions& config_opts, const std::string& prefix) const;
   // Return a new numeric id.  May be used by multiple clients who are
   // sharding the same persistent cache to partition the key space.  Typically
   // the client will allocate a new id at startup and prepend the id to its

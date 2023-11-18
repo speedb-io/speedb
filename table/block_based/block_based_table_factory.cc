@@ -876,16 +876,16 @@ Status BlockBasedTableFactory::SerializePrintableOptions(
     OptionProperties* props) const {
   if (table_options_.persistent_cache) {
     props->insert({"persistent_cache",
-                   table_options_.persistent_cache->ToString(config_options)});
+	table_options_.persistent_cache->ToString(config_options, "persistent_cache")});
   }
   if (table_options_.pinning_policy) {
     props->insert(
         {"pinning_policy",
-         table_options_.pinning_policy->ToString(config_options, "")});
+         table_options_.pinning_policy->ToString(config_options, "pinning_policy")});
   }
   if (table_options_.block_cache) {
     props->insert({"block_cache",
-                   table_options_.block_cache->ToString(config_options)});
+	table_options_.block_cache->ToString(config_options, "block_cache")});
   }
   return Status::OK();
 }

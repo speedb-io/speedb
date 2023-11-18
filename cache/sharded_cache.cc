@@ -13,9 +13,11 @@
 #include <cstdint>
 #include <memory>
 
+#include "rocksdb/utilities/options_type.h"
 #include "util/hash.h"
 #include "util/math.h"
 #include "util/mutexlock.h"
+#include "util/string_util.h"
 
 namespace ROCKSDB_NAMESPACE {
 
@@ -55,28 +57,20 @@ size_t ShardedCacheBase::GetUsage(Handle* handle) const {
   return GetCharge(handle);
 }
 
-std::string ShardedCacheBase::GetPrintableOptions() const {
-  std::string ret;
-  ret.reserve(20000);
-  const int kBufferSize = 200;
-  char buffer[kBufferSize];
-  {
-    MutexLock l(&config_mutex_);
-    snprintf(buffer, kBufferSize, "    capacity : %" ROCKSDB_PRIszt "\n",
-             capacity_);
-    ret.append(buffer);
-    snprintf(buffer, kBufferSize, "    num_shard_bits : %d\n",
-             GetNumShardBits());
-    ret.append(buffer);
-    snprintf(buffer, kBufferSize, "    strict_capacity_limit : %d\n",
-             strict_capacity_limit_);
-    ret.append(buffer);
+Status ShardedCacheBase::SerializeOptions(const ConfigOptions& config_options,
+					  const std::string& prefix,
+					  OptionProperties* props) const {
+  MutexLock l(&config_mutex_);
+  props->insert({"capacity", std::to_string(capacity_)});
+  props->insert({"num_shard_bits", std::to_string(GetNumShardBits())});
+  props->insert({"strict_capacity_limit", std::to_string(strict_capacity_limit_)});
+  if (memory_allocator()) {
+    props->insert({"memory_allocator", memory_allocator()->ToString(config_options)});
+  } else {
+    props->insert({"memory_allocator", kNullptrString});
   }
-  snprintf(buffer, kBufferSize, "    memory_allocator : %s\n",
-           memory_allocator() ? memory_allocator()->Name() : "None");
-  ret.append(buffer);
-  AppendPrintableOptions(ret);
-  return ret;
+  AppendPrintableOptions(props);
+  return Cache::SerializeOptions(config_options, prefix, props);
 }
 
 int GetDefaultCacheShardBits(size_t capacity, size_t min_shard_size) {

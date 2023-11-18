@@ -264,8 +264,7 @@ Status FileSystemWrapper::SerializeOptions(const ConfigOptions& config_options,
       !target_->IsInstanceOf(FileSystem::kDefaultName())) {
     props->insert(
         {kTargetPropName(),
-         target_->ToString(config_options, OptionTypeInfo::MakePrefix(
-                                               prefix, kTargetPropName()))});
+         target_->ToString(config_options)});
   }
   return FileSystem::SerializeOptions(config_options, prefix, props);
 }

@@ -32,6 +32,7 @@
 #include "monitoring/perf_context_imp.h"
 #include "monitoring/statistics.h"
 #include "port/lang.h"
+#include "rocksdb/utilities/options_type.h"
 #include "util/distributed_mutex.h"
 
 namespace ROCKSDB_NAMESPACE {
@@ -661,17 +662,9 @@ size_t LRUCacheShard::GetTableAddressCount() const {
   return size_t{1} << table_.GetLengthBits();
 }
 
-void LRUCacheShard::AppendPrintableOptions(std::string& str) const {
-  const int kBufferSize = 200;
-  char buffer[kBufferSize];
-  {
-    DMutexLock l(mutex_);
-    snprintf(buffer, kBufferSize, "    high_pri_pool_ratio: %.3lf\n",
-             high_pri_pool_ratio_);
-    snprintf(buffer + strlen(buffer), kBufferSize - strlen(buffer),
-             "    low_pri_pool_ratio: %.3lf\n", low_pri_pool_ratio_);
-  }
-  str.append(buffer);
+void LRUCacheShard::AppendPrintableOptions(OptionProperties* props) const {
+  props->insert({"high_pri_pool_ratio", std::to_string(high_pri_pool_ratio_)});
+  props->insert({"low_pri_pool_ratio", std::to_string(low_pri_pool_ratio_)});
 }
 
 LRUCache::LRUCache(size_t capacity, int num_shard_bits,

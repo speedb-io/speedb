@@ -60,27 +60,28 @@ Status PersistentCacheConfig::SerializeOptions(
 }
 
 std::string PersistentCacheConfig::ToString(
-    const ConfigOptions& config_options) const {
+					    const ConfigOptions& config_options, const std::string& prefix) const {
   OptionProperties props;
-  auto status = SerializeOptions(config_options, "", &props);
+  auto status = SerializeOptions(config_options, prefix, &props);
   assert(status.ok());
   if (status.ok()) {
-    return config_options.ToString("", props);
+    return config_options.ToString(prefix, props);
   } else {
     return "";
   }
 }
 
 std::string PersistentCache::ToString(
-    const ConfigOptions& config_options) const {
+				      const ConfigOptions& config_options,
+				      const std::string& prefix) const {
   //**TODO: This method is needed until PersistentCache is Customizable
   OptionProperties options;
   std::string id = Name();
   options.insert({OptionTypeInfo::kIdPropName(), id});
-  Status s = SerializePrintableOptions(config_options, "", &options);
+  Status s = SerializePrintableOptions(config_options, prefix, &options);
   assert(s.ok());
   if (s.ok()) {
-    return config_options.ToString("", options);
+    return config_options.ToString(prefix, options);
   } else {
     return id;
   }

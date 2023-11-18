@@ -6,6 +6,7 @@
 #include "cache/secondary_cache_adapter.h"
 
 #include "monitoring/perf_context_imp.h"
+#include "rocksdb/utilities/options_type.h"
 
 namespace ROCKSDB_NAMESPACE {
 
@@ -281,11 +282,12 @@ void CacheWithSecondaryAdapter::WaitAll(AsyncLookupHandle* async_handles,
   }
 }
 
-std::string CacheWithSecondaryAdapter::GetPrintableOptions() const {
-  std::string str = target_->GetPrintableOptions();
-  str.append("  secondary_cache:\n");
-  str.append(secondary_cache_->GetPrintableOptions());
-  return str;
+Status CacheWithSecondaryAdapter::SerializeOptions(const ConfigOptions& config_options,
+						  const std::string& prefix,
+						  OptionProperties* props) const {
+  props->insert({"target", target_->ToString(config_options)});
+  props->insert({"secondary_cache", secondary_cache_->ToString(config_options)});
+  return CacheWrapper::SerializeOptions(config_options, prefix, props);
 }
 
 const char* CacheWithSecondaryAdapter::Name() const {

@@ -13,6 +13,7 @@
 #include "port/port.h"
 #include "rocksdb/env.h"
 #include "rocksdb/file_system.h"
+#include "rocksdb/utilities/options_type.h"
 #include "util/mutexlock.h"
 
 namespace ROCKSDB_NAMESPACE {
@@ -301,13 +302,12 @@ class SimCacheImpl : public SimCache {
     return oss.str();
   }
 
-  std::string GetPrintableOptions() const override {
-    std::ostringstream oss;
-    oss << "    cache_options:" << std::endl;
-    oss << target_->GetPrintableOptions();
-    oss << "    sim_cache_options:" << std::endl;
-    oss << key_only_cache_->GetPrintableOptions();
-    return oss.str();
+  Status SerializeOptions(const ConfigOptions& config_options,
+			  const std::string& prefix,
+			  OptionProperties* props) const override {
+    props->insert({"cache", target_->ToString(config_options)});
+    props->insert({"sim_cache", key_only_cache_->ToString(config_options)});
+    return SimCache::SerializeOptions(config_options, prefix, props);
   }
 
   Status StartActivityLogging(const std::string& activity_log_file, Env* env,

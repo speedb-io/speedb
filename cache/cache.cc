@@ -137,7 +137,7 @@ std::string Cache::GetId() const {
        << port::GetProcessID();
   return ostr.str();
 }
-  
+
 std::string Cache::ToString(const ConfigOptions& config_options,
                             const std::string& prefix) const {
   OptionProperties props;

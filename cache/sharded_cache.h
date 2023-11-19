@@ -121,8 +121,8 @@ class ShardedCacheBase : public Cache {
 
  protected:  // fns
   Status SerializeOptions(const ConfigOptions& config_options,
-			  const std::string& /*prefix*/,
-			  OptionProperties* props) const override;
+                          const std::string& /*prefix*/,
+                          OptionProperties* props) const override;
   virtual void AppendPrintableOptions(OptionProperties* props) const = 0;
   size_t GetPerShardCapacity() const;
   size_t ComputePerShardCapacity(size_t capacity) const;

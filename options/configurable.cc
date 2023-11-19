@@ -21,11 +21,11 @@
 
 #include "logging/logging.h"
 #include "options/configurable_helper.h"
-#include "options/options_formatter_impl.h"
 #include "options/options_helper.h"
 #include "rocksdb/customizable.h"
 #include "rocksdb/status.h"
 #include "rocksdb/utilities/object_registry.h"
+#include "rocksdb/utilities/options_formatter.h"
 #include "rocksdb/utilities/options_type.h"
 #include "util/coding.h"
 #include "util/string_util.h"
@@ -588,15 +588,9 @@ Status ConfigurableHelper::SerializeOptions(const ConfigOptions& config_options,
           } else {
             copy.compare_to = compare_to;
           }
-	  if (opt_info.IsConfigurable()) {
-	    s = SerializeOption(copy,
-				opt_name,
-				opt_info, opt_addr, &single);
-	  } else {
-	    s = SerializeOption(copy,
-				OptionTypeInfo::MakePrefix(prefix, opt_name),
-				opt_info, opt_addr, &single);
-	  }
+          s = SerializeOption(copy,
+                              OptionTypeInfo::MakePrefix(prefix, opt_name),
+                              opt_info, opt_addr, &single);
           if (!s.ok()) {
             return s;
           } else if (!single.empty()) {
@@ -638,7 +632,7 @@ Status ConfigurableHelper::SerializeOption(const ConfigOptions& config_options,
 std::string Configurable::GetPrintableOptions() const {
   ConfigOptions config_options;
   Properties props;
-  config_options.formatter = std::make_shared<LogOptionsFormatter>();
+  config_options.formatter = OptionsFormatter::GetLogFormatter();
   config_options.depth = ConfigOptions::kDepthPrintable;
   return ToString(config_options);
 }

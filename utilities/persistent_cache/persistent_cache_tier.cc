@@ -59,8 +59,8 @@ Status PersistentCacheConfig::SerializeOptions(
       options);
 }
 
-std::string PersistentCacheConfig::ToString(
-					    const ConfigOptions& config_options, const std::string& prefix) const {
+std::string PersistentCacheConfig::ToString(const ConfigOptions& config_options,
+                                            const std::string& prefix) const {
   OptionProperties props;
   auto status = SerializeOptions(config_options, prefix, &props);
   assert(status.ok());
@@ -71,9 +71,8 @@ std::string PersistentCacheConfig::ToString(
   }
 }
 
-std::string PersistentCache::ToString(
-				      const ConfigOptions& config_options,
-				      const std::string& prefix) const {
+std::string PersistentCache::ToString(const ConfigOptions& config_options,
+                                      const std::string& prefix) const {
   //**TODO: This method is needed until PersistentCache is Customizable
   OptionProperties options;
   std::string id = Name();

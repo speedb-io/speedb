@@ -27,7 +27,6 @@
 #include "logging/logging.h"
 #include "options/configurable_helper.h"
 #include "options/db_options.h"
-#include "options/options_formatter_impl.h"
 #include "options/options_helper.h"
 #include "options/options_parser.h"
 #include "port/port.h"
@@ -42,6 +41,7 @@
 #include "rocksdb/options.h"
 #include "rocksdb/table.h"
 #include "rocksdb/utilities/object_registry.h"
+#include "rocksdb/utilities/options_formatter.h"
 #include "rocksdb/utilities/options_type.h"
 #include "util/cast_util.h"
 
@@ -1015,7 +1015,7 @@ void MutableCFOptions::RefreshDerivedOptions(int num_levels,
 void MutableCFOptions::Dump(Logger* log) const {
   ConfigOptions config_options;
   config_options.depth = ConfigOptions::kDepthPrintable;
-  config_options.formatter.reset(new LogOptionsFormatter());
+  config_options.formatter = OptionsFormatter::GetLogFormatter();
   auto cf_cfg = CFOptionsAsConfigurable(*this);
   auto cf_str = cf_cfg->ToString(config_options, "Options");
   ROCKS_LOG_HEADER(log, "%s", cf_str.c_str());

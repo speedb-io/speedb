@@ -448,7 +448,7 @@ class Cache {
   // Prerequisite: no entry is referenced.
   virtual void EraseUnRefEntries() = 0;
 
-  //virtual std::string GetPrintableOptions() const { return ""; }
+  // virtual std::string GetPrintableOptions() const { return ""; }
 
   std::string ToString(const ConfigOptions& opts,
                        const std::string& prefix = "") const;
@@ -585,9 +585,9 @@ class Cache {
   void DiscardItemOwnerId(ItemOwnerId*);
 
  protected:
-  virtual Status SerializeOptions(
-      const ConfigOptions& /*config_options*/, const std::string& /*prefix*/,
-      OptionProperties* /*options*/) const {
+  virtual Status SerializeOptions(const ConfigOptions& /*config_options*/,
+                                  const std::string& /*prefix*/,
+                                  OptionProperties* /*options*/) const {
     return Status::OK();
   }
   virtual Status SerializePrintableOptions(

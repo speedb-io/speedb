@@ -31,9 +31,9 @@
 #include "db/db_impl/db_impl.h"
 #include "logging/logging.h"
 #include "monitoring/instrumented_mutex.h"
-#include "options/options_formatter_impl.h"
 #include "rocksdb/convenience.h"
 #include "rocksdb/status.h"
+#include "rocksdb/utilities/options_formatter.h"
 #include "rocksdb/utilities/options_type.h"
 #include "rocksdb/write_controller.h"
 #include "test_util/sync_point.h"
@@ -324,7 +324,7 @@ Status WriteBufferManager::SerializePrintableOptions(
 std::string WriteBufferManager::GetPrintableOptions() const {
   ConfigOptions config_options;
 
-  config_options.formatter = std::make_shared<LogOptionsFormatter>();
+  config_options.formatter = OptionsFormatter::GetLogFormatter();
   return ToString(config_options);
 }
 

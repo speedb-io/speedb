@@ -58,14 +58,16 @@ size_t ShardedCacheBase::GetUsage(Handle* handle) const {
 }
 
 Status ShardedCacheBase::SerializeOptions(const ConfigOptions& config_options,
-					  const std::string& prefix,
-					  OptionProperties* props) const {
+                                          const std::string& prefix,
+                                          OptionProperties* props) const {
   MutexLock l(&config_mutex_);
   props->insert({"capacity", std::to_string(capacity_)});
   props->insert({"num_shard_bits", std::to_string(GetNumShardBits())});
-  props->insert({"strict_capacity_limit", std::to_string(strict_capacity_limit_)});
+  props->insert(
+      {"strict_capacity_limit", std::to_string(strict_capacity_limit_)});
   if (memory_allocator()) {
-    props->insert({"memory_allocator", memory_allocator()->ToString(config_options)});
+    props->insert(
+        {"memory_allocator", memory_allocator()->ToString(config_options)});
   } else {
     props->insert({"memory_allocator", kNullptrString});
   }

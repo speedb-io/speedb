@@ -29,7 +29,6 @@
 #include "logging/logging.h"
 #include "monitoring/statistics.h"
 #include "options/db_options.h"
-#include "options/options_formatter_impl.h"
 #include "options/options_helper.h"
 #include "rocksdb/cache.h"
 #include "rocksdb/compaction_filter.h"
@@ -46,6 +45,7 @@
 #include "rocksdb/table.h"
 #include "rocksdb/table_pinning_policy.h"
 #include "rocksdb/table_properties.h"
+#include "rocksdb/utilities/options_formatter.h"
 #include "rocksdb/wal_filter.h"
 #include "rocksdb/write_buffer_manager.h"
 #include "rocksdb/write_controller.h"
@@ -151,7 +151,7 @@ DBOptions::DBOptions(const Options& options)
 void DBOptions::Dump(Logger* log) const {
   ConfigOptions config_options;
   config_options.depth = ConfigOptions::kDepthPrintable;
-  config_options.formatter.reset(new LogOptionsFormatter());
+  config_options.formatter = OptionsFormatter::GetLogFormatter();
   auto db_cfg = DBOptionsAsConfigurable(*this);
   auto db_str = db_cfg->ToString(config_options, "Options");
   ROCKS_LOG_HEADER(log, "%s", db_str.c_str());
@@ -160,7 +160,7 @@ void DBOptions::Dump(Logger* log) const {
 void ColumnFamilyOptions::Dump(Logger* log) const {
   ConfigOptions config_options;
   config_options.depth = ConfigOptions::kDepthPrintable;
-  config_options.formatter.reset(new LogOptionsFormatter());
+  config_options.formatter = OptionsFormatter::GetLogFormatter();
   auto cf_cfg = CFOptionsAsConfigurable(*this);
   auto cf_str = cf_cfg->ToString(config_options, "Options");
   ROCKS_LOG_HEADER(log, "%s", cf_str.c_str());

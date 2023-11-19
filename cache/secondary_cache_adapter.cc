@@ -282,11 +282,12 @@ void CacheWithSecondaryAdapter::WaitAll(AsyncLookupHandle* async_handles,
   }
 }
 
-Status CacheWithSecondaryAdapter::SerializeOptions(const ConfigOptions& config_options,
-						  const std::string& prefix,
-						  OptionProperties* props) const {
+Status CacheWithSecondaryAdapter::SerializeOptions(
+    const ConfigOptions& config_options, const std::string& prefix,
+    OptionProperties* props) const {
   props->insert({"target", target_->ToString(config_options)});
-  props->insert({"secondary_cache", secondary_cache_->ToString(config_options)});
+  props->insert(
+      {"secondary_cache", secondary_cache_->ToString(config_options)});
   return CacheWrapper::SerializeOptions(config_options, prefix, props);
 }
 

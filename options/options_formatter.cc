@@ -266,20 +266,18 @@ Status PropertiesOptionsFormatter::ToProps(const std::string& props_str,
 
 namespace {
 static const int kLogPadding = 47;
-void AppendElemToLog(const std::string& prefix,
-		     const std::string& name,
-		     const std::string& value,
-		     std::string* result) {
+void AppendElemToLog(const std::string& prefix, const std::string& name,
+                     const std::string& value, std::string* result) {
   std::ostringstream oss;
   if (!result->empty()) {
     oss << std::endl;
   }
   int padding = kLogPadding;
-  if (prefix.empty()) { // There is no prefix, only a name
+  if (prefix.empty()) {  // There is no prefix, only a name
     oss << std::setw(padding) << name << ": ";
-  } else if (name.empty()) { // There is a prefix and no name
+  } else if (name.empty()) {  // There is a prefix and no name
     oss << std::setw(padding) << prefix << ": ";
-  } else { // There is a name and a prefix
+  } else {  // There is a name and a prefix
     auto pos = value.find(prefix + "." + name);
     if (pos == std::string::npos) {
       // The value does not contains the name/prefix.  Append it
@@ -290,8 +288,8 @@ void AppendElemToLog(const std::string& prefix,
   oss << value;
   result->append(oss.str());
 }
-} // end anonymous namespace
-  
+}  // end anonymous namespace
+
 std::string LogOptionsFormatter::ToString(const std::string& prefix,
                                           const OptionProperties& props) const {
   std::string result;
@@ -300,19 +298,22 @@ std::string LogOptionsFormatter::ToString(const std::string& prefix,
     if (id == props.end()) {
       // There is no ID.  Print all of the elements as prefix.name : value
       for (const auto& it : props) {
-	AppendElemToLog(prefix, it.first, it.second, &result);
+        AppendElemToLog(prefix, it.first, it.second, &result);
       }
     } else if (props.size() == 1) {
       // There is only one element and it is the ID.  Return just the ID
       return id->second;
     } else {
       // There is more than one element and an ID
-      // Print the ID 
+      // Print the ID
       AppendElemToLog(prefix, "", id->second, &result);
+      auto pos = prefix.find_last_of(".");
+      auto short_name =
+          (pos != std::string::npos) ? prefix.substr(pos + 1) : prefix;
       for (const auto& it : props) {
         if (it.first != OptionTypeInfo::kIdPropName()) {
-	  AppendElemToLog(prefix, it.first, it.second, &result);
-	}
+          AppendElemToLog(short_name, it.first, it.second, &result);
+        }
       }
     }
   }
@@ -328,7 +329,8 @@ std::string LogOptionsFormatter::ToString(
     if (printed > 0) {
       oss << std::endl;
     }
-    oss << std::setw(kLogPadding - 3) << prefix << "[" << printed++ << "]: " << elem;
+    oss << std::setw(kLogPadding - 3) << prefix << "[" << printed++
+        << "]: " << elem;
   }
   return oss.str();
 }
@@ -366,6 +368,12 @@ const std::shared_ptr<OptionsFormatter>& OptionsFormatter::Default() {
   static std::shared_ptr<OptionsFormatter> default_formatter =
       std::make_shared<DefaultOptionsFormatter>();
   return default_formatter;
+}
+
+const std::shared_ptr<OptionsFormatter>& OptionsFormatter::GetLogFormatter() {
+  static std::shared_ptr<OptionsFormatter> log_formatter =
+      std::make_shared<LogOptionsFormatter>();
+  return log_formatter;
 }
 
 Status OptionsFormatter::CreateFromString(

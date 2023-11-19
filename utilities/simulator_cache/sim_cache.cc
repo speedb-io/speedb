@@ -303,8 +303,8 @@ class SimCacheImpl : public SimCache {
   }
 
   Status SerializeOptions(const ConfigOptions& config_options,
-			  const std::string& prefix,
-			  OptionProperties* props) const override {
+                          const std::string& prefix,
+                          OptionProperties* props) const override {
     props->insert({"cache", target_->ToString(config_options)});
     props->insert({"sim_cache", key_only_cache_->ToString(config_options)});
     return SimCache::SerializeOptions(config_options, prefix, props);

@@ -37,6 +37,7 @@ class OptionProperties;
 class OptionsFormatter : public Customizable {
  public:
   static const std::shared_ptr<OptionsFormatter>& Default();
+  static const std::shared_ptr<OptionsFormatter>& GetLogFormatter();
   // Creates and configures a new OptionsFormatter from the input options and
   // id.
   static Status CreateFromString(const ConfigOptions& config_options,

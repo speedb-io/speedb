@@ -32,8 +32,8 @@ class CacheWithSecondaryAdapter : public CacheWrapper {
 
  private:
   Status SerializeOptions(const ConfigOptions& config_options,
-						  const std::string& prefix,
-						     OptionProperties* props) const override;
+                          const std::string& prefix,
+                          OptionProperties* props) const override;
   bool EvictionHandler(const Slice& key, Handle* handle);
 
   void StartAsyncLookupOnMySecondary(AsyncLookupHandle& async_handle);

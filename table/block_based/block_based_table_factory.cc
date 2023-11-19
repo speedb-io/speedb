@@ -872,20 +872,25 @@ Status BlockBasedTableFactory::ValidateOptions(
 }
 
 Status BlockBasedTableFactory::SerializePrintableOptions(
-							 const ConfigOptions& config_options, const std::string& /*prefix*/,
+    const ConfigOptions& config_options, const std::string& prefix,
     OptionProperties* props) const {
   if (table_options_.persistent_cache) {
     props->insert({"persistent_cache",
-	table_options_.persistent_cache->ToString(config_options, "persistent_cache")});
+                   table_options_.persistent_cache->ToString(
+                       config_options, OptionTypeInfo::MakePrefix(
+                                           prefix, "persistent_cache"))});
   }
   if (table_options_.pinning_policy) {
-    props->insert(
-        {"pinning_policy",
-         table_options_.pinning_policy->ToString(config_options, "pinning_policy")});
+    props->insert({"pinning_policy",
+                   table_options_.pinning_policy->ToString(
+                       config_options,
+                       OptionTypeInfo::MakePrefix(prefix, "pinning_policy"))});
   }
   if (table_options_.block_cache) {
     props->insert({"block_cache",
-	table_options_.block_cache->ToString(config_options, "block_cache")});
+                   table_options_.block_cache->ToString(
+                       config_options,
+                       OptionTypeInfo::MakePrefix(prefix, "block_cache"))});
   }
   return Status::OK();
 }

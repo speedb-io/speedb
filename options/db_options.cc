@@ -23,7 +23,6 @@
 
 #include "logging/logging.h"
 #include "options/configurable_helper.h"
-#include "options/options_formatter_impl.h"
 #include "options/options_helper.h"
 #include "options/options_parser.h"
 #include "port/port.h"
@@ -36,6 +35,7 @@
 #include "rocksdb/sst_file_manager.h"
 #include "rocksdb/statistics.h"
 #include "rocksdb/system_clock.h"
+#include "rocksdb/utilities/options_formatter.h"
 #include "rocksdb/utilities/options_type.h"
 #include "rocksdb/wal_filter.h"
 #include "rocksdb/write_buffer_manager.h"
@@ -921,7 +921,7 @@ MutableDBOptions::MutableDBOptions(const DBOptions& options)
 void MutableDBOptions::Dump(Logger* log) const {
   ConfigOptions config_options;
   config_options.depth = ConfigOptions::kDepthPrintable;
-  config_options.formatter.reset(new LogOptionsFormatter());
+  config_options.formatter = OptionsFormatter::GetLogFormatter();
   auto db_cfg = DBOptionsAsConfigurable(*this);
   auto db_str = db_cfg->ToString(config_options, "Options");
   ROCKS_LOG_HEADER(log, "%s", db_str.c_str());

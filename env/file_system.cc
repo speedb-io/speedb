@@ -262,9 +262,7 @@ Status FileSystemWrapper::SerializeOptions(const ConfigOptions& config_options,
                                            OptionProperties* props) const {
   if (!config_options.IsShallow() && target_ != nullptr &&
       !target_->IsInstanceOf(FileSystem::kDefaultName())) {
-    props->insert(
-        {kTargetPropName(),
-         target_->ToString(config_options)});
+    props->insert({kTargetPropName(), target_->ToString(config_options)});
   }
   return FileSystem::SerializeOptions(config_options, prefix, props);
 }

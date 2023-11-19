@@ -920,8 +920,7 @@ MutableDBOptions::MutableDBOptions(const DBOptions& options)
 
 void MutableDBOptions::Dump(Logger* log) const {
   ConfigOptions config_options;
-  config_options.depth = ConfigOptions::kDepthPrintable;
-  config_options.formatter = OptionsFormatter::GetLogFormatter();
+  config_options.SetupForLogging();
   auto db_cfg = DBOptionsAsConfigurable(*this);
   auto db_str = db_cfg->ToString(config_options, "Options");
   ROCKS_LOG_HEADER(log, "%s", db_str.c_str());

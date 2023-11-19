@@ -150,21 +150,28 @@ DBOptions::DBOptions(const Options& options)
 
 void DBOptions::Dump(Logger* log) const {
   ConfigOptions config_options;
-  config_options.depth = ConfigOptions::kDepthPrintable;
-  config_options.formatter = OptionsFormatter::GetLogFormatter();
-  auto db_cfg = DBOptionsAsConfigurable(*this);
-  auto db_str = db_cfg->ToString(config_options, "Options");
+  config_options.SetupForLogging();
+  auto db_str = ToString(config_options, "Options");
   ROCKS_LOG_HEADER(log, "%s", db_str.c_str());
 }  // DBOptions::Dump
 
+std::string DBOptions::ToString(ConfigOptions& config_options,
+                                const std::string& prefix) const {
+  auto db_cfg = DBOptionsAsConfigurable(*this);
+  return db_cfg->ToString(config_options, prefix);
+}
 void ColumnFamilyOptions::Dump(Logger* log) const {
   ConfigOptions config_options;
-  config_options.depth = ConfigOptions::kDepthPrintable;
-  config_options.formatter = OptionsFormatter::GetLogFormatter();
-  auto cf_cfg = CFOptionsAsConfigurable(*this);
-  auto cf_str = cf_cfg->ToString(config_options, "Options");
+  config_options.SetupForLogging();
+  auto cf_str = ToString(config_options, "Options");
   ROCKS_LOG_HEADER(log, "%s", cf_str.c_str());
 }  // ColumnFamilyOptions::Dump
+
+std::string ColumnFamilyOptions::ToString(ConfigOptions& config_options,
+                                          const std::string& prefix) const {
+  auto cf_cfg = CFOptionsAsConfigurable(*this);
+  return cf_cfg->ToString(config_options, prefix);
+}
 
 void Options::Dump(Logger* log) const {
   DBOptions::Dump(log);

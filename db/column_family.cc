@@ -635,18 +635,18 @@ ColumnFamilyData::ColumnFamilyData(
       compaction_picker_.reset(
           new LevelCompactionPicker(ioptions_, &internal_comparator_));
     }
-
-    if (column_family_set_->NumberOfColumnFamilies() < 10) {
+    {
+      // Dump the ColumnFamilyOptions that have changed from the default
+      // to the logger.
+      auto cf_cfg = CFOptionsAsConfigurable(ColumnFamilyOptions());
+      ConfigOptions config_options;
+      config_options.SetupForLogging(cf_cfg.get());
+      auto cf_str = initial_cf_options_.ToString(config_options, "Options");
       ROCKS_LOG_HEADER(ioptions_.logger,
-                       "--------------- Options for column family [%s]:\n",
-                       name.c_str());
-      initial_cf_options_.Dump(ioptions_.logger);
-    } else {
-      ROCKS_LOG_INFO(ioptions_.logger,
-                     "\t(skipping printing options of [%s])\n", name.c_str());
+                       "--------------- Options for column family [%s]:%s\n",
+                       name.c_str(), cf_str.c_str());
     }
   }
-
   RecalculateWriteStallConditions(mutable_cf_options_);
 
   if (cf_options.table_factory->IsInstanceOf(

@@ -55,6 +55,13 @@ ConfigOptions::ConfigOptions(const DBOptions& db_opts) : env(db_opts.env) {
   registry = ObjectRegistry::NewInstance();
 }
 
+ConfigOptions& ConfigOptions::SetupForLogging(const Configurable* compare) {
+  depth = ConfigOptions::kDepthPrintable;
+  formatter = OptionsFormatter::GetLogFormatter();
+  compare_to = compare;
+  return *this;
+}
+
 std::string ConfigOptions::ToString(const std::string& prefix,
                                     const OptionProperties& props) const {
   if (formatter) {

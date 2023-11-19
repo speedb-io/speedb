@@ -596,6 +596,20 @@ Status ConfigurableHelper::SerializeOptions(const ConfigOptions& config_options,
           } else if (!single.empty()) {
             props->insert_or_assign(opt_name, single);
           }
+        } else if (compare_to != nullptr && opt_info.ShouldSerialize() &&
+                   opt_info.IsCustomizable() && copy.IsPrintable()) {
+          // We decided that this object has no difference
+          // Check if there are any printable options we would otherwise miss
+          const auto custom = opt_info.AsRawPointer<Customizable>(opt_addr);
+          if (custom != nullptr) {
+            OptionProperties printable;
+            auto nested = OptionTypeInfo::MakePrefix(prefix, opt_name);
+            s = custom->SerializePrintableOptions(copy, nested, &printable);
+            if (s.ok() && !printable.empty()) {
+              props->insert_or_assign(opt_name,
+                                      copy.ToString(nested, printable));
+            }
+          }
         }
       }
     }

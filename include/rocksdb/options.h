@@ -367,6 +367,8 @@ struct ColumnFamilyOptions : public AdvancedColumnFamilyOptions {
   explicit ColumnFamilyOptions(const Options& options);
 
   void Dump(Logger* log) const;
+  std::string ToString(ConfigOptions& config_options,
+                       const std::string& prefix) const;
 };
 
 enum class WALRecoveryMode : char {
@@ -1019,6 +1021,8 @@ struct DBOptions {
   explicit DBOptions(const Options& options);
 
   void Dump(Logger* log) const;
+  std::string ToString(ConfigOptions& config_options,
+                       const std::string& prefix) const;
 
   // Allows OS to incrementally sync files to disk while they are being
   // written, asynchronously, in the background. This operation can be used

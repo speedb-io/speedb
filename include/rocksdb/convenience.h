@@ -57,6 +57,9 @@ struct ConfigOptions {
   // the input DBOptions.  Currently constructs a new object registry.
   explicit ConfigOptions(const DBOptions&);
 
+  // Initializes the ConfigOptions for use for Dump/Log formats
+  ConfigOptions& SetupForLogging(const Configurable* compare = nullptr);
+
   // This enum defines the RocksDB options sanity level.
   enum SanityLevel : unsigned char {
     kSanityLevelNone = 0x01,  // Performs no sanity check at all.
@@ -118,7 +121,7 @@ struct ConfigOptions {
   std::shared_ptr<OptionsFormatter> formatter;
 
   // If set, only changes from this reference version will be serialized.
-  Configurable* compare_to = nullptr;
+  const Configurable* compare_to = nullptr;
 
   bool IsShallow() const { return depth == Depth::kDepthShallow; }
   bool IsDetailed() const {

@@ -2462,6 +2462,52 @@ TEST_F(OptionsTest, SerializeChangedOptionsCompareLoosely) {
   ASSERT_EQ(copy_str, props.begin()->second.c_str());
 }
 
+TEST_F(OptionsTest, SerializePrintableDBOptions) {
+  Random rnd(302);
+  DBOptions base;
+  ConfigOptions cfg_opts;
+  std::string opts_str, print_str;
+  DBOptions copy;
+  OptionProperties props;
+
+  test::RandomInitDBOptions(&base, &rnd);
+  ASSERT_OK(GetStringFromDBOptions(cfg_opts, base, &opts_str));
+  cfg_opts.depth = ConfigOptions::kDepthPrintable;
+  ASSERT_OK(GetStringFromDBOptions(cfg_opts, base, &print_str));
+  if (print_str != opts_str) {
+    ASSERT_NOK(GetDBOptionsFromString(cfg_opts, DBOptions(), print_str, &copy));
+  }
+  ASSERT_OK(cfg_opts.ToProps(print_str, &props));
+  cfg_opts.ignore_unknown_options = true;
+  ASSERT_OK(GetDBOptionsFromString(cfg_opts, DBOptions(), print_str, &copy));
+  ASSERT_OK(RocksDBOptionsParser::VerifyDBOptions(cfg_opts, base, copy));
+}
+
+TEST_F(OptionsTest, SerializePrintableCFOptions) {
+  Random rnd(302);
+  DBOptions db_opts;
+  ColumnFamilyOptions base, copy;
+  ConfigOptions cfg_opts;
+  std::string opts_str, print_str;
+  OptionProperties props;
+
+  test::RandomInitCFOptions(&base, db_opts, &rnd);
+  base.table_factory.reset(
+      NewBlockBasedTableFactory(test::RandomBlockBasedTableOptions(&rnd)));
+  ASSERT_OK(GetStringFromColumnFamilyOptions(cfg_opts, base, &opts_str));
+  cfg_opts.depth = ConfigOptions::kDepthPrintable;
+  ASSERT_OK(GetStringFromColumnFamilyOptions(cfg_opts, base, &print_str));
+  if (print_str != opts_str) {
+    ASSERT_NOK(GetColumnFamilyOptionsFromString(cfg_opts, ColumnFamilyOptions(),
+                                                print_str, &copy));
+  }
+  ASSERT_OK(cfg_opts.ToProps(print_str, &props));
+  cfg_opts.ignore_unknown_options = true;
+  ASSERT_OK(GetColumnFamilyOptionsFromString(cfg_opts, ColumnFamilyOptions(),
+                                             print_str, &copy));
+  ASSERT_OK(RocksDBOptionsParser::VerifyCFOptions(cfg_opts, base, copy));
+}
+
 const static std::string kCustomEnvName = "Custom";
 const static std::string kCustomEnvProp = "env=" + kCustomEnvName;
 

@@ -475,6 +475,9 @@ Status Configurable::GetOptionString(const ConfigOptions& config_options,
   result->clear();
   Status s =
       ConfigurableHelper::SerializeOptions(config_options, *this, "", &props);
+  if (s.ok() && config_options.IsPrintable()) {
+    s = SerializePrintableOptions(config_options, "", &props);
+  }
   if (s.ok()) {
     *result = config_options.ToString("", props);
   }

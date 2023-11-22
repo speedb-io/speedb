@@ -703,15 +703,28 @@ class DBOptionsConfigurable : public MutableDBConfigurable {
       props->insert({"row_cache", kNullptrString});
     }
     if (immutable_.statistics) {
-      props->insert(
-          {"statistics", immutable_.statistics->ToString(config_options)});
+      props->insert({"statistics",
+                     immutable_.statistics->ToString(
+                         config_options,
+                         OptionTypeInfo::MakePrefix(prefix, "statistics"))});
     } else {
       props->insert({"statistics", kNullptrString});
     }
     if (immutable_.env) {
-      props->insert({"env", immutable_.env->ToString(config_options)});
+      props->insert({"env", immutable_.env->ToString(
+                                config_options,
+                                OptionTypeInfo::MakePrefix(prefix, "env"))});
+
     } else {
       props->insert({"env", kNullptrString});
+    }
+    if (immutable_.write_buffer_manager) {
+      props->insert({"write_buffer_manager",
+                     immutable_.write_buffer_manager->ToString(
+                         config_options, OptionTypeInfo::MakePrefix(
+                                             prefix, "write_buffer_manager"))});
+    } else {
+      props->insert({"write_buffer_manager", kNullptrString});
     }
     snprintf(buffer, kBufferSize, "(%p)", immutable_.rate_limiter.get());
     props->insert({"rate_limiter", buffer});

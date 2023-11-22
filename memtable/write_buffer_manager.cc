@@ -568,8 +568,7 @@ void WriteBufferManager::UpdateUsageState(size_t new_memory_used,
                                           int64_t memory_changed_size,
                                           size_t quota) {
   assert(enabled());
-  if (allow_stall_.load(std::memory_order_relaxed) == false ||
-      controllers_to_refcount_map_.empty()) {
+  if (allow_stall_.load(std::memory_order_relaxed) == false) {
     return;
   }
 

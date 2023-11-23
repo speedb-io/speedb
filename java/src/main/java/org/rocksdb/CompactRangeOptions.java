@@ -331,6 +331,6 @@ public class CompactRangeOptions extends RocksObject {
   private native void setCanceled(final long handle, final boolean canceled);
 
   private native boolean canceled(final long handle);
-  
+
   private native void setAsyncCompletionCb(final long nativeHandle_, final long completeCbHandle);
 }

@@ -242,7 +242,6 @@ static std::unordered_map<std::string,
         {"kFlushOnly",
          BlockBasedTableOptions::PrepopulateBlockCache::kFlushOnly}};
 
-
 static std::unordered_map<std::string, OptionTypeInfo>
     block_based_table_type_info = {
         /* currently not supported

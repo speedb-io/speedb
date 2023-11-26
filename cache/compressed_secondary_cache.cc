@@ -11,6 +11,7 @@
 
 #include "memory/memory_allocator.h"
 #include "monitoring/perf_context_imp.h"
+#include "rocksdb/utilities/options_type.h"
 #include "util/compression.h"
 #include "util/string_util.h"
 
@@ -200,19 +201,16 @@ Status CompressedSecondaryCache::GetCapacity(size_t& capacity) {
   return Status::OK();
 }
 
-std::string CompressedSecondaryCache::GetPrintableOptions() const {
-  std::string ret;
-  ret.reserve(20000);
-  const int kBufferSize{200};
-  char buffer[kBufferSize];
-  ret.append(cache_->GetPrintableOptions());
-  snprintf(buffer, kBufferSize, "    compression_type : %s\n",
-           CompressionTypeToString(cache_options_.compression_type).c_str());
-  ret.append(buffer);
-  snprintf(buffer, kBufferSize, "    compress_format_version : %d\n",
-           cache_options_.compress_format_version);
-  ret.append(buffer);
-  return ret;
+Status CompressedSecondaryCache::SerializePrintableOptions(
+    const ConfigOptions& config_options, const std::string& prefix,
+    OptionProperties* props) const {
+  props->insert({OptionTypeInfo::MakePrefix(prefix, "cache"),
+                 cache_->ToString(config_options)});
+  props->insert({OptionTypeInfo::MakePrefix(prefix, "compression_type"),
+                 CompressionTypeToString(cache_options_.compression_type)});
+  props->insert({OptionTypeInfo::MakePrefix(prefix, "compress_format_version"),
+                 std::to_string(cache_options_.compress_format_version)});
+  return Status::OK();
 }
 
 CompressedSecondaryCache::CacheValueChunk*

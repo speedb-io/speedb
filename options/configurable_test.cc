@@ -28,6 +28,7 @@
 #include "options/options_parser.h"
 #include "port/stack_trace.h"
 #include "rocksdb/configurable.h"
+#include "rocksdb/persistent_cache.h"
 #include "test_util/testharness.h"
 #include "test_util/testutil.h"
 

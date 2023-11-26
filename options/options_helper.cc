@@ -55,6 +55,13 @@ ConfigOptions::ConfigOptions(const DBOptions& db_opts) : env(db_opts.env) {
   registry = ObjectRegistry::NewInstance();
 }
 
+ConfigOptions& ConfigOptions::SetupForLogging(const Configurable* compare) {
+  depth = ConfigOptions::kDepthPrintable;
+  formatter = OptionsFormatter::GetLogFormatter();
+  compare_to = compare;
+  return *this;
+}
+
 std::string ConfigOptions::ToString(const std::string& prefix,
                                     const OptionProperties& props) const {
   if (formatter) {
@@ -806,10 +813,10 @@ std::unordered_map<std::string, CompactionStopStyle>
 
 std::unordered_map<std::string, Temperature>
     OptionsHelper::temperature_string_map = {
-        {"kUnknown", Temperature::kUnknown},
-        {"kHot", Temperature::kHot},
-        {"kWarm", Temperature::kWarm},
-        {"kCold", Temperature::kCold}};
+        {"kUnknown", Temperature::kUnknown}, {"kHot", Temperature::kHot},
+        {"kWarm", Temperature::kWarm},       {"kCold", Temperature::kCold},
+        {"", Temperature::kLastTemperature},
+};
 
 std::unordered_map<std::string, PrepopulateBlobCache>
     OptionsHelper::prepopulate_blob_cache_string_map = {

@@ -71,27 +71,4 @@ bool ScopedPinningPolicy::CheckPin(const TablePinningOptions& tpo,
 
   return true;
 }
-
-std::string ScopedPinningPolicy::GetPrintableOptions() const {
-  std::string ret;
-  const int kBufferSize = 200;
-  char buffer[kBufferSize];
-
-  snprintf(buffer, kBufferSize,
-           "    pinning_policy.capacity: %" ROCKSDB_PRIszt "\n",
-           options_.capacity);
-  ret.append(buffer);
-
-  snprintf(buffer, kBufferSize,
-           "    pinning_policy.last_level_with_data_percent: %" PRIu32 "\n",
-           options_.last_level_with_data_percent);
-  ret.append(buffer);
-
-  snprintf(buffer, kBufferSize, "    pinning_policy.mid_percent: %" PRIu32 "\n",
-           options_.mid_percent);
-  ret.append(buffer);
-
-  return ret;
-}
-
 }  // namespace ROCKSDB_NAMESPACE

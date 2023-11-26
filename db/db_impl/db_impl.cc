@@ -299,8 +299,8 @@ DBImpl::DBImpl(const DBOptions& options, const std::string& dbname,
 
   DumpRocksDBBuildVersion(immutable_db_options_.info_log.get());
   DumpDBFileSummary(immutable_db_options_, dbname_, db_session_id_);
-  immutable_db_options_.Dump(immutable_db_options_.info_log.get());
-  mutable_db_options_.Dump(immutable_db_options_.info_log.get());
+  auto db_options = BuildDBOptions(immutable_db_options_, mutable_db_options_);
+  db_options.Dump(immutable_db_options_.info_log.get());
   DumpSupportInfo(immutable_db_options_.info_log.get());
 
   max_total_wal_size_.store(mutable_db_options_.max_total_wal_size,

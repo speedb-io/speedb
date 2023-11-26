@@ -991,8 +991,6 @@ class TestSecondaryCache : public SecondaryCache {
     }
   }
 
-  std::string GetPrintableOptions() const override { return ""; }
-
   void SetResultMap(ResultMap&& map) { result_map_ = std::move(map); }
 
   uint32_t num_inserts() { return num_inserts_; }

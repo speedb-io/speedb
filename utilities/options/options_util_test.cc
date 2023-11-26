@@ -184,8 +184,6 @@ class DummyTableFactory : public TableFactory {
       const ColumnFamilyOptions& /*cf_opts*/) const override {
     return Status::NotSupported();
   }
-
-  std::string GetPrintableOptions() const override { return ""; }
 };
 
 class DummyMergeOperator : public MergeOperator {

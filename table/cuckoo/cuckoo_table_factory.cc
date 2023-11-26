@@ -43,27 +43,6 @@ TableBuilder* CuckooTableFactory::NewTableBuilder(
       table_builder_options.db_session_id, table_builder_options.cur_file_num);
 }
 
-std::string CuckooTableFactory::GetPrintableOptions() const {
-  std::string ret;
-  ret.reserve(2000);
-  const int kBufferSize = 200;
-  char buffer[kBufferSize];
-
-  snprintf(buffer, kBufferSize, "  hash_table_ratio: %lf\n",
-           table_options_.hash_table_ratio);
-  ret.append(buffer);
-  snprintf(buffer, kBufferSize, "  max_search_depth: %u\n",
-           table_options_.max_search_depth);
-  ret.append(buffer);
-  snprintf(buffer, kBufferSize, "  cuckoo_block_size: %u\n",
-           table_options_.cuckoo_block_size);
-  ret.append(buffer);
-  snprintf(buffer, kBufferSize, "  identity_as_first_hash: %d\n",
-           table_options_.identity_as_first_hash);
-  ret.append(buffer);
-  return ret;
-}
-
 static std::unordered_map<std::string, OptionTypeInfo> cuckoo_table_type_info =
     {
         {"hash_table_ratio",

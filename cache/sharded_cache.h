@@ -54,7 +54,7 @@ class CacheShardBase {
   static inline uint32_t HashPieceForSharding(HashCref hash) {
     return Lower32of64(hash);
   }
-  void AppendPrintableOptions(std::string& /*str*/) const {}
+  void AppendPrintableOptions(OptionProperties* /*props*/) const {}
 
   // Must be provided for concept CacheShard (TODO with C++20 support)
   /*
@@ -118,10 +118,12 @@ class ShardedCacheBase : public Cache {
 
   using Cache::GetUsage;
   size_t GetUsage(Handle* handle) const override;
-  std::string GetPrintableOptions() const override;
 
  protected:  // fns
-  virtual void AppendPrintableOptions(std::string& str) const = 0;
+  Status SerializeOptions(const ConfigOptions& config_options,
+                          const std::string& /*prefix*/,
+                          OptionProperties* props) const override;
+  virtual void AppendPrintableOptions(OptionProperties* props) const = 0;
   size_t GetPerShardCapacity() const;
   size_t ComputePerShardCapacity(size_t capacity) const;
 
@@ -333,8 +335,8 @@ class ShardedCache : public ShardedCacheBase {
     destroy_shards_in_dtor_ = true;
   }
 
-  void AppendPrintableOptions(std::string& str) const override {
-    shards_[0].AppendPrintableOptions(str);
+  void AppendPrintableOptions(OptionProperties* props) const override {
+    shards_[0].AppendPrintableOptions(props);
   }
 
  private:

@@ -228,7 +228,12 @@ class Configurable {
   // Returns a pretty-printed, human-readable version of the options.
   // This method is typically used to dump the options to a log file.
   // Classes should override this method
-  virtual std::string GetPrintableOptions() const { return ""; }
+  std::string GetPrintableOptions() const;
+  virtual Status SerializePrintableOptions(
+      const ConfigOptions& /*config_options*/, const std::string& /*prefix*/,
+      OptionProperties* /*props*/) const {
+    return Status::OK();
+  }
 
   // Validates that the settings are valid/consistent and performs any object
   // initialization required by this object.  This method may be called as part

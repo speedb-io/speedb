@@ -32,8 +32,6 @@ struct ImmutableDBOptions {
   ImmutableDBOptions();
   explicit ImmutableDBOptions(const DBOptions& options);
 
-  void Dump(Logger* log) const;
-
   bool create_if_missing;
   bool create_missing_column_families;
   bool error_if_exists;

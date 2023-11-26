@@ -38,6 +38,7 @@
 #include "rocksdb/convenience.h"
 #include "rocksdb/filter_policy.h"
 #include "rocksdb/flush_block_policy.h"
+#include "rocksdb/persistent_cache.h"
 #include "rocksdb/rocksdb_namespace.h"
 #include "rocksdb/table.h"
 #include "rocksdb/table_pinning_policy.h"
@@ -870,158 +871,28 @@ Status BlockBasedTableFactory::ValidateOptions(
   return TableFactory::ValidateOptions(db_opts, cf_opts);
 }
 
-std::string BlockBasedTableFactory::GetPrintableOptions() const {
-  std::string ret;
-  ret.reserve(20000);
-  const int kBufferSize = 200;
-  char buffer[kBufferSize];
-
-  snprintf(buffer, kBufferSize, "  flush_block_policy_factory: %s (%p)\n",
-           table_options_.flush_block_policy_factory->Name(),
-           static_cast<void*>(table_options_.flush_block_policy_factory.get()));
-  ret.append(buffer);
-  snprintf(buffer, kBufferSize, "  cache_index_and_filter_blocks: %d\n",
-           table_options_.cache_index_and_filter_blocks);
-  ret.append(buffer);
-  snprintf(buffer, kBufferSize,
-           "  cache_index_and_filter_blocks_with_high_priority: %d\n",
-           table_options_.cache_index_and_filter_blocks_with_high_priority);
-  ret.append(buffer);
-  snprintf(buffer, kBufferSize,
-           "  pin_l0_filter_and_index_blocks_in_cache: %d\n",
-           table_options_.pin_l0_filter_and_index_blocks_in_cache);
-  ret.append(buffer);
-  snprintf(buffer, kBufferSize, "  pin_top_level_index_and_filter: %d\n",
-           table_options_.pin_top_level_index_and_filter);
-  ret.append(buffer);
-  ret.append("  metadata_cache_options:\n");
-  snprintf(buffer, kBufferSize, "    top_level_index_pinning: %d\n",
-           static_cast<int>(
-               table_options_.metadata_cache_options.top_level_index_pinning));
-  ret.append(buffer);
-  snprintf(buffer, kBufferSize, "    partition_pinning: %d\n",
-           static_cast<int>(
-               table_options_.metadata_cache_options.partition_pinning));
-  ret.append(buffer);
-  snprintf(buffer, kBufferSize, "    unpartitioned_pinning: %d\n",
-           static_cast<int>(
-               table_options_.metadata_cache_options.unpartitioned_pinning));
-  ret.append(buffer);
-  snprintf(buffer, kBufferSize, "  index_type: %d\n",
-           table_options_.index_type);
-  ret.append(buffer);
-  snprintf(buffer, kBufferSize, "  data_block_index_type: %d\n",
-           table_options_.data_block_index_type);
-  ret.append(buffer);
-  snprintf(buffer, kBufferSize, "  index_shortening: %d\n",
-           static_cast<int>(table_options_.index_shortening));
-  ret.append(buffer);
-  snprintf(buffer, kBufferSize, "  data_block_hash_table_util_ratio: %lf\n",
-           table_options_.data_block_hash_table_util_ratio);
-  ret.append(buffer);
-  snprintf(buffer, kBufferSize, "  checksum: %d\n", table_options_.checksum);
-  ret.append(buffer);
-  snprintf(buffer, kBufferSize, "  no_block_cache: %d\n",
-           table_options_.no_block_cache);
-  ret.append(buffer);
-  snprintf(buffer, kBufferSize, "  block_cache: %p\n",
-           static_cast<void*>(table_options_.block_cache.get()));
-  ret.append(buffer);
-  if (table_options_.block_cache) {
-    const char* block_cache_name = table_options_.block_cache->Name();
-    if (block_cache_name != nullptr) {
-      snprintf(buffer, kBufferSize, "  block_cache_name: %s\n",
-               block_cache_name);
-      ret.append(buffer);
-    }
-    ret.append("  block_cache_options:\n");
-    ret.append(table_options_.block_cache->GetPrintableOptions());
-  }
-  snprintf(buffer, kBufferSize, "  persistent_cache: %p\n",
-           static_cast<void*>(table_options_.persistent_cache.get()));
-  ret.append(buffer);
+Status BlockBasedTableFactory::SerializePrintableOptions(
+    const ConfigOptions& config_options, const std::string& prefix,
+    OptionProperties* props) const {
   if (table_options_.persistent_cache) {
-    snprintf(buffer, kBufferSize, "  persistent_cache_options:\n");
-    ret.append(buffer);
-    ret.append(table_options_.persistent_cache->GetPrintableOptions());
+    props->insert({"persistent_cache",
+                   table_options_.persistent_cache->ToString(
+                       config_options, OptionTypeInfo::MakePrefix(
+                                           prefix, "persistent_cache"))});
   }
   if (table_options_.pinning_policy) {
-    const char* pinning_policy_name = table_options_.pinning_policy->Name();
-    if (pinning_policy_name != nullptr) {
-      snprintf(buffer, kBufferSize, "  pinning_policy_name: %s\n",
-               pinning_policy_name);
-      ret.append(buffer);
-    }
-    auto pinning_printable_options =
-        table_options_.pinning_policy->GetPrintableOptions();
-    if (pinning_printable_options.empty() == false) {
-      ret.append("  pinning_policy_options:\n");
-      ret.append(pinning_printable_options);
-    }
+    props->insert({"pinning_policy",
+                   table_options_.pinning_policy->ToString(
+                       config_options,
+                       OptionTypeInfo::MakePrefix(prefix, "pinning_policy"))});
   }
-  snprintf(buffer, kBufferSize, "  block_size: %" PRIu64 "\n",
-           table_options_.block_size);
-  ret.append(buffer);
-  snprintf(buffer, kBufferSize, "  block_size_deviation: %d\n",
-           table_options_.block_size_deviation);
-  ret.append(buffer);
-  snprintf(buffer, kBufferSize, "  block_restart_interval: %d\n",
-           table_options_.block_restart_interval);
-  ret.append(buffer);
-  snprintf(buffer, kBufferSize, "  index_block_restart_interval: %d\n",
-           table_options_.index_block_restart_interval);
-  ret.append(buffer);
-  snprintf(buffer, kBufferSize, "  metadata_block_size: %" PRIu64 "\n",
-           table_options_.metadata_block_size);
-  ret.append(buffer);
-  snprintf(buffer, kBufferSize, "  partition_filters: %d\n",
-           table_options_.partition_filters);
-  ret.append(buffer);
-  snprintf(buffer, kBufferSize, "  optimize_filters_for_memory: %d\n",
-           table_options_.optimize_filters_for_memory);
-  ret.append(buffer);
-  snprintf(buffer, kBufferSize, "  use_delta_encoding: %d\n",
-           table_options_.use_delta_encoding);
-  ret.append(buffer);
-  snprintf(buffer, kBufferSize, "  filter_policy: %s\n",
-           table_options_.filter_policy == nullptr
-               ? "nullptr"
-               : table_options_.filter_policy->Name());
-  ret.append(buffer);
-  snprintf(buffer, kBufferSize, "  whole_key_filtering: %d\n",
-           table_options_.whole_key_filtering);
-  ret.append(buffer);
-  snprintf(buffer, kBufferSize, "  verify_compression: %d\n",
-           table_options_.verify_compression);
-  ret.append(buffer);
-  snprintf(buffer, kBufferSize, "  read_amp_bytes_per_bit: %d\n",
-           table_options_.read_amp_bytes_per_bit);
-  ret.append(buffer);
-  snprintf(buffer, kBufferSize, "  format_version: %d\n",
-           table_options_.format_version);
-  ret.append(buffer);
-  snprintf(buffer, kBufferSize, "  enable_index_compression: %d\n",
-           table_options_.enable_index_compression);
-  ret.append(buffer);
-  snprintf(buffer, kBufferSize, "  block_align: %d\n",
-           table_options_.block_align);
-  ret.append(buffer);
-  snprintf(buffer, kBufferSize,
-           "  max_auto_readahead_size: %" ROCKSDB_PRIszt "\n",
-           table_options_.max_auto_readahead_size);
-  ret.append(buffer);
-  snprintf(buffer, kBufferSize, "  prepopulate_block_cache: %d\n",
-           static_cast<int>(table_options_.prepopulate_block_cache));
-  ret.append(buffer);
-  snprintf(buffer, kBufferSize,
-           "  initial_auto_readahead_size: %" ROCKSDB_PRIszt "\n",
-           table_options_.initial_auto_readahead_size);
-  ret.append(buffer);
-  snprintf(buffer, kBufferSize,
-           "  num_file_reads_for_auto_readahead: %" PRIu64 "\n",
-           table_options_.num_file_reads_for_auto_readahead);
-  ret.append(buffer);
-  return ret;
+  if (table_options_.block_cache) {
+    props->insert({"block_cache",
+                   table_options_.block_cache->ToString(
+                       config_options,
+                       OptionTypeInfo::MakePrefix(prefix, "block_cache"))});
+  }
+  return Status::OK();
 }
 
 const void* BlockBasedTableFactory::GetOptionsPtr(

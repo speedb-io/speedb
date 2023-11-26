@@ -25,6 +25,7 @@
 #include "rocksdb/customizable.h"
 #include "rocksdb/status.h"
 #include "rocksdb/utilities/object_registry.h"
+#include "rocksdb/utilities/options_formatter.h"
 #include "rocksdb/utilities/options_type.h"
 #include "util/coding.h"
 #include "util/string_util.h"
@@ -484,6 +485,9 @@ std::string Configurable::ToString(const ConfigOptions& config_options,
                                    const std::string& prefix) const {
   OptionProperties props;
   Status s = SerializeOptions(config_options, prefix, &props);
+  if (s.ok() && config_options.IsPrintable()) {
+    s = SerializePrintableOptions(config_options, prefix, &props);
+  }
   assert(s.ok());
   if (s.ok()) {
     return config_options.ToString(prefix, props);
@@ -592,6 +596,20 @@ Status ConfigurableHelper::SerializeOptions(const ConfigOptions& config_options,
           } else if (!single.empty()) {
             props->insert_or_assign(opt_name, single);
           }
+        } else if (compare_to != nullptr && opt_info.ShouldSerialize() &&
+                   opt_info.IsCustomizable() && copy.IsPrintable()) {
+          // We decided that this object has no difference
+          // Check if there are any printable options we would otherwise miss
+          const auto custom = opt_info.AsRawPointer<Customizable>(opt_addr);
+          if (custom != nullptr) {
+            OptionProperties printable;
+            auto nested = OptionTypeInfo::MakePrefix(prefix, opt_name);
+            s = custom->SerializePrintableOptions(copy, nested, &printable);
+            if (s.ok() && !printable.empty()) {
+              props->insert_or_assign(opt_name,
+                                      copy.ToString(nested, printable));
+            }
+          }
         }
       }
     }
@@ -623,6 +641,14 @@ Status ConfigurableHelper::SerializeOption(const ConfigOptions& config_options,
   }
   value->clear();
   return Status::OK();
+}
+
+std::string Configurable::GetPrintableOptions() const {
+  ConfigOptions config_options;
+  Properties props;
+  config_options.formatter = OptionsFormatter::GetLogFormatter();
+  config_options.depth = ConfigOptions::kDepthPrintable;
+  return ToString(config_options);
 }
 
 //********************************************************************************

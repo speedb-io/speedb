@@ -6,6 +6,7 @@
 #include "table/adaptive/adaptive_table_factory.h"
 
 #include "port/port.h"
+#include "rocksdb/utilities/options_type.h"
 #include "table/format.h"
 #include "table/table_builder.h"
 
@@ -76,40 +77,26 @@ TableBuilder* AdaptiveTableFactory::NewTableBuilder(
   return table_factory_to_write_->NewTableBuilder(table_builder_options, file);
 }
 
-std::string AdaptiveTableFactory::GetPrintableOptions() const {
-  std::string ret;
-  ret.reserve(20000);
-  const int kBufferSize = 200;
-  char buffer[kBufferSize];
-
+Status AdaptiveTableFactory::SerializePrintableOptions(
+    const ConfigOptions& config_options, const std::string& prefix,
+    OptionProperties* props) const {
   if (table_factory_to_write_) {
-    snprintf(buffer, kBufferSize, "  write factory (%s) options:\n%s\n",
-             (table_factory_to_write_->Name() ? table_factory_to_write_->Name()
-                                              : ""),
-             table_factory_to_write_->GetPrintableOptions().c_str());
-    ret.append(buffer);
+    props->insert(
+        {"write_factory", table_factory_to_write_->ToString(config_options)});
   }
   if (plain_table_factory_) {
-    snprintf(buffer, kBufferSize, "  %s options:\n%s\n",
-             plain_table_factory_->Name() ? plain_table_factory_->Name() : "",
-             plain_table_factory_->GetPrintableOptions().c_str());
-    ret.append(buffer);
+    props->insert({"plain_table_factory",
+                   plain_table_factory_->ToString(config_options)});
   }
   if (block_based_table_factory_) {
-    snprintf(
-        buffer, kBufferSize, "  %s options:\n%s\n",
-        (block_based_table_factory_->Name() ? block_based_table_factory_->Name()
-                                            : ""),
-        block_based_table_factory_->GetPrintableOptions().c_str());
-    ret.append(buffer);
+    props->insert({"block_based_table_factory",
+                   block_based_table_factory_->ToString(config_options)});
   }
   if (cuckoo_table_factory_) {
-    snprintf(buffer, kBufferSize, "  %s options:\n%s\n",
-             cuckoo_table_factory_->Name() ? cuckoo_table_factory_->Name() : "",
-             cuckoo_table_factory_->GetPrintableOptions().c_str());
-    ret.append(buffer);
+    props->insert({"cuckoo_table_factory",
+                   cuckoo_table_factory_->ToString(config_options)});
   }
-  return ret;
+  return TableFactory::SerializePrintableOptions(config_options, prefix, props);
 }
 
 extern TableFactory* NewAdaptiveTableFactory(

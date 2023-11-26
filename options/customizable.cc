@@ -66,8 +66,16 @@ Status Customizable::SerializeOptions(const ConfigOptions& config_options,
                                       OptionProperties* props) const {
   Status s;
   auto id = GetId();
+  if (config_options.IsPrintable() && !id.empty() &&
+      id.find('@') == std::string::npos) {
+    // We are doing printable options and this ID does not have an address in
+    // it.  Add it
+    const int kBufferSize = 200;
+    char buffer[kBufferSize];
+    snprintf(buffer, kBufferSize, " #@(%p)", this);
+    id.append(buffer);
+  }
   props->insert({OptionTypeInfo::kIdPropName(), id});
-
   if (!config_options.IsShallow() && !id.empty()) {
     s = Configurable::SerializeOptions(config_options, prefix, props);
   }
@@ -106,6 +114,14 @@ Status Customizable::GetOptionsMap(const ConfigOptions& config_options,
   } else if (customizable != nullptr) {
     status = Configurable::GetOptionsMap(config_options, value,
                                          customizable->GetId(), id, props);
+    if (!id->empty()) {
+      // If the id contains this string, it was likely there as a Printable
+      // and should be removed
+      auto pos = id->find(" #@");
+      if (pos != std::string::npos) {
+        id->erase(pos);
+      }
+    }
     if (status.ok() && customizable->IsInstanceOf(*id)) {
       // The new ID and the old ID match, so the objects are the same type.
       // Try to get the existing options, ignoring any errors

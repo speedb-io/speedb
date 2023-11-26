@@ -53,7 +53,7 @@
 //               V
 //              null
 namespace ROCKSDB_NAMESPACE {
-
+struct ConfigOptions;
 // Persistent Cache Config
 //
 // This struct captures all the options that are used to configure persistent
@@ -223,7 +223,11 @@ struct PersistentCacheConfig {
       const std::string& path, const uint64_t size,
       const std::shared_ptr<Logger>& log);
 
-  std::string ToString() const;
+  std::string ToString(const ConfigOptions& options,
+                       const std::string& prefix) const;
+  Status SerializeOptions(const ConfigOptions& config_options,
+                          const std::string& prefix,
+                          OptionProperties* options) const;
 };
 
 // Persistent Cache Tier
@@ -266,8 +270,6 @@ class PersistentCacheTier : public PersistentCache {
   // Does it store compressed data ?
   virtual bool IsCompressed() override = 0;
 
-  virtual std::string GetPrintableOptions() const override = 0;
-
   virtual uint64_t NewId() override;
 
   // Return a reference to next tier
@@ -298,6 +300,8 @@ class PersistentCacheTier : public PersistentCache {
 class PersistentTieredCache : public PersistentCacheTier {
  public:
   virtual ~PersistentTieredCache();
+  static const char* kClassName() { return "PersistentTieredCache"; }
+  const char* Name() const override { return kClassName(); }
 
   Status Open() override;
   Status Close() override;
@@ -309,10 +313,6 @@ class PersistentTieredCache : public PersistentCacheTier {
   Status Lookup(const Slice& page_key, std::unique_ptr<char[]>* data,
                 size_t* size) override;
   bool IsCompressed() override;
-
-  std::string GetPrintableOptions() const override {
-    return "PersistentTieredCache";
-  }
 
   void AddTier(const Tier& tier);
 

@@ -369,7 +369,7 @@ class ALIGN_AS(CACHE_LINE_SIZE) LRUCacheShard final : public CacheShardBase {
   // Retrieves low pri pool ratio
   double GetLowPriPoolRatio();
 
-  void AppendPrintableOptions(std::string& /*str*/) const;
+  void AppendPrintableOptions(OptionProperties* props) const;
 
  private:
   friend class LRUCache;

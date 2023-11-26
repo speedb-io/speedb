@@ -388,7 +388,7 @@ class PersistentCacheFromCache : public PersistentCache {
 
   StatsType Stats() override { return StatsType(); }
 
-  std::string GetPrintableOptions() const override { return ""; }
+  const char* Name() const override { return "PersistentCacheFromCache"; }
 
   uint64_t NewId() override { return cache_.get()->NewId(); }
 

@@ -69,6 +69,7 @@ class SimCache : public CacheWrapper {
   // reset the lookup and hit counters
   virtual void reset_counter() = 0;
   // String representation of the statistics of the simcache
+  using CacheWrapper::ToString;
   virtual std::string ToString() const = 0;
 
   // Start storing logs of the cache activity (Add/Lookup) into

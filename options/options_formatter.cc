@@ -15,7 +15,9 @@
 #include "rocksdb/utilities/options_formatter.h"
 
 #include <algorithm>
+#include <iomanip>
 #include <memory>
+#include <sstream>
 
 #include "options/options_formatter_impl.h"
 #include "options/options_parser.h"
@@ -261,46 +263,58 @@ Status PropertiesOptionsFormatter::ToProps(const std::string& props_str,
     return DefaultOptionsFormatter::ToProps(props_str, props);
   }
 }
-void LogOptionsFormatter::AppendElem(const std::string& prefix,
-                                     const std::string& name,
-                                     const std::string& value,
-                                     std::string* result) const {
+
+namespace {
+static const int kLogPadding = 47;
+void AppendElemToLog(const std::string& prefix, const std::string& name,
+                     const std::string& value, std::string* result) {
+  std::ostringstream oss;
   if (!result->empty()) {
-    result->append("\n");
+    oss << std::endl;
   }
-  result->append(prefix);
-  result->append(name);
-  result->append(": ");
-  result->append(value);
+  int padding = kLogPadding;
+  if (prefix.empty()) {  // There is no prefix, only a name
+    oss << std::setw(padding) << name << ": ";
+  } else if (name.empty()) {  // There is a prefix and no name
+    oss << std::setw(padding) << prefix << ": ";
+  } else {  // There is a name and a prefix
+    auto pos = value.find(prefix + "." + name);
+    if (pos == std::string::npos) {
+      // The value does not contains the name/prefix.  Append it
+      padding -= static_cast<int>(name.size() + 1);
+      oss << std::setw(padding) << prefix << "." << name << ": ";
+    }
+  }
+  oss << value;
+  result->append(oss.str());
 }
+}  // end anonymous namespace
 
 std::string LogOptionsFormatter::ToString(const std::string& prefix,
                                           const OptionProperties& props) const {
   std::string result;
   if (!props.empty()) {
     const auto& id = props.find(OptionTypeInfo::kIdPropName());
-    if (props.size() > 1) {
-      std::string spaces = "  ";
-      if (!prefix.empty()) {
-        // Indent by the number of "." in the prefix
-        for (auto count = std::count(prefix.begin(), prefix.end(), '.');
-             count >= 0; count--) {
-          spaces.append("  ");
-        }
+    if (id == props.end()) {
+      // There is no ID.  Print all of the elements as prefix.name : value
+      for (const auto& it : props) {
+        AppendElemToLog(prefix, it.first, it.second, &result);
       }
-      if (id != props.end()) {
-        AppendElem(spaces, id->first, id->second, &result);
-      }
+    } else if (props.size() == 1) {
+      // There is only one element and it is the ID.  Return just the ID
+      return id->second;
+    } else {
+      // There is more than one element and an ID
+      // Print the ID
+      AppendElemToLog(prefix, "", id->second, &result);
+      auto pos = prefix.find_last_of(".");
+      auto short_name =
+          (pos != std::string::npos) ? prefix.substr(pos + 1) : prefix;
       for (const auto& it : props) {
         if (it.first != OptionTypeInfo::kIdPropName()) {
-          AppendElem(spaces, it.first, it.second, &result);
+          AppendElemToLog(short_name, it.first, it.second, &result);
         }
       }
-    } else if (id != props.end()) {
-      result = id->second;
-    } else {
-      const auto& it = props.begin();
-      AppendElem(prefix, it->first, it->second, &result);
     }
   }
   return result;
@@ -309,16 +323,16 @@ std::string LogOptionsFormatter::ToString(const std::string& prefix,
 std::string LogOptionsFormatter::ToString(
     const std::string& prefix, char /*separator*/,
     const std::vector<std::string>& elems) const {
-  std::string result;
+  std::ostringstream oss;
   int printed = 0;
   for (const auto& elem : elems) {
-    result.append("  ");
-    result.append(prefix);
-    result.append("[" + std::to_string(printed++) + "]: ");
-    result.append(elem);
-    result.append("\n");
+    if (printed > 0) {
+      oss << std::endl;
+    }
+    oss << std::setw(kLogPadding - 3) << prefix << "[" << printed++
+        << "]: " << elem;
   }
-  return result;
+  return oss.str();
 }
 
 static int RegisterBuiltinOptionsFormatter(ObjectLibrary& library,
@@ -354,6 +368,12 @@ const std::shared_ptr<OptionsFormatter>& OptionsFormatter::Default() {
   static std::shared_ptr<OptionsFormatter> default_formatter =
       std::make_shared<DefaultOptionsFormatter>();
   return default_formatter;
+}
+
+const std::shared_ptr<OptionsFormatter>& OptionsFormatter::GetLogFormatter() {
+  static std::shared_ptr<OptionsFormatter> log_formatter =
+      std::make_shared<LogOptionsFormatter>();
+  return log_formatter;
 }
 
 Status OptionsFormatter::CreateFromString(

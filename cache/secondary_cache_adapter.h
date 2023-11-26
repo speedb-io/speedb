@@ -28,11 +28,12 @@ class CacheWithSecondaryAdapter : public CacheWrapper {
 
   void WaitAll(AsyncLookupHandle* async_handles, size_t count) override;
 
-  std::string GetPrintableOptions() const override;
-
   const char* Name() const override;
 
  private:
+  Status SerializeOptions(const ConfigOptions& config_options,
+                          const std::string& prefix,
+                          OptionProperties* props) const override;
   bool EvictionHandler(const Slice& key, Handle* handle);
 
   void StartAsyncLookupOnMySecondary(AsyncLookupHandle& async_handle);

@@ -228,7 +228,7 @@ class Cache {
  public:  // functions
   // The type of the Cache
   virtual const char* Name() const = 0;
-
+  virtual std::string GetId() const;
   // The Insert and Lookup APIs below are intended to allow cached objects
   // to be demoted/promoted between the primary block cache and a secondary
   // cache. The secondary cache could be a non-volatile cache, and will
@@ -448,7 +448,10 @@ class Cache {
   // Prerequisite: no entry is referenced.
   virtual void EraseUnRefEntries() = 0;
 
-  virtual std::string GetPrintableOptions() const { return ""; }
+  // virtual std::string GetPrintableOptions() const { return ""; }
+
+  std::string ToString(const ConfigOptions& opts,
+                       const std::string& prefix = "") const;
 
   // Check for any warnings or errors in the operation of the cache and
   // report them to the logger. This is intended only to be called
@@ -582,6 +585,17 @@ class Cache {
   void DiscardItemOwnerId(ItemOwnerId*);
 
  protected:
+  virtual Status SerializeOptions(const ConfigOptions& /*config_options*/,
+                                  const std::string& /*prefix*/,
+                                  OptionProperties* /*options*/) const {
+    return Status::OK();
+  }
+  virtual Status SerializePrintableOptions(
+      const ConfigOptions& /*config_options*/, const std::string& /*prefix*/,
+      OptionProperties* /*options*/) const {
+    return Status::OK();
+  }
+
   std::shared_ptr<MemoryAllocator> memory_allocator_;
   EvictionCallback eviction_callback_;
 

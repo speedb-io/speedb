@@ -4,6 +4,7 @@
 
 ### New Features 
 * Added ConfigOptions::compare_to.  When set, this value causes only values that have been changed to be part of the serialized output (#648).
+* Use the Options infrastructure to generate the LOG output.  Add the SerializePrintableOptions method and deprecate GetPrintableOptions
 
 ### Enhancements
 * Added a kUseBaseAddress flag and GetBaseOffset flag to OptionTypeInfo.  If this flag is set and a function is used for processing options, the function is passed the base address of the struct rather than the specific field (#397)
@@ -14,7 +15,6 @@
 
 ### Miscellaneous
 * Remove leftover references to ROCKSDB_LITE (#755).
-
 ## Hazlenut 2.7.0 (27/10/2023)
 Based on RocksDB 8.1.1
 

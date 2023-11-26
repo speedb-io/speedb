@@ -25,6 +25,7 @@
 #include "rocksdb/customizable.h"
 #include "rocksdb/status.h"
 #include "rocksdb/utilities/object_registry.h"
+#include "rocksdb/utilities/options_formatter.h"
 #include "rocksdb/utilities/options_type.h"
 #include "util/coding.h"
 #include "util/string_util.h"
@@ -474,6 +475,9 @@ Status Configurable::GetOptionString(const ConfigOptions& config_options,
   result->clear();
   Status s =
       ConfigurableHelper::SerializeOptions(config_options, *this, "", &props);
+  if (s.ok() && config_options.IsPrintable()) {
+    s = SerializePrintableOptions(config_options, "", &props);
+  }
   if (s.ok()) {
     *result = config_options.ToString("", props);
   }
@@ -484,6 +488,9 @@ std::string Configurable::ToString(const ConfigOptions& config_options,
                                    const std::string& prefix) const {
   OptionProperties props;
   Status s = SerializeOptions(config_options, prefix, &props);
+  if (s.ok() && config_options.IsPrintable()) {
+    s = SerializePrintableOptions(config_options, prefix, &props);
+  }
   assert(s.ok());
   if (s.ok()) {
     return config_options.ToString(prefix, props);
@@ -623,6 +630,14 @@ Status ConfigurableHelper::SerializeOption(const ConfigOptions& config_options,
   }
   value->clear();
   return Status::OK();
+}
+
+std::string Configurable::GetPrintableOptions() const {
+  ConfigOptions config_options;
+  Properties props;
+  config_options.formatter = OptionsFormatter::GetLogFormatter();
+  config_options.depth = ConfigOptions::kDepthPrintable;
+  return ToString(config_options);
 }
 
 //********************************************************************************

@@ -103,7 +103,9 @@ class CompressedSecondaryCache : public SecondaryCache {
 
   Status GetCapacity(size_t& capacity) override;
 
-  std::string GetPrintableOptions() const override;
+  Status SerializePrintableOptions(const ConfigOptions& config_options,
+                                   const std::string& prefix,
+                                   OptionProperties* props) const override;
 
  private:
   friend class CompressedSecondaryCacheTestBase;

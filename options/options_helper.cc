@@ -1312,7 +1312,17 @@ bool OptionTypeInfo::AreEqualByName(const ConfigOptions& config_options,
       return true;
     }
   }
-  return (this_value == that_value);
+  if (this_value == that_value) {
+    return true;
+  } else {
+    OptionProperties this_props;
+    OptionProperties that_props;
+    if (config_options.ToProps(this_value, &this_props).ok() &&
+        config_options.ToProps(that_value, &that_props).ok()) {
+      return this_props == that_props;
+    }
+  }
+  return false;
 }
 
 Status OptionTypeInfo::Prepare(const ConfigOptions& config_options,

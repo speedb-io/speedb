@@ -1625,6 +1625,7 @@ Status DBImpl::WriteLevel0TableForRecovery(int job_id, ColumnFamilyData* cfd,
   Status s;
   TableProperties table_properties;
   {
+    ro.part_of_flush = true;
     ScopedArenaIterator iter(mem->NewIterator(ro, &arena));
     ROCKS_LOG_DEBUG(immutable_db_options_.info_log,
                     "[%s] [WriteLevel0TableForRecovery]"

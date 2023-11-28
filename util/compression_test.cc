@@ -483,6 +483,21 @@ TEST(Compression, ColumnFamilyOptionsFromStringWithPluginCompressor) {
   ASSERT_EQ(new_options.compressor->GetCompressionType(), kPluginCompression);
 }
 
+TEST(Compression, ColumnFamilyOptionsFromStringWithCompression) {
+  ConfigOptions config_options;
+  auto library = config_options.registry->AddLibrary(
+      "ColumnFamilyOptionsFromStringWithCompression");
+  ColumnFamilyOptions options, new_options;
+  config_options.ignore_unsupported_options = false;
+
+  Status s = GetColumnFamilyOptionsFromString(
+      config_options, options, "compression=kZlibCompression", &new_options);
+  ASSERT_OK(s);
+  ASSERT_EQ(new_options.compression, kZlibCompression);
+  ASSERT_NE(new_options.compressor, nullptr);
+  ASSERT_STREQ(new_options.compressor->Name(), ZlibCompressor::kClassName());
+}
+
 TEST(Compression, StringFromColumnFamilyOptions) {
   ConfigOptions config_options;
   auto library =

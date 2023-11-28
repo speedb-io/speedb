@@ -231,7 +231,7 @@ class PosixEnv : public CompositeEnv {
     explicit JoinThreadsOnExit(PosixEnv& _deflt) : deflt(_deflt) {}
     ~JoinThreadsOnExit() {
       for (auto& tid : deflt.threads_to_join_) {
-        pthread_join(tid.native_handle(), nullptr);
+        tid.join();
       }
       for (int pool_id = 0; pool_id < Env::Priority::TOTAL; ++pool_id) {
         deflt.thread_pools_[pool_id].JoinAllThreads();

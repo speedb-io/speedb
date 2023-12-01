@@ -400,7 +400,7 @@ class TableConstructor : public Constructor {
     builder.reset(ioptions.table_factory->NewTableBuilder(
         TableBuilderOptions(ioptions, moptions, internal_comparator,
                             &int_tbl_prop_collector_factories,
-                            moptions.compressor, kUnknownColumnFamily,
+                            moptions.derived_compressor, kUnknownColumnFamily,
                             column_family_name, level_),
         file_writer_.get()));
 
@@ -3995,9 +3995,10 @@ TEST_P(BlockBasedTableTest, NoFileChecksum) {
   f.CreateWritableFile();
   std::unique_ptr<TableBuilder> builder;
   builder.reset(ioptions.table_factory->NewTableBuilder(
-      TableBuilderOptions(
-          ioptions, moptions, *comparator, &int_tbl_prop_collector_factories,
-          moptions.compressor, kUnknownColumnFamily, column_family_name, level),
+      TableBuilderOptions(ioptions, moptions, *comparator,
+                          &int_tbl_prop_collector_factories,
+                          moptions.derived_compressor, kUnknownColumnFamily,
+                          column_family_name, level),
       f.GetFileWriter()));
   ASSERT_OK(f.ResetTableBuilder(std::move(builder)));
   f.AddKVtoKVMap(1000);
@@ -4030,9 +4031,10 @@ TEST_P(BlockBasedTableTest, Crc32cFileChecksum) {
   f.SetFileChecksumGenerator(checksum_crc32c_gen1.release());
   std::unique_ptr<TableBuilder> builder;
   builder.reset(ioptions.table_factory->NewTableBuilder(
-      TableBuilderOptions(
-          ioptions, moptions, *comparator, &int_tbl_prop_collector_factories,
-          moptions.compressor, kUnknownColumnFamily, column_family_name, level),
+      TableBuilderOptions(ioptions, moptions, *comparator,
+                          &int_tbl_prop_collector_factories,
+                          moptions.derived_compressor, kUnknownColumnFamily,
+                          column_family_name, level),
       f.GetFileWriter()));
   ASSERT_OK(f.ResetTableBuilder(std::move(builder)));
   f.AddKVtoKVMap(1000);

@@ -494,8 +494,7 @@ TEST(Compression, ColumnFamilyOptionsFromStringWithCompression) {
       config_options, options, "compression=kZlibCompression", &new_options);
   ASSERT_OK(s);
   ASSERT_EQ(new_options.compression, kZlibCompression);
-  ASSERT_NE(new_options.compressor, nullptr);
-  ASSERT_STREQ(new_options.compressor->Name(), ZlibCompressor::kClassName());
+  ASSERT_EQ(new_options.compressor, nullptr);
 }
 
 TEST(Compression, StringFromColumnFamilyOptions) {
@@ -536,8 +535,7 @@ TEST(Compression, StringFromColumnFamilyOptions) {
               std::string::npos);
   ASSERT_TRUE(opts_serialized.find("bottommost_compressor=nullptr") !=
               std::string::npos);
-  ASSERT_TRUE(opts_serialized.find("blob_compressor={id=" +
-                                   std::string(NoCompressor::kClassName())) !=
+  ASSERT_TRUE(opts_serialized.find("blob_compressor=nullptr") !=
               std::string::npos);
 
   // Re-parse serialized options
@@ -745,10 +743,7 @@ TEST(Compression, DBWithZlibAndCompressionOptions) {
   ASSERT_OK(s);
   ASSERT_EQ(cf_descs[0].options.compression, kZlibCompression);
   ASSERT_EQ(cf_descs[0].options.compression_opts.window_bits, -13);
-  ASSERT_STREQ(cf_descs[0].options.compressor->ToString(config_options).c_str(),
-               "id=Zlib;max_dict_bytes=0;max_train_bytes=0;max_dict_buffer_"
-               "bytes=0;strategy=0;window_bits=-13;use_zstd_dict_trainer=true;"
-               "level=32767;parallel_threads=1");
+  ASSERT_EQ(cf_descs[0].options.compressor, nullptr);
 
   CloseDB(db);
   ASSERT_OK(DestroyDB(dbname, options));
@@ -782,17 +777,7 @@ TEST(Compression, DBWithCompressionPerLevel) {
   ASSERT_EQ(cf_descs[0].options.compression_per_level.size(), 2);
   ASSERT_EQ(cf_descs[0].options.compression_per_level[0], kNoCompression);
   ASSERT_EQ(cf_descs[0].options.compression_per_level[1], kSnappyCompression);
-  ASSERT_EQ(cf_descs[0].options.compressor_per_level.size(), 2);
-  ASSERT_STREQ(cf_descs[0]
-                   .options.compressor_per_level[0]
-                   ->ToString(config_options)
-                   .c_str(),
-               "id=NoCompression;parallel_threads=1");
-  ASSERT_STREQ(cf_descs[0]
-                   .options.compressor_per_level[1]
-                   ->ToString(config_options)
-                   .c_str(),
-               "id=Snappy;parallel_threads=1");
+  ASSERT_EQ(cf_descs[0].options.compressor_per_level.size(), 0);
 
   CloseDB(db);
 

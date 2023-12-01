@@ -1211,41 +1211,54 @@ void MutableCFOptions::RefreshDerivedOptions(int num_levels,
     }
   }
 
+  derived_compressor.reset();
   if (compressor == nullptr) {
-    compressor =
+    derived_compressor =
         BuiltinCompressor::GetCompressor(compression, compression_opts);
-  }
-  if (compressor == nullptr) {
-    compressor = BuiltinCompressor::GetCompressor(kSnappyCompression);
+    if (derived_compressor == nullptr) {
+      derived_compressor = BuiltinCompressor::GetCompressor(kSnappyCompression);
+    }
+  } else {
+    derived_compressor = compressor;
   }
 
+  derived_bottommost_compressor.reset();
   if (bottommost_compressor == nullptr) {
     if (bottommost_compression != kDisableCompressionOption) {
       if (bottommost_compression_opts.enabled) {
-        bottommost_compressor = BuiltinCompressor::GetCompressor(
+        derived_bottommost_compressor = BuiltinCompressor::GetCompressor(
             bottommost_compression, bottommost_compression_opts);
       } else {
-        bottommost_compressor = BuiltinCompressor::GetCompressor(
+        derived_bottommost_compressor = BuiltinCompressor::GetCompressor(
             bottommost_compression, compression_opts);
       }
     }
+  } else {
+    derived_bottommost_compressor = bottommost_compressor;
   }
 
+  derived_blob_compressor.reset();
   if (blob_compressor == nullptr) {
     if (blob_compression_type != kDisableCompressionOption) {
-      blob_compressor = BuiltinCompressor::GetCompressor(blob_compression_type,
-                                                         compression_opts);
+      derived_blob_compressor = BuiltinCompressor::GetCompressor(
+          blob_compression_type, compression_opts);
     }
-  }
-  if (blob_compressor == nullptr) {
-    blob_compressor = BuiltinCompressor::GetCompressor(kNoCompression);
+    if (derived_blob_compressor == nullptr) {
+      derived_blob_compressor =
+          BuiltinCompressor::GetCompressor(kNoCompression);
+    }
+  } else {
+    derived_blob_compressor = blob_compressor;
   }
 
+  derived_compressor_per_level.clear();
   if (compressor_per_level.empty()) {
     for (auto type : compression_per_level) {
-      compressor_per_level.push_back(
+      derived_compressor_per_level.push_back(
           BuiltinCompressor::GetCompressor(type, compression_opts));
     }
+  } else {
+    derived_compressor_per_level = compressor_per_level;
   }
 }
 

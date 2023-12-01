@@ -230,6 +230,10 @@ struct MutableCFOptions {
   // Derived options
   // Per-level target file size.
   std::vector<uint64_t> max_file_size;
+  std::shared_ptr<Compressor> derived_compressor;
+  std::shared_ptr<Compressor> derived_bottommost_compressor;
+  std::shared_ptr<Compressor> derived_blob_compressor;
+  std::vector<std::shared_ptr<Compressor>> derived_compressor_per_level;
 };
 
 uint64_t MultiplyCheckOverflow(uint64_t op1, double op2);

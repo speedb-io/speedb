@@ -51,10 +51,10 @@ void MakeBuilder(
   std::unique_ptr<FSWritableFile> wf(new test::StringSink);
   writable->reset(
       new WritableFileWriter(std::move(wf), "" /* don't care */, EnvOptions()));
-  TableBuilderOptions tboptions(ioptions, moptions, internal_comparator,
-                                int_tbl_prop_collector_factories,
-                                moptions.compressor, kTestColumnFamilyId,
-                                kTestColumnFamilyName, kTestLevel);
+  TableBuilderOptions tboptions(
+      ioptions, moptions, internal_comparator, int_tbl_prop_collector_factories,
+      moptions.derived_compressor, kTestColumnFamilyId, kTestColumnFamilyName,
+      kTestLevel);
   builder->reset(NewTableBuilder(tboptions, writable->get()));
 }
 }  // namespace

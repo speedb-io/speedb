@@ -646,6 +646,8 @@ TEST_F(OptionsSettableTest, ColumnFamilyOptionsAllFieldsSettable) {
        sizeof(std::vector<std::shared_ptr<Compressor>>)},
       {offsetof(struct MutableCFOptions, max_file_size),
        sizeof(std::vector<uint64_t>)},
+      {offsetof(struct MutableCFOptions, derived_compressor_per_level),
+       sizeof(std::vector<std::shared_ptr<Compressor>>)},
   };
 
   // For all memory used for options, pre-fill every char. Otherwise, the

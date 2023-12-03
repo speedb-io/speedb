@@ -8760,13 +8760,8 @@ class Benchmark {
   void WaitForCompaction() {
     // Give background threads a chance to wake
     FLAGS_env->SleepForMicroseconds(5 * 1000000);
-
-    if (db_.db != nullptr) {
-      WaitForCompactionHelper(db_);
-    } else {
-      for (auto& db_with_cfh : multi_dbs_) {
-        WaitForCompactionHelper(db_with_cfh);
-      }
+    for (auto& db_with_cfh : dbs_to_use_) {
+      WaitForCompactionHelper(db_with_cfh);
     }
   }
 

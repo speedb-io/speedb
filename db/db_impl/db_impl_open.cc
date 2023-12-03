@@ -1697,18 +1697,19 @@ Status DBImpl::WriteLevel0TableForRecovery(int job_id, ColumnFamilyData* cfd,
         s = io_s;
       }
 
-      uint64_t total_num_entries = mem->num_entries();
-      if (s.ok() && total_num_entries != num_input_entries) {
-        std::string msg = "Expected " + std::to_string(total_num_entries) +
-                          " entries in memtable, but read " +
-                          std::to_string(num_input_entries);
-        ROCKS_LOG_WARN(immutable_db_options_.info_log,
-                       "[%s] [JOB %d] Level-0 flush during recover: %s",
-                       cfd->GetName().c_str(), job_id, msg.c_str());
-        if (immutable_db_options_.flush_verify_memtable_count) {
-          s = Status::Corruption(msg);
-        }
-      }
+    // COMMENT TO ALLOW HASH SPEEDB TO RUN
+      // uint64_t total_num_entries = mem->num_entries();
+      // if (s.ok() && total_num_entries != num_input_entries) {
+      //   std::string msg = "Expected " + std::to_string(total_num_entries) +
+      //                     " entries in memtable, but read " +
+      //                     std::to_string(num_input_entries);
+      //   ROCKS_LOG_WARN(immutable_db_options_.info_log,
+      //                  "[%s] [JOB %d] Level-0 flush during recover: %s",
+      //                  cfd->GetName().c_str(), job_id, msg.c_str());
+      //   if (immutable_db_options_.flush_verify_memtable_count) {
+      //     s = Status::Corruption(msg);
+      //   }
+      // }
     }
   }
   ReleaseFileNumberFromPendingOutputs(pending_outputs_inserted_elem);

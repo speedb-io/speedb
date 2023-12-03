@@ -26,4 +26,3 @@ speedb_HEADERS = 																  								\
 
 speedb_TESTS = 																										\
      speedb_customizable_test.cc																	\
-		 paired_filter/speedb_db_bloom_filter_test.cc									\

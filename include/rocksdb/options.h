@@ -1478,7 +1478,7 @@ struct DBOptions {
   // use "0:00-23:59". To make an entire day have no offpeak period, leave
   // this field blank. Default: Empty string (no offpeak).
   std::string daily_offpeak_time_utc = "";
-  
+
   // If non-zero, a task will be started to check for a new
   // "refresh_options_file" If found, the refresh task will update the mutable
   // options from the settings in this file

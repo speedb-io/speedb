@@ -314,9 +314,11 @@ DEFINE_string(
     "operation includes a rare but possible retry in case it got "
     "`Status::Incomplete()`. This happens upon encountering more keys than "
     "have ever been seen by the thread (or eight initially)\n"
-    "\tbackup --  Create a backup of the current DB and verify that a new backup is corrected. "
+    "\tbackup --  Create a backup of the current DB and verify that a new "
+    "backup is corrected. "
     "Rate limit can be specified through --backup_rate_limit\n"
-    "\trestore -- Restore the DB from the latest backup available, rate limit can be specified through --restore_rate_limit\n");
+    "\trestore -- Restore the DB from the latest backup available, rate limit "
+    "can be specified through --restore_rate_limit\n");
 
 DEFINE_int64(num, 1000000, "Number of key/values to place in database");
 
@@ -3392,8 +3394,8 @@ class Benchmark {
             ConfigOptions(), FLAGS_secondary_cache_uri, &secondary_cache);
         if (secondary_cache == nullptr) {
           fprintf(stderr,
-              "No secondary cache registered matching string: %s status=%s",
-              FLAGS_secondary_cache_uri.c_str(), s.ToString().c_str());
+                  "No secondary cache registered matching string: %s status=%s",
+                  FLAGS_secondary_cache_uri.c_str(), s.ToString().c_str());
         }
         opts.secondary_cache = secondary_cache;
       } else if (FLAGS_use_compressed_secondary_cache && !use_tiered_cache) {

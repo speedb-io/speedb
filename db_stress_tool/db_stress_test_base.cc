@@ -24,8 +24,8 @@
 #include "rocksdb/sst_file_manager.h"
 #include "rocksdb/types.h"
 #include "rocksdb/utilities/object_registry.h"
-#include "speedb/version.h"
 #include "rocksdb/utilities/write_batch_with_index.h"
+#include "speedb/version.h"
 #include "test_util/testutil.h"
 #include "util/cast_util.h"
 #include "utilities/backup/backup_engine_impl.h"
@@ -3401,7 +3401,7 @@ void InitializeOptionsFromFlags(
 
   options.refresh_options_sec = FLAGS_refresh_options_sec;
   options.refresh_options_file = FLAGS_refresh_options_file;
-  
+
   options.use_dynamic_delay = FLAGS_use_dynamic_delay;
 
   // Integrated BlobDB

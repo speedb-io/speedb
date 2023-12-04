@@ -27,7 +27,7 @@ public class NativeLibraryLoader {
       Environment.getJniLibraryFileName(ROCKSDB_LIBRARY_NAME);
   private static final /* @Nullable */ String fallbackJniLibraryFileName =
       Environment.getFallbackJniLibraryFileName(ROCKSDB_LIBRARY_NAME);
-  private static final String tempFilePrefix = "libspeedbjni";  
+  private static final String tempFilePrefix = "libspeedbjni";
   private static final String tempFileSuffix = Environment.getJniLibraryExtension();
 
   /**

@@ -2297,17 +2297,6 @@ void DBDumperCommand::DoDumpCommand() {
       if (is_db_ttl_ && timestamp_) {
         fprintf(stdout, "%s ", TimeToHumanString(rawtime).c_str());
       }
-<<<<<<< HEAD
-      // (TODO) TTL Iterator does not support wide columns yet.
-      std::string str =
-          is_db_ttl_
-              ? PrintKeyValue(iter->key().ToString(), iter->value().ToString(),
-                              is_key_hex_, is_value_hex_)
-              : PrintKeyValueOrWideColumns(iter->key(), iter->value(),
-                                           iter->columns(), is_key_hex_,
-                                           is_value_hex_);
-      fprintf(stdout, "%s\n", str.c_str());
-=======
       if (is_no_value_) {
         std::string str = is_key_hex_ ? StringToHex(iter->key().ToString())
                                       : iter->key().ToString();
@@ -2318,7 +2307,6 @@ void DBDumperCommand::DoDumpCommand() {
                           is_key_hex_, is_value_hex_);
         fprintf(stdout, "%s\n", str.c_str());
       }
->>>>>>> c7bab4f78... adding beezcli and ttl support (#427)
     }
   }
 

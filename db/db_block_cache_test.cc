@@ -745,7 +745,8 @@ class MockCache : public LRUCache {
                 Handle** handle, Priority priority, const Slice& compressed,
                 CompressionType type) override {
     return InsertWithOwnerId(key, value, helper, charge,
-                             Cache::kUnknownItemOwnerId, handle, priority, compressed, type);
+                             Cache::kUnknownItemOwnerId, handle, priority,
+                             compressed, type);
   }
 
   Status InsertWithOwnerId(const Slice& key, Cache::ObjectPtr value,
@@ -759,7 +760,8 @@ class MockCache : public LRUCache {
       high_pri_insert_count++;
     }
     return LRUCache::InsertWithOwnerId(key, value, helper, charge,
-                                       item_owner_id, handle, priority, compressed, type);
+                                       item_owner_id, handle, priority,
+                                       compressed, type);
   }
 };
 

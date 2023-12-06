@@ -8259,8 +8259,7 @@ INSTANTIATE_TEST_CASE_P(
                           BottommostLevelCompaction::kIfHaveCompactionFilter,
                           BottommostLevelCompaction::kForce,
                           BottommostLevelCompaction::kForceOptimized),
-        ::testing::Bool(),
-        ::testing::Bool()));
+        ::testing::Bool(), ::testing::Bool()));
 
 TEST_F(DBCompactionTest, UpdateLevelSubCompactionTest) {
   Options options = CurrentOptions();

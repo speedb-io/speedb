@@ -293,13 +293,11 @@ class Cache {
   // Same as Insert() but includes the inserted item's owner id
   // Implemented to avoid having all derived classes to implement it.
   // Only classes that support per-item accounting will override this method.
-  virtual Status InsertWithOwnerId(const Slice& key, ObjectPtr obj,
-                                   const CacheItemHelper* helper, size_t charge,
-                                   ItemOwnerId /* item_owner_id */,
-                                   Handle** handle = nullptr,
-                                   Priority priority = Priority::LOW,
-                                   const Slice& compressed = Slice(),
-                                   CompressionType type = CompressionType::kNoCompression) {
+  virtual Status InsertWithOwnerId(
+      const Slice& key, ObjectPtr obj, const CacheItemHelper* helper,
+      size_t charge, ItemOwnerId /* item_owner_id */, Handle** handle = nullptr,
+      Priority priority = Priority::LOW, const Slice& compressed = Slice(),
+      CompressionType type = CompressionType::kNoCompression) {
     return Insert(key, obj, helper, charge, handle, priority, compressed, type);
   }
 

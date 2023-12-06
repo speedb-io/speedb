@@ -1396,7 +1396,7 @@ class DBTestBase : public testing::Test {
            &tp->index_key_is_user_key, &tp->index_value_is_delta_encoded,
            &tp->index_size, &tp->filter_size);
   }
-  
+
   void ResetWriteControllerTokens(DBImpl* db);
 
  private:  // Prone to error on direct use

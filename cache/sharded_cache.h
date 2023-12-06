@@ -196,12 +196,12 @@ class ShardedCache : public ShardedCacheBase {
                              handle, priority, compressed_value, type);
   }
 
-  Status InsertWithOwnerId(const Slice& key, ObjectPtr obj,
-                           const CacheItemHelper* helper, size_t charge,
-                           ItemOwnerId item_owner_id, Handle** handle = nullptr,
-                           Priority priority = Priority::LOW,
-                           const Slice& /*compressed_value*/ = Slice(),
-                           CompressionType /*type*/ = CompressionType::kNoCompression) override {
+  Status InsertWithOwnerId(
+      const Slice& key, ObjectPtr obj, const CacheItemHelper* helper,
+      size_t charge, ItemOwnerId item_owner_id, Handle** handle = nullptr,
+      Priority priority = Priority::LOW,
+      const Slice& /*compressed_value*/ = Slice(),
+      CompressionType /*type*/ = CompressionType::kNoCompression) override {
     assert(helper);
     HashVal hash = CacheShard::ComputeHash(key, hash_seed_);
     auto h_out = reinterpret_cast<HandleImpl**>(handle);

@@ -660,7 +660,8 @@ Status BlockBasedTable::Open(
   BlockCacheLookupContext lookup_context{TableReaderCaller::kPrefetch};
   Rep* rep = new BlockBasedTable::Rep(
       ioptions, env_options, table_options, internal_comparator, skip_filters,
-      file_size, level, immortal_table, user_defined_timestamps_persisted, cache_owner_id);
+      file_size, level, immortal_table, user_defined_timestamps_persisted,
+      cache_owner_id);
   rep->file = std::move(file);
   rep->footer = footer;
 
@@ -1374,11 +1375,10 @@ WithBlocklikeCheck<Status, TBlocklike> BlockBasedTable::PutDataBlockToCache(
   if (block_cache && block_holder->own_bytes()) {
     size_t charge = block_holder->ApproximateMemoryUsage();
     BlockCacheTypedHandle<TBlocklike>* cache_handle = nullptr;
-    s = block_cache.InsertFull(cache_key, block_holder.get(), charge,
-                               &cache_handle, GetCachePriority<TBlocklike>(),
-                               rep_->ioptions.lowest_used_cache_tier,
-                               compressed_block_contents.data, block_comp_type,
-                               rep_->cache_owner_id);
+    s = block_cache.InsertFull(
+        cache_key, block_holder.get(), charge, &cache_handle,
+        GetCachePriority<TBlocklike>(), rep_->ioptions.lowest_used_cache_tier,
+        compressed_block_contents.data, block_comp_type, rep_->cache_owner_id);
 
     if (s.ok()) {
       assert(cache_handle != nullptr);

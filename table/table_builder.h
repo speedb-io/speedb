@@ -54,8 +54,8 @@ struct TableReaderOptions {
       const InternalKeyComparator& _internal_comparator,
       uint8_t _block_protection_bytes_per_key, bool _skip_filters = false,
       bool _immortal = false, bool _force_direct_prefetch = false,
-      int _level = -1, 
-      bool _is_bottommost = false, bool _is_last_level_with_data = false,
+      int _level = -1, bool _is_bottommost = false,
+      bool _is_last_level_with_data = false,
       BlockCacheTracer* const _block_cache_tracer = nullptr,
       size_t _max_file_size_for_l0_meta_pin = 0,
       const std::string& _cur_db_session_id = "", uint64_t _cur_file_num = 0,
@@ -120,7 +120,7 @@ struct TableReaderOptions {
 
   // Whether the key in the table contains user-defined timestamps.
   bool user_defined_timestamps_persisted;
-  
+
   Cache::ItemOwnerId cache_owner_id = Cache::kUnknownItemOwnerId;
 };
 

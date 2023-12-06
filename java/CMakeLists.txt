@@ -567,7 +567,7 @@ else ()
 
 endif()
 
-get_target_property(ROCKSDBJNI_CLASSES_JAR_FILE rocksdbjni_classes JAR_FILE)
+get_target_property(ROCKSDBJNI_CLASSES_JAR_FILE ${PROJECT_NAME}jni_classes JAR_FILE)
 add_jar(
     rocksdbjni_test_classes
     SOURCES

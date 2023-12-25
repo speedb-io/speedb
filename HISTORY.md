@@ -1,9 +1,11 @@
 # Speedb Change Log 
 
 ## Unreleased
+Based on RocksDB 8.6.7
 
 ### New Features 
 * Added ConfigOptions::compare_to.  When set, this value causes only values that have been changed to be part of the serialized output (#648).
+* Rebase on RocksDB 8.6.7
 
 ### Enhancements
 * Added a kUseBaseAddress flag and GetBaseOffset flag to OptionTypeInfo.  If this flag is set and a function is used for processing options, the function is passed the base address of the struct rather than the specific field (#397)

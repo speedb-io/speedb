@@ -50,8 +50,7 @@ jobs:
               echo $file does not have the Apache 2.0 license header && exit_code=222
             fi
           done
-          #exit $exit_code
-          exit 0
+          exit $exit_code
       - name: Check HISTORY PR
         run: |  
           set +e
@@ -64,8 +63,7 @@ jobs:
               else 
               history_not_in=0
             fi
-            #exit $history_not_in 
-            exit 0
+            exit $history_not_in 
           fi
           echo "No files were added"
           exit 0
@@ -82,8 +80,7 @@ jobs:
               else 
               history_not_in=0
             fi
-            #exit $history_not_in 
-            exit 0
+            exit $history_not_in 
           fi
           echo "No files were added"
           exit 0    

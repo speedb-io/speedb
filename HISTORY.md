@@ -11,6 +11,7 @@
 ### Bug Fixes
 * Stall deadlock consists small cfs (#637).
 * Proactive Flushes: Fix a race in the ShouldInitiateAnotherFlushMemOnly that may cause the method to return an incorrect answer (#758).
+* Compaction: Restore SetupForCompaction functionality. Specifically, hint POSIX_FADV_NORMAL for compaction input files.See https://github.com/speedb-io/speedb/issues/787 for full details.
 
 ### Miscellaneous
 * Remove leftover references to ROCKSDB_LITE (#755).

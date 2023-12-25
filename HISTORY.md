@@ -14,6 +14,7 @@
 
 ### Miscellaneous
 * Remove leftover references to ROCKSDB_LITE (#755).
+* Options: Set level_compaction_dynamic_level_bytes as false by default. This flag is not working properly with Speedb. see https://github.com/speedb-io/speedb/issues/786 for more details.
 
 ## Hazlenut 2.7.0 (27/10/2023)
 Based on RocksDB 8.1.1

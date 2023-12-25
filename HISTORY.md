@@ -9,6 +9,7 @@ Based on RocksDB 8.6.7
 
 ### Enhancements
 * Added a kUseBaseAddress flag and GetBaseOffset flag to OptionTypeInfo.  If this flag is set and a function is used for processing options, the function is passed the base address of the struct rather than the specific field (#397)
+* Export GetFlushReasonString/GetCompactionReasonString in listener.h (#785).
 
 ### Bug Fixes
 * Stall deadlock consists small cfs (#637).

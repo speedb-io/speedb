@@ -1005,10 +1005,10 @@ struct DBOptions {
   // running RocksDB on spinning disks, you should set this to at least 2MB.
   // That way RocksDB's compaction is doing sequential instead of random reads.
   //
-  // Default: 2MB
+  // Default: 0
   //
   // Dynamically changeable through SetDBOptions() API.
-  size_t compaction_readahead_size = 2 * 1024 * 1024;
+  size_t compaction_readahead_size = 0;
 
   // This is a maximum buffer size that is used by WinMmapReadableFile in
   // unbuffered disk I/O mode. We need to maintain an aligned buffer for

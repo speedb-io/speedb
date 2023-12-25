@@ -1193,7 +1193,9 @@ Status BlockBasedTable::PrefetchIndexAndFilterBlocks(
   return s;
 }
 
-void BlockBasedTable::SetupForCompaction() {}
+void BlockBasedTable::SetupForCompaction() {
+  rep_->file->file()->Hint(FSRandomAccessFile::kNormal);
+}
 
 TablePinningPolicy* BlockBasedTable::GetPinningPolicy() const {
   return rep_->table_options.pinning_policy.get();

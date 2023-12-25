@@ -558,6 +558,36 @@ class DB {
     }  // else value is already assigned
     return s;
   }
+
+  // Finds the smallest key in the entire DB.
+  //
+  // Returns OK when successfully finding such a key. In that case, key (must be != nullptr)
+  // will contain the found key. If value != nullptr, the associated value will be returned
+  // in value.
+  //
+  // Returns NotFound is no such key exists (=> DB is empty). In that case, key and value
+  // will remain unchanged.
+  // Returns some other non-OK status on error, as applicable. In that case, key and value
+  // will remain unchanged.
+  Status GetSmallest( const ReadOptions& options,
+                      std::string* key,
+                      std::string* value);
+
+  // Same as GetSmallest() with no CF, but for a specific CF.
+  Status GetSmallest( const ReadOptions& options,
+                      ColumnFamilyHandle* column_family,
+                      std::string* key,
+                      std::string* value);
+
+  // Convenience service. Same as: return GetSmallest(...).IsNotFound()
+  Status IsEmpty( const ReadOptions& options,
+                  bool* answer);
+
+  // Convenience service. Same as: return GetSmallest(...).IsNotFound()
+  Status IsEmpty( const ReadOptions& options,
+                  ColumnFamilyHandle* column_family,
+                  bool* answer);
+
   virtual Status Get(const ReadOptions& options,
                      ColumnFamilyHandle* column_family, const Slice& key,
                      PinnableSlice* value) = 0;

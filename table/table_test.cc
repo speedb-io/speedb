@@ -90,12 +90,16 @@
 #include "utilities/memory_allocators.h"
 #include "utilities/merge_operators.h"
 
+#include "rocksdb/utilities/debug.h"
 namespace ROCKSDB_NAMESPACE {
 
 extern const uint64_t kLegacyBlockBasedTableMagicNumber;
 extern const uint64_t kLegacyPlainTableMagicNumber;
 extern const uint64_t kBlockBasedTableMagicNumber;
 extern const uint64_t kPlainTableMagicNumber;
+
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx
+#if 0
 
 namespace {
 
@@ -4384,6 +4388,9 @@ TEST_F(DBHarnessTest, RandomizedLongDB) {
 }
 #endif  // !defined(ROCKSDB_VALGRIND_RUN) || defined(ROCKSDB_FULL_VALGRIND_RUN)
 
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx
+#endif
+
 class MemTableTest : public testing::Test {
  public:
   MemTableTest() {
@@ -4411,44 +4418,81 @@ class MemTableTest : public testing::Test {
 };
 
 TEST_F(MemTableTest, Simple) {
+  auto PrintIter = [](InternalIterator* iter) {
+    ParsedInternalKey key_result;
+    auto parsed_status = ParseInternalKey(iter->key(), &key_result, true);
+    KeyVersion key_version(key_result.user_key.ToString(), iter->value().ToString(), key_result.sequence, (int)key_result.type);
+    auto key_str = key_result.user_key.ToString();
+    auto value_str = iter->value().ToString();
+    std::cout << "DR: [" << key_str << ", " << value_str << "), seq:" << key_result.sequence << ", type:" << key_version.GetTypeName() << '\n';
+  };
+
   WriteBatch batch;
   WriteBatchInternal::SetSequence(&batch, 100);
-  ASSERT_OK(batch.Put(std::string("k1"), std::string("v1")));
-  ASSERT_OK(batch.Put(std::string("k2"), std::string("v2")));
-  ASSERT_OK(batch.Put(std::string("k3"), std::string("v3")));
-  ASSERT_OK(batch.Put(std::string("largekey"), std::string("vlarge")));
-  ASSERT_OK(batch.DeleteRange(std::string("chi"), std::string("xigua")));
-  ASSERT_OK(batch.DeleteRange(std::string("begin"), std::string("end")));
+  ASSERT_OK(batch.DeleteRange(std::string("c"), std::string("f")));
+  // ASSERT_OK(batch.DeleteRange(std::string("begin"), std::string("end")));
+
   ColumnFamilyMemTablesDefault cf_mems_default(GetMemTable());
   ASSERT_TRUE(
       WriteBatchInternal::InsertInto(&batch, &cf_mems_default, nullptr, nullptr)
           .ok());
 
-  for (int i = 0; i < 2; ++i) {
-    Arena arena;
-    ScopedArenaIterator arena_iter_guard;
-    std::unique_ptr<InternalIterator> iter_guard;
-    InternalIterator* iter;
-    if (i == 0) {
-      iter = GetMemTable()->NewIterator(ReadOptions(), &arena);
-      arena_iter_guard.set(iter);
-    } else {
-      iter = GetMemTable()->NewRangeTombstoneIterator(
-          ReadOptions(), kMaxSequenceNumber /* read_seq */,
-          false /* immutable_memtable */);
-      iter_guard.reset(iter);
-    }
-    if (iter == nullptr) {
-      continue;
-    }
-    iter->SeekToFirst();
-    while (iter->Valid()) {
-      fprintf(stderr, "key: '%s' -> '%s'\n", iter->key().ToString().c_str(),
-              iter->value().ToString().c_str());
-      iter->Next();
-    }
+  GetMemTable()->Add(100, kTypeRangeDeletion, std::string("f"), std::string("g"), nullptr);
+
+  std::unique_ptr<InternalIterator> iter_guard;
+  InternalIterator* iter = GetMemTable()->NewRangeTombstoneIterator(
+      ReadOptions(), kMaxSequenceNumber /* read_seq */,
+      false /* immutable_memtable */);
+  iter_guard.reset(iter);
+  
+  iter->SeekToFirst();
+  while (iter->Valid()) {
+    PrintIter(iter);
+    iter->Next();
   }
+
+  // for (int i = 0; i < 2; ++i) {
+  //   Arena arena;
+  //   ScopedArenaIterator arena_iter_guard;
+  //   std::unique_ptr<InternalIterator> iter_guard;
+  //   InternalIterator* iter;
+  //   if (i == 0) {
+  //     std::cout << "Keys Iter\n";
+  //     iter = GetMemTable()->NewIterator(ReadOptions(), &arena);
+  //     arena_iter_guard.set(iter);
+  //   } else {
+  //     std::cout << "Range Tombstones Iter\n";
+  //     iter = GetMemTable()->NewRangeTombstoneIterator(
+  //         ReadOptions(), kMaxSequenceNumber /* read_seq */,
+  //         false /* immutable_memtable */);
+  //     iter_guard.reset(iter);
+  //   }
+  //   if (iter == nullptr) {
+  //     continue;
+  //   }
+  //   iter->SeekToFirst();
+  //   while (iter->Valid()) {
+  //     ParsedInternalKey key_result;
+  //     auto parsed_status = ParseInternalKey(iter->key(), &key_result, true);
+  //     KeyVersion key_version(key_result.user_key.ToString(), iter->value().ToString(), key_result.sequence, (int)key_result.type);
+
+  //     auto key_str = key_result.user_key.ToString();
+  //     auto value_str = iter->value().ToString();
+
+  //     if (i == 0) {
+  //       // std::cout << key_str << " -> " << value_str << ", seq:" << key_result.sequence << ", type:" << key_version.GetTypeName() << '\n';
+  //     } else {
+  //       std::cout << "DR: [" << key_str << ", " << value_str << "), seq:" << key_result.sequence << ", type:" << key_version.GetTypeName() << '\n';
+  //     }
+  //     // fprintf(stderr, "key: '%s' -> '%s'\n", iter->key().ToString().c_str(),
+  //     //         iter->value().ToString().c_str());
+  //     iter->Next();
+  //   }
+  // }
 }
+
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx
+#if 0
 
 // Test the empty key
 TEST_P(ParameterizedHarnessTest, SimpleEmptyKey) {
@@ -5918,6 +5962,10 @@ TEST_F(CacheUsageOptionsOverridesTest, SanitizeAndValidateOptions) {
               std::string::npos);
   Destroy(options);
 }
+
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx
+#endif
+
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {

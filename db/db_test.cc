@@ -6499,6 +6499,9 @@ TEST_F(DBTest, CompactFilesShouldTriggerAutoCompaction) {
             options.level0_file_num_compaction_trigger);
 }
 
+TEST_F(DBTest, DelPutInSameBatch) {
+}
+
 // Github issue #595
 // Large write batch with column families
 TEST_F(DBTest, LargeBatchWithColumnFamilies) {

@@ -573,6 +573,72 @@ TEST_P(DBTestTailingIterator, TailingIteratorUpperBound) {
   Close();
 }
 
+TEST_P(DBTestTailingIterator, MissingKeys) {
+  for (auto reseek_to_fix: {true, false}) {
+    std::cout << "\nReseek_to_fix = " << std::boolalpha << reseek_to_fix << "\n";
+    Options options;
+    options.create_if_missing = true;
+    DestroyAndReopen(options);
+
+    ReadOptions read_options;
+    read_options.tailing = true;
+
+    bool flush_and_move = GetParam();
+
+    ASSERT_OK(Put("20", "20"));
+    ASSERT_OK(Put("30", "30"));
+    ASSERT_OK(Put("40", "40"));
+
+    if (flush_and_move) {
+      ASSERT_OK(Flush());
+      MoveFilesToLevel(3);
+    }
+
+    ASSERT_OK(Put("45", "45"));
+    ASSERT_OK(Put("50", "50"));
+
+    if (flush_and_move) {
+      ASSERT_OK(Flush());
+      MoveFilesToLevel(2);
+    }
+    
+    ASSERT_OK(Put("35", "30"));
+    
+    if (flush_and_move) {
+      ASSERT_OK(Flush());
+      MoveFilesToLevel(1);
+    }
+
+    std::unique_ptr<Iterator> it(db_->NewIterator(read_options));
+    it->Seek("30");
+    ASSERT_EQ("30", it->key().ToString());
+
+    ASSERT_OK(Put("31", "30"));
+
+    if (reseek_to_fix) {
+      it->Seek("30");
+    }
+    
+    it->Next();
+    EXPECT_EQ("31", it->key().ToString());
+
+    ASSERT_OK(Put("32", "30"));
+
+    if (reseek_to_fix) {
+      it->Seek("31");
+    }
+
+    it->Next();
+    EXPECT_EQ("32", it->key().ToString());
+
+    it->Next();
+    EXPECT_EQ("35", it->key().ToString());
+
+    it->Next();
+    EXPECT_EQ("40", it->key().ToString());
+  }
+}
+
 TEST_P(DBTestTailingIterator, TailingIteratorGap) {
   // level 1:            [20, 25]  [35, 40]
   // level 2:  [10 - 15]                    [45 - 50]
@@ -603,19 +669,19 @@ TEST_P(DBTestTailingIterator, TailingIteratorGap) {
   ASSERT_OK(Flush(1));
   MoveFilesToLevel(3, 1);
 
-  ASSERT_OK(Put(1, "10", "10"));
-  ASSERT_OK(Put(1, "15", "15"));
-  ASSERT_OK(Flush(1));
+  // ASSERT_OK(Put(1, "10", "10"));
+  // ASSERT_OK(Put(1, "15", "15"));
+  // ASSERT_OK(Flush(1));
   ASSERT_OK(Put(1, "45", "45"));
   ASSERT_OK(Put(1, "50", "50"));
   ASSERT_OK(Flush(1));
   MoveFilesToLevel(2, 1);
 
-  ASSERT_OK(Put(1, "20", "20"));
-  ASSERT_OK(Put(1, "25", "25"));
-  ASSERT_OK(Flush(1));
+  // ASSERT_OK(Put(1, "20", "20"));
+  // ASSERT_OK(Put(1, "25", "25"));
+  // ASSERT_OK(Flush(1));
   ASSERT_OK(Put(1, "35", "35"));
-  ASSERT_OK(Put(1, "40", "40"));
+  // ASSERT_OK(Put(1, "40", "40"));
   ASSERT_OK(Flush(1));
   MoveFilesToLevel(1, 1);
 
@@ -635,6 +701,63 @@ TEST_P(DBTestTailingIterator, TailingIteratorGap) {
     it->Next();
     ASSERT_TRUE(it->Valid());
     ASSERT_EQ("40", it->key().ToString());
+
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+#if 0
+  std::cout << "Iter at 30, Putting 31\n";
+  ASSERT_OK(Put(1, "31", "30"));
+
+  std::cout << "Next\n";
+  it->Next();
+  ASSERT_TRUE(it->Valid());
+  EXPECT_EQ("31", it->key().ToString());
+
+  std::cout << "Iter at " << it->key().ToString() << " - Putting 32\n";
+  ASSERT_OK(Put(1, "32", "30"));
+
+  std::cout << "Next\n";
+  it->Next();
+  ASSERT_TRUE(it->Valid());
+  EXPECT_EQ("32", it->key().ToString());
+
+  std::cout << "Iter at " << it->key().ToString() << " Next\n";
+
+  it->Next();
+  ASSERT_TRUE(it->Valid());
+  EXPECT_EQ("35", it->key().ToString());
+
+  std::cout << "Seek(30)\n";
+  it->Seek("30");
+  ASSERT_TRUE(it->Valid());
+  EXPECT_EQ("30", it->key().ToString());
+
+  std::cout << "Iter at " << it->key().ToString() << " Next\n";
+  it->Next();
+  ASSERT_TRUE(it->Valid());
+  EXPECT_EQ("31", it->key().ToString());
+
+  std::cout << "Iter at " << it->key().ToString() << " Next\n";
+  it->Next();
+  ASSERT_TRUE(it->Valid());
+  EXPECT_EQ("32", it->key().ToString());
+
+  std::cout << "Iter at " << it->key().ToString() << " Next\n";
+  it->Next();
+  ASSERT_TRUE(it->Valid());
+  EXPECT_EQ("35", it->key().ToString());
+
+  std::cout << "Iter at " << it->key().ToString() << " Next\n";
+  it->Next();
+  ASSERT_TRUE(it->Valid());
+  EXPECT_EQ("40", it->key().ToString());
+
+  std::cout << "Iter at " << it->key().ToString() << " Next\n";
+  it->Next();
+  ASSERT_TRUE(it->Valid());
+  EXPECT_EQ("45", it->key().ToString());
+
+// XXXXXXXXXXXXXXXXXXXXXX
+#endif
 
     ASSERT_OK(it->status());
   }

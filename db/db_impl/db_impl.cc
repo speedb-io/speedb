@@ -2088,6 +2088,7 @@ InternalIterator* DBImpl::NewInternalIterator(
           &cfd->ioptions()->internal_comparator, nullptr /* smallest */,
           nullptr /* largest */);
     }
+    // UDI: Adding keys / range-deletes iters for mutable memtable
     merge_iter_builder.AddPointAndTombstoneIterator(mem_iter,
                                                     mem_tombstone_iter);
   } else {

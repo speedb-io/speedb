@@ -14,6 +14,7 @@ Based on RocksDB 8.6.7
 ### Bug Fixes
 * Stall deadlock consists small cfs (#637).
 * Proactive Flushes: Fix a race in the ShouldInitiateAnotherFlushMemOnly that may cause the method to return an incorrect answer (#758).
+* Fix CI failure after changing compation_readahead_size default to 0 (#794).
 
 ### Miscellaneous
 * Remove leftover references to ROCKSDB_LITE (#755).

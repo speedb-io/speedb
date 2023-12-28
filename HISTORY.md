@@ -13,10 +13,12 @@ Based on RocksDB 8.6.7
 ### Bug Fixes
 * Stall deadlock consists small cfs (#637).
 * Proactive Flushes: Fix a race in the ShouldInitiateAnotherFlushMemOnly that may cause the method to return an incorrect answer (#758).
+* Fix CI failure after changing compation_readahead_size default to 0 (#794).
 * Compaction: Restore SetupForCompaction functionality. Specifically, hint POSIX_FADV_NORMAL for compaction input files.See https://github.com/speedb-io/speedb/issues/787 for full details.
 
 ### Miscellaneous
 * Remove leftover references to ROCKSDB_LITE (#755).
+* Options: Set compaction_readahead_size default to 0. The current default of 2Mb is not optimal for most of our use cases. Having a value of 0 means that the FS will use its default size for prefetching (true only with https://github.com/speedb-io/speedb/pull/788).
 
 ## Hazlenut 2.7.0 (27/10/2023)
 Based on RocksDB 8.1.1

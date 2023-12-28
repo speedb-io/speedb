@@ -171,6 +171,7 @@ TEST_P(PrefetchTest, Basic) {
   SyncPoint::GetInstance()->SetCallBack("FilePrefetchBuffer::Prefetch:Start",
                                         [&](void*) { buff_prefetch_count++; });
   SyncPoint::GetInstance()->EnableProcessing();
+  options.compaction_readahead_size = 2 * 1024 * 1024;
 
   Status s = TryReopen(options);
   if (use_direct_io && (s.IsNotSupported() || s.IsInvalidArgument())) {

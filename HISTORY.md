@@ -10,6 +10,7 @@ Based on RocksDB 8.6.7
 ### Enhancements
 * Added a kUseBaseAddress flag and GetBaseOffset flag to OptionTypeInfo.  If this flag is set and a function is used for processing options, the function is passed the base address of the struct rather than the specific field (#397)
 * Enabled speedb features in C and Java (#722)
+* stress test: Add the ability to trace write operations. Controlled by flag trace_ops (on by default). Trace files will be written to the expected values dir.
 
 ### Bug Fixes
 * Stall deadlock consists small cfs (#637).

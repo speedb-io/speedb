@@ -57,6 +57,4 @@ jobs:
       - name: Save the DB if the test failed
         if:  always()
         run:  |
-          find . -name "rocksdb_crashtest_*"
-          find /tmp -name "rocksdb_crashtest_*"
           ls -l /tmp

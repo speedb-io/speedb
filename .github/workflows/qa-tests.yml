@@ -56,5 +56,5 @@ jobs:
           esac
       - name: Save the DB if the test failed
         if:  always() 
-        run: | 
+        run:  | 
           ls -l /tmp/rocksdb_crashtest_*    

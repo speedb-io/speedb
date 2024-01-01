@@ -54,8 +54,3 @@ jobs:
               make clean && ${{ matrix.short_test }}
               ;;
           esac
-          
-      - name: Save the DB if the test failed
-        if:  always() 
-        run: | 
-          ls -l /tmp/rocksdb_crashtest_*    

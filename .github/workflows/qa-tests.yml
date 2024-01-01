@@ -55,6 +55,6 @@ jobs:
               ;;
           esac
       - name: Save the DB if the test failed
-        if: ${{ always() }}
+        if:  always() 
         run: | 
           ls -l /tmp/rocksdb_crashtest_*    

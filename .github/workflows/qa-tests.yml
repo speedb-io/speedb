@@ -58,5 +58,5 @@ jobs:
         if:  always()
         run:  |
           find . -name "rocksdb_crashtest_*"
-          find . -name "rocksdb_crashtest_*" -exec ls -l {} \;
-          ls -l tmp/rocksdb_crashtest_*
+          find /tmp -name "rocksdb_crashtest_*"
+          ls -l /tmp

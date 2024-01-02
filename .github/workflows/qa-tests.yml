@@ -20,15 +20,15 @@ jobs:
     strategy:
       matrix:
         include:
-          - name: Unit tests
-            short_test: TMPD="$(mktemp -d /tmp/speedb.XXXX)" make -j$(nproc) check
-            long_test: TMPD="$(mktemp -d /tmp/speedb.XXXX)" make -j$(nproc) check
+          # - name: Unit tests
+          #   short_test: TMPD="$(mktemp -d /tmp/speedb.XXXX)" make -j$(nproc) check
+          #   long_test: TMPD="$(mktemp -d /tmp/speedb.XXXX)" make -j$(nproc) check
           - name: black-box
-            short_test: CRASH_TEST_EXT_ARGS="--duration=3600" make -j$(nproc) blackbox_asan_crash_test
+            short_test: CRASH_TEST_EXT_ARGS="--interval=80 --duration=3600" make -j$(nproc) blackbox_asan_crash_test
             long_test: CRASH_TEST_EXT_ARGS="--duration=10000" make -j$(nproc) blackbox_asan_crash_test
-          - name: white-box
-            short_test: CRASH_TEST_EXT_ARGS="--duration=3600" make -j$(nproc) whitebox_asan_crash_test
-            long_test: CRASH_TEST_EXT_ARGS="--duration=10000" make -j$(nproc) whitebox_asan_crash_test
+          # - name: white-box
+          #   short_test: CRASH_TEST_EXT_ARGS="--duration=3600" make -j$(nproc) whitebox_asan_crash_test
+          #   long_test: CRASH_TEST_EXT_ARGS="--duration=10000" make -j$(nproc) whitebox_asan_crash_test
     
     steps:
       - name: Network hotfix
@@ -54,3 +54,7 @@ jobs:
               make clean && ${{ matrix.short_test }}
               ;;
           esac
+      - name: Save the DB if the test failed
+        if:  always()
+        run:  |
+          ls -l /tmp

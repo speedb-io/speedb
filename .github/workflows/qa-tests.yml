@@ -55,7 +55,13 @@ jobs:
               ;;
           esac
       - name: Save the DB if the test failed
-        if:  always()
+        id: test_db
+        if:  failure()
         run:  |
           ls -l /tmp
           du -ksh /tmp/*
+      - name: prep the test db
+        if: sucess()
+        run: |
+          tar -zcvf /tmp/qa_db.tar.gz /tmp/rocksdb_crashtest_* 
+          ls -l /tmp/qa_db.tar.gz

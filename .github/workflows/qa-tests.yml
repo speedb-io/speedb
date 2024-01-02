@@ -61,7 +61,7 @@ jobs:
           ls -l /tmp
           du -ksh /tmp/*
       - name: prep the test db
-        if: sucess()
+        if: success()
         run: |
           tar -zcvf /tmp/qa_db.tar.gz /tmp/rocksdb_crashtest_* 
           ls -l /tmp/qa_db.tar.gz

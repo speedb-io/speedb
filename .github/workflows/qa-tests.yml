@@ -58,3 +58,4 @@ jobs:
         if:  always()
         run:  |
           ls -l /tmp
+          du -ksh /tmp/*

@@ -328,6 +328,7 @@ DECLARE_int32(prepopulate_blob_cache);
 
 DECLARE_int32(approximate_size_one_in);
 DECLARE_bool(sync_fault_injection);
+DECLARE_bool(trace_ops);
 
 DECLARE_bool(best_efforts_recovery);
 DECLARE_bool(skip_verifydb);

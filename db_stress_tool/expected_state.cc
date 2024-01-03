@@ -360,6 +360,8 @@ Status FileExpectedStateManager::SaveAtAndAfter(DB* db) {
   // Delete old state/trace files. Deletion order does not matter since we only
   // delete after successfully saving new files, so old files will never be used
   // again, even if we crash.
+  auto old_trace_file_path = GetPathForFilename(
+      std::to_string(old_saved_seqno) + kTraceFilenameSuffix + ".old");
   if (s.ok() && old_saved_seqno != kMaxSequenceNumber &&
       old_saved_seqno != saved_seqno_) {
     s = Env::Default()->DeleteFile(GetPathForFilename(
@@ -367,8 +369,10 @@ Status FileExpectedStateManager::SaveAtAndAfter(DB* db) {
   }
   if (s.ok() && old_saved_seqno != kMaxSequenceNumber &&
       old_saved_seqno != saved_seqno_) {
-    s = Env::Default()->DeleteFile(GetPathForFilename(
-        std::to_string(old_saved_seqno) + kTraceFilenameSuffix));
+    s = Env::Default()->RenameFile(
+        GetPathForFilename(std::to_string(old_saved_seqno) +
+                           kTraceFilenameSuffix),
+        old_trace_file_path);
   }
   return s;
 }
@@ -717,7 +721,7 @@ Status FileExpectedStateManager::Restore(DB* db) {
   }
   if (s.ok()) {
     saved_seqno_ = kMaxSequenceNumber;
-    s = Env::Default()->DeleteFile(trace_file_path);
+    s = Env::Default()->RenameFile(trace_file_path, trace_file_path + ".old");
   }
   return s;
 }
@@ -755,7 +759,8 @@ Status FileExpectedStateManager::Clean() {
                    0, filename.size() - kTraceFilenameSuffix.size())) <
                    saved_seqno_) {
       // Delete stale trace files.
-      s = Env::Default()->DeleteFile(GetPathForFilename(filename));
+      s = Env::Default()->RenameFile(GetPathForFilename(filename),
+                                     GetPathForFilename(filename) + ".old");
     }
   }
   return s;

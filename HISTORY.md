@@ -15,8 +15,9 @@ Based on RocksDB 8.6.7
 
 
 ### Bug Fixes
-* Stall deadlock consists small cfs (#637).
+* fix conflicts between db_bench flags and enable speedb features flag(#743).
 * Proactive Flushes: Fix a race in the ShouldInitiateAnotherFlushMemOnly that may cause the method to return an incorrect answer (#758).
+* Stall deadlock consists small cfs (#637).
 * Fix CI failure after changing compation_readahead_size default to 0 (#794).
 * Compaction: Restore SetupForCompaction functionality. Specifically, hint POSIX_FADV_NORMAL for compaction input files.See https://github.com/speedb-io/speedb/issues/787 for full details.
 * stress test: Fix TestIterateAgainstExpected not supporting 0 iterations. TestIterateAgainstExpected was not designed to support value of 0 in FLAGS_num_iterations.

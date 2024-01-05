@@ -1172,7 +1172,7 @@ DEFINE_uint64(stats_dump_period_sec,
 DEFINE_bool(use_dynamic_delay, ROCKSDB_NAMESPACE::Options().use_dynamic_delay,
             "Use dynamic delay");
 
-DEFINE_bool(crash_test, false,
+DEFINE_bool(crash_test, true,
             "If true, speedb features validation will be skipped .");
 
 DEFINE_bool(enable_speedb_features, false,

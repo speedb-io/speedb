@@ -165,7 +165,7 @@ int db_stress_tool(int argc, char** argv) {
         FLAGS_readpercent, FLAGS_prefixpercent, FLAGS_writepercent,
         FLAGS_delpercent, FLAGS_delrangepercent, FLAGS_iterpercent,
         FLAGS_customopspercent);
-    exit(1);
+    //exit(1);
   }
   if (FLAGS_disable_wal == 1 && FLAGS_reopen > 0) {
     fprintf(stderr, "Error: Db cannot reopen safely with disable_wal set!\n");

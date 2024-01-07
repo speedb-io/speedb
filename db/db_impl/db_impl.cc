@@ -1166,41 +1166,35 @@ void DBImpl::DumpStats() {
                      stats.c_str());
     }
 #ifdef MEMORY_REPORTING
-    ROCKS_LOG_INFO(immutable_db_options_.info_log,
-                   "Arena Stats: Arena total: %" PRIu64,
-                   Arena::arena_tracker_.total.load());
+    std::ostringstream oss;
+    oss << std::endl << "** Memory Reporting **" << std::endl; 
+    oss << "Arena Stats:" << std::endl << "Total: " << NumberToHumanString(Arena::arena_tracker_.total.load()) << std::endl;
     for (const auto& it : Arena::arena_tracker_.arena_stats) {
-      ROCKS_LOG_INFO(immutable_db_options_.info_log, "%s : %" PRIu64, it.first,
-                     it.second.load());
+      oss << it.first << ": " << NumberToHumanString(it.second.load()) << std::endl;
     }
-    ROCKS_LOG_INFO(immutable_db_options_.info_log, "CF stats: ");
+    oss << "CF Stats: " << std::endl;
     uint64_t cfs_total_memory = 0;
+    std::ostringstream cf_oss;
     for (auto cfd : *versions_->GetColumnFamilySet()) {
       if (cfd->initialized()) {
         std::string cf_name = cfd->GetName();
         uint64_t allocated_cf = cfd->mem()->ApproximateMemoryUsageFast() +
                                 cfd->imm()->ApproximateMemoryUsage();
         cfs_total_memory += allocated_cf;
-        ROCKS_LOG_INFO(immutable_db_options_.info_log,
-                       "CF Name: %s , memory used: %" PRIu64, cf_name.c_str(),
-                       allocated_cf);
+        cf_oss << "[" << cf_name.c_str() << "]: " << NumberToHumanString(allocated_cf) << std::endl;
       }
     }
-    ROCKS_LOG_INFO(immutable_db_options_.info_log,
-                   "Total CF memory usage: %" PRIu64, cfs_total_memory);
-    std::string out;
-    this->GetProperty("rocksdb.block-cache-usage", &out);
-    ROCKS_LOG_INFO(immutable_db_options_.info_log,
-                   "rocksdb.block-cache-usage: %s", out.c_str());
-    this->GetProperty("rocksdb.estimate-table-readers-mem", &out);
-    ROCKS_LOG_INFO(immutable_db_options_.info_log,
-                   "rocksdb.estimate-table-readers-mem: %s", out.c_str());
-    this->GetProperty("rocksdb.block-cache-pinned-usage", &out);
-    ROCKS_LOG_INFO(immutable_db_options_.info_log,
-                   "rocksdb.block-cache-pinned-usage: %s", out.c_str());
-    ROCKS_LOG_INFO(immutable_db_options_.info_log,
-                   "Total CacheAllocationUsage: %" PRIu64,
-                   ROCKSDB_NAMESPACE::blockfetchermem::mem.load());
+    oss << "Total: " << NumberToHumanString(cfs_total_memory) << std::endl << cf_oss.str();
+    size_t out;
+    this->GetIntProperty("rocksdb.block-cache-usage", &out);
+    oss << "rocksdb.block-cache-usage: " << NumberToHumanString(out) << std::endl;
+    this->GetIntProperty("rocksdb.estimate-table-readers-mem", &out);
+    oss << "rocksdb.estimate-table-readers-mem: " << NumberToHumanString(out) << std::endl;    
+    this->GetIntProperty("rocksdb.block-cache-pinned-usage", &out);
+    oss << "rocksdb.block-cache-pinned-usage: " << NumberToHumanString(out) << std::endl;
+    oss << "Total CacheAllocationUsage: " << NumberToHumanString(ROCKSDB_NAMESPACE::blockfetchermem::mem.load()) << std::endl;
+    ROCKS_LOG_INFO(immutable_db_options_.info_log, "%s",
+                     oss.str().c_str());
 #endif
   }
 

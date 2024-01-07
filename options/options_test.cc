@@ -5312,7 +5312,7 @@ TEST_F(SharedOptionsTest, SharedOptionsTest) {
             SharedOptions::kDefaultDelayedWriteRate);
   ASSERT_EQ(so_with_dflts.GetBucketSize(), SharedOptions::kDefaultBucketSize);
   ASSERT_EQ(so_with_dflts.IsMergeMemtableSupported(),
-            SharedOptions::kDeafultUseMerge);
+            SharedOptions::kDefaultUseMerge);
 
   auto so_with_dflts_cache = so_with_dflts.GetCache();
   ASSERT_TRUE(so_with_dflts_cache != nullptr);

@@ -57,7 +57,7 @@ jobs:
 
 
       - name: Save the DB if the test failed
-        if:  ${{ failure }}
+        if:  ${{ failure() }}
         id: savedb 
         run:  | 
           ls -l /tmp/rocksdb_crashtest_* 

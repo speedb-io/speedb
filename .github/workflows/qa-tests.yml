@@ -66,7 +66,7 @@ jobs:
 
       - name: Upload the DB
         uses: actions/upload-artifact@v3
-        if: ${{ always() && step.savedb.outcome != 'skipped' && step.savedb.outcome != 'failure' }}
+        if: ${{ always() && steps.savedb.outcome != 'skipped' && steps.savedb.outcome != 'failure' }}
         with:
           name: testdb 
           retention-days: 3

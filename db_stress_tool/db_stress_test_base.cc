@@ -147,7 +147,7 @@ bool is_default(const char* flag_name) {
 }
 
 void ValidateEnableSpeedbFlags() {
-    std::vector<std::string> confilct_flags = {
+  std::vector<std::string> confilct_flags = {
       "num_high_pri_threads", "num_bottom_pri_threads",
       "num_bottom_pri_threads", "num_low_pri_threads",
       "max_background_compactions", "max_background_flushes", "cache_size",
@@ -160,7 +160,7 @@ void ValidateEnableSpeedbFlags() {
       "whole_key_filtering", "optimize_filters_for_hits",
       "max_num_parallel_flushes", "start_delay_percent",
       "max_num_parallel_flushes", "use_blob_cache"};
-  
+
   if (FLAGS_enable_speedb_features && !FLAGS_crash_test) {
     if (is_default("max_background_jobs") || is_default("total_ram_size")) {
       fprintf(
@@ -173,9 +173,7 @@ void ValidateEnableSpeedbFlags() {
       if (!is_default(flag.c_str())) {
         std::string msg = "enable_speedb_features and " + flag +
                           " cannot be configured together \n";
-        fprintf(
-          stderr, "%s",
-          msg.c_str());
+        fprintf(stderr, "%s", msg.c_str());
         exit(1);
       }
     }

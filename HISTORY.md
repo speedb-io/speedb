@@ -18,6 +18,7 @@ Based on RocksDB 8.6.7
 * Compaction: Restore SetupForCompaction functionality. Specifically, hint POSIX_FADV_NORMAL for compaction input files.See https://github.com/speedb-io/speedb/issues/787 for full details.
 * stress test: Fix TestIterateAgainstExpected not supporting 0 iterations. TestIterateAgainstExpected was not designed to support value of 0 in FLAGS_num_iterations.
 RocksDB has a value of 10 by default and we've added the option to randomize the values from 0 to 100 in https://github.com/speedb-io/speedb/commit/434692a63318036a3995a53001337f18bf467903
+* Add more checks for using db_stress with --enable_speedb_features=true
 
 ### Miscellaneous
 * Remove leftover references to ROCKSDB_LITE (#755).

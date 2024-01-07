@@ -2804,9 +2804,7 @@ void StressTest::Open(SharedState* shared) {
   Status s;
   SharedOptions so(FLAGS_total_ram_size, FLAGS_max_background_jobs,
                    FLAGS_delayed_write_rate, 1000000, true);
-  if (FLAGS_enable_speedb_features) {
-    options_.EnableSpeedbFeatures(so);
-  }
+
     std::vector<std::string> existing_column_families;
     s = DB::ListColumnFamilies(DBOptions(options_), FLAGS_db,
                                &existing_column_families);  // ignore errors
@@ -2853,6 +2851,13 @@ void StressTest::Open(SharedState* shared) {
         cf_descriptors.emplace_back(name, ColumnFamilyOptions(options_));
       }
     }
+    if (FLAGS_enable_speedb_features) {
+      options_.EnableSpeedbFeatures(so);
+      if (existing_column_families.empty()) {
+        cf_descriptors.emplace_back(
+            kDefaultColumnFamilyName, *ColumnFamilyOptions(options_).EnableSpeedbFeaturesCF(so));
+      }
+    }  
     while (cf_descriptors.size() < (size_t)FLAGS_column_families) {
       std::string name = std::to_string(new_column_family_name_.load());
       new_column_family_name_++;

@@ -54,14 +54,20 @@ jobs:
               make clean && ${{ matrix.short_test }}
               ;;
           esac
+
+
       - name: Save the DB if the test failed
-        id: test_db
-        if:  failure()
-        run:  |
-          ls -l /tmp
-          du -ksh /tmp/*
-      - name: prep the test db
-        if: success()
-        run: |
-          tar -zcvf /tmp/qa_db.tar.gz /tmp/rocksdb_crashtest_* 
-          ls -l /tmp/qa_db.tar.gz
+        if:  ${{ failure }}
+        id: savedb 
+        run:  | 
+          ls -l /tmp/rocksdb_crashtest_* 
+          tar -zxvf /tmp/db4debug.tar.gz /tmp/rocksdb_crashtest_* 
+          ls -l /tmp/db4debug.tar.gz
+
+      - name: Upload the DB
+        uses: actions/upload-artifact@v3
+        if: ${{ always() && step.savedb.outcome != 'skipped' && step.savedb.outcome != 'failure' }}
+        with:
+          name: testdb 
+          retention-days: 3
+          path: /tmp/db4debug.tar.gz

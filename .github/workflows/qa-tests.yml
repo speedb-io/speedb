@@ -61,7 +61,7 @@ jobs:
         id: savedb 
         run:  | 
           ls -l /tmp/rocksdb_crashtest_* 
-          tar -zxvf /tmp/db4debug.tar.gz /tmp/rocksdb_crashtest_* 
+          tar -zcvf /tmp/db4debug.tar.gz /tmp/rocksdb_crashtest_* 
           ls -l /tmp/db4debug.tar.gz
 
       - name: Upload the DB

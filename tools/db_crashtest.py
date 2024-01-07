@@ -243,7 +243,7 @@ default_params = {
     "allow_concurrent_memtable_write": lambda: random.randint(0, 1),
     # only done when thread#0 does TestAcquireSnapshot. 
     "compare_full_db_state_snapshot": lambda: random.choice([0, 0, 0, 1]),
-    "num_iterations": lambda: random.choice([0 if t == 0 else 10 for t in range(0, 20)]),
+    "num_iterations": lambda: random.choice([0 if t == 0 else 10 for t in range(0, 6)]),
     "sync_wal_one_in": 100000,
     "customopspercent": 0,
     # "filter_uri": lambda: random.choice(["speedb.PairedBloomFilter", ""]),

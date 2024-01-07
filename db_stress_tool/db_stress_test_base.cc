@@ -2844,12 +2844,7 @@ void StressTest::Open(SharedState* shared) {
         new_column_family_name_ =
             std::max(new_column_family_name_.load(), std::stoi(name) + 1);
       }
-      if (FLAGS_enable_speedb_features) {
-        cf_descriptors.emplace_back(
-            name, *ColumnFamilyOptions(options_).EnableSpeedbFeaturesCF(so));
-      } else {
-        cf_descriptors.emplace_back(name, ColumnFamilyOptions(options_));
-      }
+      cf_descriptors.emplace_back(name, ColumnFamilyOptions(options_));
     }
     if (FLAGS_enable_speedb_features) {
       options_.EnableSpeedbFeatures(so);

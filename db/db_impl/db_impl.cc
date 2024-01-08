@@ -1103,10 +1103,12 @@ Status DBImpl::GetStatsHistory(
 
 void DBImpl::DumpStats() {
   TEST_SYNC_POINT("DBImpl::DumpStats:1");
-  std::string stats;
   if (shutdown_initiated_) {
     return;
   }
+
+  std::string db_stats;
+  std::vector<std::string> cfs_stats;
 
   // Also probe block cache(s) for problems, dump to info log
   UnorderedSet<Cache*> probed_caches;
@@ -1141,7 +1143,7 @@ void DBImpl::DumpStats() {
     assert(property_info != nullptr);
     assert(!property_info->need_out_of_mutex);
     default_cf_internal_stats_->GetStringProperty(*property_info, *property,
-                                                  &stats);
+                                                  &db_stats);
 
     property = &InternalStats::kPeriodicCFStats;
     property_info = GetPropertyInfo(*property);
@@ -1149,22 +1151,35 @@ void DBImpl::DumpStats() {
     assert(!property_info->need_out_of_mutex);
     for (auto cfd : *versions_->GetColumnFamilySet()) {
       if (cfd->initialized()) {
+        std::string cf_stats_str{std::string("CF Stats [") + cfd->GetName() +
+                                 "]"};
+        auto cf_stats_hdr_len = cf_stats_str.size();
         cfd->internal_stats()->GetStringProperty(*property_info, *property,
-                                                 &stats);
+                                                 &cf_stats_str);
+
+        // Avoid displaying any information for CF-s with no stats information
+        if (cf_stats_str.size() > cf_stats_hdr_len) {
+          cfs_stats.push_back(cf_stats_str);
+        }
       }
     }
   }
   TEST_SYNC_POINT("DBImpl::DumpStats:2");
   ROCKS_LOG_INFO(immutable_db_options_.info_log,
                  "------- DUMPING STATS -------");
-  ROCKS_LOG_INFO(immutable_db_options_.info_log, "%s", stats.c_str());
+  ROCKS_LOG_INFO(immutable_db_options_.info_log, "%s", db_stats.c_str());
+  for (const auto& cf_stats_str : cfs_stats) {
+    ROCKS_LOG_INFO(immutable_db_options_.info_log, "%s", cf_stats_str.c_str());
+  }
+
   if (immutable_db_options_.dump_malloc_stats) {
-    stats.clear();
-    DumpMallocStats(&stats);
-    if (!stats.empty()) {
+    std::string malloc_stats;
+    DumpMallocStats(&malloc_stats);
+    if (!malloc_stats.empty()) {
       ROCKS_LOG_INFO(immutable_db_options_.info_log,
                      "------- Malloc STATS -------");
-      ROCKS_LOG_INFO(immutable_db_options_.info_log, "%s", stats.c_str());
+      ROCKS_LOG_INFO(immutable_db_options_.info_log, "%s",
+                     malloc_stats.c_str());
     }
   }
 

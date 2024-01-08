@@ -2290,7 +2290,7 @@ class SharedOptions {
  public:
   static constexpr size_t kDefaultDelayedWriteRate = 256 * 1024 * 1024ul;
   static constexpr size_t kDefaultBucketSize = 1000000;
-  static constexpr bool kDeafultUseMerge = true;
+  static constexpr bool kDefaultUseMerge = true;
 
   static constexpr size_t kWbmPerCfSizeIncrease = 512 * 1024 * 1024ul;
 
@@ -2298,7 +2298,7 @@ class SharedOptions {
   SharedOptions(size_t total_ram_size_bytes, size_t total_threads,
                 size_t delayed_write_rate = kDefaultDelayedWriteRate,
                 size_t bucket_size = kDefaultBucketSize,
-                bool use_merge = kDeafultUseMerge);
+                bool use_merge = kDefaultUseMerge);
 
  public:
   size_t GetMaxWriteBufferManagerSize() const;
@@ -2340,7 +2340,7 @@ class SharedOptions {
   size_t total_threads_ = 0;
   size_t delayed_write_rate_ = kDefaultBucketSize;
   size_t bucket_size_ = kDefaultBucketSize;
-  bool use_merge_ = kDeafultUseMerge;
+  bool use_merge_ = kDefaultUseMerge;
 
  private:
   // For Future Use

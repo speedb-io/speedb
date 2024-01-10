@@ -559,34 +559,51 @@ class DB {
     return s;
   }
 
-  // Finds the smallest key in the entire DB.
+  // Finds the smallest key in 'column_family' that is >= target.
   //
-  // Returns OK when successfully finding such a key. In that case, key (must be != nullptr)
-  // will contain the found key. If value != nullptr, the associated value will be returned
-  // in value.
+  // If a key is found:
+  // - The found key will be returned in the 'key' parameter (must be != nullptr).
+  // - If 'value' != nullptr, the associated value will be returned in the 'value' parameter.
+  // - Returns OK.
   //
-  // Returns NotFound is no such key exists (=> DB is empty). In that case, key and value
-  // will remain unchanged.
+  // Else (no such key exists):
+  // - 'key' and 'value' remain unchanged.
+  // - Returns NotFound.
+  //
   // Returns some other non-OK status on error, as applicable. In that case, key and value
   // will remain unchanged.
-  Status GetSmallest( const ReadOptions& options,
-                      std::string* key,
-                      std::string* value);
+  Status GetSmallestAtOrAfter(const ReadOptions& options,
+                              ColumnFamilyHandle* column_family,
+                              const Slice& target,
+                              std::string* key,
+                              std::string* value);
 
-  // Same as GetSmallest() with no CF, but for a specific CF.
+  // Same as GetSmallestAtOrAfter(column_family) for the default CF.
+  Status GetSmallestAtOrAfter(const ReadOptions& options,
+                              const Slice& target,
+                              std::string* key,
+                              std::string* value);
+
+  // Same as GetSmallestAtOrAfter() but finds the smallest key in the CF (no target is specified).
   Status GetSmallest( const ReadOptions& options,
                       ColumnFamilyHandle* column_family,
                       std::string* key,
                       std::string* value);
 
-  // Convenience service. Same as: return GetSmallest(...).IsNotFound()
-  Status IsEmpty( const ReadOptions& options,
-                  bool* answer);
+  // Same as GetSmallest(column_family) for the default CF.
+  Status GetSmallest( const ReadOptions& options,
+                      std::string* key,
+                      std::string* value);
 
   // Convenience service. Same as: return GetSmallest(...).IsNotFound()
   Status IsEmpty( const ReadOptions& options,
                   ColumnFamilyHandle* column_family,
                   bool* answer);
+
+  // Same as IsEmpty(column_family) for the default CF.
+  Status IsEmpty( const ReadOptions& options,
+                  bool* answer);
+
 
   virtual Status Get(const ReadOptions& options,
                      ColumnFamilyHandle* column_family, const Slice& key,

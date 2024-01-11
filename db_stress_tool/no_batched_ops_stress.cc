@@ -1695,10 +1695,18 @@ class NonBatchedOpsStressTest : public StressTest {
           // Fail fast to preserve the DB state.
           thread->shared->SetVerificationFailure();
           if (iter->Valid()) {
+          std::unique_ptr<Iterator> iter2(db_->NewIterator(ro, cfh));
+          iter2->Seek(Slice(Key(j)));
+          fprintf(stderr, "\nIterator2 has key %s\n",
+                  iter2->key().ToString(true).c_str());
+
             fprintf(stderr,
                     "Expected state has key %s, iterator is at key %s\n",
                     Slice(Key(j)).ToString(true).c_str(),
                     iter->key().ToString(true).c_str());
+            iter->Seek(Slice(Key(j)));
+            fprintf(stderr, "\nIterator seek for key  has key %s\n",
+            iter->key().ToString(true).c_str());
           } else {
             fprintf(stderr, "Expected state has key %s, iterator is invalid\n",
                     Slice(Key(j)).ToString(true).c_str());
@@ -1932,6 +1940,12 @@ class NonBatchedOpsStressTest : public StressTest {
                 post_read_expected_value)) {
           // Fail fast to preserve the DB state.
           thread->shared->SetVerificationFailure();
+          db_->Flush(FlushOptions());
+          db_->CompactRange(CompactRangeOptions(), nullptr, nullptr);
+          std::unique_ptr<Iterator> iter2(db_->NewIterator(ro, cfh));
+          iter2->Seek(iter->key());
+          fprintf(stderr, "Iterator2 has key %s, but expected state does not.\n",
+                  iter2->key().ToString(true).c_str());
           fprintf(stderr, "Iterator has key %s, but expected state does not.\n",
                   iter->key().ToString(true).c_str());
           fprintf(stderr, "Column family: %s, op_logs: %s\n",

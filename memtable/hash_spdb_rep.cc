@@ -33,6 +33,10 @@
 
 namespace ROCKSDB_NAMESPACE {
 namespace {
+
+// ========================================================================================
+//                                    SpdbKeyHandle
+// ========================================================================================
 struct SpdbKeyHandle {
   SpdbKeyHandle* GetNextBucketItem() {
     return next_.load(std::memory_order_acquire);
@@ -44,6 +48,9 @@ struct SpdbKeyHandle {
   char key_[1];
 };
 
+// ========================================================================================
+//                                    BucketHeader
+// ========================================================================================
 struct BucketHeader {
   port::RWMutexWr rwlock_;  // this mutex probably wont cause delay
   std::atomic<SpdbKeyHandle*> items_ = nullptr;
@@ -135,6 +142,9 @@ struct BucketHeader {
   }
 };
 
+// ========================================================================================
+//                                    SpdbHashTable
+// ========================================================================================
 struct SpdbHashTable {
   std::vector<BucketHeader> buckets_;
 
@@ -191,8 +201,9 @@ struct SpdbHashTable {
   }
 };
 
-// SpdbVector implemntation
-
+// ========================================================================================
+//                                    SpdbVector
+// ========================================================================================
 bool SpdbVector::Add(const char* key) {
   ReadLock rl(&add_rwlock_);
   if (sorted_) {
@@ -272,7 +283,9 @@ SpdbVector::Iterator SpdbVector::Seek(
   return ret;
 }
 
-// SpdbVectorContainer implemanmtation
+// ========================================================================================
+//                                    SpdbVectorContainer
+// ========================================================================================
 bool SpdbVectorContainer::InternalInsert(const char* key) {
   return curr_vector_.load()->Add(key);
 }
@@ -399,15 +412,15 @@ void SpdbVectorContainer::SortThread() {
   }
 }
 
+// ========================================================================================
+//                                    HashSpdbRep
+// ========================================================================================
 class HashSpdbRep : public MemTableRep {
  public:
   HashSpdbRep(const MemTableRep::KeyComparator& compare, Allocator* allocator,
               size_t bucket_size, bool use_merge);
 
   HashSpdbRep(Allocator* allocator, size_t bucket_size);
-
-  void PostCreate(const MemTableRep::KeyComparator& compare,
-                  Allocator* allocator, bool use_merge);
 
   KeyHandle Allocate(const size_t len, char** buf) override;
 
@@ -461,13 +474,6 @@ HashSpdbRep::HashSpdbRep(const MemTableRep::KeyComparator& compare,
 HashSpdbRep::HashSpdbRep(Allocator* allocator, size_t bucket_size)
     : MemTableRep(allocator), spdb_hash_table_(bucket_size) {}
 
-void HashSpdbRep::PostCreate(const MemTableRep::KeyComparator& compare,
-                             Allocator* allocator, bool use_merge) {
-  allocator_ = allocator;
-  spdb_vectors_cont_ =
-      std::make_shared<SpdbVectorContainer>(compare, use_merge);
-}
-
 HashSpdbRep::~HashSpdbRep() {
   if (spdb_vectors_cont_) {
     MarkReadOnly();
@@ -475,13 +481,7 @@ HashSpdbRep::~HashSpdbRep() {
 }
 
 KeyHandle HashSpdbRep::Allocate(const size_t len, char** buf) {
-  // constexpr size_t kInlineDataSize =
-  //     sizeof(SpdbKeyHandle) - offsetof(SpdbKeyHandle, key_);
-
   size_t alloc_size = sizeof(SpdbKeyHandle) + len;
-  // alloc_size =
-  //     std::max(len, kInlineDataSize) - kInlineDataSize +
-  //     sizeof(SpdbKeyHandle);
   SpdbKeyHandle* h =
       reinterpret_cast<SpdbKeyHandle*>(allocator_->AllocateAligned(alloc_size));
   *buf = h->key_;
@@ -533,6 +533,9 @@ MemTableRep::Iterator* HashSpdbRep::GetIterator(Arena* arena,
   return new SpdbVectorIterator(spdb_vectors_cont_, GetComparator(),
                                 part_of_flush);
 }
+// ========================================================================================
+//                                    HashSpdbRepFactory (&Misc)
+// ========================================================================================
 struct HashSpdbRepOptions {
   static const char* kName() { return "HashSpdbRepOptions"; }
   size_t hash_bucket_count;
@@ -566,12 +569,6 @@ class HashSpdbRepFactory : public MemTableRepFactory {
                                  Logger* logger) override;
   bool IsInsertConcurrentlySupported() const override { return true; }
   bool CanHandleDuplicatedKey() const override { return true; }
-  MemTableRep* PreCreateMemTableRep() override;
-  void PostCreateMemTableRep(MemTableRep* switch_mem,
-                             const MemTableRep::KeyComparator& compare,
-                             Allocator* allocator,
-                             const SliceTransform* transform,
-                             Logger* logger) override;
 
   static const char* kClassName() { return "HashSpdbRepFactory"; }
   const char* Name() const override { return kClassName(); }
@@ -583,18 +580,6 @@ class HashSpdbRepFactory : public MemTableRepFactory {
 }  // namespace
 
 // HashSpdbRepFactory
-
-MemTableRep* HashSpdbRepFactory::PreCreateMemTableRep() {
-  return new HashSpdbRep(nullptr, options_.hash_bucket_count);
-}
-
-void HashSpdbRepFactory::PostCreateMemTableRep(
-    MemTableRep* switch_mem, const MemTableRep::KeyComparator& compare,
-    Allocator* allocator, const SliceTransform* /*transform*/,
-    Logger* /*logger*/) {
-  static_cast<HashSpdbRep*>(switch_mem)
-      ->PostCreate(compare, allocator, options_.use_merge);
-}
 
 MemTableRep* HashSpdbRepFactory::CreateMemTableRep(
     const MemTableRep::KeyComparator& compare, Allocator* allocator,

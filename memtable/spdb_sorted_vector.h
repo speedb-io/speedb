@@ -26,6 +26,9 @@ namespace ROCKSDB_NAMESPACE {
 namespace {
 enum SeekOption { SEEK_FORWARD_OP, SEEK_BACKWARD_OP };
 
+// ========================================================================================
+//                                    SpdbVector
+// ========================================================================================
 class SpdbVector {
  public:
   using Vec = std::vector<const char*>;
@@ -96,6 +99,9 @@ class SpdbVector {
 
 using SpdbVectorPtr = std::shared_ptr<SpdbVector>;
 
+// ========================================================================================
+//                                    SortHeapItem
+// ========================================================================================
 class SortHeapItem {
  public:
   SortHeapItem() : spdb_vector_(0) {}
@@ -115,6 +121,9 @@ class SortHeapItem {
   SpdbVector::Iterator curr_iter_;
 };
 
+// ========================================================================================
+//                                    IteratorComparator
+// ========================================================================================
 class IteratorComparator {
  public:
   IteratorComparator(const MemTableRep::KeyComparator& comparator,
@@ -135,6 +144,9 @@ class IteratorComparator {
 
 using IterHeap = BinaryHeap<SortHeapItem*, IteratorComparator>;
 
+// ========================================================================================
+//                                    IterHeapInfo
+// ========================================================================================
 class IterHeapInfo {
  public:
   IterHeapInfo(const MemTableRep::KeyComparator& comparator)
@@ -172,8 +184,6 @@ class IterHeapInfo {
 
   void Insert(SortHeapItem* sort_item) { iter_heap_.get()->push(sort_item); }
 
-  bool Prev(SortHeapItem* sort_item);
-
   const MemTableRep::KeyComparator& Comparator() const { return comparator_; }
 
  private:
@@ -183,6 +193,9 @@ class IterHeapInfo {
 
 using IterAnchors = std::list<SortHeapItem*>;
 
+// ========================================================================================
+//                                    SpdbVectorContainer
+// ========================================================================================
 class SpdbVectorContainer {
  public:
   SpdbVectorContainer(const MemTableRep::KeyComparator& comparator,
@@ -203,8 +216,6 @@ class SpdbVectorContainer {
     MarkReadOnly();
     sort_thread_.join();
   }
-
-  bool InternalInsert(const char* key);
 
   void Insert(const char* key);
 
@@ -240,6 +251,10 @@ class SpdbVectorContainer {
   }
 
  private:
+  // URQ - Try inserting a key into the current vector and return the insertion
+  // result
+  bool InternalInsert(const char* key);
+
   void SortThread();
 
  private:
@@ -258,6 +273,9 @@ class SpdbVectorContainer {
   std::condition_variable sort_thread_cv_;
 };
 
+// ========================================================================================
+//                                    SpdbVectorIterator
+// ========================================================================================
 class SpdbVectorIterator : public MemTableRep::Iterator {
  public:
   // Initialize an iterator over the specified list.
@@ -265,8 +283,7 @@ class SpdbVectorIterator : public MemTableRep::Iterator {
   SpdbVectorIterator(std::shared_ptr<SpdbVectorContainer> spdb_vectors_cont,
                      const MemTableRep::KeyComparator& comparator,
                      bool part_of_flush)
-      : spdb_vectors_cont_holder_(spdb_vectors_cont),
-        spdb_vectors_cont_(spdb_vectors_cont.get()),
+      : spdb_vectors_cont_(spdb_vectors_cont.get()),
         iter_heap_info_(comparator),
         up_iter_direction_(true) {
     is_empty_ = !spdb_vectors_cont_->InitIterator(iter_anchor_, part_of_flush);
@@ -394,7 +411,6 @@ class SpdbVectorIterator : public MemTableRep::Iterator {
   }
 
  private:
-  std::shared_ptr<SpdbVectorContainer> spdb_vectors_cont_holder_;
   SpdbVectorContainer* spdb_vectors_cont_;
   IterAnchors iter_anchor_;
   IterHeapInfo iter_heap_info_;

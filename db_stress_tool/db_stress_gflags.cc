@@ -1020,6 +1020,8 @@ DEFINE_bool(sync_fault_injection, false,
             "--expected_values_dir for verifying there are no holes in the "
             "recovered data.");
 
+DEFINE_bool(trace_ops, true, "Traces all write operations.");
+
 DEFINE_bool(best_efforts_recovery, false,
             "If true, use best efforts recovery.");
 DEFINE_bool(skip_verifydb, false,

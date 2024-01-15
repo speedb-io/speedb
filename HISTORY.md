@@ -10,15 +10,25 @@ Based on RocksDB 8.6.7
 ### Enhancements
 * Added memory reporting to the logs to be able to monitor which component in the Arena is using the memory and CacheAllocation overall memory usage, print some statistics. This feature requires compiling with MEMORY_REPORTING flag (#481)
 * Added a kUseBaseAddress flag and GetBaseOffset flag to OptionTypeInfo.  If this flag is set and a function is used for processing options, the function is passed the base address of the struct rather than the specific field (#397)
+* Export GetFlushReasonString/GetCompactionReasonString in listener.h (#785).
+* Enabled speedb features in C and Java (#722)
+* stress test: Add the ability to trace write operations. Controlled by flag trace_ops (on by default). Trace files will be written to the expected values dir.
+* LOG Enhancement: Have a separate LOG entry per CF Stats. This ensures that no CF stats data is lost in case the size of the combined CF stats text exceeds the LOG's threshold (#534).
 
 ### Bug Fixes
-* Stall deadlock consists small cfs (#637).
+* fix conflicts between db_bench flags and enable speedb features flag(#743).
 * Proactive Flushes: Fix a race in the ShouldInitiateAnotherFlushMemOnly that may cause the method to return an incorrect answer (#758).
+* Stall deadlock consists small cfs (#637).
 * Fix CI failure after changing compation_readahead_size default to 0 (#794).
+* Compaction: Restore SetupForCompaction functionality. Specifically, hint POSIX_FADV_NORMAL for compaction input files.See https://github.com/speedb-io/speedb/issues/787 for full details.
+* stress test: Fix TestIterateAgainstExpected not supporting 0 iterations. TestIterateAgainstExpected was not designed to support value of 0 in FLAGS_num_iterations.
+RocksDB has a value of 10 by default and we've added the option to randomize the values from 0 to 100 in https://github.com/speedb-io/speedb/commit/434692a63318036a3995a53001337f18bf467903
 
 ### Miscellaneous
 * Remove leftover references to ROCKSDB_LITE (#755).
 * Options: Set compaction_readahead_size default to 0. The current default of 2Mb is not optimal for most of our use cases. Having a value of 0 means that the FS will use its default size for prefetching (true only with https://github.com/speedb-io/speedb/pull/788).
+* Options: Set level_compaction_dynamic_level_bytes as false by default. This flag is not working properly with Speedb. see https://github.com/speedb-io/speedb/issues/786 for more details.
+* stress test: Disable hash speedb memtable and enable_speedb_features from testing until issues are solved.
 
 ## Hazlenut 2.7.0 (27/10/2023)
 Based on RocksDB 8.1.1

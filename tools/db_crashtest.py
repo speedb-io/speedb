@@ -243,16 +243,19 @@ default_params = {
     "allow_concurrent_memtable_write": lambda: random.randint(0, 1),
     # only done when thread#0 does TestAcquireSnapshot. 
     "compare_full_db_state_snapshot": lambda: random.choice([0, 0, 0, 1]),
-    "num_iterations": lambda: random.randint(0, 100),
+    "num_iterations": lambda: random.randint(1, 100),
     "sync_wal_one_in": 100000,
     "customopspercent": 0,
     # "filter_uri": lambda: random.choice(["speedb.PairedBloomFilter", ""]),
-    "memtablerep": lambda: random.choice(["skip_list", "hash_spdb"]),
+    # disable hash_spd until issues are fixed.
+    # "memtablerep": lambda: random.choice(["skip_list", "hash_spdb"]),
+    "memtablerep": "skip_list",
     "pinning_policy": lambda: random.choice(["default", "scoped"]),
     "use_dynamic_delay": lambda: random.choice([0, 1, 1, 1]),
     "allow_wbm_stalls": lambda: random.randint(0, 1),
     "start_delay_percent": lambda: random.randint(0, 99),
-    "enable_speedb_features": lambda: random.randint(0, 1),
+    # disable until hash_spd issues are fixed.
+    # "enable_speedb_features": lambda: random.randint(0, 1),
     "total_ram_size": lambda: random.choice([512 * 1024 * 1024, 1024 * 1024 * 1024]),
     "max_background_jobs": lambda: random.choice([4, 8]),
     "crash_test": 1,

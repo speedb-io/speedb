@@ -175,6 +175,8 @@ enum class CompactionReason : int {
   kNumOfReasons,
 };
 
+const char* GetCompactionReasonString(CompactionReason compaction_reason);
+
 // When adding flush reason, make sure to also update `GetFlushReasonString()`.
 enum class FlushReason : int {
   kOthers = 0x00,
@@ -197,6 +199,8 @@ enum class FlushReason : int {
   kCatchUpAfterErrorRecovery = 0xe,
   kWriteBufferManagerInitiated = 0xf
 };
+
+const char* GetFlushReasonString(FlushReason flush_reason);
 
 // TODO: In the future, BackgroundErrorReason will only be used to indicate
 // why the BG Error is happening (e.g., flush, compaction). We may introduce

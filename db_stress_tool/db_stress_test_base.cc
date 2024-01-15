@@ -425,7 +425,7 @@ void StressTest::TrackExpectedState(SharedState* shared) {
   // Therefore recovery from such potential WAL data loss is a prefix recovery
   // that requires tracing
   if ((FLAGS_sync_fault_injection || FLAGS_disable_wal ||
-       FLAGS_manual_wal_flush_one_in > 0) &&
+       FLAGS_manual_wal_flush_one_in > 0 || FLAGS_trace_ops) &&
       IsStateTracked()) {
     Status s = shared->SaveAtAndAfter(db_);
     if (!s.ok()) {
@@ -3162,7 +3162,7 @@ void StressTest::Reopen(ThreadState* thread) {
   Open(thread->shared);
 
   if ((FLAGS_sync_fault_injection || FLAGS_disable_wal ||
-       FLAGS_manual_wal_flush_one_in > 0) &&
+       FLAGS_manual_wal_flush_one_in > 0 || FLAGS_trace_ops) &&
       IsStateTracked()) {
     Status s = thread->shared->SaveAtAndAfter(db_);
     if (!s.ok()) {

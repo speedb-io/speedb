@@ -1,3 +1,17 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
 // Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -21,6 +35,7 @@
 #include "include/org_rocksdb_FlushOptions.h"
 #include "include/org_rocksdb_Options.h"
 #include "include/org_rocksdb_ReadOptions.h"
+#include "include/org_rocksdb_SharedOptions.h"
 #include "include/org_rocksdb_WriteOptions.h"
 #include "rocksdb/comparator.h"
 #include "rocksdb/convenience.h"
@@ -3266,6 +3281,19 @@ void Java_org_rocksdb_Options_optimizeForPointLookup(
 
 /*
  * Class:     org_rocksdb_Options
+ * Method:    enableSpeedbFeatures
+ * Signature: (JJ)V
+ */
+JNIEXPORT void JNICALL Java_org_rocksdb_Options_enableSpeedbFeatures(
+    JNIEnv*, jobject, jlong jhandle, jlong shared_handle) {
+  auto shared_opts =
+      reinterpret_cast<ROCKSDB_NAMESPACE::SharedOptions*>(shared_handle);
+  auto opts = reinterpret_cast<ROCKSDB_NAMESPACE::Options*>(jhandle);
+  opts->EnableSpeedbFeatures(*shared_opts);
+}
+
+/*
+ * Class:     org_rocksdb_Options
  * Method:    optimizeLevelStyleCompaction
  * Signature: (JJ)V
  */
@@ -4097,6 +4125,21 @@ void Java_org_rocksdb_ColumnFamilyOptions_optimizeForPointLookup(
       ->OptimizeForPointLookup(block_cache_size_mb);
 }
 
+/*
+ * Class:     org_rocksdb_ColumnFamilyOptions
+ * Method:    enableSpeedbFeatures
+ * Signature: (JJ)V
+ */
+JNIEXPORT void JNICALL
+Java_org_rocksdb_ColumnFamilyOptions_enableSpeedbFeatures(JNIEnv*, jobject,
+                                                          jlong jhandle,
+                                                          jlong shared_handle) {
+  auto shared_opts =
+      reinterpret_cast<ROCKSDB_NAMESPACE::SharedOptions*>(shared_handle);
+  auto opts =
+      reinterpret_cast<ROCKSDB_NAMESPACE::ColumnFamilyOptions*>(jhandle);
+  opts->EnableSpeedbFeaturesCF(*shared_opts);
+}
 /*
  * Class:     org_rocksdb_ColumnFamilyOptions
  * Method:    optimizeLevelStyleCompaction
@@ -5942,6 +5985,19 @@ void Java_org_rocksdb_DBOptions_optimizeForSmallDb(JNIEnv*, jobject,
                                                    jlong jhandle) {
   reinterpret_cast<ROCKSDB_NAMESPACE::DBOptions*>(jhandle)
       ->OptimizeForSmallDb();
+}
+
+/*
+ * Class:     org_rocksdb_DBOptions
+ * Method:    enableSpeedbFeatures
+ * Signature: (JJ)V
+ */
+JNIEXPORT void JNICALL Java_org_rocksdb_DBOptions_enableSpeedbFeatures(
+    JNIEnv*, jobject, jlong jhandle, jlong shared_handle) {
+  auto shared_opts =
+      reinterpret_cast<ROCKSDB_NAMESPACE::SharedOptions*>(shared_handle);
+  auto opts = reinterpret_cast<ROCKSDB_NAMESPACE::DBOptions*>(jhandle);
+  opts->EnableSpeedbFeaturesDB(*shared_opts);
 }
 
 /*
@@ -8739,4 +8795,117 @@ void Java_org_rocksdb_FlushOptions_disposeInternal(JNIEnv*, jobject,
   auto* flush_opt = reinterpret_cast<ROCKSDB_NAMESPACE::FlushOptions*>(jhandle);
   assert(flush_opt != nullptr);
   delete flush_opt;
+}
+
+/////////////////////////////////////////////////////////////////////
+// ROCKSDB_NAMESPACE::SharedOptions
+
+/*
+ * Class:     org_rocksdb_SharedOptions
+ * Method:    newSharedOptions
+ * Signature: (JJJJZ)J
+ */
+JNIEXPORT jlong JNICALL Java_org_rocksdb_SharedOptions_newSharedOptions__JJJJZ(
+    JNIEnv*, jclass, jlong capacity, jlong total_threads,
+    jlong delayed_write_rate, jlong bucket_size, jboolean use_merge) {
+  auto opts = new ROCKSDB_NAMESPACE::SharedOptions(
+      capacity, total_threads, delayed_write_rate, bucket_size, use_merge);
+  return GET_CPLUSPLUS_POINTER(opts);
+}
+
+/*
+ * Class:     org_rocksdb_SharedOptions
+ * Method:    newSharedOptions
+ * Signature: (JJ)J
+ */
+JNIEXPORT jlong JNICALL Java_org_rocksdb_SharedOptions_newSharedOptions__JJ(
+    JNIEnv*, jclass, jlong capacity, jlong total_threads) {
+  auto opts = new ROCKSDB_NAMESPACE::SharedOptions(capacity, total_threads);
+  return GET_CPLUSPLUS_POINTER(opts);
+}
+
+/*
+ * Class:     org_rocksdb_SharedOptions
+ * Method:    disposeInternal
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_org_rocksdb_SharedOptions_disposeInternal(
+    JNIEnv*, jobject, jlong jhandle) {
+  auto* opts = reinterpret_cast<ROCKSDB_NAMESPACE::SharedOptions*>(jhandle);
+  assert(opts != nullptr);
+  delete opts;
+}
+
+/*
+ * Class:     org_rocksdb_SharedOptions
+ * Method:    getTotalThreads
+ * Signature: (J)J
+ */
+JNIEXPORT jlong JNICALL
+Java_org_rocksdb_SharedOptions_getTotalThreads(JNIEnv*, jclass, jlong jhandle) {
+  auto* opts = reinterpret_cast<ROCKSDB_NAMESPACE::SharedOptions*>(jhandle);
+  assert(opts != nullptr);
+  return opts->GetTotalThreads();
+}
+
+/*
+ * Class:     org_rocksdb_SharedOptions
+ * Method:    getTotalRamSizeBytes
+ * Signature: (J)J
+ */
+JNIEXPORT jlong JNICALL Java_org_rocksdb_SharedOptions_getTotalRamSizeBytes(
+    JNIEnv*, jclass, jlong jhandle) {
+  auto* opts = reinterpret_cast<ROCKSDB_NAMESPACE::SharedOptions*>(jhandle);
+  assert(opts != nullptr);
+  return opts->GetTotalRamSizeBytes();
+}
+
+/*
+ * Class:     org_rocksdb_SharedOptions
+ * Method:    getDelayedWriteRate
+ * Signature: (J)J
+ */
+JNIEXPORT jlong JNICALL Java_org_rocksdb_SharedOptions_getDelayedWriteRate(
+    JNIEnv*, jclass, jlong jhandle) {
+  auto* opts = reinterpret_cast<ROCKSDB_NAMESPACE::SharedOptions*>(jhandle);
+  assert(opts != nullptr);
+  return opts->GetDelayedWriteRate();
+}
+
+/*
+ * Class:     org_rocksdb_SharedOptions
+ * Method:    getMaxWriteBufferManagerSize
+ * Signature: (J)J
+ */
+JNIEXPORT jlong JNICALL
+Java_org_rocksdb_SharedOptions_getMaxWriteBufferManagerSize(JNIEnv*, jclass,
+                                                            jlong jhandle) {
+  auto* opts = reinterpret_cast<ROCKSDB_NAMESPACE::SharedOptions*>(jhandle);
+  assert(opts != nullptr);
+  return opts->GetMaxWriteBufferManagerSize();
+}
+
+/*
+ * Class:     org_rocksdb_SharedOptions
+ * Method:    getBucketSize
+ * Signature: (J)J
+ */
+JNIEXPORT jlong JNICALL
+Java_org_rocksdb_SharedOptions_getBucketSize(JNIEnv*, jclass, jlong jhandle) {
+  auto* opts = reinterpret_cast<ROCKSDB_NAMESPACE::SharedOptions*>(jhandle);
+  assert(opts != nullptr);
+  return opts->GetBucketSize();
+}
+
+/*
+ * Class:     org_rocksdb_SharedOptions
+ * Method:    isMergeMemtableSupported
+ * Signature: (J)Z
+ */
+JNIEXPORT jboolean JNICALL
+Java_org_rocksdb_SharedOptions_isMergeMemtableSupported(JNIEnv*, jclass,
+                                                        jlong jhandle) {
+  auto* opts = reinterpret_cast<ROCKSDB_NAMESPACE::SharedOptions*>(jhandle);
+  assert(opts != nullptr);
+  return opts->IsMergeMemtableSupported();
 }

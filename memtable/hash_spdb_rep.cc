@@ -203,6 +203,7 @@ bool SpdbVector::Add(const char* key) {
   const size_t location = n_elements_.fetch_add(1, std::memory_order_relaxed);
   if (location < items_.size()) {
     items_[location] = key;
+    std::cout << "insert key to the vector in index: " << location << std::endl;
     return true;
   }
   return false;
@@ -283,6 +284,10 @@ void SpdbVectorContainer::Insert(const char* key) {
     ReadLock rl(&spdb_vectors_add_rwlock_);
 
     if (InternalInsert(key)) {
+      Slice outstring = GetComparator().decode_key(key);
+      outstring.remove_suffix(8);
+      std::cout << "1st inserting: " << outstring.ToString(true) << std::endl;
+
       return;
     }
   }
@@ -293,12 +298,16 @@ void SpdbVectorContainer::Insert(const char* key) {
     WriteLock wl(&spdb_vectors_add_rwlock_);
 
     if (InternalInsert(key)) {
+      Slice outstring = GetComparator().decode_key(key);
+      outstring.remove_suffix(8);
+      std::cout << "2nd inserting: " << outstring.ToString(true) << std::endl;
       return;
     }
 
     {
       MutexLock l(&spdb_vectors_mutex_);
       SpdbVectorPtr spdb_vector(new SpdbVector(switch_spdb_vector_limit_));
+      std::cout << "new vector because of a new insert, vectors count: " << spdb_vectors_.size() << " last spdb vector size: " << spdb_vectors_.back()->Size() << std::endl;
       spdb_vectors_.push_back(spdb_vector);
       spdb_vector->SetVectorListIter(std::prev(spdb_vectors_.end()));
       curr_vector_.store(spdb_vector.get());
@@ -310,6 +319,9 @@ void SpdbVectorContainer::Insert(const char* key) {
       assert(false);
       return;
     }
+    Slice outstring = GetComparator().decode_key(key);
+    outstring.remove_suffix(8);
+    std::cout << "3rd inserting: " << outstring.ToString(true) << std::endl;
   }
   if (notify_sort_thread) {
     sort_thread_cv_.notify_one();
@@ -331,6 +343,8 @@ bool SpdbVectorContainer::InitIterator(IterAnchors& iter_anchor,
       {
         MutexLock l(&spdb_vectors_mutex_);
         SpdbVectorPtr spdb_vector(new SpdbVector(switch_spdb_vector_limit_));
+        // Could replace empty vector. (spdb_vectors_.back()->Size()) will be zero
+        std::cout << "new vector because of a new insert, vectors count: " << spdb_vectors_.size() << " last spdb vector size: " << spdb_vectors_.back()->Size() << std::endl;
         spdb_vectors_.push_back(spdb_vector);
         spdb_vector->SetVectorListIter(std::prev(spdb_vectors_.end()));
         curr_vector_.store(spdb_vector.get());

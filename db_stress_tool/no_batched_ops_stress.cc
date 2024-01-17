@@ -26,6 +26,7 @@
 #include "db_stress_tool/db_stress_common.h"
 #include "rocksdb/utilities/transaction_db.h"
 #include "utilities/fault_injection_fs.h"
+#include "db/arena_wrapped_db_iter.h"
 
 namespace ROCKSDB_NAMESPACE {
 class NonBatchedOpsStressTest : public StressTest {
@@ -1713,6 +1714,22 @@ class NonBatchedOpsStressTest : public StressTest {
                     "Expected state has key %s, iterator is at key %s\n",
                     Slice(Key(j)).ToString(true).c_str(),
                     iter->key().ToString(true).c_str());
+                        iter->Seek(Slice(Key(j)));
+            iter->Refresh();
+            iter->Seek(Slice(Key(j)));
+            fprintf(stderr, "\nIterator after Refresh() seek for key has key %s\n",
+            iter->key().ToString(true).c_str());
+            auto dbiter = static_cast<ArenaWrappedDBIter *>(iter.get());
+            std::string sv;
+            iter->GetProperty("rocksdb.iterator.super-version-number", &sv);
+            fprintf(stderr, "iter seqnum ===========================: %" PRIu64 "=====================\n", dbiter->GetSequenceNumber());
+            fprintf(stderr, "iter superversion ===========================: %s =====================\n", sv.c_str());
+
+            std::unique_ptr<Iterator> iter2(db_->NewIterator(ro, cfh));
+            iter2->Seek(Slice(Key(j)));
+            fprintf(stderr, "Iterator2 has key: %s\n",
+                    iter2->key().ToString(true).c_str());
+
           } else {
             fprintf(stderr, "Expected state has key %s, iterator is invalid\n",
                     Slice(Key(j)).ToString(true).c_str());
@@ -1950,6 +1967,19 @@ class NonBatchedOpsStressTest : public StressTest {
                   iter->key().ToString(true).c_str());
           fprintf(stderr, "Column family: %s, op_logs: %s\n",
                   cfh->GetName().c_str(), op_logs.c_str());
+            std::unique_ptr<Iterator> iter2(db_->NewIterator(ro, cfh));
+            iter2->Seek(Slice(iter->key()));
+            if(iter2->Valid()) {
+              fprintf(stderr, "Iterator2 has key: %s\n",
+              iter2->key().ToString(true).c_str());
+            }
+            auto dbiter = static_cast<ArenaWrappedDBIter *>(iter.get());
+            std::string sv;
+            iter->GetProperty("rocksdb.iterator.super-version-number", &sv);
+            fprintf(stderr, "iter seqnum ===========================: %" PRIu64 "=====================\n", dbiter->GetSequenceNumber());
+            fprintf(stderr, "iter superversion ===========================: %s =====================\n", sv.c_str());
+
+
           thread->stats.AddErrors(1);
           break;
         }

@@ -57,6 +57,9 @@ class Version;
 // numbers, deletion markers, overwrites, etc.
 class DBIter final : public Iterator {
  public:
+ uint64_t GetSequenceNumber() {
+  return sequence_;
+ }
   // The following is grossly complicated. TODO: clean it up
   // Which direction is the iterator currently moving?
   // (1) When moving forward:

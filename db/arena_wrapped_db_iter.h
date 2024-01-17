@@ -42,6 +42,9 @@ class ArenaWrappedDBIter : public Iterator {
       assert(false);
     }
   }
+  uint64_t GetSequenceNumber() {
+    return db_iter_->GetSequenceNumber();
+  }
 
   // Get the arena to be used to allocate memory for DBIter to be wrapped,
   // as well as child iterators in it.

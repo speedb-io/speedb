@@ -15,7 +15,7 @@
 #pragma once
 
 #include <atomic>
-
+#include <iostream>
 #include "port/port.h"
 #include "rocksdb/memtablerep.h"
 #include "rocksdb/slice_transform.h"
@@ -24,7 +24,6 @@
 
 namespace ROCKSDB_NAMESPACE {
 namespace {
-enum SeekOption { SEEK_FORWARD_OP, SEEK_BACKWARD_OP };
 
 class SpdbVector {
  public:
@@ -200,7 +199,7 @@ class SpdbVectorContainer {
   }
 
   ~SpdbVectorContainer() {
-    MarkReadOnly();
+    //MarkReadOnly();
     sort_thread_.join();
   }
 
@@ -231,6 +230,7 @@ class SpdbVectorContainer {
     {
       std::unique_lock<std::mutex> lck(sort_thread_mutex_);
       WriteLock wl(&spdb_vectors_add_rwlock_);
+      std::cout << "MarkReadOnly()" << "vectors count: " << spdb_vectors_.size() << std::endl;
       immutable_.store(true);
     }
     sort_thread_cv_.notify_one();

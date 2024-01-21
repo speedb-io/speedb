@@ -24,7 +24,9 @@
 namespace ROCKSDB_NAMESPACE {
 
 namespace {
-  void PrintFragmentedRangeDels(const std::string& title, FragmentedRangeTombstoneIterator* iter) {
+
+void PrintFragmentedRangeDels(const std::string& title,
+                              FragmentedRangeTombstoneIterator* iter) {
   printf("%s - FragmentedRangeTombstoneIterator:\n", title.c_str());
   for (iter->SeekToFirst(); iter->Valid(); iter->Next()) {
     printf("{%s, %s, seq:%d}, ",
@@ -32,6 +34,28 @@ namespace {
             iter->value().ToString().c_str(),
             (int)iter->seq());
   }
+}
+
+enum class RelativePos { BEFORE, OVERLAP, AFTER };
+
+RelativePos CompareRangeTsToUserKey(const RangeTombstone& range_ts,
+                                    const Slice& user_key,
+                                    const Comparator* comparator) {
+  int user_key_vs_start_key =
+      comparator->Compare(user_key, range_ts.start_key_);
+  if (user_key_vs_start_key < 0) {
+    // Range > User-Key
+    return RelativePos::AFTER;
+  }
+
+  int user_key_vs_end_key = comparator->Compare(user_key, range_ts.end_key_);
+  if (user_key_vs_end_key >= 0) {
+    // Range < User-Key
+    return RelativePos::BEFORE;
+  }
+
+  // Range overlaps User-Key
+  return RelativePos::OVERLAP;
 }
 
 class FragmentedRangeTombstoneIteratorWrapper: public Iterator {
@@ -100,6 +124,15 @@ class FragmentedRangeTombstoneIteratorWrapper: public Iterator {
     return (wrapped_iter_ptr_? wrapped_iter_ptr_->status() : Status::OK());
   }
 
+  RangeTombstone Tombstone() const {
+    if (wrapped_iter_ptr_) {
+      return wrapped_iter_ptr_->Tombstone();
+    } else {
+      assert(0);
+      return RangeTombstone();
+    }
+  }
+
   private:
     std::unique_ptr<FragmentedRangeTombstoneIterator> wrapped_iter_ptr_;
 };
@@ -126,14 +159,47 @@ Status ProcessLogLevel([[maybe_unused]] GlobalDelList* del_list,
   while (values_iter->Valid() || range_del_iter_wrapper.Valid()) {
     if (values_iter->Valid()) {
       ParsedInternalKey values_parsed_ikey;
-      ParseInternalKey(values_iter->key(), &values_parsed_ikey, true /* log_err_key */);      
-      if (values_parsed_ikey.type == kTypeValue) {
-        if (curr_suk->empty() || (comparator->Compare(values_parsed_ikey.user_key, *curr_suk))) {
-          curr_suk->assign(values_parsed_ikey.user_key.data(), values_parsed_ikey.user_key.size());
-          break;
+      ParseInternalKey(values_iter->key(), &values_parsed_ikey,
+                       true /* log_err_key */);
+
+      auto range_vs_user_key = RelativePos::OVERLAP;
+      SequenceNumber dr_seq_num = 0U;
+
+      if (range_del_iter_wrapper.Valid()) {
+        auto range_ts = range_del_iter_wrapper.Tombstone();
+        dr_seq_num = range_ts.seq_;
+        range_vs_user_key = CompareRangeTsToUserKey(
+            range_ts, values_parsed_ikey.user_key, comparator);
+      } else {
+        // Handle as if values iter is Before dr iter
+        range_vs_user_key = RelativePos::AFTER;
+      }
+
+      if (range_vs_user_key == RelativePos::BEFORE) {
+        assert(range_del_iter_wrapper.Valid());
+        range_del_iter_wrapper.Next();
+      } else {
+        // DR Overlaps or is After (or invalid) values iter
+        if (dr_seq_num <= values_parsed_ikey.sequence) {
+          // DR is older
+          if (values_parsed_ikey.type == kTypeValue) {
+            if (curr_suk->empty() ||
+                (comparator->Compare(values_parsed_ikey.user_key, *curr_suk))) {
+              // Found a new CSK
+              curr_suk->assign(values_parsed_ikey.user_key.data(),
+                               values_parsed_ikey.user_key.size());
+            }
+            // Reached the smallest value in this level => level processed
+            break;
+          }
+        } else {
+          // DR Is newer => key at values iter is irrelevant
+          values_iter->Next();
         }
       }
-      values_iter->Next();
+    } else {
+      // values iter is Invalid, DR Iter is valid => CURRENTLY LEVEL Processed
+      break;
     }
   }
 

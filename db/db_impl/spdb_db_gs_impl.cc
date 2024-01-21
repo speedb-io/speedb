@@ -159,12 +159,13 @@ Status DBImpl::GetSmallest( const ReadOptions& read_options,
   SuperVersion* super_version = cfd->GetReferencedSuperVersion(this);
 
   // TODO - Figure out what to do about the Arena
-  auto arena = std::make_unique<Arena>();
+  Arena arena;
 
   // ================
   // MUTABLE Memtable
   // ================
-  auto mem_iter = super_version->mem->NewIterator(read_options, arena.get());
+  // auto mem_iter = super_version->mem->NewIterator(read_options, arena.get());
+  auto mem_iter = super_version->mem->NewIterator(read_options, &arena);
 
   Status s;
   auto range_del_iter = super_version->mem->NewRangeTombstoneIterator(
@@ -182,7 +183,9 @@ Status DBImpl::GetSmallest( const ReadOptions& read_options,
 
   mem_iter->~InternalIterator();
 
-  if (key->empty() == false) {
+  CleanupSuperVersion(super_version);  
+
+  if (key->empty()) {
     return Status::NotFound();
   }
   

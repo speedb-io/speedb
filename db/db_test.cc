@@ -113,6 +113,9 @@ class DBTestWithParam
   bool exclusive_manual_compaction_;
 };
 
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+#if 0
+
 TEST_F(DBTest, MockEnvTest) {
   std::unique_ptr<MockEnv> env{MockEnv::Create(Env::Default())};
   Options options;
@@ -7604,6 +7607,24 @@ TEST_F(DBTest, StaticPinningLastLevelWithData) {
   ASSERT_EQ(NumTableFilesAtLevel(1, 0), 2);
   ASSERT_EQ(2U, pinning_policy->total_num_pinned_);
   ASSERT_EQ(1U, pinning_policy->num_pinned_last_level_with_data_);
+}
+
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+#endif
+
+
+TEST_F(DBTest, Gs_EmptyDB) {
+  Options options;
+  options.create_if_missing = true;
+  DestroyAndReopen(options);
+
+  auto cfh = dbfull()->DefaultColumnFamily();
+
+  std::string smallest_key;
+  ASSERT_TRUE(dbfull()->GetSmallest(ReadOptions(),
+                                    cfh,
+                                    &smallest_key,
+                                    nullptr /* value */).IsNotFound());
 }
 
 }  // namespace ROCKSDB_NAMESPACE

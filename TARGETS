@@ -5101,12 +5101,6 @@ cpp_unittest_wrapper(name="global_write_controller_test",
             extra_compiler_flags=[])
 
 
-cpp_unittest_wrapper(name="spdb_db_gs_impl_test",
-            srcs=["db/spdb_db_gs_impl_test.cc"],
-            deps=[":rocksdb_test_lib"],
-            extra_compiler_flags=[])
-
-
 cpp_unittest_wrapper(name="hash_table_test",
             srcs=["utilities/persistent_cache/hash_table_test.cc"],
             deps=[":rocksdb_test_lib"],

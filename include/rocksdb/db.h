@@ -572,38 +572,26 @@ class DB {
   //
   // Returns some other non-OK status on error, as applicable. In that case, key and value
   // will remain unchanged.
-  Status GetSmallestAtOrAfter(const ReadOptions& options,
-                              ColumnFamilyHandle* column_family,
-                              const Slice& target,
-                              std::string* key,
-                              std::string* value);
-
-  // Same as GetSmallestAtOrAfter(column_family) for the default CF.
-  Status GetSmallestAtOrAfter(const ReadOptions& options,
-                              const Slice& target,
-                              std::string* key,
-                              std::string* value);
+  // virtual Status GetSmallestAtOrAfter(const ReadOptions& read_options,
+  //                                     ColumnFamilyHandle* column_family,
+  //                                     const Slice& target,
+  //                                     std::string* key,
+  //                                     std::string* value) = 0;
 
   // Same as GetSmallestAtOrAfter() but finds the smallest key in the CF (no target is specified).
-  Status GetSmallest( const ReadOptions& options,
-                      ColumnFamilyHandle* column_family,
-                      std::string* key,
-                      std::string* value);
-
-  // Same as GetSmallest(column_family) for the default CF.
-  Status GetSmallest( const ReadOptions& options,
-                      std::string* key,
-                      std::string* value);
+  virtual Status GetSmallest( const ReadOptions& /* read_options */,
+                              ColumnFamilyHandle* /* column_family */,
+                              std::string* /* key */,
+                              std::string* /* value */) {
+    assert(0);
+    return Status::NotSupported(
+        "GetSmallest() that isn't overriden by a specific DB is not implemented.");
+  }
 
   // Convenience service. Same as: return GetSmallest(...).IsNotFound()
-  Status IsEmpty( const ReadOptions& options,
-                  ColumnFamilyHandle* column_family,
-                  bool* answer);
-
-  // Same as IsEmpty(column_family) for the default CF.
-  Status IsEmpty( const ReadOptions& options,
-                  bool* answer);
-
+  // virtual Status IsEmpty( const ReadOptions& read_options,
+  //                         ColumnFamilyHandle* column_family,
+  //                         bool* answer) = 0;
 
   virtual Status Get(const ReadOptions& options,
                      ColumnFamilyHandle* column_family, const Slice& key,

@@ -731,6 +731,8 @@ set(SOURCES
         db/db_impl/db_impl_readonly.cc
         db/db_impl/db_impl_secondary.cc
         db/db_impl/compact_range_threads_mngr.cc
+        db/db_impl/spdb_gs_del_list.cc
+        db/db_impl/spdb_db_gs_impl.cc
         db/db_info_dumper.cc
         db/db_iter.cc
         db/dbformat.cc
@@ -1465,6 +1467,7 @@ if(WITH_TESTS)
         db/write_callback_test.cc
         db/write_controller_test.cc
         db/global_write_controller_test.cc
+        db/spdb_db_gs_impl_test.cc
         env/env_test.cc
         env/io_posix_test.cc
         env/mock_env_test.cc

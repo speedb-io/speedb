@@ -254,6 +254,11 @@ class DBImpl : public DB {
                      ColumnFamilyHandle* column_family, const Slice& key,
                      PinnableSlice* value, std::string* timestamp) override;
 
+  Status GetSmallest( const ReadOptions& read_options,
+                      ColumnFamilyHandle* column_family,
+                      std::string* key,
+                      std::string* value) override;
+
   using DB::GetEntity;
   Status GetEntity(const ReadOptions& options,
                    ColumnFamilyHandle* column_family, const Slice& key,

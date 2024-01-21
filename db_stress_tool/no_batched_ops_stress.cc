@@ -1650,6 +1650,9 @@ class NonBatchedOpsStressTest : public StressTest {
 
     ColumnFamilyHandle* const cfh = column_families_[rand_column_family];
     assert(cfh);
+    ColumnFamilyDescriptor cfd;
+    Status s = cfh->GetDescriptor(&cfd);
+    assert(s.ok());
 
     const std::size_t expected_values_size = static_cast<std::size_t>(ub - lb);
     std::vector<ExpectedValue> pre_read_expected_values;
@@ -1844,7 +1847,8 @@ class NonBatchedOpsStressTest : public StressTest {
       op_logs += "P";
     }
 
-    if (thread->rand.OneIn(2)) {
+    if (thread->rand.OneIn(2) &&
+        cfd.options.memtable_factory->IsRefreshIterSupported()) {
       pre_read_expected_values.clear();
       post_read_expected_values.clear();
       // Refresh after forward/backward scan to allow higher chance of SV

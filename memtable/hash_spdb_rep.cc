@@ -568,6 +568,7 @@ class HashSpdbRepFactory : public MemTableRepFactory {
                                  Logger* logger) override;
   bool IsInsertConcurrentlySupported() const override { return true; }
   bool CanHandleDuplicatedKey() const override { return true; }
+  bool IsRefreshIterSupported() const override { return false; }
   MemTableRep* PreCreateMemTableRep() override;
   void PostCreateMemTableRep(MemTableRep* switch_mem,
                              const MemTableRep::KeyComparator& compare,

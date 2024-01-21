@@ -29,7 +29,6 @@ static uint64_t TestGetTickerCount(const Options& options,
                                    Tickers ticker_type) {
   return options.statistics->getTickerCount(ticker_type);
 }
-
 class TestIterator : public InternalIterator {
  public:
   explicit TestIterator(const Comparator* comparator)
@@ -229,15 +228,26 @@ class TestIterator : public InternalIterator {
   }
 };
 
-class DBIteratorTest : public testing::Test {
+class DBIteratorTest : public testing::Test,
+                       public testing::WithParamInterface<std::string> {
  public:
   Env* env_;
 
   DBIteratorTest() : env_(Env::Default()) {}
+
+  void UpdateMemtableFactoryIfApplicable(Options* options) {
+    std::string memtbl_rep_name = GetParam();
+
+    if (strcasecmp(memtbl_rep_name.c_str(), "hash_spdb") &&
+        (options->prefix_extractor == nullptr)) {
+      options->memtable_factory.reset(NewHashSpdbRepFactory());
+    }
+  }
 };
 
-TEST_F(DBIteratorTest, DBIteratorPrevNext) {
+TEST_P(DBIteratorTest, DBIteratorPrevNext) {
   Options options;
+  UpdateMemtableFactoryIfApplicable(&options);
   ImmutableOptions ioptions = ImmutableOptions(options);
   MutableCFOptions mutable_cf_options = MutableCFOptions(options);
   {
@@ -678,8 +688,9 @@ TEST_F(DBIteratorTest, DBIteratorPrevNext) {
   }
 }
 
-TEST_F(DBIteratorTest, DBIteratorEmpty) {
+TEST_P(DBIteratorTest, DBIteratorEmpty) {
   Options options;
+  UpdateMemtableFactoryIfApplicable(&options);
   ImmutableOptions ioptions = ImmutableOptions(options);
   MutableCFOptions mutable_cf_options = MutableCFOptions(options);
   ReadOptions ro;
@@ -713,9 +724,10 @@ TEST_F(DBIteratorTest, DBIteratorEmpty) {
   }
 }
 
-TEST_F(DBIteratorTest, DBIteratorUseSkipCountSkips) {
+TEST_P(DBIteratorTest, DBIteratorUseSkipCountSkips) {
   ReadOptions ro;
   Options options;
+  UpdateMemtableFactoryIfApplicable(&options);
   options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
   options.merge_operator = MergeOperators::CreateFromStringId("stringappend");
 
@@ -756,10 +768,11 @@ TEST_F(DBIteratorTest, DBIteratorUseSkipCountSkips) {
   ASSERT_EQ(TestGetTickerCount(options, NUMBER_OF_RESEEKS_IN_ITERATION), 3u);
 }
 
-TEST_F(DBIteratorTest, DBIteratorUseSkip) {
+TEST_P(DBIteratorTest, DBIteratorUseSkip) {
   ReadOptions ro;
   Options options;
   options.merge_operator = MergeOperators::CreateFromStringId("stringappend");
+  UpdateMemtableFactoryIfApplicable(&options);
   ImmutableOptions ioptions = ImmutableOptions(options);
   MutableCFOptions mutable_cf_options = MutableCFOptions(options);
 
@@ -1005,8 +1018,9 @@ TEST_F(DBIteratorTest, DBIteratorUseSkip) {
   }
 }
 
-TEST_F(DBIteratorTest, DBIteratorSkipInternalKeys) {
+TEST_P(DBIteratorTest, DBIteratorSkipInternalKeys) {
   Options options;
+  UpdateMemtableFactoryIfApplicable(&options);
   ImmutableOptions ioptions = ImmutableOptions(options);
   MutableCFOptions mutable_cf_options = MutableCFOptions(options);
   ReadOptions ro;
@@ -1388,10 +1402,11 @@ TEST_F(DBIteratorTest, DBIteratorSkipInternalKeys) {
   }
 }
 
-TEST_F(DBIteratorTest, DBIterator1) {
+TEST_P(DBIteratorTest, DBIterator1) {
   ReadOptions ro;
   Options options;
   options.merge_operator = MergeOperators::CreateFromStringId("stringappend");
+  UpdateMemtableFactoryIfApplicable(&options);
 
   TestIterator* internal_iter = new TestIterator(BytewiseComparator());
   internal_iter->AddPut("a", "0");
@@ -1417,10 +1432,11 @@ TEST_F(DBIteratorTest, DBIterator1) {
   ASSERT_FALSE(db_iter->Valid());
 }
 
-TEST_F(DBIteratorTest, DBIterator2) {
+TEST_P(DBIteratorTest, DBIterator2) {
   ReadOptions ro;
   Options options;
   options.merge_operator = MergeOperators::CreateFromStringId("stringappend");
+  UpdateMemtableFactoryIfApplicable(&options);
 
   TestIterator* internal_iter = new TestIterator(BytewiseComparator());
   internal_iter->AddPut("a", "0");
@@ -1443,10 +1459,11 @@ TEST_F(DBIteratorTest, DBIterator2) {
   ASSERT_TRUE(!db_iter->Valid());
 }
 
-TEST_F(DBIteratorTest, DBIterator3) {
+TEST_P(DBIteratorTest, DBIterator3) {
   ReadOptions ro;
   Options options;
   options.merge_operator = MergeOperators::CreateFromStringId("stringappend");
+  UpdateMemtableFactoryIfApplicable(&options);
 
   TestIterator* internal_iter = new TestIterator(BytewiseComparator());
   internal_iter->AddPut("a", "0");
@@ -1469,10 +1486,11 @@ TEST_F(DBIteratorTest, DBIterator3) {
   ASSERT_TRUE(!db_iter->Valid());
 }
 
-TEST_F(DBIteratorTest, DBIterator4) {
+TEST_P(DBIteratorTest, DBIterator4) {
   ReadOptions ro;
   Options options;
   options.merge_operator = MergeOperators::CreateFromStringId("stringappend");
+  UpdateMemtableFactoryIfApplicable(&options);
 
   TestIterator* internal_iter = new TestIterator(BytewiseComparator());
   internal_iter->AddPut("a", "0");
@@ -1499,10 +1517,11 @@ TEST_F(DBIteratorTest, DBIterator4) {
   ASSERT_TRUE(!db_iter->Valid());
 }
 
-TEST_F(DBIteratorTest, DBIterator5) {
+TEST_P(DBIteratorTest, DBIterator5) {
   ReadOptions ro;
   Options options;
   options.merge_operator = MergeOperators::CreateFromStringId("stringappend");
+  UpdateMemtableFactoryIfApplicable(&options);
   ImmutableOptions ioptions = ImmutableOptions(options);
   MutableCFOptions mutable_cf_options = MutableCFOptions(options);
 
@@ -1697,10 +1716,11 @@ TEST_F(DBIteratorTest, DBIterator5) {
   }
 }
 
-TEST_F(DBIteratorTest, DBIterator6) {
+TEST_P(DBIteratorTest, DBIterator6) {
   ReadOptions ro;
   Options options;
   options.merge_operator = MergeOperators::CreateFromStringId("stringappend");
+  UpdateMemtableFactoryIfApplicable(&options);
   ImmutableOptions ioptions = ImmutableOptions(options);
   MutableCFOptions mutable_cf_options = MutableCFOptions(options);
 
@@ -1869,10 +1889,11 @@ TEST_F(DBIteratorTest, DBIterator6) {
   }
 }
 
-TEST_F(DBIteratorTest, DBIterator7) {
+TEST_P(DBIteratorTest, DBIterator7) {
   ReadOptions ro;
   Options options;
   options.merge_operator = MergeOperators::CreateFromStringId("stringappend");
+  UpdateMemtableFactoryIfApplicable(&options);
   ImmutableOptions ioptions = ImmutableOptions(options);
   MutableCFOptions mutable_cf_options = MutableCFOptions(options);
 
@@ -2274,10 +2295,11 @@ TEST_F(DBIteratorTest, DBIterator7) {
   }
 }
 
-TEST_F(DBIteratorTest, DBIterator8) {
+TEST_P(DBIteratorTest, DBIterator8) {
   ReadOptions ro;
   Options options;
   options.merge_operator = MergeOperators::CreateFromStringId("stringappend");
+  UpdateMemtableFactoryIfApplicable(&options);
 
   TestIterator* internal_iter = new TestIterator(BytewiseComparator());
   internal_iter->AddDeletion("a");
@@ -2303,10 +2325,11 @@ TEST_F(DBIteratorTest, DBIterator8) {
 
 // TODO(3.13): fix the issue of Seek() then Prev() which might not necessary
 //             return the biggest element smaller than the seek key.
-TEST_F(DBIteratorTest, DBIterator9) {
+TEST_P(DBIteratorTest, DBIterator9) {
   ReadOptions ro;
   Options options;
   options.merge_operator = MergeOperators::CreateFromStringId("stringappend");
+  UpdateMemtableFactoryIfApplicable(&options);
   {
     TestIterator* internal_iter = new TestIterator(BytewiseComparator());
     internal_iter->AddMerge("a", "merge_1");
@@ -2374,9 +2397,10 @@ TEST_F(DBIteratorTest, DBIterator9) {
 
 // TODO(3.13): fix the issue of Seek() then Prev() which might not necessary
 //             return the biggest element smaller than the seek key.
-TEST_F(DBIteratorTest, DBIterator10) {
+TEST_P(DBIteratorTest, DBIterator10) {
   ReadOptions ro;
   Options options;
+  UpdateMemtableFactoryIfApplicable(&options);
 
   TestIterator* internal_iter = new TestIterator(BytewiseComparator());
   internal_iter->AddPut("a", "1");
@@ -2416,10 +2440,11 @@ TEST_F(DBIteratorTest, DBIterator10) {
   ASSERT_EQ(db_iter->value().ToString(), "3");
 }
 
-TEST_F(DBIteratorTest, SeekToLastOccurrenceSeq0) {
+TEST_P(DBIteratorTest, SeekToLastOccurrenceSeq0) {
   ReadOptions ro;
   Options options;
   options.merge_operator = nullptr;
+  UpdateMemtableFactoryIfApplicable(&options);
 
   TestIterator* internal_iter = new TestIterator(BytewiseComparator());
   internal_iter->AddPut("a", "1");
@@ -2442,10 +2467,11 @@ TEST_F(DBIteratorTest, SeekToLastOccurrenceSeq0) {
   ASSERT_FALSE(db_iter->Valid());
 }
 
-TEST_F(DBIteratorTest, DBIterator11) {
+TEST_P(DBIteratorTest, DBIterator11) {
   ReadOptions ro;
   Options options;
   options.merge_operator = MergeOperators::CreateFromStringId("stringappend");
+  UpdateMemtableFactoryIfApplicable(&options);
 
   TestIterator* internal_iter = new TestIterator(BytewiseComparator());
   internal_iter->AddPut("a", "0");
@@ -2471,10 +2497,11 @@ TEST_F(DBIteratorTest, DBIterator11) {
   ASSERT_FALSE(db_iter->Valid());
 }
 
-TEST_F(DBIteratorTest, DBIterator12) {
+TEST_P(DBIteratorTest, DBIterator12) {
   ReadOptions ro;
   Options options;
   options.merge_operator = nullptr;
+  UpdateMemtableFactoryIfApplicable(&options);
 
   TestIterator* internal_iter = new TestIterator(BytewiseComparator());
   internal_iter->AddPut("a", "1");
@@ -2499,10 +2526,11 @@ TEST_F(DBIteratorTest, DBIterator12) {
   ASSERT_FALSE(db_iter->Valid());
 }
 
-TEST_F(DBIteratorTest, DBIterator13) {
+TEST_P(DBIteratorTest, DBIterator13) {
   ReadOptions ro;
   Options options;
   options.merge_operator = nullptr;
+  UpdateMemtableFactoryIfApplicable(&options);
 
   std::string key;
   key.resize(9);
@@ -2532,10 +2560,11 @@ TEST_F(DBIteratorTest, DBIterator13) {
   ASSERT_EQ(db_iter->value().ToString(), "2");
 }
 
-TEST_F(DBIteratorTest, DBIterator14) {
+TEST_P(DBIteratorTest, DBIterator14) {
   ReadOptions ro;
   Options options;
   options.merge_operator = nullptr;
+  UpdateMemtableFactoryIfApplicable(&options);
 
   std::string key("b");
   TestIterator* internal_iter = new TestIterator(BytewiseComparator());
@@ -2565,11 +2594,18 @@ TEST_F(DBIteratorTest, DBIterator14) {
   ASSERT_EQ(db_iter->value().ToString(), "4");
 }
 
-class DBIterWithMergeIterTest : public testing::Test {
+class DBIterWithMergeIterTest
+    : public testing::Test,
+      public testing::WithParamInterface<std::string> {
  public:
   DBIterWithMergeIterTest()
       : env_(Env::Default()), icomp_(BytewiseComparator()) {
     options_.merge_operator = nullptr;
+
+    std::string memtbl_rep_name = GetParam();
+    if (strcasecmp(memtbl_rep_name.c_str(), "hash_spdb")) {
+      options_.memtable_factory.reset(NewHashSpdbRepFactory());
+    }
 
     internal_iter1_ = new TestIterator(BytewiseComparator());
     internal_iter1_->Add("a", kTypeValue, "1", 3u);
@@ -2608,7 +2644,7 @@ class DBIterWithMergeIterTest : public testing::Test {
   std::unique_ptr<Iterator> db_iter_;
 };
 
-TEST_F(DBIterWithMergeIterTest, InnerMergeIterator1) {
+TEST_P(DBIterWithMergeIterTest, InnerMergeIterator1) {
   db_iter_->SeekToFirst();
   ASSERT_TRUE(db_iter_->Valid());
   ASSERT_EQ(db_iter_->key().ToString(), "a");
@@ -2637,7 +2673,7 @@ TEST_F(DBIterWithMergeIterTest, InnerMergeIterator1) {
   ASSERT_FALSE(db_iter_->Valid());
 }
 
-TEST_F(DBIterWithMergeIterTest, InnerMergeIterator2) {
+TEST_P(DBIterWithMergeIterTest, InnerMergeIterator2) {
   // Test Prev() when one child iterator is at its end.
   db_iter_->SeekForPrev("g");
   ASSERT_TRUE(db_iter_->Valid());
@@ -2665,7 +2701,7 @@ TEST_F(DBIterWithMergeIterTest, InnerMergeIterator2) {
   ASSERT_EQ(db_iter_->value().ToString(), "4");
 }
 
-TEST_F(DBIterWithMergeIterTest, InnerMergeIteratorDataRace1) {
+TEST_P(DBIterWithMergeIterTest, InnerMergeIteratorDataRace1) {
   // Test Prev() when one child iterator is at its end but more rows
   // are added.
   db_iter_->Seek("f");
@@ -2701,7 +2737,7 @@ TEST_F(DBIterWithMergeIterTest, InnerMergeIteratorDataRace1) {
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->DisableProcessing();
 }
 
-TEST_F(DBIterWithMergeIterTest, InnerMergeIteratorDataRace2) {
+TEST_P(DBIterWithMergeIterTest, InnerMergeIteratorDataRace2) {
   // Test Prev() when one child iterator is at its end but more rows
   // are added.
   db_iter_->Seek("f");
@@ -2739,7 +2775,7 @@ TEST_F(DBIterWithMergeIterTest, InnerMergeIteratorDataRace2) {
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->DisableProcessing();
 }
 
-TEST_F(DBIterWithMergeIterTest, InnerMergeIteratorDataRace3) {
+TEST_P(DBIterWithMergeIterTest, InnerMergeIteratorDataRace3) {
   // Test Prev() when one child iterator is at its end but more rows
   // are added and max_skipped is triggered.
   db_iter_->Seek("f");
@@ -2781,7 +2817,7 @@ TEST_F(DBIterWithMergeIterTest, InnerMergeIteratorDataRace3) {
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->DisableProcessing();
 }
 
-TEST_F(DBIterWithMergeIterTest, InnerMergeIteratorDataRace4) {
+TEST_P(DBIterWithMergeIterTest, InnerMergeIteratorDataRace4) {
   // Test Prev() when one child iterator has more rows inserted
   // between Seek() and Prev() when changing directions.
   internal_iter2_->Add("z", kTypeValue, "9", 4u);
@@ -2832,7 +2868,7 @@ TEST_F(DBIterWithMergeIterTest, InnerMergeIteratorDataRace4) {
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->DisableProcessing();
 }
 
-TEST_F(DBIterWithMergeIterTest, InnerMergeIteratorDataRace5) {
+TEST_P(DBIterWithMergeIterTest, InnerMergeIteratorDataRace5) {
   internal_iter2_->Add("z", kTypeValue, "9", 4u);
 
   // Test Prev() when one child iterator has more rows inserted
@@ -2879,7 +2915,7 @@ TEST_F(DBIterWithMergeIterTest, InnerMergeIteratorDataRace5) {
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->DisableProcessing();
 }
 
-TEST_F(DBIterWithMergeIterTest, InnerMergeIteratorDataRace6) {
+TEST_P(DBIterWithMergeIterTest, InnerMergeIteratorDataRace6) {
   internal_iter2_->Add("z", kTypeValue, "9", 4u);
 
   // Test Prev() when one child iterator has more rows inserted
@@ -2925,7 +2961,7 @@ TEST_F(DBIterWithMergeIterTest, InnerMergeIteratorDataRace6) {
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->DisableProcessing();
 }
 
-TEST_F(DBIterWithMergeIterTest, InnerMergeIteratorDataRace7) {
+TEST_P(DBIterWithMergeIterTest, InnerMergeIteratorDataRace7) {
   internal_iter1_->Add("u", kTypeValue, "10", 4u);
   internal_iter1_->Add("v", kTypeValue, "11", 4u);
   internal_iter1_->Add("w", kTypeValue, "12", 4u);
@@ -2979,7 +3015,7 @@ TEST_F(DBIterWithMergeIterTest, InnerMergeIteratorDataRace7) {
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->DisableProcessing();
 }
 
-TEST_F(DBIterWithMergeIterTest, InnerMergeIteratorDataRace8) {
+TEST_P(DBIterWithMergeIterTest, InnerMergeIteratorDataRace8) {
   // internal_iter1_: a, f, g
   // internal_iter2_: a, b, c, d, adding (z)
   internal_iter2_->Add("z", kTypeValue, "9", 4u);
@@ -3016,10 +3052,11 @@ TEST_F(DBIterWithMergeIterTest, InnerMergeIteratorDataRace8) {
   ROCKSDB_NAMESPACE::SyncPoint::GetInstance()->DisableProcessing();
 }
 
-TEST_F(DBIteratorTest, SeekPrefixTombstones) {
+TEST_P(DBIteratorTest, SeekPrefixTombstones) {
   ReadOptions ro;
   Options options;
   options.prefix_extractor.reset(NewNoopTransform());
+  UpdateMemtableFactoryIfApplicable(&options);
   TestIterator* internal_iter = new TestIterator(BytewiseComparator());
   internal_iter->AddDeletion("b");
   internal_iter->AddDeletion("c");
@@ -3051,7 +3088,7 @@ TEST_F(DBIteratorTest, SeekPrefixTombstones) {
   ASSERT_EQ(skipped_keys, 0);
 }
 
-TEST_F(DBIteratorTest, SeekToFirstLowerBound) {
+TEST_P(DBIteratorTest, SeekToFirstLowerBound) {
   const int kNumKeys = 3;
   for (int i = 0; i < kNumKeys + 2; ++i) {
     // + 2 for two special cases: lower bound before and lower bound after the
@@ -3067,6 +3104,7 @@ TEST_F(DBIteratorTest, SeekToFirstLowerBound) {
     Slice lower_bound(lower_bound_str);
     ro.iterate_lower_bound = &lower_bound;
     Options options;
+    UpdateMemtableFactoryIfApplicable(&options);
     std::unique_ptr<Iterator> db_iter(NewDBIterator(
         env_, ro, ImmutableOptions(options), MutableCFOptions(options),
         BytewiseComparator(), internal_iter, nullptr /* version */,
@@ -3093,7 +3131,7 @@ TEST_F(DBIteratorTest, SeekToFirstLowerBound) {
   }
 }
 
-TEST_F(DBIteratorTest, PrevLowerBound) {
+TEST_P(DBIteratorTest, PrevLowerBound) {
   const int kNumKeys = 3;
   const int kLowerBound = 2;
   TestIterator* internal_iter = new TestIterator(BytewiseComparator());
@@ -3107,6 +3145,7 @@ TEST_F(DBIteratorTest, PrevLowerBound) {
   Slice lower_bound(lower_bound_str);
   ro.iterate_lower_bound = &lower_bound;
   Options options;
+  UpdateMemtableFactoryIfApplicable(&options);
   std::unique_ptr<Iterator> db_iter(NewDBIterator(
       env_, ro, ImmutableOptions(options), MutableCFOptions(options),
       BytewiseComparator(), internal_iter, nullptr /* version */,
@@ -3122,7 +3161,7 @@ TEST_F(DBIteratorTest, PrevLowerBound) {
   ASSERT_FALSE(db_iter->Valid());
 }
 
-TEST_F(DBIteratorTest, SeekLessLowerBound) {
+TEST_P(DBIteratorTest, SeekLessLowerBound) {
   const int kNumKeys = 3;
   const int kLowerBound = 2;
   TestIterator* internal_iter = new TestIterator(BytewiseComparator());
@@ -3136,6 +3175,7 @@ TEST_F(DBIteratorTest, SeekLessLowerBound) {
   Slice lower_bound(lower_bound_str);
   ro.iterate_lower_bound = &lower_bound;
   Options options;
+  UpdateMemtableFactoryIfApplicable(&options);
   std::unique_ptr<Iterator> db_iter(NewDBIterator(
       env_, ro, ImmutableOptions(options), MutableCFOptions(options),
       BytewiseComparator(), internal_iter, nullptr /* version */,
@@ -3150,9 +3190,10 @@ TEST_F(DBIteratorTest, SeekLessLowerBound) {
   ASSERT_EQ(lower_bound_str, db_iter->key().ToString());
 }
 
-TEST_F(DBIteratorTest, ReverseToForwardWithDisappearingKeys) {
+TEST_P(DBIteratorTest, ReverseToForwardWithDisappearingKeys) {
   Options options;
   options.prefix_extractor.reset(NewCappedPrefixTransform(0));
+  UpdateMemtableFactoryIfApplicable(&options);
 
   TestIterator* internal_iter = new TestIterator(BytewiseComparator());
   internal_iter->AddPut("a", "A");
@@ -3185,6 +3226,10 @@ TEST_F(DBIteratorTest, ReverseToForwardWithDisappearingKeys) {
   // ForwardIterator, which doesn't support SeekForPrev().
   EXPECT_LT(internal_iter->steps(), 20);
 }
+
+INSTANTIATE_TEST_CASE_P(DBIteratorTest, DBIteratorTest,
+                        testing::ValuesIn(std::vector<std::string>{
+                            "skip_list", "hash_spdb"}));
 
 }  // namespace ROCKSDB_NAMESPACE
 

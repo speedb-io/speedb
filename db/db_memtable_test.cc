@@ -15,9 +15,22 @@
 
 namespace ROCKSDB_NAMESPACE {
 
-class DBMemTableTest : public DBTestBase {
+class DBMemTableTest : public DBTestBase,
+                       public testing::WithParamInterface<std::string> {
  public:
   DBMemTableTest() : DBTestBase("db_memtable_test", /*env_do_fsync=*/true) {}
+
+  std::unique_ptr<MemTableRepFactory> CreateMemTableRepFactory() {
+    std::string memtbl_rep_name = GetParam();
+    std::unique_ptr<MemTableRepFactory> factoryPtr;
+    if (!strcasecmp(memtbl_rep_name.c_str(), "skip_list")) {
+      factoryPtr.reset(new SkipListFactory());
+    } else if (!strcasecmp(memtbl_rep_name.c_str(), "hash_spdb")) {
+      factoryPtr.reset(NewHashSpdbRepFactory());
+    }
+
+    return factoryPtr;
+  }
 };
 
 class MockMemTableRep : public MemTableRep {
@@ -67,13 +80,25 @@ class MockMemTableRep : public MemTableRep {
 
 class MockMemTableRepFactory : public MemTableRepFactory {
  public:
+  MockMemTableRepFactory(const std::string& memtbl_rep_name)
+      : memtbl_rep_name_(memtbl_rep_name) {}
+
   MemTableRep* CreateMemTableRep(const MemTableRep::KeyComparator& cmp,
                                  Allocator* allocator,
                                  const SliceTransform* transform,
                                  Logger* logger) override {
-    SkipListFactory factory;
-    MemTableRep* skiplist_rep =
-        factory.CreateMemTableRep(cmp, allocator, transform, logger);
+    MemTableRep* skiplist_rep = nullptr;
+
+    if (memtbl_rep_name_ == "skip_list") {
+      SkipListFactory factory;
+      skiplist_rep =
+          factory.CreateMemTableRep(cmp, allocator, transform, logger);
+    } else if (memtbl_rep_name_ == "hash_spdb") {
+      auto hash_spdb_factory = NewHashSpdbRepFactory();
+      skiplist_rep = hash_spdb_factory->CreateMemTableRep(cmp, allocator,
+                                                          transform, logger);
+    }
+
     mock_rep_ = new MockMemTableRep(allocator, skiplist_rep);
     return mock_rep_;
   }
@@ -96,6 +121,7 @@ class MockMemTableRepFactory : public MemTableRepFactory {
   uint32_t GetLastColumnFamilyId() { return last_column_family_id_; }
 
  private:
+  const std::string memtbl_rep_name_;
   MockMemTableRep* mock_rep_;
   // workaround since there's no std::numeric_limits<uint32_t>::max() yet.
   uint32_t last_column_family_id_ = static_cast<uint32_t>(-1);
@@ -126,7 +152,7 @@ class TestPrefixExtractor : public SliceTransform {
 };
 
 // Test that ::Add properly returns false when inserting duplicate keys
-TEST_F(DBMemTableTest, DuplicateSeq) {
+TEST_P(DBMemTableTest, DuplicateSeq) {
   SequenceNumber seq = 123;
   std::string value;
   MergeContext merge_context;
@@ -137,8 +163,8 @@ TEST_F(DBMemTableTest, DuplicateSeq) {
 
   // Create a MemTable
   InternalKeyComparator cmp(BytewiseComparator());
-  auto factory = std::make_shared<SkipListFactory>();
-  options.memtable_factory = factory;
+  options.memtable_factory = std::move(CreateMemTableRepFactory());
+
   ImmutableOptions ioptions(options);
   WriteBufferManager wb(options.db_write_buffer_size);
   MemTable* mem = new MemTable(cmp, ioptions, MutableCFOptions(options), &wb,
@@ -210,7 +236,7 @@ TEST_F(DBMemTableTest, DuplicateSeq) {
 }
 
 // A simple test to verify that the concurrent merge writes is functional
-TEST_F(DBMemTableTest, ConcurrentMergeWrite) {
+TEST_P(DBMemTableTest, ConcurrentMergeWrite) {
   int num_ops = 1000;
   std::string value;
   MergeContext merge_context;
@@ -221,8 +247,7 @@ TEST_F(DBMemTableTest, ConcurrentMergeWrite) {
 
   // Create a MemTable
   InternalKeyComparator cmp(BytewiseComparator());
-  auto factory = std::make_shared<SkipListFactory>();
-  options.memtable_factory = factory;
+  options.memtable_factory = std::move(CreateMemTableRepFactory());
   options.allow_concurrent_memtable_write = true;
   ImmutableOptions ioptions(options);
   WriteBufferManager wb(options.db_write_buffer_size);
@@ -277,11 +302,11 @@ TEST_F(DBMemTableTest, ConcurrentMergeWrite) {
   delete mem;
 }
 
-TEST_F(DBMemTableTest, InsertWithHint) {
+TEST_P(DBMemTableTest, InsertWithHint) {
   Options options;
   options.allow_concurrent_memtable_write = false;
   options.create_if_missing = true;
-  options.memtable_factory.reset(new MockMemTableRepFactory());
+  options.memtable_factory.reset(new MockMemTableRepFactory(GetParam()));
   options.memtable_insert_with_hint_prefix_extractor.reset(
       new TestPrefixExtractor());
   options.env = env_;
@@ -316,13 +341,13 @@ TEST_F(DBMemTableTest, InsertWithHint) {
   ASSERT_EQ("vvv", Get("NotInPrefixDomain"));
 }
 
-TEST_F(DBMemTableTest, ColumnFamilyId) {
+TEST_P(DBMemTableTest, ColumnFamilyId) {
   // Verifies MemTableRepFactory is told the right column family id.
   Options options;
   options.env = CurrentOptions().env;
   options.allow_concurrent_memtable_write = false;
   options.create_if_missing = true;
-  options.memtable_factory.reset(new MockMemTableRepFactory());
+  options.memtable_factory.reset(new MockMemTableRepFactory(GetParam()));
   DestroyAndReopen(options);
   CreateAndReopenWithCF({"pikachu"}, options);
 
@@ -334,6 +359,10 @@ TEST_F(DBMemTableTest, ColumnFamilyId) {
                 ->GetLastColumnFamilyId());
   }
 }
+
+INSTANTIATE_TEST_CASE_P(DBMemTableTest, DBMemTableTest,
+                        testing::ValuesIn(std::vector<std::string>{
+                            "skip_list", "hash_spdb"}));
 
 }  // namespace ROCKSDB_NAMESPACE
 

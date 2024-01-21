@@ -45,11 +45,21 @@ bool FLAGS_verbose = false;
 
 namespace ROCKSDB_NAMESPACE {
 
-class DBIteratorStressTest : public testing::Test {
+class DBIteratorStressTest : public testing::Test,
+                             public testing::WithParamInterface<std::string> {
  public:
   Env* env_;
 
   DBIteratorStressTest() : env_(Env::Default()) {}
+
+  void UpdateMemtableFactoryIfApplicable(Options* options) {
+    std::string memtbl_rep_name = GetParam();
+
+    if (strcasecmp(memtbl_rep_name.c_str(), "hash_spdb") &&
+        (options->prefix_extractor == nullptr)) {
+      options->memtable_factory.reset(NewHashSpdbRepFactory());
+    }
+  }
 };
 
 namespace {
@@ -416,7 +426,7 @@ struct ReferenceIterator {
 //     PinnedIteratorManager and check that there's no use-after free.
 //   * Try different combinations of prefix_extractor, total_order_seek,
 //     prefix_same_as_start, iterate_lower_bound, iterate_upper_bound.
-TEST_F(DBIteratorStressTest, StressTest) {
+TEST_P(DBIteratorStressTest, StressTest) {
   // We use a deterministic RNG, and everything happens in a single thread.
   Random64 rnd(826909345792864532ll);
 
@@ -435,6 +445,7 @@ TEST_F(DBIteratorStressTest, StressTest) {
 
   Options options;
   options.merge_operator = MergeOperators::CreateFromStringId("stringappend");
+  UpdateMemtableFactoryIfApplicable(&options);
   ReadOptions ropt;
 
   size_t num_matching = 0;
@@ -661,6 +672,10 @@ TEST_F(DBIteratorStressTest, StressTest) {
             << "\n  non-ok status: " << num_not_ok
             << "\n  mutated on the fly: " << num_recently_removed << std::endl;
 }
+
+INSTANTIATE_TEST_CASE_P(DBIteratorStressTest, DBIteratorStressTest,
+                        testing::ValuesIn(std::vector<std::string>{
+                            "skip_list", "hash_spdb"}));
 
 }  // namespace ROCKSDB_NAMESPACE
 

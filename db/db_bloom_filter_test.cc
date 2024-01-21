@@ -43,6 +43,34 @@ const std::string kStandard128Ribbon =
     test::Standard128RibbonFilterPolicy::kClassName();
 const std::string kAutoBloom = BloomFilterPolicy::kClassName();
 const std::string kAutoRibbon = RibbonFilterPolicy::kClassName();
+<<<<<<< Updated upstream
+=======
+const std::string kSpeedbPairedBloomFilter = "speedb.PairedBloomFilter";
+
+namespace {
+std::shared_ptr<const FilterPolicy> Create(double bits_per_key,
+                                           const std::string& name) {
+  if (name != kSpeedbPairedBloomFilter) {
+    return BloomLikeFilterPolicy::Create(name, bits_per_key);
+  } else {
+    ConfigOptions config_options;
+    config_options.ignore_unsupported_options = false;
+    std::shared_ptr<const FilterPolicy> filter_policy;
+    Status s = FilterPolicy::CreateFromString(
+        config_options,
+        kSpeedbPairedBloomFilter + ":" + std::to_string(bits_per_key),
+        &filter_policy);
+    assert(filter_policy != nullptr);
+    return filter_policy;
+  }
+}
+>>>>>>> Stashed changes
+
+std::vector<std::string> GetAllFixedImpls() {
+  std::vector<std::string> impls(BloomLikeFilterPolicy::GetAllFixedImpls());
+  impls.push_back(kSpeedbPairedBloomFilter);
+  return impls;
+}
 
 template <typename T>
 T Pop(T& var) {
@@ -2269,12 +2297,15 @@ TEST_P(BloomStatsTestWithParam, BloomStatsTest) {
 
   // check SST bloom stats
   ASSERT_EQ(value1, Get(key1));
-  ASSERT_EQ(1, get_perf_context()->bloom_sst_hit_count);
+  // ASSERT_EQ(1, get_perf_context()->bloom_sst_hit_count);
+  EXPECT_EQ(1, get_perf_context()->bloom_sst_hit_count);
   ASSERT_EQ(value3, Get(key3));
-  ASSERT_EQ(2, get_perf_context()->bloom_sst_hit_count);
+  // ASSERT_EQ(2, get_perf_context()->bloom_sst_hit_count);
+  EXPECT_EQ(2, get_perf_context()->bloom_sst_hit_count);
 
   ASSERT_EQ("NOT_FOUND", Get(key2));
-  ASSERT_EQ(1, get_perf_context()->bloom_sst_miss_count);
+  // ASSERT_EQ(1, get_perf_context()->bloom_sst_miss_count);
+  EXPECT_EQ(1, get_perf_context()->bloom_sst_miss_count);
 }
 
 // Same scenario as in BloomStatsTest but using an iterator
@@ -2659,7 +2690,8 @@ int CountIter(std::unique_ptr<Iterator>& iter, const Slice& key) {
 // into the same string, or 2) the transformed seek key is of the same length
 // as the upper bound and two keys are adjacent according to the comparator.
 TEST_F(DBBloomFilterTest, DynamicBloomFilterUpperBound) {
-  for (const auto& bfp_impl : BloomLikeFilterPolicy::GetAllFixedImpls()) {
+  for (const auto& bfp_impl : GetAllFixedImpls()) {
+    std::cout << "bfp_impl=" << bfp_impl << '\n';
     Options options;
     options.create_if_missing = true;
     options.env = CurrentOptions().env;
@@ -2830,7 +2862,8 @@ TEST_F(DBBloomFilterTest, DynamicBloomFilterUpperBound) {
 // Create multiple SST files each with a different prefix_extractor config,
 // verify iterators can read all SST files using the latest config.
 TEST_F(DBBloomFilterTest, DynamicBloomFilterMultipleSST) {
-  for (const auto& bfp_impl : BloomLikeFilterPolicy::GetAllFixedImpls()) {
+  for (const auto& bfp_impl : GetAllFixedImpls()) {
+    std::cout << "bfp_impl=" << bfp_impl << '\n';
     Options options;
     options.env = CurrentOptions().env;
     options.create_if_missing = true;
@@ -2957,7 +2990,8 @@ TEST_F(DBBloomFilterTest, DynamicBloomFilterMultipleSST) {
 // as expected
 TEST_F(DBBloomFilterTest, DynamicBloomFilterNewColumnFamily) {
   int iteration = 0;
-  for (const auto& bfp_impl : BloomLikeFilterPolicy::GetAllFixedImpls()) {
+  for (const auto& bfp_impl : GetAllFixedImpls()) {
+    std::cout << "bfp_impl=" << bfp_impl << '\n';
     Options options = CurrentOptions();
     options.create_if_missing = true;
     options.prefix_extractor.reset(NewFixedPrefixTransform(1));
@@ -3013,7 +3047,8 @@ TEST_F(DBBloomFilterTest, DynamicBloomFilterNewColumnFamily) {
 // Verify it's possible to change prefix_extractor at runtime and iterators
 // behaves as expected
 TEST_F(DBBloomFilterTest, DynamicBloomFilterOptions) {
-  for (const auto& bfp_impl : BloomLikeFilterPolicy::GetAllFixedImpls()) {
+  for (const auto& bfp_impl : GetAllFixedImpls()) {
+    std::cout << "bfp_impl=" << bfp_impl << '\n';
     Options options;
     options.env = CurrentOptions().env;
     options.create_if_missing = true;

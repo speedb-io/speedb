@@ -15,6 +15,7 @@
 #include "port/port.h"
 #include "port/stack_trace.h"
 #include "rocksdb/iostats_context.h"
+#include "rocksdb/memtablerep.h"
 #include "rocksdb/perf_context.h"
 #include "table/block_based/flush_block_policy_impl.h"
 #include "util/random.h"
@@ -30,15 +31,30 @@ class DummyReadCallback : public ReadCallback {
   void SetSnapshot(SequenceNumber seq) { max_visible_seq_ = seq; }
 };
 
+namespace {
+void UpdateMemtableFactoryIfApplicable(Options* options,
+                                       const std::string& memtbl_rep_name) {
+  if (strcasecmp(memtbl_rep_name.c_str(), "hash_spdb") &&
+      (options->prefix_extractor == nullptr)) {
+    options->memtable_factory.reset(NewHashSpdbRepFactory());
+  }
+}
+}  // namespace
+
 class DBIteratorBaseTest : public DBTestBase {
  public:
   DBIteratorBaseTest()
       : DBTestBase("db_iterator_test", /*env_do_fsync=*/true) {}
 };
 
-TEST_F(DBIteratorBaseTest, APICallsWithPerfContext) {
+class DBIteratorBaseTestSelectMemtblRep
+    : public DBIteratorBaseTest,
+      public testing::WithParamInterface<std::string> {};
+
+TEST_P(DBIteratorBaseTestSelectMemtblRep, APICallsWithPerfContext) {
   // Set up the DB
   Options options = CurrentOptions();
+  UpdateMemtableFactoryIfApplicable(&options, GetParam());
   DestroyAndReopen(options);
   Random rnd(301);
   for (int i = 1; i <= 3; i++) {
@@ -83,8 +99,10 @@ TEST_F(DBIteratorBaseTest, APICallsWithPerfContext) {
 
 // Test param:
 //   bool: whether to pass read_callback to NewIterator().
-class DBIteratorTest : public DBIteratorBaseTest,
-                       public testing::WithParamInterface<bool> {
+//   std::string: type of memtable to create
+class DBIteratorTest
+    : public DBIteratorBaseTest,
+      public testing::WithParamInterface<std::tuple<bool, std::string>> {
  public:
   DBIteratorTest() {}
 
@@ -98,7 +116,7 @@ class DBIteratorTest : public DBIteratorBaseTest,
     SequenceNumber seq = read_options.snapshot != nullptr
                              ? read_options.snapshot->GetSequenceNumber()
                              : db_->GetLatestSequenceNumber();
-    bool use_read_callback = GetParam();
+    bool use_read_callback = std::get<0>(GetParam());
     DummyReadCallback* read_callback = nullptr;
     if (use_read_callback) {
       read_callback = new DummyReadCallback();
@@ -118,6 +136,7 @@ class DBIteratorTest : public DBIteratorBaseTest,
 TEST_P(DBIteratorTest, IteratorProperty) {
   // The test needs to be changed if kPersistedTier is supported in iterator.
   Options options = CurrentOptions();
+  UpdateMemtableFactoryIfApplicable(&options, std::get<1>(GetParam()));
   CreateAndReopenWithCF({"pikachu"}, options);
   ASSERT_OK(Put(1, "1", "2"));
   ASSERT_OK(Delete(1, "2"));
@@ -146,6 +165,7 @@ TEST_P(DBIteratorTest, IteratorProperty) {
 TEST_P(DBIteratorTest, PersistedTierOnIterator) {
   // The test needs to be changed if kPersistedTier is supported in iterator.
   Options options = CurrentOptions();
+  UpdateMemtableFactoryIfApplicable(&options, std::get<1>(GetParam()));
   CreateAndReopenWithCF({"pikachu"}, options);
   ReadOptions ropt;
   ropt.read_tier = kPersistedTier;
@@ -167,6 +187,7 @@ TEST_P(DBIteratorTest, NonBlockingIteration) {
     Options options = CurrentOptions(options_override);
     options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
     non_blocking_opts.read_tier = kBlockCacheTier;
+    UpdateMemtableFactoryIfApplicable(&options, std::get<1>(GetParam()));
 
     CreateAndReopenWithCF({"pikachu"}, options);
     // write one kv to the database.
@@ -248,6 +269,7 @@ TEST_P(DBIteratorTest, IterReseekNewUpperBound) {
   table_options.block_size_deviation = 50;
   options.table_factory.reset(NewBlockBasedTableFactory(table_options));
   options.compression = kNoCompression;
+  UpdateMemtableFactoryIfApplicable(&options, std::get<1>(GetParam()));
   Reopen(options);
 
   ASSERT_OK(Put("a", rnd.RandomString(400)));
@@ -595,6 +617,7 @@ TEST_P(DBIteratorTest, IterReseek) {
   options.max_sequential_skip_in_iterations = 3;
   options.create_if_missing = true;
   options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
+  UpdateMemtableFactoryIfApplicable(&options, std::get<1>(GetParam()));
   DestroyAndReopen(options);
   CreateAndReopenWithCF({"pikachu"}, options);
 
@@ -674,13 +697,14 @@ TEST_P(DBIteratorTest, IterReseek) {
   delete iter;
 }
 
-TEST_F(DBIteratorTest, ReseekUponDirectionChange) {
+TEST_P(DBIteratorTest, ReseekUponDirectionChange) {
   Options options = GetDefaultOptions();
   options.create_if_missing = true;
   options.prefix_extractor.reset(NewFixedPrefixTransform(1));
   options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
   options.merge_operator.reset(
       new StringAppendTESTOperator(/*delim_char=*/' '));
+  UpdateMemtableFactoryIfApplicable(&options, std::get<1>(GetParam()));
   DestroyAndReopen(options);
   ASSERT_OK(Put("foo", "value"));
   ASSERT_OK(Put("bar", "value"));
@@ -809,7 +833,9 @@ TEST_P(DBIteratorTest, IterWithSnapshot) {
   anon::OptionsOverride options_override;
   options_override.skip_policy = kSkipNoSnapshot;
   do {
-    CreateAndReopenWithCF({"pikachu"}, CurrentOptions(options_override));
+    Options db_options = CurrentOptions(options_override);
+    UpdateMemtableFactoryIfApplicable(&db_options, std::get<1>(GetParam()));
+    CreateAndReopenWithCF({"pikachu"}, db_options);
     ASSERT_OK(Put(1, "key1", "val1"));
     ASSERT_OK(Put(1, "key2", "val2"));
     ASSERT_OK(Put(1, "key3", "val3"));
@@ -948,6 +974,7 @@ TEST_P(DBIteratorTest, DBIteratorBoundTest) {
   options.create_if_missing = true;
 
   options.prefix_extractor = nullptr;
+  UpdateMemtableFactoryIfApplicable(&options, std::get<1>(GetParam()));
   DestroyAndReopen(options);
   ASSERT_OK(Put("a", "0"));
   ASSERT_OK(Put("foo", "bar"));
@@ -1122,6 +1149,7 @@ TEST_P(DBIteratorTest, DBIteratorBoundMultiSeek) {
   options.create_if_missing = true;
   options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
   options.prefix_extractor = nullptr;
+  UpdateMemtableFactoryIfApplicable(&options, std::get<1>(GetParam()));
   DestroyAndReopen(options);
   ASSERT_OK(Put("a", "0"));
   ASSERT_OK(Put("z", "0"));
@@ -1186,6 +1214,7 @@ TEST_P(DBIteratorTest, DBIteratorBoundOptimizationTest) {
     table_options.flush_block_policy_factory =
         std::make_shared<FlushBlockEveryKeyPolicyFactory>();
     options.table_factory.reset(NewBlockBasedTableFactory(table_options));
+    UpdateMemtableFactoryIfApplicable(&options, std::get<1>(GetParam()));
 
     DestroyAndReopen(options);
     ASSERT_OK(Put("foo1", "bar1"));
@@ -1237,6 +1266,7 @@ TEST_P(DBIteratorTest, IndexWithFirstKey) {
     table_options.block_cache =
         NewLRUCache(8000);  // fits all blocks and their cache metadata overhead
     options.table_factory.reset(NewBlockBasedTableFactory(table_options));
+    UpdateMemtableFactoryIfApplicable(&options, std::get<1>(GetParam()));
 
     DestroyAndReopen(options);
     ASSERT_OK(Merge("a1", "x1"));
@@ -1357,6 +1387,7 @@ TEST_P(DBIteratorTest, IndexWithFirstKeyGet) {
       std::make_shared<FlushBlockEveryKeyPolicyFactory>();
   table_options.block_cache = NewLRUCache(1000);  // fits all blocks
   options.table_factory.reset(NewBlockBasedTableFactory(table_options));
+  UpdateMemtableFactoryIfApplicable(&options, std::get<1>(GetParam()));
 
   DestroyAndReopen(options);
   ASSERT_OK(Merge("a", "x1"));
@@ -1394,6 +1425,7 @@ TEST_P(DBIteratorTest, PrevAfterAndNextAfterMerge) {
   options.create_if_missing = true;
   options.merge_operator = MergeOperators::CreatePutOperator();
   options.env = env_;
+  UpdateMemtableFactoryIfApplicable(&options, std::get<1>(GetParam()));
   DestroyAndReopen(options);
 
   // write three entries with different keys using Merge()
@@ -1448,6 +1480,7 @@ class DBIteratorTestForPinnedData : public DBIteratorTest {
     table_options.use_delta_encoding = false;
     options.table_factory.reset(NewBlockBasedTableFactory(table_options));
     options.merge_operator = MergeOperators::CreatePutOperator();
+    UpdateMemtableFactoryIfApplicable(&options, std::get<1>(GetParam()));
     DestroyAndReopen(options);
 
     std::vector<std::string> generated_keys(key_pool);
@@ -1609,9 +1642,11 @@ TEST_P(DBIteratorTestForPinnedData, PinnedDataIteratorRandomizedFlush) {
   PinnedDataIteratorRandomized(TestConfig::FLUSH_EVERY_1000);
 }
 
-INSTANTIATE_TEST_CASE_P(DBIteratorTestForPinnedDataInstance,
-                        DBIteratorTestForPinnedData,
-                        testing::Values(true, false));
+INSTANTIATE_TEST_CASE_P(
+    DBIteratorTestForPinnedDataInstance, DBIteratorTestForPinnedData,
+    ::testing::Combine(testing::Values(true, false),
+                       testing::Values(std::string("skip_list"),
+                                       std::string("hash_spdb"))));
 
 TEST_P(DBIteratorTest, PinnedDataIteratorMultipleFiles) {
   Options options = CurrentOptions();
@@ -1620,6 +1655,7 @@ TEST_P(DBIteratorTest, PinnedDataIteratorMultipleFiles) {
   options.table_factory.reset(NewBlockBasedTableFactory(table_options));
   options.disable_auto_compactions = true;
   options.write_buffer_size = 1024 * 1024 * 10;  // 10 Mb
+  UpdateMemtableFactoryIfApplicable(&options, std::get<1>(GetParam()));
   DestroyAndReopen(options);
 
   std::map<std::string, std::string> true_data;
@@ -1689,6 +1725,7 @@ TEST_P(DBIteratorTest, PinnedDataIteratorMergeOperator) {
   table_options.use_delta_encoding = false;
   options.table_factory.reset(NewBlockBasedTableFactory(table_options));
   options.merge_operator = MergeOperators::CreateUInt64AddOperator();
+  UpdateMemtableFactoryIfApplicable(&options, std::get<1>(GetParam()));
   DestroyAndReopen(options);
 
   std::string numbers[7];
@@ -1749,6 +1786,7 @@ TEST_P(DBIteratorTest, PinnedDataIteratorReadAfterUpdate) {
   table_options.use_delta_encoding = false;
   options.table_factory.reset(NewBlockBasedTableFactory(table_options));
   options.write_buffer_size = 100000;
+  UpdateMemtableFactoryIfApplicable(&options, std::get<1>(GetParam()));
   DestroyAndReopen(options);
 
   Random rnd(301);
@@ -1821,6 +1859,7 @@ TEST_P(DBIteratorTest, IterSeekForPrevCrossingFiles) {
   BlockBasedTableOptions table_options;
   table_options.filter_policy.reset(NewBloomFilterPolicy(10, true));
   options.table_factory.reset(NewBlockBasedTableFactory(table_options));
+  UpdateMemtableFactoryIfApplicable(&options, std::get<1>(GetParam()));
   DestroyAndReopen(options);
 
   ASSERT_OK(Put("a1", "va1"));
@@ -1877,6 +1916,7 @@ TEST_P(DBIteratorTest, IterSeekForPrevCrossingFilesCustomPrefixExtractor) {
   BlockBasedTableOptions table_options;
   table_options.filter_policy.reset(NewBloomFilterPolicy(10, true));
   options.table_factory.reset(NewBlockBasedTableFactory(table_options));
+  UpdateMemtableFactoryIfApplicable(&options, std::get<1>(GetParam()));
   DestroyAndReopen(options);
 
   ASSERT_OK(Put("a1", "va1"));
@@ -1932,6 +1972,7 @@ TEST_P(DBIteratorTest, IterPrevKeyCrossingBlocks) {
   options.merge_operator = MergeOperators::CreateStringAppendTESTOperator();
   options.disable_auto_compactions = true;
   options.max_sequential_skip_in_iterations = 8;
+  UpdateMemtableFactoryIfApplicable(&options, std::get<1>(GetParam()));
 
   DestroyAndReopen(options);
 
@@ -1999,6 +2040,7 @@ TEST_P(DBIteratorTest, IterPrevKeyCrossingBlocksRandomized) {
   options.level0_slowdown_writes_trigger = (1 << 30);
   options.level0_stop_writes_trigger = (1 << 30);
   options.max_sequential_skip_in_iterations = 8;
+  UpdateMemtableFactoryIfApplicable(&options, std::get<1>(GetParam()));
   DestroyAndReopen(options);
 
   const int kNumKeys = 500;
@@ -2142,6 +2184,7 @@ TEST_P(DBIteratorTest, IterPrevKeyCrossingBlocksRandomized) {
 TEST_P(DBIteratorTest, IteratorWithLocalStatistics) {
   Options options = CurrentOptions();
   options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
+  UpdateMemtableFactoryIfApplicable(&options, std::get<1>(GetParam()));
   DestroyAndReopen(options);
 
   Random rnd(301);
@@ -2244,6 +2287,7 @@ TEST_P(DBIteratorTest, ReadAhead) {
   table_options.block_size = 1024;
   table_options.no_block_cache = true;
   options.table_factory.reset(NewBlockBasedTableFactory(table_options));
+  UpdateMemtableFactoryIfApplicable(&options, std::get<1>(GetParam()));
   Reopen(options);
 
   std::string value(1024, 'a');
@@ -2312,6 +2356,7 @@ TEST_P(DBIteratorTest, DBIteratorSkipRecentDuplicatesTest) {
   options.prefix_extractor = nullptr;
   options.write_buffer_size = 1 << 27;  // big enough to avoid flush
   options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
+  UpdateMemtableFactoryIfApplicable(&options, std::get<1>(GetParam()));
   DestroyAndReopen(options);
 
   // Insert.
@@ -2462,6 +2507,7 @@ TEST_P(DBIteratorTest, CreationFailure) {
 TEST_P(DBIteratorTest, UpperBoundWithChangeDirection) {
   Options options = CurrentOptions();
   options.max_sequential_skip_in_iterations = 3;
+  UpdateMemtableFactoryIfApplicable(&options, std::get<1>(GetParam()));
   DestroyAndReopen(options);
 
   // write a bunch of kvs to the database.
@@ -2565,6 +2611,7 @@ TEST_P(DBIteratorTest, TableFilter) {
 TEST_P(DBIteratorTest, UpperBoundWithPrevReseek) {
   Options options = CurrentOptions();
   options.max_sequential_skip_in_iterations = 3;
+  UpdateMemtableFactoryIfApplicable(&options, std::get<1>(GetParam()));
   DestroyAndReopen(options);
 
   // write a bunch of kvs to the database.
@@ -2606,6 +2653,7 @@ TEST_P(DBIteratorTest, UpperBoundWithPrevReseek) {
 TEST_P(DBIteratorTest, SkipStatistics) {
   Options options = CurrentOptions();
   options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
+  UpdateMemtableFactoryIfApplicable(&options, std::get<1>(GetParam()));
   DestroyAndReopen(options);
 
   int skip_count = 0;
@@ -2686,6 +2734,7 @@ TEST_P(DBIteratorTest, SkipStatistics) {
 
 TEST_P(DBIteratorTest, SeekAfterHittingManyInternalKeys) {
   Options options = CurrentOptions();
+  UpdateMemtableFactoryIfApplicable(&options, std::get<1>(GetParam()));
   DestroyAndReopen(options);
   ReadOptions ropts;
   ropts.max_skippable_internal_keys = 2;
@@ -2735,6 +2784,7 @@ TEST_P(DBIteratorTest, NonBlockingIterationBugRepro) {
   table_options.flush_block_policy_factory =
       std::make_shared<FlushBlockEveryKeyPolicyFactory>();
   options.table_factory.reset(NewBlockBasedTableFactory(table_options));
+  UpdateMemtableFactoryIfApplicable(&options, std::get<1>(GetParam()));
   DestroyAndReopen(options);
 
   // Two records in sst file, each in its own block.
@@ -2796,6 +2846,7 @@ TEST_P(DBIteratorTest, AvoidReseekLevelIterator) {
   BlockBasedTableOptions table_options;
   table_options.block_size = 800;
   options.table_factory.reset(NewBlockBasedTableFactory(table_options));
+  UpdateMemtableFactoryIfApplicable(&options, std::get<1>(GetParam()));
   Reopen(options);
 
   Random rnd(301);
@@ -2897,6 +2948,7 @@ TEST_P(DBIteratorTest, IterateBoundChangedBeforeSeek) {
   table_options.block_size = 100;
   options.table_factory.reset(NewBlockBasedTableFactory(table_options));
   std::string value(50, 'v');
+  UpdateMemtableFactoryIfApplicable(&options, std::get<1>(GetParam()));
   Reopen(options);
   ASSERT_OK(Put("aaa", value));
   ASSERT_OK(Flush());
@@ -2981,6 +3033,7 @@ TEST_P(DBIteratorTest, Blob) {
   options.enable_blob_files = true;
   options.max_sequential_skip_in_iterations = 2;
   options.statistics = CreateDBStatistics();
+  UpdateMemtableFactoryIfApplicable(&options, std::get<1>(GetParam()));
 
   Reopen(options);
 
@@ -3097,8 +3150,11 @@ TEST_P(DBIteratorTest, Blob) {
   ASSERT_EQ(IterStatus(iter), "b->vb3");
 }
 
-INSTANTIATE_TEST_CASE_P(DBIteratorTestInstance, DBIteratorTest,
-                        testing::Values(true, false));
+INSTANTIATE_TEST_CASE_P(
+    DBIteratorTestInstance, DBIteratorTest,
+    ::testing::Combine(testing::Values(true, false),
+                       testing::Values(std::string("skip_list"),
+                                       std::string("hash_spdb"))));
 
 // Tests how DBIter work with ReadCallback
 class DBIteratorWithReadCallbackTest : public DBIteratorTest {};
@@ -3235,11 +3291,12 @@ TEST_F(DBIteratorWithReadCallbackTest, ReadCallback) {
   delete iter;
 }
 
-TEST_F(DBIteratorTest, BackwardIterationOnInplaceUpdateMemtable) {
+TEST_P(DBIteratorTest, BackwardIterationOnInplaceUpdateMemtable) {
   Options options = CurrentOptions();
   options.create_if_missing = true;
   options.inplace_update_support = false;
   options.env = env_;
+  UpdateMemtableFactoryIfApplicable(&options, std::get<1>(GetParam()));
   DestroyAndReopen(options);
   constexpr int kNumKeys = 10;
 
@@ -3273,9 +3330,10 @@ TEST_F(DBIteratorTest, BackwardIterationOnInplaceUpdateMemtable) {
   }
 }
 
-TEST_F(DBIteratorTest, IteratorRefreshReturnSV) {
+TEST_P(DBIteratorTest, IteratorRefreshReturnSV) {
   Options options = CurrentOptions();
   options.disable_auto_compactions = true;
+  UpdateMemtableFactoryIfApplicable(&options, std::get<1>(GetParam()));
   DestroyAndReopen(options);
   ASSERT_OK(
       db_->DeleteRange(WriteOptions(), db_->DefaultColumnFamily(), "a", "z"));
@@ -3294,6 +3352,11 @@ TEST_F(DBIteratorTest, IteratorRefreshReturnSV) {
   // error.
   Close();
 }
+
+INSTANTIATE_TEST_CASE_P(DBIteratorBaseTestSelectMemtblRep,
+                        DBIteratorBaseTestSelectMemtblRep,
+                        testing::ValuesIn(std::vector<std::string>{
+                            "skip_list", "hash_spdb"}));
 
 }  // namespace ROCKSDB_NAMESPACE
 

@@ -35,7 +35,8 @@
 
 namespace ROCKSDB_NAMESPACE {
 
-class MemTableListTest : public testing::Test {
+class MemTableListTest : public testing::Test,
+                         public testing::WithParamInterface<std::string> {
  public:
   std::string dbname;
   DB* db;
@@ -53,6 +54,7 @@ class MemTableListTest : public testing::Test {
   void CreateDB() {
     if (db == nullptr) {
       options.create_if_missing = true;
+      options.memtable_factory = std::move(CreateMemTableRepFactory());
       EXPECT_OK(DestroyDB(dbname, options));
       // Open DB only with default column family
       ColumnFamilyOptions cf_options;
@@ -220,11 +222,43 @@ class MemTableListTest : public testing::Test {
         committed_flush_jobs_info, to_delete, nullptr, &log_buffer);
   }
 
+  std::unique_ptr<MemTableRepFactory> CreateMemTableRepFactory() {
+    std::string memtbl_rep_name = GetParam();
+    std::unique_ptr<MemTableRepFactory> factoryPtr;
+    if (!strcasecmp(memtbl_rep_name.c_str(), "skip_list")) {
+      factoryPtr.reset(new SkipListFactory());
+    } else if (!strcasecmp(memtbl_rep_name.c_str(), "hash_spdb")) {
+      factoryPtr.reset(NewHashSpdbRepFactory());
+    }
+
+    return factoryPtr;
+  };
+
  protected:
   bool udt_enabled_ = false;
 };
 
-TEST_F(MemTableListTest, Empty) {
+// class MemTableListTestSelectMemTblFactory : public MemTableListTest,
+//                                             public
+//                                             testing::WithParamInterface<std::string>
+//                                             {
+//  public:
+//   MemTableListTestSelectMemTblFactory() : MemTableListTest() {}
+
+//   std::unique_ptr<MemTableRepFactory> CreateMemTableRepFactory() {
+//     std::string memtbl_rep_name = GetParam();
+//     std::unique_ptr<MemTableRepFactory> factoryPtr;
+//     if (!strcasecmp(memtbl_rep_name.c_str(), "skip_list")) {
+//       factoryPtr.reset(new SkipListFactory());
+//     } else if (!strcasecmp(memtbl_rep_name.c_str(), "hash_spdb")) {
+//       factoryPtr.reset(NewHashSpdbRepFactory());
+//     }
+
+//     return factoryPtr;
+//   };
+// };
+
+TEST_P(MemTableListTest, Empty) {
   // Create an empty MemTableList and validate basic functions.
   MemTableList list(1, 0, 0);
 
@@ -242,7 +276,7 @@ TEST_F(MemTableListTest, Empty) {
   ASSERT_EQ(0, to_delete.size());
 }
 
-TEST_F(MemTableListTest, GetTest) {
+TEST_P(MemTableListTest, GetTest) {
   // Create MemTableList
   int min_write_buffer_number_to_merge = 2;
   int max_write_buffer_number_to_maintain = 0;
@@ -267,8 +301,8 @@ TEST_F(MemTableListTest, GetTest) {
 
   // Create a MemTable
   InternalKeyComparator cmp(BytewiseComparator());
-  auto factory = std::make_shared<SkipListFactory>();
-  options.memtable_factory = factory;
+  options.memtable_factory = std::move(CreateMemTableRepFactory());
+
   ImmutableOptions ioptions(options);
 
   WriteBufferManager wb(options.db_write_buffer_size);
@@ -377,7 +411,7 @@ TEST_F(MemTableListTest, GetTest) {
   }
 }
 
-TEST_F(MemTableListTest, GetFromHistoryTest) {
+TEST_P(MemTableListTest, GetFromHistoryTest) {
   // Create MemTableList
   int min_write_buffer_number_to_merge = 2;
   int max_write_buffer_number_to_maintain = 2;
@@ -402,8 +436,7 @@ TEST_F(MemTableListTest, GetFromHistoryTest) {
 
   // Create a MemTable
   InternalKeyComparator cmp(BytewiseComparator());
-  auto factory = std::make_shared<SkipListFactory>();
-  options.memtable_factory = factory;
+  options.memtable_factory = std::move(CreateMemTableRepFactory());
   ImmutableOptions ioptions(options);
 
   WriteBufferManager wb(options.db_write_buffer_size);
@@ -615,14 +648,14 @@ void ValidateWbmUsedCounters(const WriteBufferManager& wb,
 
 }  // namespace
 
-TEST_F(MemTableListTest, FlushPendingTest) {
+TEST_P(MemTableListTest, FlushPendingTest) {
   for (auto wbm_enabled : {false, true}) {
     const int num_tables = 6;
     SequenceNumber seq = 1;
     Status s;
 
-    auto factory = std::make_shared<SkipListFactory>();
-    options.memtable_factory = factory;
+    options.memtable_factory = std::move(CreateMemTableRepFactory());
+
     options.db_write_buffer_size = wbm_enabled ? (1024 * 1024 * 1024) : 0U;
     ImmutableOptions ioptions(options);
     InternalKeyComparator cmp(BytewiseComparator());
@@ -999,7 +1032,7 @@ TEST_F(MemTableListTest, FlushPendingTest) {
   }
 }
 
-TEST_F(MemTableListTest, EmptyAtomicFlushTest) {
+TEST_P(MemTableListTest, EmptyAtomicFlushTest) {
   autovector<MemTableList*> lists;
   autovector<uint32_t> cf_ids;
   autovector<const MutableCFOptions*> options_list;
@@ -1011,14 +1044,14 @@ TEST_F(MemTableListTest, EmptyAtomicFlushTest) {
   ASSERT_TRUE(to_delete.empty());
 }
 
-TEST_F(MemTableListTest, AtomicFlushTest) {
+TEST_P(MemTableListTest, AtomicFlushTest) {
   for (auto wbm_enabled : {false, true}) {
     const int num_cfs = 3;
     const int num_tables_per_cf = 2;
     SequenceNumber seq = 1;
 
-    auto factory = std::make_shared<SkipListFactory>();
-    options.memtable_factory = factory;
+    options.memtable_factory = std::move(CreateMemTableRepFactory());
+
     options.db_write_buffer_size = wbm_enabled ? (1024 * 1024 * 1024) : 0U;
     ImmutableOptions ioptions(options);
     InternalKeyComparator cmp(BytewiseComparator());
@@ -1208,13 +1241,35 @@ class MemTableListWithTimestampTest : public MemTableListTest {
   void SetUp() override { udt_enabled_ = true; }
 };
 
-TEST_F(MemTableListWithTimestampTest, GetTableNewestUDT) {
+// class MemTableListWithTimestampTestSelectMemTblFactory :  public
+// MemTableListWithTimestampTest,
+//                                                           public
+//                                                           testing::WithParamInterface<std::string>
+//                                                           {
+//  public:
+//   MemTableListWithTimestampTestSelectMemTblFactory() :
+//   MemTableListWithTimestampTest() {}
+
+//   std::unique_ptr<MemTableRepFactory> CreateMemTableRepFactory() {
+//     std::string memtbl_rep_name = GetParam();
+//     std::unique_ptr<MemTableRepFactory> factoryPtr;
+//     if (!strcasecmp(memtbl_rep_name.c_str(), "skip_list")) {
+//       factoryPtr.reset(new SkipListFactory());
+//     } else if (!strcasecmp(memtbl_rep_name.c_str(), "hash_spdb")) {
+//       factoryPtr.reset(NewHashSpdbRepFactory());
+//     }
+
+//     return factoryPtr;
+//   };
+// };
+
+TEST_P(MemTableListWithTimestampTest, GetTableNewestUDT) {
   const int num_tables = 3;
   const int num_entries = 5;
   SequenceNumber seq = 1;
 
-  auto factory = std::make_shared<SkipListFactory>();
-  options.memtable_factory = factory;
+  options.memtable_factory = std::move(CreateMemTableRepFactory());
+
   options.persist_user_defined_timestamps = false;
   ImmutableOptions ioptions(options);
   const Comparator* ucmp = test::BytewiseComparatorWithU64TsWrapper();
@@ -1280,6 +1335,10 @@ TEST_F(MemTableListWithTimestampTest, GetTableNewestUDT) {
   }
   to_delete.clear();
 }
+
+INSTANTIATE_TEST_CASE_P(MemTableListTest, MemTableListTest,
+                        testing::ValuesIn(std::vector<std::string>{
+                            "skip_list", "hash_spdb"}));
 
 }  // namespace ROCKSDB_NAMESPACE
 

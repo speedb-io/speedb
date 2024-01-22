@@ -7615,21 +7615,46 @@ TEST_F(DBTest, StaticPinningLastLevelWithData) {
 // ======================================================================================
 //                                    Get-Smallest
 // ======================================================================================
+class DBGsTest : public DBTest {
+ public:
+    void ReopenNewDb() {
+      Options options;
+      options.create_if_missing = true;
+      DestroyAndReopen(options);
+    }
 
-TEST_F(DBTest, GS_EmptyDB) {
-  Options options;
-  options.create_if_missing = true;
-  DestroyAndReopen(options);
+    void GetSmallestAndValidate(const Slice expected_smallest_key) {
+      std::string smallest_key;
+      Status s = dbfull()->GetSmallest(ReadOptions(), dbfull()->DefaultColumnFamily(),
+                                       &smallest_key, nullptr /* value */);
 
-  std::string smallest_key;
-  ASSERT_TRUE(dbfull()
-                  ->GetSmallest(ReadOptions(), dbfull()->DefaultColumnFamily(),
-                                &smallest_key, nullptr /* value */)
-                  .IsNotFound());
-  ASSERT_TRUE(smallest_key.empty());
+      // Guarantees destruction of the db_iter in case of any test assertion failures below
+      std::unique_ptr<Iterator> db_iter {dbfull()->NewIterator(ReadOptions())};
+      db_iter->SeekToFirst();
+
+      if (expected_smallest_key.empty()) {
+        ASSERT_TRUE(s.IsNotFound()) << "Expected NotFound, Actual Status:" << s.ToString();
+        ASSERT_TRUE(smallest_key.empty());
+
+        ASSERT_FALSE(db_iter->Valid());        
+      } else {
+        ASSERT_OK(s) <<  "Expected Ok, Actual Status:" << s.ToString();
+        ASSERT_EQ(smallest_key, expected_smallest_key);
+
+        ASSERT_TRUE(db_iter->Valid());
+        ASSERT_EQ(db_iter->key(), expected_smallest_key);
+      }
+    }
+};
+
+TEST_F(DBGsTest, GS_EmptyDB) {
+  ReopenNewDb();
+
+  std::string expected_smallest_key {""};
+  GetSmallestAndValidate(expected_smallest_key);
 }
 
-TEST_F(DBTest, GS_SingleValueInMemtable) {
+TEST_F(DBGsTest, GS_SingleValueInMemtable) {
   Options options;
   options.create_if_missing = true;
   DestroyAndReopen(options);
@@ -7638,18 +7663,11 @@ TEST_F(DBTest, GS_SingleValueInMemtable) {
   std::string value1 = "Value1";
   ASSERT_OK(dbfull()->Put(WriteOptions(), key1, value1));
 
-  std::string smallest_key;
-  ASSERT_OK(dbfull()->GetSmallest(ReadOptions(),
-                                  dbfull()->DefaultColumnFamily(),
-                                  &smallest_key, nullptr /* value */));
-
-  ASSERT_EQ(smallest_key, key1);
+  GetSmallestAndValidate(key1);
 }
 
-TEST_F(DBTest, GS_MultipleValueInMemtable) {
-  Options options;
-  options.create_if_missing = true;
-  DestroyAndReopen(options);
+TEST_F(DBGsTest, GS_MultipleValueInMemtable) {
+  ReopenNewDb();
 
   std::string key1 = "Key1";
   std::string key2 = "Key2";
@@ -7659,91 +7677,58 @@ TEST_F(DBTest, GS_MultipleValueInMemtable) {
   ASSERT_OK(dbfull()->Put(WriteOptions(), key3, value1));
   ASSERT_OK(dbfull()->Put(WriteOptions(), key1, value1));
 
-  std::string smallest_key;
-  ASSERT_OK(dbfull()->GetSmallest(ReadOptions(),
-                                  dbfull()->DefaultColumnFamily(),
-                                  &smallest_key, nullptr /* value */));
-
-  ASSERT_EQ(smallest_key, key1);
+  GetSmallestAndValidate(key1);
 }
 
-TEST_F(DBTest, GS_SingleValueNewerThanDRWithOverlap) {
-  Options options;
-  options.create_if_missing = true;
-  DestroyAndReopen(options);
+TEST_F(DBGsTest, GS_SingleValueNewerThanDRWithOverlap) {
+  ReopenNewDb();
 
   auto dflt_cfh = dbfull()->DefaultColumnFamily();
 
   ASSERT_OK(dbfull()->DeleteRange(WriteOptions(), dflt_cfh, "a", "z"));
   ASSERT_OK(dbfull()->Put(WriteOptions(), "c", "Value"));
 
-  std::string smallest_key;
-  ASSERT_OK(dbfull()->GetSmallest(ReadOptions(), dflt_cfh, &smallest_key,
-                                  nullptr /* value */));
-
-  ASSERT_EQ(smallest_key, "c");
+  GetSmallestAndValidate("c");
 }
 
-TEST_F(DBTest, GS_SingleValueNewerThanDRNoOverlap) {
-  Options options;
-  options.create_if_missing = true;
-  DestroyAndReopen(options);
+TEST_F(DBGsTest, GS_SingleValueNewerThanDRNoOverlap) {
+  ReopenNewDb();
 
   auto dflt_cfh = dbfull()->DefaultColumnFamily();
 
   ASSERT_OK(dbfull()->DeleteRange(WriteOptions(), dflt_cfh, "a", "b"));
   ASSERT_OK(dbfull()->Put(WriteOptions(), "c", "Value"));
 
-  std::string smallest_key;
-  ASSERT_OK(dbfull()->GetSmallest(ReadOptions(), dflt_cfh, &smallest_key,
-                                  nullptr /* value */));
-
-  ASSERT_EQ(smallest_key, "c");
+  GetSmallestAndValidate("c");
 }
 
-TEST_F(DBTest, GS_SingleValueOlderThanDRNoOverlap) {
-  Options options;
-  options.create_if_missing = true;
-  DestroyAndReopen(options);
+TEST_F(DBGsTest, GS_SingleValueOlderThanDRNoOverlap) {
+  ReopenNewDb();
 
   auto dflt_cfh = dbfull()->DefaultColumnFamily();
 
   ASSERT_OK(dbfull()->Put(WriteOptions(), "c", "Value"));
   ASSERT_OK(dbfull()->DeleteRange(WriteOptions(), dflt_cfh, "a", "b"));
 
-  std::string smallest_key;
-  ASSERT_OK(dbfull()->GetSmallest(ReadOptions(), dflt_cfh, &smallest_key,
-                                  nullptr /* value */));
-
-  ASSERT_EQ(smallest_key, "c");
+  GetSmallestAndValidate("c");
 }
 
-TEST_F(DBTest, GS_SingleValueOlderThanDRWithOverlap) {
-  Options options;
-  options.create_if_missing = true;
-  DestroyAndReopen(options);
+TEST_F(DBGsTest, GS_SingleValueOlderThanDRWithOverlap) {
+  ReopenNewDb();
 
   auto dflt_cfh = dbfull()->DefaultColumnFamily();
 
   ASSERT_OK(dbfull()->Put(WriteOptions(), "c", "Value"));
   ASSERT_OK(dbfull()->DeleteRange(WriteOptions(), dflt_cfh, "a", "z"));
 
-  std::string smallest_key;
-  ASSERT_TRUE(dbfull()
-                  ->GetSmallest(ReadOptions(), dflt_cfh, &smallest_key,
-                                nullptr /* value */)
-                  .IsNotFound());
-
-  ASSERT_TRUE(smallest_key.empty());
+  GetSmallestAndValidate("");
 }
 
 //   K1
 // |    DR   |
 //      K2
-TEST_F(DBTest, GS_ValuesAndDR_1) {
-  Options options;
-  options.create_if_missing = true;
-  DestroyAndReopen(options);
+TEST_F(DBGsTest, GS_ValuesAndDR_1) {
+  ReopenNewDb();
 
   auto dflt_cfh = dbfull()->DefaultColumnFamily();
 
@@ -7751,21 +7736,15 @@ TEST_F(DBTest, GS_ValuesAndDR_1) {
   ASSERT_OK(dbfull()->DeleteRange(WriteOptions(), dflt_cfh, "a", "z"));
   ASSERT_OK(dbfull()->Put(WriteOptions(), "t", "Value"));
 
-  std::string smallest_key;
-  ASSERT_OK(dbfull()->GetSmallest(ReadOptions(), dflt_cfh, &smallest_key,
-                                  nullptr /* value */));
-
-  ASSERT_EQ(smallest_key, "t");
+  GetSmallestAndValidate("t");
 }
 
 //   K1
 // |      DR1   |
 //         K2
 //      |     DR2    |
-TEST_F(DBTest, GS_ValuesAndDR_2) {
-  Options options;
-  options.create_if_missing = true;
-  DestroyAndReopen(options);
+TEST_F(DBGsTest, GS_ValuesAndDR_2) {
+  ReopenNewDb();
 
   auto dflt_cfh = dbfull()->DefaultColumnFamily();
 
@@ -7774,13 +7753,21 @@ TEST_F(DBTest, GS_ValuesAndDR_2) {
   ASSERT_OK(dbfull()->Put(WriteOptions(), "t", "Value"));
   ASSERT_OK(dbfull()->DeleteRange(WriteOptions(), dflt_cfh, "e", "z"));
 
-  std::string smallest_key;
-  ASSERT_TRUE(dbfull()
-                  ->GetSmallest(ReadOptions(), dflt_cfh, &smallest_key,
-                                nullptr /* value */)
-                  .IsNotFound());
+  GetSmallestAndValidate("");
+}
 
-  ASSERT_TRUE(smallest_key.empty());
+// |    DR   |
+//           K1
+TEST_F(DBGsTest, GS_ValuesAndDR_3) {
+  ReopenNewDb();
+
+  auto dflt_cfh = dbfull()->DefaultColumnFamily();
+
+  ASSERT_OK(dbfull()->DeleteRange(WriteOptions(), dflt_cfh, "a", "z"));
+  // The key overlaps the DR's end => NOT overlapping
+  ASSERT_OK(dbfull()->Put(WriteOptions(), "z", "Value"));
+
+  GetSmallestAndValidate("z");
 }
 
 }  // namespace ROCKSDB_NAMESPACE

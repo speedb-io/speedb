@@ -3295,6 +3295,41 @@ TEST_F(DBIteratorTest, IteratorRefreshReturnSV) {
   Close();
 }
 
+TEST_F(DBIteratorTest, HashSpdbRefreshStatus) {
+  Options options = CurrentOptions();
+  options.memtable_factory.reset(NewHashSpdbRepFactory());
+  DestroyAndReopen(options);
+  Iterator* iter = db_->NewIterator(ReadOptions());
+  Status s = iter->Refresh();
+  ASSERT_TRUE(s.IsNotSupported());
+  ASSERT_FALSE(iter->IsAllowRefresh());
+  delete iter;
+}
+
+TEST_F(DBIteratorTest, VectorRefreshStatus) {
+  Options options = CurrentOptions();
+  options.allow_concurrent_memtable_write = false;
+  options.memtable_factory.reset(new VectorRepFactory());
+  DestroyAndReopen(options);
+  Iterator* iter = db_->NewIterator(ReadOptions());
+  Status s = iter->Refresh();
+  ASSERT_TRUE(s.IsNotSupported());
+  ASSERT_FALSE(iter->IsAllowRefresh());
+  delete iter;
+}
+
+TEST_F(DBIteratorTest, SkipListRefreshStatus) {
+  Options options = CurrentOptions();
+  options.memtable_factory.reset(new SkipListFactory());
+  DestroyAndReopen(options);
+  Iterator* iter = db_->NewIterator(ReadOptions());
+  Status s = iter->Refresh();
+  ASSERT_OK(s);
+  ASSERT_TRUE(iter->IsAllowRefresh());
+  delete iter;
+}
+
+
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {

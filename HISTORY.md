@@ -8,6 +8,10 @@ Based on RocksDB 8.6.7
 * Rebase on RocksDB 8.6.7
 
 ### Enhancements
+* Added IsRefreshIterSupported() to memtable_rep, to publish if the memtable support Refresh() of the iterator.
+NewIterator() will return status notsupported for not supported memtable.
+IsAllowRefresh() has been added.
+db_stress has been updated as well to take into account that some memtables do not support Refresh()
 * Added memory reporting to the logs to be able to monitor which component in the Arena is using the memory and CacheAllocation overall memory usage, print some statistics. This feature requires compiling with MEMORY_REPORTING flag (#481)
 * Added a kUseBaseAddress flag and GetBaseOffset flag to OptionTypeInfo.  If this flag is set and a function is used for processing options, the function is passed the base address of the struct rather than the specific field (#397)
 * Export GetFlushReasonString/GetCompactionReasonString in listener.h (#785).

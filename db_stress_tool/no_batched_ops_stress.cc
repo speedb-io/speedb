@@ -1844,7 +1844,7 @@ class NonBatchedOpsStressTest : public StressTest {
       op_logs += "P";
     }
 
-    if (thread->rand.OneIn(2)) {
+    if (thread->rand.OneIn(2) && iter->IsAllowRefresh()) {
       pre_read_expected_values.clear();
       post_read_expected_values.clear();
       // Refresh after forward/backward scan to allow higher chance of SV
@@ -1853,7 +1853,11 @@ class NonBatchedOpsStressTest : public StressTest {
         pre_read_expected_values.push_back(
             shared->Get(rand_column_family, i + lb));
       }
+      // the return of Refresh doesnt has effect here cause we clear the
+      // pre/post expected values before. thats why we add the previous check of
+      // IsAllowRefresh
       iter->Refresh();
+
       for (int64_t i = 0; i < static_cast<int64_t>(expected_values_size); ++i) {
         post_read_expected_values.push_back(
             shared->Get(rand_column_family, i + lb));

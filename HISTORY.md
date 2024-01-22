@@ -16,6 +16,10 @@ Based on RocksDB 8.6.7
 * LOG Enhancement: Have a separate LOG entry per CF Stats. This ensures that no CF stats data is lost in case the size of the combined CF stats text exceeds the LOG's threshold (#534).
 
 ### Bug Fixes
+* Added IsRefreshIterSupported() to memtable_rep, to publish if the memtable support Refresh() of the iterator.
+Refresh() will return status NotSupported for memtables that do not support Refresh().
+IsAllowRefresh() has been added.
+db_stress has been updated as well to take into account that some memtables do not support Refresh()
 * fix conflicts between db_bench flags and enable speedb features flag(#743).
 * Proactive Flushes: Fix a race in the ShouldInitiateAnotherFlushMemOnly that may cause the method to return an incorrect answer (#758).
 * Stall deadlock consists small cfs (#637).
@@ -29,7 +33,6 @@ RocksDB has a value of 10 by default and we've added the option to randomize the
 * Remove leftover references to ROCKSDB_LITE (#755).
 * Options: Set compaction_readahead_size default to 0. The current default of 2Mb is not optimal for most of our use cases. Having a value of 0 means that the FS will use its default size for prefetching (true only with https://github.com/speedb-io/speedb/pull/788).
 * Options: Set level_compaction_dynamic_level_bytes as false by default. This flag is not working properly with Speedb. see https://github.com/speedb-io/speedb/issues/786 for more details.
-* stress test: Disable hash speedb memtable and enable_speedb_features from testing until issues are solved.
 
 ## Hazlenut 2.7.0 (27/10/2023)
 Based on RocksDB 8.1.1

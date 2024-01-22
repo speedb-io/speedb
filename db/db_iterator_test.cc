@@ -1,3 +1,17 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -3293,6 +3307,40 @@ TEST_F(DBIteratorTest, IteratorRefreshReturnSV) {
   // iter used to not cleanup SV, so the Close() below would hit an assertion
   // error.
   Close();
+}
+
+TEST_F(DBIteratorTest, HashSpdbRefreshStatus) {
+  Options options = CurrentOptions();
+  options.memtable_factory.reset(NewHashSpdbRepFactory());
+  DestroyAndReopen(options);
+  Iterator* iter = db_->NewIterator(ReadOptions());
+  Status s = iter->Refresh();
+  ASSERT_TRUE(s.IsNotSupported());
+  ASSERT_FALSE(iter->IsAllowRefresh());
+  delete iter;
+}
+
+TEST_F(DBIteratorTest, VectorRefreshStatus) {
+  Options options = CurrentOptions();
+  options.allow_concurrent_memtable_write = false;
+  options.memtable_factory.reset(new VectorRepFactory());
+  DestroyAndReopen(options);
+  Iterator* iter = db_->NewIterator(ReadOptions());
+  Status s = iter->Refresh();
+  ASSERT_TRUE(s.IsNotSupported());
+  ASSERT_FALSE(iter->IsAllowRefresh());
+  delete iter;
+}
+
+TEST_F(DBIteratorTest, SkipListRefreshStatus) {
+  Options options = CurrentOptions();
+  options.memtable_factory.reset(new SkipListFactory());
+  DestroyAndReopen(options);
+  Iterator* iter = db_->NewIterator(ReadOptions());
+  Status s = iter->Refresh();
+  ASSERT_OK(s);
+  ASSERT_TRUE(iter->IsAllowRefresh());
+  delete iter;
 }
 
 }  // namespace ROCKSDB_NAMESPACE

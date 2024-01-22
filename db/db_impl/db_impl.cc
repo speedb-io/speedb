@@ -1181,6 +1181,46 @@ void DBImpl::DumpStats() {
       ROCKS_LOG_INFO(immutable_db_options_.info_log, "%s",
                      malloc_stats.c_str());
     }
+#ifdef MEMORY_REPORTING
+    std::ostringstream oss;
+    oss << std::endl << "** Memory Reporting **" << std::endl;
+    oss << "Arena Stats:" << std::endl
+        << "Total: " << NumberToHumanString(Arena::arena_tracker_.total.load())
+        << std::endl;
+    for (const auto& it : Arena::arena_tracker_.arena_stats) {
+      oss << it.first << ": " << NumberToHumanString(it.second.load())
+          << std::endl;
+    }
+    oss << "CF Stats: " << std::endl;
+    uint64_t cfs_total_memory = 0;
+    std::ostringstream cf_oss;
+    for (auto cfd : *versions_->GetColumnFamilySet()) {
+      if (cfd->initialized()) {
+        std::string cf_name = cfd->GetName();
+        uint64_t allocated_cf = cfd->mem()->ApproximateMemoryUsageFast() +
+                                cfd->imm()->ApproximateMemoryUsage();
+        cfs_total_memory += allocated_cf;
+        cf_oss << "[" << cf_name.c_str()
+               << "]: " << NumberToHumanString(allocated_cf) << std::endl;
+      }
+    }
+    oss << "Total: " << NumberToHumanString(cfs_total_memory) << std::endl
+        << cf_oss.str();
+    size_t out;
+    this->GetIntProperty("rocksdb.block-cache-usage", &out);
+    oss << "rocksdb.block-cache-usage: " << NumberToHumanString(out)
+        << std::endl;
+    this->GetIntProperty("rocksdb.estimate-table-readers-mem", &out);
+    oss << "rocksdb.estimate-table-readers-mem: " << NumberToHumanString(out)
+        << std::endl;
+    this->GetIntProperty("rocksdb.block-cache-pinned-usage", &out);
+    oss << "rocksdb.block-cache-pinned-usage: " << NumberToHumanString(out)
+        << std::endl;
+    oss << "Total CacheAllocationUsage: "
+        << NumberToHumanString(ROCKSDB_NAMESPACE::blockfetchermem::mem.load())
+        << std::endl;
+    ROCKS_LOG_INFO(immutable_db_options_.info_log, "%s", oss.str().c_str());
+#endif
   }
 
   PrintStatistics();

@@ -2537,6 +2537,7 @@ class Stats {
           next_report_ += 50000;
         else
           next_report_ += 100000;
+
         fprintf(stderr, "... finished %" PRIu64 " ops%30s\r", done_, "");
       } else {
         uint64_t now = clock_->NowMicros();

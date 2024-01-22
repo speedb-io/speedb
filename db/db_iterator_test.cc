@@ -3329,7 +3329,6 @@ TEST_F(DBIteratorTest, SkipListRefreshStatus) {
   delete iter;
 }
 
-
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {

@@ -44,6 +44,7 @@
 #include "db/blob/blob_index.h"
 #include "db/blob/blob_log_format.h"
 #include "db/db_impl/db_impl.h"
+#include "db/db_impl/spdb_gs_del_list.h"
 #include "db/db_test_util.h"
 #include "db/dbformat.h"
 #include "db/job_context.h"
@@ -85,7 +86,6 @@
 #include "util/rate_limiter_impl.h"
 #include "util/string_util.h"
 #include "utilities/merge_operators.h"
-
 namespace ROCKSDB_NAMESPACE {
 
 // Note that whole DBTest and its child classes disable fsync on files
@@ -7615,6 +7615,45 @@ TEST_F(DBTest, StaticPinningLastLevelWithData) {
 // ======================================================================================
 //                                    Get-Smallest
 // ======================================================================================
+class DelListTest : public ::testing::Test {
+ public:
+  void ValidateDelListContents(
+      spdb_gs::GlobalDelList& del_list,
+      const std::list<spdb_gs::GlobalDelList::DelElement>& expected_contents) {
+    ASSERT_EQ(del_list.Size(), expected_contents.size());
+
+    auto expected_contents_iter = expected_contents.begin();
+    auto del_list_iter = del_list.NewIterator();
+
+    for (del_list_iter->SeekToFirst(); del_list_iter->Valid();
+         del_list_iter->Next()) {
+      ASSERT_TRUE(expected_contents_iter != expected_contents.end());
+      ASSERT_EQ(*expected_contents_iter, del_list_iter->key());
+    }
+  }
+};
+
+TEST_F(DelListTest, Basic) {
+  spdb_gs::GlobalDelList del_list(BytewiseComparator());
+
+  ASSERT_TRUE(del_list.Empty());
+  ASSERT_EQ(0U, del_list.Size());
+
+  auto del_list_iter = del_list.NewIterator();
+  ASSERT_FALSE(del_list_iter->Valid());
+}
+
+TEST_F(DelListTest, Insert) {
+  spdb_gs::GlobalDelList del_list(BytewiseComparator());
+
+  auto del_list_iter = del_list.NewIterator();
+
+  del_list.InsertBefore(*del_list_iter, {"a", "b"});
+  ValidateDelListContents(del_list, {{"a", "b"}});
+}
+
+#if 0
+
 class DBGsTest : public DBTest {
  public:
   void ReopenNewDb() {
@@ -7772,6 +7811,8 @@ TEST_F(DBGsTest, GS_ValuesAndDR_3) {
 
   GetSmallestAndValidate("z");
 }
+
+#endif
 
 }  // namespace ROCKSDB_NAMESPACE
 

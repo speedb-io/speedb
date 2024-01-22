@@ -30,9 +30,22 @@ class GlobalDelList {
     std::string user_start_key;
     std::string user_end_key;
 
-    bool IsRange() const { return (user_end_key.empty() == false); }
+    // To construct a del-key
+    explicit DelElement(const std::string& _user_start_key)
+        : user_start_key(_user_start_key) {}
 
+    // To construct a del-range
+    DelElement(const std::string& _user_start_key,
+               const std::string& _user_end_key)
+        : user_start_key(_user_start_key), user_end_key(_user_end_key) {}
+
+    bool IsRange() const { return (user_end_key.empty() == false); }
     bool IsDelKey() const { return (IsRange() == false); }
+
+    bool operator==(const DelElement& other) const {
+      return ((user_start_key == other.user_start_key) &&
+              (user_end_key == other.user_end_key));
+    }
   };
 
  public:
@@ -44,14 +57,16 @@ class GlobalDelList {
 
   class Iterator {
    public:
-    Iterator(const std::list<DelElement>& del_list);
+    // TODO - Make private and understand why GlobalDelList can't access
+    // although it's a friend class
+    Iterator(std::list<DelElement>& del_list);
 
     // No copying
     Iterator(const Iterator&) = delete;
     Iterator(Iterator&&) = delete;
     Iterator& operator=(const Iterator&) = delete;
 
-    void Valid() const;
+    bool Valid() const;
 
     void SeekToFirst();
     void Seek(const Slice& user_start_key);
@@ -61,27 +76,32 @@ class GlobalDelList {
     const DelElement& key() const;
 
    private:
-    const GlobalDelList& del_list_;
-    std::list<DelElement>::const_iterator del_list_iter_;
+    std::list<DelElement>& del_list_;
+    std::list<DelElement>::iterator del_list_iter_;
+
+    friend class GlobalDelList;
   };
+
+  bool Empty() const { return del_list_.empty(); }
+  size_t Size() const { return del_list_.size(); }
 
   std::unique_ptr<Iterator> NewIterator();
 
-  void InsertBefore(const Iterator& pos, const DelElement& element);
+  void InsertBefore(Iterator& pos, const DelElement& del_elem);
 
-  // Merge element with the element pointed to by the iterator at pos.
-  // The element and the pointed element must be overlapping.
-  void MergeWith(const Iterator& pos, const DelElement& element);
+  // Merge del_elem with the del_elem pointed to by the iterator at pos.
+  // The del_elem and the pointed del_elem must be overlapping.
+  void MergeWith(Iterator& pos, const DelElement& del_elem);
 
   // Remove all elements > user_start_key.
   // If start_pos is != nullptr, the list is trimmed from start_pos onwards.
-  // The assumption is that the end of the element pointed by start_pos is
+  // The assumption is that the end of the del_elem pointed by start_pos is
   // after user_start_key.
-  void TrimList(const Slice& user_start_key,
-                const Iterator* start_pos = nullptr);
+  void TrimList(const Slice& user_start_key, Iterator* start_pos = nullptr);
 
  private:
   const Comparator* comparator_ = nullptr;
+  std::list<DelElement> del_list_;
 };
 
 }  // namespace spdb_gs

@@ -113,7 +113,8 @@ class Iterator : public Cleanable {
   virtual Status Refresh() {
     return Status::NotSupported("Refresh() is not supported");
   }
-
+  // Internally - previous check to Refresh
+  virtual bool IsAllowRefresh() { return true; }
   // Property "rocksdb.iterator.is-key-pinned":
   //   If returning "1", this means that the Slice returned by key() is valid
   //   as long as the iterator is not deleted.

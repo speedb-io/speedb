@@ -13,48 +13,19 @@
 // limitations under the License.
 
 #include <memory>
+#include <string>
 
 #include "db/db_impl/db_impl.h"
+#include "db/db_impl/spdb_db_gs_utils.h"
 #include "db/db_impl/spdb_gs_del_list.h"
 #include "db/dbformat.h"
-#include "db/range_del_aggregator.h"
+#include "db/range_tombstone_fragmenter.h"
 #include "memory/arena.h"
-#include "table/merging_iterator.h"
-
 namespace ROCKSDB_NAMESPACE {
+namespace spdb_gs {
 
 namespace {
 
-void PrintFragmentedRangeDels(const std::string& title,
-                              FragmentedRangeTombstoneIterator* iter) {
-  printf("%s - FragmentedRangeTombstoneIterator:\n", title.c_str());
-  for (iter->SeekToFirst(); iter->Valid(); iter->Next()) {
-    printf("{%s, %s, seq:%d}, ", ExtractUserKey(iter->key()).ToString().c_str(),
-           iter->value().ToString().c_str(), (int)iter->seq());
-  }
-}
-
-enum class RelativePos { BEFORE, OVERLAP, AFTER };
-
-RelativePos CompareRangeTsToUserKey(const RangeTombstone& range_ts,
-                                    const Slice& user_key,
-                                    const Comparator* comparator) {
-  int user_key_vs_start_key =
-      comparator->Compare(user_key, range_ts.start_key_);
-  if (user_key_vs_start_key < 0) {
-    // Range > User-Key
-    return RelativePos::AFTER;
-  }
-
-  int user_key_vs_end_key = comparator->Compare(user_key, range_ts.end_key_);
-  if (user_key_vs_end_key >= 0) {
-    // Range < User-Key
-    return RelativePos::BEFORE;
-  }
-
-  // Range overlaps User-Key
-  return RelativePos::OVERLAP;
-}
 
 class FragmentedRangeTombstoneIteratorWrapper : public Iterator {
  public:
@@ -131,21 +102,20 @@ class FragmentedRangeTombstoneIteratorWrapper : public Iterator {
   std::unique_ptr<FragmentedRangeTombstoneIterator> wrapped_iter_ptr_;
 };
 
-}  // namespace
-
-namespace spdb_gs {
-
 Status ProcessLogLevel(
-    [[maybe_unused]] GlobalDelList* del_list, InternalIterator* values_iter,
+    GlobalDelList* /* glbl_del_list */, InternalIterator* values_iter,
     std::unique_ptr<FragmentedRangeTombstoneIterator> range_del_iter,
     std::string* curr_suk, const Comparator* comparator) {
+  // assert(glbl_del_list != nullptr);
   assert(values_iter != nullptr);
-  assert(del_list != nullptr);
 
   Status s;
 
   FragmentedRangeTombstoneIteratorWrapper range_del_iter_wrapper(
       std::move(range_del_iter));
+
+  // auto del_list_iter = glbl_del_list->NewIterator();
+  // del_list_iter->SeekToFirst();
 
   values_iter->SeekToFirst();
   range_del_iter_wrapper.SeekToFirst();
@@ -200,7 +170,11 @@ Status ProcessLogLevel(
   return s;
 }
 
+}  // namespace
+
 }  // namespace spdb_gs
+
+using namespace spdb_gs;
 
 Status DBImpl::GetSmallest(const ReadOptions& read_options,
                            ColumnFamilyHandle* column_family, std::string* key,
@@ -234,7 +208,7 @@ Status DBImpl::GetSmallest(const ReadOptions& read_options,
     PrintFragmentedRangeDels("DBImpl::GetSmallest - ", range_del_iter);
   }
 
-  spdb_gs::GlobalDelList del_list(cfd->user_comparator());
+  GlobalDelList del_list(cfd->user_comparator());
   std::unique_ptr<FragmentedRangeTombstoneIterator> range_del_iter_ptr(
       range_del_iter);
   ProcessLogLevel(&del_list, mem_iter, std::move(range_del_iter_ptr), key,

@@ -26,9 +26,13 @@ namespace spdb_gs {
 
 class GlobalDelList {
  public:
-  struct Element {
+  struct DelElement {
     std::string user_start_key;
     std::string user_end_key;
+
+    bool IsRange() const { return (user_end_key.empty() == false); }
+
+    bool IsDelKey() const { return (IsRange() == false); }
   };
 
  public:
@@ -40,7 +44,7 @@ class GlobalDelList {
 
   class Iterator {
    public:
-    Iterator(const std::list<Element>& del_list);
+    Iterator(const std::list<DelElement>& del_list);
 
     // No copying
     Iterator(const Iterator&) = delete;
@@ -54,20 +58,20 @@ class GlobalDelList {
 
     void Next();
 
-    const Element& key() const;
+    const DelElement& key() const;
 
    private:
     const GlobalDelList& del_list_;
-    std::list<Element>::const_iterator del_list_iter_;
+    std::list<DelElement>::const_iterator del_list_iter_;
   };
 
   std::unique_ptr<Iterator> NewIterator();
 
-  void InsertBefore(const Iterator& pos, const Element& element);
+  void InsertBefore(const Iterator& pos, const DelElement& element);
 
   // Merge element with the element pointed to by the iterator at pos.
   // The element and the pointed element must be overlapping.
-  void MergeWith(const Iterator& pos, const Element& element);
+  void MergeWith(const Iterator& pos, const DelElement& element);
 
   // Remove all elements > user_start_key.
   // If start_pos is != nullptr, the list is trimmed from start_pos onwards.

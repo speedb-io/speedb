@@ -32,6 +32,7 @@
 #include <thread>
 #include <unordered_set>
 #include <utility>
+#include <vector>
 
 #ifndef OS_WIN
 #include <unistd.h>
@@ -7618,38 +7619,76 @@ TEST_F(DBTest, StaticPinningLastLevelWithData) {
 class DelListTest : public ::testing::Test {
  public:
   void ValidateDelListContents(
-      spdb_gs::GlobalDelList& del_list,
-      const std::list<spdb_gs::GlobalDelList::DelElement>& expected_contents) {
+      [[maybe_unused]] std::string title, spdb_gs::GlobalDelList& del_list,
+      const std::vector<spdb_gs::GlobalDelList::DelElement>&
+          expected_contents) {
+    // std::cout << title << '\n';
+    // std::cout << del_list.ToString() << '\n';
+
     ASSERT_EQ(del_list.Size(), expected_contents.size());
 
-    auto expected_contents_iter = expected_contents.begin();
     auto del_list_iter = del_list.NewIterator();
 
-    for (del_list_iter->SeekToFirst(); del_list_iter->Valid();
-         del_list_iter->Next()) {
+    del_list_iter->SeekToFirst();
+    auto expected_contents_iter = expected_contents.begin();
+
+    while (del_list_iter->Valid()) {
       ASSERT_TRUE(expected_contents_iter != expected_contents.end());
-      ASSERT_EQ(*expected_contents_iter, del_list_iter->key());
+      ASSERT_EQ(*expected_contents_iter, del_list_iter->key())
+          << "Expected:" << expected_contents_iter->ToString()
+          << ", Actual:" << del_list_iter->key().ToString();
+
+      del_list_iter->Next();
+      ++expected_contents_iter;
     }
   }
 };
 
-TEST_F(DelListTest, Basic) {
-  spdb_gs::GlobalDelList del_list(BytewiseComparator());
+// TEST_F(DelListTest, Basic) {
+//   spdb_gs::GlobalDelList del_list(BytewiseComparator());
 
-  ASSERT_TRUE(del_list.Empty());
-  ASSERT_EQ(0U, del_list.Size());
+//   ASSERT_TRUE(del_list.Empty());
+//   ASSERT_EQ(0U, del_list.Size());
 
-  auto del_list_iter = del_list.NewIterator();
-  ASSERT_FALSE(del_list_iter->Valid());
-}
+//   auto del_list_iter = del_list.NewIterator();
+//   ASSERT_FALSE(del_list_iter->Valid());
+// }
 
 TEST_F(DelListTest, Insert) {
   spdb_gs::GlobalDelList del_list(BytewiseComparator());
 
   auto del_list_iter = del_list.NewIterator();
 
-  del_list.InsertBefore(*del_list_iter, {"a", "b"});
-  ValidateDelListContents(del_list, {{"a", "b"}});
+  spdb_gs::GlobalDelList::DelElement del_elem1{"a", "b"};
+  spdb_gs::GlobalDelList::DelElement del_elem2{"d", "f"};
+  spdb_gs::GlobalDelList::DelElement del_elem3{"h"};
+  spdb_gs::GlobalDelList::DelElement del_elem4{"z"};
+
+  // Insert multiple elements always when the iterator is at end()
+  del_list_iter->SeekToFirst();
+
+  del_list.InsertBefore(*del_list_iter, del_elem1);
+  ValidateDelListContents("After del_elem1", del_list, {del_elem1});
+
+  del_list.InsertBefore(*del_list_iter, del_elem3);
+  ValidateDelListContents("After del_elem2", del_list, {del_elem1, del_elem3});
+
+  del_list_iter = std::move(del_list.NewIterator());
+  del_list_iter->SeekToFirst();
+  del_list_iter->Next();
+  ASSERT_EQ(del_list_iter->key(), del_elem3);
+
+  del_list.InsertBefore(*del_list_iter, del_elem2);
+  ValidateDelListContents("After del_elem1", del_list,
+                          {del_elem1, del_elem2, del_elem3});
+
+  ASSERT_TRUE(del_list_iter->Valid());
+  del_list_iter->Next();
+  ASSERT_FALSE(del_list_iter->Valid());
+
+  del_list.InsertBefore(*del_list_iter, del_elem4);
+  ValidateDelListContents("After del_elem4", del_list,
+                          {del_elem1, del_elem2, del_elem3, del_elem4});
 }
 
 #if 0

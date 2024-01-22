@@ -46,10 +46,18 @@ class GlobalDelList {
       return ((user_start_key == other.user_start_key) &&
               (user_end_key == other.user_end_key));
     }
+
+    std::string ToString() const {
+      if (IsDelKey()) {
+        return (std::string("{") + user_start_key + "}");
+      } else {
+        return (std::string("{") + user_start_key + ", " + user_end_key + "}");
+      }
+    }
   };
 
  public:
-  GlobalDelList(const Comparator* comparator) : comparator_(comparator){};
+  GlobalDelList(const Comparator* comparator);
 
   GlobalDelList(const GlobalDelList&) = delete;
   GlobalDelList operator=(const GlobalDelList&) = delete;
@@ -59,7 +67,7 @@ class GlobalDelList {
    public:
     // TODO - Make private and understand why GlobalDelList can't access
     // although it's a friend class
-    Iterator(std::list<DelElement>& del_list);
+    Iterator(GlobalDelList& del_list);
 
     // No copying
     Iterator(const Iterator&) = delete;
@@ -76,8 +84,9 @@ class GlobalDelList {
     const DelElement& key() const;
 
    private:
-    std::list<DelElement>& del_list_;
+    GlobalDelList& glbl_del_list_;
     std::list<DelElement>::iterator del_list_iter_;
+    std::list<DelElement>::iterator del_list_prev_iter_;
 
     friend class GlobalDelList;
   };
@@ -87,10 +96,21 @@ class GlobalDelList {
 
   std::unique_ptr<Iterator> NewIterator();
 
+  // Insert del_elem into the list before pos.
+  // It is assumed (and not validated) that del_elem is inserted in-order:
+  // del_elem must precede the pointed element. Otherwise, the del-list will
+  // be corrupt, violating its assumptions.
   void InsertBefore(Iterator& pos, const DelElement& del_elem);
 
   // Merge del_elem with the del_elem pointed to by the iterator at pos.
   // The del_elem and the pointed del_elem must be overlapping.
+  // Note that the resulting del elem may overlap del-elements that are
+  // yet to be iterated. When moving to the next del element (if pos is not the
+  // last element), the need to merge will be evaluated. If there is a need, the
+  // previous element will be merged with the next one, and the previous will be
+  // removed frmo the list.
+  //
+  // Pre-Requisites: The iterator must be Valid()
   void MergeWith(Iterator& pos, const DelElement& del_elem);
 
   // Remove all elements > user_start_key.
@@ -98,6 +118,12 @@ class GlobalDelList {
   // The assumption is that the end of the del_elem pointed by start_pos is
   // after user_start_key.
   void TrimList(const Slice& user_start_key, Iterator* start_pos = nullptr);
+
+  std::string ToString() const;
+
+ private:
+  void MergeWithInternal(std::list<DelElement>::iterator pos,
+                         const DelElement& del_elem);
 
  private:
   const Comparator* comparator_ = nullptr;

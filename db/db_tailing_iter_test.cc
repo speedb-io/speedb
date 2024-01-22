@@ -574,8 +574,9 @@ TEST_P(DBTestTailingIterator, TailingIteratorUpperBound) {
 }
 
 TEST_P(DBTestTailingIterator, MissingKeys) {
-  for (auto reseek_to_fix: {true, false}) {
-    std::cout << "\nReseek_to_fix = " << std::boolalpha << reseek_to_fix << "\n";
+  for (auto reseek_to_fix : {true, false}) {
+    std::cout << "\nReseek_to_fix = " << std::boolalpha << reseek_to_fix
+              << "\n";
     Options options;
     options.create_if_missing = true;
     DestroyAndReopen(options);
@@ -601,9 +602,9 @@ TEST_P(DBTestTailingIterator, MissingKeys) {
       ASSERT_OK(Flush());
       MoveFilesToLevel(2);
     }
-    
+
     ASSERT_OK(Put("35", "30"));
-    
+
     if (flush_and_move) {
       ASSERT_OK(Flush());
       MoveFilesToLevel(1);
@@ -618,7 +619,7 @@ TEST_P(DBTestTailingIterator, MissingKeys) {
     if (reseek_to_fix) {
       it->Seek("30");
     }
-    
+
     it->Next();
     EXPECT_EQ("31", it->key().ToString());
 

@@ -562,30 +562,33 @@ class DB {
   // Finds the smallest key in 'column_family' that is >= target.
   //
   // If a key is found:
-  // - The found key will be returned in the 'key' parameter (must be != nullptr).
-  // - If 'value' != nullptr, the associated value will be returned in the 'value' parameter.
+  // - The found key will be returned in the 'key' parameter (must be !=
+  // nullptr).
+  // - If 'value' != nullptr, the associated value will be returned in the
+  // 'value' parameter.
   // - Returns OK.
   //
   // Else (no such key exists):
   // - 'key' and 'value' remain unchanged.
   // - Returns NotFound.
   //
-  // Returns some other non-OK status on error, as applicable. In that case, key and value
-  // will remain unchanged.
-  // virtual Status GetSmallestAtOrAfter(const ReadOptions& read_options,
+  // Returns some other non-OK status on error, as applicable. In that case, key
+  // and value will remain unchanged. virtual Status GetSmallestAtOrAfter(const
+  // ReadOptions& read_options,
   //                                     ColumnFamilyHandle* column_family,
   //                                     const Slice& target,
   //                                     std::string* key,
   //                                     std::string* value) = 0;
 
-  // Same as GetSmallestAtOrAfter() but finds the smallest key in the CF (no target is specified).
-  virtual Status GetSmallest( const ReadOptions& /* read_options */,
-                              ColumnFamilyHandle* /* column_family */,
-                              std::string* /* key */,
-                              std::string* /* value */) {
+  // Same as GetSmallestAtOrAfter() but finds the smallest key in the CF (no
+  // target is specified).
+  virtual Status GetSmallest(const ReadOptions& /* read_options */,
+                             ColumnFamilyHandle* /* column_family */,
+                             std::string* /* key */, std::string* /* value */) {
     assert(0);
     return Status::NotSupported(
-        "GetSmallest() that isn't overriden by a specific DB is not implemented.");
+        "GetSmallest() that isn't overriden by a specific DB is not "
+        "implemented.");
   }
 
   // Convenience service. Same as: return GetSmallest(...).IsNotFound()

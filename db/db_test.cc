@@ -7617,40 +7617,43 @@ TEST_F(DBTest, StaticPinningLastLevelWithData) {
 // ======================================================================================
 class DBGsTest : public DBTest {
  public:
-    void ReopenNewDb() {
-      Options options;
-      options.create_if_missing = true;
-      DestroyAndReopen(options);
+  void ReopenNewDb() {
+    Options options;
+    options.create_if_missing = true;
+    DestroyAndReopen(options);
+  }
+
+  void GetSmallestAndValidate(const Slice expected_smallest_key) {
+    std::string smallest_key;
+    Status s =
+        dbfull()->GetSmallest(ReadOptions(), dbfull()->DefaultColumnFamily(),
+                              &smallest_key, nullptr /* value */);
+
+    // Guarantees destruction of the db_iter in case of any test assertion
+    // failures below
+    std::unique_ptr<Iterator> db_iter{dbfull()->NewIterator(ReadOptions())};
+    db_iter->SeekToFirst();
+
+    if (expected_smallest_key.empty()) {
+      ASSERT_TRUE(s.IsNotFound())
+          << "Expected NotFound, Actual Status:" << s.ToString();
+      ASSERT_TRUE(smallest_key.empty());
+
+      ASSERT_FALSE(db_iter->Valid());
+    } else {
+      ASSERT_OK(s) << "Expected Ok, Actual Status:" << s.ToString();
+      ASSERT_EQ(smallest_key, expected_smallest_key);
+
+      ASSERT_TRUE(db_iter->Valid());
+      ASSERT_EQ(db_iter->key(), expected_smallest_key);
     }
-
-    void GetSmallestAndValidate(const Slice expected_smallest_key) {
-      std::string smallest_key;
-      Status s = dbfull()->GetSmallest(ReadOptions(), dbfull()->DefaultColumnFamily(),
-                                       &smallest_key, nullptr /* value */);
-
-      // Guarantees destruction of the db_iter in case of any test assertion failures below
-      std::unique_ptr<Iterator> db_iter {dbfull()->NewIterator(ReadOptions())};
-      db_iter->SeekToFirst();
-
-      if (expected_smallest_key.empty()) {
-        ASSERT_TRUE(s.IsNotFound()) << "Expected NotFound, Actual Status:" << s.ToString();
-        ASSERT_TRUE(smallest_key.empty());
-
-        ASSERT_FALSE(db_iter->Valid());        
-      } else {
-        ASSERT_OK(s) <<  "Expected Ok, Actual Status:" << s.ToString();
-        ASSERT_EQ(smallest_key, expected_smallest_key);
-
-        ASSERT_TRUE(db_iter->Valid());
-        ASSERT_EQ(db_iter->key(), expected_smallest_key);
-      }
-    }
+  }
 };
 
 TEST_F(DBGsTest, GS_EmptyDB) {
   ReopenNewDb();
 
-  std::string expected_smallest_key {""};
+  std::string expected_smallest_key{""};
   GetSmallestAndValidate(expected_smallest_key);
 }
 

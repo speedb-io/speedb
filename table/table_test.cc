@@ -62,6 +62,7 @@
 #include "rocksdb/table_properties.h"
 #include "rocksdb/trace_record.h"
 #include "rocksdb/unique_id.h"
+#include "rocksdb/utilities/debug.h"
 #include "rocksdb/write_buffer_manager.h"
 #include "table/block_based/block.h"
 #include "table/block_based/block_based_table_builder.h"
@@ -89,8 +90,6 @@
 #include "util/string_util.h"
 #include "utilities/memory_allocators.h"
 #include "utilities/merge_operators.h"
-
-#include "rocksdb/utilities/debug.h"
 namespace ROCKSDB_NAMESPACE {
 
 extern const uint64_t kLegacyBlockBasedTableMagicNumber;
@@ -4421,10 +4420,14 @@ TEST_F(MemTableTest, Simple) {
   auto PrintIter = [](InternalIterator* iter) {
     ParsedInternalKey key_result;
     auto parsed_status = ParseInternalKey(iter->key(), &key_result, true);
-    KeyVersion key_version(key_result.user_key.ToString(), iter->value().ToString(), key_result.sequence, (int)key_result.type);
+    KeyVersion key_version(key_result.user_key.ToString(),
+                           iter->value().ToString(), key_result.sequence,
+                           (int)key_result.type);
     auto key_str = key_result.user_key.ToString();
     auto value_str = iter->value().ToString();
-    std::cout << "DR: [" << key_str << ", " << value_str << "), seq:" << key_result.sequence << ", type:" << key_version.GetTypeName() << '\n';
+    std::cout << "DR: [" << key_str << ", " << value_str
+              << "), seq:" << key_result.sequence
+              << ", type:" << key_version.GetTypeName() << '\n';
   };
 
   WriteBatch batch;
@@ -4437,14 +4440,15 @@ TEST_F(MemTableTest, Simple) {
       WriteBatchInternal::InsertInto(&batch, &cf_mems_default, nullptr, nullptr)
           .ok());
 
-  GetMemTable()->Add(100, kTypeRangeDeletion, std::string("f"), std::string("g"), nullptr);
+  GetMemTable()->Add(100, kTypeRangeDeletion, std::string("f"),
+                     std::string("g"), nullptr);
 
   std::unique_ptr<InternalIterator> iter_guard;
   InternalIterator* iter = GetMemTable()->NewRangeTombstoneIterator(
       ReadOptions(), kMaxSequenceNumber /* read_seq */,
       false /* immutable_memtable */);
   iter_guard.reset(iter);
-  
+
   iter->SeekToFirst();
   while (iter->Valid()) {
     PrintIter(iter);
@@ -4474,17 +4478,23 @@ TEST_F(MemTableTest, Simple) {
   //   while (iter->Valid()) {
   //     ParsedInternalKey key_result;
   //     auto parsed_status = ParseInternalKey(iter->key(), &key_result, true);
-  //     KeyVersion key_version(key_result.user_key.ToString(), iter->value().ToString(), key_result.sequence, (int)key_result.type);
+  //     KeyVersion key_version(key_result.user_key.ToString(),
+  //     iter->value().ToString(), key_result.sequence, (int)key_result.type);
 
   //     auto key_str = key_result.user_key.ToString();
   //     auto value_str = iter->value().ToString();
 
   //     if (i == 0) {
-  //       // std::cout << key_str << " -> " << value_str << ", seq:" << key_result.sequence << ", type:" << key_version.GetTypeName() << '\n';
+  //       // std::cout << key_str << " -> " << value_str << ", seq:" <<
+  //       key_result.sequence << ", type:" << key_version.GetTypeName() <<
+  //       '\n';
   //     } else {
-  //       std::cout << "DR: [" << key_str << ", " << value_str << "), seq:" << key_result.sequence << ", type:" << key_version.GetTypeName() << '\n';
+  //       std::cout << "DR: [" << key_str << ", " << value_str << "), seq:" <<
+  //       key_result.sequence << ", type:" << key_version.GetTypeName() <<
+  //       '\n';
   //     }
-  //     // fprintf(stderr, "key: '%s' -> '%s'\n", iter->key().ToString().c_str(),
+  //     // fprintf(stderr, "key: '%s' -> '%s'\n",
+  //     iter->key().ToString().c_str(),
   //     //         iter->value().ToString().c_str());
   //     iter->Next();
   //   }

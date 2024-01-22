@@ -15,6 +15,5 @@
 #include "db/db_impl/spdb_gs_del_list.h"
 
 namespace ROCKSDB_NAMESPACE {
-namespace spdb_gs {
-}  // namespace spdb_gs
+namespace spdb_gs {}  // namespace spdb_gs
 }  // namespace ROCKSDB_NAMESPACE

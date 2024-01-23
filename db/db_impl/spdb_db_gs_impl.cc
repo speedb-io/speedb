@@ -26,7 +26,6 @@ namespace spdb_gs {
 
 namespace {
 
-
 class FragmentedRangeTombstoneIteratorWrapper : public Iterator {
  public:
   FragmentedRangeTombstoneIteratorWrapper(

@@ -69,7 +69,7 @@ class GlobalDelList {
     // although it's a friend class
     Iterator(GlobalDelList& del_list);
 
-    // No copying
+    // No copying / assignment
     Iterator(const Iterator&) = delete;
     Iterator(Iterator&&) = delete;
     Iterator& operator=(const Iterator&) = delete;

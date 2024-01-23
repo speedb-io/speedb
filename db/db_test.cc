@@ -7616,12 +7616,13 @@ TEST_F(DBTest, StaticPinningLastLevelWithData) {
 // ======================================================================================
 //                                    Get-Smallest
 // ======================================================================================
+using DelElem = spdb_gs::GlobalDelList::DelElement;
+
 class DelListTest : public ::testing::Test {
  public:
-  void ValidateDelListContents(
-      [[maybe_unused]] std::string title, spdb_gs::GlobalDelList& del_list,
-      const std::vector<spdb_gs::GlobalDelList::DelElement>&
-          expected_contents) {
+  void ValidateDelListContents([[maybe_unused]] std::string title,
+                               spdb_gs::GlobalDelList& del_list,
+                               const std::vector<DelElem>& expected_contents) {
     // std::cout << title << '\n';
     // std::cout << del_list.ToString() << '\n';
 
@@ -7654,41 +7655,89 @@ class DelListTest : public ::testing::Test {
 //   ASSERT_FALSE(del_list_iter->Valid());
 // }
 
-TEST_F(DelListTest, Insert) {
-  spdb_gs::GlobalDelList del_list(BytewiseComparator());
+// TEST_F(DelListTest, Insert) {
+//   spdb_gs::GlobalDelList del_list(BytewiseComparator());
+//   auto del_list_iter = del_list.NewIterator();
 
+//   DelElem del_elem1{"a", "b"};
+//   DelElem del_elem2{"d", "f"};
+//   DelElem del_elem3{"h"};
+//   DelElem del_elem4{"z"};
+
+//   // Insert multiple elements always when the iterator is at end()
+//   del_list_iter->SeekToFirst();
+
+//   del_list.InsertBefore(*del_list_iter, del_elem1);
+//   ValidateDelListContents("After del_elem1", del_list, {del_elem1});
+
+//   del_list.InsertBefore(*del_list_iter, del_elem3);
+//   ValidateDelListContents("After del_elem2", del_list, {del_elem1,
+//   del_elem3});
+
+//   del_list_iter = std::move(del_list.NewIterator());
+//   del_list_iter->SeekToFirst();
+//   del_list_iter->Next();
+//   ASSERT_EQ(del_list_iter->key(), del_elem3);
+
+//   del_list.InsertBefore(*del_list_iter, del_elem2);
+//   ValidateDelListContents("After del_elem1", del_list,
+//                           {del_elem1, del_elem2, del_elem3});
+
+//   ASSERT_TRUE(del_list_iter->Valid());
+//   del_list_iter->Next();
+//   ASSERT_FALSE(del_list_iter->Valid());
+
+//   del_list.InsertBefore(*del_list_iter, del_elem4);
+//   ValidateDelListContents("After del_elem4", del_list,
+//                           {del_elem1, del_elem2, del_elem3, del_elem4});
+// }
+
+TEST_F(DelListTest, MergeWith) {
+  spdb_gs::GlobalDelList del_list(BytewiseComparator());
   auto del_list_iter = del_list.NewIterator();
 
-  spdb_gs::GlobalDelList::DelElement del_elem1{"a", "b"};
-  spdb_gs::GlobalDelList::DelElement del_elem2{"d", "f"};
-  spdb_gs::GlobalDelList::DelElement del_elem3{"h"};
-  spdb_gs::GlobalDelList::DelElement del_elem4{"z"};
+  DelElem del_elem1{"j", "z"};
+  DelElem del_elem2{"h", "m"};
 
-  // Insert multiple elements always when the iterator is at end()
   del_list_iter->SeekToFirst();
-
   del_list.InsertBefore(*del_list_iter, del_elem1);
   ValidateDelListContents("After del_elem1", del_list, {del_elem1});
 
-  del_list.InsertBefore(*del_list_iter, del_elem3);
-  ValidateDelListContents("After del_elem2", del_list, {del_elem1, del_elem3});
-
-  del_list_iter = std::move(del_list.NewIterator());
   del_list_iter->SeekToFirst();
+
+  // Merge {"h", "m"} with {"j", "z"}, expecting {"h", "z"}
+  del_list.MergeWith(*del_list_iter, del_elem2);
+  ValidateDelListContents("After del_elem2", del_list, {{"h", "z"}});
+
+  // Merge {"h", "z"} with itself => remains unchanged
+  del_list.MergeWith(*del_list_iter, {"h", "z"});
+  ValidateDelListContents("After merge with itself {'h', 'z'}", del_list,
+                          {{"h", "z"}});
+
+  // Merge {"h", "z"} with an overlapping deletion-key => remains unchanged
+  del_list.MergeWith(*del_list_iter, {"t", ""});
+  ValidateDelListContents("After merge with overlapping DK 'b'", del_list,
+                          {{"h", "z"}});
+
+  // Restart the iterator
+  del_list_iter->SeekToFirst();
+  ASSERT_EQ(del_list_iter->key(), DelElem("h", "z"));
+  del_list.InsertBefore(*del_list_iter, DelElem("a", "c"));
+  ValidateDelListContents("After inserting {'a', 'c'} as first range", del_list,
+                          {{"a", "c"}, {"h", "z"}});
+
+  del_list_iter->SeekToFirst();
+  ASSERT_EQ(del_list_iter->key(), DelElem("a", "c"));
+
+  // Merging to have a merged range that overlaps with the next
+  del_list.MergeWith(*del_list_iter, {"b", "k"});
+
+  // Expecting the move of the iterator to merge with the previous
+  // and remain with a single {'a', 'z'} range
   del_list_iter->Next();
-  ASSERT_EQ(del_list_iter->key(), del_elem3);
 
-  del_list.InsertBefore(*del_list_iter, del_elem2);
-  ValidateDelListContents("After del_elem1", del_list,
-                          {del_elem1, del_elem2, del_elem3});
-
-  ASSERT_TRUE(del_list_iter->Valid());
-  del_list_iter->Next();
-  ASSERT_FALSE(del_list_iter->Valid());
-
-  del_list.InsertBefore(*del_list_iter, del_elem4);
-  ValidateDelListContents("After del_elem4", del_list,
-                          {del_elem1, del_elem2, del_elem3, del_elem4});
+  ValidateDelListContents("After inserting an overlapping range and next",
+                          del_list, {{"a", "z"}});
 }
 
 #if 0

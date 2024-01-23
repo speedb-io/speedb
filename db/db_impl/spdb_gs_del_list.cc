@@ -34,6 +34,8 @@ void GlobalDelList::MergeWith(Iterator& pos, const DelElement& del_elem) {
 
 void GlobalDelList::MergeWithInternal(std::list<DelElement>::iterator pos,
                                       const DelElement& del_elem) {
+  assert(pos != del_list_.end());
+
   if (pos->IsDelKey()) {
     // If both are del-keys, nothing to do
     // If, however, merging a range-ts with a del-list del-key, just replace the

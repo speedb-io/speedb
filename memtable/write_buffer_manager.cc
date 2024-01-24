@@ -745,6 +745,7 @@ void WriteBufferManager::InitiateFlushesThread() {
           // the callback (which may take a long time).
           was_flush_initiated = initiator.cb(kMinFlushSizes[iter]);
         }
+
         if (!was_flush_initiated) {
           // No flush was initiated => undo the counters update
           assert(num_running_flushes_ > 0U);

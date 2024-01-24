@@ -3296,11 +3296,6 @@ Status DBImpl::BackgroundFlush(bool* made_progress, JobContext* job_context,
           bg_job_limits.max_compactions, bg_flush_scheduled_,
           bg_compaction_scheduled_);
     }
-    *reason = bg_flush_args[0].flush_reason_;
-    if (write_buffer_manager_) {
-      write_buffer_manager_->FlushStarted(
-          *reason == FlushReason::kWriteBufferManagerInitiated);
-    }
 
     status = FlushMemTablesToOutputFiles(bg_flush_args, made_progress,
                                          job_context, log_buffer, thread_pri);
@@ -3348,6 +3343,12 @@ void DBImpl::BackgroundCallFlush(Env::Priority thread_pri) {
     Status s =
         BackgroundFlush(&made_progress, &job_context, &log_buffer, &reason,
                         &flush_rescheduled_to_retain_udt, thread_pri);
+
+    if (write_buffer_manager_) {
+      write_buffer_manager_->FlushStarted(
+          reason == FlushReason::kWriteBufferManagerInitiated);
+    }
+
     if (s.IsTryAgain() && flush_rescheduled_to_retain_udt) {
       bg_cv_.SignalAll();  // In case a waiter can proceed despite the error
       mutex_.Unlock();
@@ -4441,9 +4442,7 @@ size_t DBImpl::InitiateMemoryManagerFlushRequestAtomicFlush(
       "write buffer manager initiated Atomic flush finished, status: %s",
       s.ToString().c_str());
 
-  if (s.ok() == false) {
-    assert(num_flushes_initiated == 0);
-  }
+  assert(s.ok() || (num_flushes_initiated == 0));
   return num_flushes_initiated;
 }
 
@@ -4547,9 +4546,7 @@ size_t DBImpl::InitiateMemoryManagerFlushRequestNonAtomicFlush(
       "[%s] write buffer manager initialize flush finished, status: %s\n",
       cfd_to_flush->GetName().c_str(), s.ToString().c_str());
 
-  if (s.ok() == false) {
-    assert(num_flushes_initiated == 0);
-  }
+  assert(s.ok() || (num_flushes_initiated == 0));
   return num_flushes_initiated;
 }
 

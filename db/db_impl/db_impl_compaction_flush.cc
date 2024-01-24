@@ -2333,7 +2333,12 @@ void DBImpl::GenerateFlushRequest(const autovector<ColumnFamilyData*>& cfds,
 Status DBImpl::FlushMemTable(ColumnFamilyData* cfd,
                              const FlushOptions& flush_options,
                              FlushReason flush_reason,
-                             bool entered_write_thread) {
+                             bool entered_write_thread,
+                             size_t* num_flushes_initiated) {
+  if (num_flushes_initiated != nullptr) {
+    *num_flushes_initiated = 0U;
+  }
+
   // This method should not be called if atomic_flush is true.
   assert(!immutable_db_options_.atomic_flush);
   if (!flush_options.wait && write_controller_->IsStopped()) {
@@ -2447,7 +2452,10 @@ Status DBImpl::FlushMemTable(ColumnFamilyData* cfd,
         }
       }
       for (const auto& req : flush_reqs) {
-        SchedulePendingFlush(req);
+        bool pushed_req = SchedulePendingFlush(req);
+        if (pushed_req && (num_flushes_initiated != nullptr)) {
+          ++(*num_flushes_initiated);
+        }
       }
       MaybeScheduleFlushOrCompaction();
     }
@@ -2486,8 +2494,13 @@ Status DBImpl::FlushMemTable(ColumnFamilyData* cfd,
 Status DBImpl::AtomicFlushMemTables(
     const FlushOptions& flush_options, FlushReason flush_reason,
     const autovector<ColumnFamilyData*>& provided_candidate_cfds,
-    bool entered_write_thread) {
+    bool entered_write_thread, size_t* num_flushes_initiated) {
   assert(immutable_db_options_.atomic_flush);
+
+  if (num_flushes_initiated != nullptr) {
+    *num_flushes_initiated = 0U;
+  }
+
   if (!flush_options.wait && write_controller_->IsStopped()) {
     std::ostringstream oss;
     oss << "Writes have been stopped, thus unable to perform manual flush. "
@@ -2598,7 +2611,10 @@ Status DBImpl::AtomicFlushMemTables(
         }
       }
       GenerateFlushRequest(cfds, flush_reason, &flush_req);
-      SchedulePendingFlush(flush_req);
+      bool pushed_req = SchedulePendingFlush(flush_req);
+      if (pushed_req && (num_flushes_initiated != nullptr)) {
+        ++(*num_flushes_initiated);
+      }
       MaybeScheduleFlushOrCompaction();
     }
 
@@ -3014,14 +3030,17 @@ ColumnFamilyData* DBImpl::PickCompactionFromQueue(
   return cfd;
 }
 
-void DBImpl::SchedulePendingFlush(const FlushRequest& flush_req) {
+bool DBImpl::SchedulePendingFlush(const FlushRequest& flush_req) {
   mutex_.AssertHeld();
   if (reject_new_background_jobs_) {
-    return;
+    return false;
   }
   if (flush_req.cfd_to_max_mem_id_to_persist.empty()) {
-    return;
+    return false;
   }
+
+  bool pushed_req = false;
+
   if (!immutable_db_options_.atomic_flush) {
     // For the non-atomic flush case, we never schedule multiple column
     // families in the same flush request.
@@ -3035,6 +3054,7 @@ void DBImpl::SchedulePendingFlush(const FlushRequest& flush_req) {
       cfd->set_queued_for_flush(true);
       ++unscheduled_flushes_;
       flush_queue_.push_back(flush_req);
+      pushed_req = true;
     }
   } else {
     for (auto& iter : flush_req.cfd_to_max_mem_id_to_persist) {
@@ -3043,7 +3063,10 @@ void DBImpl::SchedulePendingFlush(const FlushRequest& flush_req) {
     }
     ++unscheduled_flushes_;
     flush_queue_.push_back(flush_req);
+    pushed_req = true;
   }
+
+  return pushed_req;
 }
 
 void DBImpl::SchedulePendingCompaction(ColumnFamilyData* cfd) {
@@ -4351,16 +4374,20 @@ bool DBImpl::InitiateMemoryManagerFlushRequest(size_t min_size_to_flush) {
   flush_options.allow_write_stall = true;
   flush_options.wait = false;
 
+  size_t num_flushes_initiated = 0U;
   if (immutable_db_options_.atomic_flush) {
-    return InitiateMemoryManagerFlushRequestAtomicFlush(min_size_to_flush,
-                                                        flush_options);
+    num_flushes_initiated = InitiateMemoryManagerFlushRequestAtomicFlush(
+        min_size_to_flush, flush_options);
   } else {
-    return InitiateMemoryManagerFlushRequestNonAtomicFlush(min_size_to_flush,
-                                                           flush_options);
+    num_flushes_initiated = InitiateMemoryManagerFlushRequestNonAtomicFlush(
+        min_size_to_flush, flush_options);
   }
+
+  // TODO - Have Proactive Flushes handle num_flushes_initiated > 1
+  return (num_flushes_initiated > 0U);
 }
 
-bool DBImpl::InitiateMemoryManagerFlushRequestAtomicFlush(
+size_t DBImpl::InitiateMemoryManagerFlushRequestAtomicFlush(
     size_t min_size_to_flush, const FlushOptions& flush_options) {
   assert(immutable_db_options_.atomic_flush);
 
@@ -4370,7 +4397,7 @@ bool DBImpl::InitiateMemoryManagerFlushRequestAtomicFlush(
 
     SelectColumnFamiliesForAtomicFlush(&cfds);
     if (cfds.empty()) {
-      return false;
+      return 0U;
     }
 
     // min_size_to_flush may be 0.
@@ -4391,7 +4418,7 @@ bool DBImpl::InitiateMemoryManagerFlushRequestAtomicFlush(
         }
       }
       if (total_size_to_flush < min_size_to_flush) {
-        return false;
+        return 0U;
       }
     }
   }
@@ -4404,17 +4431,23 @@ bool DBImpl::InitiateMemoryManagerFlushRequestAtomicFlush(
 
   TEST_SYNC_POINT(
       "DBImpl::InitiateMemoryManagerFlushRequestAtomicFlush::BeforeFlush");
+  size_t num_flushes_initiated = 0U;
   auto s = AtomicFlushMemTables(
-      flush_options, FlushReason::kWriteBufferManagerInitiated, cfds);
+      flush_options, FlushReason::kWriteBufferManagerInitiated, cfds,
+      false /* entered_write_thread */, &num_flushes_initiated);
 
   ROCKS_LOG_INFO(
       immutable_db_options_.info_log,
       "write buffer manager initiated Atomic flush finished, status: %s",
       s.ToString().c_str());
-  return s.ok();
+
+  if (s.ok() == false) {
+    assert(num_flushes_initiated == 0);
+  }
+  return num_flushes_initiated;
 }
 
-bool DBImpl::InitiateMemoryManagerFlushRequestNonAtomicFlush(
+size_t DBImpl::InitiateMemoryManagerFlushRequestNonAtomicFlush(
     size_t min_size_to_flush, const FlushOptions& flush_options) {
   assert(immutable_db_options_.atomic_flush == false);
 
@@ -4456,7 +4489,7 @@ bool DBImpl::InitiateMemoryManagerFlushRequestNonAtomicFlush(
     }
 
     if (cfd_to_flush == nullptr) {
-      return false;
+      return 0U;
     }
 
     orig_cfd_to_flush = cfd_to_flush;
@@ -4503,15 +4536,21 @@ bool DBImpl::InitiateMemoryManagerFlushRequestNonAtomicFlush(
 
   TEST_SYNC_POINT(
       "DBImpl::InitiateMemoryManagerFlushRequestNonAtomicFlush::BeforeFlush");
-  auto s = FlushMemTable(cfd_to_flush, flush_options,
-                         FlushReason::kWriteBufferManagerInitiated);
+  size_t num_flushes_initiated = 0U;
+
+  auto s = FlushMemTable(
+      cfd_to_flush, flush_options, FlushReason::kWriteBufferManagerInitiated,
+      false /* entered_write_thread */, &num_flushes_initiated);
 
   ROCKS_LOG_INFO(
       immutable_db_options_.info_log,
       "[%s] write buffer manager initialize flush finished, status: %s\n",
       cfd_to_flush->GetName().c_str(), s.ToString().c_str());
 
-  return s.ok();
+  if (s.ok() == false) {
+    assert(num_flushes_initiated == 0);
+  }
+  return num_flushes_initiated;
 }
 
 }  // namespace ROCKSDB_NAMESPACE

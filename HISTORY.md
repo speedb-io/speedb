@@ -28,6 +28,7 @@ db_stress has been updated as well to take into account that some memtables do n
 * stress test: Fix TestIterateAgainstExpected not supporting 0 iterations. TestIterateAgainstExpected was not designed to support value of 0 in FLAGS_num_iterations.
 RocksDB has a value of 10 by default and we've added the option to randomize the values from 0 to 100 in https://github.com/speedb-io/speedb/commit/434692a63318036a3995a53001337f18bf467903
 * Add more checks for using db_stress with --enable_speedb_features=true
+* Proactive Flushes: Have the initiator return a correct answer when it was requested to initate a flush (#812).
 
 ### Miscellaneous
 * Remove leftover references to ROCKSDB_LITE (#755).

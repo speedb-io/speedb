@@ -44,7 +44,7 @@ RocksDB has a value of 10 by default and we've added the option to randomize the
 * Add more checks for using db_stress with --enable_speedb_features=true
 * Proactive Flushes: Have the initiator return a correct answer when it was requested to initate a flush (#812).
 * stress test: Adding a trace file by default in PR https://github.com/speedb-io/speedb/pull/797 has revealed some incompatibilities between the trace file and several configurations (more details in https://github.com/speedb-io/speedb/issues/813). Keep the trace file and remove the IsDone assertion.
-
+* Allow cross-compilation on macOS systems when using Cmake. See https://github.com/speedb-io/speedb/issues/822 for full details.
 
 ### Miscellaneous
 * Remove leftover references to ROCKSDB_LITE (#755).

@@ -204,7 +204,7 @@ jobs:
             git clone https://github.com/madler/zlib.git -b v1.3 zlib-1.3
             cd zlib-1.3\contrib\vstudio\vc14
             devenv zlibvc.sln /upgrade
-            cp ../../../zlib.h .            
+            cp ../../../zlib.h .
             msbuild zlibvc.sln /p:Configuration=Debug /p:Platform=x64
             msbuild zlibvc.sln /p:Configuration=Release /p:Platform=x64
             copy x64\ZlibDllRelease\zlibwapi.lib x64\ZlibStatRelease\

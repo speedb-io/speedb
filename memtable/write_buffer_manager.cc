@@ -809,9 +809,9 @@ void WriteBufferManager::FlushEnded(bool /* wbm_initiated */) {
   // the WBM will not be aware of the number of running flushes at the time
   // it is enabled. The counter will become valid once all of the flushes
   // that were running when it was enabled will have completed.
-  if (num_running_flushes_ > 0U) {
-    --num_running_flushes_;
-  }
+  assert(num_running_flushes_ > 0U);
+  --num_running_flushes_;
+
   size_t curr_memory_used = memory_usage();
   RecalcFlushInitiationSize();
   ReevaluateNeedForMoreFlushesLockHeld(curr_memory_used);

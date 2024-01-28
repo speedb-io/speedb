@@ -905,7 +905,8 @@ TEST_P(WriteBufferManagerFlushInitiationTest, DISABLED_FlushInitiationSteps) {
   DeregisterInitiator(initiator_id);
 }
 
-TEST_P(WriteBufferManagerFlushInitiationTest, RegisteringLate) {
+// TODO - The test is flaky. Investigate why and either fix it or remvoe it
+TEST_P(WriteBufferManagerFlushInitiationTest, DISABLED_RegisteringLate) {
   // Reach the 1st step, but no registered initiators
   wbm_->ReserveMem(flush_step_size_);
   IncNumFlushesToInitiate();

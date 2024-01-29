@@ -14,7 +14,8 @@
 
 #pragma once
 
-#include "db/db_impl/spdb_db_gs_del_list.h"
+#include <string>
+
 #include "db/dbformat.h"
 
 namespace ROCKSDB_NAMESPACE {
@@ -51,15 +52,50 @@ void PrintFragmentedRangeDels(
     const std::string& title,
     ROCKSDB_NAMESPACE::FragmentedRangeTombstoneIterator* iter);
 
+struct DelElement {
+  std::string user_start_key;
+  std::string user_end_key;
+
+  // To construct a del-key
+  DelElement(const Slice& _user_start_key)
+      : user_start_key(_user_start_key.data(), _user_start_key.size()) {}
+
+  // To construct a del-range
+  DelElement(const Slice& _user_start_key, const Slice& _user_end_key)
+      : user_start_key(_user_start_key.data(), _user_start_key.size()),
+        user_end_key(_user_end_key.data(), _user_end_key.size()) {}
+
+  bool IsRange() const { return (user_end_key.empty() == false); }
+  bool IsDelKey() const { return (IsRange() == false); }
+
+  bool operator==(const DelElement& other) const {
+    return ((user_start_key == other.user_start_key) &&
+            (user_end_key == other.user_end_key));
+  }
+
+  static bool LessThan(const DelElement& first, const DelElement& second, const Comparator* comparator) {
+    // Ordering based only on the start key
+    return (comparator->Compare(first.user_start_key, second.user_start_key) < 0);
+  }
+
+  std::string ToString() const {
+    if (IsDelKey()) {
+      return (std::string("{") + user_start_key + "}");
+    } else {
+      return (std::string("{") + user_start_key + ", " + user_end_key + "}");
+    }
+  }
+};
+
 RelativePos CompareRangeTsToUserKey(const RangeTombstone& range_ts,
                                     const Slice& user_key,
                                     const Comparator* comparator);
 
-RelativePos CompareDelElemToUserKey(const GlobalDelList::DelElement& del_elem,
+RelativePos CompareDelElemToUserKey(const DelElement& del_elem,
                                     const Slice& user_key,
                                     const Comparator* comparator);
 
-RelativePos CompareDelElemToRangeTs(const GlobalDelList::DelElement& del_elem,
+RelativePos CompareDelElemToRangeTs(const DelElement& del_elem,
                                     const RangeTombstone& range_ts,
                                     const Comparator* comparator,
                                     OverlapType* overlap_type);

@@ -56,7 +56,7 @@ LIB_SOURCES =                                                   \
   db/db_impl/db_impl_write.cc                                   \
   db/db_impl/db_spdb_impl_write.cc                              \
   db/db_impl/compact_range_threads_mngr.cc                      \
-  db/db_impl/spdb_gs_del_list.cc                                \
+  db/db_impl/spdb_db_gs_del_list.cc                                \
   db/db_impl/spdb_db_gs_utils.cc                                \
   db/db_impl/spdb_db_gs_impl.cc                                 \
   db/db_info_dumper.cc                                          \

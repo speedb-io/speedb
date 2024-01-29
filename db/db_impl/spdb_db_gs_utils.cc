@@ -96,7 +96,7 @@ RelativePos CompareRangeTsToUserKey(const RangeTombstone& range_ts,
       CompareRangeTsToUserKeyInt(range_ts, user_key, comparator));
 }
 
-RelativePos CompareDelElemToUserKey(const GlobalDelList::DelElement& del_elem,
+RelativePos CompareDelElemToUserKey(const DelElement& del_elem,
                                     const Slice& user_key,
                                     const Comparator* comparator) {
   int result = 0;
@@ -126,7 +126,7 @@ RelativePos CompareDelElemToUserKey(const GlobalDelList::DelElement& del_elem,
   return ComparisonResultToRelativePos(result);
 }
 
-RelativePos CompareDelElemToRangeTs(const GlobalDelList::DelElement& del_elem,
+RelativePos CompareDelElemToRangeTs(const DelElement& del_elem,
                                     const RangeTombstone& range_ts,
                                     const Comparator* comparator,
                                     OverlapType* overlap_type) {

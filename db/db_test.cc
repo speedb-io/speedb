@@ -7616,7 +7616,7 @@ TEST_F(DBTest, StaticPinningLastLevelWithData) {
 // ======================================================================================
 //                                    Get-Smallest
 // ======================================================================================
-using DelElem = spdb_gs::GlobalDelList::DelElement;
+using DelElem = spdb_gs::DelElement;
 
 class DelListTest : public ::testing::Test {
  public:

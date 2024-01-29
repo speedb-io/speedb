@@ -274,7 +274,7 @@ void UpdateCSK(GlobalContext& gc, LevelContext& lc) {
   auto new_csk = lc.values_parsed_ikey.user_key;
 
   gc.csk->assign(new_csk.data(), new_csk.size());
-  gc.del_list->Trim(new_csk, lc.del_list_iter.get());
+  gc.del_list->Trim(new_csk);
   lc.range_del_iter->SetUpperBound(new_csk);
 
   // Not setting the upper bound of the values-iter since it is currently
@@ -304,7 +304,7 @@ void ProcessCurrRangeTsVsDelList(GlobalContext& gc, LevelContext& lc) {
       case RelativePos::AFTER:
         gc.del_list->InsertBefore(
             *lc.del_list_iter,
-            GlobalDelList::DelElement(range_ts.start_key_, range_ts.end_key_));
+            DelElement(range_ts.start_key_, range_ts.end_key_));
         lc.range_del_iter->Next();
         break;
 
@@ -313,7 +313,7 @@ void ProcessCurrRangeTsVsDelList(GlobalContext& gc, LevelContext& lc) {
           case OverlapType::STARTS_BEFORE_ENDS_BEFORE:
             gc.del_list->ReplaceWith(
                 *lc.del_list_iter,
-                GlobalDelList::DelElement(del_elem.user_start_key,
+                DelElement(del_elem.user_start_key,
                                           range_ts.end_key_));
             lc.del_list_iter->SeekForward(range_ts.end_key_);
             break;
@@ -323,13 +323,13 @@ void ProcessCurrRangeTsVsDelList(GlobalContext& gc, LevelContext& lc) {
           case OverlapType::STARTS_AFTER_ENDS_AFTER:
             gc.del_list->ReplaceWith(
                 *lc.del_list_iter,
-                GlobalDelList::DelElement(range_ts.start_key_,
+                DelElement(range_ts.start_key_,
                                           del_elem.user_end_key));
             lc.range_del_iter->Seek(del_elem.user_end_key);
             break;
           case OverlapType::CONTAINED:
             gc.del_list->ReplaceWith(
-                *lc.del_list_iter, GlobalDelList::DelElement(
+                *lc.del_list_iter, DelElement(
                                        range_ts.start_key_, range_ts.end_key_));
             lc.del_list_iter->SeekForward(range_ts.end_key_);
             break;
@@ -346,7 +346,7 @@ void ProcessCurrRangeTsVsDelList(GlobalContext& gc, LevelContext& lc) {
     // del list exhausted
     gc.del_list->InsertBefore(
         *lc.del_list_iter,
-        GlobalDelList::DelElement(range_ts.start_key_, range_ts.end_key_));
+        DelElement(range_ts.start_key_, range_ts.end_key_));
   }
 }
 
@@ -369,7 +369,7 @@ bool ProcessCurrValuesIterVsDelList(GlobalContext& gc, LevelContext& lc) {
       } else if (lc.value_category == ValueCategory::DEL_KEY) {
         gc.del_list->InsertBefore(
             *lc.del_list_iter,
-            GlobalDelList::DelElement(lc.values_parsed_ikey.user_key));
+            DelElement(lc.values_parsed_ikey.user_key));
         lc.values_iter->Next();
       }
       break;

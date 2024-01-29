@@ -20,54 +20,12 @@
 
 #include "include/rocksdb/comparator.h"
 #include "include/rocksdb/slice.h"
+#include "db/db_impl/spdb_db_gs_utils.h"
 
 namespace ROCKSDB_NAMESPACE {
 namespace spdb_gs {
 
 class GlobalDelList {
- public:
-  struct DelElement {
-    std::string user_start_key;
-    std::string user_end_key;
-
-    // To construct a del-key
-    explicit DelElement(const std::string& _user_start_key)
-        : user_start_key(_user_start_key) {}
-
-    explicit DelElement(const Slice& _user_start_key)
-        : DelElement(_user_start_key.ToString()) {}
-
-    // To construct a del-range
-    DelElement(const std::string& _user_start_key,
-               const std::string& _user_end_key)
-        : user_start_key(_user_start_key), user_end_key(_user_end_key) {}
-
-    DelElement(const Slice& _user_start_key, const std::string& _user_end_key)
-        : DelElement(_user_start_key.ToString(), _user_end_key) {}
-
-    DelElement(const std::string& _user_start_key, const Slice& _user_end_key)
-        : DelElement(_user_start_key, _user_end_key.ToString()) {}
-
-    DelElement(const Slice& _user_start_key, const Slice& _user_end_key)
-        : DelElement(_user_start_key.ToString(), _user_end_key.ToString()) {}
-
-    bool IsRange() const { return (user_end_key.empty() == false); }
-    bool IsDelKey() const { return (IsRange() == false); }
-
-    bool operator==(const DelElement& other) const {
-      return ((user_start_key == other.user_start_key) &&
-              (user_end_key == other.user_end_key));
-    }
-
-    std::string ToString() const {
-      if (IsDelKey()) {
-        return (std::string("{") + user_start_key + "}");
-      } else {
-        return (std::string("{") + user_start_key + ", " + user_end_key + "}");
-      }
-    }
-  };
-
  public:
   GlobalDelList(const Comparator* comparator);
 
@@ -90,10 +48,13 @@ class GlobalDelList {
 
     void SeekToFirst();
 
-    // Move the iterator its current position onwards.
-    // If the iterator is not Valid() same as Seek(user_start_key)
-    // Pre-Requisite: user_start_key >= iter->Key()
-    void SeekForward(const Slice& user_start_key);
+    // Move the iterator forward, until the first del-elem that either
+    // contains or is after user_start_key (by the del-elem's start key).
+    // The del-element is searched from the current iterator's position until
+    // the end of the list.
+    //
+    // Pre-Requisite: If the iterator is Valid() => seek_start_key must be >= iter->key().user_start_key.
+    void SeekForward(const Slice& seek_start_key);
 
     void Next();
 
@@ -134,11 +95,11 @@ class GlobalDelList {
   // Pre-Requisites: The iterator must be Valid()
   void ReplaceWith(Iterator& pos, const DelElement& del_elem);
 
-  // Remove all elements > upper_bound.
-  // If start_pos is != nullptr, the list is trimmed from start_pos onwards.
-  // The assumption is that the end of the del_elem pointed by start_pos is
-  // after user_start_key.
-  void Trim(const Slice& upper_bound, Iterator* start_pos = nullptr);
+  // Remove all elements >= upper_bound (based on del-elem's start keys).
+  //
+  // If the upper_bound falls inside a del-element [start, end), then this
+  // del-element will be replaced by [start, upper_bound).
+  void Trim(const Slice& upper_bound);
 
   const Slice* GetUpperBound() const {
     return (upper_bound_.empty() == false) ? &upper_bound_ : nullptr;

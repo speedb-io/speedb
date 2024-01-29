@@ -160,7 +160,7 @@ void GlobalDelList::Iterator::SeekForward(const Slice& seek_start_key) {
         *prev_iter, seek_start_key, glbl_del_list_.comparator_);
     assert(prev_del_elem_vs_seek_key != RelativePos::AFTER);
 
-    if (prev_del_elem_vs_seek_key != RelativePos::OVERLAP) {
+    if (prev_del_elem_vs_seek_key == RelativePos::OVERLAP) {
       del_list_iter_ = prev_iter;
     }
   }

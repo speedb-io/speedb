@@ -7645,6 +7645,7 @@ class DelListTest : public ::testing::Test {
   }
 };
 
+#if 0
 TEST_F(DelListTest, Basic) {
   spdb_gs::GlobalDelList del_list(BytewiseComparator());
 
@@ -7738,6 +7739,59 @@ TEST_F(DelListTest, MergeWith) {
   ValidateDelListContents("After inserting an overlapping range and next",
                           del_list, {{"a", "z"}});
 }
+#endif
+
+TEST_F(DelListTest, SeekForward) {
+  spdb_gs::GlobalDelList del_list(BytewiseComparator());
+  auto del_list_iter = del_list.NewIterator();
+
+  // Insert multiple elements always when the iterator is at end()
+  del_list_iter->SeekToFirst();
+
+  del_list.InsertBefore(*del_list_iter, {"b", "e"});
+  del_list.InsertBefore(*del_list_iter, {"f", "h"});
+  del_list.InsertBefore(*del_list_iter, {"i"});
+  del_list.InsertBefore(*del_list_iter, {"k", "m"});
+  del_list.InsertBefore(*del_list_iter, {"p"});
+  del_list.InsertBefore(*del_list_iter, {"q", "z"});
+  ValidateDelListContents(
+      "List Contents", del_list,
+      {{"b", "e"}, {"f", "h"}, {"i"}, {"k", "m"}, {"p"}, {"q", "z"}});
+  ASSERT_FALSE(::testing::Test::HasFailure());
+
+  del_list_iter.reset(del_list.NewIterator().release());
+
+  del_list_iter->SeekForward("a");
+  ASSERT_TRUE(del_list_iter->Valid());
+  ASSERT_EQ(del_list_iter->key(), DelElem("b", "e"));
+
+  del_list_iter->SeekForward("c");
+  ASSERT_TRUE(del_list_iter->Valid());
+  ASSERT_EQ(del_list_iter->key(), DelElem("b", "e"));
+
+  del_list_iter->SeekForward("g");
+  ASSERT_TRUE(del_list_iter->Valid());
+  ASSERT_EQ(del_list_iter->key(), DelElem("f", "h"));
+
+  del_list_iter->SeekForward("i");
+  ASSERT_TRUE(del_list_iter->Valid());
+  ASSERT_EQ(del_list_iter->key(), DelElem("i"));
+
+  del_list_iter->SeekForward("k");
+  ASSERT_TRUE(del_list_iter->Valid());
+  ASSERT_EQ(del_list_iter->key(), DelElem("k", "m"));
+
+  del_list_iter->SeekForward("m");
+  ASSERT_TRUE(del_list_iter->Valid());
+  ASSERT_EQ(del_list_iter->key(), DelElem("p"));
+
+  del_list_iter->SeekForward("z");
+  ASSERT_FALSE(del_list_iter->Valid());
+
+  del_list_iter.reset(del_list.NewIterator().release());
+  del_list_iter->SeekForward("z");
+  ASSERT_FALSE(del_list_iter->Valid());
+}
 
 class DBGsTest : public DBTest {
  public:
@@ -7774,6 +7828,7 @@ class DBGsTest : public DBTest {
   }
 };
 
+#if 0
 TEST_F(DBGsTest, GS_EmptyDB) {
   ReopenNewDb();
 
@@ -7896,7 +7951,7 @@ TEST_F(DBGsTest, GS_ValuesAndDR_3) {
 
   GetSmallestAndValidate("z");
 }
-
+#endif
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {

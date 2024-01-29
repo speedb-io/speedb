@@ -14,8 +14,8 @@
 
 #pragma once
 
-// #include "db/dbformat.h"
-#include "db/db_impl/spdb_gs_del_list.h"
+#include "db/db_impl/spdb_db_gs_del_list.h"
+#include "db/dbformat.h"
 
 namespace ROCKSDB_NAMESPACE {
 // Forward Declarations
@@ -24,7 +24,28 @@ class FragmentedRangeTombstoneIterator;
 
 namespace spdb_gs {
 
+enum class ValueCategory { VALUE, MERGE_VALUE, DEL_KEY, OTHER, NONE };
+
+ValueCategory GetValueCategoryOfKey(ValueType value_type);
+
 enum class RelativePos { BEFORE, OVERLAP, AFTER };
+enum class OverlapType {
+  IDENTICAL,
+  CONTAINS,
+  CONTAINED,
+  STARTS_BEFORE_ENDS_BEFORE,
+  STARTS_AFTER_ENDS_AFTER,
+  NONE
+};
+
+struct RelativePosInfo {
+  RelativePos relative_pos;
+  OverlapType overlap_type = OverlapType::NONE;
+
+  RelativePosInfo(RelativePos _relative_pos) : relative_pos(_relative_pos) {}
+  RelativePosInfo(RelativePos _relative_pos, OverlapType _overlap_type)
+      : relative_pos(_relative_pos), overlap_type(_overlap_type) {}
+};
 
 void PrintFragmentedRangeDels(
     const std::string& title,
@@ -40,7 +61,8 @@ RelativePos CompareDelElemToUserKey(const GlobalDelList::DelElement& del_elem,
 
 RelativePos CompareDelElemToRangeTs(const GlobalDelList::DelElement& del_elem,
                                     const RangeTombstone& range_ts,
-                                    const Comparator* comparator);
+                                    const Comparator* comparator,
+                                    OverlapType* overlap_type);
 
 }  // namespace spdb_gs
 }  // namespace ROCKSDB_NAMESPACE

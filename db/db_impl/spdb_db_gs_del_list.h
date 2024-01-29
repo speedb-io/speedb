@@ -34,10 +34,22 @@ class GlobalDelList {
     explicit DelElement(const std::string& _user_start_key)
         : user_start_key(_user_start_key) {}
 
+    explicit DelElement(const Slice& _user_start_key)
+        : DelElement(_user_start_key.ToString()) {}
+
     // To construct a del-range
     DelElement(const std::string& _user_start_key,
                const std::string& _user_end_key)
         : user_start_key(_user_start_key), user_end_key(_user_end_key) {}
+
+    DelElement(const Slice& _user_start_key, const std::string& _user_end_key)
+        : DelElement(_user_start_key.ToString(), _user_end_key) {}
+
+    DelElement(const std::string& _user_start_key, const Slice& _user_end_key)
+        : DelElement(_user_start_key, _user_end_key.ToString()) {}
+
+    DelElement(const Slice& _user_start_key, const Slice& _user_end_key)
+        : DelElement(_user_start_key.ToString(), _user_end_key.ToString()) {}
 
     bool IsRange() const { return (user_end_key.empty() == false); }
     bool IsDelKey() const { return (IsRange() == false); }
@@ -77,7 +89,11 @@ class GlobalDelList {
     bool Valid() const;
 
     void SeekToFirst();
-    void Seek(const Slice& user_start_key);
+
+    // Move the iterator its current position onwards.
+    // If the iterator is not Valid() same as Seek(user_start_key)
+    // Pre-Requisite: user_start_key >= iter->Key()
+    void SeekForward(const Slice& user_start_key);
 
     void Next();
 
@@ -96,7 +112,7 @@ class GlobalDelList {
 
   std::unique_ptr<Iterator> NewIterator();
 
-  // Insert del_elem into the list before pos.
+  // Insert del_elem into the list BEFORE pos.
   // It is assumed (and not validated) that del_elem is inserted in-order:
   // del_elem must precede the pointed element. Otherwise, the del-list will
   // be corrupt, violating its assumptions.
@@ -113,11 +129,20 @@ class GlobalDelList {
   // Pre-Requisites: The iterator must be Valid()
   void MergeWith(Iterator& pos, const DelElement& del_elem);
 
-  // Remove all elements > user_start_key.
+  // Replace the element pointed to by pos by del_elem.
+  //
+  // Pre-Requisites: The iterator must be Valid()
+  void ReplaceWith(Iterator& pos, const DelElement& del_elem);
+
+  // Remove all elements > upper_bound.
   // If start_pos is != nullptr, the list is trimmed from start_pos onwards.
   // The assumption is that the end of the del_elem pointed by start_pos is
   // after user_start_key.
-  void TrimList(const Slice& user_start_key, Iterator* start_pos = nullptr);
+  void Trim(const Slice& upper_bound, Iterator* start_pos = nullptr);
+
+  const Slice* GetUpperBound() const {
+    return (upper_bound_.empty() == false) ? &upper_bound_ : nullptr;
+  }
 
   std::string ToString() const;
 
@@ -126,8 +151,9 @@ class GlobalDelList {
                          const DelElement& del_elem);
 
  private:
-  const Comparator* comparator_ = nullptr;
   std::list<DelElement> del_list_;
+  const Comparator* comparator_ = nullptr;
+  Slice upper_bound_;
 };
 
 }  // namespace spdb_gs

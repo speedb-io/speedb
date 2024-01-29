@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "db/db_impl/spdb_gs_del_list.h"
+#include "db/db_impl/spdb_db_gs_del_list.h"
 
 namespace ROCKSDB_NAMESPACE {
 namespace spdb_gs {
@@ -91,10 +91,6 @@ bool GlobalDelList::Iterator::Valid() const {
 
 void GlobalDelList::Iterator::SeekToFirst() {
   del_list_iter_ = glbl_del_list_.del_list_.begin();
-}
-
-void GlobalDelList::Iterator::Seek(const Slice& /* user_start_key */) {
-  assert(0);
 }
 
 void GlobalDelList::Iterator::Next() {

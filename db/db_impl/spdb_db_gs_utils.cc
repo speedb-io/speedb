@@ -33,6 +33,26 @@ void PrintFragmentedRangeDels(
   }
 }
 
+ValueCategory GetValueCategoryOfKey(ValueType value_type) {
+  switch (value_type) {
+    case kTypeValue:
+      return ValueCategory::VALUE;
+
+    case kTypeMerge:
+      return ValueCategory::MERGE_VALUE;
+
+    case kTypeDeletion:
+      [[fallthrough]];
+    case kTypeSingleDeletion:
+      [[fallthrough]];
+    case kTypeDeletionWithTimestamp:
+      return ValueCategory::DEL_KEY;
+
+    default:
+      return ValueCategory::OTHER;
+  }
+}
+
 namespace {
 RelativePos ComparisonResultToRelativePos(int comparison_result) {
   if (comparison_result < 0) {
@@ -108,12 +128,20 @@ RelativePos CompareDelElemToUserKey(const GlobalDelList::DelElement& del_elem,
 
 RelativePos CompareDelElemToRangeTs(const GlobalDelList::DelElement& del_elem,
                                     const RangeTombstone& range_ts,
-                                    const Comparator* comparator) {
+                                    const Comparator* comparator,
+                                    OverlapType* overlap_type) {
+  if (overlap_type != nullptr) {
+    *overlap_type = OverlapType::NONE;
+  }
+
   if (del_elem.IsDelKey()) {
     // Comparing a range to a del-key in the del-list
     int range_ts_vs_del_key = CompareRangeTsToUserKeyInt(
         range_ts, del_elem.user_start_key, comparator);
-    return ComparisonResultToRelativePos(-1 * range_ts_vs_del_key);
+    auto relative_pos = ComparisonResultToRelativePos(-1 * range_ts_vs_del_key);
+    if ((overlap_type != nullptr) && (relative_pos == RelativePos::OVERLAP)) {
+      *overlap_type = OverlapType::CONTAINED;
+    }
   }
 
   int range_ts_start_vs_del_elem_end =
@@ -126,6 +154,29 @@ RelativePos CompareDelElemToRangeTs(const GlobalDelList::DelElement& del_elem,
       comparator->Compare(del_elem.user_start_key, range_ts.end_key_);
   if (del_elem_start_vs_range_ts_end >= 0) {
     return RelativePos::AFTER;
+  }
+
+  if (overlap_type != nullptr) {
+    int range_ts_start_vs_del_elem_start =
+        comparator->Compare(range_ts.start_key_, del_elem.user_start_key);
+
+    int range_ts_end_vs_del_elem_end =
+        comparator->Compare(range_ts.start_key_, del_elem.user_start_key);
+
+    if (range_ts_start_vs_del_elem_start < 0) {
+      if (range_ts_end_vs_del_elem_end > 0) {
+        *overlap_type = OverlapType::CONTAINED;
+      } else {
+        *overlap_type = OverlapType::STARTS_AFTER_ENDS_AFTER;
+      }
+    } else {
+      if (range_ts_end_vs_del_elem_end <= 0) {
+        // Contains may be identical. Not differentiating
+        *overlap_type = OverlapType::CONTAINS;
+      } else {
+        *overlap_type = OverlapType::STARTS_BEFORE_ENDS_BEFORE;
+      }
+    }
   }
 
   return RelativePos::OVERLAP;

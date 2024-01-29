@@ -16,6 +16,7 @@ Based on RocksDB 8.6.7
 * LOG Enhancement: Have a separate LOG entry per CF Stats. This ensures that no CF stats data is lost in case the size of the combined CF stats text exceeds the LOG's threshold (#534).
 
 ### Bug Fixes
+* Fix a bug in db_stress where non existence parameters have checked with enable_speedb_features.
 * Added IsRefreshIterSupported() to memtable_rep, to publish if the memtable support Refresh() of the iterator.
 Refresh() will return status NotSupported for memtables that do not support Refresh().
 IsAllowRefresh() has been added.

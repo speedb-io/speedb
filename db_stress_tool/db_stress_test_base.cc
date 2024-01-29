@@ -147,19 +147,21 @@ bool is_default(const char* flag_name) {
 }
 
 void ValidateEnableSpeedbFlags() {
-  std::vector<std::string> confilct_flags = {
-      "num_high_pri_threads", "num_bottom_pri_threads",
-      "num_bottom_pri_threads", "num_low_pri_threads",
-      "max_background_compactions", "max_background_flushes", "cache_size",
-      "cache_type",
-      // Assume simcache_size default is disabled simcache
-      "simcache_size", "memtablerep", "pinning_policy",
-      "scoped_pinning_capacity", "use_ribbon_filter", "bloom_bits",
-      "allow_wbm_stalls", "db_write_buffer_size", "initiate_wbm_flushes",
-      "bytes_per_sync", "use_dynamic_delay", "memtable_bloom_size_ratio",
-      "whole_key_filtering", "optimize_filters_for_hits",
-      "max_num_parallel_flushes", "start_delay_percent",
-      "max_num_parallel_flushes", "use_blob_cache"};
+  std::vector<std::string> confilct_flags = {"max_background_compactions",
+                                             "max_background_flushes",
+                                             "cache_size",
+                                             "cache_type",
+                                             "memtablerep",
+                                             "pinning_policy",
+                                             "bloom_bits",
+                                             "allow_wbm_stalls",
+                                             "db_write_buffer_size",
+                                             "initiate_wbm_flushes",
+                                             "bytes_per_sync",
+                                             "use_dynamic_delay",
+                                             "start_delay_percent",
+                                             "max_num_parallel_flushes",
+                                             "use_blob_cache"};
 
   if (FLAGS_enable_speedb_features && !FLAGS_crash_test) {
     if (is_default("max_background_jobs") || is_default("total_ram_size")) {

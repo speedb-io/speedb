@@ -462,9 +462,9 @@ class DBImpl : public DB {
 
   // flush initiated by the write buffer manager to free some space
   bool InitiateMemoryManagerFlushRequest(size_t min_size_to_flush);
-  bool InitiateMemoryManagerFlushRequestAtomicFlush(
+  size_t InitiateMemoryManagerFlushRequestAtomicFlush(
       size_t min_size_to_flush, const FlushOptions& flush_options);
-  bool InitiateMemoryManagerFlushRequestNonAtomicFlush(
+  size_t InitiateMemoryManagerFlushRequestNonAtomicFlush(
       size_t min_size_to_flush, const FlushOptions& flush_options);
 
   virtual SequenceNumber GetLatestSequenceNumber() const override;
@@ -1995,7 +1995,8 @@ class DBImpl : public DB {
   // Force current memtable contents to be flushed.
   Status FlushMemTable(ColumnFamilyData* cfd, const FlushOptions& options,
                        FlushReason flush_reason,
-                       bool entered_write_thread = false);
+                       bool entered_write_thread = false,
+                       size_t* num_flushes_initiated = nullptr);
 
   // Atomic-flush memtables from quanlified CFs among `provided_candidate_cfds`
   // (if non-empty) or amomg all column families and atomically record the
@@ -2003,7 +2004,8 @@ class DBImpl : public DB {
   Status AtomicFlushMemTables(
       const FlushOptions& options, FlushReason flush_reason,
       const autovector<ColumnFamilyData*>& provided_candidate_cfds = {},
-      bool entered_write_thread = false);
+      bool entered_write_thread = false,
+      size_t* num_flushes_initiated = nullptr);
 
   // Wait until flushing this column family won't stall writes
   Status WaitUntilFlushWouldNotStallWrites(ColumnFamilyData* cfd,
@@ -2156,7 +2158,7 @@ class DBImpl : public DB {
   void GenerateFlushRequest(const autovector<ColumnFamilyData*>& cfds,
                             FlushReason flush_reason, FlushRequest* req);
 
-  void SchedulePendingFlush(const FlushRequest& req);
+  bool SchedulePendingFlush(const FlushRequest& req);
 
   void SchedulePendingCompaction(ColumnFamilyData* cfd);
   void SchedulePendingPurge(std::string fname, std::string dir_to_sync,

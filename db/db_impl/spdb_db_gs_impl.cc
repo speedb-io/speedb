@@ -35,11 +35,14 @@ class InternalIteratorWrapper : public Iterator {
       : wrapped_iter_ptr_(std::move(wrapped_iter_ptr)),
         comparator_(comparator),
         upper_bound_(upper_bound) {
-    assert(wrapped_iter_ptr);
+    assert(wrapped_iter_ptr_);
     assert(comparator != nullptr);
   }
 
-  ~InternalIteratorWrapper() { wrapped_iter_ptr_.get()->~InternalIterator(); }
+  ~InternalIteratorWrapper() {
+    wrapped_iter_ptr_.get()->~InternalIterator();
+    wrapped_iter_ptr_.release();
+  }
 
   bool Valid() const override { return valid_; }
 
@@ -287,11 +290,12 @@ void ProcessCurrRangeTsVsDelList(GlobalContext& gc, LevelContext& lc) {
   assert(lc.range_del_iter->Valid());
 
   auto range_ts = lc.range_del_iter->Tombstone();
-  auto& del_elem = lc.del_list_iter->key();
 
   // values iter is Invalid, DR Iter is valid => Add to global del-list and
   // complete level processing
   if (lc.del_list_iter->Valid()) {
+    auto& del_elem = lc.del_list_iter->key();
+
     auto overlap_type = OverlapType::NONE;
     auto del_list_vs_range_ts = CompareDelElemToRangeTs(
         lc.del_list_iter->key(), range_ts, gc.comparator, &overlap_type);
@@ -313,8 +317,7 @@ void ProcessCurrRangeTsVsDelList(GlobalContext& gc, LevelContext& lc) {
           case OverlapType::STARTS_BEFORE_ENDS_BEFORE:
             gc.del_list->ReplaceWith(
                 *lc.del_list_iter,
-                DelElement(del_elem.user_start_key,
-                                          range_ts.end_key_));
+                DelElement(del_elem.user_start_key, range_ts.end_key_));
             lc.del_list_iter->SeekForward(range_ts.end_key_);
             break;
           case OverlapType::CONTAINS:
@@ -323,14 +326,13 @@ void ProcessCurrRangeTsVsDelList(GlobalContext& gc, LevelContext& lc) {
           case OverlapType::STARTS_AFTER_ENDS_AFTER:
             gc.del_list->ReplaceWith(
                 *lc.del_list_iter,
-                DelElement(range_ts.start_key_,
-                                          del_elem.user_end_key));
+                DelElement(range_ts.start_key_, del_elem.user_end_key));
             lc.range_del_iter->Seek(del_elem.user_end_key);
             break;
           case OverlapType::CONTAINED:
             gc.del_list->ReplaceWith(
-                *lc.del_list_iter, DelElement(
-                                       range_ts.start_key_, range_ts.end_key_));
+                *lc.del_list_iter,
+                DelElement(range_ts.start_key_, range_ts.end_key_));
             lc.del_list_iter->SeekForward(range_ts.end_key_);
             break;
           default:
@@ -345,14 +347,18 @@ void ProcessCurrRangeTsVsDelList(GlobalContext& gc, LevelContext& lc) {
   } else {
     // del list exhausted
     gc.del_list->InsertBefore(
-        *lc.del_list_iter,
-        DelElement(range_ts.start_key_, range_ts.end_key_));
+        *lc.del_list_iter, DelElement(range_ts.start_key_, range_ts.end_key_));
+    lc.range_del_iter->Next();
   }
 }
 
 bool ProcessCurrValuesIterVsDelList(GlobalContext& gc, LevelContext& lc) {
-  auto del_list_vs_values_iter_key = CompareDelElemToUserKey(
-      lc.del_list_iter->key(), lc.values_parsed_ikey.user_key, gc.comparator);
+  auto del_list_vs_values_iter_key = RelativePos::AFTER;
+
+  if (lc.del_list_iter->Valid()) {
+    del_list_vs_values_iter_key = CompareDelElemToUserKey(
+        lc.del_list_iter->key(), lc.values_parsed_ikey.user_key, gc.comparator);
+  }
 
   bool was_new_csk_found = false;
 
@@ -367,9 +373,8 @@ bool ProcessCurrValuesIterVsDelList(GlobalContext& gc, LevelContext& lc) {
         UpdateCSK(gc, lc);
         was_new_csk_found = true;
       } else if (lc.value_category == ValueCategory::DEL_KEY) {
-        gc.del_list->InsertBefore(
-            *lc.del_list_iter,
-            DelElement(lc.values_parsed_ikey.user_key));
+        gc.del_list->InsertBefore(*lc.del_list_iter,
+                                  DelElement(lc.values_parsed_ikey.user_key));
         lc.values_iter->Next();
       }
       break;
@@ -495,7 +500,6 @@ Status ProcessMutableMemtable(SuperVersion* super_version, GlobalContext& gc) {
 
 }  // unnamed namespace
 }  // namespace spdb_gs
-
 
 Status DBImpl::GetSmallest(const ReadOptions& read_options,
                            ColumnFamilyHandle* column_family, std::string* key,

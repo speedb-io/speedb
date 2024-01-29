@@ -18,9 +18,9 @@
 #include <memory>
 #include <string>
 
+#include "db/db_impl/spdb_db_gs_utils.h"
 #include "include/rocksdb/comparator.h"
 #include "include/rocksdb/slice.h"
-#include "db/db_impl/spdb_db_gs_utils.h"
 
 namespace ROCKSDB_NAMESPACE {
 namespace spdb_gs {
@@ -53,7 +53,8 @@ class GlobalDelList {
     // The del-element is searched from the current iterator's position until
     // the end of the list.
     //
-    // Pre-Requisite: If the iterator is Valid() => seek_start_key must be >= iter->key().user_start_key.
+    // Pre-Requisite: If the iterator is Valid() => seek_start_key must be >=
+    // iter->key().user_start_key.
     void SeekForward(const Slice& seek_start_key);
 
     void Next();

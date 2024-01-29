@@ -73,9 +73,11 @@ struct DelElement {
             (user_end_key == other.user_end_key));
   }
 
-  static bool LessThan(const DelElement& first, const DelElement& second, const Comparator* comparator) {
+  static bool LessThan(const DelElement& first, const DelElement& second,
+                       const Comparator* comparator) {
     // Ordering based only on the start key
-    return (comparator->Compare(first.user_start_key, second.user_start_key) < 0);
+    return (comparator->Compare(first.user_start_key, second.user_start_key) <
+            0);
   }
 
   std::string ToString() const {

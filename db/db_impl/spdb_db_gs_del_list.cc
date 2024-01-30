@@ -86,7 +86,10 @@ void GlobalDelList::Trim(const Slice& upper_bound) {
   if (containing_start_vs_upper_bound < 0) {
     ReplaceWith(trim_iter,
                 DelElement(containing_del_elem.user_start_key, upper_bound));
+    trim_iter.Next();
   }
+
+  del_list_.erase(trim_iter.del_list_iter_, del_list_.end());
 }
 
 std::string GlobalDelList::ToString() const {

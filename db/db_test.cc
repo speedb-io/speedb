@@ -87,6 +87,11 @@
 #include "util/rate_limiter_impl.h"
 #include "util/string_util.h"
 #include "utilities/merge_operators.h"
+
+#define CALL_WRAPPER(func) \
+  func;                    \
+  ASSERT_FALSE(HasFailure());
+
 namespace ROCKSDB_NAMESPACE {
 
 // Note that whole DBTest and its child classes disable fsync on files
@@ -7620,9 +7625,9 @@ using DelElem = spdb_gs::DelElement;
 
 class DelListTest : public ::testing::Test {
  public:
-  void ValidateDelListContents([[maybe_unused]] std::string title,
-                               spdb_gs::GlobalDelList& del_list,
-                               const std::vector<DelElem>& expected_contents) {
+  void ValidateDelListContents(spdb_gs::GlobalDelList& del_list,
+                               const std::vector<DelElem>& expected_contents,
+                               [[maybe_unused]] std::string title = "") {
     // std::cout << title << '\n';
     // std::cout << del_list.ToString() << '\n';
 
@@ -7645,7 +7650,6 @@ class DelListTest : public ::testing::Test {
   }
 };
 
-#if 0
 TEST_F(DelListTest, Basic) {
   spdb_gs::GlobalDelList del_list(BytewiseComparator());
 
@@ -7669,10 +7673,10 @@ TEST_F(DelListTest, Insert) {
   del_list_iter->SeekToFirst();
 
   del_list.InsertBefore(*del_list_iter, del_elem1);
-  ValidateDelListContents("After del_elem1", del_list, {del_elem1});
+  CALL_WRAPPER(ValidateDelListContents(del_list, {del_elem1}));
 
   del_list.InsertBefore(*del_list_iter, del_elem3);
-  ValidateDelListContents("After del_elem2", del_list, {del_elem1, del_elem3});
+  CALL_WRAPPER(ValidateDelListContents(del_list, {del_elem1, del_elem3}));
 
   del_list_iter = std::move(del_list.NewIterator());
   del_list_iter->SeekToFirst();
@@ -7680,51 +7684,45 @@ TEST_F(DelListTest, Insert) {
   ASSERT_EQ(del_list_iter->key(), del_elem3);
 
   del_list.InsertBefore(*del_list_iter, del_elem2);
-  ValidateDelListContents("After del_elem1", del_list,
-                          {del_elem1, del_elem2, del_elem3});
+  CALL_WRAPPER(
+      ValidateDelListContents(del_list, {del_elem1, del_elem2, del_elem3}));
 
   ASSERT_TRUE(del_list_iter->Valid());
   del_list_iter->Next();
   ASSERT_FALSE(del_list_iter->Valid());
 
   del_list.InsertBefore(*del_list_iter, del_elem4);
-  ValidateDelListContents("After del_elem4", del_list,
-                          {del_elem1, del_elem2, del_elem3, del_elem4});
+  CALL_WRAPPER(ValidateDelListContents(
+      del_list, {del_elem1, del_elem2, del_elem3, del_elem4}));
 }
 
 TEST_F(DelListTest, MergeWith) {
   spdb_gs::GlobalDelList del_list(BytewiseComparator());
   auto del_list_iter = del_list.NewIterator();
 
-  DelElem del_elem1{"j", "z"};
-  DelElem del_elem2{"h", "m"};
-
   del_list_iter->SeekToFirst();
-  del_list.InsertBefore(*del_list_iter, del_elem1);
-  ValidateDelListContents("After del_elem1", del_list, {del_elem1});
+  del_list.InsertBefore(*del_list_iter, {"j", "z"});
+  CALL_WRAPPER(ValidateDelListContents(del_list, {{"j", "z"}}));
 
   del_list_iter->SeekToFirst();
 
   // Merge {"h", "m"} with {"j", "z"}, expecting {"h", "z"}
-  del_list.MergeWith(*del_list_iter, del_elem2);
-  ValidateDelListContents("After del_elem2", del_list, {{"h", "z"}});
+  del_list.MergeWith(*del_list_iter, {"h", "m"});
+  CALL_WRAPPER(ValidateDelListContents(del_list, {{"h", "z"}}));
 
   // Merge {"h", "z"} with itself => remains unchanged
   del_list.MergeWith(*del_list_iter, {"h", "z"});
-  ValidateDelListContents("After merge with itself {'h', 'z'}", del_list,
-                          {{"h", "z"}});
+  CALL_WRAPPER(ValidateDelListContents(del_list, {{"h", "z"}}));
 
   // Merge {"h", "z"} with an overlapping deletion-key => remains unchanged
   del_list.MergeWith(*del_list_iter, {"t", ""});
-  ValidateDelListContents("After merge with overlapping DK 'b'", del_list,
-                          {{"h", "z"}});
+  CALL_WRAPPER(ValidateDelListContents(del_list, {{"h", "z"}}));
 
   // Restart the iterator
   del_list_iter->SeekToFirst();
   ASSERT_EQ(del_list_iter->key(), DelElem("h", "z"));
   del_list.InsertBefore(*del_list_iter, DelElem("a", "c"));
-  ValidateDelListContents("After inserting {'a', 'c'} as first range", del_list,
-                          {{"a", "c"}, {"h", "z"}});
+  CALL_WRAPPER(ValidateDelListContents(del_list, {{"a", "c"}, {"h", "z"}}));
 
   del_list_iter->SeekToFirst();
   ASSERT_EQ(del_list_iter->key(), DelElem("a", "c"));
@@ -7736,17 +7734,16 @@ TEST_F(DelListTest, MergeWith) {
   // and remain with a single {'a', 'z'} range
   del_list_iter->Next();
 
-  ValidateDelListContents("After inserting an overlapping range and next",
-                          del_list, {{"a", "z"}});
+  CALL_WRAPPER(ValidateDelListContents(del_list, {{"a", "z"}}));
 }
-#endif
 
 TEST_F(DelListTest, SeekForward) {
   spdb_gs::GlobalDelList del_list(BytewiseComparator());
-  auto del_list_iter = del_list.NewIterator();
 
-  // Insert multiple elements always when the iterator is at end()
+  auto del_list_iter = del_list.NewIterator();
   del_list_iter->SeekToFirst();
+  del_list_iter->SeekForward("a");
+  ASSERT_FALSE(del_list_iter->Valid());
 
   del_list.InsertBefore(*del_list_iter, {"b", "e"});
   del_list.InsertBefore(*del_list_iter, {"f", "h"});
@@ -7754,10 +7751,9 @@ TEST_F(DelListTest, SeekForward) {
   del_list.InsertBefore(*del_list_iter, {"k", "m"});
   del_list.InsertBefore(*del_list_iter, {"p"});
   del_list.InsertBefore(*del_list_iter, {"q", "z"});
-  ValidateDelListContents(
-      "List Contents", del_list,
-      {{"b", "e"}, {"f", "h"}, {"i"}, {"k", "m"}, {"p"}, {"q", "z"}});
-  ASSERT_FALSE(::testing::Test::HasFailure());
+  CALL_WRAPPER(ValidateDelListContents(
+      del_list,
+      {{"b", "e"}, {"f", "h"}, {"i"}, {"k", "m"}, {"p"}, {"q", "z"}}));
 
   del_list_iter.reset(del_list.NewIterator().release());
 
@@ -7791,6 +7787,61 @@ TEST_F(DelListTest, SeekForward) {
   del_list_iter.reset(del_list.NewIterator().release());
   del_list_iter->SeekForward("z");
   ASSERT_FALSE(del_list_iter->Valid());
+}
+
+TEST_F(DelListTest, Trim) {
+  spdb_gs::GlobalDelList del_list(BytewiseComparator());
+
+  CALL_WRAPPER(ValidateDelListContents(del_list, {}));
+
+  del_list.Trim("a");
+  CALL_WRAPPER(ValidateDelListContents(del_list, {}));
+
+  auto del_list_iter = del_list.NewIterator();
+  del_list_iter->SeekToFirst();
+  del_list.InsertBefore(*del_list_iter, {"b", "e"});
+  CALL_WRAPPER(ValidateDelListContents(del_list, {{"b", "e"}}));
+
+  del_list.Trim("a");
+  CALL_WRAPPER(ValidateDelListContents(del_list, {}));
+
+  del_list_iter->SeekToFirst();
+  del_list.InsertBefore(*del_list_iter, {"b", "e"});
+  CALL_WRAPPER(ValidateDelListContents(del_list, {{"b", "e"}}));
+
+  del_list.Trim("e");
+  CALL_WRAPPER(ValidateDelListContents(del_list, {{"b", "e"}}));
+
+  del_list.Trim("d");
+  CALL_WRAPPER(ValidateDelListContents(del_list, {{"b", "d"}}));
+
+  del_list.Trim("b");
+  CALL_WRAPPER(ValidateDelListContents(del_list, {}));
+
+  del_list_iter->SeekToFirst();
+  del_list.InsertBefore(*del_list_iter, {"b", "e"});
+  del_list.InsertBefore(*del_list_iter, {"f", "h"});
+  del_list.InsertBefore(*del_list_iter, {"i"});
+  del_list.InsertBefore(*del_list_iter, {"k", "m"});
+  del_list.InsertBefore(*del_list_iter, {"p"});
+  del_list.InsertBefore(*del_list_iter, {"q", "z"});
+  CALL_WRAPPER(ValidateDelListContents(
+      del_list,
+      {{"b", "e"}, {"f", "h"}, {"i"}, {"k", "m"}, {"p"}, {"q", "z"}}));
+
+  del_list.Trim("n");
+  CALL_WRAPPER(ValidateDelListContents(
+      del_list, {{"b", "e"}, {"f", "h"}, {"i"}, {"k", "m"}}));
+
+  del_list.Trim("l");
+  CALL_WRAPPER(ValidateDelListContents(
+      del_list, {{"b", "e"}, {"f", "h"}, {"i"}, {"k", "l"}}));
+
+  del_list.Trim("i");
+  CALL_WRAPPER(ValidateDelListContents(del_list, {{"b", "e"}, {"f", "h"}}));
+
+  del_list.Trim("b");
+  CALL_WRAPPER(ValidateDelListContents(del_list, {}));
 }
 
 class DBGsTest : public DBTest {
@@ -7828,7 +7879,6 @@ class DBGsTest : public DBTest {
   }
 };
 
-#if 0
 TEST_F(DBGsTest, GS_EmptyDB) {
   ReopenNewDb();
 
@@ -7951,7 +8001,6 @@ TEST_F(DBGsTest, GS_ValuesAndDR_3) {
 
   GetSmallestAndValidate("z");
 }
-#endif
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {

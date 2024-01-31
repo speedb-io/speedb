@@ -80,6 +80,17 @@ struct DelElement {
             0);
   }
 
+  Slice RangeEnd() const { return (IsRange() ? user_end_key : user_start_key); }
+
+  bool IsWithinUpperBound(const Slice& upper_bound,
+                          const Comparator* comparator) const {
+    if (upper_bound.empty() == false) {
+      return (comparator->Compare(RangeEnd(), upper_bound) <= 0);
+    } else {
+      return true;
+    }
+  }
+
   std::string ToString() const {
     if (IsDelKey()) {
       return (std::string("{") + user_start_key + "}");

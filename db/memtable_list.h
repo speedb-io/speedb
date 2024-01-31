@@ -8,6 +8,7 @@
 #include <deque>
 #include <limits>
 #include <list>
+#include <memory>
 #include <set>
 #include <string>
 #include <vector>
@@ -118,6 +119,13 @@ class MemTableListVersion {
   void AddIterators(const ReadOptions& options,
                     MergeIteratorBuilder* merge_iter_builder,
                     bool add_range_tombstone_iter);
+
+  struct IteratorPair {
+    std::unique_ptr<InternalIterator> memtbl_iter;
+    std::unique_ptr<FragmentedRangeTombstoneIterator> range_ts_iter;
+  };
+  std::vector<IteratorPair> GetIterators(const ReadOptions& options,
+                                         Arena* arena);
 
   uint64_t GetTotalNumEntries() const;
 

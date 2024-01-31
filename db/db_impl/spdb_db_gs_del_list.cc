@@ -31,15 +31,18 @@ std::unique_ptr<GlobalDelList::Iterator> GlobalDelList::NewIterator() {
 
 void GlobalDelList::InsertBefore(Iterator& pos, const DelElement& del_elem) {
   del_list_.insert(pos.del_list_iter_, del_elem);
+  assert(Valid());
 }
 
 void GlobalDelList::MergeWith(Iterator& pos, const DelElement& del_elem) {
   MergeWithInternal(pos.del_list_iter_, del_elem);
+  assert(Valid());
 }
 
 void GlobalDelList::MergeWithInternal(std::list<DelElement>::iterator pos,
                                       const DelElement& del_elem) {
   assert(pos != del_list_.end());
+  assert(del_elem.IsWithinUpperBound(upper_bound_, comparator_));
 
   if (pos->IsDelKey()) {
     // If both are del-keys, nothing to do
@@ -61,6 +64,7 @@ void GlobalDelList::MergeWithInternal(std::list<DelElement>::iterator pos,
     pos->user_end_key = std::max<std::string>(
         pos->user_end_key, del_elem.user_end_key, MinMaxCompare);
   }
+  assert(Valid());
 }
 
 // Replace the element pointed to by pos by del_elem.
@@ -76,6 +80,8 @@ void GlobalDelList::Trim(const Slice& upper_bound) {
   trim_iter.SeekForward(upper_bound);
 
   if (trim_iter.Valid() == false) {
+    upper_bound_ = upper_bound;
+    assert(Valid());
     return;
   }
 
@@ -90,6 +96,18 @@ void GlobalDelList::Trim(const Slice& upper_bound) {
   }
 
   del_list_.erase(trim_iter.del_list_iter_, del_list_.end());
+
+  upper_bound_ = upper_bound;
+  assert(Valid());
+}
+
+bool GlobalDelList::Valid() const {
+  if (del_list_.empty() || upper_bound_.empty()) {
+    return true;
+  }
+
+  const Slice& last_del_elem_range_end = del_list_.back().RangeEnd();
+  return (comparator_->Compare(last_del_elem_range_end, upper_bound_) <= 0);
 }
 
 std::string GlobalDelList::ToString() const {

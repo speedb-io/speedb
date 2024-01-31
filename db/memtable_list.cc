@@ -24,7 +24,6 @@
 #include <limits>
 #include <queue>
 #include <string>
-
 #include "db/db_impl/db_impl.h"
 #include "db/memtable.h"
 #include "db/range_tombstone_fragmenter.h"
@@ -260,6 +259,43 @@ void MemTableListVersion::AddIterators(const ReadOptions& options,
                                                        mem_tombstone_iter);
     }
   }
+}
+
+std::vector<MemTableListVersion::IteratorPair>
+MemTableListVersion::GetIterators(const ReadOptions& read_options,
+                                  Arena* arena) {
+  if (memlist_.empty()) {
+    return {};
+  }
+
+  // TODO - The number of immutable memtables is known => the size of the vector
+  // is known here - use that or switch to autovector
+  std::vector<IteratorPair> iters(memlist_.size());
+
+  // Except for snapshot read, using kMaxSequenceNumber is OK because these
+  // are immutable memtables.
+  SequenceNumber read_seq = read_options.snapshot != nullptr
+                                ? read_options.snapshot->GetSequenceNumber()
+                                : kMaxSequenceNumber;
+
+  auto i = 0U;
+  for (auto& m : memlist_) {
+    auto mem_iter = m->NewIterator(read_options, arena);
+    FragmentedRangeTombstoneIterator* range_ts_iter = nullptr;
+
+    if (read_options.ignore_range_deletions == false) {
+      // Except for snapshot read, using kMaxSequenceNumber is OK because these
+      // are immutable memtables.
+      range_ts_iter = m->NewRangeTombstoneIterator(
+          read_options, read_seq, true /* immutale_memtable */);
+    }
+    iters[i] = {std::move(std::unique_ptr<InternalIterator>(mem_iter)),
+                std::move(std::unique_ptr<FragmentedRangeTombstoneIterator>(
+                    range_ts_iter))};
+    ++i;
+  }
+
+  return iters;
 }
 
 uint64_t MemTableListVersion::GetTotalNumEntries() const {

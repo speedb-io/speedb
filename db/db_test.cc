@@ -7790,58 +7790,72 @@ TEST_F(DelListTest, SeekForward) {
 }
 
 TEST_F(DelListTest, Trim) {
-  spdb_gs::GlobalDelList del_list(BytewiseComparator());
+  // Recreating the list after trimming since trimming sets the upper bound of
+  // the del-list => illegal to insert del-elems not within the upper-bound
 
-  CALL_WRAPPER(ValidateDelListContents(del_list, {}));
+  auto del_list =
+      std::make_unique<spdb_gs::GlobalDelList>(BytewiseComparator());
+  CALL_WRAPPER(ValidateDelListContents(*del_list, {}));
 
-  del_list.Trim("a");
-  CALL_WRAPPER(ValidateDelListContents(del_list, {}));
+  del_list->Trim("a");
+  CALL_WRAPPER(ValidateDelListContents(*del_list, {}));
 
-  auto del_list_iter = del_list.NewIterator();
-  del_list_iter->SeekToFirst();
-  del_list.InsertBefore(*del_list_iter, {"b", "e"});
-  CALL_WRAPPER(ValidateDelListContents(del_list, {{"b", "e"}}));
-
-  del_list.Trim("a");
-  CALL_WRAPPER(ValidateDelListContents(del_list, {}));
-
-  del_list_iter->SeekToFirst();
-  del_list.InsertBefore(*del_list_iter, {"b", "e"});
-  CALL_WRAPPER(ValidateDelListContents(del_list, {{"b", "e"}}));
-
-  del_list.Trim("e");
-  CALL_WRAPPER(ValidateDelListContents(del_list, {{"b", "e"}}));
-
-  del_list.Trim("d");
-  CALL_WRAPPER(ValidateDelListContents(del_list, {{"b", "d"}}));
-
-  del_list.Trim("b");
-  CALL_WRAPPER(ValidateDelListContents(del_list, {}));
+  // =====================================================
+  del_list.reset(new spdb_gs::GlobalDelList(BytewiseComparator()));
+  auto del_list_iter = del_list->NewIterator();
 
   del_list_iter->SeekToFirst();
-  del_list.InsertBefore(*del_list_iter, {"b", "e"});
-  del_list.InsertBefore(*del_list_iter, {"f", "h"});
-  del_list.InsertBefore(*del_list_iter, {"i"});
-  del_list.InsertBefore(*del_list_iter, {"k", "m"});
-  del_list.InsertBefore(*del_list_iter, {"p"});
-  del_list.InsertBefore(*del_list_iter, {"q", "z"});
+  del_list->InsertBefore(*del_list_iter, {"b", "e"});
+  CALL_WRAPPER(ValidateDelListContents(*del_list, {{"b", "e"}}));
+
+  del_list->Trim("a");
+  CALL_WRAPPER(ValidateDelListContents(*del_list, {}));
+
+  // =====================================================
+  del_list.reset(new spdb_gs::GlobalDelList(BytewiseComparator()));
+  del_list_iter = del_list->NewIterator();
+
+  del_list_iter->SeekToFirst();
+  del_list->InsertBefore(*del_list_iter, {"b", "e"});
+  CALL_WRAPPER(ValidateDelListContents(*del_list, {{"b", "e"}}));
+
+  del_list->Trim("e");
+  CALL_WRAPPER(ValidateDelListContents(*del_list, {{"b", "e"}}));
+
+  del_list->Trim("d");
+  CALL_WRAPPER(ValidateDelListContents(*del_list, {{"b", "d"}}));
+
+  del_list->Trim("b");
+  CALL_WRAPPER(ValidateDelListContents(*del_list, {}));
+
+  // =====================================================
+  del_list.reset(new spdb_gs::GlobalDelList(BytewiseComparator()));
+  del_list_iter = del_list->NewIterator();
+
+  del_list_iter->SeekToFirst();
+  del_list->InsertBefore(*del_list_iter, {"b", "e"});
+  del_list->InsertBefore(*del_list_iter, {"f", "h"});
+  del_list->InsertBefore(*del_list_iter, {"i"});
+  del_list->InsertBefore(*del_list_iter, {"k", "m"});
+  del_list->InsertBefore(*del_list_iter, {"p"});
+  del_list->InsertBefore(*del_list_iter, {"q", "z"});
   CALL_WRAPPER(ValidateDelListContents(
-      del_list,
+      *del_list,
       {{"b", "e"}, {"f", "h"}, {"i"}, {"k", "m"}, {"p"}, {"q", "z"}}));
 
-  del_list.Trim("n");
+  del_list->Trim("n");
   CALL_WRAPPER(ValidateDelListContents(
-      del_list, {{"b", "e"}, {"f", "h"}, {"i"}, {"k", "m"}}));
+      *del_list, {{"b", "e"}, {"f", "h"}, {"i"}, {"k", "m"}}));
 
-  del_list.Trim("l");
+  del_list->Trim("l");
   CALL_WRAPPER(ValidateDelListContents(
-      del_list, {{"b", "e"}, {"f", "h"}, {"i"}, {"k", "l"}}));
+      *del_list, {{"b", "e"}, {"f", "h"}, {"i"}, {"k", "l"}}));
 
-  del_list.Trim("i");
-  CALL_WRAPPER(ValidateDelListContents(del_list, {{"b", "e"}, {"f", "h"}}));
+  del_list->Trim("i");
+  CALL_WRAPPER(ValidateDelListContents(*del_list, {{"b", "e"}, {"f", "h"}}));
 
-  del_list.Trim("b");
-  CALL_WRAPPER(ValidateDelListContents(del_list, {}));
+  del_list->Trim("b");
+  CALL_WRAPPER(ValidateDelListContents(*del_list, {}));
 }
 
 class DBGsTest : public DBTest {

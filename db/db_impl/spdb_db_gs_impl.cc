@@ -474,11 +474,10 @@ Status ProcessLogLevel(GlobalContext& gc, LevelContext& lc) {
   return Status::OK();
 }
 
-Status ProcessMutableMemtable(SuperVersion* super_version, GlobalContext& gc) {
+Status ProcessMutableMemtable(SuperVersion* super_version, GlobalContext& gc,
+                              Arena& arena) {
   LevelContext lc;
 
-  // TODO - Figure out what to do about the Arena
-  Arena arena;
   std::unique_ptr<InternalIterator> wrapped_values_iter(
       super_version->mem->NewIterator(gc.mutable_read_options, &arena));
   lc.values_iter.reset(new InternalIteratorWrapper(
@@ -496,6 +495,32 @@ Status ProcessMutableMemtable(SuperVersion* super_version, GlobalContext& gc) {
   auto status = ProcessLogLevel(gc, lc);
 
   return status;
+}
+
+Status ProcessImmutableMemtables(SuperVersion* super_version, GlobalContext& gc,
+                                 Arena& arena) {
+  LevelContext lc;
+
+  auto iters =
+      super_version->imm->GetIterators(gc.mutable_read_options, &arena);
+
+  for (auto& memtbl_iters : iters) {
+    lc.values_iter.reset(new InternalIteratorWrapper(
+        std::move(memtbl_iters.memtbl_iter), gc.comparator, *gc.csk));
+
+    std::unique_ptr<FragmentedRangeTombstoneIterator> wrapped_range_del_iter;
+    if (memtbl_iters.range_ts_iter.get() != nullptr) {
+      wrapped_range_del_iter.reset(memtbl_iters.range_ts_iter.release());
+    }
+    lc.range_del_iter.reset(new FragmentedRangeTombstoneIteratorWrapper(
+        std::move(wrapped_range_del_iter), gc.comparator, *gc.csk));
+
+    auto status = ProcessLogLevel(gc, lc);
+    if (status.ok() == false) {
+      return status;
+    }
+  }
+  return Status::OK();
 }
 
 }  // unnamed namespace
@@ -525,14 +550,16 @@ Status DBImpl::GetSmallest(const ReadOptions& read_options,
   gc.comparator = cfd->user_comparator();
   gc.logger = immutable_db_options_.info_log;
 
-  Status status;
+  // TODO - User the CSK to set the upper bound of applicable iterators
 
-  // ================
-  // MUTABLE Memtable
-  // ================
-  status = ProcessMutableMemtable(super_version, gc);
+  // TODO - Figure out what to do about the Arena
+  Arena arena;
 
-  // Set the CSK as the iterator upper bound when creating the next iterators
+  auto status = ProcessMutableMemtable(super_version, gc, arena);
+
+  if (status.ok()) {
+    status = ProcessImmutableMemtables(super_version, gc, arena);
+  }
 
   CleanupSuperVersion(super_version);
 

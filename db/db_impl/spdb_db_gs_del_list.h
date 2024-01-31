@@ -102,9 +102,11 @@ class GlobalDelList {
   // del-element will be replaced by [start, upper_bound).
   void Trim(const Slice& upper_bound);
 
-  const Slice* GetUpperBound() const {
-    return (upper_bound_.empty() == false) ? &upper_bound_ : nullptr;
+  Slice GetUpperBound() const {
+    return (upper_bound_.empty() == false) ? upper_bound_ : Slice();
   }
+
+  bool Valid() const;
 
   std::string ToString() const;
 

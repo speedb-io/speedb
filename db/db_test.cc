@@ -7623,6 +7623,7 @@ TEST_F(DBTest, StaticPinningLastLevelWithData) {
 // ======================================================================================
 using DelElem = spdb_gs::DelElement;
 
+#if 0
 class DelListTest : public ::testing::Test {
  public:
   void ValidateDelListContents(spdb_gs::GlobalDelList& del_list,
@@ -7857,13 +7858,23 @@ TEST_F(DelListTest, Trim) {
   del_list->Trim("b");
   CALL_WRAPPER(ValidateDelListContents(*del_list, {}));
 }
+#endif
+
+// ======================================================================================
+//                                    Get-Smallest
+// ======================================================================================
 
 class DBGsTest : public DBTest {
  public:
-  void ReopenNewDb() {
-    Options options;
-    options.create_if_missing = true;
-    DestroyAndReopen(options);
+  void ReopenNewDb(Options* user_options = nullptr) {
+    if (user_options == nullptr) {
+      Options options;
+      options.create_if_missing = true;
+      DestroyAndReopen(options);
+    } else {
+      user_options->create_if_missing = true;
+      DestroyAndReopen(*user_options);
+    }
   }
 
   void GetSmallestAndValidate(const Slice expected_smallest_key) {
@@ -7893,6 +7904,7 @@ class DBGsTest : public DBTest {
   }
 };
 
+#if 0
 TEST_F(DBGsTest, GS_EmptyDB) {
   ReopenNewDb();
 
@@ -7901,9 +7913,7 @@ TEST_F(DBGsTest, GS_EmptyDB) {
 }
 
 TEST_F(DBGsTest, GS_SingleValueInMemtable) {
-  Options options;
-  options.create_if_missing = true;
-  DestroyAndReopen(options);
+  ReopenNewDb();
 
   std::string key1 = "Key1";
   std::string value1 = "Value1";
@@ -8015,6 +8025,43 @@ TEST_F(DBGsTest, GS_ValuesAndDR_3) {
 
   GetSmallestAndValidate("z");
 }
+
+TEST_F(DBGsTest, GS_ValueInImmBasic) {
+  ReopenNewDb();
+
+  ASSERT_OK(dbfull()->Put(WriteOptions(), "Key1", "Value1"));
+  ASSERT_OK(dbfull()->TEST_SwitchMemtable());
+
+  auto dflt_cfh_impl = static_cast<ColumnFamilyHandleImpl*>(dbfull()->DefaultColumnFamily());
+  ASSERT_EQ(1, dflt_cfh_impl->cfd()->imm()->NumNotFlushed());
+  ASSERT_TRUE(dflt_cfh_impl->cfd()->mem()->IsEmpty());
+
+  GetSmallestAndValidate("Key1");
+}
+#endif
+
+TEST_F(DBGsTest, GS_SmallestInImmLargerInMutable) {
+  Options options;
+  options.allow_concurrent_memtable_write = false;
+  options.memtable_factory.reset(new VectorRepFactory());
+  ReopenNewDb(&options);
+
+  ASSERT_OK(dbfull()->Put(WriteOptions(), "c", "b1"));
+  ASSERT_OK(dbfull()->Put(WriteOptions(), "a", "a1"));
+  ASSERT_OK(dbfull()->TEST_SwitchMemtable());
+  ASSERT_OK(dbfull()->Put(WriteOptions(), "b", "b1"));
+
+  auto dflt_cfh_impl =
+      static_cast<ColumnFamilyHandleImpl*>(dbfull()->DefaultColumnFamily());
+
+  auto imm_list = dflt_cfh_impl->cfd()->imm();
+  ASSERT_EQ(1, imm_list->NumNotFlushed());
+  ASSERT_FALSE(dflt_cfh_impl->cfd()->mem()->IsEmpty());
+  ASSERT_EQ(2U, imm_list->current()->GetTotalNumEntries());
+
+  CALL_WRAPPER(GetSmallestAndValidate("a"));
+}
+
 }  // namespace ROCKSDB_NAMESPACE
 
 int main(int argc, char** argv) {

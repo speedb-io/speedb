@@ -104,10 +104,10 @@ class InternalIteratorWrapper : public Iterator {
   void UpdateValidity() {
     valid_ = wrapped_iter_ptr_->Valid();
     if (valid_ && HasUpperBound()) {
-      auto curr_pos_vs_upper_bound =
+      auto curr_value_vs_upper_bound =
           comparator_->Compare(wrapped_iter_ptr_->key(), upper_bound_);
       // The upper bound is the csk => excluding the csk from the iteration.
-      valid_ = (curr_pos_vs_upper_bound > 0);
+      valid_ = (curr_value_vs_upper_bound < 0);
     }
   }
 
@@ -276,6 +276,10 @@ struct LevelContext {
 void UpdateCSK(GlobalContext& gc, LevelContext& lc) {
   auto new_csk = lc.values_parsed_ikey.user_key;
 
+  printf("UpdateCSK curr:%s, new:%s\n",
+         ((gc.csk != nullptr) ? gc.csk->c_str() : "NONE"),
+         new_csk.ToString().c_str());
+
   gc.csk->assign(new_csk.data(), new_csk.size());
   gc.del_list->Trim(new_csk);
   lc.range_del_iter->SetUpperBound(new_csk);
@@ -418,6 +422,7 @@ Status ProcessLogLevel(GlobalContext& gc, LevelContext& lc) {
     if (lc.range_del_iter->Valid() == false) {
       auto was_new_csk_found = ProcessCurrValuesIterVsDelList(gc, lc);
       if (was_new_csk_found) {
+        printf("Processing Level Ended, new csk was found\n");
         return Status::OK();
       } else {
         continue;
@@ -471,6 +476,9 @@ Status ProcessLogLevel(GlobalContext& gc, LevelContext& lc) {
     }
   }
 
+  printf("Processing Level Ended, was new csk was found:%d\n",
+         lc.new_csk_found_in_level);
+
   return Status::OK();
 }
 
@@ -492,9 +500,8 @@ Status ProcessMutableMemtable(SuperVersion* super_version, GlobalContext& gc,
   lc.range_del_iter.reset(new FragmentedRangeTombstoneIteratorWrapper(
       std::move(wrapped_range_del_iter), gc.comparator, *gc.csk));
 
-  auto status = ProcessLogLevel(gc, lc);
-
-  return status;
+  printf("Processing Mutable Table - Iter\n");
+  return ProcessLogLevel(gc, lc);
 }
 
 Status ProcessImmutableMemtables(SuperVersion* super_version, GlobalContext& gc,
@@ -515,6 +522,7 @@ Status ProcessImmutableMemtables(SuperVersion* super_version, GlobalContext& gc,
     lc.range_del_iter.reset(new FragmentedRangeTombstoneIteratorWrapper(
         std::move(wrapped_range_del_iter), gc.comparator, *gc.csk));
 
+    printf("Processing Immutable Memtable\n");
     auto status = ProcessLogLevel(gc, lc);
     if (status.ok() == false) {
       return status;

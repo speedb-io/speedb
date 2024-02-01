@@ -771,6 +771,8 @@ Status MemTable::Add(SequenceNumber s, ValueType type,
         return Status::TryAgain("key+seq exists");
       }
     } else {
+      // printf("Insert to [%p] - |%s|, handle:%p\n", table.get(),
+      // key.ToString().c_str(), handle);
       bool res = table->InsertKey(handle);
       if (UNLIKELY(!res)) {
         return Status::TryAgain("key+seq exists");

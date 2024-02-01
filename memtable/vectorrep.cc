@@ -124,6 +124,7 @@ class VectorRep : public MemTableRep {
 };
 
 void VectorRep::Insert(KeyHandle handle) {
+  // printf("[%p] VectorRep::Insert %p\n", this, handle);
   auto* key = static_cast<char*>(handle);
   WriteLock l(&rwlock_);
   assert(!immutable_);
@@ -165,7 +166,9 @@ VectorRep::Iterator::Iterator(class VectorRep* vrep,
       bucket_(bucket),
       cit_(bucket_->end()),
       compare_(compare),
-      sorted_(false) {}
+      sorted_(false) {
+  // printf("Create VectorRep::Iterator [%p] for VectorRep [%p]\n", this, vrep);
+}
 
 void VectorRep::Iterator::DoSort() const {
   // vrep is non-null means that we are working on an immutable memtable
@@ -199,6 +202,8 @@ bool VectorRep::Iterator::Valid() const {
 // REQUIRES: Valid()
 const char* VectorRep::Iterator::key() const {
   assert(sorted_);
+  // printf("VectorRep::Iterator::key() [%p] - key = %p\n", this,
+  // (void*)(*cit_));
   return *cit_;
 }
 

@@ -7624,7 +7624,9 @@ TEST_F(DBTest, StaticPinningLastLevelWithData) {
 using DelElem = spdb_gs::DelElement;
 
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-// #if 0
+#if 0
+
+// TODO: Write unit-tests for the gs-utils funtions
 class GsUtilsTest : public ::testing::Test {};
 
 class DelListTest : public ::testing::Test {
@@ -7863,7 +7865,7 @@ TEST_F(DelListTest, Trim) {
 }
 
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-// #endif
+#endif
 
 // ======================================================================================
 //                                    Get-Smallest
@@ -8079,6 +8081,18 @@ TEST_F(DBGsTest, GS_RangeTsInMutableCoveringValueInImm) {
 
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 // #endif
+
+TEST_F(DBGsTest, GS_RangeTsInImmNotCoveringValueInMutable) {
+  ReopenNewDb();
+  auto dflt_cfh = dbfull()->DefaultColumnFamily();
+
+  ASSERT_OK(dbfull()->DeleteRange(WriteOptions(), dflt_cfh, "a", "z"));
+  ASSERT_OK(dbfull()->TEST_SwitchMemtable());
+  ASSERT_OK(dbfull()->Put(WriteOptions(), "c", "b1"));
+  ASSERT_OK(dbfull()->Put(WriteOptions(), "a", "a1"));
+
+  CALL_WRAPPER(GetSmallestAndValidate("a"));
+}
 
 }  // namespace ROCKSDB_NAMESPACE
 

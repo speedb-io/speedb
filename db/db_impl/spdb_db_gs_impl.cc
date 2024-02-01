@@ -244,7 +244,7 @@ class FragmentedRangeTombstoneIteratorWrapper : public Iterator {
             wrapped_iter_ptr_->start_key(), GetUpperBound());
         // The upper bound is exclusive for ranges;
         // A range that starts at the upper bound is invalid
-        valid_ = (curr_range_start_vs_upper_bound >= 0);
+        valid_ = (curr_range_start_vs_upper_bound > 0);
       }
     }
   }

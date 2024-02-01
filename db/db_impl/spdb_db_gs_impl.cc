@@ -19,6 +19,7 @@
 #include "db/db_impl/spdb_db_gs_del_list.h"
 #include "db/db_impl/spdb_db_gs_utils.h"
 #include "db/dbformat.h"
+#include "db/lookup_key.h"
 #include "db/range_tombstone_fragmenter.h"
 #include "memory/arena.h"
 #include "rocksdb/status.h"
@@ -69,7 +70,10 @@ class InternalIteratorWrapper : public Iterator {
   }
 
   void Seek(const Slice& target) override {
-    wrapped_iter_ptr_->Seek(target);
+    // TODO - Handle Sequence number correctly
+    LookupKey lookup_key(target, kMaxSequenceNumber);
+    auto target_ikey = lookup_key.internal_key();
+    wrapped_iter_ptr_->Seek(target_ikey);
     UpdateValidity();
   }
 
@@ -300,9 +304,11 @@ void ProcessCurrRangeTsVsDelList(GlobalContext& gc, LevelContext& lc) {
   if (lc.del_list_iter->Valid()) {
     auto& del_elem = lc.del_list_iter->key();
 
-    auto overlap_type = OverlapType::NONE;
+    RelativePos overlap_start_rel_pos{RelativePos::NONE};
+    RelativePos overlap_end_rel_pos{RelativePos::NONE};
     auto del_list_vs_range_ts = CompareDelElemToRangeTs(
-        lc.del_list_iter->key(), range_ts, gc.comparator, &overlap_type);
+        lc.del_list_iter->key(), range_ts, gc.comparator,
+        &overlap_start_rel_pos, &overlap_end_rel_pos);
 
     switch (del_list_vs_range_ts) {
       case RelativePos::BEFORE:
@@ -316,37 +322,42 @@ void ProcessCurrRangeTsVsDelList(GlobalContext& gc, LevelContext& lc) {
         lc.range_del_iter->Next();
         break;
 
-      case RelativePos::OVERLAP:
-        switch (overlap_type) {
-          case OverlapType::STARTS_BEFORE_ENDS_BEFORE:
+      case RelativePos::OVERLAP: {
+        bool del_elem_starts_at_or_before_range_ts =
+            (overlap_start_rel_pos == RelativePos::BEFORE) ||
+            (overlap_start_rel_pos == RelativePos::OVERLAP);
+        bool del_elem_ends_before_range_ts =
+            (overlap_end_rel_pos == RelativePos::BEFORE);
+
+        if (del_elem_starts_at_or_before_range_ts) {
+          if (del_elem_ends_before_range_ts) {
             gc.del_list->ReplaceWith(
                 *lc.del_list_iter,
                 DelElement(del_elem.user_start_key, range_ts.end_key_));
             lc.del_list_iter->SeekForward(range_ts.end_key_);
-            break;
-          case OverlapType::CONTAINS:
-            // Nothing to do, the del_list element contains the range_ts
-            break;
-          case OverlapType::STARTS_AFTER_ENDS_AFTER:
-            gc.del_list->ReplaceWith(
-                *lc.del_list_iter,
-                DelElement(range_ts.start_key_, del_elem.user_end_key));
-            lc.range_del_iter->Seek(del_elem.user_end_key);
-            break;
-          case OverlapType::CONTAINED:
+          } else {
+            // Del-elem contains range-ts => Nothing to do
+          }
+        } else {
+          if (del_elem_ends_before_range_ts) {
+            // Range-ts contains del-elem
             gc.del_list->ReplaceWith(
                 *lc.del_list_iter,
                 DelElement(range_ts.start_key_, range_ts.end_key_));
             lc.del_list_iter->SeekForward(range_ts.end_key_);
-            break;
-          default:
-            assert(0);
-            break;
+          } else {
+            // del-elem start after range ts but ends after
+            gc.del_list->ReplaceWith(
+                *lc.del_list_iter,
+                DelElement(range_ts.start_key_, del_elem.user_end_key));
+            lc.range_del_iter->Seek(del_elem.user_end_key);
+          }
         }
-        break;
+      } break;
 
       default:
         assert(0);
+        break;
     }
   } else {
     // del list exhausted
@@ -361,7 +372,8 @@ bool ProcessCurrValuesIterVsDelList(GlobalContext& gc, LevelContext& lc) {
 
   if (lc.del_list_iter->Valid()) {
     del_list_vs_values_iter_key = CompareDelElemToUserKey(
-        lc.del_list_iter->key(), lc.values_parsed_ikey.user_key, gc.comparator);
+        lc.del_list_iter->key(), lc.values_parsed_ikey.user_key, gc.comparator,
+        nullptr /* overlap_start_rel_pos */, nullptr /* overlap_end_rel_pos */);
   }
 
   bool was_new_csk_found = false;
@@ -386,7 +398,7 @@ bool ProcessCurrValuesIterVsDelList(GlobalContext& gc, LevelContext& lc) {
     case RelativePos::OVERLAP:
       // The key is covered by the Del-Elem => it is irrelevant (as all of the
       // range covered)
-      lc.values_iter->Seek(lc.del_list_iter->key().user_start_key);
+      lc.values_iter->Seek(lc.del_list_iter->key().user_end_key);
       break;
 
     default:
@@ -436,7 +448,8 @@ Status ProcessLogLevel(GlobalContext& gc, LevelContext& lc) {
 
     auto range_ts = lc.range_del_iter->Tombstone();
     auto range_ts_vs_values_iter_key = CompareRangeTsToUserKey(
-        range_ts, lc.values_parsed_ikey.user_key, gc.comparator);
+        range_ts, lc.values_parsed_ikey.user_key, gc.comparator,
+        nullptr /* overlap_start_rel_pos */, nullptr /* overlap_end_rel_pos */);
 
     switch (range_ts_vs_values_iter_key) {
       case RelativePos::BEFORE:

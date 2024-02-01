@@ -7623,7 +7623,10 @@ TEST_F(DBTest, StaticPinningLastLevelWithData) {
 // ======================================================================================
 using DelElem = spdb_gs::DelElement;
 
-#if 0
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+// #if 0
+class GsUtilsTest : public ::testing::Test {};
+
 class DelListTest : public ::testing::Test {
  public:
   void ValidateDelListContents(spdb_gs::GlobalDelList& del_list,
@@ -7858,7 +7861,9 @@ TEST_F(DelListTest, Trim) {
   del_list->Trim("b");
   CALL_WRAPPER(ValidateDelListContents(*del_list, {}));
 }
-#endif
+
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+// #endif
 
 // ======================================================================================
 //                                    Get-Smallest
@@ -7904,7 +7909,9 @@ class DBGsTest : public DBTest {
   }
 };
 
-#if 0
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+// #if 0
+
 TEST_F(DBGsTest, GS_EmptyDB) {
   ReopenNewDb();
 
@@ -8038,13 +8045,9 @@ TEST_F(DBGsTest, GS_ValueInImmBasic) {
 
   GetSmallestAndValidate("Key1");
 }
-#endif
 
 TEST_F(DBGsTest, GS_SmallestInImmLargerInMutable) {
-  Options options;
-  options.allow_concurrent_memtable_write = false;
-  options.memtable_factory.reset(new VectorRepFactory());
-  ReopenNewDb(&options);
+  ReopenNewDb();
 
   ASSERT_OK(dbfull()->Put(WriteOptions(), "c", "b1"));
   ASSERT_OK(dbfull()->Put(WriteOptions(), "a", "a1"));
@@ -8061,6 +8064,21 @@ TEST_F(DBGsTest, GS_SmallestInImmLargerInMutable) {
 
   CALL_WRAPPER(GetSmallestAndValidate("a"));
 }
+
+TEST_F(DBGsTest, GS_RangeTsInMutableCoveringValueInImm) {
+  ReopenNewDb();
+  auto dflt_cfh = dbfull()->DefaultColumnFamily();
+
+  ASSERT_OK(dbfull()->Put(WriteOptions(), "c", "b1"));
+  ASSERT_OK(dbfull()->Put(WriteOptions(), "a", "a1"));
+  ASSERT_OK(dbfull()->TEST_SwitchMemtable());
+  ASSERT_OK(dbfull()->DeleteRange(WriteOptions(), dflt_cfh, "a", "z"));
+
+  CALL_WRAPPER(GetSmallestAndValidate(""));
+}
+
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+// #endif
 
 }  // namespace ROCKSDB_NAMESPACE
 

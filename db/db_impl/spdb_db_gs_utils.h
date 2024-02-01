@@ -29,24 +29,7 @@ enum class ValueCategory { VALUE, MERGE_VALUE, DEL_KEY, OTHER, NONE };
 
 ValueCategory GetValueCategoryOfKey(ValueType value_type);
 
-enum class RelativePos { BEFORE, OVERLAP, AFTER };
-enum class OverlapType {
-  IDENTICAL,
-  CONTAINS,
-  CONTAINED,
-  STARTS_BEFORE_ENDS_BEFORE,
-  STARTS_AFTER_ENDS_AFTER,
-  NONE
-};
-
-struct RelativePosInfo {
-  RelativePos relative_pos;
-  OverlapType overlap_type = OverlapType::NONE;
-
-  RelativePosInfo(RelativePos _relative_pos) : relative_pos(_relative_pos) {}
-  RelativePosInfo(RelativePos _relative_pos, OverlapType _overlap_type)
-      : relative_pos(_relative_pos), overlap_type(_overlap_type) {}
-};
+enum class RelativePos { BEFORE, OVERLAP, AFTER, NONE };
 
 void PrintFragmentedRangeDels(
     const std::string& title,
@@ -102,16 +85,21 @@ struct DelElement {
 
 RelativePos CompareRangeTsToUserKey(const RangeTombstone& range_ts,
                                     const Slice& user_key,
-                                    const Comparator* comparator);
+                                    const Comparator* comparator,
+                                    RelativePos* overlap_start_rel_pos,
+                                    RelativePos* overlap_end_rel_pos);
 
 RelativePos CompareDelElemToUserKey(const DelElement& del_elem,
                                     const Slice& user_key,
-                                    const Comparator* comparator);
+                                    const Comparator* comparator,
+                                    RelativePos* overlap_start_rel_pos,
+                                    RelativePos* overlap_end_rel_pos);
 
 RelativePos CompareDelElemToRangeTs(const DelElement& del_elem,
                                     const RangeTombstone& range_ts,
                                     const Comparator* comparator,
-                                    OverlapType* overlap_type);
+                                    RelativePos* overlap_start_rel_pos,
+                                    RelativePos* overlap_end_rel_pos);
 
 }  // namespace spdb_gs
 }  // namespace ROCKSDB_NAMESPACE

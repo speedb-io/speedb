@@ -63,27 +63,86 @@ RelativePos ComparisonResultToRelativePos(int comparison_result) {
     return RelativePos::AFTER;
   }
 }
-}  // namespace
 
-int CompareRangeTsToUserKeyInt(const RangeTombstone& range_ts,
-                               const Slice& user_key,
-                               const Comparator* comparator) {
-  int result = 0;
+RelativePos ReverseRelativePos(RelativePos curr_relative_pos) {
+  switch (curr_relative_pos) {
+    case RelativePos::BEFORE:
+      return RelativePos::AFTER;
+    case RelativePos::AFTER:
+      return RelativePos::BEFORE;
+    case RelativePos::OVERLAP:
+      return RelativePos::OVERLAP;
+    case RelativePos::NONE:
+      return RelativePos::NONE;
+    default:
+      assert(0);
+      return RelativePos::NONE;
+  }
+}
+}  // unnamed namespace
 
-  int user_key_vs_start_key =
-      comparator->Compare(user_key, range_ts.start_key_);
+RelativePos CompareRangeToUserKey(const Slice& range_start_key,
+                                  const Slice& range_end_key,
+                                  const Slice& user_key,
+                                  const Comparator* comparator,
+                                  RelativePos* overlap_start_rel_pos,
+                                  RelativePos* overlap_end_rel_pos) {
+  RelativePos result = RelativePos::NONE;
+  if (overlap_start_rel_pos != nullptr) {
+    *overlap_start_rel_pos = RelativePos::NONE;
+  }
+  if (overlap_end_rel_pos != nullptr) {
+    *overlap_end_rel_pos = RelativePos::NONE;
+  }
 
-  if (user_key_vs_start_key < 0) {
+  int range_start_key_vs_user_key =
+      comparator->Compare(range_start_key, user_key);
+
+  if (range_start_key_vs_user_key > 0) {
     // Range > user-key
-    result = 1;
-  } else {
-    int user_key_vs_end_key = comparator->Compare(user_key, range_ts.end_key_);
-    if (user_key_vs_end_key >= 0) {
-      // Range < User-Key (The Range is half-open)
-      result = -1;
-    } else {
-      result = 0;
+    result = RelativePos::AFTER;
+
+  } else if (range_start_key_vs_user_key == 0) {
+    // User key is on range's start
+    result = RelativePos::OVERLAP;
+
+    if (overlap_start_rel_pos != nullptr) {
+      *overlap_start_rel_pos = RelativePos::OVERLAP;
     }
+    if (overlap_end_rel_pos != nullptr) {
+      // Assuming the range is NOT empty
+      // The range [a, b) actually contains a single key (a) but we can't know
+      // that
+      *overlap_end_rel_pos = RelativePos::BEFORE;
+    }
+
+  } else {
+    // Range starts before user-key, now check the range end vs the user-key
+    auto range_end_key_vs_user_key =
+        comparator->Compare(range_end_key, user_key);
+
+    if (range_end_key_vs_user_key <= 0) {
+      // Range < User-Key (The Range is half-open)
+      // The range [a, b) is BEFORE the user-key b
+      result = RelativePos::BEFORE;
+    } else {
+      result = RelativePos::OVERLAP;
+
+      // Range starts before user key
+      if (overlap_start_rel_pos != nullptr) {
+        *overlap_start_rel_pos = RelativePos::BEFORE;
+      }
+      if (overlap_end_rel_pos != nullptr) {
+        *overlap_end_rel_pos = RelativePos::AFTER;
+      }
+    }
+  }
+
+  if (result == RelativePos::OVERLAP) {
+    assert((overlap_start_rel_pos == nullptr) ||
+           (*overlap_end_rel_pos != RelativePos::NONE));
+    assert((overlap_end_rel_pos == nullptr) ||
+           (*overlap_end_rel_pos != RelativePos::NONE));
   }
 
   return result;
@@ -91,57 +150,74 @@ int CompareRangeTsToUserKeyInt(const RangeTombstone& range_ts,
 
 RelativePos CompareRangeTsToUserKey(const RangeTombstone& range_ts,
                                     const Slice& user_key,
-                                    const Comparator* comparator) {
-  return ComparisonResultToRelativePos(
-      CompareRangeTsToUserKeyInt(range_ts, user_key, comparator));
+                                    const Comparator* comparator,
+                                    RelativePos* overlap_start_rel_pos,
+                                    RelativePos* overlap_end_rel_pos) {
+  return CompareRangeToUserKey(range_ts.start_key_, range_ts.end_key_, user_key,
+                               comparator, overlap_start_rel_pos,
+                               overlap_end_rel_pos);
 }
 
 RelativePos CompareDelElemToUserKey(const DelElement& del_elem,
                                     const Slice& user_key,
-                                    const Comparator* comparator) {
-  int result = 0;
-
-  int user_key_vs_start_key =
-      comparator->Compare(user_key, del_elem.user_start_key);
+                                    const Comparator* comparator,
+                                    RelativePos* overlap_start_rel_pos,
+                                    RelativePos* overlap_end_rel_pos) {
+  if (overlap_start_rel_pos != nullptr) {
+    *overlap_start_rel_pos = RelativePos::NONE;
+  }
+  if (overlap_end_rel_pos != nullptr) {
+    *overlap_end_rel_pos = RelativePos::NONE;
+  }
 
   // A del-elem may be a del-key => no end key
   if (del_elem.IsDelKey()) {
-    result = -1 * user_key_vs_start_key;
-  } else if (user_key_vs_start_key < 0) {
-    // Del-Elem Range > user-key
-    result = 1;
-  } else {
-    assert(del_elem.user_end_key.empty() == false);
+    // Actually comparing 2 keys
+    int del_elem_start_key_vs_user_key =
+        comparator->Compare(del_elem.user_start_key, user_key);
+    auto result = ComparisonResultToRelativePos(del_elem_start_key_vs_user_key);
 
-    int user_key_vs_end_key =
-        comparator->Compare(user_key, del_elem.user_end_key);
-    if (user_key_vs_end_key >= 0) {
-      // Del-Elem Range < User-Key (The Range is half-open)
-      result = -1;
-    } else {
-      result = 0;
+    if (result == RelativePos::OVERLAP) {
+      if (overlap_start_rel_pos != nullptr) {
+        *overlap_start_rel_pos = RelativePos::OVERLAP;
+      }
+      if (overlap_end_rel_pos != nullptr) {
+        *overlap_end_rel_pos = RelativePos::OVERLAP;
+      }
     }
+    return result;
+  } else {
+    return CompareRangeToUserKey(del_elem.user_start_key, del_elem.user_end_key,
+                                 user_key, comparator, overlap_start_rel_pos,
+                                 overlap_end_rel_pos);
   }
-
-  return ComparisonResultToRelativePos(result);
 }
 
 RelativePos CompareDelElemToRangeTs(const DelElement& del_elem,
                                     const RangeTombstone& range_ts,
                                     const Comparator* comparator,
-                                    OverlapType* overlap_type) {
-  if (overlap_type != nullptr) {
-    *overlap_type = OverlapType::NONE;
+                                    RelativePos* overlap_start_rel_pos,
+                                    RelativePos* overlap_end_rel_pos) {
+  if (overlap_start_rel_pos != nullptr) {
+    *overlap_start_rel_pos = RelativePos::NONE;
+  }
+  if (overlap_end_rel_pos != nullptr) {
+    *overlap_end_rel_pos = RelativePos::NONE;
   }
 
   if (del_elem.IsDelKey()) {
-    // Comparing a range to a del-key in the del-list
-    int range_ts_vs_del_key = CompareRangeTsToUserKeyInt(
-        range_ts, del_elem.user_start_key, comparator);
-    auto relative_pos = ComparisonResultToRelativePos(-1 * range_ts_vs_del_key);
-    if ((overlap_type != nullptr) && (relative_pos == RelativePos::OVERLAP)) {
-      *overlap_type = OverlapType::CONTAINED;
+    auto range_ts_vs_del_key =
+        CompareRangeTsToUserKey(range_ts, del_elem.user_start_key, comparator,
+                                overlap_start_rel_pos, overlap_end_rel_pos);
+
+    if (overlap_start_rel_pos != nullptr) {
+      *overlap_start_rel_pos = ReverseRelativePos(*overlap_start_rel_pos);
     }
+    if (overlap_end_rel_pos != nullptr) {
+      *overlap_end_rel_pos = ReverseRelativePos(*overlap_end_rel_pos);
+    }
+
+    return ReverseRelativePos(range_ts_vs_del_key);
   }
 
   int range_ts_start_vs_del_elem_end =
@@ -156,27 +232,19 @@ RelativePos CompareDelElemToRangeTs(const DelElement& del_elem,
     return RelativePos::AFTER;
   }
 
-  if (overlap_type != nullptr) {
-    int range_ts_start_vs_del_elem_start =
-        comparator->Compare(range_ts.start_key_, del_elem.user_start_key);
+  // They overlap => set the overlap info if requested
+  if (overlap_start_rel_pos != nullptr) {
+    int del_elem_start_vs_range_ts_start =
+        comparator->Compare(del_elem.user_start_key, range_ts.start_key_);
+    *overlap_start_rel_pos =
+        ComparisonResultToRelativePos(del_elem_start_vs_range_ts_start);
+  }
 
-    int range_ts_end_vs_del_elem_end =
-        comparator->Compare(range_ts.start_key_, del_elem.user_start_key);
-
-    if (range_ts_start_vs_del_elem_start < 0) {
-      if (range_ts_end_vs_del_elem_end > 0) {
-        *overlap_type = OverlapType::CONTAINED;
-      } else {
-        *overlap_type = OverlapType::STARTS_AFTER_ENDS_AFTER;
-      }
-    } else {
-      if (range_ts_end_vs_del_elem_end <= 0) {
-        // Contains may be identical. Not differentiating
-        *overlap_type = OverlapType::CONTAINS;
-      } else {
-        *overlap_type = OverlapType::STARTS_BEFORE_ENDS_BEFORE;
-      }
-    }
+  if (overlap_end_rel_pos != nullptr) {
+    int del_elem_end_vs_range_ts_end =
+        comparator->Compare(del_elem.user_end_key, range_ts.end_key_);
+    *overlap_end_rel_pos =
+        ComparisonResultToRelativePos(del_elem_end_vs_range_ts_end);
   }
 
   return RelativePos::OVERLAP;

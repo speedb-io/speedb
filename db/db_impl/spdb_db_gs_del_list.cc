@@ -178,7 +178,8 @@ void GlobalDelList::Iterator::SeekForward(const Slice& seek_start_key) {
     // seek_start_key, we will postion the iter on that del-elem.
     auto prev_iter = std::prev(del_list_iter_, 1);
     auto prev_del_elem_vs_seek_key = CompareDelElemToUserKey(
-        *prev_iter, seek_start_key, glbl_del_list_.comparator_);
+        *prev_iter, seek_start_key, glbl_del_list_.comparator_,
+        nullptr /* overlap_start_rel_pos */, nullptr /* overlap_end_rel_pos */);
     assert(prev_del_elem_vs_seek_key != RelativePos::AFTER);
 
     if (prev_del_elem_vs_seek_key == RelativePos::OVERLAP) {

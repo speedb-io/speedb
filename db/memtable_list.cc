@@ -289,7 +289,7 @@ MemTableListVersion::GetIterators(const ReadOptions& read_options,
       range_ts_iter = m->NewRangeTombstoneIterator(
           read_options, read_seq, true /* immutale_memtable */);
       if (range_ts_iter == nullptr || range_ts_iter->empty()) {
-        printf("range_ts_iter null or empty!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+        // printf("range_ts_iter null or empty!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
       }
     }
     iters[i] = {std::move(std::unique_ptr<InternalIterator>(mem_iter)),

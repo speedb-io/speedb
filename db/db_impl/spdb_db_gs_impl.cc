@@ -244,7 +244,9 @@ class FragmentedRangeTombstoneIteratorWrapper : public Iterator {
             wrapped_iter_ptr_->start_key(), GetUpperBound());
         // The upper bound is exclusive for ranges;
         // A range that starts at the upper bound is invalid
-        valid_ = (curr_range_start_vs_upper_bound > 0);
+        if (curr_range_start_vs_upper_bound >= 0) {
+          valid_ = false;
+        }
       }
     }
   }
@@ -513,7 +515,7 @@ Status ProcessMutableMemtable(SuperVersion* super_version, GlobalContext& gc,
   lc.range_del_iter.reset(new FragmentedRangeTombstoneIteratorWrapper(
       std::move(wrapped_range_del_iter), gc.comparator, *gc.csk));
 
-  printf("Processing Mutable Table - Iter\n");
+  // printf("Processing Mutable Table - Iter\n");
   return ProcessLogLevel(gc, lc);
 }
 
@@ -535,7 +537,7 @@ Status ProcessImmutableMemtables(SuperVersion* super_version, GlobalContext& gc,
     lc.range_del_iter.reset(new FragmentedRangeTombstoneIteratorWrapper(
         std::move(wrapped_range_del_iter), gc.comparator, *gc.csk));
 
-    printf("Processing Immutable Memtable\n");
+    // printf("Processing Immutable Memtable\n");
     auto status = ProcessLogLevel(gc, lc);
     if (status.ok() == false) {
       return status;

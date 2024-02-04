@@ -90,6 +90,11 @@ class TruncatedRangeDelIterator {
 
   SequenceNumber lower_bound() const { return iter_->lower_bound(); }
 
+  // TODO - CONSIDER WHAT TO DO ABOUT THIS!!!!
+  std::unique_ptr<FragmentedRangeTombstoneIterator> StealInternalIterAndInvalidate() {
+    return std::move(iter_);
+  }
+
  private:
   std::unique_ptr<FragmentedRangeTombstoneIterator> iter_;
   const InternalKeyComparator* icmp_;

@@ -33,6 +33,7 @@
 #include <unordered_set>
 #include <utility>
 #include <vector>
+#include <iostream>
 
 #ifndef OS_WIN
 #include <unistd.h>
@@ -7886,7 +7887,11 @@ class DBGsTest : public DBTest {
     }
   }
 
-  void GetSmallestAndValidate(const Slice expected_smallest_key) {
+  void GetSmallestAndValidate(const Slice expected_smallest_key, const std::string& title = "") {
+    if (title.empty() == false) {
+      std::cout << "\n" << title << "\n";
+    }
+
     std::string smallest_key;
     Status s =
         dbfull()->GetSmallest(ReadOptions(), dbfull()->DefaultColumnFamily(),
@@ -8166,9 +8171,6 @@ TEST_F(DBGsTest, GS_RangeTsAndDelKeyInImmCoveringInMutable) {
   CALL_WRAPPER(GetSmallestAndValidate("c"));
 }
 
-// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-#endif
-
 TEST_F(DBGsTest, GS_RangeTsAndDelKeyInMutableCoveringImm) {
   ReopenNewDb();
   auto dflt_cfh = dbfull()->DefaultColumnFamily();
@@ -8180,6 +8182,42 @@ TEST_F(DBGsTest, GS_RangeTsAndDelKeyInMutableCoveringImm) {
   ASSERT_OK(dbfull()->DeleteRange(WriteOptions(), dflt_cfh, "k", "z"));
 
   CALL_WRAPPER(GetSmallestAndValidate(""));
+}
+
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+#endif
+
+// TEST_F(DBGsTest, GS_RangeTsAndDelKeyInImmCoveringInMutable) {
+//   ReopenNewDb();
+//   auto dflt_cfh = dbfull()->DefaultColumnFamily();
+
+//   ASSERT_OK(dbfull()->Delete(WriteOptions(), dflt_cfh, "c"));
+//   ASSERT_OK(dbfull()->DeleteRange(WriteOptions(), dflt_cfh, "k", "z"));
+//   CALL_WRAPPER(GetSmallestAndValidate("", "mutable with dk / dr"));
+
+//   ASSERT_OK(dbfull()->TEST_SwitchMemtable());
+//   ASSERT_OK(dbfull()->Put(WriteOptions(), "x", "b1"));
+//   ASSERT_OK(dbfull()->Put(WriteOptions(), "c", "a1"));
+//   CALL_WRAPPER(GetSmallestAndValidate("c", "switched and added c, x"));
+
+//   ASSERT_OK(dbfull()->TEST_SwitchMemtable());
+//   ASSERT_OK(dbfull()->Put(WriteOptions(), "d", "a1"));
+//   CALL_WRAPPER(GetSmallestAndValidate("c", "switched and added d"));
+
+//   ASSERT_OK(dbfull()->TEST_SwitchMemtable());
+//   ASSERT_OK(dbfull()->Delete(WriteOptions(), "c"));
+//   CALL_WRAPPER(GetSmallestAndValidate("d", "switched and deleted d"));
+// }
+
+TEST_F(DBGsTest, GS_EmptyMutableValuesIn1L0File) {
+  ReopenNewDb();
+
+  ASSERT_OK(dbfull()->Put(WriteOptions(), "x", "b1"));
+  ASSERT_OK(dbfull()->Put(WriteOptions(), "c", "a1"));
+  ASSERT_OK(dbfull()->TEST_FlushMemTable());
+  ASSERT_EQ(1, NumTableFilesAtLevel(0));
+
+  CALL_WRAPPER(GetSmallestAndValidate("c"));
 }
 
 }  // namespace ROCKSDB_NAMESPACE

@@ -2068,6 +2068,50 @@ void Version::AddIteratorsForLevel(const ReadOptions& read_options,
   }
 }
 
+std::vector<Version::IteratorPair> Version::GetLevel0Iterators( const ReadOptions& read_options,
+                                                                const FileOptions& soptions,
+                                                                bool allow_unprepared_value,
+                                                                Arena* arena) {
+  assert(storage_info_.finalized_);
+
+  if (storage_info_.IsLevelEmpty(0)) {
+    return {};
+  }
+  
+  // TODO - Understand if this should be handled for Get Smallest as well
+  // bool should_sample = should_sample_file_read();
+
+  std::vector<IteratorPair> iters;
+
+  for (size_t i = 0; i < storage_info_.LevelFilesBrief(0).num_files; i++) {
+    const auto& file = storage_info_.LevelFilesBrief(0).files[i];
+    TruncatedRangeDelIterator* tombstone_iter = nullptr;
+    auto table_iter = cfd_->table_cache()->NewIterator(
+        read_options, soptions, cfd_->internal_comparator(),
+        *file.file_metadata, /*range_del_agg=*/nullptr,
+        mutable_cf_options_.prefix_extractor, nullptr,
+        cfd_->internal_stats()->GetFileReadHist(0),
+        TableReaderCaller::kUserIterator, arena,
+        /*skip_filters=*/false, /*level=*/0, max_file_size_for_l0_meta_pin_,
+        /*smallest_compaction_key=*/nullptr,
+        /*largest_compaction_key=*/nullptr, allow_unprepared_value,
+        mutable_cf_options_.block_protection_bytes_per_key, &tombstone_iter);
+
+    // TODO - Handle read_options.ignore_range_deletions!!!!
+    FragmentedRangeTombstoneIterator* range_ts_iter = nullptr;
+    if ((read_options.ignore_range_deletions == false) && (tombstone_iter != nullptr)) {
+      range_ts_iter = tombstone_iter->StealInternalIterAndInvalidate().release();
+    }
+    delete tombstone_iter;
+    tombstone_iter = nullptr;
+
+    iters.push_back( {std::move(std::unique_ptr<InternalIterator>(table_iter)),
+                        std::move(std::unique_ptr<FragmentedRangeTombstoneIterator>(range_ts_iter))});
+  }
+
+  return iters;
+}
+
 Status Version::OverlapWithLevelIterator(const ReadOptions& read_options,
                                          const FileOptions& file_options,
                                          const Slice& smallest_user_key,

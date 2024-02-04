@@ -312,6 +312,10 @@ class VersionStorageInfo {
   bool HasOverlappingUserKey(const std::vector<FileMetaData*>* inputs,
                              int level);
 
+  bool IsLevelEmpty(int level) const {
+    return ((level >= num_non_empty_levels()) || (LevelFilesBrief(level).num_files == 0));
+  }
+
   int num_levels() const { return num_levels_; }
 
   // REQUIRES: PrepareForVersionAppend has been called
@@ -861,6 +865,17 @@ class Version {
                             const FileOptions& soptions,
                             MergeIteratorBuilder* merger_iter_builder,
                             int level, bool allow_unprepared_value);
+
+  struct IteratorPair {
+    std::unique_ptr<InternalIterator> table_iter;
+    std::unique_ptr<FragmentedRangeTombstoneIterator> range_ts_iter;
+  };
+
+  // TODO - Consider using auto-vector or, adding to some entity like the merger_iter_builder
+  std::vector<IteratorPair> GetLevel0Iterators( const ReadOptions& read_options,
+                                                const FileOptions& soptions,
+                                                bool allow_unprepared_value,
+                                                Arena* arena);
 
   Status OverlapWithLevelIterator(const ReadOptions&, const FileOptions&,
                                   const Slice& smallest_user_key,

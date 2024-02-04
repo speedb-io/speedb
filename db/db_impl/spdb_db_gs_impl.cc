@@ -400,7 +400,11 @@ bool ProcessCurrValuesIterVsDelList(GlobalContext& gc, LevelContext& lc) {
     case RelativePos::OVERLAP:
       // The key is covered by the Del-Elem => it is irrelevant (as all of the
       // range covered)
-      lc.values_iter->Seek(lc.del_list_iter->key().user_end_key);
+      if (lc.del_list_iter->key().IsRange()) {
+        lc.values_iter->Seek(lc.del_list_iter->key().user_end_key);
+      } else {
+        lc.values_iter->Next();
+      }
       break;
 
     default:
@@ -436,7 +440,7 @@ Status ProcessLogLevel(GlobalContext& gc, LevelContext& lc) {
     if (lc.range_del_iter->Valid() == false) {
       auto was_new_csk_found = ProcessCurrValuesIterVsDelList(gc, lc);
       if (was_new_csk_found) {
-        printf("Processing Level Ended, new csk was found\n");
+        // printf("Processing Level Ended, new csk was found\n");
         return Status::OK();
       } else {
         continue;
@@ -491,8 +495,8 @@ Status ProcessLogLevel(GlobalContext& gc, LevelContext& lc) {
     }
   }
 
-  printf("Processing Level Ended, was new csk was found:%d\n",
-         lc.new_csk_found_in_level);
+  // printf("Processing Level Ended, was new csk was found:%d\n",
+  //  lc.new_csk_found_in_level);
 
   return Status::OK();
 }

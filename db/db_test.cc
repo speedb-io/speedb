@@ -7624,7 +7624,7 @@ TEST_F(DBTest, StaticPinningLastLevelWithData) {
 using DelElem = spdb_gs::DelElement;
 
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-// #if 0
+#if 0
 
 // TODO: Write unit-tests for the gs-utils funtions
 class GsUtilsTest : public ::testing::Test {};
@@ -7865,7 +7865,7 @@ TEST_F(DelListTest, Trim) {
 }
 
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-// #endif
+#endif
 
 // ======================================================================================
 //                                    Get-Smallest
@@ -7912,7 +7912,7 @@ class DBGsTest : public DBTest {
 };
 
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-// #if 0
+#if 0
 
 TEST_F(DBGsTest, GS_EmptyDB) {
   ReopenNewDb();
@@ -8079,9 +8079,6 @@ TEST_F(DBGsTest, GS_RangeTsInMutableCoveringValueInImm) {
   CALL_WRAPPER(GetSmallestAndValidate(""));
 }
 
-// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-// #endif
-
 TEST_F(DBGsTest, GS_RangeTsInImmCoveringValueInMutable) {
   ReopenNewDb();
   auto dflt_cfh = dbfull()->DefaultColumnFamily();
@@ -8116,6 +8113,33 @@ TEST_F(DBGsTest, GS_RangeTsInImmNotCoveringValueInMutable) {
   ASSERT_OK(dbfull()->Put(WriteOptions(), "a", "a1"));
 
   CALL_WRAPPER(GetSmallestAndValidate("a"));
+}
+
+
+TEST_F(DBGsTest, GS_DelKeyInImmSameAsValueInMutable) {
+  ReopenNewDb();
+  auto dflt_cfh = dbfull()->DefaultColumnFamily();
+
+  ASSERT_OK(dbfull()->Delete(WriteOptions(), dflt_cfh, "c"));
+  ASSERT_OK(dbfull()->TEST_SwitchMemtable());
+  ASSERT_OK(dbfull()->Put(WriteOptions(), "x", "b1"));
+  ASSERT_OK(dbfull()->Put(WriteOptions(), "c", "a1"));
+
+  CALL_WRAPPER(GetSmallestAndValidate("c"));
+}
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+#endif
+
+TEST_F(DBGsTest, GS_DelKeyInMutableSameAsValueInImm) {
+  ReopenNewDb();
+  auto dflt_cfh = dbfull()->DefaultColumnFamily();
+
+  ASSERT_OK(dbfull()->Put(WriteOptions(), "x", "b1"));
+  ASSERT_OK(dbfull()->Put(WriteOptions(), "c", "a1"));
+  ASSERT_OK(dbfull()->TEST_SwitchMemtable());
+  ASSERT_OK(dbfull()->Delete(WriteOptions(), dflt_cfh, "c"));
+
+  CALL_WRAPPER(GetSmallestAndValidate("x"));
 }
 
 }  // namespace ROCKSDB_NAMESPACE

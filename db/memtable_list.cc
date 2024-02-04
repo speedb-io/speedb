@@ -46,6 +46,7 @@ class VersionSet;
 
 void MemTableListVersion::AddMemTable(MemTable* m) {
   memlist_.push_front(m);
+  // printf("Added memtbl. #memtbls:%zu\n", memlist_.size());
   *parent_memtable_list_memory_usage_ += m->ApproximateMemoryUsage();
 }
 
@@ -361,6 +362,7 @@ void MemTableListVersion::Remove(MemTable* m,
                                  autovector<MemTable*>* to_delete) {
   assert(refs_ == 1);  // only when refs_ == 1 is MemTableListVersion mutable
   memlist_.remove(m);
+  // printf("Removed memtbl. #memtbls:%zu\n", memlist_.size());
 
   m->MarkFlushed();
   if (max_write_buffer_size_to_maintain_ > 0 ||

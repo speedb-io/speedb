@@ -23,6 +23,9 @@
 #include "db/range_tombstone_fragmenter.h"
 #include "memory/arena.h"
 #include "rocksdb/status.h"
+
+extern bool gs_debug_prints;
+
 namespace ROCKSDB_NAMESPACE {
 namespace spdb_gs {
 
@@ -272,6 +275,8 @@ struct LevelContext {
   std::unique_ptr<FragmentedRangeTombstoneIteratorWrapper> range_del_iter;
   std::unique_ptr<GlobalDelList::Iterator> del_list_iter;
 
+  // std::string prev_del_key;
+
   // These are valid only when applicable
   ParsedInternalKey values_parsed_ikey;
   ValueCategory value_category = ValueCategory::NONE;
@@ -282,9 +287,11 @@ struct LevelContext {
 void UpdateCSK(GlobalContext& gc, LevelContext& lc) {
   auto new_csk = lc.values_parsed_ikey.user_key;
 
-  printf("UpdateCSK curr:%s, new:%s\n",
-         ((gc.csk != nullptr) ? gc.csk->c_str() : "NONE"),
-         new_csk.ToString().c_str());
+  if (gs_debug_prints) {
+    printf("UpdateCSK curr:%s, new:%s\n",
+          ((gc.csk != nullptr) ? gc.csk->c_str() : "NONE"),
+          new_csk.ToString().c_str());
+  }
 
   gc.csk->assign(new_csk.data(), new_csk.size());
   gc.del_list->Trim(new_csk);
@@ -378,8 +385,6 @@ bool ProcessCurrValuesIterVsDelList(GlobalContext& gc, LevelContext& lc) {
         nullptr /* overlap_start_rel_pos */, nullptr /* overlap_end_rel_pos */);
   }
 
-  bool was_new_csk_found = false;
-
   switch (del_list_vs_values_iter_key) {
     case RelativePos::BEFORE:
       lc.del_list_iter->SeekForward(lc.values_parsed_ikey.user_key);
@@ -388,11 +393,12 @@ bool ProcessCurrValuesIterVsDelList(GlobalContext& gc, LevelContext& lc) {
     case RelativePos::AFTER:
       if ((lc.value_category == ValueCategory::VALUE) ||
           (lc.value_category == ValueCategory::MERGE_VALUE)) {
+        // if ((lc.prev_del.key.empty() == false) && ()
         UpdateCSK(gc, lc);
-        was_new_csk_found = true;
       } else if (lc.value_category == ValueCategory::DEL_KEY) {
         gc.del_list->InsertBefore(*lc.del_list_iter,
                                   DelElement(lc.values_parsed_ikey.user_key));
+        // lc.prev_del_key.assign(lc.values_iter->key().data(), lc.values_iter->key().size());
         lc.values_iter->Next();
       }
       break;
@@ -413,7 +419,7 @@ bool ProcessCurrValuesIterVsDelList(GlobalContext& gc, LevelContext& lc) {
       break;
   }
 
-  return was_new_csk_found;
+  return lc.new_csk_found_in_level;
 }
 
 Status ProcessLogLevel(GlobalContext& gc, LevelContext& lc) {
@@ -441,7 +447,7 @@ Status ProcessLogLevel(GlobalContext& gc, LevelContext& lc) {
     if (lc.range_del_iter->Valid() == false) {
       auto was_new_csk_found = ProcessCurrValuesIterVsDelList(gc, lc);
       if (was_new_csk_found) {
-        printf("Processing Level Ended, new csk was found\n");
+        if (gs_debug_prints) printf("Processing Level Ended, new csk was found\n");
         return Status::OK();
       } else {
         continue;
@@ -496,7 +502,7 @@ Status ProcessLogLevel(GlobalContext& gc, LevelContext& lc) {
     }
   }
 
-  printf("Processing Level Ended, was new csk was found:%d\n", lc.new_csk_found_in_level);
+  if (gs_debug_prints) printf("Processing Level Ended, was new csk was found:%d\n", lc.new_csk_found_in_level);
 
   return Status::OK();
 }
@@ -519,21 +525,20 @@ Status ProcessMutableMemtable(SuperVersion* super_version, GlobalContext& gc,
   lc.range_del_iter.reset(new FragmentedRangeTombstoneIteratorWrapper(
       std::move(wrapped_range_del_iter), gc.comparator, *gc.csk));
 
-  printf("Processing Mutable Table\n");
+  if (gs_debug_prints) printf("Processing Mutable Table\n");
   return ProcessLogLevel(gc, lc);
 }
 
 Status ProcessImmutableMemtables(SuperVersion* super_version, GlobalContext& gc,
                                  Arena& arena) {
-  LevelContext lc;
-
   auto iters =
       super_version->imm->GetIterators(gc.mutable_read_options, &arena);
 
-  printf("Processing Immutable Memtables. Num Memtables:%zu\n", iters.size());
+  if (gs_debug_prints) printf("Processing Immutable Memtables. Num Memtables:%zu\n", iters.size());
 
   auto i = 1;
   for (auto& memtbl_iters : iters) {
+    LevelContext lc;
     lc.values_iter.reset(new InternalIteratorWrapper(
         std::move(memtbl_iters.memtbl_iter), gc.comparator, *gc.csk));
 
@@ -544,7 +549,7 @@ Status ProcessImmutableMemtables(SuperVersion* super_version, GlobalContext& gc,
     lc.range_del_iter.reset(new FragmentedRangeTombstoneIteratorWrapper(
         std::move(wrapped_range_del_iter), gc.comparator, *gc.csk));
 
-    printf("Processing Immutable Memtable #%d\n", i);
+    if (gs_debug_prints) printf("Processing Immutable Memtable #%d\n", i);
     auto status = ProcessLogLevel(gc, lc);
     if (status.ok() == false) {
       return status;
@@ -559,19 +564,19 @@ Status ProcessLevel0Files(SuperVersion* super_version, GlobalContext& gc,
   constexpr int level0 = 0;
 
   if (super_version->current->storage_info()->IsLevelEmpty(level0)) {
+    if (gs_debug_prints) printf("Level-0 Is Empty\n");
     return Status::OK();
   }
-
-  LevelContext lc;
 
   // TOOD - Handle allow_unprepared_value!!!!
   auto iters =
       super_version->current->GetLevel0Iterators(gc.mutable_read_options, file_options, false /* allow_unprepared_value */, &arena);
 
-  printf("Processing Level-0 Files. Num Files:%zu\n", iters.size());
+  if (gs_debug_prints) printf("Processing Level-0 Files. Num Files:%zu\n", iters.size());
 
   auto i = 1;
   for (auto& file_iters : iters) {
+    LevelContext lc;
     lc.values_iter.reset(new InternalIteratorWrapper(
         std::move(file_iters.table_iter), gc.comparator, *gc.csk));
 
@@ -582,7 +587,7 @@ Status ProcessLevel0Files(SuperVersion* super_version, GlobalContext& gc,
     lc.range_del_iter.reset(new FragmentedRangeTombstoneIteratorWrapper(
         std::move(wrapped_range_del_iter), gc.comparator, *gc.csk));
 
-    printf("Processing Level-0 File #%d\n", i);
+    if (gs_debug_prints) printf("Processing Level-0 File #%d\n", i);
     auto status = ProcessLogLevel(gc, lc);
     if (status.ok() == false) {
       return status;

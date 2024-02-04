@@ -34,6 +34,15 @@ void GlobalDelList::InsertBefore(Iterator& pos, const DelElement& del_elem) {
   assert(Valid());
 }
 
+void GlobalDelList::InsertBeforeAndSetIterOnInserted(Iterator& pos, const DelElement& del_elem) {
+  InsertBefore(pos, del_elem);
+  if (pos.Valid()) {
+    --pos.del_list_iter_;
+  } else {
+    pos.SeekToFirst();
+  }
+}
+
 void GlobalDelList::MergeWith(Iterator& pos, const DelElement& del_elem) {
   MergeWithInternal(pos.del_list_iter_, del_elem);
   assert(Valid());

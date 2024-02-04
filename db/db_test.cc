@@ -88,6 +88,8 @@
 #include "util/string_util.h"
 #include "utilities/merge_operators.h"
 
+#define RUN_ALL_GS_TESTS 0
+
 #define CALL_WRAPPER(func) \
   func;                    \
   ASSERT_FALSE(HasFailure());
@@ -7624,7 +7626,7 @@ TEST_F(DBTest, StaticPinningLastLevelWithData) {
 using DelElem = spdb_gs::DelElement;
 
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-#if 0
+#if RUN_ALL_GS_TESTS
 
 // TODO: Write unit-tests for the gs-utils funtions
 class GsUtilsTest : public ::testing::Test {};
@@ -7912,7 +7914,7 @@ class DBGsTest : public DBTest {
 };
 
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-#if 0
+#if RUN_ALL_GS_TESTS
 
 TEST_F(DBGsTest, GS_EmptyDB) {
   ReopenNewDb();
@@ -7984,6 +7986,18 @@ TEST_F(DBGsTest, GS_SingleValueOlderThanDRWithOverlap) {
   auto dflt_cfh = dbfull()->DefaultColumnFamily();
 
   ASSERT_OK(dbfull()->Put(WriteOptions(), "c", "Value"));
+  ASSERT_OK(dbfull()->DeleteRange(WriteOptions(), dflt_cfh, "a", "z"));
+
+  GetSmallestAndValidate("");
+}
+
+TEST_F(DBGsTest, GS_RangeTsOverlapsDelKey) {
+  ReopenNewDb();
+
+  auto dflt_cfh = dbfull()->DefaultColumnFamily();
+
+  ASSERT_OK(dbfull()->Put(WriteOptions(), "c", "Value"));
+  ASSERT_OK(dbfull()->Delete(WriteOptions(), "c"));
   ASSERT_OK(dbfull()->DeleteRange(WriteOptions(), dflt_cfh, "a", "z"));
 
   GetSmallestAndValidate("");
@@ -8115,7 +8129,6 @@ TEST_F(DBGsTest, GS_RangeTsInImmNotCoveringValueInMutable) {
   CALL_WRAPPER(GetSmallestAndValidate("a"));
 }
 
-
 TEST_F(DBGsTest, GS_DelKeyInImmSameAsValueInMutable) {
   ReopenNewDb();
   auto dflt_cfh = dbfull()->DefaultColumnFamily();
@@ -8127,8 +8140,6 @@ TEST_F(DBGsTest, GS_DelKeyInImmSameAsValueInMutable) {
 
   CALL_WRAPPER(GetSmallestAndValidate("c"));
 }
-// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-#endif
 
 TEST_F(DBGsTest, GS_DelKeyInMutableSameAsValueInImm) {
   ReopenNewDb();
@@ -8140,6 +8151,35 @@ TEST_F(DBGsTest, GS_DelKeyInMutableSameAsValueInImm) {
   ASSERT_OK(dbfull()->Delete(WriteOptions(), dflt_cfh, "c"));
 
   CALL_WRAPPER(GetSmallestAndValidate("x"));
+}
+
+TEST_F(DBGsTest, GS_RangeTsAndDelKeyInImmCoveringInMutable) {
+  ReopenNewDb();
+  auto dflt_cfh = dbfull()->DefaultColumnFamily();
+
+  ASSERT_OK(dbfull()->Delete(WriteOptions(), dflt_cfh, "c"));
+  ASSERT_OK(dbfull()->DeleteRange(WriteOptions(), dflt_cfh, "k", "z"));
+  ASSERT_OK(dbfull()->TEST_SwitchMemtable());
+  ASSERT_OK(dbfull()->Put(WriteOptions(), "x", "b1"));
+  ASSERT_OK(dbfull()->Put(WriteOptions(), "c", "a1"));
+
+  CALL_WRAPPER(GetSmallestAndValidate("c"));
+}
+
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+#endif
+
+TEST_F(DBGsTest, GS_RangeTsAndDelKeyInMutableCoveringImm) {
+  ReopenNewDb();
+  auto dflt_cfh = dbfull()->DefaultColumnFamily();
+
+  ASSERT_OK(dbfull()->Put(WriteOptions(), "x", "b1"));
+  ASSERT_OK(dbfull()->Put(WriteOptions(), "c", "a1"));
+  ASSERT_OK(dbfull()->TEST_SwitchMemtable());
+  ASSERT_OK(dbfull()->Delete(WriteOptions(), dflt_cfh, "c"));
+  ASSERT_OK(dbfull()->DeleteRange(WriteOptions(), dflt_cfh, "k", "z"));
+
+  CALL_WRAPPER(GetSmallestAndValidate(""));
 }
 
 }  // namespace ROCKSDB_NAMESPACE

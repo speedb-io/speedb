@@ -80,7 +80,8 @@ class GlobalDelList {
   // be corrupt, violating its assumptions.
   void InsertBefore(Iterator& pos, const DelElement& del_elem);
 
-  void InsertBeforeAndSetIterOnInserted(Iterator& pos, const DelElement& del_elem);
+  void InsertBeforeAndSetIterOnInserted(Iterator& pos,
+                                        const DelElement& del_elem);
 
   // Merge del_elem with the del_elem pointed to by the iterator at pos.
   // The del_elem and the pointed del_elem must be overlapping.

@@ -28,14 +28,14 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
+#include <iomanip>
+#include <iostream>
 #include <set>
 #include <thread>
 #include <unordered_set>
 #include <utility>
 #include <vector>
-#include <iostream>
-#include <iomanip>
-#include <chrono>
 
 #ifndef OS_WIN
 #include <unistd.h>
@@ -7893,23 +7893,8 @@ class DBGsTest : public DBTest {
     }
   }
 
-  std::string GetSmallestUsingSeekToFirst() {
-    std::unique_ptr<Iterator> db_iter{dbfull()->NewIterator(ReadOptions())};
-    db_iter->SeekToFirst();
-    EXPECT_TRUE(db_iter->Valid());
-    return db_iter->key().ToString();
-  }
-
-  std::string GetSmallestUsingGetSmallest() {
-    std::string smallest_key;
-    Status s =
-        dbfull()->GetSmallest(ReadOptions(), dbfull()->DefaultColumnFamily(),
-                              &smallest_key, nullptr /* value */);
-    EXPECT_OK(s);
-    return smallest_key;
-  }
-
-  void GetSmallestAndValidate(const Slice expected_smallest_key, const std::string& title = "") {
+  void GetSmallestAndValidate(const Slice expected_smallest_key,
+                              const std::string& title = "") {
     if (gs_debug_prints && (title.empty() == false)) {
       std::cout << "\n" << title << "\n";
     }
@@ -8082,7 +8067,8 @@ TEST_F(DBGsTest, GS_ValueInImmBasic) {
   ASSERT_OK(dbfull()->Put(WriteOptions(), "Key1", "Value1"));
   ASSERT_OK(dbfull()->TEST_SwitchMemtable());
 
-  auto dflt_cfh_impl = static_cast<ColumnFamilyHandleImpl*>(dbfull()->DefaultColumnFamily());
+  auto dflt_cfh_impl =
+      static_cast<ColumnFamilyHandleImpl*>(dbfull()->DefaultColumnFamily());
   ASSERT_EQ(1, dflt_cfh_impl->cfd()->imm()->NumNotFlushed());
   ASSERT_TRUE(dflt_cfh_impl->cfd()->mem()->IsEmpty());
 
@@ -8241,7 +8227,6 @@ TEST_F(DBGsTest, GS_RangeTsAndDelKeyInImmCoveringInL0) {
   CALL_WRAPPER(GetSmallestAndValidate("d", "switched and deleted d"));
 }
 
-
 TEST_F(DBGsTest, GS_ValueImmediatelyDeletedInMutable) {
   ReopenNewDb();
   auto dflt_cfh = dbfull()->DefaultColumnFamily();
@@ -8255,116 +8240,180 @@ TEST_F(DBGsTest, GS_ValueImmediatelyDeletedInMutable) {
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 #endif
 
-// #if 0
-TEST_F(DBGsTest, GS_Stress) {
-  Options options;
-  options.write_buffer_size = 64 << 20;
-  options.max_write_buffer_number = 1000;
-  options.disable_auto_compactions = true;
-  options.level0_slowdown_writes_trigger = 2000;
-  options.level0_stop_writes_trigger = 3000;
-  options.level0_file_num_compaction_trigger = -1;
-  ReopenNewDb(&options);
-
-  auto dflt_cfh = dbfull()->DefaultColumnFamily();
-  auto dflt_cfh_impl = static_cast<ColumnFamilyHandleImpl*>(dflt_cfh);
-
-  Random rnd(301);
-  auto NextKey = [&rnd](int len) {
-    return rnd.HumanReadableString(len);
-  };
-
-  std::cout << "Generating Keys\n";
-  std::vector<std::string> keys;
-  std::vector<std::string> deletd_keys;
-  int num_keys = 0;
-  int num_deletions = 0;
-  int num_flushes = 0;
-  constexpr int num_flush_iters = 50;
-  // constexpr int num_flush_iters = 2;
-  constexpr int num_keys_per_iter = 20000U;
-  // constexpr int num_keys_per_iter = 100U;
-
-  for (auto i = 1; i < num_flush_iters + 1; ++i) {
-    for (auto j = 0U; j < num_keys_per_iter; ++j) {
-      auto key_len = 10 + rnd.Uniform(5);
-      auto key = NextKey(key_len);
-      keys.push_back(key);
-      ASSERT_OK(dbfull()->Put(WriteOptions(), key, (key + key)));
-      ++num_keys;
-
-      if (rnd.OneIn(4)) {
-        auto del_key = keys[rnd.Uniform(keys.size())];
-        ASSERT_OK(dbfull()->Delete(WriteOptions(), dflt_cfh, del_key));
-        deletd_keys.push_back(del_key);
-        ++num_deletions;
-      }
-    }
-    if (i != num_flush_iters) {
-      std::cout << "Flushing #" << i << "\n";
-      ASSERT_OK(dbfull()->TEST_FlushMemTable(true, true));
-      ++num_flushes;
-    }
+class DBGsStressTest : public DBGsTest {
+ public:
+  void CreateDB() {
+    Options options;
+    options.write_buffer_size = 64 << 20;
+    options.max_write_buffer_number = 1000;
+    options.disable_auto_compactions = true;
+    options.level0_slowdown_writes_trigger = 2000;
+    options.level0_stop_writes_trigger = 3000;
+    options.level0_file_num_compaction_trigger = -1;
+    ReopenNewDb(&options);
   }
 
-  std::sort(keys.begin(), keys.end());
-  std::sort(deletd_keys.begin(), deletd_keys.end());
+  void BuildDBContents(const int num_flush_iters, const int num_keys_per_iter) {
+    auto dflt_cfh = dbfull()->DefaultColumnFamily();
+    auto dflt_cfh_impl = static_cast<ColumnFamilyHandleImpl*>(dflt_cfh);
 
-  auto num_immutable = dflt_cfh_impl->cfd()->imm()->NumNotFlushed();  
-  std::cout << "num_keys:" << num_keys << ", num_deletions:" << num_deletions << ", num_immutable:" << num_immutable << '\n';
-  std::cout << "Num files at level-0:" << NumTableFilesAtLevel(0) << '\n';
-  std::cout << "Num files at level-1:" << NumTableFilesAtLevel(1) << '\n';
+    Random rnd(301);
+    auto NextKey = [&rnd](int len) { return rnd.HumanReadableString(len); };
+
+    std::cout << "Generating Keys\n";
+    ;
+    int num_keys = 0;
+    int num_deletions = 0;
+    int num_flushes = 0;
+    for (auto i = 1; i < num_flush_iters + 1; ++i) {
+      for (auto j = 0; j < num_keys_per_iter; ++j) {
+        auto key_len = 10 + rnd.Uniform(5);
+        auto key = NextKey(key_len);
+        keys.push_back(key);
+        ASSERT_OK(dbfull()->Put(WriteOptions(), key, (key + key)));
+        ++num_keys;
+
+        if (rnd.OneIn(4)) {
+          auto del_key = keys[rnd.Uniform(keys.size())];
+          ASSERT_OK(dbfull()->Delete(WriteOptions(), dflt_cfh, del_key));
+          deletd_keys.push_back(del_key);
+          ++num_deletions;
+        }
+      }
+      if (i != num_flush_iters) {
+        // std::cout << "Flushing #" << i << "\n";
+        ASSERT_OK(dbfull()->TEST_FlushMemTable(true, true));
+        ++num_flushes;
+      }
+    }
+
+    std::sort(keys.begin(), keys.end());
+    std::sort(deletd_keys.begin(), deletd_keys.end());
+
+    auto num_immutable = dflt_cfh_impl->cfd()->imm()->NumNotFlushed();
+    std::cout << "num_keys:" << num_keys << ", num_deletions:" << num_deletions
+              << ", num_immutable:" << num_immutable << '\n';
+    std::cout << "Num files at level-0:" << NumTableFilesAtLevel(0) << '\n';
+    std::cout << "Num files at level-1:" << NumTableFilesAtLevel(1) << '\n';
+  }
+
+  void FindSmallesKeys() {
+    int expected_smallest_idx = 0;
+
+    // Find the next key that wasn't deleted after it was inserted to the DB
+    while (std::find(deletd_keys.begin(), deletd_keys.end(),
+                     keys[expected_smallest_idx]) != deletd_keys.end()) {
+      ++expected_smallest_idx;
+    }
+    keys_to_delete.push_back(keys[expected_smallest_idx]);
+    ++expected_smallest_idx;
+  }
+
+  std::string GetSmallestUsingSeekToFirst() {
+    std::unique_ptr<Iterator> db_iter{dbfull()->NewIterator(ReadOptions())};
+    db_iter->SeekToFirst();
+    EXPECT_TRUE(db_iter->Valid());
+    return db_iter->key().ToString();
+  }
+
+  std::string GetSmallestUsingGetSmallest() {
+    std::string smallest_key;
+    Status s =
+        dbfull()->GetSmallest(ReadOptions(), dbfull()->DefaultColumnFamily(),
+                              &smallest_key, nullptr /* value */);
+    EXPECT_OK(s);
+    return smallest_key;
+  }
+
+  std::vector<std::string> GetSmallestKeysUsingSeek(size_t num_keys) {
+    std::vector<std::string> smallest_keys(num_keys);
+
+    std::unique_ptr<Iterator> db_iter{dbfull()->NewIterator(ReadOptions())};
+    db_iter->SeekToFirst();
+    EXPECT_TRUE(db_iter->Valid());
+    for (auto i = 0U; i < num_keys; ++i) {
+      smallest_keys[i] = db_iter->key().ToString();
+      db_iter->Next();
+    }
+    return smallest_keys;
+  }
+
+  std::vector<std::string> keys;
+  std::vector<std::string> deletd_keys;
+  std::vector<std::string> keys_to_delete;
+};
+
+// #if 0
+TEST_F(DBGsStressTest, GS_Stress) {
+  CreateDB();
+
+  constexpr int num_flush_iters = 20;
+  constexpr int num_keys_per_iter = 20000U;
+  BuildDBContents(num_flush_iters, num_keys_per_iter);
 
   constexpr int num_calls = 1000;
   std::vector<std::string> seek_results(num_calls);
   std::vector<std::string> get_smallest_results(num_calls);
-  constexpr int precision = 4;
 
-  std::cout << "\nSeek / GetSmallest Start\n";
-  
   using nano = std::chrono::nanoseconds;
-  // nano total_seek_time {0};
-  // nano total_get_smallest_time {0};
+  auto dflt_cfh = dbfull()->DefaultColumnFamily();
 
-  int expected_smallest_idx = 0;
-  auto start_seek = std::chrono::high_resolution_clock::now();
+  bool delete_during_run = false;
+
+  std::cout << "\nSeek Start\n";
+  auto start = std::chrono::high_resolution_clock::now();
   for (auto i = 0; i < num_calls; ++i) {
-    // seek_results[i] = GetSmallestUsingSeekToFirst();
-    seek_results[i] = GetSmallestUsingGetSmallest();
+    seek_results[i] = GetSmallestUsingSeekToFirst();
 
-    // total_seek_time += end_seek - start_seek;
-
-    // auto start_get_smallest = std::chrono::high_resolution_clock::now();
-    // get_smallest_results[i] = GetSmallestUsingGetSmallest();
-    // auto end_get_smallest = std::chrono::high_resolution_clock::now();
-    // total_get_smallest_time += end_get_smallest - start_get_smallest;
-
-    while (std::find(deletd_keys.begin(), deletd_keys.end(), keys[expected_smallest_idx]) != deletd_keys.end()) {
-      // std::cout << "|" << keys[expected_smallest_idx] << "| deleted\n";
-      ++expected_smallest_idx;
+    if (delete_during_run) {
+      // Delete the smallest found so next call will find the next smallest
+      ASSERT_OK(dbfull()->Delete(WriteOptions(), dflt_cfh, seek_results[i]));
     }
-
-    // std::cout << "Next expected smallest:|" << keys[expected_smallest_idx] << "|\n";
-    ASSERT_EQ(keys[expected_smallest_idx], seek_results[i]) << "i = " << i;
-    ++expected_smallest_idx;
-    
-    // if (seek_results[i] != keys[expected_smallest_idx]) {
-    //   std::cout << "MISMATCH!!!! - Re-Running GetSmallest with debug prints\n";
-    //   gs_debug_prints = true;
-    //   GetSmallestUsingGetSmallest();
-    //   ASSERT_EQ(seek_results[i], get_smallest_results[i]) << "i = " << i;
-    // }
-
-    // std::cout << "Success (i=" << i << "), Deleting |" << seek_results[i] << "|\n";
-    ASSERT_OK(dbfull()->Delete(WriteOptions(), dflt_cfh, seek_results[i])); 
   }
-  auto end_seek = std::chrono::high_resolution_clock::now();
+  auto end = std::chrono::high_resolution_clock::now();
+  nano total_seek_time = end - start;
 
-  nano total_seek_time = end_seek - start_seek;
-  std::cout << "Seek Time:" << std::fixed << std::setprecision(precision) <<  (total_seek_time.count() * 1e-9) << std::endl;
-  // std::cout << "GetSmallest Time:" << std::fixed << std::setprecision(precision) <<  (total_get_smallest_time.count() * 1e-9) << std::endl;
+  // Find the keys that are expected to be found by Get-Smallest
+  std::vector<std::string> expected_smallest_keys =
+      GetSmallestKeysUsingSeek(num_calls);
+
+  std::cout << "GetSmallest Start\n";
+  start = std::chrono::high_resolution_clock::now();
+  for (auto i = 0; i < num_calls; ++i) {
+    get_smallest_results[i] = GetSmallestUsingGetSmallest();
+
+    if (delete_during_run) {
+      // Delete the smallest found so next call will find the next smallest
+      ASSERT_OK(
+          dbfull()->Delete(WriteOptions(), dflt_cfh, get_smallest_results[i]));
+    }
+  }
+  end = std::chrono::high_resolution_clock::now();
+  nano total_get_smallest_time = end - start;
+
+  // Validate that the results of both methods are the same
+  for (auto i = 0; i < num_calls; ++i) {
+    if (delete_during_run) {
+      ASSERT_EQ(expected_smallest_keys[i], get_smallest_results[i]);
+    } else {
+      ASSERT_EQ(seek_results[i], get_smallest_results[i]);
+    }
+  }
+
+  constexpr int precision = 4;
+  std::cout << "Seek Time       :" << std::fixed << std::setprecision(precision)
+            << (total_seek_time.count() * 1e-9) << std::endl;
+  std::cout << "GetSmallest Time:" << std::fixed << std::setprecision(precision)
+            << (total_get_smallest_time.count() * 1e-9) << std::endl;
+
+  double ratio = static_cast<double>(total_get_smallest_time.count()) /
+                 static_cast<double>(total_seek_time.count());
+  std::cout << "GetSmallest / Seek ratio:" << std::fixed
+            << std::setprecision(precision) << ratio << '\n';
 }
 // #endif
+
+// ASSERT_EQ(keys[expected_smallest_idx], seek_results[i]);
 
 }  // namespace ROCKSDB_NAMESPACE
 

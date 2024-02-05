@@ -34,7 +34,8 @@ void GlobalDelList::InsertBefore(Iterator& pos, const DelElement& del_elem) {
   assert(Valid());
 }
 
-void GlobalDelList::InsertBeforeAndSetIterOnInserted(Iterator& pos, const DelElement& del_elem) {
+void GlobalDelList::InsertBeforeAndSetIterOnInserted(
+    Iterator& pos, const DelElement& del_elem) {
   pos.del_list_iter_ = del_list_.insert(pos.del_list_iter_, del_elem);
   assert(Valid());
 }

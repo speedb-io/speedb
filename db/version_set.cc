@@ -2068,16 +2068,15 @@ void Version::AddIteratorsForLevel(const ReadOptions& read_options,
   }
 }
 
-std::vector<Version::IteratorPair> Version::GetLevel0Iterators( const ReadOptions& read_options,
-                                                                const FileOptions& soptions,
-                                                                bool allow_unprepared_value,
-                                                                Arena* arena) {
+std::vector<Version::IteratorPair> Version::GetLevel0Iterators(
+    const ReadOptions& read_options, const FileOptions& soptions,
+    bool allow_unprepared_value, Arena* arena) {
   assert(storage_info_.finalized_);
 
   if (storage_info_.IsLevelEmpty(0)) {
     return {};
   }
-  
+
   // TODO - Understand if this should be handled for Get Smallest as well
   // bool should_sample = should_sample_file_read();
 
@@ -2099,14 +2098,18 @@ std::vector<Version::IteratorPair> Version::GetLevel0Iterators( const ReadOption
 
     // TODO - Handle read_options.ignore_range_deletions!!!!
     FragmentedRangeTombstoneIterator* range_ts_iter = nullptr;
-    if ((read_options.ignore_range_deletions == false) && (tombstone_iter != nullptr)) {
-      range_ts_iter = tombstone_iter->StealInternalIterAndInvalidate().release();
+    if ((read_options.ignore_range_deletions == false) &&
+        (tombstone_iter != nullptr)) {
+      range_ts_iter =
+          tombstone_iter->StealInternalIterAndInvalidate().release();
     }
     delete tombstone_iter;
     tombstone_iter = nullptr;
 
-    iters.push_back( {std::move(std::unique_ptr<InternalIterator>(table_iter)),
-                        std::move(std::unique_ptr<FragmentedRangeTombstoneIterator>(range_ts_iter))});
+    iters.push_back(
+        {std::move(std::unique_ptr<InternalIterator>(table_iter)),
+         std::move(std::unique_ptr<FragmentedRangeTombstoneIterator>(
+             range_ts_iter))});
   }
 
   return iters;

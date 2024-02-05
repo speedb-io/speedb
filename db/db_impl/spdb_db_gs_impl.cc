@@ -289,8 +289,8 @@ void UpdateCSK(GlobalContext& gc, LevelContext& lc) {
 
   if (gs_debug_prints) {
     printf("UpdateCSK curr:%s, new:%s\n",
-          ((gc.csk != nullptr) ? gc.csk->c_str() : "NONE"),
-          new_csk.ToString().c_str());
+           ((gc.csk != nullptr) ? gc.csk->c_str() : "NONE"),
+           new_csk.ToString().c_str());
   }
 
   gc.csk->assign(new_csk.data(), new_csk.size());
@@ -395,8 +395,8 @@ bool ProcessCurrValuesIterVsDelList(GlobalContext& gc, LevelContext& lc) {
           (lc.value_category == ValueCategory::MERGE_VALUE)) {
         UpdateCSK(gc, lc);
       } else if (lc.value_category == ValueCategory::DEL_KEY) {
-        gc.del_list->InsertBeforeAndSetIterOnInserted(*lc.del_list_iter,
-                                  DelElement(lc.values_parsed_ikey.user_key));
+        gc.del_list->InsertBeforeAndSetIterOnInserted(
+            *lc.del_list_iter, DelElement(lc.values_parsed_ikey.user_key));
         lc.values_iter->Next();
       }
       break;
@@ -445,7 +445,8 @@ Status ProcessLogLevel(GlobalContext& gc, LevelContext& lc) {
     if (lc.range_del_iter->Valid() == false) {
       auto was_new_csk_found = ProcessCurrValuesIterVsDelList(gc, lc);
       if (was_new_csk_found) {
-        if (gs_debug_prints) printf("Processing Level Ended, new csk was found\n");
+        if (gs_debug_prints)
+          printf("Processing Level Ended, new csk was found\n");
         return Status::OK();
       } else {
         continue;
@@ -500,7 +501,9 @@ Status ProcessLogLevel(GlobalContext& gc, LevelContext& lc) {
     }
   }
 
-  if (gs_debug_prints) printf("Processing Level Ended, was new csk was found:%d\n", lc.new_csk_found_in_level);
+  if (gs_debug_prints)
+    printf("Processing Level Ended, was new csk was found:%d\n",
+           lc.new_csk_found_in_level);
 
   return Status::OK();
 }
@@ -532,7 +535,8 @@ Status ProcessImmutableMemtables(SuperVersion* super_version, GlobalContext& gc,
   auto iters =
       super_version->imm->GetIterators(gc.mutable_read_options, &arena);
 
-  if (gs_debug_prints) printf("Processing Immutable Memtables. Num Memtables:%zu\n", iters.size());
+  if (gs_debug_prints)
+    printf("Processing Immutable Memtables. Num Memtables:%zu\n", iters.size());
 
   auto i = 1;
   for (auto& memtbl_iters : iters) {
@@ -558,7 +562,7 @@ Status ProcessImmutableMemtables(SuperVersion* super_version, GlobalContext& gc,
 }
 
 Status ProcessLevel0Files(SuperVersion* super_version, GlobalContext& gc,
-                                 const FileOptions& file_options, Arena& arena) {
+                          const FileOptions& file_options, Arena& arena) {
   constexpr int level0 = 0;
 
   if (super_version->current->storage_info()->IsLevelEmpty(level0)) {
@@ -567,10 +571,12 @@ Status ProcessLevel0Files(SuperVersion* super_version, GlobalContext& gc,
   }
 
   // TOOD - Handle allow_unprepared_value!!!!
-  auto iters =
-      super_version->current->GetLevel0Iterators(gc.mutable_read_options, file_options, false /* allow_unprepared_value */, &arena);
+  auto iters = super_version->current->GetLevel0Iterators(
+      gc.mutable_read_options, file_options, false /* allow_unprepared_value */,
+      &arena);
 
-  if (gs_debug_prints) printf("Processing Level-0 Files. Num Files:%zu\n", iters.size());
+  if (gs_debug_prints)
+    printf("Processing Level-0 Files. Num Files:%zu\n", iters.size());
 
   auto i = 1;
   for (auto& file_iters : iters) {

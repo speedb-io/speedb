@@ -47,7 +47,8 @@ class GlobalDelList {
     bool Valid() const;
 
     void SeekToFirst();
-
+    void Seek(const Slice& target);
+    
     // Move the iterator forward, until the first del-elem that either
     // contains or is after user_start_key (by the del-elem's start key).
     // The del-element is searched from the current iterator's position until

@@ -265,6 +265,7 @@ struct GlobalContext {
   ReadOptions mutable_read_options;
   SequenceNumber seq_num = kMaxSequenceNumber;
   GlobalDelList* del_list = nullptr;
+  Slice target;
   std::string csk;
   const Comparator* comparator = nullptr;
   std::shared_ptr<Logger> logger;
@@ -422,9 +423,15 @@ bool ProcessCurrValuesIterVsDelList(GlobalContext& gc, LevelContext& lc) {
 }
 
 Status ProcessLogLevel(GlobalContext& gc, LevelContext& lc) {
-  gc.del_list_iter->SeekToFirst();
-  lc.values_iter->SeekToFirst();
-  lc.range_del_iter->SeekToFirst();
+  if (gc.target.empty()) {
+    gc.del_list_iter->SeekToFirst();
+    lc.values_iter->SeekToFirst();
+    lc.range_del_iter->SeekToFirst();
+  } else {
+    gc.del_list_iter->Seek(gc.target);
+    lc.values_iter->Seek(gc.target);
+    lc.range_del_iter->Seek(gc.target);
+  }
 
   while ((lc.new_csk_found_in_level == false) &&
          (lc.values_iter->Valid() || lc.range_del_iter->Valid())) {
@@ -623,6 +630,9 @@ Status DBImpl::GetSmallestAtOrAfter(const ReadOptions& read_options,
   // TODO - Support snapshots
   gc.seq_num = kMaxSequenceNumber;
   gc.del_list = &del_list;
+  if (target.empty() == false) {
+    gc.target = target;
+  }
   gc.csk.clear();
   gc.comparator = cfd->user_comparator();
   gc.logger = immutable_db_options_.info_log;

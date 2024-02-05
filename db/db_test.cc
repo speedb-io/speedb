@@ -8278,7 +8278,7 @@ class DBGsStressTest : public DBGsTest {
     ReopenNewDb(&options);
   }
 
-  void BuildDBContents(const int num_flush_iters, const int num_keys_per_iter) {
+  void BuildDBContents(const int num_flush_iters, const int num_keys_per_iter, const int delete_one_in) {
     auto dflt_cfh = dbfull()->DefaultColumnFamily();
     auto dflt_cfh_impl = static_cast<ColumnFamilyHandleImpl*>(dflt_cfh);
 
@@ -8298,7 +8298,7 @@ class DBGsStressTest : public DBGsTest {
         ASSERT_OK(dbfull()->Put(WriteOptions(), key, (key + key)));
         ++num_keys;
 
-        if (rnd.OneIn(4)) {
+        if (rnd.OneIn(delete_one_in)) {
           auto del_key = keys[rnd.Uniform(keys.size())];
           ASSERT_OK(dbfull()->Delete(WriteOptions(), dflt_cfh, del_key));
           deletd_keys.push_back(del_key);
@@ -8368,14 +8368,14 @@ class DBGsStressTest : public DBGsTest {
   std::vector<std::string> keys_to_delete;
 };
 
-// #if 0
 TEST_F(DBGsStressTest, GS_Stress) {
   auto comparator = std::make_unique<CountingComparator>();
   CreateDB(comparator.get());
 
   constexpr int num_flush_iters = 20;
   constexpr int num_keys_per_iter = 20000U;
-  BuildDBContents(num_flush_iters, num_keys_per_iter);
+  constexpr int delete_one_in = 4;
+  BuildDBContents(num_flush_iters, num_keys_per_iter, delete_one_in);
 
   constexpr int num_calls = 1000;
   std::vector<std::string> seek_results(num_calls);
@@ -8401,7 +8401,8 @@ TEST_F(DBGsStressTest, GS_Stress) {
   nano total_seek_time = end - start;
   auto seek_num_comparisons = comparator->num_comparisons;
 
-  // Find the keys that are expected to be found by Get-Smallest
+  // Find the keys that are expected to be found by Get-Smallest.
+  // (applicable only when delete_during_run == true.
   std::vector<std::string> expected_smallest_keys =
       GetSmallestKeysUsingSeek(num_calls);
 
@@ -8445,9 +8446,6 @@ TEST_F(DBGsStressTest, GS_Stress) {
   std::cout << "GetSmallest / Seek ratio:" << std::fixed
             << std::setprecision(precision) << ratio << '\n';
 }
-// #endif
-
-// ASSERT_EQ(keys[expected_smallest_idx], seek_results[i]);
 
 }  // namespace ROCKSDB_NAMESPACE
 

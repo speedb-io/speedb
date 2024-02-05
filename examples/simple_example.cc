@@ -33,6 +33,8 @@ std::string kDBPath = "C:\\Windows\\TEMP\\rocksdb_delete_range_example";
 std::string kDBPath = "/tmp/rocksdb_delete_range_example";
 #endif
 
+extern bool gs_debug_prints;
+bool gs_debug_prints = false;
 
 int main() {
   Options options;
@@ -78,7 +80,7 @@ int main() {
   printf ("delete completed %lu micros\n", clock->NowMicros() -t );
   t = clock->NowMicros();
   size_t key = htonl(0);
-  for (uint32_t i = 0; i < 100000000 ; i++) {
+  for (uint32_t i = 0; i < 1000000 ; i++) {
     auto iter = db->NewIterator(ReadOptions());
     iter->Seek(std::string((char *)&key, 8));
     delete iter;

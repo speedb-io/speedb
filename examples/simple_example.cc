@@ -2,90 +2,108 @@
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
 //  (found in the LICENSE.Apache file in the root directory).
+//
+// An example code demonstrating how to use CompactFiles, EventListener,
+// and GetColumnFamilyMetaData APIs to implement custom compaction algorithm.
 
-#include <cstdio>
+#include <mutex>
 #include <string>
+#include <iostream>
+#include <arpa/inet.h>
 
 #include "rocksdb/db.h"
+#include "rocksdb/env.h"
 #include "rocksdb/options.h"
-#include "rocksdb/slice.h"
+#include "rocksdb/system_clock.h"
 
+using ROCKSDB_NAMESPACE::ColumnFamilyMetaData;
+using ROCKSDB_NAMESPACE::CompactionOptions;
 using ROCKSDB_NAMESPACE::DB;
+using ROCKSDB_NAMESPACE::EventListener;
+using ROCKSDB_NAMESPACE::FlushJobInfo;
 using ROCKSDB_NAMESPACE::Options;
-using ROCKSDB_NAMESPACE::PinnableSlice;
 using ROCKSDB_NAMESPACE::ReadOptions;
 using ROCKSDB_NAMESPACE::Status;
-using ROCKSDB_NAMESPACE::WriteBatch;
 using ROCKSDB_NAMESPACE::WriteOptions;
+using ROCKSDB_NAMESPACE::FlushOptions;
 
 #if defined(OS_WIN)
-std::string kDBPath = "C:\\Windows\\TEMP\\rocksdb_simple_example";
+std::string kDBPath = "C:\\Windows\\TEMP\\rocksdb_delete_range_example";
 #else
-std::string kDBPath = "/tmp/rocksdb_simple_example";
+std::string kDBPath = "/tmp/rocksdb_delete_range_example";
 #endif
 
-int main() {
-  DB* db;
-  Options options;
-  // Optimize RocksDB. This is the easiest way to get RocksDB to perform well
-  options.IncreaseParallelism();
-  options.OptimizeLevelStyleCompaction();
-  // create the DB if it's not already present
-  options.create_if_missing = true;
 
-  // open DB
+int main() {
+  Options options;
+  options.create_if_missing = true;
+  // Disable RocksDB background compaction.
+  DB* db = nullptr;
+  ROCKSDB_NAMESPACE::DestroyDB(kDBPath, options);
+  options.compression = ROCKSDB_NAMESPACE::CompressionType::kNoCompression;
+  
+ 
   Status s = DB::Open(options, kDBPath, &db);
   assert(s.ok());
+  assert(db);
+  const uint32_t prime= 999983; 
+  std::string value("", 1024);
+  WriteOptions write_options;
+  write_options.disableWAL = true;
+  auto clock = db->GetEnv()->GetSystemClock();
+  auto t = clock->NowMicros();
+  size_t time2 = 0;
+  for (uint32_t i = 0; i < prime ; ++i) {
+    // make sure the keys are sorted
+    size_t key = htonl((i * prime/100) % prime);
+    db->Put(write_options, std::string((char *)&key, 8), value);
+  }
+  printf ("insert completed %lu micros\n", clock->NowMicros() - t);
+  t = clock->NowMicros();
+  // disable the auto compaction
+  options.disable_auto_compactions=true;
 
-  // Put key-value
-  s = db->Put(WriteOptions(), "key1", "value");
-  assert(s.ok());
-  std::string value;
-  // get value
-  s = db->Get(ReadOptions(), "key1", &value);
-  assert(s.ok());
-  assert(value == "value");
-
-  // atomically apply a set of updates
-  {
-    WriteBatch batch;
-    batch.Delete("key1");
-    batch.Put("key2", value);
-    s = db->Write(WriteOptions(), &batch);
+  // now the delete (10% we delete using a normal delete)
+  for (uint32_t i = 0; i < prime/10 ; ++i) {
+    size_t key = htonl(i);    
+    db->Delete(write_options, std::string((char *)&key, 8));
   }
 
-  s = db->Get(ReadOptions(), "key1", &value);
-  assert(s.IsNotFound());
-
-  db->Get(ReadOptions(), "key2", &value);
-  assert(value == "value");
-
-  {
-    PinnableSlice pinnable_val;
-    db->Get(ReadOptions(), db->DefaultColumnFamily(), "key2", &pinnable_val);
-    assert(pinnable_val == "value");
+  size_t start_key = htonl(prime/10 + 100);
+  size_t end_key = htonl(prime/10  + 100 + prime/10);
+  db->DeleteRange(write_options, db->DefaultColumnFamily(),
+                  std::string((char *)&start_key, 8),
+                  std::string((char *)&end_key, 8));
+  
+  printf ("delete completed %lu micros\n", clock->NowMicros() -t );
+  t = clock->NowMicros();
+  size_t key = htonl(0);
+  for (uint32_t i = 0; i < 100000000 ; i++) {
+    auto iter = db->NewIterator(ReadOptions());
+    iter->Seek(std::string((char *)&key, 8));
+    delete iter;
   }
+  printf("time to get 1000  keys after delete is %lu micros\n",   clock->NowMicros() - t);
+  exit(0);
+  t = clock->NowMicros();
 
-  {
-    std::string string_val;
-    // If it cannot pin the value, it copies the value to its internal buffer.
-    // The intenral buffer could be set during construction.
-    PinnableSlice pinnable_val(&string_val);
-    db->Get(ReadOptions(), db->DefaultColumnFamily(), "key2", &pinnable_val);
-    assert(pinnable_val == "value");
-    // If the value is not pinned, the internal buffer must have the value.
-    assert(pinnable_val.IsPinned() || string_val == "value");
+  for (uint32_t i = 0; i < 1000 ; i++) {
+    auto iter = db->NewIterator(ReadOptions());
+    iter->Seek(std::string((char *)&start_key, 8));
+    delete iter;
   }
-
-  PinnableSlice pinnable_val;
-  s = db->Get(ReadOptions(), db->DefaultColumnFamily(), "key1", &pinnable_val);
-  assert(s.IsNotFound());
-  // Reset PinnableSlice after each use and before each reuse
-  pinnable_val.Reset();
-  db->Get(ReadOptions(), db->DefaultColumnFamily(), "key2", &pinnable_val);
-  assert(pinnable_val == "value");
-  pinnable_val.Reset();
-  // The Slice pointed by pinnable_val is not valid after this point
+  printf("time to get 1000  keys after range delete is %lu micros\n",   clock->NowMicros() -t);
+  t = clock->NowMicros();
+  auto delete_range_start = + prime/10  + 100 + prime/10;
+  for (uint32_t i = 0; i < 1000 ; i++) {
+    auto iter = db->NewIterator(ReadOptions());    
+    start_key = htonl(rand() % (prime - delete_range_start) + delete_range_start); 
+    iter->Seek(std::string((char *)&start_key, 8));
+    delete iter;
+  }
+  printf("time to get 1000  keys with no delete is %lu micros\n",   clock->NowMicros() -t);
+    
+  
 
   delete db;
 

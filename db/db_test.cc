@@ -91,7 +91,7 @@
 #include "util/string_util.h"
 #include "utilities/merge_operators.h"
 
-#define RUN_ALL_GS_TESTS 0
+#define RUN_ALL_GS_TESTS 1
 extern bool gs_debug_prints;
 bool gs_debug_prints = false;
 

@@ -265,7 +265,7 @@ struct GlobalContext {
   ReadOptions mutable_read_options;
   SequenceNumber seq_num = kMaxSequenceNumber;
   GlobalDelList* del_list = nullptr;
-  std::string* csk = nullptr;
+  std::string csk;
   const Comparator* comparator = nullptr;
   std::shared_ptr<Logger> logger;
 
@@ -290,11 +290,11 @@ void UpdateCSK(GlobalContext& gc, LevelContext& lc) {
 
   if (gs_debug_prints) {
     printf("UpdateCSK curr:%s, new:%s\n",
-           ((gc.csk != nullptr) ? gc.csk->c_str() : "NONE"),
+           ((gc.csk.empty() == false) ? gc.csk.c_str() : "NONE"),
            new_csk.ToString().c_str());
   }
 
-  gc.csk->assign(new_csk.data(), new_csk.size());
+  gc.csk.assign(new_csk.data(), new_csk.size());
   gc.del_list->Trim(new_csk);
   lc.range_del_iter->SetUpperBound(new_csk);
 
@@ -513,7 +513,7 @@ Status ProcessMutableMemtable(SuperVersion* super_version, GlobalContext& gc,
   std::unique_ptr<InternalIterator> wrapped_values_iter(
       super_version->mem->NewIterator(gc.mutable_read_options, &arena));
   lc.values_iter.reset(new InternalIteratorWrapper(
-      std::move(wrapped_values_iter), gc.comparator, *gc.csk));
+      std::move(wrapped_values_iter), gc.comparator, gc.csk));
 
   auto range_del_iter = super_version->mem->NewRangeTombstoneIterator(
       gc.mutable_read_options, gc.seq_num, false /* immutable_memtable */);
@@ -522,7 +522,7 @@ Status ProcessMutableMemtable(SuperVersion* super_version, GlobalContext& gc,
     wrapped_range_del_iter.reset(std::move(range_del_iter));
   }
   lc.range_del_iter.reset(new FragmentedRangeTombstoneIteratorWrapper(
-      std::move(wrapped_range_del_iter), gc.comparator, *gc.csk));
+      std::move(wrapped_range_del_iter), gc.comparator, gc.csk));
 
   if (gs_debug_prints) printf("Processing Mutable Table\n");
   return ProcessLogLevel(gc, lc);
@@ -540,14 +540,14 @@ Status ProcessImmutableMemtables(SuperVersion* super_version, GlobalContext& gc,
   for (auto& memtbl_iters : iters) {
     LevelContext lc;
     lc.values_iter.reset(new InternalIteratorWrapper(
-        std::move(memtbl_iters.memtbl_iter), gc.comparator, *gc.csk));
+        std::move(memtbl_iters.memtbl_iter), gc.comparator, gc.csk));
 
     std::unique_ptr<FragmentedRangeTombstoneIterator> wrapped_range_del_iter;
     if (memtbl_iters.range_ts_iter.get() != nullptr) {
       wrapped_range_del_iter.reset(memtbl_iters.range_ts_iter.release());
     }
     lc.range_del_iter.reset(new FragmentedRangeTombstoneIteratorWrapper(
-        std::move(wrapped_range_del_iter), gc.comparator, *gc.csk));
+        std::move(wrapped_range_del_iter), gc.comparator, gc.csk));
 
     if (gs_debug_prints) printf("Processing Immutable Memtable #%d\n", i);
     auto status = ProcessLogLevel(gc, lc);
@@ -580,14 +580,14 @@ Status ProcessLevel0Files(SuperVersion* super_version, GlobalContext& gc,
   for (auto& file_iters : iters) {
     LevelContext lc;
     lc.values_iter.reset(new InternalIteratorWrapper(
-        std::move(file_iters.table_iter), gc.comparator, *gc.csk));
+        std::move(file_iters.table_iter), gc.comparator, gc.csk));
 
     std::unique_ptr<FragmentedRangeTombstoneIterator> wrapped_range_del_iter;
     if (file_iters.range_ts_iter.get() != nullptr) {
       wrapped_range_del_iter.reset(file_iters.range_ts_iter.release());
     }
     lc.range_del_iter.reset(new FragmentedRangeTombstoneIteratorWrapper(
-        std::move(wrapped_range_del_iter), gc.comparator, *gc.csk));
+        std::move(wrapped_range_del_iter), gc.comparator, gc.csk));
 
     if (gs_debug_prints) printf("Processing Level-0 File #%d\n", i);
     auto status = ProcessLogLevel(gc, lc);
@@ -622,7 +622,7 @@ Status DBImpl::GetSmallest(const ReadOptions& read_options,
   // TODO - Support snapshots
   gc.seq_num = kMaxSequenceNumber;
   gc.del_list = &del_list;
-  gc.csk = key;
+  gc.csk.clear();
   gc.comparator = cfd->user_comparator();
   gc.logger = immutable_db_options_.info_log;
 
@@ -646,10 +646,11 @@ Status DBImpl::GetSmallest(const ReadOptions& read_options,
 
   CleanupSuperVersion(super_version);
 
-  if (key->empty()) {
+  if (gc.csk.empty()) {
     return Status::NotFound();
   }
 
+  *key = gc.csk;
   return status;
 }
 

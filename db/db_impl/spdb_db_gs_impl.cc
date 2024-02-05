@@ -602,9 +602,10 @@ Status ProcessLevel0Files(SuperVersion* super_version, GlobalContext& gc,
 }  // unnamed namespace
 }  // namespace spdb_gs
 
-Status DBImpl::GetSmallest(const ReadOptions& read_options,
-                           ColumnFamilyHandle* column_family, std::string* key,
-                           std::string* /* value */) {
+Status DBImpl::GetSmallestAtOrAfter(const ReadOptions& read_options,
+                                    ColumnFamilyHandle* column_family,
+                                    const Slice& target, std::string* key,
+                                    std::string* /* value */) {
   assert(read_options.timestamp == nullptr);
   assert(read_options.snapshot == nullptr);
   assert(read_options.ignore_range_deletions == false);
@@ -647,11 +648,22 @@ Status DBImpl::GetSmallest(const ReadOptions& read_options,
   CleanupSuperVersion(super_version);
 
   if (gc.csk.empty()) {
+    *key = "";
     return Status::NotFound();
   }
 
+  // Verify that the found key >= user's key
+  assert(target.empty() || (gc.comparator->Compare(target, gc.csk) <= 0));
   *key = gc.csk;
+
   return status;
+}
+
+Status DBImpl::GetSmallest(const ReadOptions& read_options,
+                           ColumnFamilyHandle* column_family, std::string* key,
+                           std::string* value) {
+  std::string target = "";
+  return GetSmallestAtOrAfter(read_options, column_family, target, key, value);
 }
 
 }  // namespace ROCKSDB_NAMESPACE

@@ -573,12 +573,17 @@ class DB {
   // - Returns NotFound.
   //
   // Returns some other non-OK status on error, as applicable. In that case, key
-  // and value will remain unchanged. virtual Status GetSmallestAtOrAfter(const
-  // ReadOptions& read_options,
-  //                                     ColumnFamilyHandle* column_family,
-  //                                     const Slice& target,
-  //                                     std::string* key,
-  //                                     std::string* value) = 0;
+  // and value will remain unchanged.
+  virtual Status GetSmallestAtOrAfter(const ReadOptions& /* read_options */,
+                                      ColumnFamilyHandle* /* column_family */,
+                                      const Slice& /* target */,
+                                      std::string* /* key */,
+                                      std::string* /* value */) {
+    assert(0);
+    return Status::NotSupported(
+        "GetSmallestAtOrAfter() that isn't overriden by a specific DB is not "
+        "implemented.");
+  }
 
   // Same as GetSmallestAtOrAfter() but finds the smallest key in the CF (no
   // target is specified).

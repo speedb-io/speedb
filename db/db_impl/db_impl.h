@@ -254,6 +254,11 @@ class DBImpl : public DB {
                      ColumnFamilyHandle* column_family, const Slice& key,
                      PinnableSlice* value, std::string* timestamp) override;
 
+  Status GetSmallestAtOrAfter(const ReadOptions& read_options,
+                              ColumnFamilyHandle* column_family,
+                              const Slice& target, std::string* key,
+                              std::string* value) override;
+
   Status GetSmallest(const ReadOptions& read_options,
                      ColumnFamilyHandle* column_family, std::string* key,
                      std::string* value) override;

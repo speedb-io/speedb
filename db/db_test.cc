@@ -8234,15 +8234,35 @@ TEST_F(DBGsTest, GS_ValueImmediatelyDeletedInMutable) {
   ASSERT_OK(dbfull()->Put(WriteOptions(), "x", "b1"));
   ASSERT_OK(dbfull()->Delete(WriteOptions(), dflt_cfh, "x"));
 
-  gs_debug_prints = true;
   CALL_WRAPPER(GetSmallestAndValidate(""));
 }
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 #endif
 
+namespace {
+class CountingComparator : public Comparator {
+ public:
+  virtual const char* Name() const override { return "UdiComparator"; }
+  virtual int Compare(const Slice& a, const Slice& b) const override {
+    ++num_comparisons;
+    return BytewiseComparator()->Compare(a, b);
+  }
+  virtual void FindShortestSeparator(std::string* s,
+                                     const Slice& l) const override {
+    BytewiseComparator()->FindShortestSeparator(s, l);
+  }
+  virtual void FindShortSuccessor(std::string* key) const override {
+    BytewiseComparator()->FindShortSuccessor(key);
+  }
+
+ public:
+  mutable size_t num_comparisons = 0U;
+};
+
+}  // namespace
 class DBGsStressTest : public DBGsTest {
  public:
-  void CreateDB() {
+  void CreateDB(const Comparator* comparator = nullptr) {
     Options options;
     options.write_buffer_size = 64 << 20;
     options.max_write_buffer_number = 1000;
@@ -8250,6 +8270,11 @@ class DBGsStressTest : public DBGsTest {
     options.level0_slowdown_writes_trigger = 2000;
     options.level0_stop_writes_trigger = 3000;
     options.level0_file_num_compaction_trigger = -1;
+
+    if (comparator != nullptr) {
+      options.comparator = comparator;
+    }
+
     ReopenNewDb(&options);
   }
 
@@ -8345,7 +8370,8 @@ class DBGsStressTest : public DBGsTest {
 
 // #if 0
 TEST_F(DBGsStressTest, GS_Stress) {
-  CreateDB();
+  auto comparator = std::make_unique<CountingComparator>();
+  CreateDB(comparator.get());
 
   constexpr int num_flush_iters = 20;
   constexpr int num_keys_per_iter = 20000U;
@@ -8361,6 +8387,7 @@ TEST_F(DBGsStressTest, GS_Stress) {
   bool delete_during_run = false;
 
   std::cout << "\nSeek Start\n";
+  comparator->num_comparisons = 0U;
   auto start = std::chrono::high_resolution_clock::now();
   for (auto i = 0; i < num_calls; ++i) {
     seek_results[i] = GetSmallestUsingSeekToFirst();
@@ -8372,12 +8399,14 @@ TEST_F(DBGsStressTest, GS_Stress) {
   }
   auto end = std::chrono::high_resolution_clock::now();
   nano total_seek_time = end - start;
+  auto seek_num_comparisons = comparator->num_comparisons;
 
   // Find the keys that are expected to be found by Get-Smallest
   std::vector<std::string> expected_smallest_keys =
       GetSmallestKeysUsingSeek(num_calls);
 
   std::cout << "GetSmallest Start\n";
+  comparator->num_comparisons = 0U;
   start = std::chrono::high_resolution_clock::now();
   for (auto i = 0; i < num_calls; ++i) {
     get_smallest_results[i] = GetSmallestUsingGetSmallest();
@@ -8390,6 +8419,7 @@ TEST_F(DBGsStressTest, GS_Stress) {
   }
   end = std::chrono::high_resolution_clock::now();
   nano total_get_smallest_time = end - start;
+  auto get_smallest_num_comparisons = comparator->num_comparisons;
 
   // Validate that the results of both methods are the same
   for (auto i = 0; i < num_calls; ++i) {
@@ -8405,6 +8435,10 @@ TEST_F(DBGsStressTest, GS_Stress) {
             << (total_seek_time.count() * 1e-9) << std::endl;
   std::cout << "GetSmallest Time:" << std::fixed << std::setprecision(precision)
             << (total_get_smallest_time.count() * 1e-9) << std::endl;
+
+  std::cout << "Seek #Comparisons:" << seek_num_comparisons
+            << ", GetSmallest #Comparisons:" << get_smallest_num_comparisons
+            << '\n';
 
   double ratio = static_cast<double>(total_get_smallest_time.count()) /
                  static_cast<double>(total_seek_time.count());

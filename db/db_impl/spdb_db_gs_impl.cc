@@ -268,12 +268,13 @@ struct GlobalContext {
   std::string* csk = nullptr;
   const Comparator* comparator = nullptr;
   std::shared_ptr<Logger> logger;
+
+  std::unique_ptr<GlobalDelList::Iterator> del_list_iter;
 };
 
 struct LevelContext {
   std::unique_ptr<InternalIteratorWrapper> values_iter;
   std::unique_ptr<FragmentedRangeTombstoneIteratorWrapper> range_del_iter;
-  std::unique_ptr<GlobalDelList::Iterator> del_list_iter;
 
   // std::string prev_del_key;
 
@@ -310,23 +311,23 @@ void ProcessCurrRangeTsVsDelList(GlobalContext& gc, LevelContext& lc) {
 
   // values iter is Invalid, DR Iter is valid => Add to global del-list and
   // complete level processing
-  if (lc.del_list_iter->Valid()) {
-    auto& del_elem = lc.del_list_iter->key();
+  if (gc.del_list_iter->Valid()) {
+    auto& del_elem = gc.del_list_iter->key();
 
     RelativePos overlap_start_rel_pos{RelativePos::NONE};
     RelativePos overlap_end_rel_pos{RelativePos::NONE};
     auto del_list_vs_range_ts = CompareDelElemToRangeTs(
-        lc.del_list_iter->key(), range_ts, gc.comparator,
+        gc.del_list_iter->key(), range_ts, gc.comparator,
         &overlap_start_rel_pos, &overlap_end_rel_pos);
 
     switch (del_list_vs_range_ts) {
       case RelativePos::BEFORE:
-        lc.del_list_iter->SeekForward(range_ts.start_key_);
+        gc.del_list_iter->SeekForward(range_ts.start_key_);
         break;
 
       case RelativePos::AFTER:
         gc.del_list->InsertBefore(
-            *lc.del_list_iter,
+            *gc.del_list_iter,
             DelElement(range_ts.start_key_, range_ts.end_key_));
         lc.range_del_iter->Next();
         break;
@@ -341,9 +342,9 @@ void ProcessCurrRangeTsVsDelList(GlobalContext& gc, LevelContext& lc) {
         if (del_elem_starts_at_or_before_range_ts) {
           if (del_elem_ends_before_range_ts) {
             gc.del_list->ReplaceWith(
-                *lc.del_list_iter,
+                *gc.del_list_iter,
                 DelElement(del_elem.user_start_key, range_ts.end_key_));
-            lc.del_list_iter->SeekForward(range_ts.end_key_);
+            gc.del_list_iter->SeekForward(range_ts.end_key_);
           } else {
             // Del-elem contains range-ts => Nothing to do
           }
@@ -351,13 +352,13 @@ void ProcessCurrRangeTsVsDelList(GlobalContext& gc, LevelContext& lc) {
           if (del_elem_ends_before_range_ts) {
             // Range-ts contains del-elem
             gc.del_list->ReplaceWith(
-                *lc.del_list_iter,
+                *gc.del_list_iter,
                 DelElement(range_ts.start_key_, range_ts.end_key_));
-            lc.del_list_iter->SeekForward(range_ts.end_key_);
+            gc.del_list_iter->SeekForward(range_ts.end_key_);
           } else {
             // del-elem start after range ts but ends after
             gc.del_list->ReplaceWith(
-                *lc.del_list_iter,
+                *gc.del_list_iter,
                 DelElement(range_ts.start_key_, del_elem.user_end_key));
             lc.range_del_iter->Seek(del_elem.user_end_key);
           }
@@ -371,7 +372,7 @@ void ProcessCurrRangeTsVsDelList(GlobalContext& gc, LevelContext& lc) {
   } else {
     // del list exhausted
     gc.del_list->InsertBefore(
-        *lc.del_list_iter, DelElement(range_ts.start_key_, range_ts.end_key_));
+        *gc.del_list_iter, DelElement(range_ts.start_key_, range_ts.end_key_));
     lc.range_del_iter->Next();
   }
 }
@@ -379,15 +380,15 @@ void ProcessCurrRangeTsVsDelList(GlobalContext& gc, LevelContext& lc) {
 bool ProcessCurrValuesIterVsDelList(GlobalContext& gc, LevelContext& lc) {
   auto del_list_vs_values_iter_key = RelativePos::AFTER;
 
-  if (lc.del_list_iter->Valid()) {
+  if (gc.del_list_iter->Valid()) {
     del_list_vs_values_iter_key = CompareDelElemToUserKey(
-        lc.del_list_iter->key(), lc.values_parsed_ikey.user_key, gc.comparator,
+        gc.del_list_iter->key(), lc.values_parsed_ikey.user_key, gc.comparator,
         nullptr /* overlap_start_rel_pos */, nullptr /* overlap_end_rel_pos */);
   }
 
   switch (del_list_vs_values_iter_key) {
     case RelativePos::BEFORE:
-      lc.del_list_iter->SeekForward(lc.values_parsed_ikey.user_key);
+      gc.del_list_iter->SeekForward(lc.values_parsed_ikey.user_key);
       break;
 
     case RelativePos::AFTER:
@@ -396,7 +397,7 @@ bool ProcessCurrValuesIterVsDelList(GlobalContext& gc, LevelContext& lc) {
         UpdateCSK(gc, lc);
       } else if (lc.value_category == ValueCategory::DEL_KEY) {
         gc.del_list->InsertBeforeAndSetIterOnInserted(
-            *lc.del_list_iter, DelElement(lc.values_parsed_ikey.user_key));
+            *gc.del_list_iter, DelElement(lc.values_parsed_ikey.user_key));
         lc.values_iter->Next();
       }
       break;
@@ -404,8 +405,8 @@ bool ProcessCurrValuesIterVsDelList(GlobalContext& gc, LevelContext& lc) {
     case RelativePos::OVERLAP:
       // The key is covered by the Del-Elem => it is irrelevant (as all of the
       // range covered)
-      if (lc.del_list_iter->key().IsRange()) {
-        lc.values_iter->Seek(lc.del_list_iter->key().user_end_key);
+      if (gc.del_list_iter->key().IsRange()) {
+        lc.values_iter->Seek(gc.del_list_iter->key().user_end_key);
       } else {
         lc.values_iter->Next();
       }
@@ -421,10 +422,7 @@ bool ProcessCurrValuesIterVsDelList(GlobalContext& gc, LevelContext& lc) {
 }
 
 Status ProcessLogLevel(GlobalContext& gc, LevelContext& lc) {
-  // TODO - Create this once for all levels rather than recreate per level
-  lc.del_list_iter.reset(gc.del_list->NewIterator().release());
-
-  lc.del_list_iter->SeekToFirst();
+  gc.del_list_iter->SeekToFirst();
   lc.values_iter->SeekToFirst();
   lc.range_del_iter->SeekToFirst();
 
@@ -627,6 +625,9 @@ Status DBImpl::GetSmallest(const ReadOptions& read_options,
   gc.csk = key;
   gc.comparator = cfd->user_comparator();
   gc.logger = immutable_db_options_.info_log;
+
+  // TODO - Create this once for all levels rather than recreate per level
+  gc.del_list_iter.reset(gc.del_list->NewIterator().release());
 
   // TODO - User the CSK to set the upper bound of applicable iterators
 

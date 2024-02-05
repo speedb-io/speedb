@@ -8241,8 +8241,6 @@ TEST_F(DBGsTest, GS_RangeTsAndDelKeyInImmCoveringInL0) {
   CALL_WRAPPER(GetSmallestAndValidate("d", "switched and deleted d"));
 }
 
-// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-#endif
 
 TEST_F(DBGsTest, GS_ValueImmediatelyDeletedInMutable) {
   ReopenNewDb();
@@ -8254,8 +8252,10 @@ TEST_F(DBGsTest, GS_ValueImmediatelyDeletedInMutable) {
   gs_debug_prints = true;
   CALL_WRAPPER(GetSmallestAndValidate(""));
 }
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+#endif
 
-#if 0
+// #if 0
 TEST_F(DBGsTest, GS_Stress) {
   Options options;
   options.write_buffer_size = 64 << 20;
@@ -8323,20 +8323,21 @@ TEST_F(DBGsTest, GS_Stress) {
   std::cout << "\nSeek / GetSmallest Start\n";
   
   using nano = std::chrono::nanoseconds;
-  nano total_seek_time {0};
-  nano total_get_smallest_time {0};
+  // nano total_seek_time {0};
+  // nano total_get_smallest_time {0};
 
   int expected_smallest_idx = 0;
+  auto start_seek = std::chrono::high_resolution_clock::now();
   for (auto i = 0; i < num_calls; ++i) {
-    auto start_seek = std::chrono::high_resolution_clock::now();
-    seek_results[i] = GetSmallestUsingSeekToFirst();
-    auto end_seek = std::chrono::high_resolution_clock::now();
-    total_seek_time += end_seek - start_seek;
+    // seek_results[i] = GetSmallestUsingSeekToFirst();
+    seek_results[i] = GetSmallestUsingGetSmallest();
 
-    auto start_get_smallest = std::chrono::high_resolution_clock::now();
-    get_smallest_results[i] = GetSmallestUsingGetSmallest();
-    auto end_get_smallest = std::chrono::high_resolution_clock::now();
-    total_get_smallest_time += end_get_smallest - start_get_smallest;
+    // total_seek_time += end_seek - start_seek;
+
+    // auto start_get_smallest = std::chrono::high_resolution_clock::now();
+    // get_smallest_results[i] = GetSmallestUsingGetSmallest();
+    // auto end_get_smallest = std::chrono::high_resolution_clock::now();
+    // total_get_smallest_time += end_get_smallest - start_get_smallest;
 
     while (std::find(deletd_keys.begin(), deletd_keys.end(), keys[expected_smallest_idx]) != deletd_keys.end()) {
       // std::cout << "|" << keys[expected_smallest_idx] << "| deleted\n";
@@ -8347,21 +8348,23 @@ TEST_F(DBGsTest, GS_Stress) {
     ASSERT_EQ(keys[expected_smallest_idx], seek_results[i]) << "i = " << i;
     ++expected_smallest_idx;
     
-    if (seek_results[i] != get_smallest_results[i]) {
-      std::cout << "MISMATCH!!!! - Re-Running GetSmallest with debug prints\n";
-      gs_debug_prints = true;
-      GetSmallestUsingGetSmallest();
-      ASSERT_EQ(seek_results[i], get_smallest_results[i]) << "i = " << i;
-    }
+    // if (seek_results[i] != keys[expected_smallest_idx]) {
+    //   std::cout << "MISMATCH!!!! - Re-Running GetSmallest with debug prints\n";
+    //   gs_debug_prints = true;
+    //   GetSmallestUsingGetSmallest();
+    //   ASSERT_EQ(seek_results[i], get_smallest_results[i]) << "i = " << i;
+    // }
 
     // std::cout << "Success (i=" << i << "), Deleting |" << seek_results[i] << "|\n";
     ASSERT_OK(dbfull()->Delete(WriteOptions(), dflt_cfh, seek_results[i])); 
   }
+  auto end_seek = std::chrono::high_resolution_clock::now();
 
+  nano total_seek_time = end_seek - start_seek;
   std::cout << "Seek Time:" << std::fixed << std::setprecision(precision) <<  (total_seek_time.count() * 1e-9) << std::endl;
-  std::cout << "GetSmallest Time:" << std::fixed << std::setprecision(precision) <<  (total_get_smallest_time.count() * 1e-9) << std::endl;
+  // std::cout << "GetSmallest Time:" << std::fixed << std::setprecision(precision) <<  (total_get_smallest_time.count() * 1e-9) << std::endl;
 }
-#endif
+// #endif
 
 }  // namespace ROCKSDB_NAMESPACE
 

@@ -393,12 +393,10 @@ bool ProcessCurrValuesIterVsDelList(GlobalContext& gc, LevelContext& lc) {
     case RelativePos::AFTER:
       if ((lc.value_category == ValueCategory::VALUE) ||
           (lc.value_category == ValueCategory::MERGE_VALUE)) {
-        // if ((lc.prev_del.key.empty() == false) && ()
         UpdateCSK(gc, lc);
       } else if (lc.value_category == ValueCategory::DEL_KEY) {
-        gc.del_list->InsertBefore(*lc.del_list_iter,
+        gc.del_list->InsertBeforeAndSetIterOnInserted(*lc.del_list_iter,
                                   DelElement(lc.values_parsed_ikey.user_key));
-        // lc.prev_del_key.assign(lc.values_iter->key().data(), lc.values_iter->key().size());
         lc.values_iter->Next();
       }
       break;

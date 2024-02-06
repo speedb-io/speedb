@@ -62,6 +62,19 @@ DB* PrepareDB() {
   return db;
 }
 
+void InsertEntries(DB* db, const WriteOptions& write_options, int n_entries) {
+  std::string value("", 1024);
+
+  for(int k = 0; k < n_entries; k++) {
+    uint8_t priority = rand() % kNPriorities;
+    std::string key((char *)&priority, 1);
+    uint32_t ikey = htonl(debug_info[priority].last_written);
+    key += std::string((char *)&ikey, 4);
+    db->Put(write_options, key, value);
+    debug_info[priority].last_written++;
+  }
+}
+
 void ValidateReadValue(const char *key) {  
   int p = key[0];
   uint32_t val = ntohl(*((uint32_t *)&key[1]));
@@ -83,19 +96,9 @@ int main() {
   std::cout << "Starting\n";
   for (size_t i = 0; i < 1000 * 10 ; ++i) {
     {
-      if (i != 0 && (i % 1000) == 0) {
-        std::cout << "i = " << i << '\n';
-      }
       // insert up to 10 random entries
       int n_entries = rand() % 10 + 1;
-      for(int k = 0; k < n_entries; k++) {
-        uint8_t priority = rand() % kNPriorities;
-        std::string key((char *)&priority, 1);
-        uint32_t ikey = htonl(debug_info[priority].last_written);
-        key += std::string((char *)&ikey, 4);
-        db->Put(write_options, key, value);
-        debug_info[priority].last_written++;
-      }
+      InsertEntries(db, write_options, n_entries);
     }
     { // now pop and verify
       int n_entries = rand() % 10 + 1;

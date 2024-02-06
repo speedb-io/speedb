@@ -62,47 +62,44 @@ DB* PrepareDB() {
   return db;
 }
 
-void InsertEntries(DB* db, const WriteOptions& write_options, int n_entries) {
-  std::string value("", 1024);
-
-  for(int k = 0; k < n_entries; k++) {
-    uint8_t priority = rand() % kNPriorities;
-    std::string key((char *)&priority, 1);
-    uint32_t ikey = htonl(debug_info[priority].last_written);
-    key += std::string((char *)&ikey, 4);
-    db->Put(write_options, key, value);
-    debug_info[priority].last_written++;
-  }
-}
-
-void ValidateReadValue(const char *key = nullptr) {  
-  int p = key[0];
-  uint32_t val = ntohl(*((uint32_t *)&key[1]));
-  if (val != debug_info[p].last_read) {
-    std::cout << "OOPS:" << val << ", " << debug_info[p].last_read << '\n';
-    assert (val == debug_info[p].last_read);
-  }
-  debug_info[p].last_read++;
-  assert(NoValBefore(p));
-}
-
 int main() { 
+  // Options options;
+  // options.create_if_missing = true;
+  // // Disable RocksDB background compaction.
+  // DB* db = nullptr;
+  // ROCKSDB_NAMESPACE::DestroyDB(kDBPath, options);
+  // options.compression = ROCKSDB_NAMESPACE::CompressionType::kNoCompression;
+  // options.statistics =   ROCKSDB_NAMESPACE::CreateDBStatistics();
+  // options.stats_dump_period_sec=30;
+  // options.disable_auto_compactions = true; 
+  // Status s = DB::Open(options, kDBPath, &db);
+  // assert(s.ok());
+  // assert(db);
+
   auto db = PrepareDB();
-
-  auto clock = db->GetEnv()->GetSystemClock();
-
+    
+  std::string value("", 1024);
   WriteOptions write_options;
   write_options.disableWAL = true;
-
+  auto clock = db->GetEnv()->GetSystemClock();
+  auto t = clock->NowMicros(); 
   std::cout << "Starting\n";
-  auto num_1000s_iters = 2;
-  auto start_time = clock->NowMicros();
-
-  for (size_t i = 0; i < num_1000s_iters * 1000; ++i) {
-    // insert up to 10 random entries
-    int n_entries = rand() % 10 + 1;
-    InsertEntries(db, write_options, n_entries);
-
+  for (size_t i = 0; i < 1000 * 10 ; ++i) {
+    {
+      if (i != 0 && (i % 1000) == 0) {
+        std::cout << "i = " << i << '\n';
+      }
+      // insert up to 10 random entries
+      int n_entries = rand() % 10 + 1;
+      for(int k = 0; k < n_entries; k++) {
+        uint8_t priority = rand() % kNPriorities;
+        std::string key((char *)&priority, 1);
+        uint32_t ikey = htonl(debug_info[priority].last_written);
+        key += std::string((char *)&ikey, 4);
+        db->Put(write_options, key, value);
+        debug_info[priority].last_written++;
+      }
+    }
     { // now pop and verify
       int n_entries = rand() % 10 + 1;
       for(int k = 0; k < n_entries; k++) {
@@ -110,22 +107,20 @@ int main() {
         iter->SeekToFirst();
         if (iter->Valid()) {
           const char *key = iter->key().data();
-          ValidateReadValue(key);
-
-          debug_info[key[0]].last_read++;
+          int p = key[0];
+          uint32_t val = ntohl(*((uint32_t *)&key[1]));
+          if (val != debug_info[p].last_read) {
+            std::cout << "OOPS:" << val << ", " << debug_info[p].last_read << '\n';
+            assert (val == debug_info[p].last_read);
+          }
+          debug_info[p].last_read++;
           db->Delete(write_options, iter->key());
+          assert(NoValBefore(p));
         } else {
           assert(NoValBefore(kNPriorities));
           break;
         }
       }
-    }
-
-    if (i != 0 && (i % 1000) == 0) {
-      auto end_time = clock->NowMicros();
-      start_time = clock->NowMicros();
-
-      std::cout << "Completed " << i << " Iters in " << (end_time - start_time) << " micros\n";
     }
   }
 

@@ -672,8 +672,7 @@ Status DBImpl::GetSmallestAtOrAfter(const ReadOptions& read_options,
 Status DBImpl::GetSmallest(const ReadOptions& read_options,
                            ColumnFamilyHandle* column_family, std::string* key,
                            std::string* value) {
-  std::string target = "";
-  return GetSmallestAtOrAfter(read_options, column_family, target, key, value);
+  return GetSmallestAtOrAfter(read_options, column_family, "" /* target */, key, value);
 }
 
 }  // namespace ROCKSDB_NAMESPACE

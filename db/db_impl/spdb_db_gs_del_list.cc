@@ -149,7 +149,7 @@ void GlobalDelList::Iterator::SeekToFirst() {
 }
 
 void GlobalDelList::Iterator::Seek(const Slice& target) {
-  SeekToFirst();
+  del_list_iter_ = glbl_del_list_.del_list_.end();
   SeekForward(target);
 }
 

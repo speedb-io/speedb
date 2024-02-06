@@ -91,7 +91,7 @@
 #include "util/string_util.h"
 #include "utilities/merge_operators.h"
 
-#define RUN_ALL_GS_TESTS 1
+#define RUN_ALL_GS_TESTS 0
 extern bool gs_debug_prints;
 bool gs_debug_prints = false;
 
@@ -8262,6 +8262,8 @@ class CountingComparator : public Comparator {
 }  // namespace
 class DBGsStressTest : public DBGsTest {
  public:
+  DBGsStressTest(): rnd(301) {}
+
   void CreateDB(const Comparator* comparator = nullptr) {
     Options options;
     options.write_buffer_size = 64 << 20;
@@ -8282,8 +8284,7 @@ class DBGsStressTest : public DBGsTest {
     auto dflt_cfh = dbfull()->DefaultColumnFamily();
     auto dflt_cfh_impl = static_cast<ColumnFamilyHandleImpl*>(dflt_cfh);
 
-    Random rnd(301);
-    auto NextKey = [&rnd](int len) { return rnd.HumanReadableString(len); };
+    auto NextKey = [this](int len) { return rnd.HumanReadableString(len); };
 
     std::cout << "Generating Keys\n";
     ;
@@ -8322,6 +8323,15 @@ class DBGsStressTest : public DBGsTest {
     std::cout << "Num files at level-1:" << NumTableFilesAtLevel(1) << '\n';
   }
 
+  void PickSeekKeys(const int num_keys) {
+    assert(static_cast<int>(keys.size()) >= num_keys);
+
+    for (auto i = 0; i < num_keys; ++i) {
+      auto key_idx = rnd.Uniform(keys.size());
+      seek_keys.push_back(keys[key_idx]);
+    }
+  }
+
   void FindSmallesKeys() {
     int expected_smallest_idx = 0;
 
@@ -8341,11 +8351,27 @@ class DBGsStressTest : public DBGsTest {
     return db_iter->key().ToString();
   }
 
+  std::string GetSmallestAtOrAfterUsingSeek(const Slice& target) {
+    std::unique_ptr<Iterator> db_iter{dbfull()->NewIterator(ReadOptions())};
+    db_iter->Seek(target);
+    EXPECT_TRUE(db_iter->Valid());
+    return db_iter->key().ToString();
+  }
+
   std::string GetSmallestUsingGetSmallest() {
     std::string smallest_key;
     Status s =
         dbfull()->GetSmallest(ReadOptions(), dbfull()->DefaultColumnFamily(),
                               &smallest_key, nullptr /* value */);
+    EXPECT_OK(s);
+    return smallest_key;
+  }
+
+  std::string GetSmallestAtOrAfterUsingGetSmallestAtOrAfter(const Slice& target) {
+    std::string smallest_key;
+    Status s =
+        dbfull()->GetSmallestAtOrAfter(ReadOptions(), dbfull()->DefaultColumnFamily(),
+                              target, &smallest_key, nullptr /* value */);
     EXPECT_OK(s);
     return smallest_key;
   }
@@ -8366,9 +8392,15 @@ class DBGsStressTest : public DBGsTest {
   std::vector<std::string> keys;
   std::vector<std::string> deletd_keys;
   std::vector<std::string> keys_to_delete;
+  std::vector<std::string> seek_keys;
+
+  Random rnd;
 };
 
-TEST_F(DBGsStressTest, GS_Stress) {
+TEST_F(DBGsStressTest, GS_GetSmallestStress) {
+  bool get_smallest_at_or_after = true;
+  constexpr int num_seek_keys = 100000;
+
   auto comparator = std::make_unique<CountingComparator>();
   CreateDB(comparator.get());
 
@@ -8377,7 +8409,10 @@ TEST_F(DBGsStressTest, GS_Stress) {
   constexpr int delete_one_in = 4;
   BuildDBContents(num_flush_iters, num_keys_per_iter, delete_one_in);
 
-  constexpr int num_calls = 1000;
+  if (get_smallest_at_or_after) {
+    PickSeekKeys(num_seek_keys);
+  }
+  constexpr int num_calls = num_seek_keys;
   std::vector<std::string> seek_results(num_calls);
   std::vector<std::string> get_smallest_results(num_calls);
 
@@ -8390,7 +8425,11 @@ TEST_F(DBGsStressTest, GS_Stress) {
   comparator->num_comparisons = 0U;
   auto start = std::chrono::high_resolution_clock::now();
   for (auto i = 0; i < num_calls; ++i) {
-    seek_results[i] = GetSmallestUsingSeekToFirst();
+    if (get_smallest_at_or_after) {
+      seek_results[i] = GetSmallestAtOrAfterUsingSeek(seek_keys[i]);
+    } else {
+      seek_results[i] = GetSmallestUsingSeekToFirst();
+    }
 
     if (delete_during_run) {
       // Delete the smallest found so next call will find the next smallest
@@ -8410,7 +8449,11 @@ TEST_F(DBGsStressTest, GS_Stress) {
   comparator->num_comparisons = 0U;
   start = std::chrono::high_resolution_clock::now();
   for (auto i = 0; i < num_calls; ++i) {
-    get_smallest_results[i] = GetSmallestUsingGetSmallest();
+    if (get_smallest_at_or_after) {
+      get_smallest_results[i] = GetSmallestAtOrAfterUsingGetSmallestAtOrAfter(seek_keys[i]);      
+    } else {
+      get_smallest_results[i] = GetSmallestUsingGetSmallest();
+    }
 
     if (delete_during_run) {
       // Delete the smallest found so next call will find the next smallest

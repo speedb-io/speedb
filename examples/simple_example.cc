@@ -9,6 +9,8 @@
 #include <string>
 #include <arpa/inet.h>
 #include <memory>
+#include <chrono>
+#include <iomanip>
 
 #include <iostream> 
 #include "rocksdb/db.h"
@@ -86,20 +88,23 @@ void ValidateReadValue(const char *key) {
 }
 
 int main() { 
+  using nano = std::chrono::nanoseconds;
+
   auto db = PrepareDB();
 
   std::string value("", 1024);
   WriteOptions write_options;
   write_options.disableWAL = true;
-  auto clock = db->GetEnv()->GetSystemClock();
-  auto t = clock->NowMicros(); 
+
   std::cout << "Starting\n";
-  for (size_t i = 0; i < 1000 * 10 ; ++i) {
-    {
-      // insert up to 10 random entries
-      int n_entries = rand() % 10 + 1;
-      InsertEntries(db, write_options, n_entries);
-    }
+  auto num_1000s_iters = 10;
+  auto total_iters = num_1000s_iters * 1000;
+  auto start_time = std::chrono::high_resolution_clock::now();
+  for (size_t i = 0; i < total_iters; ++i) {
+    // insert up to 10 random entries
+    int n_entries = rand() % 10 + 1;
+    InsertEntries(db, write_options, n_entries);
+
     { // now pop and verify
       int n_entries = rand() % 10 + 1;
       for(int k = 0; k < n_entries; k++) {
@@ -118,6 +123,14 @@ int main() {
           break;
         }
       }
+    }
+
+    if ((i != 0) && ((i % 1000) == 999) || (i == total_iters - 1)) {
+      auto end_time = std::chrono::high_resolution_clock::now();
+      nano total_time = end_time - start_time;
+      std::cout << "Completed 1000 Iters (i = " << (i+1) << ") in " << std::fixed << std::setprecision(4) << (total_time.count() * 1e-9) << " seconds" << std::endl;
+
+      start_time = std::chrono::high_resolution_clock::now();
     }
   }
 

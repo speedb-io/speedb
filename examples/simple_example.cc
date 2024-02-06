@@ -47,16 +47,41 @@ bool NoValBefore(uint p) {
   return true;
 }
 
-DB* PrepareDB() {
+class CountingComparator : public Comparator {
+ public:
+  virtual const char* Name() const override { return "UdiComparator"; }
+  virtual int Compare(const Slice& a, const Slice& b) const override {
+    ++num_comparisons;
+    return BytewiseComparator()->Compare(a, b);
+  }
+  virtual void FindShortestSeparator(std::string* s,
+                                     const Slice& l) const override {
+    BytewiseComparator()->FindShortestSeparator(s, l);
+  }
+  virtual void FindShortSuccessor(std::string* key) const override {
+    BytewiseComparator()->FindShortSuccessor(key);
+  }
+
+ public:
+  mutable size_t num_comparisons = 0U;
+};
+
+DB* PrepareDB(const Comparator* comparator) {
   Options options;
-  options.create_if_missing = true;
   // Disable RocksDB background compaction.
   DB* db = nullptr;
   ROCKSDB_NAMESPACE::DestroyDB(kDBPath, options);
+  options.create_if_missing = true;
+  options.max_write_buffer_number = 1000;
+  options.disable_auto_compactions = true;
+  options.level0_slowdown_writes_trigger = 2000;
+  options.level0_stop_writes_trigger = 3000;
+  options.level0_file_num_compaction_trigger = -1;
   options.compression = ROCKSDB_NAMESPACE::CompressionType::kNoCompression;
-  options.statistics =   ROCKSDB_NAMESPACE::CreateDBStatistics();
-  options.stats_dump_period_sec=30;
+  options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
+  options.stats_dump_period_sec = 30;
   options.disable_auto_compactions = true; 
+  options.comparator = comparator;
   Status s = DB::Open(options, kDBPath, &db);
   assert(s.ok());
   assert(db);
@@ -87,17 +112,63 @@ void ValidateReadValue(const char *key) {
   assert(NoValBefore(p));
 }
 
+void PopAndVerifySeek(DB* db, const WriteOptions& write_options) {
+  // now pop and verify
+  int n_entries = rand() % 10 + 1;
+  for(int k = 0; k < n_entries; k++) {
+    std::unique_ptr<Iterator> iter(db->NewIterator(ReadOptions()));
+    iter->SeekToFirst();
+    if (iter->Valid()) {
+      const char *key = iter->key().data();
+      ValidateReadValue(key);
+
+      int p = key[0];
+      debug_info[p].last_read++;
+      db->Delete(write_options, iter->key());
+      assert(NoValBefore(p));
+    } else {
+      assert(NoValBefore(kNPriorities));
+      break;
+    }
+  }
+}
+
+void PopAndVerifyGetSmallest(DB* db, const WriteOptions& write_options) {
+  // now pop and verify
+  int n_entries = rand() % 10 + 1;
+  for(int k = 0; k < n_entries; k++) {
+    std::string smallest_key;
+    auto s = db->GetSmallest(ReadOptions(), db->DefaultColumnFamily(), &smallest_key, nullptr);
+
+    if (s.ok()) {
+      const char *key = smallest_key.data();
+      ValidateReadValue(key);
+
+      int p = key[0];
+      debug_info[p].last_read++;
+      db->Delete(write_options, smallest_key);
+      assert(NoValBefore(p));
+    } else {
+      assert(NoValBefore(kNPriorities));
+      break;
+    }
+  }
+}
+
+#define USE_GET_SMALLEST 1
+
 int main() { 
   using nano = std::chrono::nanoseconds;
 
-  auto db = PrepareDB();
+  auto comparator = std::make_unique<CountingComparator>();
+  auto db = PrepareDB(comparator.get());
 
   std::string value("", 1024);
   WriteOptions write_options;
   write_options.disableWAL = true;
 
   std::cout << "Starting\n";
-  auto num_1000s_iters = 10;
+  auto num_1000s_iters = 100;
   auto total_iters = num_1000s_iters * 1000;
   auto start_time = std::chrono::high_resolution_clock::now();
   for (size_t i = 0; i < total_iters; ++i) {
@@ -105,30 +176,16 @@ int main() {
     int n_entries = rand() % 10 + 1;
     InsertEntries(db, write_options, n_entries);
 
-    { // now pop and verify
-      int n_entries = rand() % 10 + 1;
-      for(int k = 0; k < n_entries; k++) {
-        std::unique_ptr<Iterator> iter(db->NewIterator(ReadOptions()));
-        iter->SeekToFirst();
-        if (iter->Valid()) {
-          const char *key = iter->key().data();
-          ValidateReadValue(key);
-
-          int p = key[0];
-          debug_info[p].last_read++;
-          db->Delete(write_options, iter->key());
-          assert(NoValBefore(p));
-        } else {
-          assert(NoValBefore(kNPriorities));
-          break;
-        }
-      }
-    }
+#if USE_GET_SMALLEST  
+    PopAndVerifyGetSmallest(db, write_options);
+#else
+    PopAndVerifySeek(db, write_options);
+#endif
 
     if ((i != 0) && ((i % 1000) == 999) || (i == total_iters - 1)) {
       auto end_time = std::chrono::high_resolution_clock::now();
       nano total_time = end_time - start_time;
-      std::cout << "Completed 1000 Iters (i = " << (i+1) << ") in " << std::fixed << std::setprecision(4) << (total_time.count() * 1e-9) << " seconds" << std::endl;
+      std::cout << "Completed 1000 Iters (i = " << (i+1) << ") in " << std::fixed << std::setprecision(4) << (total_time.count() * 1e-9) << " seconds. #Comparisons:" << comparator->num_comparisons << std::endl;
 
       start_time = std::chrono::high_resolution_clock::now();
     }

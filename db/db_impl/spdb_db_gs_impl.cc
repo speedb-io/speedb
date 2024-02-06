@@ -23,6 +23,7 @@
 #include "db/range_tombstone_fragmenter.h"
 #include "memory/arena.h"
 #include "rocksdb/status.h"
+#include "util/stop_watch.h"
 
 extern bool gs_debug_prints;
 
@@ -672,6 +673,8 @@ Status DBImpl::GetSmallestAtOrAfter(const ReadOptions& read_options,
 Status DBImpl::GetSmallest(const ReadOptions& read_options,
                            ColumnFamilyHandle* column_family, std::string* key,
                            std::string* value) {
+                            
+  StopWatch sw(immutable_db_options_.clock, immutable_db_options_.statistics.get(), DB_MULTIGET);
   return GetSmallestAtOrAfter(read_options, column_family, "" /* target */, key, value);
 }
 

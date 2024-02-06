@@ -4,28 +4,23 @@
 //  (found in the LICENSE.Apache file in the root directory).
 //
 // An example code demonstrating how to use CompactFiles, EventListener,
-// and GetColumnFamilyMetaData APIs to implement custom compaction algorithm.
-
+// and GetColumnFamilyMetaData APIs to implement custom compaction algorithm. 
 #include <mutex>
 #include <string>
-#include <iostream>
 #include <arpa/inet.h>
+#include <memory>
 
+#include <iostream> 
 #include "rocksdb/db.h"
 #include "rocksdb/env.h"
 #include "rocksdb/options.h"
 #include "rocksdb/system_clock.h"
+#include "rocksdb/statistics.h"
 
-using ROCKSDB_NAMESPACE::ColumnFamilyMetaData;
-using ROCKSDB_NAMESPACE::CompactionOptions;
-using ROCKSDB_NAMESPACE::DB;
-using ROCKSDB_NAMESPACE::EventListener;
-using ROCKSDB_NAMESPACE::FlushJobInfo;
-using ROCKSDB_NAMESPACE::Options;
-using ROCKSDB_NAMESPACE::ReadOptions;
-using ROCKSDB_NAMESPACE::Status;
-using ROCKSDB_NAMESPACE::WriteOptions;
-using ROCKSDB_NAMESPACE::FlushOptions;
+extern bool gs_debug_prints;
+bool gs_debug_prints = false;
+
+using namespace ROCKSDB_NAMESPACE;
 
 #if defined(OS_WIN)
 std::string kDBPath = "C:\\Windows\\TEMP\\rocksdb_delete_range_example";
@@ -33,114 +28,86 @@ std::string kDBPath = "C:\\Windows\\TEMP\\rocksdb_delete_range_example";
 std::string kDBPath = "/tmp/rocksdb_delete_range_example";
 #endif
 
-extern bool gs_debug_prints;
-bool gs_debug_prints = false;
+struct PerPriority
+{
+  uint32_t last_read = 0;
+  uint32_t last_written = 0;
+  bool empty() {return last_read == last_written;}
+};
 
-namespace {
-constexpr uint32_t PRIME = 999983; 
+static constexpr int kNPriorities=32;
+PerPriority debug_info[kNPriorities];
+bool NoValBefore(uint p) {
+  for (uint i = 0; i < p; i++) {
+    if (!debug_info[i].empty())
+      return false;
+  }
+  return true;
+}
 
-DB* RecreateDB() {
-  Options options;  
-  ROCKSDB_NAMESPACE::DestroyDB(kDBPath, options);
+void PrepareDB() {
 
-  options.compression = ROCKSDB_NAMESPACE::CompressionType::kNoCompression;
+}
+
+int main() { 
+  Options options;
   options.create_if_missing = true;
   // Disable RocksDB background compaction.
-  options.disable_auto_compactions = true;
-  options.max_write_buffer_number = 1000;
-  options.level0_slowdown_writes_trigger = 2000;
-  options.level0_stop_writes_trigger = 3000;
-  options.level0_file_num_compaction_trigger = -1;
-
   DB* db = nullptr;
-  auto s = DB::Open(options, kDBPath, &db);
+  ROCKSDB_NAMESPACE::DestroyDB(kDBPath, options);
+  options.compression = ROCKSDB_NAMESPACE::CompressionType::kNoCompression;
+  options.statistics =   ROCKSDB_NAMESPACE::CreateDBStatistics();
+  options.stats_dump_period_sec=30;
+  options.disable_auto_compactions = true; 
+  Status s = DB::Open(options, kDBPath, &db);
   assert(s.ok());
-  assert(db != nullptr);
-
-  return db;
-}
-
-size_t PrepareDB(DB* db) {
-  std::cout << "Preparing DB\n";
-
+  assert(db);
+  
+  std::string value("", 1024);
   WriteOptions write_options;
   write_options.disableWAL = true;
-
-  std::string value("", 1024);
-
   auto clock = db->GetEnv()->GetSystemClock();
-
-  std::cout << "Inserting keys\n";
-  auto start_time = clock->NowMicros();
-  for (uint32_t i = 0; i < PRIME ; ++i) {
-    // make sure the keys are sorted
-    size_t key = htonl((i * PRIME/100) % PRIME);
-    auto s = db->Put(write_options, std::string(reinterpret_cast<char*>(&key), 8), value);
-    assert(s.ok());
+  auto t = clock->NowMicros(); 
+  std::cout << "Starting\n";
+  for (size_t i = 0; i < 1000 * 10 ; ++i) {
+    {
+      if (i != 0 && (i % 1000) == 0) {
+        std::cout << "i = " << i << '\n';
+      }
+      // insert up to 10 random entries
+      int n_entries = rand() % 10 + 1;
+      for(int k = 0; k < n_entries; k++) {
+        uint8_t priority = rand() % kNPriorities;
+        std::string key((char *)&priority, 1);
+        uint32_t ikey = htonl(debug_info[priority].last_written);
+        key += std::string((char *)&ikey, 4);
+        db->Put(write_options, key, value);
+        debug_info[priority].last_written++;
+      }
+    }
+    { // now pop and verify
+      int n_entries = rand() % 10 + 1;
+      for(int k = 0; k < n_entries; k++) {
+        std::unique_ptr<Iterator> iter(db->NewIterator(ReadOptions()));
+        iter->SeekToFirst();
+        if (iter->Valid()) {
+          const char *key = iter->key().data();
+          int p = key[0];
+          uint32_t val = ntohl(*((uint32_t *)&key[1]));
+          if (val != debug_info[p].last_read) {
+            std::cout << "OOPS:" << val << ", " << debug_info[p].last_read << '\n';
+            assert (val == debug_info[p].last_read);
+          }
+          debug_info[p].last_read++;
+          db->Delete(write_options, iter->key());
+          assert(NoValBefore(p));
+        } else {
+          assert(NoValBefore(kNPriorities));
+          break;
+        }
+      }
+    }
   }
-  auto end_time = clock->NowMicros();
-  std::cout << "Insert Completed in " << (end_time - start_time) << " micros\n";
 
-  // now the delete (10% we delete using a normal delete)
-  std::cout << "Deleting Single Keys\n";
-  start_time = clock->NowMicros();
-  for (uint32_t i = 0; i < PRIME/10 ; ++i) {
-    size_t key = htonl(i);    
-    auto s =db->Delete(write_options, std::string(reinterpret_cast<char*>(&key), 8));
-    assert(s.ok());
-  }
-  auto end_time = clock->NowMicros();
-  std::cout << "Deleting Single Keys Completed in " << (end_time - start_time) << " micros\n";
-
-  std::cout << "Deleting A Range\n";
-  size_t start_key = htonl(PRIME/10 + 100);
-  size_t end_key = htonl(PRIME/10  + 100 + PRIME/10);
-  auto s = db->DeleteRange( write_options, db->DefaultColumnFamily(),
-                            std::string(reinterpret_cast<char*>(&start_key), 8),
-                            std::string(reinterpret_cast<char*>(&end_key), 8));
-  assert(s.ok());
-
-  return start_key;
-}
-
-}
-
-void RunGetSmallestTest() {
-  auto db = RecreateDB();
-  size_t start_key = PrepareDB(db);
-
-  auto clock = db->GetEnv()->GetSystemClock();
-
-  std::cout << "Seeking using a DB Iterator\n";
-  auto start_time = clock->NowMicros();
-  size_t key = htonl(0);
-  for (uint32_t i = 0; i < 1000000 ; i++) {
-    auto iter = db->NewIterator(ReadOptions());
-    iter->Seek(std::string(reinterpret_cast<char*>(&key), 8));
-    delete iter;
-  }
-  std::cout << "The time to get 1000  keys after delete is %lu micros\n",   clock->NowMicros() - t);
-  exit(0);
-  t = clock->NowMicros();
-
-  for (uint32_t i = 0; i < 1000 ; i++) {
-    auto iter = db->NewIterator(ReadOptions());
-    iter->Seek(std::string(reinterpret_cast<char*>(&start_key), 8));
-    delete iter;
-  }
-  printf("time to get 1000  keys after range delete is %lu micros\n",   clock->NowMicros() -t);
-  t = clock->NowMicros();
-  auto delete_range_start = + PRIME/10  + 100 + PRIME/10;
-  for (uint32_t i = 0; i < 1000 ; i++) {
-    auto iter = db->NewIterator(ReadOptions());    
-    start_key = htonl(rand() % (PRIME - delete_range_start) + delete_range_start); 
-    iter->Seek(std::string(reinterpret_cast<char*>(&start_key), 8));
-    delete iter;
-  }
-  printf("time to get 1000  keys with no delete is %lu micros\n",   clock->NowMicros() -t);
-  delete db;
-}
-
-int main() {
-  RunGetSmallestTest();
+  delete db; 
 }

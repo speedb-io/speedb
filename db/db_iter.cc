@@ -1583,6 +1583,7 @@ void DBIter::SeekForPrev(const Slice& target) {
 }
 
 void DBIter::SeekToFirst() {
+  StopWatch sw(clock_, statistics_, DB_SEEK);
   if (iterate_lower_bound_ != nullptr) {
     Seek(*iterate_lower_bound_);
     return;

@@ -7,6 +7,7 @@
 ### Enhancements
 
 ### Bug Fixes
+* CancelAllBackgroundWork: Flush does not wait for stall conditions to clear
 
 ### Miscellaneous
 * WriteController logging: Remove redundant reports when WC is not shared between dbs

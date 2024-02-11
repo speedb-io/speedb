@@ -1,6 +1,16 @@
 # Speedb Change Log 
 
 ## Unreleased
+
+### New Features 
+
+### Enhancements
+
+### Bug Fixes
+
+### Miscellaneous
+
+## Incaberry 2.8.0 (31/1/2024)
 Based on RocksDB 8.6.7
 
 ### New Features 
@@ -38,7 +48,7 @@ RocksDB has a value of 10 by default and we've added the option to randomize the
 * Options: Set level_compaction_dynamic_level_bytes as false by default. This flag is not working properly with Speedb. see https://github.com/speedb-io/speedb/issues/786 for more details.
 * zlib: Update links to zlib 1.3 in CI and Makefile since the link in zlib.net is dead.
 
-## Hazlenut 2.7.0 (27/10/2023)
+## Hazelnut 2.7.0 (27/10/2023)
 Based on RocksDB 8.1.1
 
 ### New Features 

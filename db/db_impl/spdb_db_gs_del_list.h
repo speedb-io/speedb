@@ -61,7 +61,7 @@ class GlobalDelList {
     void Next();
 
     const DelElement& key() const;
-
+    
    private:
     GlobalDelList& glbl_del_list_;
     std::list<DelElement>::iterator del_list_iter_;

@@ -22,6 +22,8 @@
 extern bool gs_debug_prints;
 bool gs_debug_prints = false;
 
+extern bool gs_optimize_seek_forward;
+
 #define USE_GET_SMALLEST 1
 #define USE_SINGLE_DELETE 0 
 
@@ -194,6 +196,8 @@ void PopAndVerifyGetSmallest(DB* db, const WriteOptions& write_options) {
 }
 
 int main() { 
+  gs_optimize_seek_forward = true;
+  
   using nano = std::chrono::nanoseconds;
 
   auto comparator = std::make_unique<CountingComparator>();
@@ -210,9 +214,9 @@ int main() {
 #endif
 
   auto num_1000s_iters = 100;
-  auto total_iters = num_1000s_iters * 1000;
+  size_t total_iters = num_1000s_iters * 1000;
   auto start_time = std::chrono::high_resolution_clock::now();
-  for (size_t i = 0; i < total_iters; ++i) {
+  for (size_t i = 0U; i < total_iters; ++i) {
     // insert up to 10 random entries
     int n_entries = rand() % 10 + 1;
     InsertEntries(db, write_options, n_entries);
@@ -223,7 +227,7 @@ int main() {
     PopAndVerifySeek(db, write_options);
 #endif
 
-    if ((i != 0) && ((i % 1000) == 999) || (i == total_iters - 1)) {
+    if (((i != 0) && ((i % 1000) == 999)) || (i == total_iters - 1)) {
       auto end_time = std::chrono::high_resolution_clock::now();
       nano total_time = end_time - start_time;
       std::cout << "Completed 1000 Iters (i = " << (i+1) << ") in " << std::fixed << std::setprecision(4) << (total_time.count() * 1e-9) << " seconds. #Comparisons:" << comparator->num_comparisons << std::endl;

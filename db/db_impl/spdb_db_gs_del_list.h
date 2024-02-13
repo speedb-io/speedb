@@ -67,6 +67,7 @@ class GlobalDelList {
     std::list<DelElement>::iterator del_list_iter_;
     std::list<DelElement>::iterator del_list_prev_iter_;
 
+    size_t min_dist_from_begin_ = 0U;
     friend class GlobalDelList;
   };
 

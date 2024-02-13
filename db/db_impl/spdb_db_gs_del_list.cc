@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <functional>
+#include <cmath>
 
 #include "db/db_impl/spdb_db_gs_utils.h"
 
@@ -146,6 +147,7 @@ bool GlobalDelList::Iterator::Valid() const {
 
 void GlobalDelList::Iterator::SeekToFirst() {
   del_list_iter_ = glbl_del_list_.del_list_.begin();
+  min_dist_from_begin_ = 0U;
 }
 
 void GlobalDelList::Iterator::Seek(const Slice& target) {
@@ -179,9 +181,32 @@ void GlobalDelList::Iterator::SeekForward(const Slice& seek_start_key) {
     seek_start_pos = glbl_del_list_.del_list_.begin();
   }
 
+  auto lower_bound_end_pos = glbl_del_list_.del_list_.end();
+
+  // TODO - Should be the ceil(log2(N))
+  auto max_num_lower_bound_comparisons = std::log2(glbl_del_list_.Size());
+  auto temp_iter = del_list_iter_;
+  auto num_skipped = 0U;
+  while ((temp_iter != glbl_del_list_.del_list_.end()) && (num_skipped < max_num_lower_bound_comparisons)) {
+    ++temp_iter;
+    ++num_skipped;
+  }
+  if (temp_iter == glbl_del_list_.del_list_.end()) {
+    --temp_iter;
+  }
+  auto seek_key_vs_temp_del_elem_end = glbl_del_list_.comparator_->Compare(seek_start_key, temp_iter->RangeEnd());
+  if (seek_key_vs_temp_del_elem_end < 0) {
+    // temp_iter points at a del-elem that ends after the seek key => no point looking past it
+    lower_bound_end_pos = temp_iter;
+  } else {
+    // temp_iter points at a del-elem that ends before the seek key => start looking from the del-elem following temp_iter
+    seek_start_pos = temp_iter;
+    ++seek_start_pos;
+  }
+
   DelElement seek_del_elem(seek_start_key);
   del_list_iter_ =
-      std::lower_bound(seek_start_pos, glbl_del_list_.del_list_.end(),
+      std::lower_bound(seek_start_pos, lower_bound_end_pos,
                        seek_del_elem, CompareDelElems);
 
   if (del_list_iter_ != glbl_del_list_.del_list_.begin()) {
@@ -205,6 +230,7 @@ void GlobalDelList::Iterator::Next() {
   assert(Valid());
   del_list_prev_iter_ = del_list_iter_;
   ++del_list_iter_;
+  ++min_dist_from_begin_;
 
   if (del_list_iter_ != glbl_del_list_.del_list_.end()) {
     if (glbl_del_list_.comparator_->Compare(del_list_prev_iter_->user_end_key,
@@ -215,6 +241,7 @@ void GlobalDelList::Iterator::Next() {
       glbl_del_list_.del_list_.erase(del_list_prev_iter_);
       // The prev iterator is now invalid
       del_list_prev_iter_ = glbl_del_list_.del_list_.end();
+      --min_dist_from_begin_;
     }
   }
 }

@@ -9,6 +9,8 @@
 ### Bug Fixes
 
 ### Miscellaneous
+* WriteController logging: Remove redundant reports when WC is not shared between dbs
+
 
 ## Incaberry 2.8.0 (31/1/2024)
 Based on RocksDB 8.6.7

@@ -558,6 +558,7 @@ Status ProcessLogLevel(GlobalContext& gc, LevelContext& lc) {
         if (range_ts.seq_ < lc.values_parsed_ikey.sequence) {
           // DR Is Older
           ProcessCurrValuesIterVsDelList(gc, lc);
+          ProcessCurrRangeTsVsDelList(gc, lc);
         } else {
           // DR Is newer => the value / merge-value is covered by the range-ts
           // => irrelevant

@@ -91,7 +91,7 @@
 #include "util/string_util.h"
 #include "utilities/merge_operators.h"
 
-#define RUN_ALL_GS_TESTS 0
+#define RUN_ALL_GS_TESTS 1
 extern bool gs_debug_prints;
 bool gs_debug_prints = false;
 
@@ -7917,10 +7917,10 @@ class DBGsTest : public DBTest {
       ASSERT_FALSE(db_iter->Valid());
     } else {
       ASSERT_OK(s) << "Expected Ok, Actual Status:" << s.ToString();
-      ASSERT_EQ(smallest_key, expected_smallest_key);
+      ASSERT_EQ(smallest_key, expected_smallest_key) << "Actual:'" << smallest_key << "', Expected:'" << expected_smallest_key.ToString() << "'";
 
       ASSERT_TRUE(db_iter->Valid());
-      ASSERT_EQ(db_iter->key(), expected_smallest_key);
+      ASSERT_EQ(db_iter->key(), expected_smallest_key) << "Actual:'" << db_iter->key().ToString() << "', Expected:'" << expected_smallest_key.ToString() << "'";
     }
   }
 };
@@ -8236,6 +8236,22 @@ TEST_F(DBGsTest, GS_ValueImmediatelyDeletedInMutable) {
 
   CALL_WRAPPER(GetSmallestAndValidate(""));
 }
+
+TEST_F(DBGsTest, GS_RangeCoversValueInMutableValueNewerAndSmallerValueInL0) {
+  ReopenNewDb();
+
+  auto dflt_cfh = dbfull()->DefaultColumnFamily();
+  ASSERT_OK(dbfull()->Put(WriteOptions(), "a", "b1"));
+  ASSERT_OK(dbfull()->TEST_FlushMemTable());
+  ASSERT_OK(dbfull()->DeleteRange(WriteOptions(), dflt_cfh, "a", "z"));
+  ASSERT_OK(dbfull()->Put(WriteOptions(), "c", "a1"));
+  ASSERT_EQ(1, NumTableFilesAtLevel(0));
+
+  gs_debug_prints = true;
+  CALL_WRAPPER(GetSmallestAndValidate("c"));
+  gs_debug_prints = false;
+}
+
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 #endif
 

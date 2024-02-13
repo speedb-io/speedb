@@ -173,6 +173,7 @@ void GlobalDelList::Iterator::SeekForward(const Slice& seek_start_key) {
                seek_start_key, del_list_iter_->user_start_key) > 0);
     // Start from current
     seek_start_pos = del_list_iter_;
+    ++seek_start_pos;
   } else {
     // Invalid => start from the beginning
     seek_start_pos = glbl_del_list_.del_list_.begin();

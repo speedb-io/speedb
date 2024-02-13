@@ -22,6 +22,9 @@
 extern bool gs_debug_prints;
 bool gs_debug_prints = false;
 
+#define USE_GET_SMALLEST 1
+#define USE_SINGLE_DELETE 0 
+
 using namespace ROCKSDB_NAMESPACE;
 
 #if defined(OS_WIN)
@@ -30,15 +33,19 @@ std::string kDBPath = "C:\\Windows\\TEMP\\rocksdb_delete_range_example";
 std::string kDBPath = "/tmp/rocksdb_delete_range_example";
 #endif
 
+uint64_t num_popped = 0U;
+
 struct PerPriority
 {
-  uint32_t last_read = 0;
-  uint32_t last_written = 0;
+  uint32_t last_read = 1;
+  uint32_t last_written = 1;
   bool empty() {return last_read == last_written;}
 };
 
-static constexpr int kNPriorities=32;
-PerPriority debug_info[kNPriorities];
+static constexpr int kNPriorities= 32;
+
+// Priorities are 1-32, priority 0 (smallest) is left for DeleteRange()
+PerPriority debug_info[1 + kNPriorities];
 bool NoValBefore(uint p) {
   for (uint i = 0; i < p; i++) {
     if (!debug_info[i].empty())
@@ -72,15 +79,14 @@ DB* PrepareDB(const Comparator* comparator) {
   DB* db = nullptr;
   ROCKSDB_NAMESPACE::DestroyDB(kDBPath, options);
   options.create_if_missing = true;
-  options.max_write_buffer_number = 1000;
+  options.write_buffer_size = 1 << 20;
   options.disable_auto_compactions = true;
   options.level0_slowdown_writes_trigger = 2000;
   options.level0_stop_writes_trigger = 3000;
-  options.level0_file_num_compaction_trigger = -1;
+  // options.level0_file_num_compaction_trigger = -1;
   options.compression = ROCKSDB_NAMESPACE::CompressionType::kNoCompression;
   options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
   options.stats_dump_period_sec = 30;
-  options.disable_auto_compactions = true; 
   options.comparator = comparator;
   Status s = DB::Open(options, kDBPath, &db);
   assert(s.ok());
@@ -89,11 +95,13 @@ DB* PrepareDB(const Comparator* comparator) {
   return db;
 }
 
+uint64_t num_inserted = 0U;
 void InsertEntries(DB* db, const WriteOptions& write_options, int n_entries) {
   std::string value("", 1024);
 
   for(int k = 0; k < n_entries; k++) {
-    uint8_t priority = rand() % kNPriorities;
+    // Leave priority 0 for the DeleteRange (smallest).
+    uint8_t priority = 1 + rand() % kNPriorities;
     std::string key((char *)&priority, 1);
     uint32_t ikey = htonl(debug_info[priority].last_written);
     key += std::string((char *)&ikey, 4);
@@ -119,26 +127,45 @@ void PopAndVerifySeek(DB* db, const WriteOptions& write_options) {
     std::unique_ptr<Iterator> iter(db->NewIterator(ReadOptions()));
     iter->SeekToFirst();
     if (iter->Valid()) {
-      const char *key = iter->key().data();
-      ValidateReadValue(key);
+      const char *smallest_key = iter->key().data();
+      ValidateReadValue(smallest_key);
 
-      int p = key[0];
+      int p = smallest_key[0];
       debug_info[p].last_read++;
       db->Delete(write_options, iter->key());
       assert(NoValBefore(p));
+
+      // ++num_popped;
+      // if (num_popped % 100) {
+      //   std::string min_key((char *)&p, 1);
+      //   uint32_t ikey = htonl(0);
+      //   min_key += std::string((char *)&ikey, 4);
+
+      //   // std::cout << "Delete Range (p=" << p << '\n';
+      //   auto s = db->DeleteRange(write_options, db->DefaultColumnFamily(), min_key, smallest_key);
+      //   assert(s.ok());
+      // }
     } else {
-      assert(NoValBefore(kNPriorities));
+      assert(NoValBefore(1+ kNPriorities));
       break;
     }
   }
 }
 
+size_t get_smallest_count = 0U;
 void PopAndVerifyGetSmallest(DB* db, const WriteOptions& write_options) {
   // now pop and verify
   int n_entries = rand() % 10 + 1;
   for(int k = 0; k < n_entries; k++) {
     std::string smallest_key;
+
+    // ++get_smallest_count;
+    // if (get_smallest_count == 882) {
+    //   std::cout << "GetSmallest (#" << get_smallest_count << ")\n";
+    //   gs_debug_prints = true;
+    // }
     auto s = db->GetSmallest(ReadOptions(), db->DefaultColumnFamily(), &smallest_key, nullptr);
+    // std::cout << "After GetSmallest (#" << get_smallest_count << ")\n";
 
     if (s.ok()) {
       const char *key = smallest_key.data();
@@ -148,14 +175,23 @@ void PopAndVerifyGetSmallest(DB* db, const WriteOptions& write_options) {
       debug_info[p].last_read++;
       db->Delete(write_options, smallest_key);
       assert(NoValBefore(p));
+
+      // ++num_popped;
+      // if (num_popped % 100) {
+      //   std::string min_key((char *)&p, 1);
+      //   uint32_t ikey = htonl(0);
+      //   min_key += std::string((char *)&ikey, 4);
+
+      //   // std::cout << "Delete Range (p=" << p << '\n';
+      //   s = db->DeleteRange(write_options, db->DefaultColumnFamily(), min_key, smallest_key);
+      //   assert(s.ok());
+      // }
     } else {
-      assert(NoValBefore(kNPriorities));
+      assert(NoValBefore(1 + kNPriorities));
       break;
     }
   }
 }
-
-#define USE_GET_SMALLEST 1
 
 int main() { 
   using nano = std::chrono::nanoseconds;
@@ -167,7 +203,12 @@ int main() {
   WriteOptions write_options;
   write_options.disableWAL = true;
 
-  std::cout << "Starting\n";
+#if USE_GET_SMALLEST  
+  std::cout << "Starting - Get Smallest\n";
+#else
+  std::cout << "Starting - Seek\n";
+#endif
+
   auto num_1000s_iters = 100;
   auto total_iters = num_1000s_iters * 1000;
   auto start_time = std::chrono::high_resolution_clock::now();

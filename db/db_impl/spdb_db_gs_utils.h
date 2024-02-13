@@ -56,6 +56,11 @@ struct DelElement {
             (user_end_key == other.user_end_key));
   }
 
+  bool operator!=(const DelElement& other) const {
+    auto are_equal = (*this == other);
+    return (are_equal == false);
+  }
+
   static bool LessThan(const DelElement& first, const DelElement& second,
                        const Comparator* comparator) {
     // Ordering based only on the start key
@@ -74,6 +79,15 @@ struct DelElement {
     }
   }
 
+  bool Empty() const {
+    return user_start_key.empty();
+  }
+
+  void Clear() {
+    user_start_key.clear();
+    user_end_key.clear();
+  }
+  
   std::string ToString() const {
     if (IsDelKey()) {
       return (std::string("{") + user_start_key + "}");

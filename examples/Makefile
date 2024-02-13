@@ -12,7 +12,7 @@ ifndef DISABLE_JEMALLOC
 endif
 
 ifneq ($(USE_RTTI), 1)
-	CXXFLAGS += -fno-rtti
+	CXXFLAGS += -fno-rtti -g
 endif
 
 CFLAGS += -Wstrict-prototypes
@@ -24,7 +24,7 @@ all: simple_example column_families_example compaction_filter_example compact_fi
 	 enable_speedb_features_example on_thread_start_callback_example speedb_non_blocking_compact_range_example
 
 simple_example: static_lib simple_example.cc
-	$(CXX) $(CXXFLAGS) $@.cc -o$@ ../$(LIBNAME).a -I../include -O2 -std=c++17 $(PLATFORM_LDFLAGS) $(PLATFORM_CXXFLAGS) $(EXEC_LDFLAGS)
+	$(CXX) $(CXXFLAGS) $@.cc -o$@ ../$(LIBNAME).a -I../include -O0 -std=c++17 $(PLATFORM_LDFLAGS) $(PLATFORM_CXXFLAGS) $(EXEC_LDFLAGS)
 
 column_families_example: static_lib column_families_example.cc
 	$(CXX) $(CXXFLAGS) $@.cc -o$@ ../$(LIBNAME).a -I../include -O2 -std=c++17 $(PLATFORM_LDFLAGS) $(PLATFORM_CXXFLAGS) $(EXEC_LDFLAGS)

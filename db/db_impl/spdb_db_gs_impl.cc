@@ -173,7 +173,7 @@ class FragmentedRangeTombstoneIteratorWrapper : public Iterator {
   void Next() override {
     if (wrapped_iter_ptr_) {
       assert(Valid());
-      wrapped_iter_ptr_->Next();
+      wrapped_iter_ptr_->TopNext();
       UpdateValidity();
     } else {
       assert(0);
@@ -423,6 +423,68 @@ bool ProcessCurrValuesIterVsDelList(GlobalContext& gc, LevelContext& lc) {
   return lc.new_csk_found_in_level;
 }
 
+namespace {
+Slice prev_value;
+Slice prev_range_del;
+DelElement prev_del_list {"", ""};
+size_t loop_count = 0U;
+
+void ResetState() {
+  prev_value.clear();
+  prev_range_del.clear();
+  prev_del_list.Clear();
+  loop_count = 0U;
+}
+
+void PrintState(GlobalContext& gc, LevelContext& lc) {
+  ++loop_count;
+
+  if (!gs_debug_prints) {
+    return;
+  }
+
+  std::cout << "loop_count:" << loop_count << "\n";
+  if (lc.values_iter->Valid()) {
+    if (prev_value.empty()) {
+      std::cout << "First value\n";
+    } else if (prev_value != lc.values_iter->key()) {
+      std::cout << "Values Iter changed\n";
+    } else {
+      std::cout << "Values Iter UNCHANGED\n";
+    }
+    prev_value = lc.values_iter->key();
+  } else {
+    std::cout << "Invalid values iter\n";
+  }
+
+  if (lc.range_del_iter->Valid()) {
+    if (prev_range_del.empty()) {
+      std::cout << "First range-del\n";
+    } else if (prev_range_del != lc.range_del_iter->key()) {
+      std::cout << "Range-Del Iter changed\n";
+    } else {
+      std::cout << "Range Del Iter UNCHANGED\n";
+    }
+    prev_range_del = lc.range_del_iter->key();
+  } else {
+    std::cout << "Invalid range-del iter\n";
+  }
+
+  if (gc.del_list_iter->Valid()) {
+    if (prev_del_list.Empty()) {
+      std::cout << "First del-list elem\n";
+    } else if (prev_del_list != gc.del_list_iter->key()) {
+      std::cout << "Del List Iter changed\n";
+    } else {
+      std::cout << "Del List Iter UNCHANGED\n";
+    }
+    prev_del_list = gc.del_list_iter->key();
+  } else {
+    std::cout << "Invalid Del List iter\n";
+  }
+}
+}
+
 Status ProcessLogLevel(GlobalContext& gc, LevelContext& lc) {
   if (gc.target.empty()) {
     gc.del_list_iter->SeekToFirst();
@@ -434,8 +496,12 @@ Status ProcessLogLevel(GlobalContext& gc, LevelContext& lc) {
     lc.range_del_iter->Seek(gc.target);
   }
 
+  ResetState();
   while ((lc.new_csk_found_in_level == false) &&
          (lc.values_iter->Valid() || lc.range_del_iter->Valid())) {
+
+    PrintState(gc, lc);
+
     if (lc.values_iter->Valid() == false) {
       // Range ts iter is Valid() values_iter is Invalid()
       ProcessCurrRangeTsVsDelList(gc, lc);

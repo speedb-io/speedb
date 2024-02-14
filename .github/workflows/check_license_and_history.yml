@@ -3,8 +3,9 @@ name: Check License and History
 on:  # this workflow is planned to be called by the ci_pipeline and it will compare the PR files with the main
   workflow_call:
   workflow_dispatch:
-  #pull_request_review:
-  #  types: [submitted]
+  push:
+  pull_request_target:
+
 
 jobs:
   changedfiles:

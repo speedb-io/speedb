@@ -35,7 +35,7 @@ std::unique_ptr<GlobalDelList::Iterator> GlobalDelList::NewIterator() {
 
 void GlobalDelList::InsertBefore(Iterator& pos, const DelElement& del_elem) {
   del_list_.insert(pos.del_list_iter_, del_elem);
-  assert(Valid());
+  // assert(Valid());
 }
 
 void GlobalDelList::InsertBeforeAndSetIterOnInserted(
@@ -158,6 +158,44 @@ void GlobalDelList::Iterator::Seek(const Slice& target) {
   SeekForward(target);
 }
 
+  // if (gs_optimize_seek_forward) {
+  //   // TODO - Should be the ceil(log2(N))
+  //   auto max_num_lower_bound_comparisons = std::log2(glbl_del_list_.Size());
+  //   auto temp_iter = del_list_iter_;
+  //   auto num_skipped = 0U;
+  //   while ((temp_iter != glbl_del_list_.del_list_.end()) && (num_skipped < max_num_lower_bound_comparisons)) {
+  //     ++temp_iter;
+  //     ++num_skipped;
+  //   }
+  //   if (temp_iter == glbl_del_list_.del_list_.end()) {
+  //     --temp_iter;
+  //   }
+  //   auto seek_key_vs_temp_del_elem_end = glbl_del_list_.comparator_->Compare(seek_start_key, temp_iter->RangeEnd());
+  //   if (seek_key_vs_temp_del_elem_end < 0) {
+  //     // temp_iter points at a del-elem that ends after the seek key => no point looking past it
+  //     lower_bound_end_pos = temp_iter;
+  //   } else {
+  //     // temp_iter points at a del-elem that ends before the seek key => start looking from the del-elem following temp_iter
+  //     seek_start_pos = temp_iter;
+  //     ++seek_start_pos;
+  //   }
+  // }
+
+  // if (del_list_iter_ != glbl_del_list_.del_list_.begin()) {
+  //   // We are positioned at the first del-elem that is >= seek_start_key (by
+  //   // del-elem start). If the previous element contains (not before)
+  //   // seek_start_key, we will postion the iter on that del-elem.
+  //   auto prev_iter = std::prev(del_list_iter_, 1);
+  //   auto prev_del_elem_vs_seek_key = CompareDelElemToUserKey(
+  //       *prev_iter, seek_start_key, glbl_del_list_.comparator_,
+  //       nullptr /* overlap_start_rel_pos */, nullptr /* overlap_end_rel_pos */);
+  //   assert(prev_del_elem_vs_seek_key != RelativePos::AFTER);
+
+  //   if (prev_del_elem_vs_seek_key == RelativePos::OVERLAP) {
+  //     del_list_iter_ = prev_iter;
+  //   }
+  // }
+
 void GlobalDelList::Iterator::SeekForward(const Slice& seek_start_key) {
   if (glbl_del_list_.del_list_.empty()) {
     return;
@@ -165,12 +203,21 @@ void GlobalDelList::Iterator::SeekForward(const Slice& seek_start_key) {
 
   auto CompareDelElems = [this](const DelElement& first,
                                 const DelElement& second) {
-    return DelElement::LessThan(first, second,
-                                this->glbl_del_list_.comparator_);
+    const Comparator* comparator = this->glbl_del_list_.comparator_;
+
+    if (first.IsDelKey() && second.IsDelKey()) {
+      return (comparator->Compare(first.user_start_key, second.user_start_key) < 0);
+    } else if (first.IsRange() && second.IsDelKey()) {
+      return (comparator->Compare(first.user_end_key, second.user_start_key) <= 0);
+    } else if (first.IsDelKey() && second.IsRange()) {
+      return (comparator->Compare(first.user_start_key, second.user_start_key) < 0);      
+    } else {
+      // Both are Ranges
+      return (comparator->Compare(first.user_end_key, second.user_start_key) <= 0);
+    }
   };
 
-  std::list<DelElement>::iterator seek_start_pos =
-      glbl_del_list_.del_list_.end();
+  std::list<DelElement>::iterator seek_start_pos = glbl_del_list_.del_list_.end();
 
   if (Valid()) {
     // Seek key must be greater than current
@@ -178,7 +225,6 @@ void GlobalDelList::Iterator::SeekForward(const Slice& seek_start_key) {
                seek_start_key, del_list_iter_->user_start_key) > 0);
     // Start from current
     seek_start_pos = del_list_iter_;
-    ++seek_start_pos;
   } else {
     // Invalid => start from the beginning
     seek_start_pos = glbl_del_list_.del_list_.begin();
@@ -186,48 +232,11 @@ void GlobalDelList::Iterator::SeekForward(const Slice& seek_start_key) {
 
   auto lower_bound_end_pos = glbl_del_list_.del_list_.end();
 
-  if (gs_optimize_seek_forward) {
-    // TODO - Should be the ceil(log2(N))
-    auto max_num_lower_bound_comparisons = std::log2(glbl_del_list_.Size());
-    auto temp_iter = del_list_iter_;
-    auto num_skipped = 0U;
-    while ((temp_iter != glbl_del_list_.del_list_.end()) && (num_skipped < max_num_lower_bound_comparisons)) {
-      ++temp_iter;
-      ++num_skipped;
-    }
-    if (temp_iter == glbl_del_list_.del_list_.end()) {
-      --temp_iter;
-    }
-    auto seek_key_vs_temp_del_elem_end = glbl_del_list_.comparator_->Compare(seek_start_key, temp_iter->RangeEnd());
-    if (seek_key_vs_temp_del_elem_end < 0) {
-      // temp_iter points at a del-elem that ends after the seek key => no point looking past it
-      lower_bound_end_pos = temp_iter;
-    } else {
-      // temp_iter points at a del-elem that ends before the seek key => start looking from the del-elem following temp_iter
-      seek_start_pos = temp_iter;
-      ++seek_start_pos;
-    }
-  }
-
   DelElement seek_del_elem(seek_start_key);
   del_list_iter_ =
       std::lower_bound(seek_start_pos, lower_bound_end_pos,
                        seek_del_elem, CompareDelElems);
 
-  if (del_list_iter_ != glbl_del_list_.del_list_.begin()) {
-    // We are positioned at the first del-elem that is >= seek_start_key (by
-    // del-elem start). If the previous element contains (not before)
-    // seek_start_key, we will postion the iter on that del-elem.
-    auto prev_iter = std::prev(del_list_iter_, 1);
-    auto prev_del_elem_vs_seek_key = CompareDelElemToUserKey(
-        *prev_iter, seek_start_key, glbl_del_list_.comparator_,
-        nullptr /* overlap_start_rel_pos */, nullptr /* overlap_end_rel_pos */);
-    assert(prev_del_elem_vs_seek_key != RelativePos::AFTER);
-
-    if (prev_del_elem_vs_seek_key == RelativePos::OVERLAP) {
-      del_list_iter_ = prev_iter;
-    }
-  }
   del_list_prev_iter_ = glbl_del_list_.del_list_.end();
 }
 

@@ -28,10 +28,33 @@
 extern bool gs_debug_prints;
 bool gs_debug_prints = false;
 
+extern bool gs_validate_iters_progress;
+bool gs_validate_iters_progress = false;
+
+extern bool gs_report_iters_progress;
+bool gs_report_iters_progress = false;
+
 namespace ROCKSDB_NAMESPACE {
 namespace spdb_gs {
 
 namespace {
+
+std::string RangeTsToString(const RangeTombstone& range_ts) {
+  if (range_ts.start_key_.empty()) {
+    return "Empty Range-TS";
+  }
+
+  std::string result;
+  result += "{" + range_ts.start_key_.ToString() + ", ";
+  result += range_ts.start_key_.ToString() + "} ";
+  result += "[" + std::to_string(range_ts.seq_) + "]";
+
+  return result;
+}
+
+bool AreRangeTssEqual(const RangeTombstone& first, const RangeTombstone& second) {
+  return ((first.start_key_ == second.start_key_) && (first.end_key_ == second.end_key_) && (first.seq_ == second.seq_));
+}
 
 class InternalIteratorWrapper : public Iterator {
  public:
@@ -67,11 +90,13 @@ class InternalIteratorWrapper : public Iterator {
   void SeekToFirst() override {
     wrapped_iter_ptr_->SeekToFirst();
     UpdateValidity();
+    ReportProgress("SeekToFirst"); 
   }
 
   void SeekToLast() override {
     wrapped_iter_ptr_->SeekToLast();
     UpdateValidity();
+    ReportProgress("SeekToLast"); 
   }
 
   void Seek(const Slice& target) override {
@@ -80,12 +105,14 @@ class InternalIteratorWrapper : public Iterator {
     auto target_ikey = lookup_key.internal_key();
     wrapped_iter_ptr_->Seek(target_ikey);
     UpdateValidity();
+    ReportProgress("Seek"); 
   }
 
   void Next() override {
     assert(Valid());
     wrapped_iter_ptr_->Next();
     UpdateValidity();
+    ReportProgress("Next"); 
   }
 
   void SeekForPrev(const Slice& /* target */) override {
@@ -108,6 +135,19 @@ class InternalIteratorWrapper : public Iterator {
   Status status() const override { return wrapped_iter_ptr_->status(); }
 
   void Invalidate() { valid_ = false; }
+
+  std::string ToString() const {
+    if (Valid() == false) {
+      return "Invalid";
+    }
+    return key().ToString();
+  }
+
+  void ReportProgress(const std::string& progress_str) {
+    if (gs_report_iters_progress) {
+      std::cout << "Values-Iter: " << progress_str << ":" << ToString() << '\n';
+    }    
+  }
 
  private:
   void UpdateValidity() {
@@ -154,6 +194,7 @@ class FragmentedRangeTombstoneIteratorWrapper : public Iterator {
     if (wrapped_iter_ptr_) {
       wrapped_iter_ptr_->SeekToFirst();
       UpdateValidity();
+      ReportProgress("SeekToFirst");
     }
   }
 
@@ -161,6 +202,7 @@ class FragmentedRangeTombstoneIteratorWrapper : public Iterator {
     if (wrapped_iter_ptr_) {
       wrapped_iter_ptr_->SeekToLast();
       UpdateValidity();
+      ReportProgress("SeekToLast");
     }
   }
 
@@ -168,14 +210,22 @@ class FragmentedRangeTombstoneIteratorWrapper : public Iterator {
     if (wrapped_iter_ptr_) {
       wrapped_iter_ptr_->Seek(target);
       UpdateValidity();
+      ReportProgress("Seek");
     }
   }
 
   void Next() override {
     if (wrapped_iter_ptr_) {
       assert(Valid());
+      [[maybe_unused]] auto curr_value = wrapped_iter_ptr_->key();
       wrapped_iter_ptr_->TopNext();
       UpdateValidity();
+      ReportProgress("Next");
+      if (Valid()) {
+        if (curr_value != wrapped_iter_ptr_->key()) {
+          assert(curr_value != wrapped_iter_ptr_->key());
+        }
+      }
     } else {
       assert(0);
     }
@@ -236,6 +286,19 @@ class FragmentedRangeTombstoneIteratorWrapper : public Iterator {
     if (wrapped_iter_ptr_) {
       wrapped_iter_ptr_->Invalidate();
     }
+  }
+
+  std::string ToString() {
+    if (Valid() == false) {
+      return "Invalid";
+    }
+    return RangeTsToString(Tombstone());
+  }
+
+  void ReportProgress(const std::string& progress_str) {
+    if (gs_report_iters_progress) {
+      std::cout << "Range-TS-Iter: " << progress_str << ":" << ToString() << '\n';
+    }    
   }
 
  private:
@@ -307,10 +370,8 @@ void UpdateCSK(GlobalContext& gc, LevelContext& lc) {
   lc.new_csk_found_in_level = true;
 }
 
-void ProcessCurrRangeTsVsDelList(GlobalContext& gc, LevelContext& lc) {
+void ProcessCurrRangeTsVsDelList(GlobalContext& gc, LevelContext& lc, const RangeTombstone& range_ts) {
   assert(lc.range_del_iter->Valid());
-
-  auto range_ts = lc.range_del_iter->Tombstone();
 
   // values iter is Invalid, DR Iter is valid => Add to global del-list and
   // complete level processing
@@ -381,6 +442,8 @@ void ProcessCurrRangeTsVsDelList(GlobalContext& gc, LevelContext& lc) {
 }
 
 bool ProcessCurrValuesIterVsDelList(GlobalContext& gc, LevelContext& lc) {
+  assert(lc.values_parsed_ikey.user_key.empty() == false);
+
   auto del_list_vs_values_iter_key = RelativePos::AFTER;
 
   if (gc.del_list_iter->Valid()) {
@@ -425,66 +488,111 @@ bool ProcessCurrValuesIterVsDelList(GlobalContext& gc, LevelContext& lc) {
 }
 
 namespace {
+size_t loop_count = 0U;
+
 Slice prev_value;
 Slice prev_range_del;
+RangeTombstone prev_range_ts;
 DelElement prev_del_list {"", ""};
-size_t loop_count = 0U;
 
 void ResetState() {
   prev_value.clear();
   prev_range_del.clear();
   prev_del_list.Clear();
-  loop_count = 0U;
 }
 
-void PrintState(GlobalContext& gc, LevelContext& lc) {
-  ++loop_count;
+void SetPrevRangeDel(LevelContext& lc) {
+  prev_range_del = lc.range_del_iter->key();
+  prev_range_ts = lc.range_del_iter->Tombstone();
+  std::cout << "SetPrevRangeDel: " << lc.range_del_iter->ToString() << '\n';
+}
+void ClearPrevRangeDel() {
+  prev_range_del.clear();
+  prev_range_ts = RangeTombstone();
+  std::cout << "ClearPrevRangeDel\n";
+}
 
-  if (!gs_debug_prints) {
+void InitState(GlobalContext& gc, LevelContext& lc) {
+  ResetState();
+  if (gs_validate_iters_progress == false) {
     return;
   }
 
-  std::cout << "loop_count:" << loop_count << "\n";
   if (lc.values_iter->Valid()) {
-    if (prev_value.empty()) {
-      std::cout << "First value\n";
-    } else if (prev_value != lc.values_iter->key()) {
-      std::cout << "Values Iter changed\n";
-    } else {
-      std::cout << "Values Iter UNCHANGED\n";
-    }
     prev_value = lc.values_iter->key();
   } else {
-    std::cout << "Invalid values iter\n";
+    prev_value.clear();
   }
 
   if (lc.range_del_iter->Valid()) {
-    if (prev_range_del.empty()) {
-      std::cout << "First range-del\n";
-    } else if (prev_range_del != lc.range_del_iter->key()) {
-      std::cout << "Range-Del Iter changed\n";
-    } else {
-      std::cout << "Range Del Iter UNCHANGED\n";
-    }
-    prev_range_del = lc.range_del_iter->key();
+    SetPrevRangeDel(lc);
   } else {
-    std::cout << "Invalid range-del iter\n";
+    ClearPrevRangeDel();
   }
 
   if (gc.del_list_iter->Valid()) {
-    if (prev_del_list.Empty()) {
-      std::cout << "First del-list elem\n";
-    } else if (prev_del_list != gc.del_list_iter->key()) {
-      std::cout << "Del List Iter changed\n";
-    } else {
-      std::cout << "Del List Iter UNCHANGED\n";
-    }
     prev_del_list = gc.del_list_iter->key();
   } else {
-    std::cout << "Invalid Del List iter\n";
+    prev_del_list.Clear();
   }
 }
+
+void ValidateItersProgress(GlobalContext& gc, LevelContext& lc) {
+  if ((gs_validate_iters_progress == false) || (loop_count == 1U)) {
+    return;
+  }
+
+  bool values_iter_progressed = false;
+  bool range_del_iter_progressed = false;
+  bool del_list_iter_progressed = false;
+
+  auto was_values_iter_invalid = prev_value.empty();
+  if (lc.values_iter->Valid()) {
+    if (was_values_iter_invalid || (prev_value != lc.values_iter->key())) {
+      values_iter_progressed = true;
+      prev_value = lc.values_iter->key();
+    }
+  } else {
+    if (was_values_iter_invalid == false) {
+      values_iter_progressed = true;
+    }
+    prev_value.clear();
+  }
+
+  auto was_range_del_iter_invalid = prev_range_del.empty();
+  if (lc.range_del_iter->Valid()) {
+    if (was_range_del_iter_invalid || (AreRangeTssEqual(prev_range_ts, lc.range_del_iter->Tombstone()) == false)) {
+      range_del_iter_progressed = true;
+      SetPrevRangeDel(lc);
+    }
+  } else {
+    if (was_range_del_iter_invalid == false) {
+      range_del_iter_progressed = true;
+    }
+    ClearPrevRangeDel();
+  }
+
+  auto was_del_list_iter_invalid = prev_del_list.Empty();
+  if (gc.del_list_iter->Valid()) {
+    if (was_del_list_iter_invalid || (prev_del_list != gc.del_list_iter->key())) {
+      del_list_iter_progressed = true;
+      prev_del_list = gc.del_list_iter->key();
+    }
+  } else {
+    if (was_del_list_iter_invalid == false) {
+      del_list_iter_progressed = true;
+    }
+    prev_del_list.Clear();
+  }
+
+  if ((values_iter_progressed == false) && (range_del_iter_progressed == false) && (del_list_iter_progressed == false)) {
+    std::cout << "\n>>>>>>>>>> NO PROGRESS: loop_count:" << loop_count << '\n';
+    std::cout << "Prev Range-TS Slice:" << prev_range_del.ToString() << ", New Range-TS Slice:" << lc.range_del_iter->key().ToString() << '\n';
+    std::cout << "Prev Range-TS:" << RangeTsToString(prev_range_ts) << ", New Range-TS:" << lc.range_del_iter->ToString() << '\n';
+    assert(0);
+  }
 }
+} // Unnamed Namespace
 
 Status ProcessLogLevel(GlobalContext& gc, LevelContext& lc) {
   if (gc.target.empty()) {
@@ -497,15 +605,20 @@ Status ProcessLogLevel(GlobalContext& gc, LevelContext& lc) {
     lc.range_del_iter->Seek(gc.target);
   }
 
-  ResetState();
+  loop_count = 0U;
+  InitState(gc, lc);
+
   while ((lc.new_csk_found_in_level == false) &&
          (lc.values_iter->Valid() || lc.range_del_iter->Valid())) {
 
-    PrintState(gc, lc);
+    ++loop_count;
+    if (gs_report_iters_progress) std::cout << "loop_count:" << loop_count << '\n';
+    // Validate at the top since continue will skip validation at the end of the loop
+    ValidateItersProgress(gc, lc);
 
     if (lc.values_iter->Valid() == false) {
       // Range ts iter is Valid() values_iter is Invalid()
-      ProcessCurrRangeTsVsDelList(gc, lc);
+      ProcessCurrRangeTsVsDelList(gc, lc, lc.range_del_iter->Tombstone());
       continue;
     }
 
@@ -514,20 +627,13 @@ Status ProcessLogLevel(GlobalContext& gc, LevelContext& lc) {
         lc.values_iter->key(), &lc.values_parsed_ikey, true /* log_err_key */);
     assert(parsing_status.ok());
     lc.value_category = GetValueCategoryOfKey(lc.values_parsed_ikey.type);
-
-    if (lc.range_del_iter->Valid() == false) {
-      auto was_new_csk_found = ProcessCurrValuesIterVsDelList(gc, lc);
-      if (was_new_csk_found) {
-        if (gs_debug_prints)
-          printf("Processing Level Ended, new csk was found\n");
-        return Status::OK();
-      } else {
-        continue;
-      }
-    }
-
     if (lc.value_category == ValueCategory::OTHER) {
       lc.values_iter->Next();
+      continue;
+    }
+
+    if (lc.range_del_iter->Valid() == false) {
+      ProcessCurrValuesIterVsDelList(gc, lc);
       continue;
     }
 
@@ -538,7 +644,7 @@ Status ProcessLogLevel(GlobalContext& gc, LevelContext& lc) {
 
     switch (range_ts_vs_values_iter_key) {
       case RelativePos::BEFORE:
-        ProcessCurrRangeTsVsDelList(gc, lc);
+        ProcessCurrRangeTsVsDelList(gc, lc, range_ts);
         break;
 
       case RelativePos::AFTER:
@@ -558,8 +664,10 @@ Status ProcessLogLevel(GlobalContext& gc, LevelContext& lc) {
         assert(range_ts.seq_ != lc.values_parsed_ikey.sequence);
         if (range_ts.seq_ < lc.values_parsed_ikey.sequence) {
           // DR Is Older
-          ProcessCurrValuesIterVsDelList(gc, lc);
-          ProcessCurrRangeTsVsDelList(gc, lc);
+          auto was_new_csk_found = ProcessCurrValuesIterVsDelList(gc, lc);
+          if (was_new_csk_found) {
+            ProcessCurrRangeTsVsDelList(gc, lc, range_ts);
+          }
         } else {
           // DR Is newer => the value / merge-value is covered by the range-ts
           // => irrelevant

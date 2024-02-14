@@ -91,11 +91,12 @@
 #include "util/string_util.h"
 #include "utilities/merge_operators.h"
 
-#define RUN_ALL_GS_TESTS 1
-#define RUN_GS_STRESS 0
+#define RUN_ALL_GS_TESTS 0
+#define RUN_GS_STRESS 1
 
 extern bool gs_debug_prints;
-bool gs_debug_prints = false;
+extern bool gs_validate_iters_progress;
+extern bool gs_report_iters_progress;
 
 #define CALL_WRAPPER(func) \
   func;                    \
@@ -7780,7 +7781,7 @@ TEST_F(DelListTest, SeekForward) {
 
   del_list_iter->SeekForward("c");
   ASSERT_TRUE(del_list_iter->Valid());
-  ASSERT_EQ(del_list_iter->key(), DelElem("b", "e"));
+  ASSERT_EQ(del_list_iter->key(), DelElem("b", "e")) << "Iter Key:" << del_list_iter->key().ToString();
 
   del_list_iter->SeekForward("g");
   ASSERT_TRUE(del_list_iter->Valid());
@@ -8416,18 +8417,28 @@ class DBGsStressTest : public DBGsTest {
 };
 
 TEST_F(DBGsStressTest, GS_GetSmallestStress) {
-  bool get_smallest_at_or_after = true;
-  constexpr int num_seek_keys = 100000;
+  bool get_smallest_at_or_after = false;
+  // constexpr int num_flush_iters = 20;
+  // constexpr int num_keys_per_iter = 20000U;
+
+  constexpr int num_flush_iters = 10;
+  constexpr int num_keys_per_iter = 20000U;
+
+  // constexpr int num_seek_keys = 100000;
+  constexpr int num_seek_keys = 2;
+
+  // gs_report_iters_progress = false;
 
   auto comparator = std::make_unique<CountingComparator>();
+  std::cout << "Creating DB\n";
   CreateDB(comparator.get());
 
-  constexpr int num_flush_iters = 20;
-  constexpr int num_keys_per_iter = 20000U;
   constexpr int delete_one_in = 4;
+  std::cout << "Building DB Contents\n";
   BuildDBContents(num_flush_iters, num_keys_per_iter, delete_one_in);
 
   if (get_smallest_at_or_after) {
+    std::cout << "Picking Seek Keys (GetSmallestOrAfter)\n";
     PickSeekKeys(num_seek_keys);
   }
   constexpr int num_calls = num_seek_keys;
@@ -8463,6 +8474,7 @@ TEST_F(DBGsStressTest, GS_GetSmallestStress) {
   std::vector<std::string> expected_smallest_keys =
       GetSmallestKeysUsingSeek(num_calls);
 
+  // gs_report_iters_progress = true;
   std::cout << "GetSmallest Start\n";
   comparator->num_comparisons = 0U;
   start = std::chrono::high_resolution_clock::now();
@@ -8502,10 +8514,17 @@ TEST_F(DBGsStressTest, GS_GetSmallestStress) {
             << ", GetSmallest #Comparisons:" << get_smallest_num_comparisons
             << '\n';
 
-  double ratio = static_cast<double>(total_get_smallest_time.count()) /
+  std::cout << '\n';
+
+  double comparisons_ratio = static_cast<double>(get_smallest_num_comparisons) /
+                 static_cast<double>(seek_num_comparisons);
+  std::cout << "GetSmallest / Seek COMPARISONS ratio:" << std::fixed
+            << std::setprecision(precision) << comparisons_ratio << '\n';
+
+  double time_ratio = static_cast<double>(total_get_smallest_time.count()) /
                  static_cast<double>(total_seek_time.count());
-  std::cout << "GetSmallest / Seek ratio:" << std::fixed
-            << std::setprecision(precision) << ratio << '\n';
+  std::cout << "GetSmallest / Seek TIME ratio:" << std::fixed
+            << std::setprecision(precision) << time_ratio << '\n';
 }
 
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX

@@ -21,7 +21,7 @@
 #include "db/db_impl/spdb_db_gs_utils.h"
 
 extern bool gs_optimize_seek_forward;
-bool gs_optimize_seek_forward = false;
+bool gs_optimize_seek_forward = true;
 
 namespace ROCKSDB_NAMESPACE {
 namespace spdb_gs {
@@ -231,6 +231,46 @@ void GlobalDelList::Iterator::SeekForward(const Slice& seek_start_key) {
   }
 
   auto lower_bound_end_pos = glbl_del_list_.del_list_.end();
+
+  if (gs_optimize_seek_forward) {
+    // TODO - Should be the ceil(log2(N))
+    auto max_num_lower_bound_comparisons = std::log2(glbl_del_list_.Size());
+    auto temp_iter = del_list_iter_;
+    auto num_skipped = 0U;
+    while ((temp_iter != glbl_del_list_.del_list_.end()) && (num_skipped < max_num_lower_bound_comparisons)) {
+      ++temp_iter;
+      ++num_skipped;
+    }
+    if (temp_iter == glbl_del_list_.del_list_.end()) {
+      --temp_iter;
+    }
+
+    if (temp_iter->IsDelKey()) {
+      auto seek_key_vs_temp_del_key = glbl_del_list_.comparator_->Compare(seek_start_key, temp_iter->user_start_key);
+      if (seek_key_vs_temp_del_key == 0) {
+        del_list_iter_ = temp_iter;
+        del_list_prev_iter_ = glbl_del_list_.del_list_.end();
+        return;
+      } else if (seek_key_vs_temp_del_key < 0) {
+        // temp_iter points at a del-key that is after the seek key => no point looking past it
+        lower_bound_end_pos = temp_iter;
+      } else {
+        // temp_iter points at a del-key that is before the seek key => start looking from the del-elem following temp_iter
+        seek_start_pos = temp_iter;
+        ++seek_start_pos;
+      }
+    } else {
+      auto seek_key_vs_temp_del_range_end = glbl_del_list_.comparator_->Compare(seek_start_key, temp_iter->user_end_key);
+      if (seek_key_vs_temp_del_range_end < 0) {
+        // temp_iter points at a del-range that ends after the seek key => no point looking past it
+        lower_bound_end_pos = temp_iter;
+      } else {
+        // temp_iter points at a del-range that is before the seek key => start looking from the del-elem following temp_iter
+        seek_start_pos = temp_iter;
+        ++seek_start_pos;
+      }
+    }
+  }
 
   DelElement seek_del_elem(seek_start_key);
   del_list_iter_ =

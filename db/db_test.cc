@@ -8417,15 +8417,17 @@ class DBGsStressTest : public DBGsTest {
 };
 
 TEST_F(DBGsStressTest, GS_GetSmallestStress) {
-  bool get_smallest_at_or_after = false;
+  gs_validate_iters_progress = false;
+  bool get_smallest_at_or_after = true;
   // constexpr int num_flush_iters = 20;
   // constexpr int num_keys_per_iter = 20000U;
 
-  constexpr int num_flush_iters = 10;
-  constexpr int num_keys_per_iter = 20000U;
+  constexpr int num_flush_iters = 20;
+  constexpr int num_keys_per_iter = 200000U;
 
   // constexpr int num_seek_keys = 100000;
-  constexpr int num_seek_keys = 2;
+  constexpr int num_seek_keys = 1000;
+  constexpr int delete_one_in = 3;
 
   // gs_report_iters_progress = false;
 
@@ -8433,7 +8435,6 @@ TEST_F(DBGsStressTest, GS_GetSmallestStress) {
   std::cout << "Creating DB\n";
   CreateDB(comparator.get());
 
-  constexpr int delete_one_in = 4;
   std::cout << "Building DB Contents\n";
   BuildDBContents(num_flush_iters, num_keys_per_iter, delete_one_in);
 

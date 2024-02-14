@@ -26,6 +26,7 @@
 #include "util/stop_watch.h"
 
 extern bool gs_debug_prints;
+bool gs_debug_prints = false;
 
 namespace ROCKSDB_NAMESPACE {
 namespace spdb_gs {

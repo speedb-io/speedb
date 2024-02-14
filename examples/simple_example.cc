@@ -20,7 +20,6 @@
 #include "rocksdb/statistics.h"
 
 extern bool gs_debug_prints;
-bool gs_debug_prints = false;
 
 extern bool gs_optimize_seek_forward;
 

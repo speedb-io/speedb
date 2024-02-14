@@ -92,6 +92,8 @@
 #include "utilities/merge_operators.h"
 
 #define RUN_ALL_GS_TESTS 1
+#define RUN_GS_STRESS 0
+
 extern bool gs_debug_prints;
 bool gs_debug_prints = false;
 
@@ -8247,14 +8249,14 @@ TEST_F(DBGsTest, GS_RangeCoversValueInMutableValueNewerAndSmallerValueInL0) {
   ASSERT_OK(dbfull()->Put(WriteOptions(), "c", "a1"));
   ASSERT_EQ(1, NumTableFilesAtLevel(0));
 
-  gs_debug_prints = true;
   CALL_WRAPPER(GetSmallestAndValidate("c"));
-  gs_debug_prints = false;
 }
 
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 #endif
 
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+#if RUN_GS_STRESS
 namespace {
 class CountingComparator : public Comparator {
  public:
@@ -8505,6 +8507,9 @@ TEST_F(DBGsStressTest, GS_GetSmallestStress) {
   std::cout << "GetSmallest / Seek ratio:" << std::fixed
             << std::setprecision(precision) << ratio << '\n';
 }
+
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+#endif // RUN_GS_STRESS
 
 }  // namespace ROCKSDB_NAMESPACE
 

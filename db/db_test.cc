@@ -8427,7 +8427,8 @@ TEST_F(DBGsStressTest, GS_GetSmallestStress) {
 
   // constexpr int num_seek_keys = 100000;
   constexpr int num_seek_keys = 1000;
-  constexpr int delete_one_in = 3;
+  constexpr int delete_one_in = 100;
+  constexpr bool delete_during_run = false;
 
   // gs_report_iters_progress = false;
 
@@ -8449,7 +8450,6 @@ TEST_F(DBGsStressTest, GS_GetSmallestStress) {
   using nano = std::chrono::nanoseconds;
   auto dflt_cfh = dbfull()->DefaultColumnFamily();
 
-  bool delete_during_run = false;
 
   std::cout << "\nSeek Start\n";
   comparator->num_comparisons = 0U;

@@ -92,7 +92,7 @@
 #include "utilities/merge_operators.h"
 
 #define RUN_ALL_GS_TESTS 0
-#define RUN_GS_STRESS 0
+#define RUN_GS_STRESS 1
 
 extern bool gs_debug_prints;
 extern bool gs_validate_iters_progress;
@@ -8253,9 +8253,6 @@ TEST_F(DBGsTest, GS_RangeCoversValueInMutableValueNewerAndSmallerValueInL0) {
   CALL_WRAPPER(GetSmallestAndValidate("c"));
 }
 
-// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-#endif
-
 TEST_F(DBGsTest, GS_SingleValueInLevel1) {
   ReopenNewDb();
 
@@ -8281,6 +8278,49 @@ TEST_F(DBGsTest, GS_ValueInImmutableSmallesrThanValueInLevel1) {
 
   CALL_WRAPPER(GetSmallestAndValidate("a"));
 }
+
+TEST_F(DBGsTest, GS_ValueInImmutableGreaterThanValueInLevel1) {
+  ReopenNewDb();
+
+  ASSERT_OK(dbfull()->Put(WriteOptions(), "b", "b1"));
+  ASSERT_OK(dbfull()->TEST_FlushMemTable());
+  MoveFilesToLevel(1);
+  ASSERT_EQ(0, NumTableFilesAtLevel(0));
+  ASSERT_EQ(1, NumTableFilesAtLevel(1));
+
+  ASSERT_OK(dbfull()->Put(WriteOptions(), "c", "b1"));
+
+  CALL_WRAPPER(GetSmallestAndValidate("b"));
+}
+
+TEST_F(DBGsTest, GS_SingleValueInImmLevel1AndLevel2) {
+  ReopenNewDb();
+  auto dflt_cfh = dbfull()->DefaultColumnFamily();
+
+  ASSERT_OK(dbfull()->Put(WriteOptions(), "b", "b1"));
+  ASSERT_OK(dbfull()->TEST_FlushMemTable());
+  MoveFilesToLevel(2);
+
+  ASSERT_OK(dbfull()->Put(WriteOptions(), "c", "b1"));
+  ASSERT_OK(dbfull()->TEST_FlushMemTable());
+  MoveFilesToLevel(1);
+
+  ASSERT_EQ(0, NumTableFilesAtLevel(0));
+  ASSERT_EQ(1, NumTableFilesAtLevel(1));
+  ASSERT_EQ(1, NumTableFilesAtLevel(2));
+
+  ASSERT_OK(dbfull()->Put(WriteOptions(), "d", "b1"));
+
+  CALL_WRAPPER(GetSmallestAndValidate("b"));
+
+  ASSERT_OK(dbfull()->Delete(WriteOptions(), dflt_cfh, "c"));
+  CALL_WRAPPER(GetSmallestAndValidate("b"));
+
+  ASSERT_OK(dbfull()->Delete(WriteOptions(), dflt_cfh, "b"));
+  CALL_WRAPPER(GetSmallestAndValidate("d"));
+}
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+#endif
 
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 #if RUN_GS_STRESS
@@ -8309,7 +8349,7 @@ class DBGsStressTest : public DBGsTest {
  public:
   DBGsStressTest(): rnd(301) {}
 
-  void CreateDB(const Comparator* comparator = nullptr) {
+  void CreateDBNoLevelGt0(const Comparator* comparator = nullptr) {
     Options options;
     options.write_buffer_size = 64 << 20;
     options.max_write_buffer_number = 1000;
@@ -8325,37 +8365,86 @@ class DBGsStressTest : public DBGsTest {
     ReopenNewDb(&options);
   }
 
-  void BuildDBContents(const int num_flush_iters, const int num_keys_per_iter, const int delete_one_in) {
+  void CreateNormalDBSmallMemtables(const Comparator* comparator = nullptr) {
+    Options options;
+    options.write_buffer_size = 256 * (1 << 10);  // Small memtable - 256 KB
+    options.max_write_buffer_number = 5;
+    options.disable_auto_compactions = false;
+
+    if (comparator != nullptr) {
+      options.comparator = comparator;
+    }
+
+    ReopenNewDb(&options);
+  }
+
+  std::string NextKey(int len) {
+    return rnd.HumanReadableString(len);
+  };
+
+  int InsertKeys(int num_keys, int delete_one_in) {
     auto dflt_cfh = dbfull()->DefaultColumnFamily();
-    auto dflt_cfh_impl = static_cast<ColumnFamilyHandleImpl*>(dflt_cfh);
+    // auto dflt_cfh_impl = static_cast<ColumnFamilyHandleImpl*>(dflt_cfh);
 
-    auto NextKey = [this](int len) { return rnd.HumanReadableString(len); };
+    int num_deletions = 0;
 
-    std::cout << "Generating Keys\n";
-    ;
+    for (auto j = 0; j < num_keys; ++j) {
+      auto key_len = 10 + rnd.Uniform(5);
+      auto key = NextKey(key_len);
+      keys.push_back(key);
+      EXPECT_OK(dbfull()->Put(WriteOptions(), key, (key + key)));
+
+      if (rnd.OneIn(delete_one_in)) {
+        auto del_key = keys[rnd.Uniform(keys.size())];
+        EXPECT_OK(dbfull()->Delete(WriteOptions(), dflt_cfh, del_key));
+        deletd_keys.push_back(del_key);
+        ++num_deletions;
+      }
+
+      if ((j != 0) && ((j % 100000) == 0)) {
+        std::cout << "Inserted " << (j+1) << " Keys, num_deletions:" << num_deletions << '\n';
+      }
+    }
+    return num_deletions;
+  }
+
+  std::pair<int, int> InsertKeysWithFlushes(const int num_flush_iters, const int num_keys_per_iter, const int delete_one_in) {
+    std::cout << "Generating Keys (With Flushes) - num_flush_iters:" << num_flush_iters << ", num_keys_per_iter:" << num_keys_per_iter << ", delete_one_in:" << delete_one_in << "\n";
     int num_keys = 0;
     int num_deletions = 0;
     int num_flushes = 0;
     for (auto i = 1; i < num_flush_iters + 1; ++i) {
-      for (auto j = 0; j < num_keys_per_iter; ++j) {
-        auto key_len = 10 + rnd.Uniform(5);
-        auto key = NextKey(key_len);
-        keys.push_back(key);
-        ASSERT_OK(dbfull()->Put(WriteOptions(), key, (key + key)));
-        ++num_keys;
-
-        if (rnd.OneIn(delete_one_in)) {
-          auto del_key = keys[rnd.Uniform(keys.size())];
-          ASSERT_OK(dbfull()->Delete(WriteOptions(), dflt_cfh, del_key));
-          deletd_keys.push_back(del_key);
-          ++num_deletions;
-        }
-      }
+      num_deletions += InsertKeys(num_keys_per_iter, delete_one_in);
+      num_keys += num_keys_per_iter;
       if (i != num_flush_iters) {
-        // std::cout << "Flushing #" << i << "\n";
-        ASSERT_OK(dbfull()->TEST_FlushMemTable(true, true));
+        std::cout << "Flushing #" << i << "\n";
+        EXPECT_OK(dbfull()->TEST_FlushMemTable(true, true));
         ++num_flushes;
       }
+    }
+
+    return {num_keys, num_deletions};
+  }
+
+  int InsertKeysNoFlushes(const int num_keys, const int delete_one_in) {
+    std::cout << "Generating Keys (No Explicit Flushes) - num_keys:" << num_keys << ", delete_one_in:" << delete_one_in << "\n";
+    int num_deletions = 0;
+    num_deletions += InsertKeys(num_keys, delete_one_in);
+
+    return num_deletions;
+  }
+
+  void BuildDBContents(const int num_flush_iters, const int num_keys_per_iter, const int delete_one_in) {
+    auto dflt_cfh = dbfull()->DefaultColumnFamily();
+    auto dflt_cfh_impl = static_cast<ColumnFamilyHandleImpl*>(dflt_cfh);
+
+    int num_keys = 0;
+    int num_deletions = 0;
+    if (normal_db) {
+      num_keys = (1 + num_flush_iters) * num_keys_per_iter;
+      num_deletions = InsertKeysNoFlushes(num_keys, delete_one_in);
+    } else {
+      std::tie(num_keys, num_deletions) = InsertKeysWithFlushes(num_flush_iters, num_keys_per_iter, delete_one_in);
     }
 
     std::sort(keys.begin(), keys.end());
@@ -8366,6 +8455,8 @@ class DBGsStressTest : public DBGsTest {
               << ", num_immutable:" << num_immutable << '\n';
     std::cout << "Num files at level-0:" << NumTableFilesAtLevel(0) << '\n';
     std::cout << "Num files at level-1:" << NumTableFilesAtLevel(1) << '\n';
+    std::cout << "Num files at level-2:" << NumTableFilesAtLevel(2) << '\n';
+    std::cout << "Num files at level-3:" << NumTableFilesAtLevel(3) << '\n';
   }
 
   void PickSeekKeys(const int num_keys) {
@@ -8434,6 +8525,8 @@ class DBGsStressTest : public DBGsTest {
     return smallest_keys;
   }
 
+  bool normal_db = true;
+
   std::vector<std::string> keys;
   std::vector<std::string> deletd_keys;
   std::vector<std::string> keys_to_delete;
@@ -8445,22 +8538,25 @@ class DBGsStressTest : public DBGsTest {
 TEST_F(DBGsStressTest, GS_GetSmallestStress) {
   gs_validate_iters_progress = false;
   bool get_smallest_at_or_after = true;
-  // constexpr int num_flush_iters = 20;
-  // constexpr int num_keys_per_iter = 20000U;
-
-  constexpr int num_flush_iters = 20;
-  constexpr int num_keys_per_iter = 200000U;
 
   // constexpr int num_seek_keys = 100000;
-  constexpr int num_seek_keys = 1000;
-  constexpr int delete_one_in = 100;
+  constexpr int num_seek_keys = 10000;
+  constexpr int delete_one_in = 4;
   constexpr bool delete_during_run = false;
 
   // gs_report_iters_progress = false;
 
   auto comparator = std::make_unique<CountingComparator>();
-  std::cout << "Creating DB\n";
-  CreateDB(comparator.get());
+
+  constexpr int num_flush_iters = 19;
+  constexpr int num_keys_per_iter = 200000U;
+  if (normal_db) {
+    std::cout << "Creating Normal DB (Small Memtables)\n";
+    CreateNormalDBSmallMemtables(comparator.get());
+  } else {
+    std::cout << "Creating DB No Level > 0\n";
+    CreateDBNoLevelGt0(comparator.get());
+  }
 
   std::cout << "Building DB Contents\n";
   BuildDBContents(num_flush_iters, num_keys_per_iter, delete_one_in);
@@ -8477,7 +8573,7 @@ TEST_F(DBGsStressTest, GS_GetSmallestStress) {
   auto dflt_cfh = dbfull()->DefaultColumnFamily();
 
 
-  std::cout << "\nSeek Start\n";
+  std::cout << "\nSeek Start (" << num_calls << " Keys)\n";
   comparator->num_comparisons = 0U;
   auto start = std::chrono::high_resolution_clock::now();
   for (auto i = 0; i < num_calls; ++i) {
@@ -8552,6 +8648,8 @@ TEST_F(DBGsStressTest, GS_GetSmallestStress) {
                  static_cast<double>(total_seek_time.count());
   std::cout << "GetSmallest / Seek TIME ratio:" << std::fixed
             << std::setprecision(precision) << time_ratio << '\n';
+
+  ASSERT_OK(dbfull()->TEST_WaitForCompact());
 }
 
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX

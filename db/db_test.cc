@@ -8268,6 +8268,19 @@ TEST_F(DBGsTest, GS_SingleValueInLevel1) {
   CALL_WRAPPER(GetSmallestAndValidate("a"));
 }
 
+TEST_F(DBGsTest, GS_ValueInImmutableSmallesrThanValueInLevel1) {
+  ReopenNewDb();
+
+  ASSERT_OK(dbfull()->Put(WriteOptions(), "b", "b1"));
+  ASSERT_OK(dbfull()->TEST_FlushMemTable());
+  MoveFilesToLevel(1);
+  ASSERT_EQ(0, NumTableFilesAtLevel(0));
+  ASSERT_EQ(1, NumTableFilesAtLevel(1));
+
+  ASSERT_OK(dbfull()->Put(WriteOptions(), "a", "b1"));
+
+  CALL_WRAPPER(GetSmallestAndValidate("a"));
+}
 
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 #if RUN_GS_STRESS

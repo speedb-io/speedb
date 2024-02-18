@@ -2068,7 +2068,7 @@ void Version::AddIteratorsForLevel(const ReadOptions& read_options,
   }
 }
 
-std::vector<Version::IteratorPair> Version::GetLevel0Iterators(
+std::vector<Version::IteratorPair> Version::GetIteratorsForLevel0(
     const ReadOptions& read_options, const FileOptions& soptions,
     bool allow_unprepared_value, Arena* arena) {
   assert(storage_info_.finalized_);
@@ -2113,6 +2113,42 @@ std::vector<Version::IteratorPair> Version::GetLevel0Iterators(
   }
 
   return iters;
+}
+
+Version::IteratorPair Version::GetIteratorsForLevelGt0(int level,
+    const ReadOptions& read_options, const FileOptions& soptions,
+    bool allow_unprepared_value, Arena* arena) {
+  assert(storage_info_.finalized_);
+
+  if (storage_info_.IsLevelEmpty(level)) {
+    return {};
+  }
+
+  // For levels > 0, we can use a concatenating iterator that sequentially
+  // walks through the non-overlapping files in the level, opening them
+  // lazily.
+  auto* mem = arena->AllocateAligned(
+      sizeof(LevelIterator),
+      ArenaTracker::ArenaStats::VersionAddIteratorsForLevel);
+  TruncatedRangeDelIterator*** tombstone_iter_ptr = nullptr;
+  auto level_iter = new (mem) LevelIterator(
+      cfd_->table_cache(), read_options, soptions,
+      cfd_->internal_comparator(), &storage_info_.LevelFilesBrief(level),
+      mutable_cf_options_.prefix_extractor, should_sample_file_read(),
+      cfd_->internal_stats()->GetFileReadHist(level),
+      TableReaderCaller::kUserIterator, IsFilterSkipped(level), level,
+      mutable_cf_options_.block_protection_bytes_per_key,
+      /*range_del_agg=*/nullptr,
+      /*compaction_boundaries=*/nullptr, allow_unprepared_value,
+      &tombstone_iter_ptr);
+
+
+  FragmentedRangeTombstoneIterator* range_ts_iter = nullptr;
+
+  // TODO - HANDLE RANGE DEL ITER
+  
+  return {std::move(std::unique_ptr<InternalIterator>(level_iter)),
+         std::move(std::unique_ptr<FragmentedRangeTombstoneIterator>(range_ts_iter))};
 }
 
 Status Version::OverlapWithLevelIterator(const ReadOptions& read_options,

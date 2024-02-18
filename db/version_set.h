@@ -874,10 +874,16 @@ class Version {
 
   // TODO - Consider using auto-vector or, adding to some entity like the
   // merger_iter_builder
-  std::vector<IteratorPair> GetLevel0Iterators(const ReadOptions& read_options,
+  std::vector<IteratorPair> GetIteratorsForLevel0(const ReadOptions& read_options,
                                                const FileOptions& soptions,
                                                bool allow_unprepared_value,
                                                Arena* arena);
+
+  IteratorPair GetIteratorsForLevelGt0(int level,
+                                      const ReadOptions& read_options,
+                                      const FileOptions& soptions,
+                                      bool allow_unprepared_value,
+                                      Arena* arena);
 
   Status OverlapWithLevelIterator(const ReadOptions&, const FileOptions&,
                                   const Slice& smallest_user_key,

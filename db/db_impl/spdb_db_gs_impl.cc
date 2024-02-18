@@ -753,7 +753,7 @@ Status ProcessLevel0Files(SuperVersion* super_version, GlobalContext& gc,
   }
 
   // TOOD - Handle allow_unprepared_value!!!!
-  auto iters = super_version->current->GetLevel0Iterators(
+  auto iters = super_version->current->GetIteratorsForLevel0(
       gc.mutable_read_options, file_options, false /* allow_unprepared_value */,
       &arena);
 
@@ -780,6 +780,50 @@ Status ProcessLevel0Files(SuperVersion* super_version, GlobalContext& gc,
     }
     ++i;
   }
+  return Status::OK();
+}
+
+Status ProcessLevelsGt0(SuperVersion* super_version, GlobalContext& gc,
+                          const FileOptions& file_options, Arena& arena) {
+  auto storage_info = super_version->current->storage_info();
+  // assert(storage_info_->finalized_);
+
+  for (int level = 1; level < storage_info->num_non_empty_levels(); level++) {
+    if (storage_info->IsLevelEmpty(level)) {
+      if (gs_debug_prints) {
+        printf("Level-%d Is Empty\n", level);
+      }
+      continue;
+    }
+
+    // TOOD - Handle allow_unprepared_value!!!!
+    auto iters = super_version->current->GetIteratorsForLevelGt0(
+        level, gc.mutable_read_options, file_options, false /* allow_unprepared_value */,
+        &arena);
+
+    if (gs_debug_prints)
+      printf("Processing Level-%d \n", level);
+
+    LevelContext lc;
+    lc.values_iter.reset(new InternalIteratorWrapper(
+        std::move(iters.table_iter), gc.comparator, gc.csk));
+
+    std::unique_ptr<FragmentedRangeTombstoneIterator> wrapped_range_del_iter;
+    assert(iters.range_ts_iter.get() == nullptr);
+    if (iters.range_ts_iter.get() != nullptr) {
+      wrapped_range_del_iter.reset(iters.range_ts_iter.release());
+    }
+    lc.range_del_iter.reset(new FragmentedRangeTombstoneIteratorWrapper(
+        std::move(wrapped_range_del_iter), gc.comparator, gc.csk));
+
+    if (gs_debug_prints) printf("Processing Level-%d\n", level);
+    auto status = ProcessLogLevel(gc, lc);
+    if (status.ok() == false) {
+      if (gs_debug_prints) printf("Failed Processing Level-%d\n", level);
+      return status;
+    }
+  }
+
   return Status::OK();
 }
 
@@ -830,6 +874,10 @@ Status DBImpl::GetSmallestAtOrAfter(const ReadOptions& read_options,
 
   if (status.ok()) {
     status = ProcessLevel0Files(super_version, gc, file_options_, arena);
+  }
+
+  if (status.ok()) {
+    status = ProcessLevelsGt0(super_version, gc, file_options_, arena);
   }
 
   CleanupSuperVersion(super_version);

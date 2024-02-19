@@ -17,6 +17,7 @@
 #include <list>
 #include <memory>
 #include <string>
+#include <atomic>
 
 #include "db/db_impl/spdb_db_gs_utils.h"
 #include "include/rocksdb/comparator.h"
@@ -114,6 +115,9 @@ class GlobalDelList {
   bool Valid() const;
 
   std::string ToString() const;
+
+  static std::atomic<uint64_t> num_seek_forwards;
+  static std::atomic<uint64_t> num_found_in_binary_search;
 
  private:
   void MergeWithInternal(std::list<DelElement>::iterator pos,

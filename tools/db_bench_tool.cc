@@ -114,6 +114,7 @@
 #include "utilities/merge_operators/bytesxor.h"
 #include "utilities/merge_operators/sortlist.h"
 #include "utilities/persistent_cache/block_cache_tier.h"
+#include "db/db_impl/spdb_db_gs_del_list.h"
 
 #ifdef MEMKIND
 #include "memory/memkind_kmem_allocator.h"
@@ -7450,6 +7451,9 @@ class Benchmark {
     assert(FLAGS_reverse_iterator == false);
     assert(FLAGS_seek_nexts == 0);
 
+    spdb_gs::GlobalDelList::num_seek_forwards = 0;
+    spdb_gs::GlobalDelList::num_found_in_binary_search = 0;
+
     std::unique_ptr<const char[]> key_guard;
     Slice key = AllocateKey(&key_guard);
 
@@ -7486,9 +7490,10 @@ class Benchmark {
       thread->stats.FinishedOps(db_with_cfh, db_with_cfh->db, 1, kSeek);
     }
 
-    char msg[100];
-    snprintf(msg, sizeof(msg), "(%" PRIu64 " of %" PRIu64 " found. NUM COMPARISONS:%zu)\n", found,
-          read, s_comparator->num_comparisons.load());
+    char msg[200];
+    snprintf(msg, sizeof(msg), "(%" PRIu64 " of %" PRIu64 " found. NUM COMPARISONS:%zu, num_seek_forwards:%zu, num_found_in_binary_search:%zu)\n", found,
+          read, s_comparator->num_comparisons.load(), spdb_gs::GlobalDelList::num_seek_forwards.load(), spdb_gs::GlobalDelList::num_found_in_binary_search.load());
+
     thread->stats.AddBytes(bytes);
     thread->stats.AddMessage(msg);
   }

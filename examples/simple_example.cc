@@ -21,8 +21,6 @@
 
 extern bool gs_debug_prints;
 
-extern bool gs_optimize_seek_forward;
-
 #define USE_GET_SMALLEST 1
 #define USE_SINGLE_DELETE 0 
 
@@ -194,9 +192,7 @@ void PopAndVerifyGetSmallest(DB* db, const WriteOptions& write_options) {
   }
 }
 
-int main() { 
-  gs_optimize_seek_forward = true;
-  
+int main() {   
   using nano = std::chrono::nanoseconds;
 
   auto comparator = std::make_unique<CountingComparator>();

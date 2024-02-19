@@ -129,6 +129,10 @@ using GFLAGS_NAMESPACE::SetUsageMessage;
 using GFLAGS_NAMESPACE::SetVersionString;
 
 namespace ROCKSDB_NAMESPACE {
+namespace {
+const Comparator* s_comparator = nullptr;
+}  // namespace
+
 // Forward Declaration
 class Benchmark;
 }  // namespace ROCKSDB_NAMESPACE
@@ -196,6 +200,8 @@ DEFINE_string(
     "seekrandomwhilewriting,"
     "seekrandomwhilemerging,"
     "seektodeletedranges,"
+    "seekrandomforgetsmallest,"
+    "getsmallest,"
     "readseq,"
     "readreverse,"
     "compact,"
@@ -3942,6 +3948,10 @@ class Benchmark {
       } else if (name == "seekrandomwhilemerging") {
         num_threads++;  // Add extra thread for merging
         method = &Benchmark::SeekRandomWhileMerging;
+      } else if (name == "seekrandomforgetsmallest") {
+        method = &Benchmark::SeekRandomForGetSmallest;
+      } else if (name == "getsmallest") {
+        method = &Benchmark::GetSmallest;
       } else if (name == "readrandomsmall") {
         reads_ /= 1000;
         method = &Benchmark::ReadRandom;
@@ -4606,6 +4616,10 @@ class Benchmark {
         ErrorExit("Using Uint64 comparator but key size is not 8.");
       }
     }
+
+    s_comparator = BytewiseComparator();
+    options.comparator = s_comparator;
+
     if (FLAGS_use_stderr_info_logger) {
       options.info_log.reset(new StderrLogger());
     }
@@ -7354,6 +7368,129 @@ class Benchmark {
     } else {
       BGWriter(thread, kMerge);
     }
+  }
+
+  void SeekRandomForGetSmallest(ThreadState* thread) {
+    int64_t read = 0;
+    int64_t found = 0;
+    int64_t bytes = 0;
+    ReadOptions options = read_options_;
+    int64_t key_rand = 0;
+    std::unique_ptr<char[]> ts_guard;
+    Slice ts;
+    assert(user_timestamp_size_ == 0);
+
+    assert(FLAGS_use_tailing_iterator == false);
+    assert(FLAGS_auto_prefix_mode == false);
+    assert(FLAGS_max_scan_distance == 0);
+    assert(prefix_extractor_ == nullptr);
+    assert(FLAGS_reverse_iterator == false);
+    assert(FLAGS_seek_nexts == 0);
+
+    std::unique_ptr<const char[]> key_guard;
+    Slice key = AllocateKey(&key_guard);
+
+    s_comparator->num_comparisons = 0U;
+
+    Duration duration(FLAGS_duration, reads_);
+    while (!duration.Done(1)) {
+      key_rand = GetRandomKey(&thread->rand);
+      DBWithColumnFamilies* db_with_cfh = SelectDBWithCfh(key_rand);
+      int64_t seek_pos = key_rand;
+      GenerateKeyFromIntForSeek(static_cast<uint64_t>(seek_pos), FLAGS_num,
+                                &key);
+
+      // Pick a Iterator to use
+      std::unique_ptr<Iterator> single_iter;
+      Iterator* iter_to_use;
+      single_iter.reset(db_with_cfh->db->NewIterator(
+          options, db_with_cfh->GetCfh(key_rand)));
+      iter_to_use = single_iter.get();
+
+      iter_to_use->Seek(key);
+      read++;
+      if (iter_to_use->Valid() && iter_to_use->key().compare(key) == 0) {
+        found++;
+      }
+
+      if (thread->shared->read_rate_limiter.get() != nullptr &&
+          read % 256 == 255) {
+        thread->shared->read_rate_limiter->Request(
+            256, Env::IO_HIGH, nullptr /* stats */, RateLimiter::OpType::kRead);
+        // Set time at which last op finished to Now() to hide latency and
+        // sleep from rate limiter. Also, do the check once per batch, not
+        // once per write.
+        thread->stats.ResetLastOpTime();
+      }
+
+      thread->stats.FinishedOps(db_with_cfh, db_with_cfh->db, 1, kSeek);
+    }
+
+    char msg[200];
+    snprintf(msg, sizeof(msg), "(%" PRIu64 " of %" PRIu64 " found. NUM COMPARISONS:%zu)\n", found,
+             read, s_comparator->num_comparisons.load());
+    thread->stats.AddBytes(bytes);
+    thread->stats.AddMessage(msg);
+  }
+
+  void GetSmallest(ThreadState* thread) {
+    int64_t read = 0;
+    int64_t found = 0;
+    int64_t bytes = 0;
+    ReadOptions options = read_options_;
+    int64_t key_rand = 0;
+    std::unique_ptr<char[]> ts_guard;
+    Slice ts;
+    assert(user_timestamp_size_ == 0);
+
+    assert(FLAGS_use_tailing_iterator == false);
+    assert(FLAGS_auto_prefix_mode == false);
+    assert(FLAGS_max_scan_distance == 0);
+    assert(prefix_extractor_ == nullptr);
+    assert(FLAGS_reverse_iterator == false);
+    assert(FLAGS_seek_nexts == 0);
+
+    std::unique_ptr<const char[]> key_guard;
+    Slice key = AllocateKey(&key_guard);
+
+    s_comparator->num_comparisons = 0U;
+
+    Duration duration(FLAGS_duration, reads_);
+    while (!duration.Done(1)) {
+      key_rand = GetRandomKey(&thread->rand);
+      DBWithColumnFamilies* db_with_cfh = SelectDBWithCfh(key_rand);
+      int64_t seek_pos = key_rand;
+      GenerateKeyFromIntForSeek(static_cast<uint64_t>(seek_pos), FLAGS_num,
+                                &key);
+
+      std::string smallest_key;
+      auto get_smallest_status = db_with_cfh->db->GetSmallestAtOrAfter(options, db_with_cfh->GetCfh(key_rand), key, &smallest_key, nullptr /* value */);
+      read++;
+      if (get_smallest_status.ok()) {
+        Slice smallest_key_slice(smallest_key);
+         if (smallest_key_slice.compare(key) == 0) {
+          found++;
+         }
+      }
+
+      if (thread->shared->read_rate_limiter.get() != nullptr &&
+          read % 256 == 255) {
+        thread->shared->read_rate_limiter->Request(
+            256, Env::IO_HIGH, nullptr /* stats */, RateLimiter::OpType::kRead);
+        // Set time at which last op finished to Now() to hide latency and
+        // sleep from rate limiter. Also, do the check once per batch, not
+        // once per write.
+        thread->stats.ResetLastOpTime();
+      }
+
+      thread->stats.FinishedOps(db_with_cfh, db_with_cfh->db, 1, kSeek);
+    }
+
+    char msg[100];
+    snprintf(msg, sizeof(msg), "(%" PRIu64 " of %" PRIu64 " found. NUM COMPARISONS:%zu)\n", found,
+          read, s_comparator->num_comparisons.load());
+    thread->stats.AddBytes(bytes);
+    thread->stats.AddMessage(msg);
   }
 
   void DoDelete(ThreadState* thread, bool seq) {

@@ -9,6 +9,7 @@
 #pragma once
 
 #include <string>
+#include <atomic>
 
 #include "rocksdb/customizable.h"
 #include "rocksdb/rocksdb_namespace.h"
@@ -148,6 +149,8 @@ class Comparator : public Customizable, public CompareInterface {
            CompareWithoutTimestamp(a, /*a_has_ts=*/true, b, /*b_has_ts=*/true);
   }
 
+  mutable std::atomic<size_t> num_comparisons;
+  
  private:
   size_t timestamp_size_;
 };

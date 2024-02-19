@@ -839,6 +839,8 @@ Status DBImpl::GetSmallestAtOrAfter(const ReadOptions& read_options,
   assert(read_options.ignore_range_deletions == false);
   assert(key != nullptr);
 
+  StopWatch sw(immutable_db_options_.clock, immutable_db_options_.statistics.get(), DB_MULTIGET);
+
   auto cfh = static_cast_with_check<ColumnFamilyHandleImpl>(column_family);
   ColumnFamilyData* cfd = cfh->cfd();
 
@@ -898,7 +900,6 @@ Status DBImpl::GetSmallest(const ReadOptions& read_options,
                            ColumnFamilyHandle* column_family, std::string* key,
                            std::string* value) {
                             
-  StopWatch sw(immutable_db_options_.clock, immutable_db_options_.statistics.get(), DB_MULTIGET);
   return GetSmallestAtOrAfter(read_options, column_family, "" /* target */, key, value);
 }
 

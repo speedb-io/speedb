@@ -42,6 +42,7 @@ class BytewiseComparatorImpl : public Comparator {
   const char* Name() const override { return kClassName(); }
 
   int Compare(const Slice& a, const Slice& b) const override {
+    ++num_comparisons;
     return a.compare(b);
   }
 

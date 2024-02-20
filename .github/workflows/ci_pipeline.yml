@@ -275,7 +275,7 @@ jobs:
           ROCKSDB_DISABLE_JEMALLOC=1 PORTABLE=1 DEBUG_LEVEL=0 make -j 4 rocksdbjavastatic
 
 
-  Linux-build:
+  Linux-build-and-UnitTest:
     if: ${{ (always() && !failure() && !cancelled()) && (github.event.review.state == 'approved' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/release')) }}
     needs: [Build]
     runs-on: ubuntu-latest

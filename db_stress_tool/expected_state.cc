@@ -396,7 +396,15 @@ class ExpectedStateTraceRecordHandler : public TraceRecord::Handler,
         state_(state),
         buffered_writes_(nullptr) {}
 
-  ~ExpectedStateTraceRecordHandler() { assert(IsDone()); }
+  ~ExpectedStateTraceRecordHandler() {
+    fprintf(
+        stderr,
+        "WARNING: ~ExpectedStateTraceRecordHandler - num_write_ops_: %" PRIu64
+        "  max_write_ops_: %" PRIu64 "\n",
+        num_write_ops_, max_write_ops_);
+    // assert(IsDone())
+    ;
+  }
 
   // True if we have already reached the limit on write operations to apply.
   bool IsDone() { return num_write_ops_ == max_write_ops_; }

@@ -483,7 +483,8 @@ KeyHandle HashSpdbRep::Allocate(const size_t len, char** buf) {
   //     std::max(len, kInlineDataSize) - kInlineDataSize +
   //     sizeof(SpdbKeyHandle);
   SpdbKeyHandle* h =
-      reinterpret_cast<SpdbKeyHandle*>(allocator_->AllocateAligned(alloc_size));
+      reinterpret_cast<SpdbKeyHandle*>(allocator_->AllocateAligned(
+          alloc_size, ArenaTracker::ArenaStats::HashSpdb));
   *buf = h->key_;
   return h;
 }
@@ -526,7 +527,8 @@ MemTableRep::Iterator* HashSpdbRep::GetIterator(Arena* arena,
                                                 bool part_of_flush) {
   if (arena != nullptr) {
     void* mem;
-    mem = arena->AllocateAligned(sizeof(SpdbVectorIterator));
+    mem = arena->AllocateAligned(sizeof(SpdbVectorIterator),
+                                 ArenaTracker::ArenaStats::HashSpdbIterator);
     return new (mem)
         SpdbVectorIterator(spdb_vectors_cont_, GetComparator(), part_of_flush);
   }
@@ -566,6 +568,7 @@ class HashSpdbRepFactory : public MemTableRepFactory {
                                  Logger* logger) override;
   bool IsInsertConcurrentlySupported() const override { return true; }
   bool CanHandleDuplicatedKey() const override { return true; }
+  bool IsRefreshIterSupported() const override { return false; }
   MemTableRep* PreCreateMemTableRep() override;
   void PostCreateMemTableRep(MemTableRep* switch_mem,
                              const MemTableRep::KeyComparator& compare,

@@ -1,4 +1,22 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
+//  This source code is licensed under both the GPLv2 (found in the
+//  COPYING file in the root directory) and Apache 2.0 License
+//  (found in the LICENSE.Apache file in the root directory).
+
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
 //  (found in the LICENSE.Apache file in the root directory).
@@ -241,7 +259,8 @@ HashSkipListRep::HashSkipListRep(const MemTableRep::KeyComparator& compare,
       compare_(compare),
       allocator_(allocator) {
   auto mem =
-      allocator->AllocateAligned(sizeof(std::atomic<void*>) * bucket_size);
+      allocator->AllocateAligned(sizeof(std::atomic<void*>) * bucket_size,
+                                 ArenaTracker::ArenaStats::HashSkipList);
   buckets_ = new (mem) std::atomic<Bucket*>[bucket_size];
 
   for (size_t i = 0; i < bucket_size_; ++i) {
@@ -256,7 +275,8 @@ HashSkipListRep::Bucket* HashSkipListRep::GetInitializedBucket(
   size_t hash = GetHash(transformed);
   auto bucket = GetBucket(hash);
   if (bucket == nullptr) {
-    auto addr = allocator_->AllocateAligned(sizeof(Bucket));
+    auto addr = allocator_->AllocateAligned(
+        sizeof(Bucket), ArenaTracker::ArenaStats::HashSkipList);
     bucket = new (addr) Bucket(compare_, allocator_, skiplist_height_,
                                skiplist_branching_factor_);
     buckets_[hash].store(bucket, std::memory_order_release);
@@ -313,7 +333,8 @@ MemTableRep::Iterator* HashSkipListRep::GetIterator(Arena* arena,
   if (arena == nullptr) {
     return new Iterator(list, true, new_arena);
   } else {
-    auto mem = arena->AllocateAligned(sizeof(Iterator));
+    auto mem = arena->AllocateAligned(
+        sizeof(Iterator), ArenaTracker::ArenaStats::HashSkipListIterator);
     return new (mem) Iterator(list, true, new_arena);
   }
 }
@@ -322,7 +343,9 @@ MemTableRep::Iterator* HashSkipListRep::GetDynamicPrefixIterator(Arena* arena) {
   if (arena == nullptr) {
     return new DynamicIterator(*this);
   } else {
-    auto mem = arena->AllocateAligned(sizeof(DynamicIterator));
+    auto mem = arena->AllocateAligned(
+        sizeof(DynamicIterator),
+        ArenaTracker::ArenaStats::HashSkipListDynamicIterator);
     return new (mem) DynamicIterator(*this);
   }
 }

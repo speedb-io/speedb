@@ -1,4 +1,22 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
+//  This source code is licensed under both the GPLv2 (found in the
+//  COPYING file in the root directory) and Apache 2.0 License
+//  (found in the LICENSE.Apache file in the root directory).
+
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
 //  (found in the LICENSE.Apache file in the root directory).
@@ -37,9 +55,9 @@
 #include <atomic>
 
 #include "memory/allocator.h"
+#include "memory/arena.h"
 #include "port/port.h"
 #include "util/random.h"
-
 namespace ROCKSDB_NAMESPACE {
 
 template <typename Key, class Comparator>
@@ -206,7 +224,8 @@ template <typename Key, class Comparator>
 typename SkipList<Key, Comparator>::Node* SkipList<Key, Comparator>::NewNode(
     const Key& key, int height) {
   char* mem = allocator_->AllocateAligned(
-      sizeof(Node) + sizeof(std::atomic<Node*>) * (height - 1));
+      sizeof(Node) + sizeof(std::atomic<Node*>) * (height - 1),
+      ArenaTracker::ArenaStats::SkipList);
   return new (mem) Node(key);
 }
 
@@ -425,8 +444,8 @@ SkipList<Key, Comparator>::SkipList(const Comparator cmp, Allocator* allocator,
   // Allocate the prev_ Node* array, directly from the passed-in allocator.
   // prev_ does not need to be freed, as its life cycle is tied up with
   // the allocator as a whole.
-  prev_ = reinterpret_cast<Node**>(
-      allocator_->AllocateAligned(sizeof(Node*) * kMaxHeight_));
+  prev_ = reinterpret_cast<Node**>(allocator_->AllocateAligned(
+      sizeof(Node*) * kMaxHeight_, ArenaTracker::ArenaStats::SkipList));
   for (int i = 0; i < kMaxHeight_; i++) {
     head_->SetNext(i, nullptr);
     prev_[i] = head_;

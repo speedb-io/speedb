@@ -1,3 +1,22 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+//  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
+//  This source code is licensed under both the GPLv2 (found in the
+//  COPYING file in the root directory) and Apache 2.0 License
+//  (found in the LICENSE.Apache file in the root directory).
+
 // Copyright (c) 2011-present, Facebook, Inc. All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -70,8 +89,10 @@ struct PrefixRecord {
 class BlockPrefixIndex::Builder {
  public:
   void Add(const Slice& key_prefix, uint32_t start_block, uint32_t num_blocks) {
-    PrefixRecord* record = reinterpret_cast<PrefixRecord*>(
-        arena_.AllocateAligned(sizeof(PrefixRecord)));
+    PrefixRecord* record =
+        reinterpret_cast<PrefixRecord*>(arena_.AllocateAligned(
+            sizeof(PrefixRecord),
+            ArenaTracker::ArenaStats::BlockPrefixIndexBuilder));
     record->prefix = key_prefix;
     record->start_block = start_block;
     record->end_block = start_block + num_blocks - 1;

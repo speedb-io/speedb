@@ -149,6 +149,10 @@ void WriteController::HandleNewDelayReq(void* client_id,
 
   {
     std::lock_guard<std::mutex> logger_lock(loggers_map_mu_);
+    // The below WARN msg is intended only when the WC is shared among loggers.
+    if (loggers_to_client_ids_map_.size() == 1) {
+      return;
+    }
     for (auto& logger_and_clients : loggers_to_client_ids_map_) {
       ROCKS_LOG_WARN(logger_and_clients.first.get(),
                      "WC setting delay of %" PRIu64

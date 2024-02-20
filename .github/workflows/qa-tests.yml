@@ -54,3 +54,19 @@ jobs:
               make clean && ${{ matrix.short_test }}
               ;;
           esac
+
+      - name: Save the DB if the test failed
+        if:  ${{ failure() }}
+        id: savedb 
+        run:  | 
+          ls -l /tmp/rocksdb_crashtest_* 
+          tar -zcvf /tmp/db4debug.tar.gz /tmp/rocksdb_crashtest_* 
+          ls -l /tmp/db4debug.tar.gz
+
+      - name: Upload the DB
+        uses: actions/upload-artifact@v3
+        if: ${{ always() && steps.savedb.outcome != 'skipped' && steps.savedb.outcome != 'failure' }}
+        with:
+          name: testdb 
+          retention-days: 3
+          path: /tmp/db4debug.tar.gz

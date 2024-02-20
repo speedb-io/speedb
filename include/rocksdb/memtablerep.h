@@ -378,6 +378,7 @@ class MemTableRepFactory : public Customizable {
   // false when if the <key,seq> already exists.
   // Default: false
   virtual bool CanHandleDuplicatedKey() const { return false; }
+  virtual bool IsRefreshIterSupported() const { return true; }
   virtual MemTableRep* PreCreateMemTableRep() { return nullptr; }
   virtual void PostCreateMemTableRep(
       MemTableRep* /*switch_mem*/,
@@ -495,6 +496,7 @@ class VectorRepFactory : public MemTableRepFactory {
   static const char* kNickName() { return "vector"; }
   const char* Name() const override { return kClassName(); }
   const char* NickName() const override { return kNickName(); }
+  bool IsRefreshIterSupported() const override { return false; }
 
   // Methods for MemTableRepFactory class overrides
   using MemTableRepFactory::CreateMemTableRep;

@@ -147,6 +147,22 @@ bool is_default(const char* flag_name) {
 }
 
 void ValidateEnableSpeedbFlags() {
+  std::vector<std::string> confilct_flags = {"max_background_compactions",
+                                             "max_background_flushes",
+                                             "cache_size",
+                                             "cache_type",
+                                             "memtablerep",
+                                             "pinning_policy",
+                                             "bloom_bits",
+                                             "allow_wbm_stalls",
+                                             "db_write_buffer_size",
+                                             "initiate_wbm_flushes",
+                                             "bytes_per_sync",
+                                             "use_dynamic_delay",
+                                             "start_delay_percent",
+                                             "max_num_parallel_flushes",
+                                             "use_blob_cache"};
+
   if (FLAGS_enable_speedb_features && !FLAGS_crash_test) {
     if (is_default("max_background_jobs") || is_default("total_ram_size")) {
       fprintf(
@@ -155,35 +171,13 @@ void ValidateEnableSpeedbFlags() {
           "in bytes and max_background_jobs \n");
       exit(1);
     }
-    if (!is_default("max_background_compactions")) {
-      fprintf(stderr,
-              "enable_speedb_features and max_background_compactions cannot be "
-              "configured together \n");
-      exit(1);
-    }
-    if (!is_default("max_background_flushes")) {
-      fprintf(stderr,
-              "enable_speedb_features and max_background_flushes cannot be "
-              "configured together \n");
-      exit(1);
-    }
-    if (!FLAGS_use_dynamic_delay) {
-      fprintf(stderr,
-              "enable_speedb_features and use_dynamic_delay == false cannot be "
-              "configured together \n");
-      exit(1);
-    }
-    if (!is_default("cache_size")) {
-      fprintf(stderr,
-              "enable_speedb_features and cache_size cannot be "
-              "configured together \n");
-      exit(1);
-    }
-    if (FLAGS_cache_type != "lru_cache") {
-      fprintf(stderr,
-              "enable_speedb_features and cache_type != lru_cache cannot be "
-              "configured together \n");
-      exit(1);
+    for (const auto& flag : confilct_flags) {
+      if (!is_default(flag.c_str())) {
+        std::string msg = "enable_speedb_features and " + flag +
+                          " cannot be configured together \n";
+        fprintf(stderr, "%s", msg.c_str());
+        exit(1);
+      }
     }
   }
 }

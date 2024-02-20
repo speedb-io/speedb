@@ -1123,8 +1123,8 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
       ROCKS_LOG_WARN(
           ioptions_.logger,
           "[%s] Stalling writes because we have %d immutable memtables "
-          "(waiting for flush), max_write_buffer_number is set to %d "
-          "rate %" PRIu64,
+          "(waiting for flush), max_write_buffer_number is set to %d. "
+          "delayed write rate: %" PRIu64,
           name_.c_str(), imm()->NumNotFlushed(),
           mutable_cf_options.max_write_buffer_number,
           write_controller->delayed_write_rate());
@@ -1146,8 +1146,8 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
             1);
       }
       ROCKS_LOG_WARN(ioptions_.logger,
-                     "[%s] Stalling writes because we have %d level-0 files "
-                     "rate %" PRIu64,
+                     "[%s] Stalling writes because we have %d level-0 files. "
+                     "delayed write rate: %" PRIu64,
                      name_.c_str(), vstorage->l0_delay_trigger_count(),
                      write_controller->delayed_write_rate());
     } else if (write_stall_condition == WriteStallCondition::kDelayed &&
@@ -1175,7 +1175,7 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
       ROCKS_LOG_WARN(
           ioptions_.logger,
           "[%s] Stalling writes because of estimated pending compaction "
-          "bytes %" PRIu64 " rate %" PRIu64,
+          "bytes %" PRIu64 ". delayed write rate: %" PRIu64,
           name_.c_str(), vstorage->estimated_compaction_needed_bytes(),
           write_controller->delayed_write_rate());
     } else {

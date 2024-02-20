@@ -986,7 +986,8 @@ class FindLevelFileTest : public testing::Test {
   ~FindLevelFileTest() override {}
 
   void LevelFileInit(size_t num = 0) {
-    char* mem = arena_.AllocateAligned(num * sizeof(FdWithKeyRange));
+    char* mem = arena_.AllocateAligned(num * sizeof(FdWithKeyRange),
+                                       ArenaTracker::ArenaStats::LevelFileInit);
     file_level_.files = new (mem) FdWithKeyRange[num];
     file_level_.num_files = 0;
   }
@@ -1001,7 +1002,8 @@ class FindLevelFileTest : public testing::Test {
     Slice largest_slice = largest_key.Encode();
 
     char* mem =
-        arena_.AllocateAligned(smallest_slice.size() + largest_slice.size());
+        arena_.AllocateAligned(smallest_slice.size() + largest_slice.size(),
+                               ArenaTracker::ArenaStats::FindLevelFileTestAdd);
     memcpy(mem, smallest_slice.data(), smallest_slice.size());
     memcpy(mem + smallest_slice.size(), largest_slice.data(),
            largest_slice.size());

@@ -1886,7 +1886,9 @@ InternalIterator* BlockBasedTable::NewIterator(
         need_upper_bound_check, prefix_extractor, caller,
         compaction_readahead_size, allow_unprepared_value);
   } else {
-    auto* mem = arena->AllocateAligned(sizeof(BlockBasedTableIterator));
+    auto* mem = arena->AllocateAligned(
+        sizeof(BlockBasedTableIterator),
+        ArenaTracker::ArenaStats::BlockBasedTableIterator);
     return new (mem) BlockBasedTableIterator(
         this, read_options, rep_->internal_comparator, std::move(index_iter),
         !skip_filters && !read_options.total_order_seek &&

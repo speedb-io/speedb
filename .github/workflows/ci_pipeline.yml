@@ -317,6 +317,11 @@ jobs:
           make clean
           SPDB_RELEASE_BUILD=1 LIB_MODE=static DEBUG_LEVEL=0 PORTABLE=1 JAVA_HOME=/usr/lib/jvm/java-openjdk make -j$(nproc) rocksdbjavastatic
          
+      - name: Java Unit test
+        run: |
+          make clean
+          JAVA_HOME=/usr/lib/jvm/java-openjdk make -j$(nproc) jtest
+
       - name: Build db_bench
         run: |
           yum install -y gflags-devel

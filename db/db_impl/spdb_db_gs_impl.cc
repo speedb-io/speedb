@@ -39,6 +39,17 @@ namespace spdb_gs {
 
 namespace {
 
+class LevelFilesItersMngr {
+  public:
+    LevelFilesItersMngr(LevelFilesBrief& level_files_brief): 
+      level_files_brief_(level_files_brief),
+      files_iters_(level_files_brief.num_files) {}
+
+  private:
+    LevelFilesBrief& level_files_brief_;
+    std::vector<Version::IteratorPair> files_iters_;
+};
+
 std::string RangeTsToString(const RangeTombstone& range_ts) {
   if (range_ts.start_key_.empty()) {
     return "Empty Range-TS";
@@ -58,19 +69,22 @@ bool AreRangeTssEqual(const RangeTombstone& first, const RangeTombstone& second)
 
 class InternalIteratorWrapper : public Iterator {
  public:
-  InternalIteratorWrapper(std::unique_ptr<InternalIterator> wrapped_iter_ptr,
+  InternalIteratorWrapper(InternalIterator* wrapped_iter_ptr,
                           const Comparator* comparator,
-                          const Slice& upper_bound)
-      : wrapped_iter_ptr_(std::move(wrapped_iter_ptr)),
+                          const Slice& upper_bound, 
+                          bool iter_owner)
+      : wrapped_iter_ptr_(wrapped_iter_ptr),
         comparator_(comparator),
-        upper_bound_(upper_bound) {
-    assert(wrapped_iter_ptr_);
+        upper_bound_(upper_bound),
+        iter_owner_(iter_owner) {
+    assert(wrapped_iter_ptr_ != nullptr);
     assert(comparator != nullptr);
   }
 
   ~InternalIteratorWrapper() {
-    wrapped_iter_ptr_.get()->~InternalIterator();
-    wrapped_iter_ptr_.release();
+    if (iter_owner_) {
+      wrapped_iter_ptr_->~InternalIterator();
+    }
   }
 
   bool Valid() const override { return valid_; }
@@ -161,9 +175,10 @@ class InternalIteratorWrapper : public Iterator {
   }
 
  private:
-  std::unique_ptr<InternalIterator> wrapped_iter_ptr_;
+  InternalIterator* wrapped_iter_ptr_ = nullptr;
   const Comparator* comparator_ = nullptr;
   Slice upper_bound_;
+  bool iter_owner_ = false;
   bool valid_ = false;
 };
 
@@ -825,10 +840,10 @@ Status ProcessMutableMemtable(SuperVersion* super_version, GlobalContext& gc,
                               Arena& arena) {
   LevelContext lc;
 
-  std::unique_ptr<InternalIterator> wrapped_values_iter(
-      super_version->mem->NewIterator(gc.mutable_read_options, &arena));
+  auto wrapped_values_iter = 
+      super_version->mem->NewIterator(gc.mutable_read_options, &arena);
   lc.values_iter.reset(new InternalIteratorWrapper(
-      std::move(wrapped_values_iter), gc.comparator, gc.csk));
+      wrapped_values_iter, gc.comparator, gc.csk, true /* iter_woner */));
 
   TruncatedRangeDelIterator* range_del_iter = nullptr;
   auto fragmented_range_del_iter = super_version->mem->NewRangeTombstoneIterator(
@@ -859,7 +874,7 @@ Status ProcessImmutableMemtables(SuperVersion* super_version, GlobalContext& gc,
   for (auto& memtbl_iters : iters) {
     LevelContext lc;
     lc.values_iter.reset(new InternalIteratorWrapper(
-        std::move(memtbl_iters.memtbl_iter), gc.comparator, gc.csk));
+        memtbl_iters.memtbl_iter, gc.comparator, gc.csk, true /* iter_owner */));
 
     lc.range_del_iter = new TruncatedRangeDelIteratorWrapper(memtbl_iters.range_del_iter, gc.comparator, gc.csk);
 
@@ -894,7 +909,7 @@ Status ProcessLevel0Files(SuperVersion* super_version, GlobalContext& gc,
   for (auto& file_iters : iters) {
     LevelContext lc;
     lc.values_iter.reset(new InternalIteratorWrapper(
-        std::move(file_iters.table_iter), gc.comparator, gc.csk));
+        file_iters.table_iter, gc.comparator, gc.csk, true /* iter_owner */));
     lc.range_del_iter = new TruncatedRangeDelIteratorWrapper(file_iters.range_ts_iter, gc.comparator, gc.csk);
 
     if (gs_debug_prints) printf("Processing Level-0 File #%d\n", i);
@@ -930,7 +945,7 @@ Status ProcessLevelsGt0(SuperVersion* super_version, GlobalContext& gc,
 
     LevelContext lc;
     lc.values_iter.reset(new InternalIteratorWrapper(
-        std::move(iters.table_iter), gc.comparator, gc.csk));
+        iters.table_iter, gc.comparator, gc.csk, true /* iter_owner */));
 
     lc.range_del_iter = new TruncatedRangeDelIteratorWrapper(nullptr, gc.comparator, gc.csk);
 

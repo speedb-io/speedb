@@ -868,9 +868,12 @@ class Version {
                             int level, bool allow_unprepared_value);
 
   struct IteratorPair {
-    std::unique_ptr<InternalIterator> table_iter;
+    InternalIterator* table_iter;
     TruncatedRangeDelIterator* range_ts_iter;
   };
+
+  IteratorPair GetFileIters(const ReadOptions& read_options, const FileOptions& soptions,
+    bool allow_unprepared_value, Arena* arena, const FdWithKeyRange& fd_with_key_range);
 
   // TODO - Consider using auto-vector or, adding to some entity like the
   // merger_iter_builder

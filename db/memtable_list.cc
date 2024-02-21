@@ -300,7 +300,7 @@ MemTableListVersion::GetIterators(const ReadOptions& read_options,
 
       }
     }
-    iters[i] = {std::move(std::unique_ptr<InternalIterator>(mem_iter)), range_del_iter};
+    iters[i] = {mem_iter, range_del_iter};
     ++i;
   }
 

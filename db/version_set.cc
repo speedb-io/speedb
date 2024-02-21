@@ -2068,6 +2068,24 @@ void Version::AddIteratorsForLevel(const ReadOptions& read_options,
   }
 }
 
+Version::IteratorPair Version::GetFileIters(const ReadOptions& read_options, const FileOptions& soptions,
+    bool allow_unprepared_value, Arena* arena, const FdWithKeyRange& fd_with_key_range) {
+    TruncatedRangeDelIterator* tombstone_iter = nullptr;
+
+    auto table_iter = cfd_->table_cache()->NewIterator(
+        read_options, soptions, cfd_->internal_comparator(),
+        *fd_with_key_range.file_metadata, /*range_del_agg=*/nullptr,
+        mutable_cf_options_.prefix_extractor, nullptr,
+        cfd_->internal_stats()->GetFileReadHist(0),
+        TableReaderCaller::kUserIterator, arena,
+        /*skip_filters=*/false, /*level=*/0, max_file_size_for_l0_meta_pin_,
+        /*smallest_compaction_key=*/nullptr,
+        /*largest_compaction_key=*/nullptr, allow_unprepared_value,
+        mutable_cf_options_.block_protection_bytes_per_key, &tombstone_iter);
+
+    return {table_iter, tombstone_iter};
+}
+
 std::vector<Version::IteratorPair> Version::GetIteratorsForLevel0(
     const ReadOptions& read_options, const FileOptions& soptions,
     bool allow_unprepared_value, Arena* arena) {
@@ -2083,21 +2101,8 @@ std::vector<Version::IteratorPair> Version::GetIteratorsForLevel0(
   std::vector<IteratorPair> iters;
 
   for (size_t i = 0; i < storage_info_.LevelFilesBrief(0).num_files; i++) {
-    const auto& file = storage_info_.LevelFilesBrief(0).files[i];
-    TruncatedRangeDelIterator* tombstone_iter = nullptr;
-    auto table_iter = cfd_->table_cache()->NewIterator(
-        read_options, soptions, cfd_->internal_comparator(),
-        *file.file_metadata, /*range_del_agg=*/nullptr,
-        mutable_cf_options_.prefix_extractor, nullptr,
-        cfd_->internal_stats()->GetFileReadHist(0),
-        TableReaderCaller::kUserIterator, arena,
-        /*skip_filters=*/false, /*level=*/0, max_file_size_for_l0_meta_pin_,
-        /*smallest_compaction_key=*/nullptr,
-        /*largest_compaction_key=*/nullptr, allow_unprepared_value,
-        mutable_cf_options_.block_protection_bytes_per_key, &tombstone_iter);
-
-    iters.push_back(
-        {std::move(std::unique_ptr<InternalIterator>(table_iter)), tombstone_iter});
+    const auto& fd_with_key_range = storage_info_.LevelFilesBrief(0).files[i];
+    iters.emplace_back(GetFileIters(read_options, soptions, allow_unprepared_value, arena, fd_with_key_range));
   }
 
   return iters;
@@ -2131,7 +2136,7 @@ Version::IteratorPair Version::GetIteratorsForLevelGt0(int level,
       &tombstone_iter_ptr);
 
   // TODO - HANDLE RANGE DEL ITER  
-  return {std::move(std::unique_ptr<InternalIterator>(level_iter)), nullptr};
+  return {level_iter, nullptr};
 }
 
 Status Version::OverlapWithLevelIterator(const ReadOptions& read_options,

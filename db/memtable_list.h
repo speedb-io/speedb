@@ -121,7 +121,7 @@ class MemTableListVersion {
                     bool add_range_tombstone_iter);
 
   struct IteratorPair {
-    std::unique_ptr<InternalIterator> memtbl_iter;
+    InternalIterator* memtbl_iter;
     TruncatedRangeDelIterator* range_del_iter;
   };
   std::vector<IteratorPair> GetIterators(const ReadOptions& options,

@@ -41,11 +41,50 @@ namespace {
 
 class LevelFilesItersMngr {
   public:
-    LevelFilesItersMngr(LevelFilesBrief& level_files_brief): 
+    LevelFilesItersMngr(SuperVersion* super_version, const ReadOptions& read_options, const FileOptions& file_options, Arena* arena, LevelFilesBrief& level_files_brief): 
+      super_version_(super_version),
+      read_options_(read_options),
+      file_options_(file_options),
+      arena_(arena),
       level_files_brief_(level_files_brief),
       files_iters_(level_files_brief.num_files) {}
 
+    ~LevelFilesItersMngr() {
+      for (auto& file_iters: files_iters_) {
+        if (file_iters.table_iter != nullptr) {
+          file_iters.table_iter->~InternalIterator();
+        }
+        delete file_iters.range_ts_iter;
+      }
+    }
+
+    InternalIterator* GetInternalIter(size_t file_idx) {
+      CreateFileItersIfNecesary(file_idx);
+      return files_iters_[file_idx].table_iter;
+    }
+
+    TruncatedRangeDelIterator* GetRangeTsIter(size_t file_idx) {
+      CreateFileItersIfNecesary(file_idx);
+      return files_iters_[file_idx].range_ts_iter;
+    }
+
   private:
+    void CreateFileItersIfNecesary(size_t file_idx) {
+      assert(file_idx < files_iters_.size());
+      if (DoFileItersExist(file_idx) == false) {
+          files_iters_[file_idx] = super_version_->current->GetFileIters(read_options_, file_options_, true /* allow_unprepared_value */, arena_, level_files_brief_.files[file_idx]);
+      }
+    }
+
+    bool DoFileItersExist(size_t file_idx) const {
+      return (files_iters_[file_idx].table_iter != nullptr);
+    }
+
+  private:
+    SuperVersion* super_version_ = nullptr;
+    const ReadOptions& read_options_;
+    const FileOptions& file_options_;
+    Arena* arena_ = nullptr;
     LevelFilesBrief& level_files_brief_;
     std::vector<Version::IteratorPair> files_iters_;
 };
@@ -67,7 +106,31 @@ bool AreRangeTssEqual(const RangeTombstone& first, const RangeTombstone& second)
   return ((first.start_key_ == second.start_key_) && (first.end_key_ == second.end_key_) && (first.seq_ == second.seq_));
 }
 
-class InternalIteratorWrapper : public Iterator {
+class InternalIteratorWrapperBase {
+ public:
+  virtual ~InternalIteratorWrapperBase() = default;
+
+  virtual bool Valid() const = 0;
+  virtual void Invalidate() = 0;
+
+  virtual bool HasUpperBound() const = 0;
+  virtual void SetUpperBound(const Slice& upper_bound) = 0;
+  virtual const Slice& GetUpperBound() const = 0;
+
+  virtual void SeekToFirst() = 0;
+  virtual void Seek(const Slice& target) = 0;
+  virtual void Next() = 0;
+
+  virtual Slice key() const = 0;
+  virtual Slice value() const = 0;
+
+  virtual Status status() const = 0;
+
+  virtual std::string ToString() const = 0;
+};
+
+
+class InternalIteratorWrapper: public InternalIteratorWrapperBase {
  public:
   InternalIteratorWrapper(InternalIterator* wrapped_iter_ptr,
                           const Comparator* comparator,
@@ -89,28 +152,24 @@ class InternalIteratorWrapper : public Iterator {
 
   bool Valid() const override { return valid_; }
 
-  bool HasUpperBound() const { return (upper_bound_.empty() == false); }
+  void Invalidate() override { valid_ = false; }
 
-  void SetUpperBound(const Slice& upper_bound) {
+  bool HasUpperBound() const override { return (upper_bound_.empty() == false); }
+
+  void SetUpperBound(const Slice& upper_bound) override {
     upper_bound_ = upper_bound;
     UpdateValidity();
   }
 
-  const Slice& GetUpperBound() const {
+  const Slice& GetUpperBound() const override {
     assert(HasUpperBound());
     return upper_bound_;
   }
 
-  void SeekToFirst() override {
+  void SeekToFirst()  override{
     wrapped_iter_ptr_->SeekToFirst();
     UpdateValidity();
     ReportProgress("SeekToFirst"); 
-  }
-
-  void SeekToLast() override {
-    wrapped_iter_ptr_->SeekToLast();
-    UpdateValidity();
-    ReportProgress("SeekToLast"); 
   }
 
   void Seek(const Slice& target) override {
@@ -129,13 +188,6 @@ class InternalIteratorWrapper : public Iterator {
     ReportProgress("Next"); 
   }
 
-  void SeekForPrev(const Slice& /* target */) override {
-    assert(0);
-    Invalidate();
-  }
-
-  void Prev() override { assert(0); }
-
   Slice key() const override {
     assert(Valid());
     return wrapped_iter_ptr_->key();
@@ -148,9 +200,7 @@ class InternalIteratorWrapper : public Iterator {
 
   Status status() const override { return wrapped_iter_ptr_->status(); }
 
-  void Invalidate() { valid_ = false; }
-
-  std::string ToString() const {
+  std::string ToString() const override {
     if (Valid() == false) {
       return "Invalid";
     }
@@ -934,6 +984,8 @@ Status ProcessLevelsGt0(SuperVersion* super_version, GlobalContext& gc,
       }
       continue;
     }
+
+    // LevelFilesItersMngr level_files_iter_mngr(super_version, gc.mutable_read_options, file_options, &arena, storage_info->LevelFilesBrief(level));
 
     // TOOD - Handle allow_unprepared_value!!!!
     auto iters = super_version->current->GetIteratorsForLevelGt0(

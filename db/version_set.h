@@ -869,7 +869,7 @@ class Version {
 
   struct IteratorPair {
     std::unique_ptr<InternalIterator> table_iter;
-    std::unique_ptr<FragmentedRangeTombstoneIterator> range_ts_iter;
+    TruncatedRangeDelIterator* range_ts_iter;
   };
 
   // TODO - Consider using auto-vector or, adding to some entity like the

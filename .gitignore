@@ -103,3 +103,10 @@ cmake-build-*
 third-party/folly/
 .cache
 *.sublime-*
+db_bench_db/*
+examples/*LOG
+examples/*txt
+*csv
+*cc*orig
+out_file*
+perf*data*

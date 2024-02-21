@@ -192,7 +192,7 @@ class FragmentedRangeTombstoneIteratorWrapper : public Iterator {
 
   void SeekToFirst() override {
     if (wrapped_iter_ptr_) {
-      wrapped_iter_ptr_->SeekToFirst();
+      wrapped_iter_ptr_->SeekToTopFirst();
       UpdateValidity();
       ReportProgress("SeekToFirst");
     }
@@ -200,7 +200,7 @@ class FragmentedRangeTombstoneIteratorWrapper : public Iterator {
 
   void SeekToLast() override {
     if (wrapped_iter_ptr_) {
-      wrapped_iter_ptr_->SeekToLast();
+      wrapped_iter_ptr_->SeekToTopLast();
       UpdateValidity();
       ReportProgress("SeekToLast");
     }
@@ -326,12 +326,139 @@ class FragmentedRangeTombstoneIteratorWrapper : public Iterator {
   bool valid_ = false;
 };
 
+class TruncatedRangeDelIteratorWrapper {
+ public:
+  TruncatedRangeDelIteratorWrapper(
+      TruncatedRangeDelIterator* wrapped_iter_ptr,
+      const Comparator* comparator, const Slice& upper_bound)
+      : wrapped_iter_ptr_(wrapped_iter_ptr),
+        comparator_(comparator),
+        upper_bound_(upper_bound) {}
+
+  ~TruncatedRangeDelIteratorWrapper() {
+    delete wrapped_iter_ptr_;
+  }
+
+  bool Valid() const { return valid_; }
+
+  bool HasUpperBound() const { return (upper_bound_.empty() == false); }
+
+  void SetUpperBound(const Slice& upper_bound) {
+    upper_bound_ = upper_bound;
+    UpdateValidity();
+  }
+
+  const Slice& GetUpperBound() const {
+    assert(HasUpperBound());
+    return upper_bound_;
+  }
+
+  void SeekToFirst() {
+    if (wrapped_iter_ptr_) {
+      wrapped_iter_ptr_->SeekToFirst();
+      UpdateValidity();
+      ReportProgress("SeekToFirst");
+    }
+  }
+
+  void Seek(const Slice& target) {
+    if (wrapped_iter_ptr_) {
+      wrapped_iter_ptr_->Seek(target);
+      UpdateValidity();
+      ReportProgress("Seek");
+    }
+  }
+
+  void Next() {
+    if (wrapped_iter_ptr_) {
+      assert(Valid());
+      wrapped_iter_ptr_->Next();
+      UpdateValidity();
+      ReportProgress("Next");
+    } else {
+      assert(0);
+    }
+  }
+
+  RangeTombstone Tombstone() const {
+    if (wrapped_iter_ptr_) {
+      assert(Valid());
+      auto curr_range_ts = wrapped_iter_ptr_->Tombstone();
+      if (HasUpperBound() == false) {
+        return curr_range_ts;
+      }
+
+      assert(comparator_->Compare(curr_range_ts.start_key_, upper_bound_) < 0);
+      auto curr_range_end_vs_upper_bound =
+          comparator_->Compare(curr_range_ts.end_key_, upper_bound_);
+      if (curr_range_end_vs_upper_bound <= 0) {
+        return curr_range_ts;
+      }
+
+      // curr range extends beyond the upper bound, return a range that ends at
+      // the upper bound (exclusive)
+      return RangeTombstone(curr_range_ts.start_key_, upper_bound_,
+                            curr_range_ts.seq_);
+    } else {
+      assert(0);
+      return RangeTombstone();
+    }
+  }
+
+  Slice key() {
+    assert(Valid());
+    return wrapped_iter_ptr_->start_key().user_key;
+  }
+
+  void Invalidate() {
+    valid_ = false;
+  }
+
+  std::string ToString() {
+    if (Valid() == false) {
+      return "Invalid";
+    }
+    return RangeTsToString(Tombstone());
+  }
+
+  void ReportProgress(const std::string& progress_str) {
+    if (gs_report_iters_progress) {
+      std::cout << "Range-TS-Iter: " << progress_str << ":" << ToString() << '\n';
+    }    
+  }
+
+ private:
+  void UpdateValidity() {
+    if (wrapped_iter_ptr_ == nullptr) {
+      valid_ = false;
+    } else {
+      valid_ = wrapped_iter_ptr_->Valid();
+      if (valid_ && HasUpperBound()) {
+        auto curr_range_start_vs_upper_bound = comparator_->Compare(
+            key(), GetUpperBound());
+        // The upper bound is exclusive for ranges;
+        // A range that starts at the upper bound is invalid
+        if (curr_range_start_vs_upper_bound >= 0) {
+          valid_ = false;
+        }
+      }
+    }
+  }
+
+ private:
+  TruncatedRangeDelIterator* wrapped_iter_ptr_ = nullptr;
+  const Comparator* comparator_ = nullptr;
+  Slice upper_bound_;
+  bool valid_ = false;
+};
+
 struct GlobalContext {
   ReadOptions mutable_read_options;
   SequenceNumber seq_num = kMaxSequenceNumber;
   GlobalDelList* del_list = nullptr;
   Slice target;
   std::string csk;
+  const InternalKeyComparator* icomparator = nullptr;
   const Comparator* comparator = nullptr;
   std::shared_ptr<Logger> logger;
 
@@ -340,7 +467,7 @@ struct GlobalContext {
 
 struct LevelContext {
   std::unique_ptr<InternalIteratorWrapper> values_iter;
-  std::unique_ptr<FragmentedRangeTombstoneIteratorWrapper> range_del_iter;
+  TruncatedRangeDelIteratorWrapper* range_del_iter = nullptr;
 
   // std::string prev_del_key;
 
@@ -349,6 +476,10 @@ struct LevelContext {
   ValueCategory value_category = ValueCategory::NONE;
 
   bool new_csk_found_in_level = false;
+
+  ~LevelContext() {
+    delete range_del_iter;
+  }
 };
 
 void UpdateCSK(GlobalContext& gc, LevelContext& lc) {
@@ -699,14 +830,18 @@ Status ProcessMutableMemtable(SuperVersion* super_version, GlobalContext& gc,
   lc.values_iter.reset(new InternalIteratorWrapper(
       std::move(wrapped_values_iter), gc.comparator, gc.csk));
 
-  auto range_del_iter = super_version->mem->NewRangeTombstoneIterator(
-      gc.mutable_read_options, gc.seq_num, false /* immutable_memtable */);
-  std::unique_ptr<FragmentedRangeTombstoneIterator> wrapped_range_del_iter;
-  if (range_del_iter != nullptr) {
-    wrapped_range_del_iter.reset(std::move(range_del_iter));
+  TruncatedRangeDelIterator* range_del_iter = nullptr;
+  auto fragmented_range_del_iter = super_version->mem->NewRangeTombstoneIterator(
+        gc.mutable_read_options, gc.seq_num, false /* immutable_memtable */);
+  if (fragmented_range_del_iter == nullptr || fragmented_range_del_iter->empty()) {
+    delete fragmented_range_del_iter;
+    fragmented_range_del_iter = nullptr;
+  } else {
+    range_del_iter = new TruncatedRangeDelIterator(
+            std::unique_ptr<FragmentedRangeTombstoneIterator>(fragmented_range_del_iter),
+            gc.icomparator, nullptr /* smallest */, nullptr /* largest */);
   }
-  lc.range_del_iter.reset(new FragmentedRangeTombstoneIteratorWrapper(
-      std::move(wrapped_range_del_iter), gc.comparator, gc.csk));
+  lc.range_del_iter = new TruncatedRangeDelIteratorWrapper(range_del_iter, gc.comparator, gc.csk);
 
   if (gs_debug_prints) printf("Processing Mutable Table\n");
   return ProcessLogLevel(gc, lc);
@@ -726,12 +861,7 @@ Status ProcessImmutableMemtables(SuperVersion* super_version, GlobalContext& gc,
     lc.values_iter.reset(new InternalIteratorWrapper(
         std::move(memtbl_iters.memtbl_iter), gc.comparator, gc.csk));
 
-    std::unique_ptr<FragmentedRangeTombstoneIterator> wrapped_range_del_iter;
-    if (memtbl_iters.range_ts_iter.get() != nullptr) {
-      wrapped_range_del_iter.reset(memtbl_iters.range_ts_iter.release());
-    }
-    lc.range_del_iter.reset(new FragmentedRangeTombstoneIteratorWrapper(
-        std::move(wrapped_range_del_iter), gc.comparator, gc.csk));
+    lc.range_del_iter = new TruncatedRangeDelIteratorWrapper(memtbl_iters.range_del_iter, gc.comparator, gc.csk);
 
     if (gs_debug_prints) printf("Processing Immutable Memtable #%d\n", i);
     auto status = ProcessLogLevel(gc, lc);
@@ -765,13 +895,7 @@ Status ProcessLevel0Files(SuperVersion* super_version, GlobalContext& gc,
     LevelContext lc;
     lc.values_iter.reset(new InternalIteratorWrapper(
         std::move(file_iters.table_iter), gc.comparator, gc.csk));
-
-    std::unique_ptr<FragmentedRangeTombstoneIterator> wrapped_range_del_iter;
-    if (file_iters.range_ts_iter.get() != nullptr) {
-      wrapped_range_del_iter.reset(file_iters.range_ts_iter.release());
-    }
-    lc.range_del_iter.reset(new FragmentedRangeTombstoneIteratorWrapper(
-        std::move(wrapped_range_del_iter), gc.comparator, gc.csk));
+    lc.range_del_iter = new TruncatedRangeDelIteratorWrapper(file_iters.range_ts_iter, gc.comparator, gc.csk);
 
     if (gs_debug_prints) printf("Processing Level-0 File #%d\n", i);
     auto status = ProcessLogLevel(gc, lc);
@@ -808,13 +932,7 @@ Status ProcessLevelsGt0(SuperVersion* super_version, GlobalContext& gc,
     lc.values_iter.reset(new InternalIteratorWrapper(
         std::move(iters.table_iter), gc.comparator, gc.csk));
 
-    std::unique_ptr<FragmentedRangeTombstoneIterator> wrapped_range_del_iter;
-    assert(iters.range_ts_iter.get() == nullptr);
-    if (iters.range_ts_iter.get() != nullptr) {
-      wrapped_range_del_iter.reset(iters.range_ts_iter.release());
-    }
-    lc.range_del_iter.reset(new FragmentedRangeTombstoneIteratorWrapper(
-        std::move(wrapped_range_del_iter), gc.comparator, gc.csk));
+    lc.range_del_iter = new TruncatedRangeDelIteratorWrapper(nullptr, gc.comparator, gc.csk);
 
     if (gs_debug_prints) printf("Processing Level-%d\n", level);
     auto status = ProcessLogLevel(gc, lc);
@@ -857,6 +975,7 @@ Status DBImpl::GetSmallestAtOrAfter(const ReadOptions& read_options,
     gc.target = target;
   }
   gc.csk.clear();
+  gc.icomparator = &cfd->ioptions()->internal_comparator;
   gc.comparator = cfd->user_comparator();
   gc.logger = immutable_db_options_.info_log;
 

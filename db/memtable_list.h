@@ -122,7 +122,7 @@ class MemTableListVersion {
 
   struct IteratorPair {
     std::unique_ptr<InternalIterator> memtbl_iter;
-    std::unique_ptr<FragmentedRangeTombstoneIterator> range_ts_iter;
+    TruncatedRangeDelIterator* range_del_iter;
   };
   std::vector<IteratorPair> GetIterators(const ReadOptions& options,
                                          Arena* arena);

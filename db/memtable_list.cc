@@ -282,20 +282,25 @@ MemTableListVersion::GetIterators(const ReadOptions& read_options,
   auto i = 0U;
   for (auto& m : memlist_) {
     auto mem_iter = m->NewIterator(read_options, arena);
-    FragmentedRangeTombstoneIterator* range_ts_iter = nullptr;
 
+    TruncatedRangeDelIterator* range_del_iter = nullptr;
     if (read_options.ignore_range_deletions == false) {
       // Except for snapshot read, using kMaxSequenceNumber is OK because these
       // are immutable memtables.
-      range_ts_iter = m->NewRangeTombstoneIterator(
+      FragmentedRangeTombstoneIterator* fragmented_range_del_iter = m->NewRangeTombstoneIterator(
           read_options, read_seq, true /* immutale_memtable */);
-      if (range_ts_iter == nullptr || range_ts_iter->empty()) {
-        // printf("range_ts_iter null or empty!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+      if (fragmented_range_del_iter == nullptr || fragmented_range_del_iter->empty()) {
+        delete fragmented_range_del_iter;
+        fragmented_range_del_iter = nullptr;
+      } else {
+          range_del_iter = new TruncatedRangeDelIterator(
+            std::unique_ptr<FragmentedRangeTombstoneIterator>(fragmented_range_del_iter),
+            &m->GetInternalKeyComparator(), nullptr /* smallest */,
+            nullptr /* largest */);
+
       }
     }
-    iters[i] = {std::move(std::unique_ptr<InternalIterator>(mem_iter)),
-                std::move(std::unique_ptr<FragmentedRangeTombstoneIterator>(
-                    range_ts_iter))};
+    iters[i] = {std::move(std::unique_ptr<InternalIterator>(mem_iter)), range_del_iter};
     ++i;
   }
 

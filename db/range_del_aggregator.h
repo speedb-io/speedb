@@ -74,6 +74,11 @@ class TruncatedRangeDelIterator {
                : *largest_;
   }
 
+  // TODO - Reconsider / maybe need to account for smallest_ / largest_
+  RangeTombstone Tombstone() const {
+    return iter_->Tombstone();
+  }
+
   SequenceNumber seq() const { return iter_->seq(); }
   Slice timestamp() const {
     assert(icmp_->user_comparator()->timestamp_size());
@@ -89,12 +94,6 @@ class TruncatedRangeDelIterator {
   SequenceNumber upper_bound() const { return iter_->upper_bound(); }
 
   SequenceNumber lower_bound() const { return iter_->lower_bound(); }
-
-  // TODO - CONSIDER WHAT TO DO ABOUT THIS!!!!
-  std::unique_ptr<FragmentedRangeTombstoneIterator>
-  StealInternalIterAndInvalidate() {
-    return std::move(iter_);
-  }
 
  private:
   std::unique_ptr<FragmentedRangeTombstoneIterator> iter_;

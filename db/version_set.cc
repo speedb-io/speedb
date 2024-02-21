@@ -2096,20 +2096,8 @@ std::vector<Version::IteratorPair> Version::GetIteratorsForLevel0(
         /*largest_compaction_key=*/nullptr, allow_unprepared_value,
         mutable_cf_options_.block_protection_bytes_per_key, &tombstone_iter);
 
-    // TODO - Handle read_options.ignore_range_deletions!!!!
-    FragmentedRangeTombstoneIterator* range_ts_iter = nullptr;
-    if ((read_options.ignore_range_deletions == false) &&
-        (tombstone_iter != nullptr)) {
-      range_ts_iter =
-          tombstone_iter->StealInternalIterAndInvalidate().release();
-    }
-    delete tombstone_iter;
-    tombstone_iter = nullptr;
-
     iters.push_back(
-        {std::move(std::unique_ptr<InternalIterator>(table_iter)),
-         std::move(std::unique_ptr<FragmentedRangeTombstoneIterator>(
-             range_ts_iter))});
+        {std::move(std::unique_ptr<InternalIterator>(table_iter)), tombstone_iter});
   }
 
   return iters;
@@ -2142,13 +2130,8 @@ Version::IteratorPair Version::GetIteratorsForLevelGt0(int level,
       /*compaction_boundaries=*/nullptr, allow_unprepared_value,
       &tombstone_iter_ptr);
 
-
-  FragmentedRangeTombstoneIterator* range_ts_iter = nullptr;
-
-  // TODO - HANDLE RANGE DEL ITER
-  
-  return {std::move(std::unique_ptr<InternalIterator>(level_iter)),
-         std::move(std::unique_ptr<FragmentedRangeTombstoneIterator>(range_ts_iter))};
+  // TODO - HANDLE RANGE DEL ITER  
+  return {std::move(std::unique_ptr<InternalIterator>(level_iter)), nullptr};
 }
 
 Status Version::OverlapWithLevelIterator(const ReadOptions& read_options,

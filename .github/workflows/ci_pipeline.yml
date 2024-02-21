@@ -275,7 +275,7 @@ jobs:
           ROCKSDB_DISABLE_JEMALLOC=1 PORTABLE=1 DEBUG_LEVEL=0 make -j 4 rocksdbjavastatic
 
 
-  Linux-build:
+  Linux-build-and-UnitTest:
     if: ${{ (always() && !failure() && !cancelled()) && (github.event.review.state == 'approved' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/release')) }}
     needs: [Build]
     runs-on: ubuntu-latest
@@ -317,6 +317,11 @@ jobs:
           make clean
           SPDB_RELEASE_BUILD=1 LIB_MODE=static DEBUG_LEVEL=0 PORTABLE=1 JAVA_HOME=/usr/lib/jvm/java-openjdk make -j$(nproc) rocksdbjavastatic
          
+      - name: Java Unit test
+        run: |
+          make clean
+          JAVA_HOME=/usr/lib/jvm/java-openjdk make -j$(nproc) jtest
+
       - name: Build db_bench
         run: |
           yum install -y gflags-devel
@@ -364,7 +369,7 @@ jobs:
    
   CI-all:
     if: ${{ github.event.review.state == 'approved' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/heads/release') }}
-    needs: [Check-Licence-And-History, Build, QA-Tests, Fuzz, Linux-Arm-build, Linux-build, Macos-build, Windows-build-test]
+    needs: [Check-Licence-And-History, Build, QA-Tests, Fuzz, Linux-Arm-build, Linux-build-and-UnitTest, Macos-build, Windows-build-test]
     runs-on: ubuntu-latest
     steps:
     - name: Summary

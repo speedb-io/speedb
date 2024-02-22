@@ -41,57 +41,105 @@ namespace {
 
 class LevelFilesItersMngr {
   public:
-    LevelFilesItersMngr(SuperVersion* super_version, const ReadOptions& read_options, const FileOptions& file_options, Arena* arena, LevelFilesBrief& level_files_brief): 
-      super_version_(super_version),
-      read_options_(read_options),
-      file_options_(file_options),
-      arena_(arena),
-      level_files_brief_(level_files_brief),
-      files_iters_(level_files_brief.num_files) {}
+   LevelFilesItersMngr(SuperVersion* super_version,
+                       const InternalKeyComparator* icomparator,
+                       const ReadOptions& read_options,
+                       const FileOptions& file_options, Arena* arena,
+                       const LevelFilesBrief& level_files_brief)
+       : super_version_(super_version),
+         icomparator_(icomparator),
+         read_options_(read_options),
+         file_options_(file_options),
+         arena_(arena),
+         level_files_brief_(level_files_brief),
+         files_iters_(level_files_brief.num_files) {}
 
-    ~LevelFilesItersMngr() {
-      for (auto i = 0; i < NumFiles(); ++i) {
-        DisposeOfFileIters(i);
-      }
+#if 0
+   ~LevelFilesItersMngr() {
+     for (auto i = 0; i < NumFiles(); ++i) {
+       DisposeOfFileIters(i);
+     }
     }
-    
+
+    InternalIterator* CurrInternalIter() {
+      assert(DoFileItersExist(curr_internal_iter_idx_));
+      return files_iters_[curr_internal_iter_idx_].table_iter;
+    }
+
+    TruncatedRangeDelIterator* CurrRangeTsIter() {
+      assert(DoFileItersExist(curr_range_ts_iter_idx_));
+      return files_iters_[curr_range_ts_iter_idx_].range_ts_iter;
+    }
+
+    bool HasNextInternalIter() const {
+      return (curr_internal_iter_idx_ < NumFiles());
+    }
+
     InternalIterator* NextInternalIter() {
-      assert(curr_internal_iter_idx < NumFiles());
-      ++curr_internal_iter_idx;
-      if (curr_internal_iter_idx < NumFiles()) {
-        CreateFileItersIfNecesary(curr_internal_iter_idx);
+      assert(curr_internal_iter_idx_ < NumFiles());
+      ++curr_internal_iter_idx_;
+      if (curr_internal_iter_idx_ < NumFiles()) {
+        CreateFileItersIfNecesary(curr_internal_iter_idx_);
         DisposeOfUnneededIters();
-        return files_iters_[curr_internal_iter_idx].table_iter;
+        return files_iters_[curr_internal_iter_idx_].table_iter;
       } else {
         return nullptr;
       }
+    }
+
+    bool HasNextRangeTsIter() const {
+      return (curr_range_ts_iter_idx_ < NumFiles());
     }
 
     TruncatedRangeDelIterator* NextRangeTsIter() {
-      assert(curr_range_ts_iter_idx < NumFiles());
-      ++curr_range_ts_iter_idx;
-      if (curr_range_ts_iter_idx < NumFiles()) {
-        CreateFileItersIfNecesary(curr_range_ts_iter_idx);
+      assert(curr_range_ts_iter_idx_ < NumFiles());
+      ++curr_range_ts_iter_idx_;
+      if (curr_range_ts_iter_idx_ < NumFiles()) {
+        CreateFileItersIfNecesary(curr_range_ts_iter_idx_);
         DisposeOfUnneededIters();
-        return files_iters_[curr_range_ts_iter_idx].range_ts_iter;
+        return files_iters_[curr_range_ts_iter_idx_].range_ts_iter;
       } else {
         return nullptr;
       }
+    }
+
+    bool IsTargetCoveredByCurrInternalIter(const Slice& target) const {
+      assert(IsFileIdxValid(curr_internal_iter_idx_));
+
+      // TODO - Handle Snapshots / Sequence
+      LookupKey lookup_key(target, kMaxSequenceNumber);
+      return IsKeyWithinFileBounaries(*icomparator_, level_files_brief_,
+                                      curr_internal_iter_idx_, lookup_key);
+    }
+
+    void MoveInternalIterForward(const Slice& target) {
+      if (IsFileIdxValid(curr_internal_iter_idx_) && IsTargetCoveredByCurrInternalIter(target)) {
+        assert(DoFileItersExist(curr_internal_iter_idx_);
+        return;
+      }
+
     }
 
   private:
     void CreateFileItersIfNecesary(int file_idx) {
       assert(file_idx < NumFiles());
+      assert((min_created_iters_idx_ == -1) ||
+             (min_created_iters_idx_ < file_idx));
+
       if (DoFileItersExist(file_idx) == false) {
-          files_iters_[file_idx] = super_version_->current->GetFileIters(read_options_, file_options_, true /* allow_unprepared_value */, arena_, level_files_brief_.files[file_idx]);
+          files_iters_[file_idx] = super_version_->current->GetFileIters( read_options_, 
+                                                                          file_options_, 
+                                                                          true /* allow_unprepared_value */, 
+                                                                          arena_, 
+                                                                          level_files_brief_.files[file_idx]);
+          if (min_created_iters_idx_ == -1) {
+          }
       }
     }
 
     void DisposeOfUnneededIters() {
-      assert(curr_internal_iter_idx <= NumFiles());
-
-      if ((curr_internal_iter_idx > 0) && (curr_internal_iter_idx == curr_range_ts_iter_idx)) {
-        DisposeOfFileIters(curr_internal_iter_idx);
+      if ((curr_internal_iter_idx_ > 0) && (curr_internal_iter_idx_ == curr_range_ts_iter_idx_)) {
+        DisposeOfFileIters(curr_internal_iter_idx_);
       }
     }
 
@@ -107,6 +155,7 @@ class LevelFilesItersMngr {
     }
 
     bool DoFileItersExist(int file_idx) const {
+      assert(IsFileIdxValid(file_idx));
       return (files_iters_[file_idx].table_iter != nullptr);
     }
 
@@ -115,16 +164,24 @@ class LevelFilesItersMngr {
       return files_iters_.size();
     }
 
+    bool IsFileIdxValid(int file_idx) const {
+      return ((file_idx >= 0) && (file_idx < NumFiles()));
+    }
+
+#endif
+
   private:
     SuperVersion* super_version_ = nullptr;
+    const InternalKeyComparator* icomparator_ = nullptr;
     const ReadOptions& read_options_;
     const FileOptions& file_options_;
     Arena* arena_ = nullptr;
-    LevelFilesBrief& level_files_brief_;
+    const LevelFilesBrief& level_files_brief_;
     std::vector<Version::IteratorPair> files_iters_;
 
-    int curr_internal_iter_idx = -1;
-    int curr_range_ts_iter_idx = -1;
+    int curr_internal_iter_idx_ = -1;
+    int curr_range_ts_iter_idx_ = -1;
+    int min_created_iters_idx_ = -1;
 };
 
 std::string RangeTsToString(const RangeTombstone& range_ts) {
@@ -149,45 +206,42 @@ class InternalIteratorWrapperBase {
   virtual ~InternalIteratorWrapperBase() = default;
 
   virtual bool Valid() const = 0;
-  virtual void Invalidate() = 0;
 
   virtual bool HasUpperBound() const = 0;
   virtual void SetUpperBound(const Slice& upper_bound) = 0;
   virtual const Slice& GetUpperBound() const = 0;
 
   virtual void SeekToFirst() = 0;
-  virtual void Seek(const Slice& target) = 0;
+  virtual void SeekForward(const Slice& target) = 0;
   virtual void Next() = 0;
 
   virtual Slice key() const = 0;
   virtual Slice value() const = 0;
 
-  virtual Status status() const = 0;
-
   virtual std::string ToString() const = 0;
 };
-
 
 class InternalIteratorWrapper: public InternalIteratorWrapperBase {
  public:
   InternalIteratorWrapper(InternalIterator* wrapped_iter_ptr,
                           const Comparator* comparator,
-                          const Slice& upper_bound)
-      : wrapped_iter_ptr_(wrapped_iter_ptr),
+                          const Slice& upper_bound, bool is_iter_owner)
+      : wrapped_iter_(wrapped_iter_ptr),
         comparator_(comparator),
-        upper_bound_(upper_bound) {
-    assert(wrapped_iter_ptr_ != nullptr);
+        upper_bound_(upper_bound),
+        is_iter_owner_(is_iter_owner) {
+    assert(wrapped_iter_ != nullptr);
     assert(comparator != nullptr);
   }
 
   ~InternalIteratorWrapper() {
-    wrapped_iter_ptr_->~InternalIterator();
-    wrapped_iter_ptr_ = nullptr;
+    if (is_iter_owner_) {
+      wrapped_iter_->~InternalIterator();
+    }
+    wrapped_iter_ = nullptr;
   }
 
   bool Valid() const override { return valid_; }
-
-  void Invalidate() override { valid_ = false; }
 
   bool HasUpperBound() const override { return (upper_bound_.empty() == false); }
 
@@ -202,38 +256,36 @@ class InternalIteratorWrapper: public InternalIteratorWrapperBase {
   }
 
   void SeekToFirst()  override{
-    wrapped_iter_ptr_->SeekToFirst();
+    wrapped_iter_->SeekToFirst();
     UpdateValidity();
     ReportProgress("SeekToFirst"); 
   }
 
-  void Seek(const Slice& target) override {
+  void SeekForward(const Slice& target) override {
     // TODO - Handle Sequence number correctly
     LookupKey lookup_key(target, kMaxSequenceNumber);
     auto target_ikey = lookup_key.internal_key();
-    wrapped_iter_ptr_->Seek(target_ikey);
+    wrapped_iter_->Seek(target_ikey);
     UpdateValidity();
-    ReportProgress("Seek"); 
+    ReportProgress("Seek");
   }
 
   void Next() override {
     assert(Valid());
-    wrapped_iter_ptr_->Next();
+    wrapped_iter_->Next();
     UpdateValidity();
     ReportProgress("Next"); 
   }
 
   Slice key() const override {
     assert(Valid());
-    return wrapped_iter_ptr_->key();
+    return wrapped_iter_->key();
   }
 
   Slice value() const override {
     assert(Valid());
-    return wrapped_iter_ptr_->value();
+    return wrapped_iter_->value();
   }
-
-  Status status() const override { return wrapped_iter_ptr_->status(); }
 
   std::string ToString() const override {
     if (Valid() == false) {
@@ -245,22 +297,115 @@ class InternalIteratorWrapper: public InternalIteratorWrapperBase {
   void ReportProgress(const std::string& progress_str) {
     if (gs_report_iters_progress) {
       std::cout << "Values-Iter: " << progress_str << ":" << ToString() << '\n';
-    }    
+    }
   }
 
  private:
   void UpdateValidity() {
-    valid_ = wrapped_iter_ptr_->Valid();
+    valid_ = wrapped_iter_->Valid();
     if (valid_ && HasUpperBound()) {
       auto curr_value_vs_upper_bound =
-          comparator_->Compare(wrapped_iter_ptr_->key(), upper_bound_);
+          comparator_->Compare(wrapped_iter_->key(), upper_bound_);
       // The upper bound is the csk => excluding the csk from the iteration.
       valid_ = (curr_value_vs_upper_bound < 0);
     }
   }
 
  private:
-  InternalIterator* wrapped_iter_ptr_ = nullptr;
+  InternalIterator* wrapped_iter_ = nullptr;
+  const Comparator* comparator_ = nullptr;
+  Slice upper_bound_;
+  bool is_iter_owner_ = false;
+  bool valid_ = false;
+};
+
+class InternalLevelIteratorWrapper : public InternalIteratorWrapperBase {
+ public:
+  InternalLevelIteratorWrapper(LevelFilesItersMngr& level_iters_mngr,
+                               const Comparator* comparator,
+                               const Slice& upper_bound)
+      : level_iters_mngr_(level_iters_mngr),
+        comparator_(comparator),
+        upper_bound_(upper_bound) {
+    assert(comparator != nullptr);
+  }
+
+  bool Valid() const override { return valid_; }
+
+  bool HasUpperBound() const override {
+    return (upper_bound_.empty() == false);
+  }
+
+  void SetUpperBound(const Slice& upper_bound) override {
+    upper_bound_ = upper_bound;
+    if (file_iter_wrapper_) {
+      file_iter_wrapper_->SetUpperBound(upper_bound);
+    }
+    UpdateValidity();
+  }
+
+  const Slice& GetUpperBound() const override {
+    assert(HasUpperBound());
+    return upper_bound_;
+  }
+
+  void SeekToFirst() override {
+    file_iter_wrapper_->SeekToFirst();
+    UpdateValidity();
+  }
+
+  void SeekForward(const Slice& target) override {
+    // TODO - Handle Sequence number correctly
+    LookupKey lookup_key(target, kMaxSequenceNumber);
+    auto target_ikey = lookup_key.internal_key();
+    file_iter_wrapper_->SeekForward(target_ikey);
+    UpdateValidity();
+  }
+
+  void Next() override {
+    assert(Valid());
+    file_iter_wrapper_->Next();
+    UpdateValidity();
+  }
+
+  Slice key() const override {
+    assert(Valid());
+    return file_iter_wrapper_->key();
+  }
+
+  Slice value() const override {
+    assert(Valid());
+    return file_iter_wrapper_->value();
+  }
+
+  std::string ToString() const override {
+    if (Valid() == false) {
+      return "Invalid";
+    }
+    return key().ToString();
+  }
+
+ private:
+  void MoveToNextFileIterOrInvalidate() {
+    file_iter_wrapper_.release();
+#if 0
+    if (level_iters_mngr_.HasNextInternalIter()) {
+      auto internal_iter = level_iters_mngr_.NextInternalIter();
+      file_iter_wrapper_.reset(new InternalIteratorWrapper(
+          internal_iter, comparator_, upper_bound_, false /* iter_owner */));
+      file_iter_wrapper_->SeekToFirst();
+    }
+#endif
+    UpdateValidity();
+  }
+
+  void UpdateValidity() {
+    valid_ = (file_iter_wrapper_ != nullptr) && (file_iter_wrapper_->Valid());
+  }
+
+ private:
+  LevelFilesItersMngr& level_iters_mngr_;
+  std::unique_ptr<InternalIteratorWrapper> file_iter_wrapper_;
   const Comparator* comparator_ = nullptr;
   Slice upper_bound_;
   bool valid_ = false;
@@ -271,14 +416,13 @@ class TruncatedRangeDelIteratorWrapperBase {
   virtual ~TruncatedRangeDelIteratorWrapperBase() = default;
 
   virtual bool Valid() const = 0;
-  virtual void Invalidate() = 0;
 
   virtual bool HasUpperBound() const = 0;
   virtual void SetUpperBound(const Slice& upper_bound) = 0;
   virtual const Slice& GetUpperBound() const = 0;
 
   virtual void SeekToFirst() = 0;
-  virtual void Seek(const Slice& target) = 0;
+  virtual void SeekForward(const Slice& target) = 0;
   virtual void Next() = 0;
 
   virtual RangeTombstone Tombstone() const = 0;
@@ -290,16 +434,16 @@ class TruncatedRangeDelIteratorWrapperBase {
 
 class TruncatedRangeDelIteratorWrapper: TruncatedRangeDelIteratorWrapperBase {
  public:
-  TruncatedRangeDelIteratorWrapper(
-      TruncatedRangeDelIterator* wrapped_iter_ptr,
-      const Comparator* comparator, const Slice& upper_bound)
-      : wrapped_iter_ptr_(wrapped_iter_ptr),
+  TruncatedRangeDelIteratorWrapper(TruncatedRangeDelIterator* wrapped_iter_ptr,
+                                   const Comparator* comparator,
+                                   const Slice& upper_bound)
+      : wrapped_iter_(wrapped_iter_ptr),
         comparator_(comparator),
         upper_bound_(upper_bound) {}
 
   ~TruncatedRangeDelIteratorWrapper() {
-    delete wrapped_iter_ptr_;
-    wrapped_iter_ptr_ = nullptr;
+    delete wrapped_iter_;
+    wrapped_iter_ = nullptr;
   }
 
   bool Valid() const override { return valid_; }
@@ -317,25 +461,25 @@ class TruncatedRangeDelIteratorWrapper: TruncatedRangeDelIteratorWrapperBase {
   }
 
   void SeekToFirst() override {
-    if (wrapped_iter_ptr_) {
-      wrapped_iter_ptr_->SeekToFirst();
+    if (wrapped_iter_) {
+      wrapped_iter_->SeekToFirst();
       UpdateValidity();
       ReportProgress("SeekToFirst");
     }
   }
 
-  void Seek(const Slice& target) override {
-    if (wrapped_iter_ptr_) {
-      wrapped_iter_ptr_->Seek(target);
+  void SeekForward(const Slice& target) override {
+    if (wrapped_iter_) {
+      wrapped_iter_->Seek(target);
       UpdateValidity();
       ReportProgress("Seek");
     }
   }
 
   void Next() override {
-    if (wrapped_iter_ptr_) {
+    if (wrapped_iter_) {
       assert(Valid());
-      wrapped_iter_ptr_->Next();
+      wrapped_iter_->Next();
       UpdateValidity();
       ReportProgress("Next");
     } else {
@@ -344,9 +488,9 @@ class TruncatedRangeDelIteratorWrapper: TruncatedRangeDelIteratorWrapperBase {
   }
 
   RangeTombstone Tombstone() const override {
-    if (wrapped_iter_ptr_) {
+    if (wrapped_iter_) {
       assert(Valid());
-      auto curr_range_ts = wrapped_iter_ptr_->Tombstone();
+      auto curr_range_ts = wrapped_iter_->Tombstone();
       if (HasUpperBound() == false) {
         return curr_range_ts;
       }
@@ -370,11 +514,7 @@ class TruncatedRangeDelIteratorWrapper: TruncatedRangeDelIteratorWrapperBase {
 
   Slice key() override {
     assert(Valid());
-    return wrapped_iter_ptr_->start_key().user_key;
-  }
-
-  void Invalidate() override {
-    valid_ = false;
+    return wrapped_iter_->start_key().user_key;
   }
 
   std::string ToString() override {
@@ -392,10 +532,10 @@ class TruncatedRangeDelIteratorWrapper: TruncatedRangeDelIteratorWrapperBase {
 
  private:
   void UpdateValidity() {
-    if (wrapped_iter_ptr_ == nullptr) {
+    if (wrapped_iter_ == nullptr) {
       valid_ = false;
     } else {
-      valid_ = wrapped_iter_ptr_->Valid();
+      valid_ = wrapped_iter_->Valid();
       if (valid_ && HasUpperBound()) {
         auto curr_range_start_vs_upper_bound = comparator_->Compare(
             key(), GetUpperBound());
@@ -409,7 +549,7 @@ class TruncatedRangeDelIteratorWrapper: TruncatedRangeDelIteratorWrapperBase {
   }
 
  private:
-  TruncatedRangeDelIterator* wrapped_iter_ptr_ = nullptr;
+  TruncatedRangeDelIterator* wrapped_iter_ = nullptr;
   const Comparator* comparator_ = nullptr;
   Slice upper_bound_;
   bool valid_ = false;
@@ -518,7 +658,8 @@ void ProcessCurrRangeTsVsDelList(GlobalContext& gc, LevelContext& lc, const Rang
             gc.del_list->ReplaceWith(
                 *gc.del_list_iter,
                 DelElement(range_ts.start_key_, del_elem.user_end_key));
-            lc.range_del_iter->Seek(del_elem.user_end_key);
+            // Is this SeekForward()?
+            lc.range_del_iter->SeekForward(del_elem.user_end_key);
           }
         }
       } break;
@@ -566,7 +707,7 @@ bool ProcessCurrValuesIterVsDelList(GlobalContext& gc, LevelContext& lc) {
       // The key is covered by the Del-Elem => it is irrelevant (as all of the
       // range covered)
       if (gc.del_list_iter->key().IsRange()) {
-        lc.values_iter->Seek(gc.del_list_iter->key().user_end_key);
+        lc.values_iter->SeekForward(gc.del_list_iter->key().user_end_key);
       } else {
         lc.values_iter->Next();
       }
@@ -695,8 +836,8 @@ Status ProcessLogLevel(GlobalContext& gc, LevelContext& lc) {
     lc.range_del_iter->SeekToFirst();
   } else {
     gc.del_list_iter->Seek(gc.target);
-    lc.values_iter->Seek(gc.target);
-    lc.range_del_iter->Seek(gc.target);
+    lc.values_iter->SeekForward(gc.target);
+    lc.range_del_iter->SeekForward(gc.target);
   }
 
   loop_count = 0U;
@@ -791,7 +932,7 @@ Status ProcessMutableMemtable(SuperVersion* super_version, GlobalContext& gc,
   auto wrapped_values_iter = 
       super_version->mem->NewIterator(gc.mutable_read_options, &arena);
   lc.values_iter.reset(new InternalIteratorWrapper(
-      wrapped_values_iter, gc.comparator, gc.csk));
+      wrapped_values_iter, gc.comparator, gc.csk, true /* is_iter_owner */));
 
   TruncatedRangeDelIterator* range_del_iter = nullptr;
   auto fragmented_range_del_iter = super_version->mem->NewRangeTombstoneIterator(
@@ -821,8 +962,9 @@ Status ProcessImmutableMemtables(SuperVersion* super_version, GlobalContext& gc,
   auto i = 1;
   for (auto& memtbl_iters : iters) {
     LevelContext lc;
-    lc.values_iter.reset(new InternalIteratorWrapper(
-        memtbl_iters.memtbl_iter, gc.comparator, gc.csk));
+    lc.values_iter.reset(new InternalIteratorWrapper(memtbl_iters.memtbl_iter,
+                                                     gc.comparator, gc.csk,
+                                                     true /* is_iter_owner */));
 
     lc.range_del_iter = new TruncatedRangeDelIteratorWrapper(memtbl_iters.range_del_iter, gc.comparator, gc.csk);
 
@@ -856,8 +998,9 @@ Status ProcessLevel0Files(SuperVersion* super_version, GlobalContext& gc,
   auto i = 1;
   for (auto& file_iters : iters) {
     LevelContext lc;
-    lc.values_iter.reset(new InternalIteratorWrapper(
-        file_iters.table_iter, gc.comparator, gc.csk));
+    lc.values_iter.reset(new InternalIteratorWrapper(file_iters.table_iter,
+                                                     gc.comparator, gc.csk,
+                                                     true /* is_iter_owner */));
     lc.range_del_iter = new TruncatedRangeDelIteratorWrapper(file_iters.range_ts_iter, gc.comparator, gc.csk);
 
     if (gs_debug_prints) printf("Processing Level-0 File #%d\n", i);
@@ -883,19 +1026,16 @@ Status ProcessLevelsGt0(SuperVersion* super_version, GlobalContext& gc,
       continue;
     }
 
-    // LevelFilesItersMngr level_files_iter_mngr(super_version, gc.mutable_read_options, file_options, &arena, storage_info->LevelFilesBrief(level));
-
-    // TOOD - Handle allow_unprepared_value!!!!
-    auto iters = super_version->current->GetIteratorsForLevelGt0(
-        level, gc.mutable_read_options, file_options, false /* allow_unprepared_value */,
-        &arena);
+    LevelFilesItersMngr level_files_iter_mngr(
+        super_version, gc.icomparator, gc.mutable_read_options, file_options,
+        &arena, storage_info->LevelFilesBrief(level));
 
     if (gs_debug_prints)
       printf("Processing Level-%d \n", level);
 
     LevelContext lc;
-    lc.values_iter.reset(new InternalIteratorWrapper(
-        iters.table_iter, gc.comparator, gc.csk));
+    lc.values_iter.reset(new InternalLevelIteratorWrapper(
+        level_files_iter_mngr, gc.comparator, gc.csk));
 
     lc.range_del_iter = new TruncatedRangeDelIteratorWrapper(nullptr, gc.comparator, gc.csk);
 

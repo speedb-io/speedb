@@ -106,6 +106,10 @@ class FilePickerMultiGet;
 // params. It need not point to a valid record in Manifest.
 using VersionEditParams = VersionEdit;
 
+extern bool IsKeyWithinFileBounaries(const InternalKeyComparator& icmp,
+                                     const LevelFilesBrief& file_level,
+                                     size_t file_index, const Slice& key);
+
 // Return the smallest index i such that file_level.files[i]->largest >= key.
 // Return file_level.num_files if there is no such file.
 // REQUIRES: "file_level.files" contains a sorted list of

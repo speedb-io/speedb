@@ -54,7 +54,6 @@ class LevelFilesItersMngr {
          level_files_brief_(level_files_brief),
          files_iters_(level_files_brief.num_files) {}
 
-#if 0
    ~LevelFilesItersMngr() {
      for (auto i = 0; i < NumFiles(); ++i) {
        DisposeOfFileIters(i);
@@ -75,6 +74,10 @@ class LevelFilesItersMngr {
       return (curr_internal_iter_idx_ < NumFiles());
     }
 
+    bool HasExhaustedInternalIters() const {
+      return (HasNextInternalIter() == false);
+    }
+
     InternalIterator* NextInternalIter() {
       assert(curr_internal_iter_idx_ < NumFiles());
       ++curr_internal_iter_idx_;
@@ -91,8 +94,13 @@ class LevelFilesItersMngr {
       return (curr_range_ts_iter_idx_ < NumFiles());
     }
 
+    bool HasExhaustedRangeTsIters() const {
+      return (HasNextRangeTsIter() == false);
+    }
+
     TruncatedRangeDelIterator* NextRangeTsIter() {
       assert(curr_range_ts_iter_idx_ < NumFiles());
+
       ++curr_range_ts_iter_idx_;
       if (curr_range_ts_iter_idx_ < NumFiles()) {
         CreateFileItersIfNecesary(curr_range_ts_iter_idx_);
@@ -103,28 +111,40 @@ class LevelFilesItersMngr {
       }
     }
 
-    bool IsTargetCoveredByCurrInternalIter(const Slice& target) const {
-      assert(IsFileIdxValid(curr_internal_iter_idx_));
+    InternalIterator* AdvanceInternalIterToFileContainingKey(const Slice& key) {
+      AdvanceIterToFileContainingKey(key, &curr_internal_iter_idx_);
 
-      // TODO - Handle Snapshots / Sequence
-      LookupKey lookup_key(target, kMaxSequenceNumber);
-      return IsKeyWithinFileBounaries(*icomparator_, level_files_brief_,
-                                      curr_internal_iter_idx_, lookup_key);
+      if (IsFileIdxValid(curr_internal_iter_idx_)) {
+        return files_iters_[curr_internal_iter_idx_].table_iter;
+      } else {
+        return nullptr;
+      }
     }
 
-    void MoveInternalIterForward(const Slice& target) {
-      if (IsFileIdxValid(curr_internal_iter_idx_) && IsTargetCoveredByCurrInternalIter(target)) {
-        assert(DoFileItersExist(curr_internal_iter_idx_);
-        return;
-      }
+    TruncatedRangeDelIterator* AdvanceRangeTsIterToFileContainingKey(
+        const Slice& key) {
+      AdvanceIterToFileContainingKey(key, &curr_range_ts_iter_idx_);
 
+      if (IsFileIdxValid(curr_range_ts_iter_idx_)) {
+        return files_iters_[curr_range_ts_iter_idx_].range_ts_iter;
+      } else {
+        return nullptr;
+      }
     }
 
   private:
+   bool IsKeyWithinFileBoundaries(int file_idx, const Slice& target) const {
+     assert(IsFileIdxValid(file_idx));
+
+     // TODO - Handle Snapshots / Sequence
+     LookupKey lookup_key(target, kMaxSequenceNumber);
+     return IsKeyWithinFileBounaries(*icomparator_, level_files_brief_,
+                                     curr_internal_iter_idx_,
+                                     lookup_key.internal_key());
+   }
+
     void CreateFileItersIfNecesary(int file_idx) {
-      assert(file_idx < NumFiles());
-      assert((min_created_iters_idx_ == -1) ||
-             (min_created_iters_idx_ < file_idx));
+      assert(IsFileIdxValid(file_idx));
 
       if (DoFileItersExist(file_idx) == false) {
           files_iters_[file_idx] = super_version_->current->GetFileIters( read_options_, 
@@ -132,15 +152,25 @@ class LevelFilesItersMngr {
                                                                           true /* allow_unprepared_value */, 
                                                                           arena_, 
                                                                           level_files_brief_.files[file_idx]);
-          if (min_created_iters_idx_ == -1) {
-          }
+      }
+    }
+
+    void AdvanceIterToFileContainingKey(const Slice& key, int* curr_iter_idx) {
+      if (IsFileIdxValid(*curr_iter_idx) &&
+          IsKeyWithinFileBoundaries(*curr_iter_idx, key)) {
+        assert(DoFileItersExist(*curr_iter_idx));
+        return;
+      }
+
+      *curr_iter_idx = FindFile(*icomparator_, level_files_brief_, key);
+      if (IsFileIdxValid(*curr_iter_idx)) {
+        CreateFileItersIfNecesary(*curr_iter_idx);
+        DisposeOfUnneededIters();
       }
     }
 
     void DisposeOfUnneededIters() {
-      if ((curr_internal_iter_idx_ > 0) && (curr_internal_iter_idx_ == curr_range_ts_iter_idx_)) {
-        DisposeOfFileIters(curr_internal_iter_idx_);
-      }
+      // TODO - Implement
     }
 
     void DisposeOfFileIters(int file_idx) {
@@ -168,8 +198,6 @@ class LevelFilesItersMngr {
       return ((file_idx >= 0) && (file_idx < NumFiles()));
     }
 
-#endif
-
   private:
     SuperVersion* super_version_ = nullptr;
     const InternalKeyComparator* icomparator_ = nullptr;
@@ -181,7 +209,7 @@ class LevelFilesItersMngr {
 
     int curr_internal_iter_idx_ = -1;
     int curr_range_ts_iter_idx_ = -1;
-    int min_created_iters_idx_ = -1;
+    // int min_created_iters_idx_ = -1;
 };
 
 std::string RangeTsToString(const RangeTombstone& range_ts) {
@@ -294,6 +322,8 @@ class InternalIteratorWrapper: public InternalIteratorWrapperBase {
     return key().ToString();
   }
 
+  InternalIterator* Wrapped() { return wrapped_iter_; }
+
   void ReportProgress(const std::string& progress_str) {
     if (gs_report_iters_progress) {
       std::cout << "Values-Iter: " << progress_str << ":" << ToString() << '\n';
@@ -350,22 +380,48 @@ class InternalLevelIteratorWrapper : public InternalIteratorWrapperBase {
   }
 
   void SeekToFirst() override {
-    file_iter_wrapper_->SeekToFirst();
+    assert(file_iter_wrapper_ == nullptr);
+
+    while (level_iters_mngr_.HasNextInternalIter() &&
+           ((file_iter_wrapper_ == nullptr) ||
+            (file_iter_wrapper_->Valid() == false))) {
+      auto next_internal_iter = level_iters_mngr_.NextInternalIter();
+      file_iter_wrapper_.reset(
+          new InternalIteratorWrapper(next_internal_iter, comparator_,
+                                      upper_bound_, false /* is_iter_owner */));
+      file_iter_wrapper_->SeekToFirst();
+    }
     UpdateValidity();
   }
 
   void SeekForward(const Slice& target) override {
-    // TODO - Handle Sequence number correctly
-    LookupKey lookup_key(target, kMaxSequenceNumber);
-    auto target_ikey = lookup_key.internal_key();
-    file_iter_wrapper_->SeekForward(target_ikey);
+    auto new_internal_iter =
+        level_iters_mngr_.AdvanceInternalIterToFileContainingKey(target);
+    if ((file_iter_wrapper_ != nullptr) &&
+        (new_internal_iter == file_iter_wrapper_->Wrapped())) {
+      file_iter_wrapper_->SeekForward(target);
+      if (file_iter_wrapper_->Valid()) {
+        return;
+      }
+    }
     UpdateValidity();
   }
 
   void Next() override {
     assert(Valid());
+
     file_iter_wrapper_->Next();
-    UpdateValidity();
+    if (file_iter_wrapper_->Valid() == false) {
+      while (level_iters_mngr_.HasNextInternalIter() &&
+             ((file_iter_wrapper_ == nullptr) ||
+              (file_iter_wrapper_->Valid() == false))) {
+        file_iter_wrapper_.reset(new InternalIteratorWrapper(
+            level_iters_mngr_.NextInternalIter(), comparator_, upper_bound_,
+            false /* is_iter_owner */));
+        file_iter_wrapper_->SeekToFirst();
+      }
+      UpdateValidity();
+    }
   }
 
   Slice key() const override {
@@ -382,23 +438,10 @@ class InternalLevelIteratorWrapper : public InternalIteratorWrapperBase {
     if (Valid() == false) {
       return "Invalid";
     }
-    return key().ToString();
+    return file_iter_wrapper_->ToString();
   }
 
  private:
-  void MoveToNextFileIterOrInvalidate() {
-    file_iter_wrapper_.release();
-#if 0
-    if (level_iters_mngr_.HasNextInternalIter()) {
-      auto internal_iter = level_iters_mngr_.NextInternalIter();
-      file_iter_wrapper_.reset(new InternalIteratorWrapper(
-          internal_iter, comparator_, upper_bound_, false /* iter_owner */));
-      file_iter_wrapper_->SeekToFirst();
-    }
-#endif
-    UpdateValidity();
-  }
-
   void UpdateValidity() {
     valid_ = (file_iter_wrapper_ != nullptr) && (file_iter_wrapper_->Valid());
   }

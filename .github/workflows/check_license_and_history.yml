@@ -20,6 +20,7 @@ jobs:
       - name: Get changed files
         id: changes       
         run: |
+          echo ${{ github.event.pull_request.head.repo.full_name }}
           if [ ${{ github.event.pull_request.head.repo.full_name != 'speedb-io/speedb' }} ]; then
             echo "files added or changed in a PR that came from the speedb repo: "
             git diff --name-only --diff-filter=ACMRT ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }}  -- . ':!.github' ':!*.md'

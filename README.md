@@ -18,7 +18,7 @@
 
 A first-of-its-kind, community-led key-value storage engine, designed to support modern data sets. 
 
-Speedb is a 100% RocksDB compatible, drop-in library, focused on high performance, optimized for modern storage hardware and scale, on-premise and in the cloud. 
+Speedb is a 100% RocksDB compatible, drop-in library, focused on high performance, optimized for modern storage hardware and scale, on-premise and in the cloud 
 We strive to simplify the usability of complex data engines as well as stabilize and improve performance for any use case.
 
 We are building an open source community where RocksDB and Speedb users and developers can interact, improve, share knowledge, and learn best practices. You are welcome to join our community, contribute, and participate in the development of the next generation storage engine. We welcome any questions or comments you may have. Please use issues to submit them, and pull requests to make contributions.

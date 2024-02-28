@@ -858,16 +858,16 @@ Version::~Version() {
 
 bool IsKeyWithinFileBounaries(const InternalKeyComparator& icmp,
                               const LevelFilesBrief& file_level,
-                              size_t file_index, const Slice& key) {
+                              size_t file_index, const Slice& ikey) {
   bool answer = false;
 
   assert(file_index < file_level.num_files);
   const FdWithKeyRange& fd_with_key_range = file_level.files[file_index];
-  if (icmp.InternalKeyComparator::Compare(key, fd_with_key_range.largest_key) <=
-          0 &&
+  if (icmp.InternalKeyComparator::Compare(ikey,
+                                          fd_with_key_range.largest_key) <= 0 &&
       icmp.InternalKeyComparator::Compare(
-          key, fd_with_key_range.smallest_key) >= 0) {
-    assert(static_cast<size_t>(FindFile(icmp, file_level, key)) == file_index);
+          ikey, fd_with_key_range.smallest_key) >= 0) {
+    assert(static_cast<size_t>(FindFile(icmp, file_level, ikey)) == file_index);
     answer = true;
   }
   return answer;

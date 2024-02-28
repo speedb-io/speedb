@@ -106,9 +106,11 @@ class FilePickerMultiGet;
 // params. It need not point to a valid record in Manifest.
 using VersionEditParams = VersionEdit;
 
+// Checks whether ikey is within the boundaries of the specified file.
+// NOTE: ikey is assumed to be an INTERNAL KEY
 extern bool IsKeyWithinFileBounaries(const InternalKeyComparator& icmp,
                                      const LevelFilesBrief& file_level,
-                                     size_t file_index, const Slice& key);
+                                     size_t file_index, const Slice& ikey);
 
 // Return the smallest index i such that file_level.files[i]->largest >= key.
 // Return file_level.num_files if there is no such file.

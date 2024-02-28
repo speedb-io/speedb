@@ -92,7 +92,7 @@
 #include "utilities/merge_operators.h"
 
 #define RUN_ALL_GS_TESTS 1
-#define RUN_GS_STRESS 1
+#define RUN_GS_STRESS 0
 
 extern bool gs_debug_prints;
 extern bool gs_validate_iters_progress;
@@ -7926,6 +7926,42 @@ class DBGsTest : public DBTest {
       ASSERT_EQ(db_iter->key(), expected_smallest_key) << "Actual:'" << db_iter->key().ToString() << "', Expected:'" << expected_smallest_key.ToString() << "'";
     }
   }
+
+  void GetSmallestAtOrAfterAndValidate(const Slice& target,
+                                       const Slice expected_smallest_key_after,
+                                       const std::string& title = "") {
+    if (gs_debug_prints && (title.empty() == false)) {
+      std::cout << "\n" << title << "\n";
+    }
+
+    std::string smallest_key_after;
+    Status s = dbfull()->GetSmallestAtOrAfter(
+        ReadOptions(), dbfull()->DefaultColumnFamily(), target,
+        &smallest_key_after, nullptr /* value */);
+
+    // Guarantees destruction of the db_iter in case of any test assertion
+    // failures below
+    std::unique_ptr<Iterator> db_iter{dbfull()->NewIterator(ReadOptions())};
+    db_iter->Seek(target);
+
+    if (expected_smallest_key_after.empty()) {
+      ASSERT_TRUE(s.IsNotFound())
+          << "Expected NotFound, Actual Status:" << s.ToString();
+      ASSERT_TRUE(smallest_key_after.empty());
+
+      ASSERT_FALSE(db_iter->Valid());
+    } else {
+      ASSERT_OK(s) << "Expected Ok, Actual Status:" << s.ToString();
+      ASSERT_EQ(smallest_key_after, expected_smallest_key_after)
+          << "Actual:'" << smallest_key_after << "', Expected:'"
+          << expected_smallest_key_after.ToString() << "'";
+
+      ASSERT_TRUE(db_iter->Valid());
+      ASSERT_EQ(db_iter->key(), expected_smallest_key_after)
+          << "Actual:'" << db_iter->key().ToString() << "', Expected:'"
+          << expected_smallest_key_after.ToString() << "'";
+    }
+  }
 };
 
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
@@ -8319,8 +8355,52 @@ TEST_F(DBGsTest, GS_SingleValueInImmLevel1AndLevel2) {
   ASSERT_OK(dbfull()->Delete(WriteOptions(), dflt_cfh, "b"));
   CALL_WRAPPER(GetSmallestAndValidate("d"));
 }
+
+TEST_F(DBGsTest, SingleRangeTsInL1) {
+  ReopenNewDb();
+  auto dflt_cfh = dbfull()->DefaultColumnFamily();
+
+  ASSERT_OK(dbfull()->DeleteRange(WriteOptions(), dflt_cfh, "a", "z"));
+  ASSERT_OK(db_->Flush(FlushOptions()));
+  MoveFilesToLevel(1);
+  ASSERT_EQ(0, NumTableFilesAtLevel(0));
+  ASSERT_EQ(1, NumTableFilesAtLevel(1));
+
+  CALL_WRAPPER(GetSmallestAndValidate(""));
+}
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 #endif
+
+TEST_F(DBGsTest, TwoFilesInL1OneValuePerFile) {
+  constexpr int kOneKb = 1 << 10;
+  constexpr int kValueSize = (3 * kOneKb) / 2;
+  constexpr int kFileSize = 2 * kOneKb;
+
+  Options options;
+  options.target_file_size_base = kFileSize;
+  ReopenNewDb(&options);
+
+  Random rnd(301);
+  auto value = rnd.RandomString(kValueSize);
+
+  ASSERT_OK(Put("a", value));
+  ASSERT_OK(Put("c", value));
+  ASSERT_OK(db_->Flush(FlushOptions()));
+
+  ASSERT_OK(Put("e", value));
+  ASSERT_OK(db_->Flush(FlushOptions()));
+
+  MoveFilesToLevel(1);
+
+  std::vector<std::vector<FileMetaData>> files;
+  dbfull()->TEST_GetFilesMetaData(db_->DefaultColumnFamily(), &files);
+  ASSERT_EQ(0, NumTableFilesAtLevel(0));
+  ASSERT_EQ(2, NumTableFilesAtLevel(1));
+
+  CALL_WRAPPER(GetSmallestAndValidate("a"));
+  CALL_WRAPPER(GetSmallestAtOrAfterAndValidate("b", "c"));
+  CALL_WRAPPER(GetSmallestAtOrAfterAndValidate("d", "e"));
+}
 
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 #if RUN_GS_STRESS

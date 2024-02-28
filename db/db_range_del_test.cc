@@ -139,7 +139,9 @@ TEST_F(DBRangeDelTest, CompactionOutputFilesExactlyFilled) {
   options.table_factory.reset(NewBlockBasedTableFactory(table_options));
   Reopen(options);
 
-  // snapshot protects range tombstone from dropping due to becoming obsolete.
+  // URQ - The snapshot is taken before writing the DR. How does this protects
+  // the DR from becoming Obsolete? snapshot protects range tombstone from
+  // dropping due to becoming obsolete.
   const Snapshot* snapshot = db_->GetSnapshot();
   ASSERT_OK(db_->DeleteRange(WriteOptions(), db_->DefaultColumnFamily(), Key(0),
                              Key(1)));
@@ -203,6 +205,7 @@ TEST_F(DBRangeDelTest, MaxCompactionBytesCutsOutputFiles) {
   ASSERT_EQ(0, NumTableFilesAtLevel(0));
   ASSERT_EQ(NumTableFilesAtLevel(2), 2);
 
+  // URQ - Why set it here and not above in the opts?
   ASSERT_OK(
       db_->SetOptions(db_->DefaultColumnFamily(),
                       {{"target_file_size_base",

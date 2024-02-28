@@ -59,6 +59,7 @@ jobs:
           done
           exit $exit_code
       - name: Check HISTORY PR
+        if: github.event.pull_request.head.repo.full_name == 'speedb-io/speedb'
         run: |  
           set +e
           git diff --name-only --diff-filter=ACMRT ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }}|grep -v "\.github" |grep -q [a-z,A-Z]

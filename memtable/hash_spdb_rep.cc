@@ -554,7 +554,7 @@ static std::unordered_map<std::string, OptionTypeInfo> hash_spdb_factory_info =
 
 class HashSpdbRepFactory : public MemTableRepFactory {
  public:
-  explicit HashSpdbRepFactory(size_t hash_bucket_count = 1000000,
+  explicit HashSpdbRepFactory(size_t hash_bucket_count = 400000,
                               bool use_merge = true) {
     options_.hash_bucket_count = hash_bucket_count;
     options_.use_merge = use_merge;

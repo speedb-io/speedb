@@ -81,17 +81,34 @@ class LevelFilesItersMngr {
        }
 
        invalid_file_idx_ = last_file_idx_within_bounds_ + 1;
+       empty_ = false;
      } else {
        last_file_idx_within_bounds_ = NumFiles();
        invalid_file_idx_ = NumFiles();
        curr_internal_iter_idx_ = NumFiles();
        curr_range_ts_iter_idx_ = NumFiles();
+       empty_ = true;
      }
 
      assert(first_file_idx_within_bounds_ <= last_file_idx_within_bounds_);
    }
 
-   ~LevelFilesItersMngr() = default;
+   ~LevelFilesItersMngr() {
+     for (auto i = 0U; i < files_iters_.size(); ++i) {
+       if (files_iters_[i] != nullptr) {
+         auto& file_iters = files_iters_[i];
+         if (file_iters->table_iter != nullptr) {
+           file_iters->table_iter->~InternalIterator();
+           file_iters->table_iter = nullptr;
+         }
+
+         delete file_iters->range_ts_iter;
+         file_iters->range_ts_iter = nullptr;
+       }
+     }
+   }
+
+   bool IsEmpty() const { return empty_; }
 
    bool HasNextInternalIter() const {
      return (curr_internal_iter_idx_ < last_file_idx_within_bounds_);
@@ -116,6 +133,10 @@ class LevelFilesItersMngr {
     }
 
     InternalIterator* AdvanceInternalIterToFileContainingKey(const Slice& key) {
+      if (IsEmpty()) {
+        return nullptr;
+      }
+
       auto new_iter_idx =
           FindFileForwardContainingKey(key, curr_internal_iter_idx_);
       if (new_iter_idx != curr_internal_iter_idx_) {
@@ -131,6 +152,10 @@ class LevelFilesItersMngr {
 
     TruncatedRangeDelIterator* AdvanceRangeTsIterToFileContainingKey(
         const Slice& key) {
+      if (IsEmpty()) {
+        return nullptr;
+      }
+
       auto new_iter_idx =
           FindFileForwardContainingKey(key, curr_range_ts_iter_idx_);
       if (new_iter_idx != curr_range_ts_iter_idx_) {
@@ -277,6 +302,7 @@ class LevelFilesItersMngr {
     Slice lower_bound_;
     Slice upper_bound_;
 
+    bool empty_ = true;
     int first_file_idx_within_bounds_ = -1;
     int last_file_idx_within_bounds_ = -1;
     int invalid_file_idx_ = -1;
@@ -328,13 +354,13 @@ class InternalIteratorWrapper: public InternalIteratorWrapperBase {
       : wrapped_iter_(wrapped_iter_ptr),
         comparator_(comparator),
         upper_bound_(upper_bound),
-        is_iter_owner_(is_iter_owner) {
+        iter_owner_(is_iter_owner) {
     assert(wrapped_iter_ != nullptr);
     assert(comparator != nullptr);
   }
 
   ~InternalIteratorWrapper() {
-    if (is_iter_owner_) {
+    if (iter_owner_) {
       wrapped_iter_->~InternalIterator();
     }
     wrapped_iter_ = nullptr;
@@ -411,7 +437,7 @@ class InternalIteratorWrapper: public InternalIteratorWrapperBase {
   InternalIterator* wrapped_iter_ = nullptr;
   const Comparator* comparator_ = nullptr;
   Slice upper_bound_;
-  bool is_iter_owner_ = false;
+  bool iter_owner_ = false;
   bool valid_ = false;
 };
 
@@ -444,6 +470,10 @@ class InternalLevelIteratorWrapper : public InternalIteratorWrapperBase {
   }
 
   void SeekForward(const Slice& target) override {
+    if (level_iters_mngr_.IsEmpty()) {
+      return;
+    }
+
     auto new_internal_iter =
         level_iters_mngr_.AdvanceInternalIterToFileContainingKey(target);
 
@@ -501,11 +531,12 @@ class InternalLevelIteratorWrapper : public InternalIteratorWrapperBase {
 
  private:
   void InitFileIterWrapper(InternalIterator* wrapped_iter) {
+    assert(wrapped_iter != nullptr);
     file_iter_wrapper_.reset(new InternalIteratorWrapper(
         wrapped_iter, comparator_, upper_bound_, false /* is_iter_owner */));
   }
 
-  void CleanupFileIterWrapper() { file_iter_wrapper_.release(); }
+  void CleanupFileIterWrapper() { file_iter_wrapper_.reset(); }
 
   void UpdateValidity() {
     valid_ = (file_iter_wrapper_ != nullptr) && (file_iter_wrapper_->Valid());
@@ -516,8 +547,12 @@ class InternalLevelIteratorWrapper : public InternalIteratorWrapperBase {
            ((file_iter_wrapper_ == nullptr) ||
             (file_iter_wrapper_->Valid() == false))) {
       auto next_internal_iter = level_iters_mngr_.NextInternalIter();
-      InitFileIterWrapper(next_internal_iter);
-      file_iter_wrapper_->SeekToFirst();
+      if (next_internal_iter != nullptr) {
+        InitFileIterWrapper(next_internal_iter);
+        file_iter_wrapper_->SeekToFirst();
+      } else {
+        CleanupFileIterWrapper();
+      }
     }
   }
 
@@ -531,7 +566,7 @@ class InternalLevelIteratorWrapper : public InternalIteratorWrapperBase {
 
 class TruncatedRangeDelIteratorWrapperBase {
  public:
-  virtual ~TruncatedRangeDelIteratorWrapperBase() = default;
+  virtual ~TruncatedRangeDelIteratorWrapperBase() {}
 
   virtual bool Valid() const = 0;
 
@@ -559,10 +594,10 @@ class TruncatedRangeDelIteratorWrapper
       : wrapped_iter_(wrapped_iter_ptr),
         comparator_(comparator),
         upper_bound_(upper_bound),
-        is_iter_owner_(is_iter_owner) {}
+        iter_owner_(is_iter_owner) {}
 
   ~TruncatedRangeDelIteratorWrapper() {
-    if (is_iter_owner_) {
+    if (iter_owner_) {
       delete wrapped_iter_;
     }
     wrapped_iter_ = nullptr;
@@ -676,7 +711,7 @@ class TruncatedRangeDelIteratorWrapper
   TruncatedRangeDelIterator* wrapped_iter_ = nullptr;
   const Comparator* comparator_ = nullptr;
   Slice upper_bound_;
-  bool is_iter_owner_ = false;
+  bool iter_owner_ = false;
   bool valid_ = false;
 };
 
@@ -691,6 +726,8 @@ class TruncatedRangeDelLevelIteratorWrapper
         upper_bound_(upper_bound) {
     assert(comparator != nullptr);
   }
+
+  ~TruncatedRangeDelLevelIteratorWrapper() {}
 
   bool Valid() const override { return valid_; }
 
@@ -775,11 +812,12 @@ class TruncatedRangeDelLevelIteratorWrapper
 
  private:
   void InitFileIterWrapper(TruncatedRangeDelIterator* wrapped_iter) {
-    file_iter_wrapper_.reset(new TruncatedRangeDelIteratorWrapper(
-        wrapped_iter, comparator_, upper_bound_, false /* is_iter_owner */));
+    auto new_wrapper = new TruncatedRangeDelIteratorWrapper(
+        wrapped_iter, comparator_, upper_bound_, false /* is_iter_owner */);
+    file_iter_wrapper_.reset(new_wrapper);
   }
 
-  void CleanupFileIterWrapper() { file_iter_wrapper_.release(); }
+  void CleanupFileIterWrapper() { file_iter_wrapper_.reset(); }
 
   void UpdateValidity() {
     valid_ = (file_iter_wrapper_ != nullptr) && (file_iter_wrapper_->Valid());
@@ -832,6 +870,7 @@ struct LevelContext {
 
   ~LevelContext() {
     delete range_del_iter;
+    range_del_iter = nullptr;
   }
 };
 

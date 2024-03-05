@@ -91,8 +91,9 @@
 #include "util/string_util.h"
 #include "utilities/merge_operators.h"
 
-#define RUN_ALL_GS_TESTS 1
-#define RUN_GS_STRESS 0
+#define RUN_DEL_LIST_TESTS 0
+#define RUN_GS_TESTS 0
+#define RUN_GS_STRESS 1
 
 extern bool gs_debug_prints;
 extern bool gs_validate_iters_progress;
@@ -7634,7 +7635,7 @@ TEST_F(DBTest, StaticPinningLastLevelWithData) {
 using DelElem = spdb_gs::DelElement;
 
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-#if RUN_ALL_GS_TESTS
+#if RUN_DEL_LIST_TESTS
 
 // TODO: Write unit-tests for the gs-utils funtions
 class GsUtilsTest : public ::testing::Test {};
@@ -7964,8 +7965,8 @@ class DBGsTest : public DBTest {
   }
 };
 
-// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-#if RUN_ALL_GS_TESTS
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+#if RUN_GS_TESTS
 
 TEST_F(DBGsTest, GS_EmptyDB) {
   ReopenNewDb();
@@ -8360,16 +8361,16 @@ TEST_F(DBGsTest, SingleRangeTsInL1) {
   ReopenNewDb();
   auto dflt_cfh = dbfull()->DefaultColumnFamily();
 
-  ASSERT_OK(dbfull()->DeleteRange(WriteOptions(), dflt_cfh, "a", "z"));
+  ASSERT_OK(dbfull()->DeleteRange(WriteOptions(), dflt_cfh, "b", "z"));
   ASSERT_OK(db_->Flush(FlushOptions()));
   MoveFilesToLevel(1);
   ASSERT_EQ(0, NumTableFilesAtLevel(0));
   ASSERT_EQ(1, NumTableFilesAtLevel(1));
 
   CALL_WRAPPER(GetSmallestAndValidate(""));
+  CALL_WRAPPER(GetSmallestAtOrAfterAndValidate("a", ""));
+  CALL_WRAPPER(GetSmallestAtOrAfterAndValidate("z", ""));
 }
-// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-#endif
 
 TEST_F(DBGsTest, TwoFilesInL1OneValuePerFile) {
   constexpr int kOneKb = 1 << 10;
@@ -8383,11 +8384,11 @@ TEST_F(DBGsTest, TwoFilesInL1OneValuePerFile) {
   Random rnd(301);
   auto value = rnd.RandomString(kValueSize);
 
-  ASSERT_OK(Put("a", value));
-  ASSERT_OK(Put("c", value));
+  ASSERT_OK(Put("b", value));
+  ASSERT_OK(Put("d", value));
   ASSERT_OK(db_->Flush(FlushOptions()));
 
-  ASSERT_OK(Put("e", value));
+  ASSERT_OK(Put("f", value));
   ASSERT_OK(db_->Flush(FlushOptions()));
 
   MoveFilesToLevel(1);
@@ -8397,10 +8398,63 @@ TEST_F(DBGsTest, TwoFilesInL1OneValuePerFile) {
   ASSERT_EQ(0, NumTableFilesAtLevel(0));
   ASSERT_EQ(2, NumTableFilesAtLevel(1));
 
-  CALL_WRAPPER(GetSmallestAndValidate("a"));
-  CALL_WRAPPER(GetSmallestAtOrAfterAndValidate("b", "c"));
-  CALL_WRAPPER(GetSmallestAtOrAfterAndValidate("d", "e"));
+  CALL_WRAPPER(GetSmallestAndValidate("b"));
+  CALL_WRAPPER(GetSmallestAtOrAfterAndValidate("a", "b"));
+  CALL_WRAPPER(GetSmallestAtOrAfterAndValidate("b", "b"));
+  CALL_WRAPPER(GetSmallestAtOrAfterAndValidate("c", "d"));
+  CALL_WRAPPER(GetSmallestAtOrAfterAndValidate("d", "d"));
+  CALL_WRAPPER(GetSmallestAtOrAfterAndValidate("e", "f"));
+  CALL_WRAPPER(GetSmallestAtOrAfterAndValidate("f", "f"));
+  CALL_WRAPPER(GetSmallestAtOrAfterAndValidate("g", ""));
 }
+
+TEST_F(DBGsTest, L1RangeTsCoveringSomeValues) {
+  constexpr int kOneKb = 1 << 10;
+  constexpr int kValueSize = (3 * kOneKb) / 2;
+  constexpr int kFileSize = 2 * kOneKb;
+
+  Options options;
+  options.target_file_size_base = kFileSize;
+  ReopenNewDb(&options);
+
+  auto dflt_cfh = dbfull()->DefaultColumnFamily();
+
+  Random rnd(301);
+  auto value = rnd.RandomString(kValueSize);
+
+  ASSERT_OK(Put("b", value));
+  ASSERT_OK(Put("d", value));
+  ASSERT_OK(db_->Flush(FlushOptions()));
+
+  ASSERT_OK(Put("f", value));
+  ASSERT_OK(Put("h", value));
+  ASSERT_OK(db_->Flush(FlushOptions()));
+
+  const Snapshot* snapshot = db_->GetSnapshot();
+
+  ASSERT_OK(dbfull()->DeleteRange(WriteOptions(), dflt_cfh, "d", "f"));
+  ASSERT_OK(db_->Flush(FlushOptions()));
+
+  MoveFilesToLevel(1);
+
+  std::vector<std::vector<FileMetaData>> files;
+  dbfull()->TEST_GetFilesMetaData(db_->DefaultColumnFamily(), &files);
+
+  CALL_WRAPPER(GetSmallestAndValidate("b"));
+  CALL_WRAPPER(GetSmallestAtOrAfterAndValidate("a", "b"));
+  CALL_WRAPPER(GetSmallestAtOrAfterAndValidate("b", "b"));
+  CALL_WRAPPER(GetSmallestAtOrAfterAndValidate("c", "f"));
+  CALL_WRAPPER(GetSmallestAtOrAfterAndValidate("d", "f"));
+  CALL_WRAPPER(GetSmallestAtOrAfterAndValidate("e", "f"));
+  CALL_WRAPPER(GetSmallestAtOrAfterAndValidate("f", "f"));
+  CALL_WRAPPER(GetSmallestAtOrAfterAndValidate("g", "h"));
+  CALL_WRAPPER(GetSmallestAtOrAfterAndValidate("g", "h"));
+  CALL_WRAPPER(GetSmallestAtOrAfterAndValidate("i", ""));
+
+  db_->ReleaseSnapshot(snapshot);
+}
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+#endif
 
 // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 #if RUN_GS_STRESS

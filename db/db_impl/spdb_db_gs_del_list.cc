@@ -44,13 +44,6 @@ void GlobalDelList::InsertBefore(Iterator& pos, const DelElement& del_elem) {
 void GlobalDelList::InsertBeforeAndSetIterOnInserted(
     Iterator& pos, const DelElement& del_elem) {
   pos.del_list_iter_ = del_list_.insert(pos.del_list_iter_, del_elem);
-  auto valid = true;
-  if (!Valid()) {
-    // printf("INVALID: del_elem=|%s|, upper_bound=|%s|\n",
-    //        del_elem.ToString().c_str(), upper_bound_.ToString().c_str());
-    valid = Valid();
-  }
-  assert(valid);
   assert(Valid());
 }
 

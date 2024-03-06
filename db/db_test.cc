@@ -91,8 +91,8 @@
 #include "util/string_util.h"
 #include "utilities/merge_operators.h"
 
-#define RUN_DEL_LIST_TESTS 0
-#define RUN_GS_TESTS 0
+#define RUN_DEL_LIST_TESTS 1
+#define RUN_GS_TESTS 1
 #define RUN_GS_STRESS 1
 
 extern bool gs_debug_prints;

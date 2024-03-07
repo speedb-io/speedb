@@ -1,3 +1,17 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
 //  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -84,13 +98,11 @@ class DBBloomFilterTest : public DBTestBase {
 class DBBloomFilterTestWithPairedBloomOnOff
     : public DBTestBase,
       public testing::WithParamInterface<bool> {
-public:
+ public:
   DBBloomFilterTestWithPairedBloomOnOff()
       : DBTestBase("db_bloom_filter_tests", /*env_do_fsync=*/true) {}
 
-  void SetUp() override {
-    use_paired_bloom_ = GetParam();
-  }  
+  void SetUp() override { use_paired_bloom_ = GetParam(); }
 
   bool use_paired_bloom_ = false;
 };
@@ -220,7 +232,8 @@ TEST_P(DBBloomFilterTestDefFormatVersion, KeyMayExist) {
       ChangeOptions(kSkipPlainTable | kSkipHashIndex | kSkipFIFOCompaction));
 }
 
-TEST_P(DBBloomFilterTestWithPairedBloomOnOff, GetFilterByPrefixBloomCustomPrefixExtractor) {
+TEST_P(DBBloomFilterTestWithPairedBloomOnOff,
+       GetFilterByPrefixBloomCustomPrefixExtractor) {
   for (bool partition_filters : {true, false}) {
     Options options = last_options_;
     options.prefix_extractor =
@@ -820,7 +833,8 @@ INSTANTIATE_TEST_CASE_P(
         std::make_tuple(kSpeedbPairedBloomFilter, false,
                         test::kDefaultFormatVersion)));
 
-INSTANTIATE_TEST_CASE_P(DBBloomFilterTestWithPairedBloomOnOff, DBBloomFilterTestWithPairedBloomOnOff, testing::Bool());
+INSTANTIATE_TEST_CASE_P(DBBloomFilterTestWithPairedBloomOnOff,
+                        DBBloomFilterTestWithPairedBloomOnOff, testing::Bool());
 
 INSTANTIATE_TEST_CASE_P(
     FormatDef, DBBloomFilterTestWithParam,
@@ -2544,8 +2558,9 @@ TEST_P(DBBloomFilterTestWithPairedBloomOnOff, PrefixScan) {
   }  // end of while
 }
 
-// Speedb Paired Bloom Filters currently do NOT support the 'optimize_filters_for_hits' options =>
-// This test doesn't cover paired bloom filters
+// Speedb Paired Bloom Filters currently do NOT support the
+// 'optimize_filters_for_hits' options => This test doesn't cover paired bloom
+// filters
 TEST_F(DBBloomFilterTest, OptimizeFiltersForHits) {
   const int kNumKeysPerFlush = 1000;
 
@@ -3178,7 +3193,8 @@ TEST_F(DBBloomFilterTest, DynamicBloomFilterOptions) {
   }
 }
 
-TEST_P(DBBloomFilterTestWithPairedBloomOnOff, SeekForPrevWithPartitionedFilters) {
+TEST_P(DBBloomFilterTestWithPairedBloomOnOff,
+       SeekForPrevWithPartitionedFilters) {
   Options options = CurrentOptions();
   constexpr size_t kNumKeys = 10000;
   static_assert(kNumKeys <= 10000, "kNumKeys have to be <= 10000");
@@ -3622,7 +3638,6 @@ TEST_P(DBBloomFilterTestWithPairedBloomOnOff, WeirdPrefixExtractorWithFilter3) {
     }
   }
 }
-
 
 }  // namespace ROCKSDB_NAMESPACE
 

@@ -31,11 +31,6 @@
 
 namespace ROCKSDB_NAMESPACE {
 
-namespace {
-std::shared_ptr<const FilterPolicy> Create(double bits_per_key,
-                                           const std::string& name) {
-  return BloomLikeFilterPolicy::Create(name, bits_per_key);
-}
 const std::string kLegacyBloom = test::LegacyBloomFilterPolicy::kClassName();
 const std::string kFastLocalBloom =
     test::FastLocalBloomFilterPolicy::kClassName();
@@ -43,6 +38,29 @@ const std::string kStandard128Ribbon =
     test::Standard128RibbonFilterPolicy::kClassName();
 const std::string kAutoBloom = BloomFilterPolicy::kClassName();
 const std::string kAutoRibbon = RibbonFilterPolicy::kClassName();
+const std::string kSpeedbPairedBloomFilter = "speedb.PairedBloomFilter";
+
+namespace {
+bool IsPairedBloomFilterName(const std::string& name) {
+  return (name == kSpeedbPairedBloomFilter);
+}
+
+std::shared_ptr<const FilterPolicy> Create(double bits_per_key,
+                                           const std::string& name) {
+  if (IsPairedBloomFilterName(name) == false) {
+    return BloomLikeFilterPolicy::Create(name, bits_per_key);
+  } else {
+    ConfigOptions config_options;
+    config_options.ignore_unsupported_options = false;
+    std::shared_ptr<const FilterPolicy> filter_policy;
+    Status s = FilterPolicy::CreateFromString(
+        config_options,
+        kSpeedbPairedBloomFilter + ":" + std::to_string(bits_per_key),
+        &filter_policy);
+    EXPECT_NE(filter_policy, nullptr);
+    return filter_policy;
+  }
+}
 
 template <typename T>
 T Pop(T& var) {
@@ -63,11 +81,24 @@ class DBBloomFilterTest : public DBTestBase {
       : DBTestBase("db_bloom_filter_test", /*env_do_fsync=*/true) {}
 };
 
+class DBBloomFilterTestWithPairedBloomOnOff
+    : public DBTestBase,
+      public testing::WithParamInterface<bool> {
+public:
+  DBBloomFilterTestWithPairedBloomOnOff()
+      : DBTestBase("db_bloom_filter_tests", /*env_do_fsync=*/true) {}
+
+  void SetUp() override {
+    use_paired_bloom_ = GetParam();
+  }  
+
+  bool use_paired_bloom_ = false;
+};
+
 class DBBloomFilterTestWithParam
     : public DBTestBase,
       public testing::WithParamInterface<
           std::tuple<std::string, bool, uint32_t>> {
-  //                             public testing::WithParamInterface<bool> {
  protected:
   std::string bfp_impl_;
   bool partition_filters_;
@@ -189,7 +220,7 @@ TEST_P(DBBloomFilterTestDefFormatVersion, KeyMayExist) {
       ChangeOptions(kSkipPlainTable | kSkipHashIndex | kSkipFIFOCompaction));
 }
 
-TEST_F(DBBloomFilterTest, GetFilterByPrefixBloomCustomPrefixExtractor) {
+TEST_P(DBBloomFilterTestWithPairedBloomOnOff, GetFilterByPrefixBloomCustomPrefixExtractor) {
   for (bool partition_filters : {true, false}) {
     Options options = last_options_;
     options.prefix_extractor =
@@ -197,7 +228,13 @@ TEST_F(DBBloomFilterTest, GetFilterByPrefixBloomCustomPrefixExtractor) {
     options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
     get_perf_context()->EnablePerLevelPerfContext();
     BlockBasedTableOptions bbto;
-    bbto.filter_policy.reset(NewBloomFilterPolicy(10));
+    constexpr double bpk = 10;
+    if (use_paired_bloom_) {
+      bbto.filter_policy = Create(bpk, kSpeedbPairedBloomFilter);
+    } else {
+      bbto.filter_policy.reset(NewBloomFilterPolicy(bpk));
+    }
+
     if (partition_filters) {
       bbto.partition_filters = true;
       bbto.index_type = BlockBasedTableOptions::IndexType::kTwoLevelIndexSearch;
@@ -261,14 +298,20 @@ TEST_F(DBBloomFilterTest, GetFilterByPrefixBloomCustomPrefixExtractor) {
   }
 }
 
-TEST_F(DBBloomFilterTest, GetFilterByPrefixBloom) {
+TEST_P(DBBloomFilterTestWithPairedBloomOnOff, GetFilterByPrefixBloom) {
   for (bool partition_filters : {true, false}) {
     Options options = last_options_;
     options.prefix_extractor.reset(NewFixedPrefixTransform(8));
     options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
     get_perf_context()->EnablePerLevelPerfContext();
     BlockBasedTableOptions bbto;
-    bbto.filter_policy.reset(NewBloomFilterPolicy(10));
+    constexpr double bpk = 10;
+    if (use_paired_bloom_) {
+      bbto.filter_policy = Create(bpk, kSpeedbPairedBloomFilter);
+    } else {
+      bbto.filter_policy.reset(NewBloomFilterPolicy(bpk));
+    }
+
     if (partition_filters) {
       bbto.partition_filters = true;
       bbto.index_type = BlockBasedTableOptions::IndexType::kTwoLevelIndexSearch;
@@ -321,7 +364,7 @@ TEST_F(DBBloomFilterTest, GetFilterByPrefixBloom) {
   }
 }
 
-TEST_F(DBBloomFilterTest, WholeKeyFilterProp) {
+TEST_P(DBBloomFilterTestWithPairedBloomOnOff, WholeKeyFilterProp) {
   for (bool partition_filters : {true, false}) {
     Options options = last_options_;
     options.prefix_extractor.reset(NewFixedPrefixTransform(3));
@@ -329,7 +372,12 @@ TEST_F(DBBloomFilterTest, WholeKeyFilterProp) {
     get_perf_context()->EnablePerLevelPerfContext();
 
     BlockBasedTableOptions bbto;
-    bbto.filter_policy.reset(NewBloomFilterPolicy(10));
+    constexpr double bpk = 10;
+    if (use_paired_bloom_) {
+      bbto.filter_policy = Create(bpk, kSpeedbPairedBloomFilter);
+    } else {
+      bbto.filter_policy.reset(NewBloomFilterPolicy(bpk));
+    }
     bbto.whole_key_filtering = false;
     if (partition_filters) {
       bbto.partition_filters = true;
@@ -593,15 +641,19 @@ TEST_P(DBBloomFilterTestWithParam, BloomFilter) {
     ASSERT_TRUE(db_->GetMapProperty(
         handles_[1], DB::Properties::kAggregatedTableProperties, &props));
     uint64_t nkeys = N + N / 100;
-    uint64_t filter_size = ParseUint64(props["filter_size"]);
-    EXPECT_LE(filter_size,
-              (partition_filters_ ? 12 : 11) * nkeys / /*bits / byte*/ 8);
-    if (bfp_impl_ == kAutoRibbon) {
-      // Sometimes using Ribbon filter which is more space-efficient
-      EXPECT_GE(filter_size, 7 * nkeys / /*bits / byte*/ 8);
-    } else {
-      // Always Bloom
-      EXPECT_GE(filter_size, 10 * nkeys / /*bits / byte*/ 8);
+
+    // Size calculations for the PairedBloomFilter are tricky => Skip them.
+    if (IsPairedBloomFilterName(bfp_impl_) == false) {
+      uint64_t filter_size = ParseUint64(props["filter_size"]);
+      EXPECT_LE(filter_size,
+                (partition_filters_ ? 12 : 11) * nkeys / /*bits / byte*/ 8);
+      if (bfp_impl_ == kAutoRibbon) {
+        // Sometimes using Ribbon filter which is more space-efficient
+        EXPECT_GE(filter_size, 7 * nkeys / /*bits / byte*/ 8);
+      } else {
+        // Always Bloom
+        EXPECT_GE(filter_size, 10 * nkeys / /*bits / byte*/ 8);
+      }
     }
 
     uint64_t num_filter_entries = ParseUint64(props["num_filter_entries"]);
@@ -762,20 +814,33 @@ INSTANTIATE_TEST_CASE_P(
     ::testing::Values(
         std::make_tuple(kAutoBloom, true, test::kDefaultFormatVersion),
         std::make_tuple(kAutoBloom, false, test::kDefaultFormatVersion),
-        std::make_tuple(kAutoRibbon, false, test::kDefaultFormatVersion)));
+        std::make_tuple(kAutoRibbon, false, test::kDefaultFormatVersion),
+        std::make_tuple(kSpeedbPairedBloomFilter, true,
+                        test::kDefaultFormatVersion),
+        std::make_tuple(kSpeedbPairedBloomFilter, false,
+                        test::kDefaultFormatVersion)));
+
+INSTANTIATE_TEST_CASE_P(DBBloomFilterTestWithPairedBloomOnOff, DBBloomFilterTestWithPairedBloomOnOff, testing::Bool());
 
 INSTANTIATE_TEST_CASE_P(
     FormatDef, DBBloomFilterTestWithParam,
     ::testing::Values(
         std::make_tuple(kAutoBloom, true, test::kDefaultFormatVersion),
         std::make_tuple(kAutoBloom, false, test::kDefaultFormatVersion),
-        std::make_tuple(kAutoRibbon, false, test::kDefaultFormatVersion)));
+        std::make_tuple(kAutoRibbon, false, test::kDefaultFormatVersion),
+        std::make_tuple(kSpeedbPairedBloomFilter, true,
+                        test::kDefaultFormatVersion),
+        std::make_tuple(kSpeedbPairedBloomFilter, false,
+                        test::kDefaultFormatVersion)));
 
 INSTANTIATE_TEST_CASE_P(
     FormatLatest, DBBloomFilterTestWithParam,
     ::testing::Values(std::make_tuple(kAutoBloom, true, kLatestFormatVersion),
                       std::make_tuple(kAutoBloom, false, kLatestFormatVersion),
-                      std::make_tuple(kAutoRibbon, false,
+                      std::make_tuple(kAutoRibbon, false, kLatestFormatVersion),
+                      std::make_tuple(kSpeedbPairedBloomFilter, true,
+                                      kLatestFormatVersion),
+                      std::make_tuple(kSpeedbPairedBloomFilter, false,
                                       kLatestFormatVersion)));
 #endif  // !defined(ROCKSDB_VALGRIND_RUN) || defined(ROCKSDB_FULL_VALGRIND_RUN)
 
@@ -1036,7 +1101,19 @@ INSTANTIATE_TEST_CASE_P(
                         kStandard128Ribbon, true, true),
 
         std::make_tuple(CacheEntryRoleOptions::Decision::kEnabled, kLegacyBloom,
-                        false, false)));
+                        false, false),
+
+        std::make_tuple(CacheEntryRoleOptions::Decision::kDisabled,
+                        kSpeedbPairedBloomFilter, false, false),
+
+        std::make_tuple(CacheEntryRoleOptions::Decision::kEnabled,
+                        kSpeedbPairedBloomFilter, false, false),
+        std::make_tuple(CacheEntryRoleOptions::Decision::kEnabled,
+                        kSpeedbPairedBloomFilter, false, true),
+        std::make_tuple(CacheEntryRoleOptions::Decision::kEnabled,
+                        kSpeedbPairedBloomFilter, true, false),
+        std::make_tuple(CacheEntryRoleOptions::Decision::kEnabled,
+                        kSpeedbPairedBloomFilter, true, true)));
 
 // TODO: Speed up this test, and reduce disk space usage (~700MB)
 // The current test inserts many keys (on the scale of dummy entry size)
@@ -1418,7 +1495,10 @@ INSTANTIATE_TEST_CASE_P(
                       std::make_tuple(true, kFastLocalBloom, false),
                       std::make_tuple(true, kFastLocalBloom, true),
                       std::make_tuple(true, kStandard128Ribbon, false),
-                      std::make_tuple(true, kStandard128Ribbon, true)));
+                      std::make_tuple(true, kStandard128Ribbon, true),
+                      std::make_tuple(false, kSpeedbPairedBloomFilter, false),
+                      std::make_tuple(true, kSpeedbPairedBloomFilter, false),
+                      std::make_tuple(true, kSpeedbPairedBloomFilter, true)));
 
 TEST_P(DBFilterConstructionCorruptionTestWithParam, DetectCorruption) {
   Options options = CurrentOptions();
@@ -1793,9 +1873,14 @@ class SliceTransformLimitedDomain : public SliceTransform {
   }
 };
 
-TEST_F(DBBloomFilterTest, PrefixExtractorWithFilter1) {
+TEST_P(DBBloomFilterTestWithPairedBloomOnOff, PrefixExtractorWithFilter1) {
   BlockBasedTableOptions bbto;
-  bbto.filter_policy.reset(ROCKSDB_NAMESPACE::NewBloomFilterPolicy(10));
+  constexpr double bpk = 10;
+  if (use_paired_bloom_) {
+    bbto.filter_policy = Create(bpk, kSpeedbPairedBloomFilter);
+  } else {
+    bbto.filter_policy.reset(NewBloomFilterPolicy(bpk));
+  }
   bbto.whole_key_filtering = false;
 
   Options options = CurrentOptions();
@@ -1821,9 +1906,14 @@ TEST_F(DBBloomFilterTest, PrefixExtractorWithFilter1) {
   ASSERT_EQ(Get("zzzzz_AAAA"), "val5");
 }
 
-TEST_F(DBBloomFilterTest, PrefixExtractorWithFilter2) {
+TEST_P(DBBloomFilterTestWithPairedBloomOnOff, PrefixExtractorWithFilter2) {
   BlockBasedTableOptions bbto;
-  bbto.filter_policy.reset(ROCKSDB_NAMESPACE::NewBloomFilterPolicy(10));
+  constexpr double bpk = 10;
+  if (use_paired_bloom_) {
+    bbto.filter_policy = Create(bpk, kSpeedbPairedBloomFilter);
+  } else {
+    bbto.filter_policy.reset(NewBloomFilterPolicy(bpk));
+  }
 
   Options options = CurrentOptions();
   options.prefix_extractor = std::make_shared<SliceTransformLimitedDomain>();
@@ -2010,6 +2100,7 @@ TEST_P(DBBloomFilterTestVaryPrefixAndFormatVer, PartitionedMultiGet) {
   options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
   BlockBasedTableOptions bbto;
   bbto.filter_policy.reset(NewBloomFilterPolicy(20));
+
   bbto.partition_filters = true;
   bbto.index_type = BlockBasedTableOptions::IndexType::kTwoLevelIndexSearch;
   bbto.whole_key_filtering = !use_prefix_;
@@ -2342,10 +2433,12 @@ INSTANTIATE_TEST_CASE_P(
                       std::make_tuple(kLegacyBloom, true),
                       std::make_tuple(kFastLocalBloom, false),
                       std::make_tuple(kFastLocalBloom, true),
-                      std::make_tuple(kPlainTable, false)));
+                      std::make_tuple(kPlainTable, false),
+                      std::make_tuple(kSpeedbPairedBloomFilter, false),
+                      std::make_tuple(kSpeedbPairedBloomFilter, true)));
 
 namespace {
-void PrefixScanInit(DBBloomFilterTest* dbtest) {
+void PrefixScanInit(DBBloomFilterTestWithPairedBloomOnOff* dbtest) {
   char buf[100];
   std::string keystr;
   const int small_range_sstfiles = 5;
@@ -2395,7 +2488,7 @@ void PrefixScanInit(DBBloomFilterTest* dbtest) {
 }
 }  // anonymous namespace
 
-TEST_F(DBBloomFilterTest, PrefixScan) {
+TEST_P(DBBloomFilterTestWithPairedBloomOnOff, PrefixScan) {
   while (ChangeFilterOptions()) {
     int count;
     Slice prefix;
@@ -2422,7 +2515,12 @@ TEST_F(DBBloomFilterTest, PrefixScan) {
 
     BlockBasedTableOptions table_options;
     table_options.no_block_cache = true;
-    table_options.filter_policy.reset(NewBloomFilterPolicy(10));
+    constexpr double bpk = 10;
+    if (use_paired_bloom_) {
+      table_options.filter_policy = Create(bpk, kSpeedbPairedBloomFilter);
+    } else {
+      table_options.filter_policy.reset(NewBloomFilterPolicy(bpk));
+    }
     table_options.whole_key_filtering = false;
     options.table_factory.reset(NewBlockBasedTableFactory(table_options));
 
@@ -2446,6 +2544,8 @@ TEST_F(DBBloomFilterTest, PrefixScan) {
   }  // end of while
 }
 
+// Speedb Paired Bloom Filters currently do NOT support the 'optimize_filters_for_hits' options =>
+// This test doesn't cover paired bloom filters
 TEST_F(DBBloomFilterTest, OptimizeFiltersForHits) {
   const int kNumKeysPerFlush = 1000;
 
@@ -3078,7 +3178,7 @@ TEST_F(DBBloomFilterTest, DynamicBloomFilterOptions) {
   }
 }
 
-TEST_F(DBBloomFilterTest, SeekForPrevWithPartitionedFilters) {
+TEST_P(DBBloomFilterTestWithPairedBloomOnOff, SeekForPrevWithPartitionedFilters) {
   Options options = CurrentOptions();
   constexpr size_t kNumKeys = 10000;
   static_assert(kNumKeys <= 10000, "kNumKeys have to be <= 10000");
@@ -3089,7 +3189,12 @@ TEST_F(DBBloomFilterTest, SeekForPrevWithPartitionedFilters) {
   options.prefix_extractor.reset(NewFixedPrefixTransform(kPrefixLength));
   options.compression = kNoCompression;
   BlockBasedTableOptions bbto;
-  bbto.filter_policy.reset(NewBloomFilterPolicy(50));
+  constexpr double bpk = 50;
+  if (use_paired_bloom_) {
+    bbto.filter_policy = Create(bpk, kSpeedbPairedBloomFilter);
+  } else {
+    bbto.filter_policy.reset(NewBloomFilterPolicy(bpk));
+  }
   bbto.index_shortening =
       BlockBasedTableOptions::IndexShorteningMode::kNoShortening;
   bbto.block_size = 128;
@@ -3189,9 +3294,14 @@ std::pair<uint64_t, uint64_t> HitAndMiss(uint64_t hits, uint64_t misses) {
 // one of the old obsolete, unnecessary axioms of prefix extraction:
 // * key.starts_with(prefix(key))
 // This axiom is not really needed, and we validate that here.
-TEST_F(DBBloomFilterTest, WeirdPrefixExtractorWithFilter1) {
+TEST_P(DBBloomFilterTestWithPairedBloomOnOff, WeirdPrefixExtractorWithFilter1) {
   BlockBasedTableOptions bbto;
-  bbto.filter_policy.reset(ROCKSDB_NAMESPACE::NewBloomFilterPolicy(10));
+  constexpr double bpk = 10;
+  if (use_paired_bloom_) {
+    bbto.filter_policy = Create(bpk, kSpeedbPairedBloomFilter);
+  } else {
+    bbto.filter_policy.reset(NewBloomFilterPolicy(bpk));
+  }
   bbto.whole_key_filtering = false;
 
   Options options = CurrentOptions();
@@ -3257,9 +3367,14 @@ TEST_F(DBBloomFilterTest, WeirdPrefixExtractorWithFilter1) {
 // one of the old obsolete, unnecessary axioms of prefix extraction:
 // * Compare(prefix(key), key) <= 0
 // This axiom is not really needed, and we validate that here.
-TEST_F(DBBloomFilterTest, WeirdPrefixExtractorWithFilter2) {
+TEST_P(DBBloomFilterTestWithPairedBloomOnOff, WeirdPrefixExtractorWithFilter2) {
   BlockBasedTableOptions bbto;
-  bbto.filter_policy.reset(ROCKSDB_NAMESPACE::NewBloomFilterPolicy(10));
+  constexpr double bpk = 10;
+  if (use_paired_bloom_) {
+    bbto.filter_policy = Create(bpk, kSpeedbPairedBloomFilter);
+  } else {
+    bbto.filter_policy.reset(NewBloomFilterPolicy(bpk));
+  }
   bbto.whole_key_filtering = false;
 
   Options options = CurrentOptions();
@@ -3398,9 +3513,14 @@ class NonIdempotentFixed4Transform : public SliceTransform {
 // * prefix(prefix(key)) == prefix(key)
 // * If Compare(k1, k2) <= 0, then Compare(prefix(k1), prefix(k2)) <= 0
 // This axiom is not really needed, and we validate that here.
-TEST_F(DBBloomFilterTest, WeirdPrefixExtractorWithFilter3) {
+TEST_P(DBBloomFilterTestWithPairedBloomOnOff, WeirdPrefixExtractorWithFilter3) {
   BlockBasedTableOptions bbto;
-  bbto.filter_policy.reset(ROCKSDB_NAMESPACE::NewBloomFilterPolicy(10));
+  constexpr double bpk = 10;
+  if (use_paired_bloom_) {
+    bbto.filter_policy = Create(bpk, kSpeedbPairedBloomFilter);
+  } else {
+    bbto.filter_policy.reset(NewBloomFilterPolicy(bpk));
+  }
   bbto.whole_key_filtering = false;
 
   Options options = CurrentOptions();

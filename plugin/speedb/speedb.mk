@@ -27,11 +27,9 @@ speedb_HEADERS = \
 
 speedb_TESTS =   \
      speedb_customizable_test.cc                   \
-     paired_filter/speedb_db_bloom_filter_test.cc  \
      pinning_policy/scoped_pinning_policy_test.cc  \
 
-speedb_TESTS = 																										\
-     speedb_customizable_test.cc																	\
-		 paired_filter/speedb_db_bloom_filter_test.cc									\
+speedb_TESTS =                                     \
+     speedb_customizable_test.cc				 \
 
-speedb_JAVA_TESTS = org.rocksdb.SpeedbFilterTest \
+speedb_JAVA_TESTS = org.rocksdb.SpeedbFilterTest   \

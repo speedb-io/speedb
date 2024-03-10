@@ -17,30 +17,32 @@
 #include <inttypes.h>
 
 #include <cstdio>
+#include <string>
 #include <unordered_map>
 
 #include "port/port.h"
 #include "rocksdb/utilities/options_type.h"
 
 namespace ROCKSDB_NAMESPACE {
-static std::unordered_map<std::string, OptionTypeInfo>
-    scoped_pinning_type_info = {
-        {"capacity",
-         {offsetof(struct ScopedPinningOptions, capacity), OptionType::kSizeT,
-          OptionVerificationType::kNormal, OptionTypeFlags::kNone}},
-        {"last_level_with_data_percent",
-         {offsetof(struct ScopedPinningOptions, last_level_with_data_percent),
-          OptionType::kUInt32T, OptionVerificationType::kNormal,
-          OptionTypeFlags::kNone}},
-        {"mid_percent",
-         {offsetof(struct ScopedPinningOptions, mid_percent),
-          OptionType::kUInt32T, OptionVerificationType::kNormal,
-          OptionTypeFlags::kNone}},
+
+namespace {
+std::unordered_map<std::string, OptionTypeInfo> scoped_pinning_type_info = {
+    {"capacity",
+     {offsetof(struct ScopedPinningOptions, capacity), OptionType::kSizeT,
+      OptionVerificationType::kNormal, OptionTypeFlags::kNone}},
+    {"last_level_with_data_percent",
+     {offsetof(struct ScopedPinningOptions, last_level_with_data_percent),
+      OptionType::kUInt32T, OptionVerificationType::kNormal,
+      OptionTypeFlags::kNone}},
+    {"mid_percent",
+     {offsetof(struct ScopedPinningOptions, mid_percent), OptionType::kUInt32T,
+      OptionVerificationType::kNormal, OptionTypeFlags::kNone}},
 };
 
-ScopedPinningPolicy::ScopedPinningPolicy() {
-  RegisterOptions(&options_, &scoped_pinning_type_info);
-}
+}  // unnamed namespace
+
+ScopedPinningPolicy::ScopedPinningPolicy()
+    : ScopedPinningPolicy(ScopedPinningOptions()) {}
 
 ScopedPinningPolicy::ScopedPinningPolicy(const ScopedPinningOptions& options)
     : options_(options) {
@@ -56,6 +58,7 @@ bool ScopedPinningPolicy::CheckPin(const TablePinningInfo& tpi,
                                    CacheEntryRole /* role */, size_t size,
                                    size_t usage) const {
   auto proposed = usage + size;
+
   if (tpi.is_last_level_with_data &&
       options_.last_level_with_data_percent > 0) {
     if (proposed >
@@ -75,21 +78,11 @@ bool ScopedPinningPolicy::CheckPin(const TablePinningInfo& tpi,
 
 std::string ScopedPinningPolicy::GetPrintableOptions() const {
   std::string ret;
-  const int kBufferSize = 200;
-  char buffer[kBufferSize];
 
-  snprintf(buffer, kBufferSize, "    capacity: %" ROCKSDB_PRIszt "\n",
-           options_.capacity);
-  ret.append(buffer);
-
-  snprintf(buffer, kBufferSize,
-           "    last_level_with_data_percent: %" PRIu32 "\n",
-           options_.last_level_with_data_percent);
-  ret.append(buffer);
-
-  snprintf(buffer, kBufferSize, "    mid_percent: %" PRIu32 "\n",
-           options_.mid_percent);
-  ret.append(buffer);
+  ret.append("    capacity: ").append(std::to_string(options_.capacity));
+  ret.append("    last_level_with_data_percent: ")
+      .append(std::to_string(options_.last_level_with_data_percent));
+  ret.append("    mid_percent: ").append(std::to_string(options_.mid_percent));
 
   return ret;
 }

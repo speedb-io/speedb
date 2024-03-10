@@ -167,7 +167,7 @@ auto RecordingPinningPolicy::GetOwnerIdPinnedUsageCounters(Cache::ItemOwnerId it
   // The counters are a two-dimensional array of std::atomic<int> which in non-copyable.
   // Deep copy to a consistent, non-atomic two-dimensional array.
   const OwnerIdInfo& owner_id_info = owner_id_pinned_counters_iter->second;
-  const PerLevelAndRolePinnedCounters& owner_id_counters =
+  const PerLevelCategoryAndRolePinnedCounters& owner_id_counters =
       owner_id_info.counters;
   for (auto level_category_idx = 0U; level_category_idx < owner_id_counters.size(); ++level_category_idx) {
     const PerRolePinnedCounters& role_counters = owner_id_counters[level_category_idx];
@@ -191,7 +191,7 @@ RecordingPinningPolicy::GetOwnerIdTotalPinnedUsageNonLocking(
   size_t total_pinned_usage = 0U;
 
   const OwnerIdInfo& owner_id_info = owner_id_pinned_info_iter->second;
-  const PerLevelAndRolePinnedCounters& owner_id_counters =
+  const PerLevelCategoryAndRolePinnedCounters& owner_id_counters =
       owner_id_info.counters;
   for (auto level_category_idx = 0U; level_category_idx < owner_id_counters.size(); ++level_category_idx) {
     const PerRolePinnedCounters& role_counters = owner_id_counters[level_category_idx];

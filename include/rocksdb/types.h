@@ -11,20 +11,31 @@
 
 namespace ROCKSDB_NAMESPACE {
 
-// Define all PUBLIC COSTANTS here
-
+// ==========================================================================
+// Define all public constants here
+// ==========================================================================
 // To be used when one must specify a level but the level is unknown
 constexpr int kUnknownLevel = -1;
 
-
-// Define all PUBLIC CUSTOM TYPES here.
-
+// ==========================================================================
+// Define all public custom types here.
+// ==========================================================================
 using ColumnFamilyId = uint32_t;
 
 // Represents a sequence number in a WAL file.
 using SequenceNumber = uint64_t;
 
 const SequenceNumber kMinUnCommittedSeq = 1;  // 0 is always committed
+
+// ==========================================================================
+// Define all public literals here
+// ==========================================================================
+constexpr auto operator""_KB(unsigned long long const x) { return 1024 * x; }
+constexpr auto operator""_MB(unsigned long long const x) { return 1024_KB * x; }
+constexpr auto operator""_GB(unsigned long long const x) { return 1024_MB * x; }
+constexpr auto operator""_TB(unsigned long long const x) { return 1024_GB * x; }
+
+// ==========================================================================
 
 enum class TableFileCreationReason {
   kFlush,

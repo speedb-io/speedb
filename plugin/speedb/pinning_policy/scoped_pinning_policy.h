@@ -19,15 +19,18 @@
 #include "table/block_based/recording_pinning_policy.h"
 
 namespace ROCKSDB_NAMESPACE {
+
 struct TablePinningInfo;
 struct ScopedPinningOptions {
+  static constexpr size_t kDefaultMaxPinningCapacity = 1_GB;
+
   static const char* kName() { return "ScopedPinningOptions"; }
 
   static constexpr uint32_t kDefaultLastLevelWithDataPercent = 10;
   static constexpr uint32_t kDefaultMidPercent = 70;
 
   // Limit to how much data should be pinned
-  size_t capacity = 1024 * 1024 * 1024;  // 1GB
+  size_t capacity = kDefaultMaxPinningCapacity;
 
   // Percent of capacity at which not to pin last-leve-with-data data
   uint32_t last_level_with_data_percent = kDefaultLastLevelWithDataPercent;
@@ -46,6 +49,7 @@ class ScopedPinningPolicy : public RecordingPinningPolicy {
   static const char* kNickName() { return "scoped"; }
   const char* Name() const override { return kClassName(); }
   const char* NickName() const override { return kNickName(); }
+
   std::string GetId() const override;
 
   std::string GetPrintableOptions() const override;

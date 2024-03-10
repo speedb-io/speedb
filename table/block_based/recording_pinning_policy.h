@@ -55,13 +55,13 @@ struct AtomicWrapper {
 class RecordingPinningPolicy : public TablePinningPolicy {
  public:
   using PerRolePinnedCounters = std::array<AtomicWrapper<size_t>, kNumCacheEntryRoles>;
-  using PerLevelAndRolePinnedCounters = std::array<PerRolePinnedCounters, pinning::kNumLevelCategories>;
+  using PerLevelCategoryAndRolePinnedCounters = std::array<PerRolePinnedCounters, pinning::kNumLevelCategories>;
 
   struct OwnerIdInfo {
     OwnerIdInfo() = default;
 
     size_t ref_count = 0U;
-    PerLevelAndRolePinnedCounters counters;
+    PerLevelCategoryAndRolePinnedCounters counters;
   };
 
   // Equivalent types used for querying, NOT using atomic.
@@ -108,9 +108,7 @@ class RecordingPinningPolicy : public TablePinningPolicy {
   std::atomic<size_t> pinned_counter_;
   std::atomic<size_t> active_counter_;
 
-  // Total pinned usage is kept per the following triplet: [owner-id, level, role];
-  // Counters are maintained per level rather than per level-0 / middle-level / last-level-with-data
-  // Since the last level with data 
+  // Total pinned usage is kept per the following triplet: {owner-id, level-category, role};
   // Assumptions:
   // 1. An ItemOwnerId is used by the user only afer it has been added => AddCacheItemOwnerId() has been called
   //    and terminated before any call to MayPin() / PinData() / UnPinData() referencing that ItemOwnerId.

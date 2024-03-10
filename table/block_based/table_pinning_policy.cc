@@ -30,6 +30,7 @@
 #include "rocksdb/table.h"
 #include "rocksdb/utilities/customizable_util.h"
 #include "rocksdb/utilities/object_registry.h"
+#include "table/block_based/default_pinning_policy.h"
 #include "table/block_based/recording_pinning_policy.h"
 
 namespace ROCKSDB_NAMESPACE {
@@ -38,7 +39,7 @@ namespace pinning {
 
 namespace {
 
-std::array<std::string, kNumHierarchyCategories>
+const std::array<std::string, kNumHierarchyCategories>
     kHierarchyCategoryToHyphenString{{"top-level", "partition", "other"}};
 
 }  // Unnamed namespace
@@ -47,13 +48,8 @@ std::string GetHierarchyCategoryName(HierarchyCategory category) {
   return kHierarchyCategoryToHyphenString[static_cast<size_t>(category)];
 }
 
-enum class LevelCategory { LEVEL_0, MIDDLE_LEVEL, LAST_LEVEL_WITH_DATA, UNKNOWN_LEVEL };
-
-std::array<std::string, kNumLevelCategories>
-    kLevelCategoryToHyphenString{{"level-0", 
-                                  "middle-level", 
-                                  "last-level-with-data",
-                                  "unknown-level"}};
+const std::array<std::string, kNumLevelCategories> kLevelCategoryToHyphenString{
+    {"level-0", "middle-level", "last-level-with-data", "unknown-level"}};
 
 std::string GetLevelCategoryName(LevelCategory category) {
   return kLevelCategoryToHyphenString[static_cast<size_t>(category)];
@@ -67,6 +63,7 @@ LevelCategory GetLevelCategory(int level, bool is_last_level_with_data) {
   } else if (level == kUnknownLevel) {
     return LevelCategory::UNKNOWN_LEVEL;
   } else {
+    assert(level > 0);
     return LevelCategory::MIDDLE_LEVEL;
   }
 }
@@ -83,8 +80,10 @@ TablePinningInfo::TablePinningInfo(int _level, bool _is_last_level_with_data,
         max_file_size_for_l0_meta_pin(_max_file_size_for_l0_meta_pin) {
   // Validate / Sanitize the level + is_last_level_with_data combination
   if (is_last_level_with_data) {
-    assert((level != 0) && (level != kUnknownLevel));
-    is_last_level_with_data = false;
+    if (level <= 0) {
+      assert(level > 0);
+      is_last_level_with_data = false;
+    }
   }
 }
 
@@ -134,88 +133,68 @@ std::string PinnedEntry::ToString() const {
   return result;
 }
 
-namespace {
-class DefaultPinningPolicy : public RecordingPinningPolicy {
- public:
-  DefaultPinningPolicy() {
-    //**TODO: Register options?
+DefaultPinningPolicy::DefaultPinningPolicy() {
+  //**TODO: Register options?
+}
+
+DefaultPinningPolicy::DefaultPinningPolicy(const BlockBasedTableOptions& bbto)
+    : DefaultPinningPolicy(bbto.metadata_cache_options,
+                           bbto.pin_top_level_index_and_filter,
+                           bbto.pin_l0_filter_and_index_blocks_in_cache) {}
+
+DefaultPinningPolicy::DefaultPinningPolicy(const MetadataCacheOptions& mdco,
+                                           bool pin_top, bool pin_l0)
+    : cache_options_(mdco),
+      pin_top_level_index_and_filter_(pin_top),
+      pin_l0_index_and_filter_(pin_l0) {
+  //**TODO: Register options?
+}
+
+bool DefaultPinningPolicy::CheckPin(const TablePinningInfo& tpi,
+                                    pinning::HierarchyCategory category,
+                                    CacheEntryRole /*role*/, size_t /*size*/,
+                                    size_t /*limit*/) const {
+  if (tpi.level < 0) {
+    return false;
+  } else if (category == pinning::HierarchyCategory::TOP_LEVEL) {
+    return IsPinned(tpi, cache_options_.top_level_index_pinning,
+                    pin_top_level_index_and_filter_ ? PinningTier::kAll
+                                                    : PinningTier::kNone);
+  } else if (category == pinning::HierarchyCategory::PARTITION) {
+    return IsPinned(tpi, cache_options_.partition_pinning,
+                    pin_l0_index_and_filter_ ? PinningTier::kFlushedAndSimilar
+                                             : PinningTier::kNone);
+  } else {
+    return IsPinned(tpi, cache_options_.unpartitioned_pinning,
+                    pin_l0_index_and_filter_ ? PinningTier::kFlushedAndSimilar
+                                             : PinningTier::kNone);
   }
+}
 
-  DefaultPinningPolicy(const BlockBasedTableOptions& bbto)
-      : DefaultPinningPolicy(bbto.metadata_cache_options,
-                             bbto.pin_top_level_index_and_filter,
-                             bbto.pin_l0_filter_and_index_blocks_in_cache) {}
+bool DefaultPinningPolicy::IsPinned(const TablePinningInfo& tpi,
+                                    PinningTier pinning_tier,
+                                    PinningTier fallback_pinning_tier) const {
+  // Fallback to fallback would lead to infinite recursion. Disallow it.
+  assert(fallback_pinning_tier != PinningTier::kFallback);
 
-  DefaultPinningPolicy(const MetadataCacheOptions& mdco, bool pin_top,
-                       bool pin_l0)
-      : cache_options_(mdco),
-        pin_top_level_index_and_filter_(pin_top),
-        pin_l0_index_and_filter_(pin_l0) {
-    //**TODO: Register options?
-  }
-  static const char* kClassName() { return "DefaultPinningPolicy"; }
-  static const char* kNickName() { return "DefaultPinning"; }
-  const char* Name() const override { return kClassName(); }
-  const char* NickName() const override { return kNickName(); }
-
- protected:
-  bool CheckPin(const TablePinningInfo& tpi, pinning::HierarchyCategory category,
-                CacheEntryRole /*role*/, size_t /*size*/,
-                size_t /*limit*/) const override {
-    if (tpi.level < 0) {
+  switch (pinning_tier) {
+    case PinningTier::kFallback:
+      return IsPinned(tpi, fallback_pinning_tier,
+                      PinningTier::kNone /* fallback_pinning_tier */);
+    case PinningTier::kNone:
       return false;
-    } else if (category == pinning::HierarchyCategory::TOP_LEVEL) {
-      return IsPinned(tpi, cache_options_.top_level_index_pinning,
-                      pin_top_level_index_and_filter_ ? PinningTier::kAll
-                                                      : PinningTier::kNone);
-    } else if (category == pinning::HierarchyCategory::PARTITION) {
-      return IsPinned(tpi, cache_options_.partition_pinning,
-                      pin_l0_index_and_filter_ ? PinningTier::kFlushedAndSimilar
-                                               : PinningTier::kNone);
-    } else {
-      return IsPinned(tpi, cache_options_.unpartitioned_pinning,
-                      pin_l0_index_and_filter_ ? PinningTier::kFlushedAndSimilar
-                                               : PinningTier::kNone);
+    case PinningTier::kFlushedAndSimilar: {
+      bool answer = (tpi.level == 0 &&
+                     tpi.file_size <= tpi.max_file_size_for_l0_meta_pin);
+      return answer;
     }
+    case PinningTier::kAll:
+      return true;
+    default:
+      assert(false);
+      return false;
   }
-
- private:
-  bool IsPinned(const TablePinningInfo& tpi, PinningTier pinning_tier,
-                PinningTier fallback_pinning_tier) const {
-    // Fallback to fallback would lead to infinite recursion. Disallow it.
-    assert(fallback_pinning_tier != PinningTier::kFallback);
-
-    // printf("pinning_tier=%d\n", (int)pinning_tier);
-
-    switch (pinning_tier) {
-      case PinningTier::kFallback:
-        return IsPinned(tpi, fallback_pinning_tier,
-                        PinningTier::kNone /* fallback_pinning_tier */);
-      case PinningTier::kNone:
-        return false;
-      case PinningTier::kFlushedAndSimilar: {
-        bool answer = (tpi.level == 0 &&
-                       tpi.file_size <= tpi.max_file_size_for_l0_meta_pin);
-        // printf("kFlushedAndSimilar: level=%d, file_size=%d,
-        // max_file_size_for_l0_meta_pin=%d\n", tpi.level, (int)tpi.file_size,
-        // (int)tpi.max_file_size_for_l0_meta_pin); return tpi.level == 0 &&
-        //        tpi.file_size <= tpi.max_file_size_for_l0_meta_pin;
-        return answer;
-      }
-      case PinningTier::kAll:
-        return true;
-      default:
-        assert(false);
-        return false;
-    }
-  }
-
- private:
-  const MetadataCacheOptions cache_options_;
-  bool pin_top_level_index_and_filter_ = true;
-  bool pin_l0_index_and_filter_ = false;
-};
-}  // namespace
+}
 
 TablePinningPolicy* NewDefaultPinningPolicy(
     const BlockBasedTableOptions& bbto) {

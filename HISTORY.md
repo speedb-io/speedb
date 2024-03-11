@@ -5,7 +5,8 @@
 ### New Features 
 
 ### Enhancements
-* set the default bucket size of hashspdb to be 400k for best memory use and performance (#854)
+* set the default bucket size of hashspdb to be 400k for best memory use and performance (#854).
+* Support Speedb's Paired Bloom Filter in db_bloom_filter_test (#810).
 
 ### Bug Fixes
 * LOG Consistency:Display the pinning policy options same as block cache options / metadata cache options (#804).

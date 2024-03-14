@@ -197,7 +197,7 @@ class PartitionedFilterBlockTest
     constexpr bool immortal_table = false;
     table_.reset(new MockedBlockBasedTable(
         new BlockBasedTable::Rep(ioptions_, env_options_, table_options_,
-                                 icomp_, skip_filters, file_size, level,
+                                 icomp_, skip_filters, file_size, level, false /* last_level_with_data */,
                                  immortal_table,
                                  user_defined_timestamps_persisted_),
         pib));

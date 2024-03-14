@@ -96,9 +96,6 @@ class RecordingPinningPolicy : public TablePinningPolicy {
                         size_t limit) const = 0;
 
  private:
-  void AddCacheItemOwnerId(Cache::ItemOwnerId item_owner_id);
-  void RemoveCacheItemOwnerId(Cache::ItemOwnerId item_owner_id);
-
   std::optional<size_t> GetOwnerIdTotalPinnedUsageNonLocking(
       Cache::ItemOwnerId item_owner_id) const;
 

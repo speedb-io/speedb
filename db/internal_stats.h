@@ -33,6 +33,7 @@
 #include "db/version_set.h"
 #include "rocksdb/system_clock.h"
 #include "util/hash_containers.h"
+#include "include/rocksdb/table_pinning_policy.h"
 
 namespace ROCKSDB_NAMESPACE {
 
@@ -495,7 +496,7 @@ class InternalStats {
     uint32_t hash_seed = 0;
 
     std::unordered_map<Cache::ItemOwnerId,
-                       std::array<size_t, kNumCacheEntryRoles>>
+                       std::array<std::array<size_t, pinning::kNumLevelCategories>, kNumCacheEntryRoles>>
         charge_per_item_owner;
 
     void Clear() {

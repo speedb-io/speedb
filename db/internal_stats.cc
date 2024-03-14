@@ -721,7 +721,8 @@ InternalStats::CacheEntryRoleStats::GetEntryCallback() {
         static_cast<size_t>(helper ? helper->role : CacheEntryRole::kMisc);
     entry_counts[role_idx]++;
     total_charges[role_idx] += charge;
-    charge_per_item_owner[item_owner_id][role_idx] += charge;
+    auto level_category_value = item_owner_id >> 14; 
+    charge_per_item_owner[item_owner_id][role_idx][level_category_value] += charge;
   };
 }
 
@@ -800,7 +801,10 @@ std::string InternalStats::CacheEntryRoleStats::CacheOwnerStatsToString(
     auto role_idx = static_cast<unsigned int>(role);
     uint64_t role_total_charge = 0U;
     if (cf_charges_per_role_pos != charge_per_item_owner.end()) {
-      role_total_charge = cf_charges_per_role_pos->second[role_idx];
+      const auto& per_level_charges = cf_charges_per_role_pos->second;
+      for (auto level_cat_idx = 0U; level_cat_idx < pinning::kNumLevelCategories; ++level_cat_idx) {
+        role_total_charge += per_level_charges[role_idx][level_cat_idx];
+      }
     }
 
     str << " " << kCacheEntryRoleToCamelString[role_idx] << "("
@@ -840,14 +844,16 @@ void InternalStats::CacheEntryRoleStats::CacheOwnerStatsToMap(
   v[BlockCacheCfStatsMapKeys::CfName()] = cf_name;
   v[BlockCacheCfStatsMapKeys::CacheId()] = cache_id;
   const auto& cache_owner_charges = charge_per_item_owner.find(cache_owner_id);
-  for (size_t i = 0; i < kNumCacheEntryRoles; ++i) {
-    auto role = static_cast<CacheEntryRole>(i);
+  for (size_t role_idx = 0U; role_idx < kNumCacheEntryRoles; ++role_idx) {
+    auto role = static_cast<CacheEntryRole>(role_idx);
+    auto total_role_charge = 0U;
     if (cache_owner_charges != charge_per_item_owner.end()) {
-      v[BlockCacheCfStatsMapKeys::UsedBytes(role)] =
-          std::to_string(charge_per_item_owner.at(cache_owner_id)[i]);
-    } else {
-      v[BlockCacheCfStatsMapKeys::UsedBytes(role)] = "0";
+      const auto& per_level_charges = cache_owner_charges->second;
+      for (auto level_cat_idx = 0U; level_cat_idx < pinning::kNumLevelCategories; ++level_cat_idx) {
+        total_role_charge += per_level_charges[role_idx][level_cat_idx];
+      }
     }
+    v[BlockCacheCfStatsMapKeys::UsedBytes(role)] = std::to_string(total_role_charge);
   }
 }
 

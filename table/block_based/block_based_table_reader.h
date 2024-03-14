@@ -572,7 +572,7 @@ struct BlockBasedTable::Rep {
   Rep(const ImmutableOptions& _ioptions, const EnvOptions& _env_options,
       const BlockBasedTableOptions& _table_opt,
       const InternalKeyComparator& _internal_comparator, bool skip_filters,
-      uint64_t _file_size, int _level, const bool _immortal_table,
+      uint64_t _file_size, int _level, bool _last_level_with_data, const bool _immortal_table,
       const bool _user_defined_timestamps_persisted = true,
       Cache::ItemOwnerId _cache_owner_id = Cache::kUnknownItemOwnerId)
       : ioptions(_ioptions),
@@ -587,6 +587,7 @@ struct BlockBasedTable::Rep {
         global_seqno(kDisableGlobalSequenceNumber),
         file_size(_file_size),
         level(_level),
+        last_level_with_data(_last_level_with_data),
         immortal_table(_immortal_table),
         user_defined_timestamps_persisted(_user_defined_timestamps_persisted),
         cache_owner_id(_cache_owner_id) {}
@@ -646,6 +647,8 @@ struct BlockBasedTable::Rep {
   // the level when the table is opened, could potentially change when trivial
   // move is involved
   int level;
+
+  bool last_level_with_data;
 
   // the timestamp range of table
   // Points into memory owned by TableProperties. This would need to change if

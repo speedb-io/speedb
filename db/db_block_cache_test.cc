@@ -247,8 +247,10 @@ class DBBlockCacheTest : public DBTestBase {
         for (const auto cfh : cf_handles) {
           auto cfh_impl = static_cast<ColumnFamilyHandleImpl*>(cfh);
           auto cache_owner_id = cfh_impl->cfd()->GetCacheOwnerId();
-          total_role_charges_all_cfs +=
-              actual_stats.charge_per_item_owner[cache_owner_id][role_idx];
+          for (auto level_cat_idx = 0U; level_cat_idx < pinning::kNumLevelCategories; ++level_cat_idx) {
+            total_role_charges_all_cfs +=
+                actual_stats.charge_per_item_owner[cache_owner_id][role_idx][level_cat_idx];
+          }
         }
         ASSERT_EQ(actual_stats.total_charges[role_idx],
                   total_role_charges_all_cfs);

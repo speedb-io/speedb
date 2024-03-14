@@ -722,6 +722,8 @@ InternalStats::CacheEntryRoleStats::GetEntryCallback() {
     entry_counts[role_idx]++;
     total_charges[role_idx] += charge;
     auto level_category_value = item_owner_id >> 14; 
+    item_owner_id &= ~(0xC000);
+    printf("GetEntryCallback:role_idx:%d, charge:%d, level-cat:%d, owner_id:%d\n", (int)role_idx, (int)charge, (int)level_category_value, (int)item_owner_id);
     charge_per_item_owner[item_owner_id][role_idx][level_category_value] += charge;
   };
 }

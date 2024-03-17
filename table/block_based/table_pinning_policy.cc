@@ -51,8 +51,15 @@ std::string GetHierarchyCategoryName(HierarchyCategory category) {
 const std::array<std::string, kNumLevelCategories> kLevelCategoryToHyphenString{
     {"level-0", "middle-level", "last-level-with-data", "unknown-level"}};
 
+const std::array<std::string, kNumLevelCategories> kLevelCategoryToShortString{
+    {"L0", "Middle", "Last", "Unknown"}};
+
 std::string GetLevelCategoryName(LevelCategory category) {
   return kLevelCategoryToHyphenString[static_cast<size_t>(category)];
+}
+
+std::string GetLevelCategoryShortName(LevelCategory category) {
+  return kLevelCategoryToShortString[static_cast<size_t>(category)];
 }
 
 LevelCategory GetLevelCategory(int level, bool is_last_level_with_data) {

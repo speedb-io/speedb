@@ -52,6 +52,7 @@ constexpr uint32_t kNumLevelCategories =
     static_cast<uint32_t>(LevelCategory::UNKNOWN_LEVEL) + 1;
 
 std::string GetLevelCategoryName(LevelCategory category);
+std::string GetLevelCategoryShortName(LevelCategory category);
 
 LevelCategory GetLevelCategory(int level, bool is_last_level_with_data);
 
@@ -82,10 +83,6 @@ struct PinnedEntry {
   Cache::ItemOwnerId item_owner_id = Cache::kUnknownItemOwnerId;
   CacheEntryRole role = CacheEntryRole::kMisc;
   size_t size = 0U;
-
-  // XXXXXXXXXXXXXXXXXXXX
-  // TODO - Is this in use?
-  // PinnedEntry() = default;
 
   PinnedEntry(int _level, bool _is_last_level_with_data,
               pinning::HierarchyCategory _category,
@@ -130,6 +127,9 @@ class TablePinningPolicy : public Customizable {
 
   // Releases and clears the pinned entry.
   virtual void UnPinData(std::unique_ptr<PinnedEntry> pinned_entry) = 0;
+
+  virtual void IncrementHitCount(Cache::ItemOwnerId /* item_owner_id */, CacheEntryRole /* role */, int /* level */, bool /* last_level_with_data */) {}
+  virtual void IncrementMissCount(Cache::ItemOwnerId /* item_owner_id */, CacheEntryRole /* role */, int /* level */, bool /* last_level_with_data */) {}
 
   // Returns the amount of data currently pinned.
   virtual size_t GetPinnedUsage() const = 0;

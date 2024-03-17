@@ -239,6 +239,8 @@ void BlockBasedTable::UpdateCacheHitMetrics(BlockType block_type,
     RecordTick(statistics, BLOCK_CACHE_BYTES_READ, usage);
   }
 
+  CacheEntryRole role = CacheEntryRole::kMisc;
+
   switch (block_type) {
     case BlockType::kFilter:
     case BlockType::kFilterPartitionIndex:
@@ -249,6 +251,7 @@ void BlockBasedTable::UpdateCacheHitMetrics(BlockType block_type,
       } else {
         RecordTick(statistics, BLOCK_CACHE_FILTER_HIT);
       }
+      role = CacheEntryRole::kFilterBlock;
       break;
 
     case BlockType::kCompressionDictionary:
@@ -258,6 +261,7 @@ void BlockBasedTable::UpdateCacheHitMetrics(BlockType block_type,
       } else {
         RecordTick(statistics, BLOCK_CACHE_COMPRESSION_DICT_HIT);
       }
+      role = CacheEntryRole::kOtherBlock;
       break;
 
     case BlockType::kIndex:
@@ -268,6 +272,7 @@ void BlockBasedTable::UpdateCacheHitMetrics(BlockType block_type,
       } else {
         RecordTick(statistics, BLOCK_CACHE_INDEX_HIT);
       }
+      role = CacheEntryRole::kIndexBlock;
       break;
 
     default:
@@ -277,8 +282,15 @@ void BlockBasedTable::UpdateCacheHitMetrics(BlockType block_type,
         ++get_context->get_context_stats_.num_cache_data_hit;
       } else {
         RecordTick(statistics, BLOCK_CACHE_DATA_HIT);
+        role = CacheEntryRole::kDataBlock;
       }
+      role = CacheEntryRole::kIndexBlock;
       break;
+  }
+
+  const auto pinning_policy = GetPinningPolicy();
+  if ((pinning_policy != nullptr) && (role != CacheEntryRole::kMisc)) {
+    pinning_policy->IncrementHitCount(rep_->cache_owner_id, role, rep_->level, rep_->last_level_with_data);
   }
 }
 
@@ -296,6 +308,8 @@ void BlockBasedTable::UpdateCacheMissMetrics(BlockType block_type,
     RecordTick(statistics, BLOCK_CACHE_MISS);
   }
 
+  CacheEntryRole role = CacheEntryRole::kMisc;
+
   // TODO: introduce perf counters for misses per block type
   switch (block_type) {
     case BlockType::kFilter:
@@ -305,6 +319,7 @@ void BlockBasedTable::UpdateCacheMissMetrics(BlockType block_type,
       } else {
         RecordTick(statistics, BLOCK_CACHE_FILTER_MISS);
       }
+      role = CacheEntryRole::kFilterBlock;
       break;
 
     case BlockType::kCompressionDictionary:
@@ -313,6 +328,7 @@ void BlockBasedTable::UpdateCacheMissMetrics(BlockType block_type,
       } else {
         RecordTick(statistics, BLOCK_CACHE_COMPRESSION_DICT_MISS);
       }
+      role = CacheEntryRole::kOtherBlock;
       break;
 
     case BlockType::kIndex:
@@ -321,6 +337,7 @@ void BlockBasedTable::UpdateCacheMissMetrics(BlockType block_type,
       } else {
         RecordTick(statistics, BLOCK_CACHE_INDEX_MISS);
       }
+      role = CacheEntryRole::kIndexBlock;
       break;
 
     default:
@@ -331,7 +348,13 @@ void BlockBasedTable::UpdateCacheMissMetrics(BlockType block_type,
       } else {
         RecordTick(statistics, BLOCK_CACHE_DATA_MISS);
       }
+      role = CacheEntryRole::kDataBlock;
       break;
+  }
+
+  const auto pinning_policy = GetPinningPolicy();
+  if ((pinning_policy != nullptr) && (role != CacheEntryRole::kMisc)) {
+    pinning_policy->IncrementMissCount(rep_->cache_owner_id, role, rep_->level, rep_->last_level_with_data);
   }
 }
 
@@ -1375,7 +1398,7 @@ WithBlocklikeCheck<Status, TBlocklike> BlockBasedTable::PutDataBlockToCache(
     BlockCacheTypedHandle<TBlocklike>* cache_handle = nullptr;
     auto owner_id_with_level = rep_->cache_owner_id;
     auto level_category_value = static_cast<int>(pinning::GetLevelCategory(rep_->level, rep_->last_level_with_data));
-    owner_id_with_level &= (level_category_value << 14);
+    owner_id_with_level |= (level_category_value << 14);
 
     s = block_cache.InsertFull(cache_key, block_holder.get(), charge,
                                &cache_handle, GetCachePriority<TBlocklike>(),

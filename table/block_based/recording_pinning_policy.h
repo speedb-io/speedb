@@ -87,6 +87,9 @@ class RecordingPinningPolicy : public TablePinningPolicy {
 
   size_t GetOwnerIdTotalPinnedUsage(Cache::ItemOwnerId item_owner_id) const;
 
+  void IncrementHitCount(Cache::ItemOwnerId _item_owner_id, CacheEntryRole role, int level, bool last_level_with_data) override;
+  void IncrementMissCount(Cache::ItemOwnerId _item_owner_id, CacheEntryRole role, int level, bool last_level_with_data) override;
+
  protected:
   // Checks whether the data can be pinned.
   virtual bool CheckPin(const TablePinningInfo& tpi, 

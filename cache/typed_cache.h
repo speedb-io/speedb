@@ -321,7 +321,6 @@ class FullTypedCacheInterface
     auto helper = lowest_used_cache_tier == CacheTier::kNonVolatileBlockTier
                       ? GetFullHelper()
                       : GetBasicHelper();
-    printf("InsertFull:role_idx:%d, charge:%d, owner_id:%d\n", (int)(helper->role), (int)charge, (int)item_owner_id);
     return this->cache_->InsertWithOwnerId(key, UpCastValue(value), helper,
                                            charge, item_owner_id,
                                            untyped_handle, priority);

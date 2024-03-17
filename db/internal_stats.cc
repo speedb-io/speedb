@@ -32,6 +32,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <iomanip>
 
 #include "cache/cache_entry_roles.h"
 #include "cache/cache_entry_stats.h"
@@ -723,7 +724,6 @@ InternalStats::CacheEntryRoleStats::GetEntryCallback() {
     total_charges[role_idx] += charge;
     auto level_category_value = item_owner_id >> 14; 
     item_owner_id &= ~(0xC000);
-    printf("GetEntryCallback:role_idx:%d, charge:%d, level-cat:%d, owner_id:%d\n", (int)role_idx, (int)charge, (int)level_category_value, (int)item_owner_id);
     charge_per_item_owner[item_owner_id][role_idx][level_category_value] += charge;
   };
 }
@@ -797,22 +797,34 @@ std::string InternalStats::CacheEntryRoleStats::CacheOwnerStatsToString(
                                     CacheEntryRole::kFilterBlock,
                                     CacheEntryRole::kIndexBlock};
 
-  str << "Block cache [" << cf_name << "] ";
+  str << "Block cache [" << cf_name << "]\n";
+
+  str << std::left << std::setw(11) << "Role" << " " << std::setw(10) << "Total";  
+
+  for (auto level_cat_idx = 0U; level_cat_idx < pinning::kNumLevelCategories; ++level_cat_idx) {
+    auto level_cat_name = pinning::GetLevelCategoryShortName(pinning::LevelCategory(level_cat_idx));
+    str << std::left << std::setw(10) << level_cat_name;
+  }
+  str << '\n';
 
   for (auto role : roles) {
-    auto role_idx = static_cast<unsigned int>(role);
+    auto role_idx = static_cast<unsigned int>(role);    
+    str << std::left << std::setw(11) << kCacheEntryRoleToCamelString[role_idx] << " ";
+
     uint64_t role_total_charge = 0U;
     if (cf_charges_per_role_pos != charge_per_item_owner.end()) {
-      const auto& per_level_charges = cf_charges_per_role_pos->second;
       for (auto level_cat_idx = 0U; level_cat_idx < pinning::kNumLevelCategories; ++level_cat_idx) {
-        role_total_charge += per_level_charges[role_idx][level_cat_idx];
+        role_total_charge += cf_charges_per_role_pos->second[role_idx][level_cat_idx];
       }
     }
 
-    str << " " << kCacheEntryRoleToCamelString[role_idx] << "("
-        << BytesToHumanString(role_total_charge) << ")";
+    str << std::left << std::setw(10) << BytesToHumanString(role_total_charge) << " ";
+
+    for (auto level_cat_idx = 0U; level_cat_idx < pinning::kNumLevelCategories; ++level_cat_idx) {
+      str << std::left << std::setw(10) << BytesToHumanString(cf_charges_per_role_pos->second[role_idx][level_cat_idx]) << " ";
+    }
+    str << '\n';
   }
-  str << '\n';
   return str.str();
 }
 
@@ -845,14 +857,15 @@ void InternalStats::CacheEntryRoleStats::CacheOwnerStatsToMap(
   auto& v = *values;
   v[BlockCacheCfStatsMapKeys::CfName()] = cf_name;
   v[BlockCacheCfStatsMapKeys::CacheId()] = cache_id;
+  cache_owner_id &= ~(0xC000);
   const auto& cache_owner_charges = charge_per_item_owner.find(cache_owner_id);
   for (size_t role_idx = 0U; role_idx < kNumCacheEntryRoles; ++role_idx) {
     auto role = static_cast<CacheEntryRole>(role_idx);
     auto total_role_charge = 0U;
     if (cache_owner_charges != charge_per_item_owner.end()) {
-      const auto& per_level_charges = cache_owner_charges->second;
       for (auto level_cat_idx = 0U; level_cat_idx < pinning::kNumLevelCategories; ++level_cat_idx) {
-        total_role_charge += per_level_charges[role_idx][level_cat_idx];
+        total_role_charge +=
+            cache_owner_charges->second[role_idx][level_cat_idx];
       }
     }
     v[BlockCacheCfStatsMapKeys::UsedBytes(role)] = std::to_string(total_role_charge);
@@ -2240,7 +2253,7 @@ void InternalStats::DumpCFStatsNoFileHistogram(bool is_periodic,
   }
 
   const BlockBasedTableOptions* bbto = cfd_->GetBlockBasedTableOptions();
-  if (bbto->pinning_policy) {
+  if ((bbto != nullptr) && bbto->pinning_policy) {
     auto recording_policy = static_cast<const RecordingPinningPolicy*>(bbto->pinning_policy.get());
     auto cfd_pinning_counters = recording_policy->GetOwnerIdPinnedUsageCounters(cfd_->GetCacheOwnerId());
 

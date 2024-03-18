@@ -29,6 +29,7 @@
 #include <optional>
 #include <unordered_map>
 
+#include "db/internal_stats.h"
 #include "rocksdb/cache.h"
 #include "rocksdb/table_pinning_policy.h"
 
@@ -39,7 +40,7 @@ class RecordingPinningPolicy : public TablePinningPolicy {
  public:
   using PerRolePinnedCounters = std::array<size_t, kNumCacheEntryRoles>;
   using OwnerIdPinnedCounters =
-      std::array<PerRolePinnedCounters, pinning::kNumLevelCategories>;
+      std::array<PerRolePinnedCounters, kNumLevelCategories>;
 
   struct OwnerIdInfo {
     OwnerIdInfo() = default;

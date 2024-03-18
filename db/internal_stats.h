@@ -109,6 +109,21 @@ struct LevelStat {
   std::string header_name;
 };
 
+enum class LevelCategory {
+  LEVEL_0 = 0,
+  MIDDLE_LEVEL = 1,
+  LAST_LEVEL_WITH_DATA = 2,
+  UNKNOWN_LEVEL = 3
+};
+
+constexpr uint32_t kNumLevelCategories =
+    static_cast<uint32_t>(LevelCategory::UNKNOWN_LEVEL) + 1;
+
+std::string GetLevelCategoryName(LevelCategory category);
+std::string GetLevelCategoryShortName(LevelCategory category);
+
+LevelCategory GetLevelCategory(int level, bool is_last_level_with_data);
+
 struct DBStatInfo {
   // This what will be property_name in the flat map returned to the user
   std::string property_name;
@@ -496,7 +511,8 @@ class InternalStats {
     uint32_t hash_seed = 0;
 
     std::unordered_map<Cache::ItemOwnerId,
-                       std::array<std::array<size_t, pinning::kNumLevelCategories>, kNumCacheEntryRoles>>
+                       std::array<std::array<size_t, kNumLevelCategories>,
+                                  kNumCacheEntryRoles>>
         charge_per_item_owner;
 
     void Clear() {

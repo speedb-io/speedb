@@ -38,6 +38,7 @@
 #include "cache/cache_key.h"
 #include "db/compaction/compaction_picker.h"
 #include "db/dbformat.h"
+#include "db/internal_stats.h"
 #include "db/pinned_iterators_manager.h"
 #include "file/file_prefetch_buffer.h"
 #include "file/file_util.h"
@@ -1399,7 +1400,8 @@ WithBlocklikeCheck<Status, TBlocklike> BlockBasedTable::PutDataBlockToCache(
     size_t charge = block_holder->ApproximateMemoryUsage();
     BlockCacheTypedHandle<TBlocklike>* cache_handle = nullptr;
     auto owner_id_with_level = rep_->cache_owner_id;
-    auto level_category_value = static_cast<int>(pinning::GetLevelCategory(rep_->level, rep_->last_level_with_data));
+    auto level_category_value = static_cast<int>(
+        GetLevelCategory(rep_->level, rep_->last_level_with_data));
     owner_id_with_level |= (level_category_value << 14);
 
     s = block_cache.InsertFull(cache_key, block_holder.get(), charge,

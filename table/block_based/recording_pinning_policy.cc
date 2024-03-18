@@ -67,7 +67,7 @@ bool RecordingPinningPolicy::PinData(const TablePinningInfo& tpi,
   }
 
   auto level_category_idx = static_cast<uint64_t>(
-      pinning::GetLevelCategory(tpi.level, tpi.is_last_level_with_data));
+      GetLevelCategory(tpi.level, tpi.is_last_level_with_data));
   auto role_idx = static_cast<uint64_t>(role);
 
   std::lock_guard<std::mutex> lock(counters_mutex_);
@@ -100,7 +100,7 @@ void RecordingPinningPolicy::UnPinData(
     return;
   }
 
-  auto level_category_idx = static_cast<uint64_t>(pinning::GetLevelCategory(
+  auto level_category_idx = static_cast<uint64_t>(GetLevelCategory(
       pinned_entry->level, pinned_entry->is_last_level_with_data));
   auto role_idx = static_cast<uint64_t>(pinned_entry->role);
 

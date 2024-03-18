@@ -799,10 +799,13 @@ std::string InternalStats::CacheEntryRoleStats::CacheOwnerStatsToString(
 
   str << "Block cache [" << cf_name << "]\n";
 
-  str << std::left << std::setw(11) << "Role" << " " << std::setw(10) << "Total";  
+  str << std::left << std::setw(11) << "Role"
+      << " " << std::setw(10) << "Total";
 
-  for (auto level_cat_idx = 0U; level_cat_idx < pinning::kNumLevelCategories; ++level_cat_idx) {
-    auto level_cat_name = pinning::GetLevelCategoryShortName(pinning::LevelCategory(level_cat_idx));
+  for (auto level_cat_idx = 0U; level_cat_idx < kNumLevelCategories;
+       ++level_cat_idx) {
+    auto level_cat_name =
+        GetLevelCategoryShortName(LevelCategory(level_cat_idx));
     str << std::left << std::setw(10) << level_cat_name;
   }
   str << '\n';
@@ -813,14 +816,16 @@ std::string InternalStats::CacheEntryRoleStats::CacheOwnerStatsToString(
 
     uint64_t role_total_charge = 0U;
     if (cf_charges_per_role_pos != charge_per_item_owner.end()) {
-      for (auto level_cat_idx = 0U; level_cat_idx < pinning::kNumLevelCategories; ++level_cat_idx) {
+      for (auto level_cat_idx = 0U; level_cat_idx < kNumLevelCategories;
+           ++level_cat_idx) {
         role_total_charge += cf_charges_per_role_pos->second[role_idx][level_cat_idx];
       }
     }
 
     str << std::left << std::setw(10) << BytesToHumanString(role_total_charge) << " ";
 
-    for (auto level_cat_idx = 0U; level_cat_idx < pinning::kNumLevelCategories; ++level_cat_idx) {
+    for (auto level_cat_idx = 0U; level_cat_idx < kNumLevelCategories;
+         ++level_cat_idx) {
       size_t level_charge = 0U;
       if (cf_charges_per_role_pos != charge_per_item_owner.end()) {
         level_charge = cf_charges_per_role_pos->second[role_idx][level_cat_idx];
@@ -868,7 +873,8 @@ void InternalStats::CacheEntryRoleStats::CacheOwnerStatsToMap(
     auto role = static_cast<CacheEntryRole>(role_idx);
     auto total_role_charge = 0U;
     if (cache_owner_charges != charge_per_item_owner.end()) {
-      for (auto level_cat_idx = 0U; level_cat_idx < pinning::kNumLevelCategories; ++level_cat_idx) {
+      for (auto level_cat_idx = 0U; level_cat_idx < kNumLevelCategories;
+           ++level_cat_idx) {
         total_role_charge +=
             cache_owner_charges->second[role_idx][level_cat_idx];
       }
@@ -2268,10 +2274,11 @@ void InternalStats::DumpCFStatsNoFileHistogram(bool is_periodic,
       const auto& role_counters = cfd_pinning_counters[level_category_idx];
       for (auto role_idx = 0U; role_idx < role_counters.size(); ++role_idx) {
         if (role_counters[role_idx] > 0U) {
-          printf("Total-Pinned[%s][%s]=%d\n", 
-                  pinning::GetLevelCategoryName(pinning::LevelCategory(level_category_idx)).c_str(), 
-                  GetCacheEntryRoleName(CacheEntryRole(role_idx)).c_str(),
-                  (int)role_counters[role_idx]);
+          printf(
+              "Total-Pinned[%s][%s]=%d\n",
+              GetLevelCategoryName(LevelCategory(level_category_idx)).c_str(),
+              GetCacheEntryRoleName(CacheEntryRole(role_idx)).c_str(),
+              (int)role_counters[role_idx]);
           all_zeros = false;
         }
       }
@@ -2305,5 +2312,31 @@ void InternalStats::DumpCFFileHistogram(std::string* value) {
   value->append(oss.str());
 }
 
+const std::array<std::string, kNumLevelCategories> kLevelCategoryToHyphenString{
+    {"level-0", "middle-level", "last-level-with-data", "unknown-level"}};
+
+const std::array<std::string, kNumLevelCategories> kLevelCategoryToShortString{
+    {"L0", "Middle", "Last", "Unknown"}};
+
+std::string GetLevelCategoryName(LevelCategory category) {
+  return kLevelCategoryToHyphenString[static_cast<size_t>(category)];
+}
+
+std::string GetLevelCategoryShortName(LevelCategory category) {
+  return kLevelCategoryToShortString[static_cast<size_t>(category)];
+}
+
+LevelCategory GetLevelCategory(int level, bool is_last_level_with_data) {
+  if (is_last_level_with_data) {
+    return LevelCategory::LAST_LEVEL_WITH_DATA;
+  } else if (level == 0) {
+    return LevelCategory::LEVEL_0;
+  } else if (level == kUnknownLevel) {
+    return LevelCategory::UNKNOWN_LEVEL;
+  } else {
+    assert(level > 0);
+    return LevelCategory::MIDDLE_LEVEL;
+  }
+}
 
 }  // namespace ROCKSDB_NAMESPACE

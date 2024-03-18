@@ -48,33 +48,6 @@ std::string GetHierarchyCategoryName(HierarchyCategory category) {
   return kHierarchyCategoryToHyphenString[static_cast<size_t>(category)];
 }
 
-const std::array<std::string, kNumLevelCategories> kLevelCategoryToHyphenString{
-    {"level-0", "middle-level", "last-level-with-data", "unknown-level"}};
-
-const std::array<std::string, kNumLevelCategories> kLevelCategoryToShortString{
-    {"L0", "Middle", "Last", "Unknown"}};
-
-std::string GetLevelCategoryName(LevelCategory category) {
-  return kLevelCategoryToHyphenString[static_cast<size_t>(category)];
-}
-
-std::string GetLevelCategoryShortName(LevelCategory category) {
-  return kLevelCategoryToShortString[static_cast<size_t>(category)];
-}
-
-LevelCategory GetLevelCategory(int level, bool is_last_level_with_data) {
-  if (is_last_level_with_data) {
-    return LevelCategory::LAST_LEVEL_WITH_DATA;
-  } else if (level == 0) {
-    return LevelCategory::LEVEL_0;
-  } else if (level == kUnknownLevel) {
-    return LevelCategory::UNKNOWN_LEVEL;
-  } else {
-    assert(level > 0);
-    return LevelCategory::MIDDLE_LEVEL;
-  }
-}
-
 } // namespace pinning 
 
 TablePinningInfo::TablePinningInfo(int _level, bool _is_last_level_with_data,

@@ -46,16 +46,6 @@ constexpr uint32_t kNumHierarchyCategories =
 
 std::string GetHierarchyCategoryName(HierarchyCategory category);
 
-enum class LevelCategory { LEVEL_0 = 0, MIDDLE_LEVEL = 1, LAST_LEVEL_WITH_DATA = 2, UNKNOWN_LEVEL = 3 };
-
-constexpr uint32_t kNumLevelCategories =
-    static_cast<uint32_t>(LevelCategory::UNKNOWN_LEVEL) + 1;
-
-std::string GetLevelCategoryName(LevelCategory category);
-std::string GetLevelCategoryShortName(LevelCategory category);
-
-LevelCategory GetLevelCategory(int level, bool is_last_level_with_data);
-
 }  // namespace pinning
 
 // Struct that contains information about the table being evaluated for pinning

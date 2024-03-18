@@ -128,9 +128,6 @@ class TablePinningPolicy : public Customizable {
   // Releases and clears the pinned entry.
   virtual void UnPinData(std::unique_ptr<PinnedEntry> pinned_entry) = 0;
 
-  virtual void IncrementHitCount(Cache::ItemOwnerId /* item_owner_id */, CacheEntryRole /* role */, int /* level */, bool /* last_level_with_data */) {}
-  virtual void IncrementMissCount(Cache::ItemOwnerId /* item_owner_id */, CacheEntryRole /* role */, int /* level */, bool /* last_level_with_data */) {}
-
   // Returns the amount of data currently pinned.
   virtual size_t GetPinnedUsage() const = 0;
 

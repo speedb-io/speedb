@@ -290,7 +290,8 @@ void BlockBasedTable::UpdateCacheHitMetrics(BlockType block_type,
 
   const auto pinning_policy = GetPinningPolicy();
   if ((pinning_policy != nullptr) && (role != CacheEntryRole::kMisc)) {
-    pinning_policy->IncrementHitCount(rep_->cache_owner_id, role, rep_->level, rep_->last_level_with_data);
+    // pinning_policy->IncrementHitCount(rep_->cache_owner_id, role,
+    // rep_->level, rep_->last_level_with_data);
   }
 }
 
@@ -354,7 +355,8 @@ void BlockBasedTable::UpdateCacheMissMetrics(BlockType block_type,
 
   const auto pinning_policy = GetPinningPolicy();
   if ((pinning_policy != nullptr) && (role != CacheEntryRole::kMisc)) {
-    pinning_policy->IncrementMissCount(rep_->cache_owner_id, role, rep_->level, rep_->last_level_with_data);
+    // pinning_policy->IncrementMissCount(rep_->cache_owner_id, role,
+    // rep_->level, rep_->last_level_with_data);
   }
 }
 

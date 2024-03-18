@@ -82,14 +82,15 @@ bool RecordingPinningPolicy::PinData(const TablePinningInfo& tpi,
 
   OwnerIdInfo& owner_id_info = owner_id_pinned_counters_iter->second;
   ++owner_id_info.ref_count;
-  owner_id_info.counters[level_category_idx][role_idx]._a += size;
+  owner_id_info.counters[level_category_idx][role_idx] += size;
 
   return true;
 }
 
 void RecordingPinningPolicy::UnPinData(
     std::unique_ptr<PinnedEntry> pinned_entry) {
-  auto curr_total_usage = total_usage_.fetch_sub(pinned_entry->size);
+  [[maybe_unused]] auto curr_total_usage =
+      total_usage_.fetch_sub(pinned_entry->size);
   assert(curr_total_usage >= pinned_entry->size);
 
   assert(active_counter_ > 0U);
@@ -111,18 +112,19 @@ void RecordingPinningPolicy::UnPinData(
   OwnerIdInfo& owner_id_info = owner_id_pinned_counters_iter->second;
 
   auto& entry_usage = owner_id_info.counters[level_category_idx][role_idx];
-  auto old_entry_usage = entry_usage._a.fetch_sub(pinned_entry->size);
-  assert(old_entry_usage >= pinned_entry->size);
+  assert(entry_usage >= pinned_entry->size);
+  entry_usage -= pinned_entry->size;
 
   assert(owner_id_info.ref_count > 0U);
   --owner_id_info.ref_count;
   if (owner_id_info.ref_count == 0U) {
-    auto is_total_entry_usage_zero = [this](Cache::ItemOwnerId item_owner_id) {
-      auto total_entry_usage =
-          this->GetOwnerIdTotalPinnedUsageNonLocking(item_owner_id);
-      assert(total_entry_usage.has_value());
-      return (total_entry_usage.value_or(0U) == 0U);
-    };
+    [[maybe_unused]] auto is_total_entry_usage_zero =
+        [this](Cache::ItemOwnerId item_owner_id) {
+          auto total_entry_usage =
+              this->GetOwnerIdTotalPinnedUsageNonLocking(item_owner_id);
+          assert(total_entry_usage.has_value());
+          return (total_entry_usage.value_or(0U) == 0U);
+        };
 
     assert(is_total_entry_usage_zero(pinned_entry->item_owner_id));
 
@@ -154,29 +156,16 @@ size_t RecordingPinningPolicy::GetOwnerIdTotalPinnedUsage(Cache::ItemOwnerId ite
   return GetOwnerIdTotalPinnedUsageNonLocking(item_owner_id).value_or(0U);
 }
 
-auto RecordingPinningPolicy::GetOwnerIdPinnedUsageCounters(Cache::ItemOwnerId item_owner_id) const -> OwnerIdPinnedCountersForQuery {
+auto RecordingPinningPolicy::GetOwnerIdPinnedUsageCounters(
+    Cache::ItemOwnerId item_owner_id) const -> OwnerIdPinnedCounters {
   std::lock_guard<std::mutex> lock(counters_mutex_);
-
-  OwnerIdPinnedCountersForQuery query_counters;
 
   auto owner_id_pinned_counters_iter = pinned_counters_.find(item_owner_id);
   if (owner_id_pinned_counters_iter == pinned_counters_.end()) {
-    return OwnerIdPinnedCountersForQuery();
+    return OwnerIdPinnedCounters();
   }
 
-  // The counters are a two-dimensional array of std::atomic<int> which in non-copyable.
-  // Deep copy to a consistent, non-atomic two-dimensional array.
-  const OwnerIdInfo& owner_id_info = owner_id_pinned_counters_iter->second;
-  const PerLevelCategoryAndRolePinnedCounters& owner_id_counters =
-      owner_id_info.counters;
-  for (auto level_category_idx = 0U; level_category_idx < owner_id_counters.size(); ++level_category_idx) {
-    const PerRolePinnedCounters& role_counters = owner_id_counters[level_category_idx];
-    for (auto role_idx = 0U; role_idx < role_counters.size(); ++role_idx) {
-      query_counters[level_category_idx][role_idx] = role_counters[role_idx]._a;
-    }
-  }
-
-  return query_counters;
+  return owner_id_pinned_counters_iter->second.counters;
 }
 
 // REQUIRED: counters_mutex_ is locked
@@ -191,12 +180,11 @@ RecordingPinningPolicy::GetOwnerIdTotalPinnedUsageNonLocking(
   size_t total_pinned_usage = 0U;
 
   const OwnerIdInfo& owner_id_info = owner_id_pinned_info_iter->second;
-  const PerLevelCategoryAndRolePinnedCounters& owner_id_counters =
-      owner_id_info.counters;
+  const OwnerIdPinnedCounters& owner_id_counters = owner_id_info.counters;
   for (auto level_category_idx = 0U; level_category_idx < owner_id_counters.size(); ++level_category_idx) {
     const PerRolePinnedCounters& role_counters = owner_id_counters[level_category_idx];
     for (const auto& role_counter: role_counters) {
-      total_pinned_usage += role_counter._a;
+      total_pinned_usage += role_counter;
     }
   }
 

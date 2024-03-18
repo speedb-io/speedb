@@ -33,40 +33,20 @@
 #include "rocksdb/table_pinning_policy.h"
 
 namespace ROCKSDB_NAMESPACE {
-template <typename T>
-struct AtomicWrapper {
-  std::atomic<T> _a;
-
-  AtomicWrapper():_a(0) {}
-  AtomicWrapper(const std::atomic<T> &a):_a(a.load()) {}
-  AtomicWrapper(const AtomicWrapper &other):_a(other._a.load()) {}
-
-  AtomicWrapper& operator=(const AtomicWrapper& other) {
-    _a.store(other._a.load());
-    return *this;
-  }
-
-  void IncrementByOne() {
-    ++_a;
-  }
-};
 
 // An abstract table pinning policy that records the pinned operations
 class RecordingPinningPolicy : public TablePinningPolicy {
  public:
-  using PerRolePinnedCounters = std::array<AtomicWrapper<size_t>, kNumCacheEntryRoles>;
-  using PerLevelCategoryAndRolePinnedCounters = std::array<PerRolePinnedCounters, pinning::kNumLevelCategories>;
+  using PerRolePinnedCounters = std::array<size_t, kNumCacheEntryRoles>;
+  using OwnerIdPinnedCounters =
+      std::array<PerRolePinnedCounters, pinning::kNumLevelCategories>;
 
   struct OwnerIdInfo {
     OwnerIdInfo() = default;
 
     size_t ref_count = 0U;
-    PerLevelCategoryAndRolePinnedCounters counters;
+    OwnerIdPinnedCounters counters;
   };
-
-  // Equivalent types used for querying, NOT using atomic.
-  using PerRolePinnedCountersForQuery = std::array<size_t, kNumCacheEntryRoles>;
-  using OwnerIdPinnedCountersForQuery = std::array<PerRolePinnedCountersForQuery, pinning::kNumLevelCategories>;
 
  public:
   RecordingPinningPolicy();
@@ -77,18 +57,19 @@ class RecordingPinningPolicy : public TablePinningPolicy {
                CacheEntryRole role, size_t size,
                std::unique_ptr<PinnedEntry>* pinned_entry) override;
   void UnPinData(std::unique_ptr<PinnedEntry> pinned_entry) override;
+
   std::string ToString() const override;
 
   // Returns the total pinned memory usage
   size_t GetPinnedUsage() const override;
 
   // Returns the pinned memory usage for the owner id
-  OwnerIdPinnedCountersForQuery GetOwnerIdPinnedUsageCounters(Cache::ItemOwnerId item_owner_id) const;
+  // OwnerIdPinnedCountersForQuery
+  // GetOwnerIdPinnedUsageCounters(Cache::ItemOwnerId item_owner_id) const;
+  OwnerIdPinnedCounters GetOwnerIdPinnedUsageCounters(
+      Cache::ItemOwnerId item_owner_id) const;
 
   size_t GetOwnerIdTotalPinnedUsage(Cache::ItemOwnerId item_owner_id) const;
-
-  void IncrementHitCount(Cache::ItemOwnerId _item_owner_id, CacheEntryRole role, int level, bool last_level_with_data) override;
-  void IncrementMissCount(Cache::ItemOwnerId _item_owner_id, CacheEntryRole role, int level, bool last_level_with_data) override;
 
  protected:
   // Checks whether the data can be pinned.
@@ -108,15 +89,12 @@ class RecordingPinningPolicy : public TablePinningPolicy {
   std::atomic<size_t> pinned_counter_;
   std::atomic<size_t> active_counter_;
 
-  // Total pinned usage is kept per the following triplet: {owner-id, level-category, role};
-  // Assumptions:
-  // 1. An ItemOwnerId is used by the user only afer it has been added => AddCacheItemOwnerId() has been called
-  //    and terminated before any call to MayPin() / PinData() / UnPinData() referencing that ItemOwnerId.
-  // 2. When an ItemOwnerId is removed, all of its pinned items will have been unpinned.
-  // 3. ItemOwnerId-s are added and removed infrequently.
-  // 4. Counters are retrieved infrequently (for debugging / log reporting).
-  // Consequently, the counters_mutex is locked only when owner id-s are added or removed, and when 
-  // retrieving the counters.
+  // Total pinned usage is kept per the following triplet: {owner-id,
+  // level-category, role}; Assumptions:
+  // 1. ItemOwnerId-s are added and removed infrequently.
+  // 2. Counters are retrieved infrequently (for debugging / log reporting).
+  // Consequently, the counters_mutex is locked only when owner id-s are added
+  // or removed, and when retrieving the counters.
   std::unordered_map<Cache::ItemOwnerId, OwnerIdInfo> pinned_counters_;
 
   // Mutable so it may be locked when querying the counters (the object remains constant)

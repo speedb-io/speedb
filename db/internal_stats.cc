@@ -821,7 +821,12 @@ std::string InternalStats::CacheEntryRoleStats::CacheOwnerStatsToString(
     str << std::left << std::setw(10) << BytesToHumanString(role_total_charge) << " ";
 
     for (auto level_cat_idx = 0U; level_cat_idx < pinning::kNumLevelCategories; ++level_cat_idx) {
-      str << std::left << std::setw(10) << BytesToHumanString(cf_charges_per_role_pos->second[role_idx][level_cat_idx]) << " ";
+      size_t level_charge = 0U;
+      if (cf_charges_per_role_pos != charge_per_item_owner.end()) {
+        level_charge = cf_charges_per_role_pos->second[role_idx][level_cat_idx];
+      }
+      str << std::left << std::setw(10) << BytesToHumanString(level_charge)
+          << " ";
     }
     str << '\n';
   }
@@ -2260,7 +2265,7 @@ void InternalStats::DumpCFStatsNoFileHistogram(bool is_periodic,
     printf("Pinning counter for CF:%s\n", cfd_->GetName().c_str());
     bool all_zeros = true;
     for (auto level_category_idx = 0U; level_category_idx < cfd_pinning_counters.size(); ++level_category_idx) {
-      const RecordingPinningPolicy::PerRolePinnedCountersForQuery& role_counters = cfd_pinning_counters[level_category_idx];
+      const auto& role_counters = cfd_pinning_counters[level_category_idx];
       for (auto role_idx = 0U; role_idx < role_counters.size(); ++role_idx) {
         if (role_counters[role_idx] > 0U) {
           printf("Total-Pinned[%s][%s]=%d\n", 

@@ -16,7 +16,7 @@
 #include "options/options_helper.h"
 #include "port/port.h"
 #include "port/stack_trace.h"
-#include "rocksdb/compression_type.h"
+#include "rocksdb/compressor.h"
 #include "rocksdb/db.h"
 #include "rocksdb/file_system.h"
 #include "table/block_based/block_based_table_builder.h"
@@ -104,12 +104,13 @@ class BlockBasedTableReaderBaseTest : public testing::Test {
     // as each block's size.
     compression_opts.max_dict_bytes = compression_dict_bytes;
     compression_opts.max_dict_buffer_bytes = compression_dict_bytes;
+    std::shared_ptr<Compressor> compressor =
+        BuiltinCompressor::GetCompressor(compression_type, compression_opts);
     IntTblPropCollectorFactories factories;
     std::unique_ptr<TableBuilder> table_builder(
         options_.table_factory->NewTableBuilder(
             TableBuilderOptions(ioptions, moptions, comparator, &factories,
-                                compression_type, compression_opts,
-                                0 /* column_family_id */,
+                                compressor, 0 /* column_family_id */,
                                 kDefaultColumnFamilyName, -1 /* level */),
             writer.get()));
 
@@ -214,12 +215,14 @@ class BlockBasedTableReaderBaseTest : public testing::Test {
 //          compression dictionary.
 class BlockBasedTableReaderTest
     : public BlockBasedTableReaderBaseTest,
-      public testing::WithParamInterface<std::tuple<
-          CompressionType, bool, BlockBasedTableOptions::IndexType, bool,
-          test::UserDefinedTimestampTestMode, uint32_t, uint32_t>> {
+      public testing::WithParamInterface<
+          std::tuple<std::string, bool, BlockBasedTableOptions::IndexType, bool,
+                     test::UserDefinedTimestampTestMode, uint32_t, uint32_t>> {
  protected:
   void SetUp() override {
-    compression_type_ = std::get<0>(GetParam());
+    compression_name_ = std::get<0>(GetParam());
+    ASSERT_TRUE(
+        BuiltinCompressor::StringToType(compression_name_, &compression_type_));
     use_direct_reads_ = std::get<1>(GetParam());
     test::UserDefinedTimestampTestMode udt_test_mode = std::get<4>(GetParam());
     udt_enabled_ = test::IsUDTEnabled(udt_test_mode);
@@ -243,6 +246,7 @@ class BlockBasedTableReaderTest
         std::shared_ptr<const SliceTransform>(NewFixedPrefixTransform(3));
   }
 
+  std::string compression_name_;
   CompressionType compression_type_;
   bool use_direct_reads_;
   bool udt_enabled_;
@@ -293,7 +297,7 @@ TEST_P(BlockBasedTableReaderTest, MultiGet) {
   }
 
   std::string table_name = "BlockBasedTableReaderTest_MultiGet" +
-                           CompressionTypeToString(compression_type_);
+                           BuiltinCompressor::TypeToString(compression_type_);
 
   ImmutableOptions ioptions(options);
   CreateTable(table_name, ioptions, compression_type_, kv,
@@ -649,8 +653,8 @@ TEST_P(BlockBasedTableReaderTestVerifyChecksum, ChecksumMismatch) {
 
   options.statistics = CreateDBStatistics();
   ImmutableOptions ioptions(options);
-  std::string table_name =
-      "BlockBasedTableReaderTest" + CompressionTypeToString(compression_type_);
+  std::string table_name = "BlockBasedTableReaderTest" +
+                           BuiltinCompressor::TypeToString(compression_type_);
   CreateTable(table_name, ioptions, compression_type_, kv,
               compression_parallel_threads_, compression_dict_bytes_);
 
@@ -709,7 +713,7 @@ TEST_P(BlockBasedTableReaderTestVerifyChecksum, ChecksumMismatch) {
 INSTANTIATE_TEST_CASE_P(
     BlockBasedTableReaderTest, BlockBasedTableReaderTest,
     ::testing::Combine(
-        ::testing::ValuesIn(GetSupportedCompressions()), ::testing::Bool(),
+        ::testing::ValuesIn(Compressor::GetSupported()), ::testing::Bool(),
         ::testing::Values(
             BlockBasedTableOptions::IndexType::kBinarySearch,
             BlockBasedTableOptions::IndexType::kHashSearch,
@@ -720,7 +724,7 @@ INSTANTIATE_TEST_CASE_P(
 INSTANTIATE_TEST_CASE_P(
     VerifyChecksum, BlockBasedTableReaderTestVerifyChecksum,
     ::testing::Combine(
-        ::testing::ValuesIn(GetSupportedCompressions()),
+        ::testing::ValuesIn(Compressor::GetSupported()),
         ::testing::Values(false),
         ::testing::Values(
             BlockBasedTableOptions::IndexType::kTwoLevelIndexSearch),

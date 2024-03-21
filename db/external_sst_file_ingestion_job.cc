@@ -550,8 +550,8 @@ void ExternalSstFileIngestionJob::CreateEquivalentFileIngestingCompactions() {
                                                  */
         ,
         LLONG_MAX /* max compaction bytes, not applicable */,
-        0 /* output path ID, not applicable */, mutable_cf_options.compression,
-        mutable_cf_options.compression_opts, Temperature::kUnknown,
+        0 /* output path ID, not applicable */,
+        mutable_cf_options.derived_compressor, Temperature::kUnknown,
         0 /* max_subcompaction, not applicable */,
         {} /* grandparents, not applicable */, false /* is manual */,
         "" /* trim_ts */, -1 /* score, not applicable */,

@@ -194,11 +194,20 @@ Status DefaultOptionsFormatter::ToVector(
     const std::string& opts_str, char separator,
     std::vector<std::string>* elems) const {
   Status status;
+
+  // If the input string starts and ends with "{{...}}", strip off the outer
+  // brackets
+  std::string opts = opts_str;
+  while (opts.size() > 4 && opts[0] == '{' && opts[1] == '{' &&
+         opts[opts.size() - 2] == '}' && opts[opts.size() - 1] == '}') {
+    opts = trim(opts.substr(1, opts.size() - 2));
+  }
+
   for (size_t start = 0, end = 0;
-       status.ok() && start < opts_str.size() && end != std::string::npos;
+       status.ok() && start < opts.size() && end != std::string::npos;
        start = end + 1) {
     std::string token;
-    status = NextToken(opts_str, separator, start, &end, &token);
+    status = NextToken(opts, separator, start, &end, &token);
     if (status.ok()) {
       elems->emplace_back(token);
     }

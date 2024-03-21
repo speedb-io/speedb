@@ -34,13 +34,13 @@
 #include "db/db_test_util.h"
 #include "env/unique_id_gen.h"
 #include "port/stack_trace.h"
+#include "rocksdb/compressor.h"
 #include "rocksdb/persistent_cache.h"
 #include "rocksdb/statistics.h"
 #include "rocksdb/table.h"
 #include "rocksdb/table_properties.h"
 #include "table/block_based/block_based_table_reader.h"
 #include "table/unique_id_impl.h"
-#include "util/compression.h"
 #include "util/defer.h"
 #include "util/hash.h"
 #include "util/math.h"
@@ -1017,21 +1017,11 @@ TEST_F(DBBlockCacheTest, CacheCompressionDict) {
   const int kNumBytesPerEntry = 1024;
 
   // Try all the available libraries that support dictionary compression
-  std::vector<CompressionType> compression_types;
-  if (Zlib_Supported()) {
-    compression_types.push_back(kZlibCompression);
-  }
-  if (LZ4_Supported()) {
-    compression_types.push_back(kLZ4Compression);
-    compression_types.push_back(kLZ4HCCompression);
-  }
-  if (ZSTD_Supported()) {
-    compression_types.push_back(kZSTD);
-  } else if (ZSTDNotFinal_Supported()) {
-    compression_types.push_back(kZSTDNotFinalCompression);
-  }
+  auto compressors = Compressor::GetDictSupported();
   Random rnd(301);
-  for (auto compression_type : compression_types) {
+  for (auto c : compressors) {
+    CompressionType compression_type;
+    ASSERT_TRUE(BuiltinCompressor::StringToType(c, &compression_type));
     Options options = CurrentOptions();
     options.bottommost_compression = compression_type;
     options.bottommost_compression_opts.max_dict_bytes = 4096;
@@ -2198,10 +2188,15 @@ TEST_P(DBBlockCachePinningTest, TwoLevelDB) {
   const int kNumKeysPerFile = kBlockSize * kNumBlocksPerFile / kKeySize;
 
   Options options = CurrentOptions();
-  // `kNoCompression` makes the unit test more portable. But it relies on the
-  // current behavior of persisting/accessing dictionary even when there's no
-  // (de)compression happening, which seems fairly likely to change over time.
-  options.compression = kNoCompression;
+  // Select one of the available libraries that support dictionary compression
+  std::vector<std::string> dict_compressions = Compressor::GetDictSupported();
+  if (!dict_compressions.empty()) {
+    BuiltinCompressor::StringToType(dict_compressions[0], &options.compression);
+  } else {
+    ROCKSDB_GTEST_BYPASS(
+        "TwoLevelDB requires a library that supports dictionary compression");
+    return;
+  }
   options.compression_opts.max_dict_bytes = 4 << 10;
   options.statistics = ROCKSDB_NAMESPACE::CreateDBStatistics();
   BlockBasedTableOptions table_options;
@@ -2269,7 +2264,8 @@ TEST_P(DBBlockCachePinningTest, TwoLevelDB) {
       ++expected_index_misses;
     }
   }
-  if (unpartitioned_pinning_ == PinningTier::kNone) {
+  if (unpartitioned_pinning_ == PinningTier::kNone &&
+      options.compression != kNoCompression) {
     ++expected_compression_dict_misses;
   }
   ASSERT_EQ(expected_filter_misses,

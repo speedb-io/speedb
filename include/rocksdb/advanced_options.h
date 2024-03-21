@@ -31,6 +31,7 @@
 
 namespace ROCKSDB_NAMESPACE {
 
+class Compressor;
 class Slice;
 class SliceTransform;
 class TablePropertiesCollectorFactory;
@@ -75,6 +76,8 @@ enum CompactionPri : char {
 
 // Compression options for different compression algorithms like Zlib
 struct CompressionOptions {
+  static const char* kName() { return "CompressionOptions"; }
+
   // ==> BEGIN options that can be set by deprecated configuration syntax, <==
   // ==> e.g. compression_opts=5:6:7:8:9:10:true:11:false                  <==
   // ==> Please use compression_opts={level=6;strategy=7;} form instead.   <==
@@ -576,6 +579,19 @@ struct AdvancedColumnFamilyOptions {
   // Dynamically changeable through SetOptions() API
   std::vector<CompressionType> compression_per_level;
 
+  // Similar to compression_per_level, but the algorithms are encapsulated in
+  // Compressor objects. This adds the ability to select custom compressors,
+  // beyond the built-in ones provided through CompressionType.
+  //
+  // If compressor_per_level is specified (not empty), it overrides
+  // compression_per_level.
+  //
+  // If compressor_per_level is not specified (empty),
+  // compression_per_level is applied as described for that option.
+  //
+  // Default: empty
+  std::vector<std::shared_ptr<Compressor>> compressor_per_level;
+
   // Number of levels for this database
   int num_levels = 7;
 
@@ -1073,6 +1089,19 @@ struct AdvancedColumnFamilyOptions {
   //
   // Dynamically changeable through the SetOptions() API
   CompressionType blob_compression_type = kNoCompression;
+
+  // Similar to blob_compression_type, but the algorithm is encapsulated in a
+  // Compressor class. This adds the ability to select plugin compressors,
+  // beyond the built-in ones provided through CompressionType.
+  //
+  // If blob_compressor is specified (not null), it overrides
+  // blob_compression_type.
+  //
+  // If blob_compressor is not specified (null), blob_compression_type is
+  // applied.
+  //
+  // Default: nullptr
+  std::shared_ptr<Compressor> blob_compressor = nullptr;
 
   // Enables garbage collection of blobs. Blob GC is performed as part of
   // compaction. Valid blobs residing in blob files older than a cutoff get

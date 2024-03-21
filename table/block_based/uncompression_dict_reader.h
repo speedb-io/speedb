@@ -25,6 +25,7 @@
 #include "rocksdb/table_pinning_policy.h"
 #include "table/block_based/cachable_entry.h"
 #include "table/format.h"
+#include "util/compressor.h"
 
 namespace ROCKSDB_NAMESPACE {
 
@@ -33,7 +34,7 @@ struct BlockCacheLookupContext;
 class FilePrefetchBuffer;
 class GetContext;
 struct ReadOptions;
-struct UncompressionDict;
+class UncompressionDict;
 
 // Provides access to the uncompression dictionary regardless of whether
 // it is owned by the reader or stored in the cache, or whether it is pinned

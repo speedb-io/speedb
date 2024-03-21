@@ -375,7 +375,8 @@ class TableConstructor : public Constructor {
   }
   ~TableConstructor() override { Reset(); }
 
-  Status FinishImpl(const Options& options, const ImmutableOptions& ioptions,
+  Status FinishImpl(const Options& /* options */,
+                    const ImmutableOptions& ioptions,
                     const MutableCFOptions& moptions,
                     const BlockBasedTableOptions& /*table_options*/,
                     const InternalKeyComparator& internal_comparator,
@@ -399,8 +400,8 @@ class TableConstructor : public Constructor {
     builder.reset(ioptions.table_factory->NewTableBuilder(
         TableBuilderOptions(ioptions, moptions, internal_comparator,
                             &int_tbl_prop_collector_factories,
-                            options.compression, options.compression_opts,
-                            kUnknownColumnFamily, column_family_name, level_),
+                            moptions.compressor, kUnknownColumnFamily,
+                            column_family_name, level_),
         file_writer_.get()));
 
     for (const auto& kv : kv_map) {
@@ -3994,10 +3995,9 @@ TEST_P(BlockBasedTableTest, NoFileChecksum) {
   f.CreateWritableFile();
   std::unique_ptr<TableBuilder> builder;
   builder.reset(ioptions.table_factory->NewTableBuilder(
-      TableBuilderOptions(ioptions, moptions, *comparator,
-                          &int_tbl_prop_collector_factories,
-                          options.compression, options.compression_opts,
-                          kUnknownColumnFamily, column_family_name, level),
+      TableBuilderOptions(
+          ioptions, moptions, *comparator, &int_tbl_prop_collector_factories,
+          moptions.compressor, kUnknownColumnFamily, column_family_name, level),
       f.GetFileWriter()));
   ASSERT_OK(f.ResetTableBuilder(std::move(builder)));
   f.AddKVtoKVMap(1000);
@@ -4030,10 +4030,9 @@ TEST_P(BlockBasedTableTest, Crc32cFileChecksum) {
   f.SetFileChecksumGenerator(checksum_crc32c_gen1.release());
   std::unique_ptr<TableBuilder> builder;
   builder.reset(ioptions.table_factory->NewTableBuilder(
-      TableBuilderOptions(ioptions, moptions, *comparator,
-                          &int_tbl_prop_collector_factories,
-                          options.compression, options.compression_opts,
-                          kUnknownColumnFamily, column_family_name, level),
+      TableBuilderOptions(
+          ioptions, moptions, *comparator, &int_tbl_prop_collector_factories,
+          moptions.compressor, kUnknownColumnFamily, column_family_name, level),
       f.GetFileWriter()));
   ASSERT_OK(f.ResetTableBuilder(std::move(builder)));
   f.AddKVtoKVMap(1000);
@@ -4076,10 +4075,10 @@ TEST_F(PlainTableTest, BasicPlainTableProperties) {
   std::string column_family_name;
   int unknown_level = -1;
   std::unique_ptr<TableBuilder> builder(factory.NewTableBuilder(
-      TableBuilderOptions(ioptions, moptions, ikc,
-                          &int_tbl_prop_collector_factories, kNoCompression,
-                          CompressionOptions(), kUnknownColumnFamily,
-                          column_family_name, unknown_level),
+      TableBuilderOptions(
+          ioptions, moptions, ikc, &int_tbl_prop_collector_factories,
+          BuiltinCompressor::GetCompressor(kNoCompression),
+          kUnknownColumnFamily, column_family_name, unknown_level),
       file_writer.get()));
 
   for (char c = 'a'; c <= 'z'; ++c) {
@@ -4131,10 +4130,10 @@ TEST_F(PlainTableTest, NoFileChecksum) {
   f.CreateWritableFile();
 
   std::unique_ptr<TableBuilder> builder(factory.NewTableBuilder(
-      TableBuilderOptions(ioptions, moptions, ikc,
-                          &int_tbl_prop_collector_factories, kNoCompression,
-                          CompressionOptions(), kUnknownColumnFamily,
-                          column_family_name, unknown_level),
+      TableBuilderOptions(
+          ioptions, moptions, ikc, &int_tbl_prop_collector_factories,
+          BuiltinCompressor::GetCompressor(kNoCompression),
+          kUnknownColumnFamily, column_family_name, unknown_level),
       f.GetFileWriter()));
   ASSERT_OK(f.ResetTableBuilder(std::move(builder)));
   f.AddKVtoKVMap(1000);
@@ -4171,10 +4170,10 @@ TEST_F(PlainTableTest, Crc32cFileChecksum) {
   f.SetFileChecksumGenerator(checksum_crc32c_gen1.release());
 
   std::unique_ptr<TableBuilder> builder(factory.NewTableBuilder(
-      TableBuilderOptions(ioptions, moptions, ikc,
-                          &int_tbl_prop_collector_factories, kNoCompression,
-                          CompressionOptions(), kUnknownColumnFamily,
-                          column_family_name, unknown_level),
+      TableBuilderOptions(
+          ioptions, moptions, ikc, &int_tbl_prop_collector_factories,
+          BuiltinCompressor::GetCompressor(kNoCompression),
+          kUnknownColumnFamily, column_family_name, unknown_level),
       f.GetFileWriter()));
   ASSERT_OK(f.ResetTableBuilder(std::move(builder)));
   f.AddKVtoKVMap(1000);
@@ -4780,9 +4779,9 @@ TEST_P(BlockBasedTableTest, DISABLED_TableWithGlobalSeqno) {
   std::string column_family_name;
   std::unique_ptr<TableBuilder> builder(options.table_factory->NewTableBuilder(
       TableBuilderOptions(ioptions, moptions, ikc,
-                          &int_tbl_prop_collector_factories, kNoCompression,
-                          CompressionOptions(), kUnknownColumnFamily,
-                          column_family_name, -1),
+                          &int_tbl_prop_collector_factories,
+                          BuiltinCompressor::GetCompressor(kNoCompression),
+                          kUnknownColumnFamily, column_family_name, -1),
       file_writer.get()));
 
   for (char c = 'a'; c <= 'z'; ++c) {
@@ -4962,9 +4961,9 @@ TEST_P(BlockBasedTableTest, BlockAlignTest) {
   std::string column_family_name;
   std::unique_ptr<TableBuilder> builder(options.table_factory->NewTableBuilder(
       TableBuilderOptions(ioptions, moptions, ikc,
-                          &int_tbl_prop_collector_factories, kNoCompression,
-                          CompressionOptions(), kUnknownColumnFamily,
-                          column_family_name, -1),
+                          &int_tbl_prop_collector_factories,
+                          BuiltinCompressor::GetCompressor(kNoCompression),
+                          kUnknownColumnFamily, column_family_name, -1),
       file_writer.get()));
 
   for (int i = 1; i <= 10000; ++i) {
@@ -5055,9 +5054,9 @@ TEST_P(BlockBasedTableTest, PropertiesBlockRestartPointTest) {
 
   std::unique_ptr<TableBuilder> builder(options.table_factory->NewTableBuilder(
       TableBuilderOptions(ioptions, moptions, ikc,
-                          &int_tbl_prop_collector_factories, kNoCompression,
-                          CompressionOptions(), kUnknownColumnFamily,
-                          column_family_name, -1),
+                          &int_tbl_prop_collector_factories,
+                          BuiltinCompressor::GetCompressor(kNoCompression),
+                          kUnknownColumnFamily, column_family_name, -1),
       file_writer.get()));
 
   for (int i = 1; i <= 10000; ++i) {
@@ -5628,7 +5627,13 @@ TEST_F(ChargeCompressionDictionaryBuildingBufferTest, Basic) {
         {CacheEntryRole::kCompressionDictionaryBuildingBuffer,
          {/*.charged = */ charge_compression_dictionary_building_buffer}});
     Options options;
-    options.compression = kSnappyCompression;
+    std::vector<std::string> dict_compressions = Compressor::GetDictSupported();
+    if (!dict_compressions.empty()) {
+      BuiltinCompressor::StringToType(dict_compressions[0],
+                                      &options.compression);
+    } else {
+      return;
+    }
     options.compression_opts.max_dict_bytes = kMaxDictBytes;
     options.compression_opts.max_dict_buffer_bytes = kMaxDictBufferBytes;
     options.table_factory.reset(NewBlockBasedTableFactory(table_options));
@@ -5643,12 +5648,14 @@ TEST_F(ChargeCompressionDictionaryBuildingBufferTest, Basic) {
     InternalKeyComparator ikc(options.comparator);
     IntTblPropCollectorFactories int_tbl_prop_collector_factories;
 
+    auto compressor = BuiltinCompressor::GetCompressor(
+        options.compression, options.compression_opts);
+    ASSERT_NE(compressor, nullptr);
     std::unique_ptr<TableBuilder> builder(
         options.table_factory->NewTableBuilder(
             TableBuilderOptions(
                 ioptions, moptions, ikc, &int_tbl_prop_collector_factories,
-                kSnappyCompression, options.compression_opts,
-                kUnknownColumnFamily, "test_cf", -1 /* level */),
+                compressor, kUnknownColumnFamily, "test_cf", -1 /* level */),
             file_writer.get()));
 
     std::string key1 = "key1";
@@ -5704,7 +5711,12 @@ TEST_F(ChargeCompressionDictionaryBuildingBufferTest,
       std::make_shared<FlushBlockEveryKeyPolicyFactory>();
 
   Options options;
-  options.compression = kSnappyCompression;
+  std::vector<std::string> dict_compressions = Compressor::GetDictSupported();
+  if (!dict_compressions.empty()) {
+    BuiltinCompressor::StringToType(dict_compressions[0], &options.compression);
+  } else {
+    return;
+  }
   options.compression_opts.max_dict_bytes = kMaxDictBytes;
   options.compression_opts.max_dict_buffer_bytes = kMaxDictBufferBytes;
   options.table_factory.reset(NewBlockBasedTableFactory(table_options));
@@ -5719,11 +5731,13 @@ TEST_F(ChargeCompressionDictionaryBuildingBufferTest,
   InternalKeyComparator ikc(options.comparator);
   IntTblPropCollectorFactories int_tbl_prop_collector_factories;
 
+  auto compressor = BuiltinCompressor::GetCompressor(options.compression,
+                                                     options.compression_opts);
+  ASSERT_NE(compressor, nullptr);
   std::unique_ptr<TableBuilder> builder(options.table_factory->NewTableBuilder(
       TableBuilderOptions(ioptions, moptions, ikc,
-                          &int_tbl_prop_collector_factories, kSnappyCompression,
-                          options.compression_opts, kUnknownColumnFamily,
-                          "test_cf", -1 /* level */),
+                          &int_tbl_prop_collector_factories, compressor,
+                          kUnknownColumnFamily, "test_cf", -1 /* level */),
       file_writer.get()));
 
   std::string key1 = "key1";
@@ -5789,7 +5803,12 @@ TEST_F(ChargeCompressionDictionaryBuildingBufferTest, BasicWithCacheFull) {
       std::make_shared<FlushBlockEveryKeyPolicyFactory>();
 
   Options options;
-  options.compression = kSnappyCompression;
+  std::vector<std::string> dict_compressions = Compressor::GetDictSupported();
+  if (!dict_compressions.empty()) {
+    BuiltinCompressor::StringToType(dict_compressions[0], &options.compression);
+  } else {
+    return;
+  }
   options.compression_opts.max_dict_bytes = kMaxDictBytes;
   options.compression_opts.max_dict_buffer_bytes = kMaxDictBufferBytes;
   options.table_factory.reset(NewBlockBasedTableFactory(table_options));
@@ -5804,11 +5823,13 @@ TEST_F(ChargeCompressionDictionaryBuildingBufferTest, BasicWithCacheFull) {
   InternalKeyComparator ikc(options.comparator);
   IntTblPropCollectorFactories int_tbl_prop_collector_factories;
 
+  auto compressor = BuiltinCompressor::GetCompressor(options.compression,
+                                                     options.compression_opts);
+  ASSERT_NE(compressor, nullptr);
   std::unique_ptr<TableBuilder> builder(options.table_factory->NewTableBuilder(
       TableBuilderOptions(ioptions, moptions, ikc,
-                          &int_tbl_prop_collector_factories, kSnappyCompression,
-                          options.compression_opts, kUnknownColumnFamily,
-                          "test_cf", -1 /* level */),
+                          &int_tbl_prop_collector_factories, compressor,
+                          kUnknownColumnFamily, "test_cf", -1 /* level */),
       file_writer.get()));
 
   std::string key1 = "key1";

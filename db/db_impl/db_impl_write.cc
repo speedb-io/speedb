@@ -2140,7 +2140,10 @@ Status DBImpl::SwitchMemtable(ColumnFamilyData* cfd, WriteContext* context) {
   log::Writer* new_log = nullptr;
   MemTable* new_mem = nullptr;
   IOStatus io_s;
-
+  
+  if(cfd->mem()->IsEmpty()) {
+    return Status::OK();
+  }
   // Recoverable state is persisted in WAL. After memtable switch, WAL might
   // be deleted, so we write the state to memtable to be persisted as well.
   Status s = WriteRecoverableState();
